@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Aurai</string>
+    <string name="accessibility_service_description">让 Aurai 在任务执行期间观察并操作当前界面。敏感操作仍需你逐次确认。</string>
+</resources>
