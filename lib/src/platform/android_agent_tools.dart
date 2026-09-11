@@ -1,0 +1,466 @@
+import 'dart:async';
+
+import 'package:flutter/services.dart';
+
+import '../domain/tool_models.dart';
+import 'android_network_tools.dart';
+import 'aurai_platform.dart';
+
+typedef AccessibilityRequester = Future<Map<String, Object?>> Function();
+
+class WaitTool implements AgentTool {
+  Completer<void>? _cancelled;
+
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'wait',
+    description:
+        'Wait briefly for a UI or network transition before observing again.',
+    inputSchema: <String, Object?>{
+      'type': 'object',
+      'properties': <String, Object?>{
+        'seconds': <String, Object?>{
+          'type': 'integer',
+          'minimum': 1,
+          'maximum': 10,
+        },
+      },
+      'required': <String>['seconds'],
+      'additionalProperties': false,
+    },
+    safety: ToolSafety.lowRisk,
+    capabilityId: 'android.observe',
+  );
+
+  @override
+  Future<ToolResult> execute(ToolCall call) async {
+    final cancelled = Completer<void>();
+    _cancelled = cancelled;
+    final seconds = call.arguments['seconds']! as int;
+    final outcome = await Future.any<String>(<Future<String>>[
+      Future<void>.delayed(Duration(seconds: seconds)).then((_) => 'elapsed'),
+      cancelled.future.then((_) => 'cancelled'),
+    ]);
+    _cancelled = null;
+    return ToolResult(
+      callId: call.id,
+      toolName: call.name,
+      status: outcome == 'elapsed'
+          ? ToolResultStatus.success
+          : ToolResultStatus.cancelled,
+      output: <String, Object?>{
+        'waitedSeconds': seconds,
+        'completed': outcome == 'elapsed',
+      },
+    );
+  }
+
+  @override
+  Future<void> cancel() async {
+    _cancelled?.complete();
+  }
+}
+
+class RequestAccessibilityAccessTool implements AgentTool {
+  RequestAccessibilityAccessTool(this._request);
+  final AccessibilityRequester _request;
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'requestAccessibilityAccess',
+    description:
+        'Ask the user to enable Aurai accessibility access when UI observation or interaction is needed. Waits for the user to return.',
+    inputSchema: <String, Object?>{
+      'type': 'object',
+      'properties': <String, Object?>{},
+      'required': <String>[],
+      'additionalProperties': false,
+    },
+    safety: ToolSafety.lowRisk,
+    capabilityId: 'android.permissions',
+  );
+  @override
+  Future<ToolResult> execute(ToolCall call) async => ToolResult(
+    callId: call.id,
+    toolName: call.name,
+    status: ToolResultStatus.success,
+    output: await _request(),
+  );
+  @override
+  Future<void> cancel() async {}
+}
+
+class ObserveDeviceTool extends _PlatformTool {
+  ObserveDeviceTool(super.platform);
+
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'observeDevice',
+    description:
+        'Observe the foreground app, Android device state, and the current accessibility UI tree when authorized.',
+    inputSchema: <String, Object?>{
+      'type': 'object',
+      'properties': <String, Object?>{},
+      'required': <String>[],
+      'additionalProperties': false,
+    },
+    safety: ToolSafety.readOnly,
+    capabilityId: 'android.observe',
+  );
+
+  @override
+  Future<Map<String, Object?>> invoke(ToolCall call) =>
+      platform.observeDevice();
+}
+
+class CaptureScreenTool implements AgentTool {
+  CaptureScreenTool(this._platform, this._providerLabel);
+
+  final AuraiPlatform _platform;
+  final String _providerLabel;
+
+  @override
+  ToolDefinition get definition => ToolDefinition(
+    name: 'captureScreen',
+    description:
+        'Capture the current Android screen for visual inspection when the accessibility tree is insufficient. The image is attached to this tool result and is not stored in conversation history.',
+    inputSchema: const <String, Object?>{
+      'type': 'object',
+      'properties': <String, Object?>{},
+      'required': <String>[],
+      'additionalProperties': false,
+    },
+    safety: ToolSafety.sensitive,
+    capabilityId: 'android.vision',
+    confirmationDescription:
+        'Aurai 将读取当前屏幕并发送给 $_providerLabel 分析。画面可能包含私人信息，本次仅允许读取这一屏。',
+  );
+
+  @override
+  Future<ToolResult> execute(ToolCall call) async {
+    try {
+      final raw = Map<String, Object?>.from(await _platform.captureScreen());
+      final image = raw.remove('imageBase64') as String?;
+      final mimeType = raw['mimeType'] as String?;
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: ToolResultStatus.success,
+        output: raw,
+        attachments: image == null
+            ? const <ToolAttachment>[]
+            : <ToolAttachment>[
+                ToolAttachment(
+                  type: ToolAttachmentType.image,
+                  mimeType: mimeType!,
+                  base64Data: image,
+                  detail: 'high',
+                ),
+              ],
+      );
+    } on PlatformException catch (error) {
+      return platformToolError(call, error);
+    }
+  }
+
+  @override
+  Future<void> cancel() => _platform.cancelPendingInteraction();
+}
+
+class TapScreenTool implements AgentTool, PreflightAgentTool {
+  TapScreenTool(this._platform);
+
+  final AuraiPlatform _platform;
+
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'tapScreen',
+    description:
+        'Tap one point from the latest captureScreen result. Coordinates are normalized within that captured target window: x and y are each at least 0 and less than 1. The screenshot is invalidated after one attempt.',
+    inputSchema: <String, Object?>{
+      'type': 'object',
+      'properties': <String, Object?>{
+        'screenshotId': <String, Object?>{'type': 'string'},
+        'observationId': <String, Object?>{'type': 'string'},
+        'x': <String, Object?>{
+          'type': 'number',
+          'minimum': 0,
+          'exclusiveMaximum': 1,
+        },
+        'y': <String, Object?>{
+          'type': 'number',
+          'minimum': 0,
+          'exclusiveMaximum': 1,
+        },
+      },
+      'required': <String>['screenshotId', 'observationId', 'x', 'y'],
+      'additionalProperties': false,
+    },
+    safety: ToolSafety.sensitive,
+    capabilityId: 'android.vision',
+  );
+
+  @override
+  Future<ToolResult?> preflight(ToolCall call) async {
+    try {
+      final output = await _platform.preflightTapScreen(call.arguments);
+      if (output['valid'] == true) return null;
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: ToolResultStatus.error,
+        output: output,
+      );
+    } on PlatformException catch (error) {
+      return platformToolError(call, error);
+    }
+  }
+
+  @override
+  Future<ToolResult> execute(ToolCall call) async {
+    try {
+      final output = await _platform.tapScreen(call.id, call.arguments);
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: output['performed'] == true
+            ? ToolResultStatus.success
+            : ToolResultStatus.error,
+        output: output,
+      );
+    } on PlatformException catch (error) {
+      return platformToolError(call, error);
+    }
+  }
+
+  @override
+  Future<void> cancel() => _platform.cancelPendingInteraction();
+}
+
+class ActTool extends _PlatformTool {
+  ActTool(super.platform);
+
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'act',
+    description:
+        'Perform one generic Android UI action against the latest observed accessibility node. Re-observe after every action.',
+    inputSchema: <String, Object?>{
+      'type': 'object',
+      'properties': <String, Object?>{
+        'action': <String, Object?>{
+          'type': 'string',
+          'enum': <String>[
+            'click',
+            'inputText',
+            'scrollForward',
+            'scrollBackward',
+            'back',
+            'home',
+          ],
+        },
+        'observationId': <String, Object?>{
+          'type': 'string',
+          'description':
+              'observationId from the latest observeDevice UI result.',
+        },
+        'nodeRef': <String, Object?>{
+          'type': <String>['string', 'null'],
+          'description':
+              'Node ref from the latest observeDevice result. Use null for back and home.',
+        },
+        'text': <String, Object?>{
+          'type': <String>['string', 'null'],
+          'description': 'Text for inputText; otherwise null.',
+        },
+      },
+      'required': <String>['action', 'observationId', 'nodeRef', 'text'],
+      'additionalProperties': false,
+    },
+    safety: ToolSafety.sensitive,
+    capabilityId: 'android.accessibility',
+    actionArgument: 'action',
+    actionSafety: <String, ToolSafety>{
+      'scrollForward': ToolSafety.lowRisk,
+      'scrollBackward': ToolSafety.lowRisk,
+      'back': ToolSafety.lowRisk,
+      'home': ToolSafety.lowRisk,
+    },
+  );
+
+  @override
+  Future<Map<String, Object?>> invoke(ToolCall call) =>
+      platform.act(call.id, call.arguments);
+}
+
+class FindAppsTool extends _PlatformTool {
+  FindAppsTool(super.platform);
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'findApps',
+    description:
+        'Find launchable Android apps visible to Aurai by human-readable app name.',
+    inputSchema: <String, Object?>{
+      'type': 'object',
+      'properties': <String, Object?>{
+        'query': <String, Object?>{'type': 'string'},
+      },
+      'required': <String>['query'],
+      'additionalProperties': false,
+    },
+    safety: ToolSafety.readOnly,
+    capabilityId: 'android.apps',
+  );
+  @override
+  Future<Map<String, Object?>> invoke(ToolCall call) =>
+      platform.findApps(call.arguments['query']! as String);
+}
+
+class LaunchAppTool extends _PlatformTool {
+  LaunchAppTool(super.platform);
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'launchApp',
+    description: 'Launch an installed app selected from findApps results.',
+    inputSchema: <String, Object?>{
+      'type': 'object',
+      'properties': <String, Object?>{
+        'packageName': <String, Object?>{'type': 'string'},
+      },
+      'required': <String>['packageName'],
+      'additionalProperties': false,
+    },
+    safety: ToolSafety.lowRisk,
+    capabilityId: 'android.apps',
+  );
+  @override
+  Future<Map<String, Object?>> invoke(ToolCall call) =>
+      platform.launchApp(call.arguments['packageName']! as String);
+}
+
+class StartIntentTool extends _PlatformTool {
+  StartIntentTool(super.platform);
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'startIntent',
+    description:
+        'Start a general Android intent. The exact action, data, MIME type and extras are shown to the user before execution.',
+    inputSchema: <String, Object?>{
+      'type': 'object',
+      'properties': <String, Object?>{
+        'action': <String, Object?>{'type': 'string'},
+        'data': <String, Object?>{
+          'type': <String>['string', 'null'],
+        },
+        'mimeType': <String, Object?>{
+          'type': <String>['string', 'null'],
+        },
+        'packageName': <String, Object?>{
+          'type': <String>['string', 'null'],
+        },
+        'extras': <String, Object?>{
+          'type': <String>['array', 'null'],
+          'items': <String, Object?>{
+            'type': 'object',
+            'properties': <String, Object?>{
+              'key': <String, Object?>{'type': 'string'},
+              'value': <String, Object?>{'type': 'string'},
+            },
+            'required': <String>['key', 'value'],
+            'additionalProperties': false,
+          },
+        },
+      },
+      'required': <String>[
+        'action',
+        'data',
+        'mimeType',
+        'packageName',
+        'extras',
+      ],
+      'additionalProperties': false,
+    },
+    safety: ToolSafety.sensitive,
+    capabilityId: 'android.intents',
+  );
+  @override
+  Future<Map<String, Object?>> invoke(ToolCall call) =>
+      platform.startIntent(call.arguments);
+}
+
+class OpenSettingsTool extends _PlatformTool {
+  OpenSettingsTool(super.platform);
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'openSettings',
+    description: 'Open a stable Android Settings screen.',
+    inputSchema: <String, Object?>{
+      'type': 'object',
+      'properties': <String, Object?>{
+        'screen': <String, Object?>{
+          'type': 'string',
+          'enum': <String>[
+            'settings',
+            'wifi',
+            'network',
+            'vpn',
+            'accessibility',
+            'notificationAccess',
+            'appDetails',
+          ],
+        },
+      },
+      'required': <String>['screen'],
+      'additionalProperties': false,
+    },
+    safety: ToolSafety.lowRisk,
+    capabilityId: 'android.settings',
+  );
+  @override
+  Future<Map<String, Object?>> invoke(ToolCall call) =>
+      platform.openSettings(call.arguments['screen']! as String);
+}
+
+class AppShellTool extends _PlatformTool {
+  AppShellTool(super.platform);
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'shell',
+    description:
+        'Run a command as the Aurai app UID. This is not adb shell or root and cannot access protected Android data or settings.',
+    inputSchema: <String, Object?>{
+      'type': 'object',
+      'properties': <String, Object?>{
+        'command': <String, Object?>{'type': 'string'},
+      },
+      'required': <String>['command'],
+      'additionalProperties': false,
+    },
+    safety: ToolSafety.destructive,
+    capabilityId: 'android.shell.app_uid',
+  );
+  @override
+  Future<Map<String, Object?>> invoke(ToolCall call) =>
+      platform.runAppShell(call.arguments['command']! as String);
+}
+
+abstract class _PlatformTool implements AgentTool {
+  _PlatformTool(this.platform);
+  final AuraiPlatform platform;
+  Future<Map<String, Object?>> invoke(ToolCall call);
+  @override
+  Future<ToolResult> execute(ToolCall call) async {
+    try {
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: ToolResultStatus.success,
+        output: await invoke(call),
+      );
+    } on PlatformException catch (error) {
+      return platformToolError(call, error);
+    }
+  }
+
+  @override
+  Future<void> cancel() => platform.cancelPendingInteraction();
+}
