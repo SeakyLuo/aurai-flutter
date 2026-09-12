@@ -61,7 +61,11 @@ class ModelConfig {
 }
 
 class ModelSettings {
-  const ModelSettings({required this.activeService, required this.profiles});
+  const ModelSettings({
+    required this.activeService,
+    required this.profiles,
+    this.systemPrompt,
+  });
 
   factory ModelSettings.defaults({String openAiApiKey = ''}) => ModelSettings(
     activeService: ModelService.openAi,
@@ -76,18 +80,25 @@ class ModelSettings {
 
   final ModelService activeService;
   final Map<ModelService, ModelConfig> profiles;
+  final String? systemPrompt;
 
   ModelConfig get activeConfig => profiles[activeService]!;
 
   ModelConfig profile(ModelService service) => profiles[service]!;
 
-  ModelSettings activate(ModelConfig config) => ModelSettings(
-    activeService: config.service,
-    profiles: <ModelService, ModelConfig>{...profiles, config.service: config},
-  );
+  ModelSettings activate(ModelConfig config, {required String? systemPrompt}) =>
+      ModelSettings(
+        activeService: config.service,
+        profiles: <ModelService, ModelConfig>{
+          ...profiles,
+          config.service: config,
+        },
+        systemPrompt: systemPrompt,
+      );
 
   Map<String, Object?> toJson() => <String, Object?>{
     'activeService': activeService.name,
+    'systemPrompt': systemPrompt,
     'profiles': <String, Object?>{
       for (final entry in profiles.entries)
         entry.key.name: entry.value.toJson(),
@@ -97,11 +108,12 @@ class ModelSettings {
   factory ModelSettings.fromJson(Map<String, Object?> json) {
     if (json.containsKey('service')) {
       final legacy = ModelConfig.fromJson(json);
-      return ModelSettings.defaults().activate(legacy);
+      return ModelSettings.defaults().activate(legacy, systemPrompt: null);
     }
     final rawProfiles = (json['profiles']! as Map<Object?, Object?>)
         .cast<String, Object?>();
     return ModelSettings(
+      systemPrompt: json['systemPrompt'] as String?,
       activeService: ModelService.values.byName(
         json['activeService']! as String,
       ),
@@ -133,6 +145,7 @@ class ModelRequest {
     this.onContextSummary,
     this.onTextChanged,
     this.toolResults = const <ToolResult>[],
+    this.userUpdates = const <String>[],
   });
 
   final List<AgentMessage> messages;
@@ -143,6 +156,7 @@ class ModelRequest {
   final String personalContext;
   final Future<void> Function(ContextSummary)? onContextSummary;
   final List<ToolResult> toolResults;
+  final List<String> userUpdates;
   final void Function(String text)? onTextChanged;
 }
 

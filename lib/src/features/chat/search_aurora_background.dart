@@ -42,17 +42,17 @@ class _AuroraPainter extends CustomPainter {
     glow(
       Offset(w * .88, h * .22),
       w * .7,
-      const Color(0xffb9a7ff).withValues(alpha: dark ? .16 : .18),
+      const Color(0xffad94f5).withValues(alpha: dark ? .22 : .32),
     );
     glow(
       Offset(w * .62, h * .30),
       w * .48,
-      const Color(0xff9caeff).withValues(alpha: .12),
+      const Color(0xff9caeff).withValues(alpha: .14),
     );
     glow(
       Offset(-w * .12, h * .77),
       w * .9,
-      const Color(0xffb9a7ff).withValues(alpha: .10),
+      const Color(0xffad94f5).withValues(alpha: dark ? .18 : .26),
     );
     final top = Path()
       ..moveTo(w * .52, h * .31)

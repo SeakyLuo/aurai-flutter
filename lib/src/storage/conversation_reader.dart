@@ -17,21 +17,24 @@ class ConversationReader {
   static const pageSize = 50;
   static const messagePageSize = 100;
 
-  Future<List<Conversation>> list({Conversation? after}) async {
+  Future<List<Conversation>> list({
+    Conversation? after,
+    bool archived = false,
+  }) async {
     final rows = await database.query(
       'conversations',
-      where: after == null
-          ? null
-          : 'pinned < ? OR (pinned = ? AND (updated_at < ? OR (updated_at = ? AND id < ?)))',
-      whereArgs: after == null
-          ? null
-          : [
-              after.isPinned ? 1 : 0,
-              after.isPinned ? 1 : 0,
-              after.updatedAt.microsecondsSinceEpoch,
-              after.updatedAt.microsecondsSinceEpoch,
-              after.id,
-            ],
+      where:
+          'archived = ?${after == null ? '' : ' AND (pinned < ? OR (pinned = ? AND (updated_at < ? OR (updated_at = ? AND id < ?))))'}',
+      whereArgs: [
+        archived ? 1 : 0,
+        if (after != null) ...[
+          after.isPinned ? 1 : 0,
+          after.isPinned ? 1 : 0,
+          after.updatedAt.microsecondsSinceEpoch,
+          after.updatedAt.microsecondsSinceEpoch,
+          after.id,
+        ],
+      ],
       orderBy: 'pinned DESC, updated_at DESC, id DESC',
       limit: pageSize,
     );
@@ -239,6 +242,7 @@ class ConversationReader {
       final tool = tools[event['tool_call_id']]!;
       return AgentTaskActivity(
         text: tool['title']! as String,
+        toolName: tool['name']! as String,
         requestJson: tool['arguments_json'] as String?,
         resultJson: tool['result_json'] as String?,
         status: AgentStepStatus.values.byName(tool['status']! as String),

@@ -20,13 +20,44 @@ extension ConversationActions on ChatController {
     _conversationChanged();
   }
 
-  Conversation _targetConversation(String? id) =>
-      id == null || id == activeConversation.id
-      ? activeConversation
-      : _conversations.firstWhere((item) => item.id == id);
+  Future<Conversation> _targetConversation(String? id) async {
+    if (id == null || id == activeConversation.id) return activeConversation;
+    if (id == _runningConversation?.id) return _runningConversation!;
+    for (final conversation in _conversations) {
+      if (conversation.id == id) return conversation;
+    }
+    return _store.load(id);
+  }
+
+  Future<List<Conversation>> archivedConversations({Conversation? after}) =>
+      _store.reader.list(after: after, archived: true);
+
+  Future<void> setConversationArchived(
+    String id, {
+    required bool archived,
+  }) async {
+    final conversation = await _targetConversation(id);
+    final previous = conversation.isArchived;
+    if (archived &&
+        conversation.id == activeConversation.id &&
+        (_submitting || addingImages || changingConversation)) {
+      throw StateError('请等待当前操作完成，再归档会话');
+    }
+    conversation.isArchived = archived;
+    try {
+      await _saveConversationHeader(conversation, {
+        'archived': conversation.isArchived ? 1 : 0,
+      });
+    } on Object {
+      conversation.isArchived = previous;
+      rethrow;
+    } finally {
+      _conversationChanged();
+    }
+  }
 
   Future<void> toggleConversationPin([String? id]) async {
-    final conversation = _targetConversation(id);
+    final conversation = await _targetConversation(id);
     final previous = conversation.isPinned;
     conversation.isPinned = !previous;
     try {
@@ -44,7 +75,7 @@ extension ConversationActions on ChatController {
   Future<void> renameConversation(String id, String title) async {
     final name = title.trim();
     if (name.isEmpty) throw ArgumentError('请输入会话名称');
-    final conversation = _targetConversation(id);
+    final conversation = await _targetConversation(id);
     final previous = conversation.storedTitle;
     conversation.storedTitle = name;
     try {
@@ -72,11 +103,12 @@ extension ConversationActions on ChatController {
         where: 'id = ?',
         whereArgs: [conversation.id],
       );
+      _updateConversationList(conversation);
     }
   }
 
   Future<void> deleteConversation([String? id]) async {
-    final removed = _targetConversation(id);
+    final removed = await _targetConversation(id);
     final isActive = removed.id == activeConversation.id;
     if (removed.id == runningConversationId ||
         changingConversation ||

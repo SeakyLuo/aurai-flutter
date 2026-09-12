@@ -5,7 +5,9 @@ class DrawerDragRegion extends StatefulWidget {
     super.key,
     required this.builder,
     required this.onOpen,
+    this.enabled = true,
   });
+  final bool enabled;
   final WidgetBuilder builder;
   final VoidCallback onOpen;
 
@@ -18,19 +20,21 @@ class _DrawerDragRegionState extends State<DrawerDragRegion> {
   bool _opened = false;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    behavior: HitTestBehavior.translucent,
-    onHorizontalDragStart: (_) {
-      _distance = 0;
-      _opened = false;
-    },
-    onHorizontalDragUpdate: (details) {
-      _distance += details.delta.dx;
-      if (!_opened && _distance > 48) {
-        _opened = true;
-        widget.onOpen();
-      }
-    },
-    child: widget.builder(context),
-  );
+  Widget build(BuildContext context) => !widget.enabled
+      ? widget.builder(context)
+      : GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragStart: (_) {
+            _distance = 0;
+            _opened = false;
+          },
+          onHorizontalDragUpdate: (details) {
+            _distance += details.delta.dx;
+            if (!_opened && _distance > 48) {
+              _opened = true;
+              widget.onOpen();
+            }
+          },
+          child: widget.builder(context),
+        );
 }

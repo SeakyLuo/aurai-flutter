@@ -1,3 +1,4 @@
+import 'cjk_strong_syntax.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -178,7 +179,9 @@ class _MessageItemState extends State<MessageItem> {
                 if (message.text.isNotEmpty)
                   Material(
                     key: _bubbleKey,
-                    color: Theme.of(context).colorScheme.primaryContainer,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xff393047)
+                        : GlobalUI.userMessageBackground,
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
@@ -198,7 +201,10 @@ class _MessageItemState extends State<MessageItem> {
                         child: Text(
                           message.text,
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? const Color(0xffeee8f7)
+                                : const Color(0xff352b43),
                             fontSize: 16,
                             height: 1.55,
                           ),
@@ -226,6 +232,7 @@ class _MessageItemState extends State<MessageItem> {
             context: context,
             removeBottom: true,
             child: MarkdownBody(
+              inlineSyntaxes: [CjkStrongSyntax()],
               data: message.text,
               selectable: false,
               fitContent: false,

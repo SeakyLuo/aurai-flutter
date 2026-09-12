@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 import '../../app/global_ui.dart';
 
@@ -10,10 +11,12 @@ class GlassSurface extends StatelessWidget {
     required this.child,
     this.radius = 32,
     this.dark = false,
+    this.regular = false,
   });
   final Widget child;
   final double radius;
   final bool dark;
+  final bool regular;
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
@@ -48,7 +51,19 @@ class GlassSurface extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: (dark || Theme.of(context).brightness == Brightness.dark)
+              colors: regular
+                  ? (dark || Theme.of(context).brightness == Brightness.dark
+                        ? const [
+                            Color(0xf238383a),
+                            Color(0xeb303032),
+                            Color(0xf2333335),
+                          ]
+                        : const [
+                            Color(0xfaffffff),
+                            Color(0xf2ffffff),
+                            Color(0xf7f8f8fa),
+                          ])
+                  : (dark || Theme.of(context).brightness == Brightness.dark)
                   ? const [
                       Color(0xb348484b),
                       Color(0x99202023),
@@ -77,6 +92,8 @@ class RoundAction extends StatelessWidget {
     this.primary = false,
     this.iconWidget,
     this.compact = false,
+    this.inkResponse = true,
+    this.insetResponse = false,
   });
   final IconData icon;
   final String label;
@@ -84,6 +101,8 @@ class RoundAction extends StatelessWidget {
   final bool primary;
   final Widget? iconWidget;
   final bool compact;
+  final bool inkResponse;
+  final bool insetResponse;
 
   @override
   Widget build(BuildContext context) => Semantics(
@@ -93,42 +112,50 @@ class RoundAction extends StatelessWidget {
     child: Tooltip(
       message: label,
       child: SizedBox.square(
-        dimension: 48,
-        child: Material(
-          color: Colors.transparent,
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onPressed,
-            child: Padding(
-              padding: EdgeInsets.all(compact ? 6 : 0),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: primary && onPressed != null
-                      ? GlobalUI.primaryGradient
-                      : null,
-                  color: primary && onPressed == null
-                      ? Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.06)
-                      : null,
-                ),
-                child: Center(
-                  child:
-                      iconWidget ??
-                      Icon(
-                        icon,
-                        size: compact ? 23 : 25,
-                        color: primary
-                            ? (onPressed == null
-                                  ? Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant
-                                  : GlobalUI.onPrimary)
-                            : Theme.of(context).colorScheme.onSurface,
-                      ),
+        dimension: compact ? 48 : 40,
+        child: Padding(
+          padding: EdgeInsets.all(insetResponse ? 6 : 0),
+          child: Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            child: _RoundActionTap(
+              inkResponse: inkResponse,
+              onPressed: onPressed,
+              child: Padding(
+                padding: EdgeInsets.all(compact && !insetResponse ? 6 : 0),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: primary && onPressed != null
+                        ? GlobalUI.primaryGradient
+                        : null,
+                    color: primary && onPressed == null
+                        ? Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.06)
+                        : null,
+                  ),
+                  child: Center(
+                    child: iconWidget != null
+                        ? (compact
+                              ? iconWidget
+                              : SizedBox.square(
+                                  dimension: 20,
+                                  child: FittedBox(child: iconWidget),
+                                ))
+                        : Icon(
+                            icon,
+                            size: compact ? 23 : 20,
+                            color: primary
+                                ? (onPressed == null
+                                      ? Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant
+                                      : GlobalUI.onPrimary)
+                                : Theme.of(context).colorScheme.onSurface,
+                          ),
+                  ),
                 ),
               ),
             ),
@@ -137,4 +164,29 @@ class RoundAction extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _RoundActionTap extends StatelessWidget {
+  const _RoundActionTap({
+    required this.inkResponse,
+    required this.onPressed,
+    required this.child,
+  });
+  final bool inkResponse;
+  final VoidCallback? onPressed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => inkResponse
+      ? InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onPressed,
+          child: child,
+        )
+      : CupertinoButton(
+          padding: EdgeInsets.zero,
+          pressedOpacity: 0.6,
+          onPressed: onPressed,
+          child: child,
+        );
 }

@@ -129,17 +129,20 @@ class AgentTaskActivity {
   const AgentTaskActivity({
     required this.text,
     this.status,
+    this.toolName,
     this.requestJson,
     this.resultJson,
   });
 
   final String text;
+  final String? toolName;
   final AgentStepStatus? status;
   final String? requestJson;
   final String? resultJson;
 
   Map<String, Object?> toJson() => {
     'text': text,
+    if (toolName != null) 'toolName': toolName,
     'status': status?.name,
     if (requestJson != null) 'requestJson': requestJson,
     if (resultJson != null) 'resultJson': resultJson,
@@ -149,6 +152,7 @@ class AgentTaskActivity {
     final status = json['status'] as String?;
     return AgentTaskActivity(
       text: json['text']! as String,
+      toolName: json['toolName'] as String?,
       status: status == null ? null : AgentStepStatus.values.byName(status),
       requestJson: json['requestJson'] as String?,
       resultJson: json['resultJson'] as String?,
@@ -169,6 +173,21 @@ String newMessageId() =>
     DateTime.now().microsecondsSinceEpoch.toRadixString(36);
 
 String toolTitle(String name) => switch (name) {
+  'searchWeb' => '搜索网页',
+  'searchTools' => '搜索工具',
+  'inspectLocalDatabase' => '查看本地记录结构',
+  'queryLocalDatabase' => '查询本地记录',
+  'clickUiElement' => '点击界面元素',
+  'inputUiText' => '输入文字',
+  'scrollUiForward' => '向前滚动界面',
+  'scrollUiBackward' => '向后滚动界面',
+  'goBack' => '返回上一页',
+  'goHome' => '返回主屏幕',
+  'readWebPage' => '读取网页',
+  'prepareMemoryChanges' => '整理记忆建议',
+  'applyMemoryChanges' => '应用记忆调整',
+  'getModelBalance' => '查询模型账户余额',
+  'openModelTopUp' => '打开官方充值页',
   'searchConversations' => '搜索历史会话',
   'searchMessages' => '搜索历史消息',
   'readLocalDatabase' => '读取本地记录',
@@ -178,10 +197,23 @@ String toolTitle(String name) => switch (name) {
   'tlsProbe' => '检查 TLS 连接',
   'httpProbe' => '检查 HTTPS 请求',
   'getNotifications' => '读取通知观察',
+  'sendNotification' => '发送通知',
+  'manageSkill' => '管理技能',
+  'runSkill' => '运行技能',
+  'scheduledTask' => '管理定时任务',
+  'createScheduledTask' => '创建定时任务',
+  'updateScheduledTask' => '修改定时任务',
+  'listScheduledTasks' => '查询定时任务',
+  'pauseScheduledTask' => '暂停定时任务',
+  'resumeScheduledTask' => '恢复定时任务',
+  'deleteScheduledTask' => '删除定时任务',
+  'inspectAndroidApi' => '查询设备接口',
+  'executeAndroidScript' => '执行设备任务',
   'observeDevice' => '观察当前界面',
   'captureScreen' => '读取当前屏幕',
   'tapScreen' => '点击屏幕位置',
   'wait' => '等待状态变化',
+  'askUser' => '询问你',
   'requestAccessibilityAccess' => '请求界面操作权限',
   'act' => '操作当前界面',
   'findApps' => '查找应用',

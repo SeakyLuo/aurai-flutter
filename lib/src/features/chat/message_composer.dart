@@ -14,8 +14,10 @@ class MessageComposer extends StatelessWidget {
     this.attachments,
     this.maxLength,
     this.onChanged,
+    this.embedded = false,
   });
 
+  final bool embedded;
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool enabled;
@@ -29,12 +31,15 @@ class MessageComposer extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SafeArea(
     top: false,
+    bottom: !embedded,
     child: Center(
       heightFactor: 1,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 760),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          padding: embedded
+              ? EdgeInsets.zero
+              : const EdgeInsets.fromLTRB(12, 8, 12, 12),
           child: BackdropGroup(
             child: GlassSurface(
               radius: 28,
@@ -54,7 +59,7 @@ class MessageComposer extends StatelessWidget {
                                   .textTheme
                                   .titleMedium!
                                   .copyWith(
-                                    fontSize: 17,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.w400,
                                     height: 1.4,
                                     color: Theme.of(
@@ -109,7 +114,7 @@ class MessageComposer extends StatelessWidget {
                                           color: Theme.of(
                                             context,
                                           ).colorScheme.onSurfaceVariant,
-                                          fontSize: 17,
+                                          fontSize: 16,
                                           fontWeight: FontWeight.w400,
                                         ),
                                         counterText: '',

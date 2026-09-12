@@ -51,7 +51,7 @@ Future<MessageAction?> showMessageActionsMenu(
     ];
     final height = math.min(
       availableHeight,
-      64 + actions.length * 52 * math.max(1, media.textScaler.scale(14) / 14),
+      64 + actions.length * 46 * math.max(1, media.textScaler.scale(14) / 14),
     );
     final left = (position.dx - width / 2).clamp(
       media.padding.left + 8,
@@ -102,7 +102,7 @@ Future<MessageAction?> showMessageActionsMenu(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 14,
-                                vertical: 14,
+                                vertical: 11,
                               ),
                               child: Row(
                                 children: [

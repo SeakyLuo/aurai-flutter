@@ -1,9 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'chat_controller.dart';
+import 'conversation_task_navigation.dart';
+import 'settings_icon.dart';
+import 'archive_confirmation_dialog.dart';
 import 'conversation_menu_icon.dart';
 import 'glass_surface.dart';
 import 'conversation_rename_dialog.dart';
+import 'delete_confirmation_dialog.dart';
 
 class ConversationMore extends StatefulWidget {
   const ConversationMore({
@@ -12,12 +18,16 @@ class ConversationMore extends StatefulWidget {
     this.beforeDelete,
     this.conversation,
     this.child,
+    this.onChanged,
+    this.originTaskId,
   });
 
   final ChatController controller;
   final bool Function()? beforeDelete;
   final Conversation? conversation;
   final Widget? child;
+  final VoidCallback? onChanged;
+  final String? originTaskId;
 
   @override
   State<ConversationMore> createState() => _ConversationMoreState();
@@ -48,27 +58,79 @@ class _ConversationMoreState extends State<ConversationMore> {
     }
   }
 
+  Future<void> _archive() async {
+    final target = _conversation;
+    final controller = widget.controller;
+    final wasArchived = target.isArchived;
+    if (!wasArchived) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: .24),
+        builder: (_) => ArchiveConfirmationDialog(
+          isCurrent: target.id == controller.activeConversation.id,
+        ),
+      );
+      if (!mounted || confirmed != true) return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    void notice(String message, {SnackBarAction? action}) {
+      if (messenger.mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(message),
+            action: action,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
+    }
+
+    final undo = SnackBarAction(
+      label: '撤销',
+      onPressed: () async {
+        try {
+          await controller.setConversationArchived(target.id, archived: false);
+          notice('已撤销归档');
+        } on Object {
+          notice('撤销归档失败，请在已归档会话中重试');
+        }
+      },
+    );
+
+    setState(() => _saving = true);
+    try {
+      await controller.setConversationArchived(
+        target.id,
+        archived: !wasArchived,
+      );
+    } on Object {
+      notice('归档保存失败，请重试');
+      if (mounted) setState(() => _saving = false);
+      return;
+    }
+    try {
+      if (!wasArchived && controller.activeConversation.id == target.id) {
+        await controller.createConversation();
+      }
+      notice(
+        wasArchived ? '已取消归档' : '会话已归档',
+        action: wasArchived ? null : undo,
+      );
+    } on Object {
+      notice('会话已归档，退出失败，请从侧边栏新建会话', action: undo);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<void> _delete() async {
     if (!_canDelete()) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除会话？'),
-        content: Text('“${_conversation.title}”的消息、草稿和图片将一并删除，无法恢复。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
-          ),
-        ],
+      barrierColor: Colors.black.withValues(alpha: .24),
+      builder: (_) => DeleteConfirmationDialog(
+        title: '删除会话？',
+        description: '“${_conversation.title}”的消息、草稿和图片将一并删除，无法恢复。',
       ),
     );
     if (!mounted || confirmed != true || !_canDelete()) return;
@@ -77,12 +139,10 @@ class _ConversationMoreState extends State<ConversationMore> {
     try {
       await widget.controller.deleteConversation(deletedId);
       _notice('会话已删除');
+    } on FileSystemException {
+      _notice('会话已删除，部分图片文件清理失败');
     } on Object {
-      _notice(
-        widget.controller.conversations.any((item) => item.id == deletedId)
-            ? '删除失败，请重试'
-            : '会话已删除，部分图片文件清理失败',
-      );
+      _notice('删除失败，请重试');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -108,9 +168,15 @@ class _ConversationMoreState extends State<ConversationMore> {
     final origin = button.localToGlobal(Offset.zero, ancestor: overlay);
     final pinned = _conversation.isPinned;
     final targetId = _conversation.id;
+    final hasTask = conversationTasks(
+      widget.controller,
+      targetId,
+      originTaskId: widget.originTaskId,
+    ).isNotEmpty;
     final safe = MediaQuery.paddingOf(context);
     final menuWidth = 212.0;
-    final menuHeight = 202.0;
+    final menuHeight =
+        (_conversation.isArchived ? 202.0 : 264.0) + (hasTask ? 54 : 0);
     final anchor =
         position ??
         Offset(
@@ -153,20 +219,42 @@ class _ConversationMoreState extends State<ConversationMore> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _GlassMenuItem(
-                              icon: pinned
-                                  ? ConversationMenuIconType.unpin
-                                  : ConversationMenuIconType.pin,
-                              label: pinned ? '取消置顶' : '置顶',
-                              onTap: () =>
-                                  Navigator.pop(menuContext, _MoreAction.pin),
-                            ),
+                            if (hasTask)
+                              _GlassMenuItem(
+                                iconWidget: const SettingsIcon(
+                                  type: SettingsIconType.tasks,
+                                ),
+                                label: '查看任务',
+                                onTap: () => Navigator.pop(
+                                  menuContext,
+                                  _MoreAction.task,
+                                ),
+                              ),
+                            if (!_conversation.isArchived)
+                              _GlassMenuItem(
+                                icon: pinned
+                                    ? ConversationMenuIconType.unpin
+                                    : ConversationMenuIconType.pin,
+                                label: pinned ? '取消置顶' : '置顶',
+                                onTap: () =>
+                                    Navigator.pop(menuContext, _MoreAction.pin),
+                              ),
                             _GlassMenuItem(
                               icon: ConversationMenuIconType.rename,
                               label: '重命名',
                               onTap: () => Navigator.pop(
                                 menuContext,
                                 _MoreAction.rename,
+                              ),
+                            ),
+                            _GlassMenuItem(
+                              icon: _conversation.isArchived
+                                  ? ConversationMenuIconType.unarchive
+                                  : ConversationMenuIconType.archive,
+                              label: _conversation.isArchived ? '取消归档' : '归档',
+                              onTap: () => Navigator.pop(
+                                menuContext,
+                                _MoreAction.archive,
                               ),
                             ),
                             _GlassMenuItem(
@@ -194,23 +282,34 @@ class _ConversationMoreState extends State<ConversationMore> {
     );
     if (!mounted) return;
     switch (action) {
+      case _MoreAction.task:
+        await openConversationTask(
+          context,
+          widget.controller,
+          targetId,
+          originTaskId: widget.originTaskId,
+        );
       case _MoreAction.pin:
         await _pin();
       case _MoreAction.rename:
         await showDialog<void>(
           context: context,
           barrierDismissible: false,
+          barrierColor: Colors.black.withValues(alpha: .24),
           builder: (_) => ConversationRenameDialog(
             controller: widget.controller,
             conversationId: targetId,
             initialTitle: _conversation.title,
           ),
         );
+      case _MoreAction.archive:
+        await _archive();
       case _MoreAction.delete:
         await _delete();
       case null:
         break;
     }
+    if (action != null) widget.onChanged?.call();
   }
 
   @override
@@ -231,17 +330,19 @@ class _ConversationMoreState extends State<ConversationMore> {
         );
 }
 
-enum _MoreAction { pin, rename, delete }
+enum _MoreAction { task, pin, rename, archive, delete }
 
 class _GlassMenuItem extends StatelessWidget {
   const _GlassMenuItem({
-    required this.icon,
+    this.icon,
+    this.iconWidget,
     required this.label,
     required this.onTap,
     this.destructive = false,
   });
 
-  final ConversationMenuIconType icon;
+  final ConversationMenuIconType? icon;
+  final Widget? iconWidget;
   final String label;
   final VoidCallback onTap;
   final bool destructive;
@@ -260,10 +361,10 @@ class _GlassMenuItem extends StatelessWidget {
         highlightColor: const Color(0x14695383),
         splashColor: const Color(0x14695383),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 17),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           child: Row(
             children: [
-              ConversationMenuIcon(type: icon, color: color),
+              iconWidget ?? ConversationMenuIcon(type: icon!, color: color),
               const SizedBox(width: 13),
               Expanded(
                 child: Text(

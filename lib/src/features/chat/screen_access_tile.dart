@@ -53,25 +53,9 @@ class _ScreenAccessTileState extends State<ScreenAccessTile> {
       color: settingsFieldColor(context),
       borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
-      child: SwitchListTile(
-        activeTrackColor: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xff34d399)
-            : const Color(0xff009b68),
-        activeThumbColor: Theme.of(context).colorScheme.surface,
-        inactiveTrackColor: Theme.of(
-          context,
-        ).colorScheme.surfaceContainerHighest,
-        inactiveThumbColor: Theme.of(context).colorScheme.onSurfaceVariant,
-        trackOutlineColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? Colors.transparent
-              : Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-        overlayColor: WidgetStatePropertyAll(
-          Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
-        ),
+      child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        secondary: const SizedBox.square(
+        leading: const SizedBox.square(
           dimension: 32,
           child: Center(child: CapabilityIcon(id: 'screenAccess')),
         ),
@@ -86,10 +70,40 @@ class _ScreenAccessTileState extends State<ScreenAccessTile> {
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
-        value: _allowed ?? snapshot.data ?? false,
-        onChanged: _saving || snapshot.connectionState != ConnectionState.done
+        onTap: _saving || !snapshot.hasData
             ? null
-            : _change,
+            : () => _change(!(_allowed ?? snapshot.data!)),
+        trailing: SizedBox(
+          width: 60,
+          height: 48,
+          child: snapshot.hasData
+              ? Switch(
+                  activeTrackColor:
+                      Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xff34d399)
+                      : const Color(0xff009b68),
+                  activeThumbColor: Theme.of(context).colorScheme.surface,
+                  inactiveTrackColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest,
+                  inactiveThumbColor: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant,
+                  trackOutlineColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? Colors.transparent
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  overlayColor: WidgetStatePropertyAll(
+                    Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.08),
+                  ),
+                  value: _allowed ?? snapshot.data!,
+                  onChanged: _saving ? null : _change,
+                )
+              : null,
+        ),
       ),
     ),
   );

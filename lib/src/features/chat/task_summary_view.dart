@@ -1,3 +1,4 @@
+import 'cjk_strong_syntax.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
@@ -118,12 +119,15 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
                   for (final (index, activity)
                       in widget.summary.activities.indexed)
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      padding: EdgeInsets.symmetric(
+                        vertical: activity.status == null ? 9 : 5,
+                      ),
                       child: activity.status == null
                           ? MediaQuery.removePadding(
                               context: context,
                               removeBottom: true,
                               child: MarkdownBody(
+                                inlineSyntaxes: [CjkStrongSyntax()],
                                 data: activity.text,
                                 selectable: true,
                                 onTapLink: (text, href, title) =>
@@ -161,6 +165,7 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
                           : ToolActivityView(
                               storageId: '${widget.messageId}:$index',
                               title: activity.text,
+                              toolName: activity.toolName,
                               status: activity.status!,
                               requestJson: activity.requestJson,
                               resultJson: activity.resultJson,

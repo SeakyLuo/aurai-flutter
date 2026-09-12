@@ -3,12 +3,26 @@ import '../memory/memory_controller.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 2,
+  version: 5,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion < 5) {
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN scheduled_task INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    if (oldVersion < 4) await db.execute(forgottenMemorySchema);
+    if (oldVersion < 3) {
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0',
+      );
+      await db.execute(
+        'CREATE INDEX conversation_archive_order ON conversations(archived, pinned DESC, updated_at DESC, id DESC)',
+      );
+    }
     if (oldVersion < 2) {
       final batch = db.batch();
       for (final statement in memorySchema) {
@@ -19,7 +33,11 @@ Future<Database> openConversationDatabase() async => openDatabase(
   },
   onCreate: (db, version) async {
     final batch = db.batch();
-    for (final statement in [..._schema, ...memorySchema]) {
+    for (final statement in [
+      ..._schema,
+      ...memorySchema,
+      forgottenMemorySchema,
+    ]) {
       batch.execute(statement);
     }
     await batch.commit(noResult: true);
@@ -38,6 +56,8 @@ const _schema = [
     title TEXT NOT NULL,
     preview TEXT,
     pinned INTEGER NOT NULL DEFAULT 0,
+    archived INTEGER NOT NULL DEFAULT 0,
+    scheduled_task INTEGER NOT NULL DEFAULT 0,
     draft TEXT NOT NULL DEFAULT '',
     pending_goal TEXT,
     run_state TEXT NOT NULL DEFAULT 'idle',
@@ -123,6 +143,7 @@ const _schema = [
     legacy_text TEXT,
     legacy_status TEXT
   )''',
+  'CREATE INDEX conversation_archive_order ON conversations(archived, pinned DESC, updated_at DESC, id DESC)',
   'CREATE INDEX conversation_order ON conversations(pinned DESC, updated_at DESC, id DESC)',
   'CREATE INDEX message_history ON messages(conversation_id, created_at DESC, id DESC)',
   'CREATE INDEX message_run ON messages(run_id)',

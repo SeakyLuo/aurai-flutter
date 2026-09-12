@@ -1,3 +1,4 @@
+import '../../domain/ui_tool_actions.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -88,11 +89,7 @@ class _OperationRequestSheetState extends State<_OperationRequestSheet> {
     Navigator.pop(context, approved && valid);
   }
 
-  bool get _screenAccess => const {
-    'act',
-    'tapScreen',
-    'captureScreen',
-  }.contains(widget.request.call.name);
+  bool get _screenAccess => isScreenTool(widget.request.call.name);
 
   @override
   Widget build(BuildContext context) => AuthorizationSheetContent(

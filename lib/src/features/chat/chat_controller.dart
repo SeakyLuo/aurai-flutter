@@ -1,4 +1,9 @@
+import '../../skills/skill_store.dart';
+import '../../skills/skill_tools.dart';
 import 'dart:async';
+import '../../domain/ui_tool_actions.dart';
+import '../../scheduling/scheduled_tasks.dart';
+import '../../scheduling/schedule_tool.dart';
 import 'dart:convert';
 import 'dart:io';
 import '../../memory/memory_controller.dart';
@@ -8,9 +13,14 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../agent/agent_runtime.dart';
+import '../../agent/ask_user_tool.dart';
+import '../../agent/model_balance_tool.dart';
+import '../../agent/memory_tools.dart';
+import '../../agent/model_top_up_tool.dart';
 import '../../agent/tool_executor.dart';
 import '../../agent/tool_registry.dart';
 import '../../agent/local_history_tools.dart';
+import '../../agent/web_tools.dart';
 import '../../domain/agent_models.dart';
 import '../../domain/conversation_completion.dart';
 import '../../domain/capability.dart';
@@ -19,6 +29,8 @@ import '../../domain/tool_models.dart';
 import '../../platform/android_network_tools.dart';
 import '../../platform/android_agent_tools.dart';
 import '../../platform/android_notification_tools.dart';
+import '../../platform/send_notification_tool.dart';
+import '../../platform/android_runtime_tools.dart';
 import '../../platform/aurai_platform.dart';
 import '../../platform/message_image_store.dart';
 import '../../domain/message_image.dart';
@@ -35,6 +47,7 @@ export 'conversation.dart';
 
 part 'conversation_actions.dart';
 part 'conversation_run.dart';
+part 'scheduled_execution.dart';
 part 'message_edit_actions.dart';
 part 'accessibility_request.dart';
 
@@ -50,6 +63,21 @@ class ChatController extends ChangeNotifier {
   ChatController(this._platform);
 
   final AuraiPlatform _platform;
+  final scheduledTasks = ScheduledTasks();
+  final skills = SkillStore();
+  String? pendingComposerDraft;
+
+  Future<void> prepareSkillCreation() async {
+    await createConversation();
+    final draft = activeConversation.draft;
+    activeConversation.draft =
+        "${draft.isEmpty ? '' : '$draft\n\n'}帮我创建一个可复用的技能：";
+    await saveDraft();
+    pendingComposerDraft = activeConversation.draft;
+    notifyListeners();
+  }
+
+  bool _claimingSchedule = false;
   final _imageStore = MessageImageStore();
   bool addingImages = false;
   List<MessageImage> get draftImages => activeConversation.draftImages;
@@ -71,10 +99,11 @@ class ChatController extends ChangeNotifier {
   bool loadingEarlierMessages = false;
   bool changingConversation = false;
   List<Conversation> get conversations => List.unmodifiable(
-    <Conversation>[..._conversations]..sort((a, b) {
-      if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
-      return b.updatedAt.compareTo(a.updatedAt);
-    }),
+    <Conversation>[..._conversations.where((item) => !item.isArchived)]
+      ..sort((a, b) {
+        if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+        return b.updatedAt.compareTo(a.updatedAt);
+      }),
   );
   List<AgentMessage> get messages => activeConversation.messages;
   List<AgentStep> get steps => activeConversation.steps;
@@ -89,11 +118,13 @@ class ChatController extends ChangeNotifier {
   bool _submitting = false;
   AgentRuntime? _runtime;
   Conversation? _runningConversation;
-  bool get hasRunningTask => _runningConversation != null || _submitting;
+  bool get hasRunningTask =>
+      _runningConversation != null || _submitting || _claimingSchedule;
   String? get runningConversationId => _runningConversation?.id;
 
   String? streamingMessageId;
   PendingConfirmation? pendingConfirmation;
+  UserQuestion? pendingQuestion;
   Completer<Map<String, Object?>>? _accessibilityRequest;
   bool accessibilityRequestPending = false;
   Timer? _accessibilityTimer;
@@ -104,6 +135,8 @@ class ChatController extends ChangeNotifier {
 
   @override
   void dispose() {
+    skills.dispose();
+    scheduledTasks.dispose();
     _memory?.dispose();
     _accessibilityTimer?.cancel();
     completedReplies.dispose();
@@ -139,8 +172,9 @@ class ChatController extends ChangeNotifier {
       _platform.loadLegacyAppState,
       _platform.clearLegacyAppState,
     );
-    _memory = MemoryController(_store.database);
+    _memory = MemoryController(_store.database, () => config);
     await memory.initialize();
+    await skills.initialize();
     _newConversation = await _newDraftStore.load(_imageStore.directory);
     if (await _store.hasMessages(_newConversation.id)) {
       await _newDraftStore.clear();
@@ -155,6 +189,7 @@ class ChatController extends ChangeNotifier {
       await _store.removeDraftConversation(activeId);
     }
     await _reloadConversations();
+    await scheduledTasks.initialize(_runScheduled);
     notifyListeners();
   }
 
@@ -241,7 +276,21 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<void> saveConfig(ModelConfig newConfig) async {
-    final nextSettings = modelSettings.activate(newConfig);
+    final nextSettings = modelSettings.activate(
+      newConfig,
+      systemPrompt: modelSettings.systemPrompt,
+    );
+    await _platform.saveModelSettings(nextSettings);
+    modelSettings = nextSettings;
+    notifyListeners();
+  }
+
+  Future<void> saveSystemPrompt(String? systemPrompt) async {
+    final nextSettings = ModelSettings(
+      activeService: modelSettings.activeService,
+      profiles: modelSettings.profiles,
+      systemPrompt: systemPrompt,
+    );
     await _platform.saveModelSettings(nextSettings);
     modelSettings = nextSettings;
     notifyListeners();
@@ -486,11 +535,7 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<bool> _confirmInApp(ToolCall call, ToolDefinition definition) async {
-    final screenAccess = const {
-      'act',
-      'tapScreen',
-      'captureScreen',
-    }.contains(call.name);
+    final screenAccess = isScreenTool(call.name);
     if (screenAccess && await _platform.getScreenAccess()) return true;
     final request = PendingConfirmation(call, definition);
     pendingConfirmation = request;

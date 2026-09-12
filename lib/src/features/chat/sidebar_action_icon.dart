@@ -5,16 +5,20 @@ import 'package:flutter/material.dart';
 enum SidebarActionIconType { search, settings }
 
 class SidebarActionIcon extends StatelessWidget {
-  const SidebarActionIcon({super.key, required this.type});
+  const SidebarActionIcon({super.key, required this.type, this.color});
 
   final SidebarActionIconType type;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: const Size.square(24),
     painter: _SidebarActionPainter(
       type,
-      Theme.of(context).colorScheme.onSurfaceVariant,
+      color ??
+          (Theme.of(context).brightness == Brightness.dark
+              ? Theme.of(context).colorScheme.onSurfaceVariant
+              : const Color(0xff222222)),
     ),
   );
 }

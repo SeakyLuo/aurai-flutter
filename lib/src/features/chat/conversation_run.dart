@@ -5,6 +5,7 @@ extension ConversationRun on ChatController {
     final messages = runConversation.messages;
     final steps = runConversation.steps;
     final runConfig = config;
+    final systemPrompt = modelSettings.systemPrompt;
     final memoryRevision = memory.revision;
     await _persistRun(runConversation);
     final history = await _store.reader.messages(
@@ -38,10 +39,30 @@ extension ConversationRun on ChatController {
       if (runConversation.runState == ChatRunState.stopping)
         throw const AgentCancelled();
       final provider = switch (runConfig.service) {
-        ModelService.openAi => OpenAiResponsesProvider(runConfig),
-        ModelService.deepSeek => DeepSeekResponsesProvider(runConfig),
+        ModelService.openAi => OpenAiResponsesProvider(
+          runConfig,
+          systemPrompt: systemPrompt,
+        ),
+        ModelService.deepSeek => DeepSeekResponsesProvider(
+          runConfig,
+          systemPrompt: systemPrompt,
+        ),
       };
       final tools = <AgentTool>[
+        ManageSkillTool(skills),
+        RunSkillTool(skills, _platform, runConversation.id),
+        WebTool('searchWeb'),
+        WebTool('readWebPage'),
+        if (scheduledTasks.supported)
+          for (final operation in ScheduleTaskTool.operations)
+            ScheduleTaskTool(scheduledTasks, runConversation.id, operation),
+        ...MemoryTools(memory).tools,
+        GetModelBalanceTool(modelSettings),
+        OpenModelTopUpTool(modelSettings),
+        AskUserTool(runConversation.id, (question) {
+          pendingQuestion = question;
+          _notifyRun(runConversation);
+        }),
         for (final name in LocalHistoryTool.names)
           LocalHistoryTool(_store.database.path, name),
         GetNetworkStateTool(_platform),
@@ -50,12 +71,16 @@ extension ConversationRun on ChatController {
         TlsProbeTool(_platform),
         HttpProbeTool(_platform),
         GetNotificationsTool(_platform, runConfig.service.label),
+        SendNotificationTool(_platform, runConversation.id),
+        InspectAndroidApiTool(_platform),
+        ExecuteAndroidScriptTool(_platform, runConversation.id),
         ObserveDeviceTool(_platform),
         CaptureScreenTool(_platform, runConfig.service.label),
         TapScreenTool(_platform, runConfig.service.label),
         WaitTool(),
         RequestAccessibilityAccessTool(_requestAccessibility),
-        ActTool(_platform, runConfig.service.label),
+        for (final name in uiToolActions.keys)
+          ActTool(_platform, runConfig.service.label, name),
         FindAppsTool(_platform),
         LaunchAppTool(_platform),
         StartIntentTool(_platform),
@@ -139,27 +164,32 @@ extension ConversationRun on ChatController {
           _notifyRun(runConversation);
         },
         onStepsChanged: (newSteps) {
-          final step = newSteps.last;
           final liveSteps = runConversation.liveToolSteps;
-          if (newSteps.length > liveSteps.length) {
-            liveSteps.add((afterMessageId: messages.last.id, step: step));
-          } else {
-            liveSteps[liveSteps.length - 1] = (
-              afterMessageId: liveSteps.last.afterMessageId,
-              step: step,
+          for (var i = 0; i < newSteps.length; i++) {
+            final step = newSteps[i];
+            if (i < liveSteps.length && identical(liveSteps[i].step, step))
+              continue;
+            if (i == liveSteps.length) {
+              liveSteps.add((afterMessageId: messages.last.id, step: step));
+            } else {
+              liveSteps[i] = (
+                afterMessageId: liveSteps[i].afterMessageId,
+                step: step,
+              );
+            }
+            final activity = AgentTaskActivity(
+              text: step.title,
+              toolName: step.toolName,
+              status: step.status,
+              requestJson: step.requestJson,
+              resultJson: step.resultJson,
             );
-          }
-          final activity = AgentTaskActivity(
-            text: step.title,
-            status: step.status,
-            requestJson: step.requestJson,
-            resultJson: step.resultJson,
-          );
-          if (newSteps.length > stepActivityIndices.length) {
-            stepActivityIndices.add(activities.length);
-            activities.add(activity);
-          } else {
-            activities[stepActivityIndices.last] = activity;
+            if (i == stepActivityIndices.length) {
+              stepActivityIndices.add(activities.length);
+              activities.add(activity);
+            } else {
+              activities[stepActivityIndices[i]] = activity;
+            }
           }
           streamingMessageId = null;
           steps
@@ -245,6 +275,7 @@ extension ConversationRun on ChatController {
               for (final activity in activities)
                 AgentTaskActivity(
                   text: activity.text,
+                  toolName: activity.toolName,
                   requestJson: activity.requestJson,
                   resultJson: activity.resultJson,
                   status: activity.status == AgentStepStatus.running

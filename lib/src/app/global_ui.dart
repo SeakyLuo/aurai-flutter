@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 /// 全局视觉配置：品牌色及 Material 组件样式统一在此维护。
 abstract final class GlobalUI {
+  static const Color userMessageBackground = Color(0xffe8e0f5);
+  static const Color pageBackground = Color(0xfffAfAfA);
   static const Color primary = Color(0xffafa9ee);
   static const Color primaryLight = Color(0xffddc5f7);
   static const Color primaryBackground = Color(0xfff4effb);
@@ -35,6 +37,11 @@ abstract final class GlobalUI {
   );
   static const double liquidGlassBlur = 5;
 
+  static Color taskTimeColor(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? const Color(0xffc4b5fd)
+      : const Color(0xff7563ad);
+
   static ThemeData get theme => _theme(Brightness.light);
   static ThemeData get darkTheme => _theme(Brightness.dark);
 
@@ -47,7 +54,7 @@ abstract final class GlobalUI {
       onPrimary: onPrimary,
       primaryContainer: dark ? const Color(0xff343047) : primaryBackground,
       onPrimaryContainer: dark ? const Color(0xffe6dcfa) : onPrimaryBackground,
-      surface: dark ? const Color(0xff18181b) : Colors.white,
+      surface: dark ? const Color(0xff18181b) : pageBackground,
       onSurface: dark ? const Color(0xffeeeeF2) : const Color(0xff171717),
       onSurfaceVariant: dark
           ? const Color(0xffaaa8b3)

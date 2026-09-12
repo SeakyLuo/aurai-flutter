@@ -8,9 +8,12 @@ import '../domain/model_provider.dart';
 import '../domain/tool_models.dart';
 
 class DeepSeekResponsesProvider implements ModelProvider {
-  DeepSeekResponsesProvider(this.config)
+  DeepSeekResponsesProvider(this.config, {required String? systemPrompt})
     : _transport = ResponsesTransport(config),
-      _context = ResponsesContext(ModelContextLimits.forModel(config.model));
+      _context = ResponsesContext(
+        ModelContextLimits.forModel(config.model),
+        systemPrompt: systemPrompt ?? agentSystemPrompt,
+      );
 
   final ModelConfig config;
   final ResponsesTransport _transport;
@@ -35,7 +38,7 @@ class DeepSeekResponsesProvider implements ModelProvider {
     if (_context.limits case final limits?)
       'max_output_tokens': limits.outputTokens,
     'instructions':
-        '$agentSystemPrompt\n${_capabilitySummary(request)}\n${request.personalContext}',
+        '${_context.systemPrompt}\n${_capabilitySummary(request)}\n${request.personalContext}',
     'input': _context.input,
     'tools': request.tools
         .map(
