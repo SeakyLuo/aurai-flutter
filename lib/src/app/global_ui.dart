@@ -64,6 +64,7 @@ abstract final class GlobalUI {
       scaffoldBackgroundColor: colors.surface,
       textSelectionTheme: TextSelectionThemeData(
         cursorColor: dark ? Colors.white : Colors.black,
+        selectionHandleColor: dark ? Colors.white : Colors.black,
       ),
       scrollbarTheme: ScrollbarThemeData(
         radius: const Radius.circular(99),

@@ -1,3 +1,4 @@
+import 'keyboard_inset.dart';
 import 'operation_request_sheet.dart';
 import 'dart:async';
 
@@ -175,10 +176,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 systemNavigationBarIconBrightness: Brightness.dark,
                 systemNavigationBarContrastEnforced: false,
               ),
-              child: Padding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.viewInsetsOf(context).bottom,
-                ),
+              child: KeyboardInset(
                 child: ChatComposer(
                   controller: _textController,
                   focusNode: _focusNode,

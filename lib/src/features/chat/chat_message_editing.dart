@@ -28,15 +28,19 @@ extension _ChatMessageEditing on _ChatPageState {
         selection: TextSelection.collapsed(offset: message.text.length),
       );
       _sentMessageId = null;
-      _followOutput = false;
-      _contentBelow = false;
+      _followOutput = session.followOutput;
+      _contentBelow = session.contentBelow;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !identical(_editing, session)) return;
       final bookmark = session.bookmark;
       if (bookmark != null) {
         _viewportKey.currentState?.restoreBookmark(
-          ChatScrollBookmark(bookmark.messageId, bookmark.alignment, false),
+          ChatScrollBookmark(
+            bookmark.messageId,
+            bookmark.alignment,
+            session.followOutput,
+          ),
         );
       }
       _focusNode.requestFocus();
@@ -56,7 +60,7 @@ extension _ChatMessageEditing on _ChatPageState {
     _updateEditing(() {
       _restoreEditDraft(session);
       _editing = null;
-      _sentMessageId = session.sentMessageId;
+      _sentMessageId = session.followOutput ? null : session.sentMessageId;
       _followOutput = session.followOutput;
       _contentBelow = session.contentBelow;
     });
@@ -64,8 +68,18 @@ extension _ChatMessageEditing on _ChatPageState {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final bookmark = session.bookmark;
-      if (bookmark != null)
-        _viewportKey.currentState?.restoreBookmark(bookmark);
+      if (bookmark != null) {
+        _viewportKey.currentState?.restoreBookmark(
+          ChatScrollBookmark(
+            bookmark.messageId,
+            bookmark.alignment,
+            session.followOutput,
+            bookmark.replyAnchorId,
+          ),
+        );
+      } else if (session.followOutput) {
+        _scrollToBottom();
+      }
     });
   }
 
