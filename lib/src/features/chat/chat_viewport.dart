@@ -172,9 +172,7 @@ class ChatViewportState extends State<ChatViewport> {
       _pinSentMessage();
       return;
     }
-    if (_following &&
-        (!oldWidget.followOutput ||
-            widget.padding.bottom != oldWidget.padding.bottom)) {
+    if (_following && widget.padding.bottom != oldWidget.padding.bottom) {
       _scheduleBottomSync();
     }
     if (anchor != null && !_following) {
@@ -305,13 +303,22 @@ class ChatViewportState extends State<ChatViewport> {
     _bottomSyncQueued = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _bottomSyncQueued = false;
-      if (!mounted || !_following || _userScrolling) return;
+      if (!mounted || !_following || _userScrolling || _restoring) return;
+      final footer = _positions.itemPositions.value
+          .where((item) => item.index == widget.entries.length)
+          .firstOrNull;
+      final target = _height - widget.padding.bottom;
+      if (_replyAnchorId == null &&
+          footer != null &&
+          (footer.itemLeadingEdge * _height - target).abs() < 0.5) {
+        return;
+      }
       scrollToBottom();
     });
   }
 
   void scrollToBottom() {
-    if (!_items.isAttached || _restoring) return;
+    if (!_items.isAttached || _restoring || _userScrolling) return;
     _following = true;
     _keepSentMessageAtTop = false;
     if (_replyAnchorId != null) setState(() => _replyAnchorId = null);

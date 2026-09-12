@@ -1,43 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../domain/message_image.dart';
 import 'image_preview.dart';
-import 'attachment_action_icon.dart';
-
-Future<ImageSource?> showImageSourceMenu(BuildContext context) =>
-    showModalBottomSheet<ImageSource>(
-      context: context,
-      showDragHandle: true,
-      useSafeArea: true,
-      builder: (context) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const AttachmentActionIcon(
-                  type: AttachmentActionIconType.gallery,
-                ),
-                title: const Text('上传图片'),
-                onTap: () => Navigator.pop(context, ImageSource.gallery),
-              ),
-              ListTile(
-                leading: const AttachmentActionIcon(
-                  type: AttachmentActionIconType.camera,
-                ),
-                title: const Text('拍照'),
-                onTap: () => Navigator.pop(context, ImageSource.camera),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+export 'image_source_menu.dart';
 
 class DraftImageAttachments extends StatelessWidget {
   const DraftImageAttachments({

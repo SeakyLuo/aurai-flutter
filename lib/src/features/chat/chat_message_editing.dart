@@ -83,7 +83,7 @@ extension _ChatMessageEditing on _ChatPageState {
     });
   }
 
-  Future<void> _addEditImages() async {
+  Future<void> _addEditImages(BuildContext buttonContext) async {
     final session = _editing!;
     if (session.saving || session.picking) return;
     final remaining = MessageImageStore.maxImages - session.images.length;
@@ -93,7 +93,7 @@ extension _ChatMessageEditing on _ChatPageState {
     }
     _updateEditing(() => session.picking = true);
     try {
-      final source = await showImageSourceMenu(context);
+      final source = await showImageSourceMenu(buttonContext);
       if (source == null || !mounted || !identical(_editing, session)) return;
       final images = await widget.controller.pickEditImages(source, remaining);
       session.addedImages.addAll(images);

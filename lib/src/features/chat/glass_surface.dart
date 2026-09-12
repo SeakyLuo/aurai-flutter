@@ -61,7 +61,7 @@ class GlassSurface extends StatelessWidget {
                     ],
             ),
           ),
-          child: child,
+          child: RepaintBoundary(child: child),
         ),
       ),
     ),
