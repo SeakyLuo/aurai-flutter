@@ -68,8 +68,16 @@ class ToolExecutor {
             callId: call.id,
             toolName: call.name,
             status: ToolResultStatus.denied,
-            output: const <String, Object?>{
-              'error': 'User denied confirmation',
+            output: <String, Object?>{
+              'error': 'Operation was not approved',
+              if (tool.definition.taskScopedConfirmation &&
+                  const {
+                    'act',
+                    'tapScreen',
+                    'captureScreen',
+                  }.contains(call.name))
+                'next':
+                    'This screen operation was not approved. Do not repeat the same request. If the observation is stale, observe again before acting. If the user declined screen access, stop screen operations; authorization can only be requested in a new user task.',
             },
           );
         }

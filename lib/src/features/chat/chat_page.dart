@@ -1,16 +1,30 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
-import '../../domain/agent_models.dart';
-import 'capability_sheet.dart';
+import '../../domain/message_image.dart';
+import '../../platform/message_image_store.dart';
+import 'image_attachments.dart';
+
+import 'settings_page.dart';
+import 'search_aurora_background.dart';
+import 'accessibility_request_sheet.dart';
 import 'chat_controller.dart';
 import 'chat_widgets.dart';
 import 'chat_header.dart';
-import 'glass_surface.dart';
+import 'drawer_drag_region.dart';
+import 'thinking_indicator.dart';
+import 'chat_viewport.dart';
 import 'message_item.dart';
+import 'jump_to_bottom_button.dart';
+import 'chat_timeline.dart';
 import 'model_settings_sheet.dart';
 import 'conversations_sheet.dart';
+import 'conversation_search_page.dart';
+
+part 'chat_session_actions.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key, required this.controller});
@@ -22,15 +36,23 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _textController = TextEditingController();
   final _focusNode = FocusNode();
-  final _scrollController = ScrollController();
+  var _viewportKey = GlobalKey<ChatViewportState>();
+  final _scrollBookmarks = <String, ChatScrollBookmark>{};
   var _canSend = false;
   var _followOutput = true;
+  bool _contentBelow = false;
+  bool _positionSentMessage = false;
+  String? _beforeSentMessageId;
+  String? _sentMessageId;
   PendingConfirmation? _shownConfirmation;
   late String _conversationId;
   Timer? _draftTimer;
   bool _preparingGoal = false;
+  bool _accessibilitySheetShowing = false;
+  bool _markReadScheduled = false;
 
   @override
   void initState() {
@@ -41,7 +63,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     widget.controller.addListener(_onControllerChanged);
     _textController.addListener(_onTextChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom();
+      _loadImages();
+    });
   }
 
   @override
@@ -53,7 +78,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       ..removeListener(_onTextChanged)
       ..dispose();
     _focusNode.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -65,150 +89,188 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
     if (state == AppLifecycleState.resumed) {
       widget.controller.checkAccessibilityReturn();
+      _scheduleMarkRead();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (ModalRoute.of(context)!.isCurrent) _scheduleMarkRead();
     final controller = widget.controller;
-    final showProgress =
-        controller.isBusy ||
-        controller.pendingGoal != null ||
-        controller.steps.isNotEmpty;
-    final progressBeforeFinalAnswer =
-        showProgress &&
-        !controller.isBusy &&
-        controller.pendingGoal == null &&
-        controller.messages.isNotEmpty &&
-        controller.messages.last.role == AgentMessageRole.assistant;
-    final itemCount = controller.messages.length + (showProgress ? 1 : 0);
-    final progressKey = ValueKey(
-      'progress:${controller.activeConversation.id}',
+    final conversationId = controller.activeConversation.id;
+    final timeline = buildChatTimeline(
+      controller,
+      preparingGoal: () => _preparingGoal,
+      continueReply: _continuePending,
     );
-    final childIndices = <Key, int>{
-      for (var i = 0; i < controller.messages.length; i++)
-        ValueKey(
-          controller.messages[i].id,
-        ): progressBeforeFinalAnswer && i == controller.messages.length - 1
-            ? 0
-            : itemCount - 1 - i,
-      if (showProgress) progressKey: progressBeforeFinalAnswer ? 1 : 0,
-    };
-    return BackdropGroup(
-      child: Scaffold(
-        extendBody: true,
-        extendBodyBehindAppBar: true,
-        resizeToAvoidBottomInset: false,
-        appBar: ChatHeader(
-          onMenu: _openConversations,
-          onNew: () => _changeConversation(),
+    final showProgress =
+        (controller.isBusy && controller.runState != ChatRunState.idle) ||
+        controller.pendingGoal != null ||
+        controller.runState == ChatRunState.failed ||
+        controller.runState == ChatRunState.cancelled ||
+        controller.runState == ChatRunState.interrupted;
+    if (showProgress) {
+      timeline.add(
+        ChatTimelineEntry(
+          'progress:${controller.activeConversation.id}',
+          (_) => _buildProgress(controller),
         ),
-        bottomNavigationBar: Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.viewInsetsOf(context).bottom,
+      );
+    }
+    return AbsorbPointer(
+      absorbing: controller.changingConversation,
+      child: BackdropGroup(
+        child: Scaffold(
+          key: _scaffoldKey,
+          backgroundColor: timeline.isEmpty ? Colors.transparent : null,
+          drawer: ConversationsDrawer(
+            controller: controller,
+            onChoose: _chooseConversationAction,
           ),
-          child: ChatComposer(
-            controller: _textController,
-            focusNode: _focusNode,
-            enabled: !controller.isBusy,
-            canSend: _canSend,
-            stopping: controller.runState == ChatRunState.stopping,
-            onSend: _send,
-            onStop: _stop,
-          ),
-        ),
-        body: Builder(
-          builder: (context) {
-            final top = MediaQuery.paddingOf(context).top;
-            final bottom = MediaQuery.paddingOf(context).bottom;
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: controller.messages.isEmpty && !showProgress
-                          ? Padding(
-                              padding: EdgeInsets.only(
-                                top: top,
-                                bottom: bottom,
-                              ),
-                              child: EmptyConversation(
-                                onUseExample: _useExample,
-                              ),
-                            )
-                          : NotificationListener<ScrollNotification>(
-                              onNotification: _trackScroll,
-                              child: ListView.builder(
-                                controller: _scrollController,
-                                reverse: true,
-                                findChildIndexCallback: (key) =>
-                                    childIndices[key],
-                                keyboardDismissBehavior:
-                                    ScrollViewKeyboardDismissBehavior.onDrag,
-                                padding: EdgeInsets.only(
-                                  top: top + 12,
-                                  bottom: bottom + 16,
-                                ),
-                                itemCount: itemCount,
-                                itemBuilder: (_, reverseIndex) {
-                                  final index = itemCount - 1 - reverseIndex;
-                                  if (progressBeforeFinalAnswer) {
-                                    if (index < controller.messages.length - 1)
-                                      return MessageItem(
-                                        key: ValueKey(
-                                          controller.messages[index].id,
-                                        ),
-                                        message: controller.messages[index],
-                                      );
-                                    if (index == controller.messages.length - 1)
-                                      return KeyedSubtree(
-                                        key: progressKey,
-                                        child: _buildProgress(controller),
-                                      );
-                                    return MessageItem(
-                                      key: ValueKey(
-                                        controller.messages.last.id,
-                                      ),
-                                      message: controller.messages.last,
-                                    );
-                                  }
-                                  if (index < controller.messages.length)
-                                    return MessageItem(
-                                      key: ValueKey(
-                                        controller.messages[index].id,
-                                      ),
-                                      message: controller.messages[index],
-                                    );
-                                  return KeyedSubtree(
-                                    key: progressKey,
-                                    child: _buildProgress(controller),
-                                  );
-                                },
-                              ),
-                            ),
-                    ),
-                    if (!_followOutput && controller.messages.isNotEmpty)
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: bottom + 8,
-                        child: Center(
-                          child: GlassSurface(
-                            radius: 28,
-                            child: RoundAction(
-                              label: '回到底部',
-                              onPressed: _scrollToBottom,
-                              icon: Icons.arrow_downward_rounded,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            );
+          drawerEnableOpenDragGesture: !controller.addingImages,
+          onDrawerChanged: (opened) {
+            if (opened) _focusNode.unfocus();
+            if (!opened) _scheduleMarkRead();
           },
+          extendBody: true,
+          extendBodyBehindAppBar: true,
+          resizeToAvoidBottomInset: false,
+          appBar: ChatHeader(
+            onMenu: _openConversations,
+            controller: controller,
+            beforeDelete: _beforeDeleteConversation,
+          ),
+          bottomNavigationBar: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: const SystemUiOverlayStyle(
+              systemNavigationBarColor: Colors.transparent,
+              systemNavigationBarDividerColor: Colors.transparent,
+              systemNavigationBarIconBrightness: Brightness.dark,
+              systemNavigationBarContrastEnforced: false,
+            ),
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: ChatComposer(
+                controller: _textController,
+                focusNode: _focusNode,
+                enabled: !controller.isBusy,
+                canSend: _canSend || controller.draftImages.isNotEmpty,
+                images: controller.draftImages,
+                addingImages: controller.addingImages,
+                onAddImages: _addImages,
+                onRemoveImage: _removeImage,
+                stopping: controller.runState == ChatRunState.stopping,
+                onSend: _send,
+                canResume:
+                    controller.runState == ChatRunState.cancelled &&
+                    controller.pendingGoal != null,
+                onResume: _continuePending,
+                onStop: _stop,
+              ),
+            ),
+          ),
+          body: DrawerDragRegion(
+            onOpen: _openConversations,
+            builder: (context) {
+              final top = MediaQuery.paddingOf(context).top;
+              final bottom = MediaQuery.paddingOf(context).bottom;
+              return Stack(
+                children: [
+                  if (timeline.isEmpty)
+                    const Positioned.fill(child: SearchAuroraBackground()),
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 760),
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: timeline.isEmpty
+                                ? EmptyConversation(
+                                    contentPadding: EdgeInsets.only(
+                                      top: top,
+                                      bottom: bottom,
+                                    ),
+                                    onUseExample: _useExample,
+                                  )
+                                : KeyedSubtree(
+                                    key: PageStorageKey(
+                                      'conversation:$_conversationId',
+                                    ),
+                                    child: ChatViewport(
+                                      key: _viewportKey,
+                                      entries: timeline,
+                                      bookmark:
+                                          _scrollBookmarks[_conversationId],
+                                      followOutput: _followOutput,
+                                      sentMessageId: _sentMessageId,
+                                      sentMessageTop:
+                                          top + 8 - MessageItem.userTopMargin,
+                                      onContentBelowChanged: (value) {
+                                        if (mounted &&
+                                            _conversationId == conversationId) {
+                                          setState(() => _contentBelow = value);
+                                        }
+                                      },
+                                      padding: EdgeInsets.only(
+                                        top: top + 12,
+                                        bottom: bottom + 16,
+                                      ),
+                                      hasEarlierMessages: controller
+                                          .activeConversation
+                                          .hasEarlierMessages,
+                                      loadEarlierMessages:
+                                          controller.loadEarlierMessages,
+                                      onBookmark: (bookmark) =>
+                                          _scrollBookmarks[conversationId] =
+                                              bookmark,
+                                      onFollowOutputChanged: (value) {
+                                        if (mounted)
+                                          setState(() => _followOutput = value);
+                                      },
+                                      summaryOwners: chatSummaryOwners(
+                                        controller,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                          if (controller.changingConversation)
+                            Positioned.fill(
+                              child: ColoredBox(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surface.withValues(alpha: 0.81),
+                                child: Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(24),
+                                    child: ThinkingIndicator(label: '正在打开会话'),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (!_followOutput &&
+                              _contentBelow &&
+                              timeline.isNotEmpty)
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: bottom + 8,
+                              child: Center(
+                                child: JumpToBottomButton(
+                                  streaming:
+                                      controller.streamingMessageId != null,
+                                  onPressed: _scrollToBottom,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -219,11 +281,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     steps: controller.steps,
     needsConfiguration: controller.needsConfiguration,
     hasPendingGoal: controller.pendingGoal != null,
+    replying: controller.streamingMessageId != null,
     onContinue: _continuePending,
     onRetry: _continuePending,
     accessibilityRequestPending: controller.accessibilityRequestPending,
-    onEnableAccessibility: _enableAccessibility,
-    onCancelAccessibility: controller.cancelAccessibilityRequest,
     onBatterySettings: _openBatterySettings,
   );
 
@@ -235,14 +296,52 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (_conversationId != conversation.id) {
       _draftTimer?.cancel();
       _conversationId = conversation.id;
+      _viewportKey = GlobalKey<ChatViewportState>();
+      _contentBelow = false;
+      _sentMessageId = _scrollBookmarks[conversation.id]?.replyAnchorId;
       _textController.text = conversation.draft;
       _textController.selection = TextSelection.collapsed(
         offset: conversation.draft.length,
       );
-      _followOutput = true;
+      _followOutput = _scrollBookmarks[conversation.id]?.followOutput ?? true;
       _focusNode.unfocus();
     }
+    if (_positionSentMessage &&
+        conversation.messages.isNotEmpty &&
+        conversation.messages.last.id != _beforeSentMessageId) {
+      _positionSentMessage = false;
+      _sentMessageId = conversation.messages.last.id;
+      _followOutput = false;
+    }
+    if (widget.controller.isBusy &&
+        conversation.draft.isEmpty &&
+        _textController.text.isNotEmpty) {
+      _textController.removeListener(_onTextChanged);
+      _textController.clear();
+      _textController.addListener(_onTextChanged);
+      _canSend = false;
+    } else if (!widget.controller.isBusy &&
+        conversation.draft != _textController.text) {
+      _textController.removeListener(_onTextChanged);
+      _textController.text = conversation.draft;
+      _textController.addListener(_onTextChanged);
+      _canSend = conversation.draft.trim().isNotEmpty;
+    }
     setState(() {});
+    if (widget.controller.accessibilityRequestPending &&
+        !_accessibilitySheetShowing) {
+      _accessibilitySheetShowing = true;
+      _focusNode.unfocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          if (mounted && widget.controller.accessibilityRequestPending) {
+            await showAccessibilityRequestSheet(context, widget.controller);
+          }
+        } finally {
+          _accessibilitySheetShowing = false;
+        }
+      });
+    }
     final confirmation = widget.controller.pendingConfirmation;
     if (confirmation != null && confirmation != _shownConfirmation) {
       _shownConfirmation = confirmation;
@@ -251,12 +350,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
     if (_followOutput) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_followOutput) return;
+        _viewportKey.currentState?.scrollToBottom();
+      });
     }
-  }
-
-  Future<void> _enableAccessibility() async {
-    await widget.controller.openAccessibilitySettings();
   }
 
   Future<void> _openBatterySettings() async {
@@ -271,22 +369,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _showConfirmation(PendingConfirmation request) async {
     if (!mounted) return;
     final arguments = request.call.arguments;
-    final detail = switch (request.call.name) {
-      'shell' => '将以 Aurai 自身权限执行命令：\n${arguments['command']}',
-      'startIntent' => '将启动 Android 操作：\n${_intentSummary(arguments)}',
-      'act' when arguments['action'] == 'inputText' =>
-        '将输入文字：\n${arguments['text']}',
-      'act' => switch (arguments['action']) {
-        'click' => '将点击当前屏幕中选定的控件。',
-        'scroll' => '将滚动当前页面。',
-        'back' => '将返回上一页。',
-        'home' => '将返回手机主屏幕。',
-        _ => '将操作当前屏幕中选定的控件。',
-      },
-      _ =>
+    final detail =
         request.definition.confirmationDescriptionFor(arguments) ??
-            request.definition.description,
-    };
+        switch (request.call.name) {
+          'shell' => '将以 Aurai 自身权限执行命令：\n${arguments['command']}',
+          'startIntent' => '将启动 Android 操作：\n${_intentSummary(arguments)}',
+          'act' when arguments['action'] == 'inputText' =>
+            '将输入文字：\n${arguments['text']}',
+          'act' => switch (arguments['action']) {
+            'click' => '将点击当前屏幕中选定的控件。',
+            'scroll' => '将滚动当前页面。',
+            'back' => '将返回上一页。',
+            'home' => '将返回手机主屏幕。',
+            _ => '将操作当前屏幕中选定的控件。',
+          },
+          _ =>
+            request.definition.confirmationDescriptionFor(arguments) ??
+                request.definition.description,
+        };
     final approved = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -341,37 +441,67 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _openConversations() async {
+  void _openConversations() {
+    if (_imageOperationPending()) return;
     _focusNode.unfocus();
-    var choice = await showConversationsSheet(context, widget.controller);
-    if (!mounted || choice == null) return;
-    if (choice.action == ConversationAction.settings) {
-      choice = await showConversationSettings(context, widget.controller);
+    _scaffoldKey.currentState!.openDrawer();
+  }
+
+  Future<void> _chooseConversationAction(
+    ConversationSelection selection,
+  ) async {
+    _scaffoldKey.currentState!.closeDrawer();
+    final choice = selection;
+    if (choice.action == ConversationAction.search) {
+      final selection = await Navigator.of(context).push<ConversationSelection>(
+        MaterialPageRoute(
+          builder: (_) => ConversationSearchPage(
+            controller: widget.controller,
+            preparingGoal: () => _preparingGoal,
+          ),
+        ),
+      );
+      if (!mounted || selection == null) return;
+      await _chooseConversationAction(selection);
+      return;
     }
-    if (!mounted || choice == null) return;
+    if (choice.action == ConversationAction.settings) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => SettingsPage(
+            controller: widget.controller,
+            preparingGoal: () => _preparingGoal,
+          ),
+        ),
+      );
+      return;
+    }
     switch (choice.action) {
+      case ConversationAction.search:
       case ConversationAction.settings:
         break;
       case ConversationAction.create:
         await _changeConversation();
       case ConversationAction.select:
         await _changeConversation(choice.id);
-      case ConversationAction.model:
-        await _openSettings(continueAfterSave: false);
-      case ConversationAction.capabilities:
-        await CapabilitySheet.show(context, widget.controller);
-      case ConversationAction.clear:
-        await _confirmClear();
     }
   }
 
   Future<void> _changeConversation([String? id]) async {
     final controller = widget.controller;
-    if (id == controller.activeConversation.id) return;
-    if (controller.isBusy || _preparingGoal) {
+    if (id == controller.activeConversation.id) {
+      try {
+        await controller.markActiveConversationRead();
+      } on Object {
+        if (mounted) _imageNotice('已读状态保存失败，请重试');
+      }
+      return;
+    }
+    if (_imageOperationPending()) return;
+    if (_preparingGoal) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('请先停止当前任务，再新建或切换会话')));
+      ).showSnackBar(const SnackBar(content: Text('正在准备任务，请稍候')));
       return;
     }
     _draftTimer?.cancel();
@@ -382,12 +512,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         await controller.selectConversation(id);
       }
       if (!mounted) return;
-      _followOutput = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _scrollToBottom();
-        if (id == null) _focusNode.requestFocus();
-      });
+      if (id == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _focusNode.requestFocus();
+        });
+      }
       setState(() {});
     } on Object {
       if (mounted) {
@@ -398,19 +527,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  bool _trackScroll(ScrollNotification notification) {
-    if (notification.depth != 0 || notification.metrics.axis != Axis.vertical)
-      return false;
-    if (notification is ScrollUpdateNotification ||
-        notification is UserScrollNotification) {
-      final nearBottom = notification.metrics.extentBefore < 72;
-      if (nearBottom != _followOutput) {
-        setState(() => _followOutput = nearBottom);
-      }
-    }
-    return false;
-  }
-
   void _useExample(String example) {
     _textController.text = example;
     _textController.selection = TextSelection.collapsed(
@@ -419,10 +535,96 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _focusNode.requestFocus();
   }
 
+  bool _imageOperationPending() {
+    if (!widget.controller.addingImages) return false;
+    _imageNotice('正在处理图片，请稍候');
+    return true;
+  }
+
+  Future<void> _addImages() async {
+    final controller = widget.controller;
+    if (controller.addingImages || controller.isBusy || _preparingGoal) return;
+    if (controller.needsConfiguration) {
+      _showModelConfigurationNotice();
+      return;
+    }
+    if (controller.draftImages.length == MessageImageStore.maxImages) {
+      _imageNotice('每条消息最多添加 4 张图片，请先移除一张');
+      return;
+    }
+    _focusNode.unfocus();
+    final source = await showImageSourceMenu(context);
+    if (source != null && mounted) await _loadImages(source);
+  }
+
+  Future<void> _loadImages([ImageSource? source]) async {
+    try {
+      await widget.controller.addImages(source);
+    } on Object catch (error) {
+      if (!mounted) return;
+      final permissionDenied =
+          error is PlatformException &&
+          {
+            'camera_access_denied',
+            'camera_access_denied_without_prompt',
+            'camera_access_restricted',
+            'photo_access_denied',
+            'photo_access_denied_without_prompt',
+            'photo_access_restricted',
+          }.contains(error.code);
+      _imageNotice(
+        permissionDenied
+            ? '请在系统设置中允许相机或照片访问'
+            : switch (error) {
+                ImageInputException() => error.message,
+                PlatformException(code: 'no_available_camera') => '当前设备没有可用的相机',
+                _ => '图片添加失败，请重新选择',
+              },
+        action: permissionDenied
+            ? SnackBarAction(
+                label: '去设置',
+                onPressed: () async {
+                  try {
+                    await widget.controller.openAppSettings();
+                  } on Object {
+                    if (mounted) _imageNotice('无法打开设置，请在系统设置中找到 Aurai');
+                  }
+                },
+              )
+            : null,
+      );
+    }
+  }
+
+  Future<void> _removeImage(MessageImage image) async {
+    try {
+      await widget.controller.removeDraftImage(image);
+    } on Object {
+      if (mounted) _imageNotice('图片移除后保存失败，请重试');
+    }
+  }
+
+  void _showModelConfigurationNotice() => _imageNotice(
+    '请先连接模型',
+    action: SnackBarAction(
+      label: '模型设置',
+      onPressed: () => _openSettings(continueAfterSave: false),
+    ),
+  );
+
+  void _imageNotice(String message, {SnackBarAction? action}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message), action: action));
+
   Future<void> _send() async {
+    if (_otherConversationRunning()) return;
     final conversationId = widget.controller.activeConversation.id;
     final goal = _textController.text.trim();
-    if (goal.isEmpty || widget.controller.isBusy || _preparingGoal) {
+    if ((goal.isEmpty && widget.controller.draftImages.isEmpty) ||
+        widget.controller.isBusy ||
+        widget.controller.addingImages ||
+        _preparingGoal) {
       return;
     }
     _preparingGoal = true;
@@ -431,9 +633,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } finally {
       _preparingGoal = false;
     }
-    _textController.clear();
+    _draftTimer?.cancel();
     _focusNode.unfocus();
-    _followOutput = true;
+    _beforeSentMessageId = widget.controller.messages.lastOrNull?.id;
+    _positionSentMessage = true;
     try {
       final needsSettings = await widget.controller.submitGoal(goal);
       if (needsSettings && mounted) {
@@ -442,12 +645,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     } on Object {
       if (widget.controller.activeConversation.id == conversationId)
         _showRunNotice();
+    } finally {
+      _positionSentMessage = false;
     }
   }
 
   Future<void> _continuePending() async {
+    if (_otherConversationRunning()) return;
     final conversationId = widget.controller.activeConversation.id;
-    if (_preparingGoal) return;
+    if (_preparingGoal || widget.controller.addingImages) return;
     if (widget.controller.needsConfiguration) {
       await _openSettings(continueAfterSave: true);
       return;
@@ -533,7 +739,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _openSettings({required bool continueAfterSave}) async {
-    if (widget.controller.isBusy) {
+    if (_imageOperationPending()) return;
+    if (widget.controller.hasRunningTask) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('请先停止当前任务，再修改模型')));
@@ -549,51 +756,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _confirmClear() async {
+  bool _beforeDeleteConversation() {
+    if (_imageOperationPending()) return false;
     if (widget.controller.isBusy || _preparingGoal) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先停止当前任务')));
-      return;
+      _imageNotice('请先停止当前任务，再删除会话');
+      return false;
     }
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('清空当前会话？'),
-        content: const Text('这会删除当前会话的消息，其他会话会保留。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('清空'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      await widget.controller.clearConversation();
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('当前会话已清空')));
-      }
-    }
+    _focusNode.unfocus();
+    _draftTimer?.cancel();
+    return true;
   }
 
   void _scrollToBottom() {
-    if (!_scrollController.hasClients) {
-      return;
-    }
-    _scrollController.animateTo(
-      _scrollController.position.minScrollExtent,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOut,
-    );
-    if (!_followOutput) {
-      setState(() => _followOutput = true);
-    }
+    _viewportKey.currentState?.scrollToBottom();
+    if (!_followOutput) setState(() => _followOutput = true);
   }
 }

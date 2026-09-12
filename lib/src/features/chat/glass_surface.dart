@@ -2,10 +2,18 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../app/global_ui.dart';
+
 class GlassSurface extends StatelessWidget {
-  const GlassSurface({super.key, required this.child, this.radius = 32});
+  const GlassSurface({
+    super.key,
+    required this.child,
+    this.radius = 32,
+    this.dark = false,
+  });
   final Widget child;
   final double radius;
+  final bool dark;
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
@@ -27,13 +35,30 @@ class GlassSurface extends StatelessWidget {
     child: ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: BackdropFilter.grouped(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: DecoratedBox(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(
+              color: (dark || Theme.of(context).brightness == Brightness.dark)
+                  ? const Color(0x38ffffff)
+                  : const Color(0xcfffffff),
+              width: 1,
+            ),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xfaffffff), Color(0xd9ffffff), Color(0xe8f6f8fb)],
+              colors: (dark || Theme.of(context).brightness == Brightness.dark)
+                  ? const [
+                      Color(0xb348484b),
+                      Color(0x99202023),
+                      Color(0xc22b2b2e),
+                    ]
+                  : const [
+                      Color(0xe0ffffff),
+                      Color(0xb8ffffff),
+                      Color(0xccf2effa),
+                    ],
             ),
           ),
           child: child,
@@ -51,12 +76,14 @@ class RoundAction extends StatelessWidget {
     required this.onPressed,
     this.primary = false,
     this.iconWidget,
+    this.compact = false,
   });
   final IconData icon;
   final String label;
   final VoidCallback? onPressed;
   final bool primary;
   final Widget? iconWidget;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Semantics(
@@ -65,38 +92,46 @@ class RoundAction extends StatelessWidget {
     label: label,
     child: Tooltip(
       message: label,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: primary && onPressed != null
-              ? const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xff3aa5ff), Color(0xff0875ee)],
-                )
-              : null,
-          color: primary && onPressed == null ? const Color(0x0f171717) : null,
-        ),
+      child: SizedBox.square(
+        dimension: 48,
         child: Material(
           color: Colors.transparent,
           shape: const CircleBorder(),
           child: InkWell(
             customBorder: const CircleBorder(),
             onTap: onPressed,
-            child: iconWidget != null
-                ? Center(child: iconWidget)
-                : Icon(
-                    icon,
-                    size: 25,
-                    color: primary
-                        ? (onPressed == null
-                              ? const Color(0xffb0b4b9)
-                              : Colors.white)
-                        : const Color(0xff242424),
-                  ),
+            child: Padding(
+              padding: EdgeInsets.all(compact ? 6 : 0),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: primary && onPressed != null
+                      ? GlobalUI.primaryGradient
+                      : null,
+                  color: primary && onPressed == null
+                      ? Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.06)
+                      : null,
+                ),
+                child: Center(
+                  child:
+                      iconWidget ??
+                      Icon(
+                        icon,
+                        size: compact ? 23 : 25,
+                        color: primary
+                            ? (onPressed == null
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant
+                                  : GlobalUI.onPrimary)
+                            : Theme.of(context).colorScheme.onSurface,
+                      ),
+                ),
+              ),
+            ),
           ),
         ),
       ),

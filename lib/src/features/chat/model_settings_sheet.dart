@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/widget_utils.dart';
 import '../../domain/model_provider.dart';
 import '../../providers/model_catalog.dart';
 import 'chat_controller.dart';
@@ -16,16 +17,21 @@ class ModelSettingsSheet extends StatefulWidget {
     BuildContext context, {
     required ChatController controller,
     required bool continueAfterSave,
-  }) async =>
-      await Navigator.of(context).push<bool>(
-        MaterialPageRoute(
-          builder: (_) => ModelSettingsSheet(
-            controller: controller,
-            continueAfterSave: continueAfterSave,
+  }) async {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..removeCurrentSnackBar();
+    return await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => ModelSettingsSheet(
+              controller: controller,
+              continueAfterSave: continueAfterSave,
+            ),
           ),
-        ),
-      ) ??
-      false;
+        ) ??
+        false;
+  }
+
   @override
   State<ModelSettingsSheet> createState() => _ModelSettingsSheetState();
 }
@@ -35,7 +41,6 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
   final _address = TextEditingController();
   late ModelService _service;
   late String _model;
-  late bool _images;
   var _models = <String>[];
   var _obscure = true;
   var _saving = false;
@@ -47,8 +52,7 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
   bool get _dirty =>
       _key.text.isNotEmpty ||
       _address.text != _saved.baseUrl ||
-      _model != _saved.model ||
-      _images != _saved.supportsImageInput;
+      _model != _saved.model;
   @override
   void initState() {
     super.initState();
@@ -63,7 +67,6 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
     _key.clear();
     _address.text = _saved.baseUrl;
     _model = _saved.model;
-    _images = _saved.supportsImageInput;
     _models = {_saved.model, service.defaultModel}.toList();
     _obscure = true;
   }
@@ -89,10 +92,7 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
     },
     child: Scaffold(
       appBar: AppBar(
-        title: const Text(
-          '模型配置',
-          style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
-        ),
+        title: const Text('模型设置'),
         leading: IconButton(
           onPressed: _locked ? null : () => Navigator.maybePop(context),
           tooltip: '返回',
@@ -108,20 +108,6 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
                   children: [
-                    const Text(
-                      '为 Aurai 连接模型',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.6,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      '选择服务，连接后即可开始对话与手机任务。',
-                      style: TextStyle(color: Color(0xff737580), height: 1.6),
-                    ),
-                    const SizedBox(height: 32),
                     const _Label('模型服务'),
                     ChoiceField(
                       label: _service.label,
@@ -189,42 +175,13 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                         label: Text(_loading ? '正在获取模型…' : '从服务获取模型'),
                       ),
                     ),
-                    const Text(
+                    Text(
                       '列表由当前服务提供。请选择支持对话和工具调用的模型。',
                       style: TextStyle(
-                        color: Color(0xff737580),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 12,
                         height: 1.6,
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Divider(),
-                    ExpansionTile(
-                      tilePadding: EdgeInsets.zero,
-                      title: const Text(
-                        '屏幕分析',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      subtitle: Text(
-                        _images ? '已允许使用截图' : '仅使用文字和设备信息',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      children: [
-                        SwitchListTile.adaptive(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('允许分析屏幕截图'),
-                          subtitle: const Text(
-                            '请确认所选模型支持图片。每次发送屏幕前，Aurai 仍会请求你的授权。',
-                          ),
-                          value: _images,
-                          onChanged: _locked
-                              ? null
-                              : (value) => setState(() => _images = value),
-                        ),
-                      ],
                     ),
                   ],
                 ),
@@ -233,18 +190,14 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-                  child: SizedBox(
+                  child: WidgetUtils.primaryButton(
                     width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _locked ? null : _save,
-                      child: Text(
-                        _saving
-                            ? '正在保存…'
-                            : widget.continueAfterSave
-                            ? '保存并继续任务'
-                            : '保存并使用',
-                      ),
-                    ),
+                    onPressed: _locked ? null : _save,
+                    text: _saving
+                        ? '正在保存…'
+                        : widget.continueAfterSave
+                        ? '保存并继续任务'
+                        : '保存并使用',
                   ),
                 ),
               ),
@@ -282,10 +235,7 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
       ],
     );
     if (!mounted || model == null || model == _model) return;
-    setState(() {
-      _model = model;
-      _images = _model == _saved.model && _saved.supportsImageInput;
-    });
+    setState(() => _model = model);
   }
 
   Future<bool> _discardChanges() async =>
@@ -361,7 +311,6 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
           apiKey: _apiKey,
           model: _model,
           baseUrl: uri.toString(),
-          supportsImageInput: _images,
         ),
       );
       if (!mounted) return;
@@ -378,8 +327,18 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
     }
   }
 
-  void _notice(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text) => ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(text),
+      behavior: SnackBarBehavior.floating,
+      margin: EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        88 + MediaQuery.paddingOf(context).bottom,
+      ),
+    ),
+  );
 }
 
 class _Label extends StatelessWidget {

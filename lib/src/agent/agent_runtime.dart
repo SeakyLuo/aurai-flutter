@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
+
 import '../domain/agent_models.dart';
+import '../domain/context_summary.dart';
 import '../domain/model_provider.dart';
 import '../domain/tool_models.dart';
 import 'tool_executor.dart';
@@ -25,17 +29,31 @@ class AgentRuntime {
   Future<AgentRunResult> run({
     required List<AgentMessage> conversation,
     required AgentStepListener onStepsChanged,
+    ContextSummary? contextSummary,
+    Future<void> Function(ContextSummary)? onContextSummary,
+    FutureOr<void> Function()? onTurnStarted,
+    Future<void> Function(ModelTurn)? onTurnCompleted,
+    Future<void> Function(ToolCall)? onToolStarted,
+    Future<void> Function(ToolResult)? onToolCompleted,
+    void Function(String text)? onTextChanged,
   }) async {
     _cancelRequested = false;
     final steps = <AgentStep>[];
     String? continuationToken;
     var toolResults = const <ToolResult>[];
 
-    for (var turn = 0; turn < 20; turn += 1) {
+    while (true) {
       _throwIfCancelled();
+      await onTurnStarted?.call();
       final modelTurn = await _provider.respond(
         ModelRequest(
           messages: conversation,
+          contextSummary: contextSummary,
+          onContextSummary: onContextSummary,
+          onTextChanged: (text) {
+            _throwIfCancelled();
+            onTextChanged?.call(text);
+          },
           tools: _registry.availableDefinitions,
           capabilities: _registry.capabilities,
           continuationToken: continuationToken,
@@ -45,6 +63,11 @@ class AgentRuntime {
       continuationToken = modelTurn.continuationToken;
       _throwIfCancelled();
 
+      if (modelTurn.text != null && modelTurn.text!.isNotEmpty) {
+        onTextChanged?.call(modelTurn.text!);
+      }
+
+      await onTurnCompleted?.call(modelTurn);
       if (modelTurn.toolCalls.isEmpty) {
         final answer = modelTurn.text;
         if (answer == null || answer.trim().isEmpty) {
@@ -59,15 +82,18 @@ class AgentRuntime {
       final nextResults = <ToolResult>[];
       for (final call in modelTurn.toolCalls) {
         _throwIfCancelled();
+        await onToolStarted?.call(call);
         steps.add(
           AgentStep(
             toolName: call.name,
             title: toolTitle(call.name),
             status: AgentStepStatus.running,
+            requestJson: jsonEncode(call.arguments),
           ),
         );
         onStepsChanged(List.unmodifiable(steps));
         final result = await _executor.execute(call);
+        await onToolCompleted?.call(result);
         _throwIfCancelled();
         final status = result.status == ToolResultStatus.success
             ? AgentStepStatus.completed
@@ -75,13 +101,17 @@ class AgentRuntime {
         steps[steps.length - 1] = steps.last.copyWith(
           status: status,
           detail: _stepDetail(result),
+          resultJson: jsonEncode(
+            result.toolName == 'getNotifications'
+                ? {'contentRetention': 'task_only'}
+                : result.output,
+          ),
         );
         onStepsChanged(List.unmodifiable(steps));
         nextResults.add(result);
       }
       toolResults = nextResults;
     }
-    throw const ModelProviderException('任务步骤过多，已停止以便重新规划');
   }
 
   Future<void> cancel() async {

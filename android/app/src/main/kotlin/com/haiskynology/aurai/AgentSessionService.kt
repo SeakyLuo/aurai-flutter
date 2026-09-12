@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -14,6 +16,7 @@ import android.os.Looper
 
 class AgentSessionService : Service() {
     private val handler = Handler(Looper.getMainLooper())
+    private val coverLogo by lazy { BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher) }
 
     override fun onCreate() {
         super.onCreate()
@@ -35,24 +38,26 @@ class AgentSessionService : Service() {
                 AuraiApplication.requestAgentStop()
                 handler.postDelayed({ finish("failed") }, STOP_TIMEOUT_MS)
             }
-            ACTION_FINISH -> finish(intent!!.getStringExtra(EXTRA_OUTCOME)!!)
+            ACTION_FINISH -> finish(
+                intent!!.getStringExtra(EXTRA_OUTCOME)!!,
+                intent.getStringExtra("conversationId"),
+                intent.getStringExtra("title"),
+                intent.getStringExtra("reply"),
+            )
         }
         return START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun finish(outcome: String) {
+    private fun finish(outcome: String, conversationId: String? = null, title: String? = null, reply: String? = null) {
         handler.removeCallbacksAndMessages(null)
         running = false
-        if (outcome == "cancelled" || MainActivity.isResumed) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } else {
-            val completed = outcome == "completed"
-            stopForeground(STOP_FOREGROUND_DETACH)
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        if (outcome != "cancelled" && !MainActivity.isResumed) {
             notificationManager().notify(
-                NOTIFICATION_ID,
-                finishedNotification(completed),
+                conversationId, FINISHED_NOTIFICATION_ID,
+                finishedNotification(outcome == "completed", conversationId, title, reply),
             )
         }
         stopSelf()
@@ -60,7 +65,8 @@ class AgentSessionService : Service() {
 
     private fun runningNotification(step: String): Notification =
         Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_stat_aurai)
+            .setLargeIcon(coverLogo)
             .setContentTitle("Aurai 正在执行任务")
             .setContentText(step)
             .setContentIntent(openAppIntent())
@@ -80,26 +86,37 @@ class AgentSessionService : Service() {
             )
             .build()
 
-    private fun finishedNotification(completed: Boolean): Notification =
-        Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(if (completed) "任务已完成" else "任务未完成")
-            .setContentText(if (completed) "点按查看结果" else "点按返回 Aurai 处理")
-            .setContentIntent(openAppIntent())
+    private fun finishedNotification(completed: Boolean, conversationId: String?, title: String?, reply: String?): Notification =
+        Notification.Builder(this, RESULT_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_aurai)
+            .setLargeIcon(coverLogo)
+            .setContentTitle(if (completed) "${title!!} · 已完成回复" else "任务未完成")
+            .setContentText(if (completed) reply!!.take(240) else "点按返回 Aurai 处理")
+            .setStyle(Notification.BigTextStyle().bigText(if (completed) reply!!.take(4000) else "点按返回 Aurai 处理"))
+            .setContentIntent(openAppIntent(conversationId))
+            .setVisibility(Notification.VISIBILITY_PRIVATE)
             .setAutoCancel(true)
-            .setOnlyAlertOnce(true)
             .build()
 
-    private fun openAppIntent() = PendingIntent.getActivity(
+    private fun openAppIntent(conversationId: String? = null) = PendingIntent.getActivity(
         this,
         1,
         Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            if (conversationId != null) {
+                data = Uri.parse("aurai://conversation/${Uri.encode(conversationId)}")
+                putExtra("conversationId", conversationId)
+            }
         },
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
     private fun createChannel() {
+        notificationManager().createNotificationChannel(
+            NotificationChannel(RESULT_CHANNEL_ID, "回复完成", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "会话在后台完成后的回复通知"
+            },
+        )
         notificationManager().createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
@@ -116,6 +133,8 @@ class AgentSessionService : Service() {
     private fun notificationManager() = getSystemService(NotificationManager::class.java)
 
     companion object {
+        private const val RESULT_CHANNEL_ID = "aurai_reply_complete"
+        private const val FINISHED_NOTIFICATION_ID = 1109
         private const val CHANNEL_ID = "aurai_agent_session"
         private const val NOTIFICATION_ID = 1107
         private const val ACTION_START = "com.haiskynology.aurai.agent.START"
@@ -144,11 +163,14 @@ class AgentSessionService : Service() {
             )
         }
 
-        fun finish(context: Context, outcome: String) {
+        fun finish(context: Context, outcome: String, conversationId: String, title: String, reply: String) {
             context.startService(
                 Intent(context, AgentSessionService::class.java)
                     .setAction(ACTION_FINISH)
-                    .putExtra(EXTRA_OUTCOME, outcome),
+                    .putExtra(EXTRA_OUTCOME, outcome)
+                    .putExtra("conversationId", conversationId)
+                    .putExtra("title", title)
+                    .putExtra("reply", reply.take(4000)),
             )
         }
 

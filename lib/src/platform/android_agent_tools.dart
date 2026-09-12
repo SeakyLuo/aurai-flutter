@@ -6,6 +6,9 @@ import '../domain/tool_models.dart';
 import 'android_network_tools.dart';
 import 'aurai_platform.dart';
 
+String _screenTaskDescription(String provider) =>
+    '允许 Aurai 在当前任务中读取屏幕并发送给 $provider 分析，以及点击、输入、滚动和导航以完成你的请求。停止或结束任务后授权失效。';
+
 typedef AccessibilityRequester = Future<Map<String, Object?>> Function();
 
 class WaitTool implements AgentTool {
@@ -67,6 +70,7 @@ class RequestAccessibilityAccessTool implements AgentTool {
   @override
   ToolDefinition get definition => const ToolDefinition(
     name: 'requestAccessibilityAccess',
+    executionTimeout: Duration(seconds: 155),
     description:
         'Ask the user to enable Aurai accessibility access when UI observation or interaction is needed. Waits for the user to return.',
     inputSchema: <String, Object?>{
@@ -131,8 +135,8 @@ class CaptureScreenTool implements AgentTool {
     },
     safety: ToolSafety.sensitive,
     capabilityId: 'android.vision',
-    confirmationDescription:
-        'Aurai 将读取当前屏幕并发送给 $_providerLabel 分析。画面可能包含私人信息，本次仅允许读取这一屏。',
+    taskScopedConfirmation: true,
+    confirmationDescription: _screenTaskDescription(_providerLabel),
   );
 
   @override
@@ -167,12 +171,13 @@ class CaptureScreenTool implements AgentTool {
 }
 
 class TapScreenTool implements AgentTool, PreflightAgentTool {
-  TapScreenTool(this._platform);
+  TapScreenTool(this._platform, this._providerLabel);
 
   final AuraiPlatform _platform;
+  final String _providerLabel;
 
   @override
-  ToolDefinition get definition => const ToolDefinition(
+  ToolDefinition get definition => ToolDefinition(
     name: 'tapScreen',
     description:
         'Tap one point from the latest captureScreen result. Coordinates are normalized within that captured target window: x and y are each at least 0 and less than 1. The screenshot is invalidated after one attempt.',
@@ -197,6 +202,8 @@ class TapScreenTool implements AgentTool, PreflightAgentTool {
     },
     safety: ToolSafety.sensitive,
     capabilityId: 'android.vision',
+    taskScopedConfirmation: true,
+    confirmationDescription: _screenTaskDescription(_providerLabel),
   );
 
   @override
@@ -237,10 +244,11 @@ class TapScreenTool implements AgentTool, PreflightAgentTool {
 }
 
 class ActTool extends _PlatformTool {
-  ActTool(super.platform);
+  ActTool(super.platform, this._providerLabel);
+  final String _providerLabel;
 
   @override
-  ToolDefinition get definition => const ToolDefinition(
+  ToolDefinition get definition => ToolDefinition(
     name: 'act',
     description:
         'Perform one generic Android UI action against the latest observed accessibility node. Re-observe after every action.',
@@ -278,13 +286,8 @@ class ActTool extends _PlatformTool {
     },
     safety: ToolSafety.sensitive,
     capabilityId: 'android.accessibility',
-    actionArgument: 'action',
-    actionSafety: <String, ToolSafety>{
-      'scrollForward': ToolSafety.lowRisk,
-      'scrollBackward': ToolSafety.lowRisk,
-      'back': ToolSafety.lowRisk,
-      'home': ToolSafety.lowRisk,
-    },
+    taskScopedConfirmation: true,
+    confirmationDescription: _screenTaskDescription(_providerLabel),
   );
 
   @override

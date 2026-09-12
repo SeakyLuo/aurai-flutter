@@ -1,0 +1,126 @@
+import 'package:sqflite/sqflite.dart';
+
+Future<Database> openConversationDatabase() async => openDatabase(
+  '${await getDatabasesPath()}/aurai.sqlite',
+  version: 1,
+  onConfigure: (db) async {
+    await db.execute('PRAGMA foreign_keys = ON');
+    await db.rawQuery('PRAGMA journal_mode = WAL');
+  },
+  onCreate: (db, version) async {
+    final batch = db.batch();
+    for (final statement in _schema) {
+      batch.execute(statement);
+    }
+    await batch.commit(noResult: true);
+  },
+);
+
+const _schema = [
+  '''CREATE TABLE app_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  )''',
+  '''CREATE TABLE conversations (
+    id TEXT PRIMARY KEY,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    preview TEXT,
+    pinned INTEGER NOT NULL DEFAULT 0,
+    draft TEXT NOT NULL DEFAULT '',
+    pending_goal TEXT,
+    run_state TEXT NOT NULL DEFAULT 'idle',
+    error_detail TEXT,
+    active_run_id TEXT,
+    message_count INTEGER NOT NULL DEFAULT 0
+  )''',
+  '''CREATE TABLE agent_runs (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    user_message_id TEXT,
+    provider TEXT,
+    model TEXT,
+    status TEXT NOT NULL,
+    started_at INTEGER,
+    finished_at INTEGER,
+    elapsed_ms INTEGER,
+    is_task INTEGER NOT NULL DEFAULT 0,
+    final_message_id TEXT,
+    error_detail TEXT
+  )''',
+  '''CREATE TABLE model_turns (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    ordinal INTEGER NOT NULL,
+    response_id TEXT,
+    status TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    finished_at INTEGER,
+    UNIQUE(run_id, ordinal)
+  )''',
+  '''CREATE TABLE messages (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    run_id TEXT REFERENCES agent_runs(id) ON DELETE CASCADE,
+    model_turn_id TEXT REFERENCES model_turns(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )''',
+  '''CREATE TABLE attachments (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    message_id TEXT REFERENCES messages(id) ON DELETE CASCADE,
+    file_name TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    position INTEGER NOT NULL
+  )''',
+  '''CREATE TABLE tool_calls (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    model_turn_id TEXT NOT NULL REFERENCES model_turns(id) ON DELETE CASCADE,
+    provider_call_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    title TEXT NOT NULL,
+    arguments_json TEXT NOT NULL,
+    status TEXT NOT NULL,
+    result_status TEXT,
+    result_json TEXT,
+    started_at INTEGER NOT NULL,
+    finished_at INTEGER,
+    UNIQUE(run_id, provider_call_id)
+  )''',
+  '''CREATE TABLE tool_approvals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tool_call_id TEXT NOT NULL REFERENCES tool_calls(id) ON DELETE CASCADE,
+    safety TEXT NOT NULL,
+    scope_json TEXT NOT NULL,
+    decision TEXT NOT NULL,
+    requested_at INTEGER NOT NULL,
+    resolved_at INTEGER
+  )''',
+  '''CREATE TABLE run_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    message_id TEXT UNIQUE REFERENCES messages(id) ON DELETE CASCADE,
+    tool_call_id TEXT UNIQUE REFERENCES tool_calls(id) ON DELETE CASCADE,
+    legacy_text TEXT,
+    legacy_status TEXT
+  )''',
+  'CREATE INDEX conversation_order ON conversations(pinned DESC, updated_at DESC, id DESC)',
+  'CREATE INDEX message_history ON messages(conversation_id, created_at DESC, id DESC)',
+  'CREATE INDEX message_run ON messages(run_id)',
+  'CREATE INDEX attachment_conversation ON attachments(conversation_id, message_id)',
+  'CREATE INDEX run_conversation ON agent_runs(conversation_id, started_at DESC)',
+  'CREATE INDEX run_final_message ON agent_runs(final_message_id)',
+  'CREATE INDEX turn_run ON model_turns(run_id, ordinal)',
+  'CREATE INDEX tool_run ON tool_calls(run_id, started_at)',
+  'CREATE INDEX approval_tool ON tool_approvals(tool_call_id)',
+  'CREATE INDEX event_run ON run_events(run_id, id)',
+];
