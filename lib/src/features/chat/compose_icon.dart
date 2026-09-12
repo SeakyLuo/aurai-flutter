@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 class ComposeIcon extends StatelessWidget {
-  const ComposeIcon({super.key, this.color = const Color(0xff242424)});
-  final Color color;
+  const ComposeIcon({super.key, this.color});
+  final Color? color;
   @override
-  Widget build(BuildContext context) =>
-      CustomPaint(size: const Size.square(24), painter: _ComposePainter(color));
+  Widget build(BuildContext context) => CustomPaint(
+    size: const Size.square(24),
+    painter: _ComposePainter(color ?? Theme.of(context).colorScheme.onSurface),
+  );
 }
 
 class _ComposePainter extends CustomPainter {

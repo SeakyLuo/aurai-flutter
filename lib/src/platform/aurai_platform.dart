@@ -91,10 +91,20 @@ class AuraiPlatform {
         'step': step,
       });
 
-  Future<void> endAgentSession(String outcome) => _channel.invokeMethod<void>(
-    'endAgentSession',
-    <String, Object?>{'outcome': outcome},
-  );
+  Future<void> endAgentSession(
+    String outcome, {
+    required String conversationId,
+    required String title,
+    required String reply,
+  }) => _channel.invokeMethod<void>('endAgentSession', {
+    'outcome': outcome,
+    'conversationId': conversationId,
+    'title': title,
+    'reply': reply,
+  });
+
+  Future<String?> takeNotificationConversation() =>
+      _channel.invokeMethod<String>('takeNotificationConversation');
 
   Future<Map<String, Object?>> getBackgroundRunReadiness() =>
       _invokeMap('getBackgroundRunReadiness');
@@ -140,9 +150,13 @@ class AuraiPlatform {
     ...arguments,
   });
 
-  void setStopHandler(Future<void> Function() handler) {
+  void setStopHandler(
+    Future<void> Function() handler,
+    void Function() onNotification,
+  ) {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'stopAgent') await handler();
+      if (call.method == 'notificationOpened') onNotification();
     });
   }
 
@@ -196,19 +210,16 @@ class AuraiPlatform {
     }
   }
 
-  Future<String?> loadAppState() async {
+  Future<String?> loadLegacyAppState() async {
     if (!Platform.isAndroid) {
       return null;
     }
     return _channel.invokeMethod<String>('loadAppState');
   }
 
-  Future<void> saveAppState(String state) async {
-    if (Platform.isAndroid) {
-      await _channel.invokeMethod<void>('saveAppState', <String, Object?>{
-        'state': state,
-      });
-    }
+  Future<void> clearLegacyAppState() async {
+    if (Platform.isAndroid)
+      await _channel.invokeMethod<void>('clearLegacyAppState');
   }
 
   Future<ModelSettings> loadModelSettings() async {

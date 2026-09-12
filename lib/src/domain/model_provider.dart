@@ -1,4 +1,5 @@
 import 'agent_models.dart';
+import 'context_summary.dart';
 import 'capability.dart';
 import 'tool_models.dart';
 
@@ -19,11 +20,6 @@ extension ModelServiceDetails on ModelService {
     ModelService.openAi => 'https://api.openai.com/v1',
     ModelService.deepSeek => 'https://api.deepseek.com',
   };
-
-  bool get defaultSupportsImageInput => switch (this) {
-    ModelService.openAi => true,
-    ModelService.deepSeek => false,
-  };
 }
 
 class ModelConfig {
@@ -32,7 +28,6 @@ class ModelConfig {
     this.service = ModelService.openAi,
     required this.model,
     required this.baseUrl,
-    required this.supportsImageInput,
   });
 
   factory ModelConfig.defaults(ModelService service, {String apiKey = ''}) =>
@@ -41,14 +36,12 @@ class ModelConfig {
         apiKey: apiKey,
         model: service.defaultModel,
         baseUrl: service.defaultBaseUrl,
-        supportsImageInput: service.defaultSupportsImageInput,
       );
 
   final ModelService service;
   final String apiKey;
   final String model;
   final String baseUrl;
-  final bool supportsImageInput;
 
   bool get isConfigured => apiKey.isNotEmpty;
 
@@ -57,7 +50,6 @@ class ModelConfig {
     'apiKey': apiKey,
     'model': model,
     'baseUrl': baseUrl,
-    'supportsImageInput': supportsImageInput,
   };
 
   factory ModelConfig.fromJson(Map<String, Object?> json) => ModelConfig(
@@ -65,11 +57,6 @@ class ModelConfig {
     apiKey: json['apiKey']! as String,
     model: json['model']! as String,
     baseUrl: json['baseUrl']! as String,
-    supportsImageInput:
-        json['supportsImageInput'] as bool? ??
-        _serviceFromStored(
-          json['service']! as String,
-        ).defaultSupportsImageInput,
   );
 }
 
@@ -141,6 +128,9 @@ class ModelRequest {
     required this.tools,
     required this.capabilities,
     this.continuationToken,
+    this.contextSummary,
+    this.onContextSummary,
+    this.onTextChanged,
     this.toolResults = const <ToolResult>[],
   });
 
@@ -148,7 +138,10 @@ class ModelRequest {
   final List<ToolDefinition> tools;
   final List<Capability> capabilities;
   final String? continuationToken;
+  final ContextSummary? contextSummary;
+  final Future<void> Function(ContextSummary)? onContextSummary;
   final List<ToolResult> toolResults;
+  final void Function(String text)? onTextChanged;
 }
 
 class ModelTurn {
@@ -164,8 +157,6 @@ class ModelTurn {
 }
 
 abstract interface class ModelProvider {
-  bool get supportsImageInput;
-
   Future<ModelTurn> respond(ModelRequest request);
 
   Future<void> cancel();

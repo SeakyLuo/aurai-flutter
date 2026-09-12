@@ -92,6 +92,10 @@ class AuraiApplication : Application() {
 
     private fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "takeNotificationConversation" -> {
+                result.success(pendingNotificationConversation)
+                pendingNotificationConversation = null
+            }
             "getNetworkState" -> startTask(result, ::readNetworkState)
             "getNetworkEvents" -> result.success(readNetworkEvents())
             "dnsLookup" -> {
@@ -137,8 +141,8 @@ class AuraiApplication : Application() {
                 result.success(null)
             }
             "loadAppState" -> result.success(preferences().getString(APP_STATE_KEY, null))
-            "saveAppState" -> {
-                preferences().edit().putString(APP_STATE_KEY, call.argument<String>("state")!!).apply()
+            "clearLegacyAppState" -> {
+                preferences().edit().remove(APP_STATE_KEY).apply()
                 result.success(null)
             }
             "loadModelConfig" -> result.success(loadModelConfig())
@@ -524,6 +528,13 @@ class AuraiApplication : Application() {
         private const val MAX_NETWORK_EVENTS = 100
         private val IP_LITERAL = Regex("^[0-9a-fA-F:.]+$")
         private var activeChannel: MethodChannel? = null
+
+        private var pendingNotificationConversation: String? = null
+
+        fun notificationOpened(conversationId: String) {
+            pendingNotificationConversation = conversationId
+            activeChannel?.invokeMethod("notificationOpened", null)
+        }
 
         fun requestAgentStop() {
             activeChannel?.invokeMethod("stopAgent", null)

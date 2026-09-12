@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../agent/agent_runtime.dart';
 import '../../agent/tool_executor.dart';
 import '../../agent/tool_registry.dart';
 import '../../domain/agent_models.dart';
+import '../../domain/conversation_completion.dart';
 import '../../domain/capability.dart';
 import '../../domain/model_provider.dart';
 import '../../domain/tool_models.dart';
@@ -15,11 +18,23 @@ import '../../platform/android_network_tools.dart';
 import '../../platform/android_agent_tools.dart';
 import '../../platform/android_notification_tools.dart';
 import '../../platform/aurai_platform.dart';
+import '../../platform/message_image_store.dart';
+import '../../domain/message_image.dart';
 import '../../providers/deepseek_responses_provider.dart';
 import '../../providers/openai_responses_provider.dart';
 import 'conversation.dart';
+import '../../storage/conversation_store.dart';
+import '../../storage/conversation_message_edit.dart';
+import '../../storage/new_conversation_draft.dart';
+import '../../storage/conversation_reader.dart';
+import '../../storage/conversation_rows.dart';
 
 export 'conversation.dart';
+
+part 'conversation_actions.dart';
+part 'conversation_run.dart';
+part 'message_edit_actions.dart';
+part 'accessibility_request.dart';
 
 class PendingConfirmation {
   PendingConfirmation(this.call, this.definition);
@@ -32,12 +47,29 @@ class ChatController extends ChangeNotifier {
   ChatController(this._platform);
 
   final AuraiPlatform _platform;
-  final List<Conversation> _conversations = [Conversation.empty()];
-  int _activeIndex = 0;
-  Conversation get activeConversation => _conversations[_activeIndex];
+  final _imageStore = MessageImageStore();
+  bool addingImages = false;
+  List<MessageImage> get draftImages => activeConversation.draftImages;
+  final notificationOpenRequests = ValueNotifier<int>(0);
+  Future<String?> takeNotificationConversation() =>
+      _platform.takeNotificationConversation();
+  final completedReplies = ValueNotifier<ConversationCompletion?>(null);
+  final _store = ConversationStore();
+  final _newDraftStore = NewConversationDraft();
+  late Conversation _newConversation;
+  final List<Conversation> _conversations = [];
+  late Conversation _activeConversation;
+  Conversation get activeConversation => _activeConversation;
+  Conversation? _conversationCursor;
+  bool hasMoreConversations = false;
+  bool loadingConversations = false;
+  bool loadingEarlierMessages = false;
+  bool changingConversation = false;
   List<Conversation> get conversations => List.unmodifiable(
-    <Conversation>[..._conversations]
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)),
+    <Conversation>[..._conversations]..sort((a, b) {
+      if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+      return b.updatedAt.compareTo(a.updatedAt);
+    }),
   );
   List<AgentMessage> get messages => activeConversation.messages;
   List<AgentStep> get steps => activeConversation.steps;
@@ -49,18 +81,36 @@ class ChatController extends ChangeNotifier {
   set pendingGoal(String? value) => activeConversation.pendingGoal = value;
   String? get errorDetail => activeConversation.errorDetail;
   set errorDetail(String? value) => activeConversation.errorDetail = value;
-  Future<void> _saving = Future.value();
   bool _submitting = false;
   AgentRuntime? _runtime;
+  Conversation? _runningConversation;
+  bool get hasRunningTask => _runningConversation != null || _submitting;
+  String? get runningConversationId => _runningConversation?.id;
+
+  String? streamingMessageId;
   PendingConfirmation? pendingConfirmation;
   Completer<Map<String, Object?>>? _accessibilityRequest;
   bool accessibilityRequestPending = false;
+  Timer? _accessibilityTimer;
+  DateTime? accessibilityDeadline;
+  bool _accessibilitySettingsOpened = false;
+
+  void _accessibilityChanged() => notifyListeners();
+
+  @override
+  void dispose() {
+    _accessibilityTimer?.cancel();
+    completedReplies.dispose();
+    notificationOpenRequests.dispose();
+    super.dispose();
+  }
+
   final Set<String> _deniedConfirmations = <String>{};
   bool _accessibilityDeclined = false;
 
   bool get isBusy =>
       _submitting ||
-      _runtime != null ||
+      identical(_runningConversation, activeConversation) ||
       runState == ChatRunState.running ||
       runState == ChatRunState.stopping;
 
@@ -74,53 +124,76 @@ class ChatController extends ChangeNotifier {
   );
 
   Future<void> initialize() async {
-    _platform.setStopHandler(stop);
+    _platform.setStopHandler(stop, () => notificationOpenRequests.value++);
+    await _imageStore.initialize();
     modelSettings = await _platform.loadModelSettings();
     await refreshCapabilities();
-    final saved = await _platform.loadAppState();
-    if (saved != null) {
-      final json = (jsonDecode(saved) as Map<Object?, Object?>)
-          .cast<String, Object?>();
-      _conversations.clear();
-      if (json['version'] == 2) {
-        _conversations.addAll(
-          (json['conversations']! as List<Object?>).map(
-            (item) =>
-                Conversation.fromJson((item! as Map).cast<String, Object?>()),
-          ),
-        );
-        _activeIndex = _conversations.indexWhere(
-          (item) => item.id == json['activeConversation'],
-        );
-      } else {
-        _conversations.add(Conversation.fromJson(json, legacy: true));
-      }
+    final activeId = await _store.initialize(
+      _imageStore.directory,
+      _platform.loadLegacyAppState,
+      _platform.clearLegacyAppState,
+    );
+    _newConversation = await _newDraftStore.load(_imageStore.directory);
+    if (await _store.hasMessages(_newConversation.id)) {
+      await _newDraftStore.clear();
+      _newConversation = Conversation.empty();
     }
+    _activeConversation = activeId == null
+        ? _newConversation
+        : await _store.load(activeId);
+    if (activeId != null && activeConversation.messageCount == 0) {
+      _newConversation = activeConversation;
+      await _newDraftStore.save(_newConversation);
+      await _store.removeDraftConversation(activeId);
+    }
+    await _reloadConversations();
     notifyListeners();
-    await _persist();
   }
 
   Future<bool> submitGoal(String goal) async {
+    if (hasRunningTask) throw StateError('另一个会话正在运行，请等待完成');
     _submitting = true;
+    final wasNew = activeConversation.messageCount == 0;
+    final previousDraft = activeConversation.draft;
     try {
+      if (wasNew) await _newDraftStore.save(activeConversation);
       activeConversation.draft = '';
       messages.add(
         AgentMessage(
           id: newMessageId(),
           role: AgentMessageRole.user,
           text: goal,
+          images: List.unmodifiable(draftImages),
           createdAt: DateTime.now(),
         ),
       );
+      activeConversation.messageCount++;
+      draftImages.clear();
       pendingGoal = goal;
       steps.clear();
+      activeConversation.liveToolSteps.clear();
       errorDetail = null;
       runState = ChatRunState.idle;
       notifyListeners();
-      await _persist();
+      try {
+        await _persist();
+      } on Object {
+        final unsent = messages.removeLast();
+        activeConversation.messageCount--;
+        activeConversation.draft = previousDraft;
+        draftImages.addAll(unsent.images);
+        pendingGoal = null;
+        rethrow;
+      }
+      if (wasNew) {
+        _newConversation = Conversation.empty();
+        await _newDraftStore.clear();
+      }
+      _updateConversationList();
       if (needsConfiguration) {
         return true;
       }
+      _submitting = false;
       await continuePending();
       return false;
     } finally {
@@ -130,122 +203,31 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<void> continuePending() async {
-    if (pendingGoal == null ||
-        _runtime != null ||
-        runState == ChatRunState.running ||
-        runState == ChatRunState.stopping) {
-      return;
-    }
-    steps.clear();
-    errorDetail = null;
-    runState = ChatRunState.running;
-    _deniedConfirmations.clear();
-    _accessibilityDeclined = false;
+    if (hasRunningTask) throw StateError('另一个会话正在运行，请等待完成');
+    if (pendingGoal == null) return;
+    final conversation = activeConversation;
+    _runningConversation = conversation;
     notifyListeners();
-    await _persist();
-    var sessionStarted = false;
-    var outcome = 'failed';
     try {
-      await refreshCapabilities();
-      if (runState == ChatRunState.stopping) throw const AgentCancelled();
-      final provider = switch (config.service) {
-        ModelService.openAi => OpenAiResponsesProvider(config),
-        ModelService.deepSeek => DeepSeekResponsesProvider(config),
-      };
-      final tools = <AgentTool>[
-        GetNetworkStateTool(_platform),
-        GetNetworkEventsTool(_platform),
-        DnsLookupTool(_platform),
-        TlsProbeTool(_platform),
-        HttpProbeTool(_platform),
-        GetNotificationsTool(_platform, config.service.label),
-        ObserveDeviceTool(_platform),
-        if (provider.supportsImageInput)
-          CaptureScreenTool(_platform, config.service.label),
-        if (provider.supportsImageInput) TapScreenTool(_platform),
-        WaitTool(),
-        RequestAccessibilityAccessTool(_requestAccessibility),
-        ActTool(_platform),
-        FindAppsTool(_platform),
-        LaunchAppTool(_platform),
-        StartIntentTool(_platform),
-        OpenSettingsTool(_platform),
-        AppShellTool(_platform),
-      ];
-      final registry = ToolRegistry(tools: tools, capabilities: capabilities);
-      final executor = ToolExecutor(registry: registry, confirm: _confirm);
-      _runtime = AgentRuntime(
-        provider: provider,
-        registry: registry,
-        executor: executor,
-      );
-      await _platform.startAgentSession();
-      sessionStarted = true;
-      if (runState == ChatRunState.stopping) throw const AgentCancelled();
-      final result = await _runtime!.run(
-        conversation: List.unmodifiable(messages),
-        onStepsChanged: (newSteps) {
-          steps
-            ..clear()
-            ..addAll(newSteps);
-          final runningStep = newSteps.where(
-            (step) => step.status == AgentStepStatus.running,
-          );
-          unawaited(
-            _platform.updateAgentSessionStep(
-              runningStep.isEmpty ? '正在分析结果' : runningStep.last.title,
-            ),
-          );
-          notifyListeners();
-        },
-      );
-      messages.add(
-        AgentMessage(
-          id: newMessageId(),
-          role: AgentMessageRole.assistant,
-          text: result.answer,
-          createdAt: DateTime.now(),
-        ),
-      );
-      pendingGoal = null;
-      runState = ChatRunState.idle;
-      outcome = 'completed';
-    } on Object catch (error) {
-      if (runState == ChatRunState.stopping || error is AgentCancelled) {
-        runState = ChatRunState.cancelled;
-        outcome = 'cancelled';
-      } else {
-        runState = ChatRunState.failed;
-        errorDetail = switch (error) {
-          ModelProviderException() => error.message,
-          PlatformException() => error.message ?? '设备能力调用失败',
-          _ => '任务执行失败',
-        };
-      }
-      rethrow;
+      await _executeConversation(conversation);
     } finally {
-      if (sessionStarted) await _platform.endAgentSession(outcome);
-      _runtime = null;
+      _runningConversation = null;
+      _updateConversationList(conversation);
       notifyListeners();
-      await _persist();
     }
   }
 
   Future<void> stop() async {
-    if (runState != ChatRunState.running) {
+    final conversation = _runningConversation;
+    if (conversation == null || conversation.runState != ChatRunState.running) {
       return;
     }
-    runState = ChatRunState.stopping;
+    conversation.runState = ChatRunState.stopping;
     notifyListeners();
-    await _persist();
+    await _persistRun(conversation);
     pendingConfirmation?.completer.complete(false);
     pendingConfirmation = null;
-    _accessibilityRequest?.complete(const <String, Object?>{
-      'granted': false,
-      'reason': 'User stopped the task',
-    });
-    _accessibilityRequest = null;
-    accessibilityRequestPending = false;
+    _finishAccessibility({'granted': false, 'reason': 'User stopped the task'});
     await _platform.cancelPendingInteraction();
     await _runtime?.cancel();
   }
@@ -254,7 +236,6 @@ class ChatController extends ChangeNotifier {
     final nextSettings = modelSettings.activate(newConfig);
     await _platform.saveModelSettings(nextSettings);
     modelSettings = nextSettings;
-    await refreshCapabilities();
     notifyListeners();
   }
 
@@ -262,20 +243,7 @@ class ChatController extends ChangeNotifier {
     final loaded = await _platform.loadCapabilities();
     capabilities
       ..clear()
-      ..addAll(
-        loaded.map(
-          (capability) =>
-              capability.id == 'android.vision' &&
-                  !modelSettings.activeConfig.supportsImageInput
-              ? const Capability(
-                  id: 'android.vision',
-                  name: '屏幕视觉',
-                  availability: CapabilityAvailability.unsupported,
-                  reason: '当前模型配置未开启图像输入',
-                )
-              : capability,
-        ),
-      );
+      ..addAll(loaded);
     notifyListeners();
   }
 
@@ -284,6 +252,10 @@ class ChatController extends ChangeNotifier {
 
   Future<bool> requestNotificationPermission() =>
       _platform.requestNotificationPermission();
+
+  Future<void> openAppSettings() async {
+    await _platform.openSettings('appDetails');
+  }
 
   Future<void> openNotificationSettings() =>
       _platform.openNotificationSettings();
@@ -297,37 +269,6 @@ class ChatController extends ChangeNotifier {
 
   Future<void> openBatterySettings() => _platform.openBatterySettings();
 
-  Future<void> checkAccessibilityReturn() async {
-    if (!accessibilityRequestPending) return;
-    await refreshCapabilities();
-    final granted = capabilities.any(
-      (capability) =>
-          capability.id == 'android.accessibility' && capability.isAvailable,
-    );
-    if (granted) {
-      _accessibilityRequest!.complete(const <String, Object?>{
-        'granted': true,
-        'next': 'Call observeDevice again before acting',
-      });
-      _accessibilityRequest = null;
-      accessibilityRequestPending = false;
-      notifyListeners();
-    }
-  }
-
-  void cancelAccessibilityRequest() {
-    final request = _accessibilityRequest;
-    if (request == null) return;
-    request.complete(const <String, Object?>{
-      'granted': false,
-      'reason': 'User declined accessibility access for this task',
-    });
-    _accessibilityRequest = null;
-    accessibilityRequestPending = false;
-    _accessibilityDeclined = true;
-    notifyListeners();
-  }
-
   void resolveConfirmation(bool approved) {
     final request = pendingConfirmation;
     if (request == null) return;
@@ -336,71 +277,175 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> clearConversation() async {
-    if (isBusy) {
-      return;
-    }
-    messages.clear();
-    steps.clear();
-    pendingGoal = null;
-    errorDetail = null;
-    runState = ChatRunState.idle;
-    notifyListeners();
-    await _persist();
-  }
-
   Future<void> createConversation() async {
-    if (isBusy) throw StateError('请先停止当前任务，再新建会话');
-    final emptyIndex = _conversations.indexWhere((item) => item.isEmpty);
-    if (emptyIndex == -1) {
-      _conversations.add(Conversation.empty());
-      _activeIndex = _conversations.length - 1;
-    } else {
-      _activeIndex = emptyIndex;
-    }
-    notifyListeners();
-    await _persist();
+    if (identical(activeConversation, _newConversation)) return;
+    await _switchConversation(null);
   }
 
-  Future<void> selectConversation(String id) async {
-    if (isBusy) throw StateError('请先停止当前任务，再切换会话');
-    _activeIndex = _conversations.indexWhere((item) => item.id == id);
+  Future<void> selectConversation(String id) => _switchConversation(id);
+
+  final _loadedMessageCounts = <String, int>{};
+
+  Future<void> _switchConversation(String? id) async {
+    if (_submitting || addingImages || changingConversation)
+      throw StateError('请等待当前操作完成，再切换会话');
+    changingConversation = true;
     notifyListeners();
-    await _persist();
+    try {
+      await _persist();
+      _loadedMessageCounts[activeConversation.id] = messages.length;
+      final conversation = id == null
+          ? _newConversation
+          : id == _runningConversation?.id
+          ? _runningConversation!
+          : await _store.load(
+              id,
+              messageLimit:
+                  _loadedMessageCounts[id] ??
+                  ConversationReader.messagePageSize,
+            );
+      if (id == null) {
+        await _store.selectNewConversation();
+      } else {
+        if (conversation.runState == ChatRunState.idle &&
+            conversation.pendingGoal == null) {
+          conversation.seenRunId = conversation.activeRunId;
+        }
+        await _store.writer.save(conversation);
+      }
+      final previousIndex = _conversations.indexWhere(
+        (item) => item.id == activeConversation.id,
+      );
+      if (previousIndex >= 0 && activeConversation != _runningConversation) {
+        _conversations[previousIndex] =
+            conversationFromRow(conversationRow(activeConversation))
+              ..seenRunId = activeConversation.seenRunId
+              ..draftImages.addAll(activeConversation.draftImages);
+      }
+      _activeConversation = conversation;
+      _store.writer.retain([
+        ...conversation.messages,
+        if (_runningConversation != null &&
+            _runningConversation != conversation)
+          ..._runningConversation!.messages,
+      ]);
+      _updateConversationList();
+    } finally {
+      changingConversation = false;
+      notifyListeners();
+    }
+  }
+
+  void _conversationChanged() => notifyListeners();
+
+  void _updateConversationList([Conversation? value]) {
+    final conversation = value ?? activeConversation;
+    if (conversation.messageCount == 0) return;
+    final index = _conversations.indexWhere(
+      (item) => item.id == conversation.id,
+    );
+    if (index == -1) {
+      _conversations.add(conversation);
+    } else {
+      _conversations[index] = conversation;
+    }
+  }
+
+  Future<void> _reloadConversations() async {
+    final page = await _store.reader.list();
+    _conversations
+      ..clear()
+      ..addAll(
+        page.map(
+          (item) => item.id == activeConversation.id
+              ? activeConversation
+              : item.id == _runningConversation?.id
+              ? _runningConversation!
+              : item,
+        ),
+      );
+    _conversationCursor = page.isEmpty ? null : page.last;
+    hasMoreConversations = page.length == ConversationReader.pageSize;
+  }
+
+  Future<void> loadMoreConversations() async {
+    if (loadingConversations || !hasMoreConversations) return;
+    loadingConversations = true;
+    try {
+      final page = await _store.reader.list(after: _conversationCursor);
+      final ids = _conversations.map((item) => item.id).toSet();
+      _conversations.addAll(page.where((item) => !ids.contains(item.id)));
+      if (page.isNotEmpty) _conversationCursor = page.last;
+      hasMoreConversations = page.length == ConversationReader.pageSize;
+    } finally {
+      loadingConversations = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadEarlierMessages() async {
+    if (loadingEarlierMessages || !activeConversation.hasEarlierMessages)
+      return;
+    loadingEarlierMessages = true;
+    final conversation = activeConversation;
+    try {
+      final page = await _store.earlierMessages(conversation);
+      conversation.messages.insertAll(0, page);
+      conversation.hasEarlierMessages =
+          page.length == ConversationReader.messagePageSize;
+    } finally {
+      loadingEarlierMessages = false;
+      notifyListeners();
+    }
+  }
+
+  Future<List<ConversationSearchResult>> searchConversations(
+    String query,
+    int offset,
+  ) => _store.reader.search(query, offset);
+
+  Future<void> addImages([ImageSource? source]) async {
+    addingImages = true;
+    notifyListeners();
+    try {
+      await _persist();
+      final remaining = MessageImageStore.maxImages - draftImages.length;
+      final images = source == null
+          ? await _imageStore.recover(remaining)
+          : await _imageStore.pick(source, remaining);
+      draftImages.addAll(images);
+      try {
+        await _persist();
+      } on Object {
+        draftImages.removeWhere(images.contains);
+        await _imageStore.remove(images);
+        rethrow;
+      }
+    } finally {
+      addingImages = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeDraftImage(MessageImage image) async {
+    final index = draftImages.indexOf(image);
+    draftImages.removeAt(index);
+    notifyListeners();
+    try {
+      await _persist();
+    } on Object {
+      draftImages.insert(index, image);
+      notifyListeners();
+      rethrow;
+    }
+    await _imageStore.remove([image]);
   }
 
   Future<void> saveDraft() => _persist();
 
-  Future<void> _persist() {
-    final state = jsonEncode({
-      'version': 2,
-      'activeConversation': activeConversation.id,
-      'conversations': _conversations.map((item) => item.toJson()).toList(),
-    });
-    final write = _saving.then((_) => _platform.saveAppState(state));
-    // A failed write must not block later attempts; its caller still receives the error.
-    _saving = write.catchError((Object error) {});
-    return write;
-  }
-
-  Future<Map<String, Object?>> _requestAccessibility() async {
-    if (_accessibilityDeclined) {
-      return const <String, Object?>{
-        'granted': false,
-        'reason': 'User already declined accessibility access for this task',
-      };
-    }
-    if (_accessibilityRequest != null) {
-      return const <String, Object?>{
-        'granted': false,
-        'reason': 'Accessibility request already shown for this task',
-      };
-    }
-    _accessibilityRequest = Completer<Map<String, Object?>>();
-    accessibilityRequestPending = true;
-    notifyListeners();
-    return _accessibilityRequest!.future;
-  }
+  Future<void> _persist() => activeConversation.messageCount == 0
+      ? _newDraftStore.save(activeConversation)
+      : _store.writer.save(activeConversation);
 
   Future<bool> _confirm(ToolCall call, ToolDefinition definition) async {
     final fingerprint = '${call.name}:${jsonEncode(call.arguments)}';
@@ -408,6 +453,11 @@ class ChatController extends ChangeNotifier {
     final accessibilityAvailable = capabilities.any(
       (capability) =>
           capability.id == 'android.accessibility' && capability.isAvailable,
+    );
+    final approvalId = await _store.runs.requestApproval(
+      _runningConversation!.activeRunId!,
+      call,
+      definition,
     );
     final approved = accessibilityAvailable
         ? await _platform.requestConfirmation(
@@ -418,6 +468,7 @@ class ChatController extends ChangeNotifier {
             definition.taskScopedConfirmation,
           )
         : await _confirmInApp(call, definition);
+    await _store.runs.resolveApproval(approvalId, approved);
     if (!approved) _deniedConfirmations.add(fingerprint);
     return approved;
   }

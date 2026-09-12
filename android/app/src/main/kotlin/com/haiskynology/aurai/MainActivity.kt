@@ -1,6 +1,8 @@
 package com.haiskynology.aurai
 
 import android.Manifest
+import android.content.Intent
+import android.os.Bundle
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -9,6 +11,23 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
 
 class MainActivity : FlutterActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleNotificationIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
+    private fun handleNotificationIntent(intent: Intent) {
+        val conversationId = intent.getStringExtra("conversationId") ?: return
+        intent.removeExtra("conversationId")
+        AuraiApplication.notificationOpened(conversationId)
+    }
+
     override fun provideFlutterEngine(context: Context): FlutterEngine =
         FlutterEngineCache.getInstance().get(AuraiApplication.ENGINE_ID)!!
 

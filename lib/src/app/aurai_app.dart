@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'global_ui.dart';
+import 'appearance_settings.dart';
+import 'package:flutter/services.dart';
 import '../features/chat/chat_controller.dart';
 import '../features/chat/chat_page.dart';
+import '../features/chat/conversation_notifications.dart';
 
 class AuraiApp extends StatelessWidget {
   const AuraiApp({super.key, required this.controller});
@@ -9,67 +13,32 @@ class AuraiApp extends StatelessWidget {
   final ChatController controller;
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'Aurai',
-    debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xff1685f8),
-        primary: const Color(0xff1685f8),
-        surface: Colors.white,
-        onSurface: const Color(0xff171717),
-        onSurfaceVariant: const Color(0xff737580),
-        outlineVariant: const Color(0xffe9e9f0),
-      ),
-      scaffoldBackgroundColor: Colors.white,
-      dividerTheme: const DividerThemeData(
-        color: Color(0xffededf2),
-        thickness: 1,
-      ),
-      snackBarTheme: const SnackBarThemeData(
-        behavior: SnackBarBehavior.floating,
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(48, 52),
-          shape: const StadiumBorder(),
-        ),
-      ),
-      bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: Colors.white,
-        showDragHandle: true,
-        surfaceTintColor: Colors.transparent,
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: Color(0xff171717),
-        surfaceTintColor: Colors.transparent,
-        toolbarHeight: 72,
-        elevation: 0,
-        centerTitle: false,
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: const Color(0xfff7f7fa),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 18,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide.none,
-        ),
-      ),
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: AppearanceSettings.instance,
+    builder: (context, child) => MaterialApp(
+      title: 'Aurai',
+      debugShowCheckedModeBanner: false,
+      theme: GlobalUI.theme,
+      darkTheme: GlobalUI.darkTheme,
+      themeMode: AppearanceSettings.instance.mode,
+      builder: (context, child) {
+        final dark = Theme.of(context).brightness == Brightness.dark;
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: (dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
+              .copyWith(
+                systemNavigationBarColor: Theme.of(context).colorScheme.surface,
+                systemNavigationBarIconBrightness: dark
+                    ? Brightness.light
+                    : Brightness.dark,
+              ),
+          child: child!,
+        );
+      },
+      home: child,
     ),
-    home: ChatPage(controller: controller),
+    child: ConversationNotifications(
+      controller: controller,
+      child: ChatPage(controller: controller),
+    ),
   );
 }

@@ -100,13 +100,18 @@ class AndroidAgentBridge(private val context: Context) {
             "endAgentSession" -> {
                 sessionActive = false
                 AuraiAccessibilityService.instance?.endSession()
-                AgentSessionService.finish(context, call.argument<String>("outcome")!!)
+                AgentSessionService.finish(
+                    context, call.argument<String>("outcome")!!,
+                    call.argument<String>("conversationId")!!,
+                    call.argument<String>("title")!!,
+                    call.argument<String>("reply")!!,
+                )
                 result.success(null)
             }
             "requestConfirmation" -> requestConfirmation(call, result)
             "cancelPendingInteraction" -> {
                 appUidAdapter.cancel()
-                AuraiAccessibilityService.instance?.cancelPending()
+                AuraiAccessibilityService.instance?.cancelInteraction()
                 result.success(null)
             }
             else -> return false
@@ -128,13 +133,38 @@ class AndroidAgentBridge(private val context: Context) {
     private fun notificationGranted() = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
         context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
+    private fun accessibilityEnabled(): Boolean {
+        val target = ComponentName(context, AuraiAccessibilityService::class.java)
+        val enabled = Settings.Secure.getString(
+            context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ).orEmpty()
+        return enabled.split(':').any { ComponentName.unflattenFromString(it) == target }
+    }
+
+    private fun accessibilityMissing(): Map<String, Any?> = if (accessibilityEnabled()) {
+        mapOf("reason" to "service_disconnected", "next" to
+            "Accessibility is already enabled. Do not request permission again. Wait briefly and observeDevice again; if still disconnected, report the connection issue.")
+    } else {
+        mapOf("reason" to "permission_required", "next" to "requestAccessibilityAccess")
+    }
+
     private fun capabilities(): List<Map<String, Any?>> {
         val accessibility = AuraiAccessibilityService.instance != null
+        val accessAvailability = when {
+            accessibility -> "available"
+            accessibilityEnabled() -> "unavailable"
+            else -> "permissionRequired"
+        }
+        val accessReason = when (accessAvailability) {
+            "available" -> "可按观察结果点击、输入、滚动和导航"
+            "unavailable" -> "无障碍已开启，但服务暂未连接"
+            else -> "需要你在系统设置中手动开启 Aurai 无障碍服务"
+        }
         val notificationAccess = AuraiNotificationListenerService.accessState(context)
         val screenshotAvailability = when {
             Build.VERSION.SDK_INT < Build.VERSION_CODES.R -> "unsupported"
             accessibility -> "available"
-            else -> "permissionRequired"
+            else -> accessAvailability
         }
         return listOf(
             capability("android.network", "网络状态与连接诊断", "available", "可读取网络状态并执行 DNS 与 TLS 探测"),
@@ -145,7 +175,7 @@ class AndroidAgentBridge(private val context: Context) {
                 notificationAccess["availability"] as String,
                 notificationAccess["reason"] as String,
             ),
-            capability("android.accessibility", "跨 App 界面操作", if (accessibility) "available" else "permissionRequired", if (accessibility) "可按观察结果点击、输入、滚动和导航" else "需要你在系统设置中手动开启 Aurai 无障碍服务"),
+            capability("android.accessibility", "跨 App 界面操作", accessAvailability, accessReason),
             capability(
                 "android.vision",
                 "屏幕视觉",
@@ -153,6 +183,7 @@ class AndroidAgentBridge(private val context: Context) {
                 when (screenshotAvailability) {
                     "available" -> "可在用户确认后读取当前屏幕，并对最新截图执行一次性坐标点击"
                     "permissionRequired" -> "需要先开启 Aurai 无障碍服务"
+                    "unavailable" -> accessReason
                     else -> "需要 Android 11 或更高版本"
                 },
             ),
@@ -180,15 +211,13 @@ class AndroidAgentBridge(private val context: Context) {
             "uptimeMs" to SystemClock.elapsedRealtime(),
             "ui" to (service?.observe() ?: mapOf(
                 "accessibilityAvailable" to false,
-                "reason" to "permission_required",
-                "next" to "requestAccessibilityAccess",
-            )),
+            ) + accessibilityMissing()),
         )
     }
 
     private fun act(call: MethodCall): Map<String, Any?> {
         val service = AuraiAccessibilityService.instance
-            ?: return mapOf("performed" to false, "reason" to "permission_required", "next" to "requestAccessibilityAccess")
+            ?: return (mapOf("performed" to false) + accessibilityMissing())
         @Suppress("UNCHECKED_CAST")
         val args = call.arguments as Map<String, Any?>
         return service.perform(args["callId"] as String, args - "callId")
@@ -275,9 +304,7 @@ class AndroidAgentBridge(private val context: Context) {
             result.success(
                 mapOf(
                     "captured" to false,
-                    "reason" to "permission_required",
-                    "next" to "requestAccessibilityAccess",
-                ),
+                ) + accessibilityMissing(),
             )
             return
         }
@@ -288,9 +315,7 @@ class AndroidAgentBridge(private val context: Context) {
         val service = AuraiAccessibilityService.instance
             ?: return mapOf(
                 "valid" to false,
-                "reason" to "permission_required",
-                "next" to "requestAccessibilityAccess",
-            )
+            ) + accessibilityMissing()
         @Suppress("UNCHECKED_CAST")
         return service.preflightTapScreen(call.arguments as Map<String, Any?>)
     }
@@ -301,9 +326,7 @@ class AndroidAgentBridge(private val context: Context) {
             result.success(
                 mapOf(
                     "performed" to false,
-                    "reason" to "permission_required",
-                    "next" to "requestAccessibilityAccess",
-                ),
+                ) + accessibilityMissing(),
             )
             return
         }

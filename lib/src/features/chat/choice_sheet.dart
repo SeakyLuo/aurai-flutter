@@ -46,17 +46,18 @@ class _ChoiceSheetState<T> extends State<_ChoiceSheet<T>> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: FractionallySizedBox(
-        heightFactor: widget.choices.length > 8 ? 0.8 : 0.48,
+        heightFactor: widget.choices.length > 8 ? 0.8 : null,
         child: SafeArea(
           top: false,
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 12),
               Container(
                 width: 32,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xffdfdfdf),
+                  color: Theme.of(context).colorScheme.outlineVariant,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -100,15 +101,20 @@ class _ChoiceSheetState<T> extends State<_ChoiceSheet<T>> {
                     ),
                   ),
                 ),
-              Expanded(
+              Flexible(
                 child: choices.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           '没有匹配的模型',
-                          style: TextStyle(color: Color(0xff808080)),
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       )
                     : ListView.builder(
+                        shrinkWrap: widget.choices.length <= 8,
                         padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
                         itemCount: choices.length,
                         itemBuilder: (context, index) {
@@ -119,7 +125,9 @@ class _ChoiceSheetState<T> extends State<_ChoiceSheet<T>> {
                             button: true,
                             child: Material(
                               color: selected
-                                  ? const Color(0xffedf6ff)
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.primaryContainer
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(18),
                               child: InkWell(
@@ -139,15 +147,21 @@ class _ChoiceSheetState<T> extends State<_ChoiceSheet<T>> {
                                           style: TextStyle(
                                             fontSize: 16,
                                             color: selected
-                                                ? const Color(0xff087cf0)
-                                                : const Color(0xff242424),
+                                                ? Theme.of(context)
+                                                      .colorScheme
+                                                      .onPrimaryContainer
+                                                : Theme.of(
+                                                    context,
+                                                  ).colorScheme.onSurface,
                                           ),
                                         ),
                                       ),
                                       if (selected)
-                                        const Icon(
+                                        Icon(
                                           Icons.check_rounded,
-                                          color: Color(0xff087cf0),
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onPrimaryContainer,
                                           size: 21,
                                         ),
                                     ],
@@ -176,7 +190,7 @@ class ChoiceField extends StatelessWidget {
     button: true,
     enabled: onTap != null,
     child: Material(
-      color: const Color(0xfff5f6f8),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
@@ -191,16 +205,16 @@ class ChoiceField extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     color: onTap == null
-                        ? const Color(0xff929292)
-                        : const Color(0xff242424),
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
               const SizedBox(width: 12),
-              const Icon(
+              Icon(
                 Icons.unfold_more_rounded,
                 size: 20,
-                color: Color(0xff878b92),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ],
           ),

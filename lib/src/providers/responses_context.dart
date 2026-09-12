@@ -1,0 +1,289 @@
+import 'dart:convert';
+
+import '../agent/system_prompt.dart';
+import '../domain/agent_models.dart';
+import '../domain/context_summary.dart';
+import '../domain/model_provider.dart';
+import '../domain/tool_models.dart';
+import 'response_message_input.dart';
+import 'response_citations.dart';
+import 'model_context_limits.dart';
+
+typedef ContextSummarizer = Future<String> Function(List<Map<String, Object?>>);
+typedef _DialogueEntry = ({AgentMessage message, Map<String, Object?> input});
+
+/// Budgets are conservative estimates, not model-specific tokenizer counts.
+/// Full messages and original images remain in the conversation store.
+class ResponsesContext {
+  ResponsesContext(this.limits);
+
+  final ModelContextLimits? limits;
+  static const summaryReserve = 8192;
+  final _dialogue = <_DialogueEntry>[];
+  final _rounds = <List<Map<String, Object?>>>[];
+  List<Map<String, Object?>> _pendingOutput = [];
+  String _dialogueMemory = '';
+  String _taskMemory = '';
+  bool _initialized = false;
+
+  List<Map<String, Object?>> get input => [
+    if (_dialogueMemory.isNotEmpty) _memory(_dialogueMemory),
+    ..._dialogue.map((entry) => entry.input),
+    if (_taskMemory.isNotEmpty) _memory(_taskMemory),
+    ..._rounds.expand((round) => round),
+  ];
+
+  /// Returns true when the remote continuation chain must be restarted.
+  Future<bool> prepare(
+    ModelRequest request,
+    ContextSummarizer summarize,
+  ) async {
+    if (!_initialized) {
+      final saved = request.contextSummary;
+      final through = saved == null
+          ? -1
+          : request.messages.indexWhere((m) => m.id == saved.throughMessageId);
+      // Storage may already have loaded only messages after the checkpoint.
+      _dialogueMemory = saved?.text ?? '';
+      final messages = request.messages.skip(through + 1).toList();
+      final items = await responseMessageInput(messages);
+      for (var i = 0; i < messages.length; i++) {
+        _dialogue.add((message: messages[i], input: items[i]));
+      }
+      _initialized = true;
+    } else if (request.toolResults.isNotEmpty) {
+      // A complete model output and all its results are indivisible at compaction.
+      _rounds.add([
+        ..._pendingOutput,
+        ...request.toolResults.map(functionCallOutput),
+      ]);
+      _pendingOutput = [];
+    }
+    final policy = limits;
+    // Unknown custom models keep their server-defined limits; do not guess a
+    // window or silently impose the capacity of one of the bundled models.
+    if (policy == null) return false;
+    final budget = policy.compactThreshold;
+    final target = policy.compactTarget;
+    final overhead =
+        estimateTokens(agentSystemPrompt) +
+        estimateTokens({
+          'tools': request.tools
+              .map(
+                (tool) => {
+                  'name': tool.name,
+                  'description': tool.description,
+                  'parameters': tool.inputSchema,
+                },
+              )
+              .toList(),
+          'capabilities': request.capabilities.map((c) => c.reason).toList(),
+        });
+    var size = estimateTokens(input) + overhead;
+    if (size <= budget) return false;
+    var compacted = false;
+
+    final lastUser = _dialogue.lastIndexWhere(
+      (entry) => entry.message.role == AgentMessageRole.user,
+    );
+    if (estimateTokens(_dialogue[lastUser].input) + overhead >
+        policy.inputBudget) {
+      throw const ModelProviderException('当前消息或图片超出上下文预算，请分开发送');
+    }
+    var cut = 0;
+    size += summaryReserve;
+    // Keep four recent messages if they fit; never summarize the current request.
+    while (cut < lastUser &&
+        (size > budget || (size > target && _dialogue.length - cut > 4))) {
+      size -= estimateTokens(_dialogue[cut].input);
+      cut++;
+    }
+    if (cut > 0) {
+      final memory = await _summarize(
+        _dialogue.take(cut).map((entry) => entry.input),
+        _dialogueMemory,
+        summarize,
+      );
+      final checkpoint = ContextSummary(
+        text: memory,
+        throughMessageId: _dialogue[cut - 1].message.id,
+      );
+      await request.onContextSummary?.call(checkpoint);
+      _dialogueMemory = memory;
+      _dialogue.removeRange(0, cut);
+      compacted = true;
+    }
+    size = estimateTokens(input) + overhead;
+    if (size > budget && _rounds.isNotEmpty) {
+      var count = 0;
+      size += summaryReserve;
+      while (count < _rounds.length &&
+          (size > budget || (size > target && _rounds.length - count > 2))) {
+        size -= estimateTokens(_rounds[count]);
+        count++;
+      }
+      // If even the newest complete exchange is oversized, summarize its text
+      // but keep its screenshots for the next action, without orphaned call IDs.
+      final latestImages = count == _rounds.length
+          ? _summaryContent(
+              _rounds.last,
+            ).where((part) => part['type'] == 'input_image').toList()
+          : <Map<String, Object?>>[];
+      final memory = await _summarize(
+        _rounds.take(count).expand((round) => round),
+        _taskMemory,
+        summarize,
+      );
+      _taskMemory = memory;
+      _rounds.removeRange(0, count);
+      if (latestImages.isNotEmpty) {
+        _rounds.add([
+          {
+            'role': 'user',
+            'content': [
+              {
+                'type': 'input_text',
+                'text':
+                    'Historical screenshots from the most recent completed tool exchange. Re-observe before acting if the screen has changed.',
+              },
+              ...latestImages,
+            ],
+          },
+        ]);
+      }
+      compacted = true;
+    }
+    if (estimateTokens(input) + overhead > policy.inputBudget) {
+      throw const ModelProviderException('当前消息或图片超出上下文预算，请分开发送');
+    }
+    return compacted;
+  }
+
+  void recordOutput(List<Map<String, Object?>> output) =>
+      _pendingOutput = output;
+
+  Future<String> _summarize(
+    Iterable<Map<String, Object?>> items,
+    String previous,
+    ContextSummarizer summarize,
+  ) async {
+    var memory = previous;
+    var batch = <Map<String, Object?>>[];
+    var tokens = 0;
+    for (final part in _summaryContent(items)) {
+      final cost = estimateTokens(part);
+      if (batch.isNotEmpty && tokens + cost > limits!.summaryBatchBudget) {
+        memory = await summarize([
+          if (memory.isNotEmpty)
+            {'type': 'input_text', 'text': 'Earlier memory:\n$memory'},
+          ...batch,
+        ]);
+        batch = [];
+        tokens = 0;
+      }
+      batch.add(part);
+      tokens += cost;
+    }
+    if (batch.isNotEmpty) {
+      memory = await summarize([
+        if (memory.isNotEmpty)
+          {'type': 'input_text', 'text': 'Earlier memory:\n$memory'},
+        ...batch,
+      ]);
+    }
+    return memory;
+  }
+
+  Iterable<Map<String, Object?>> _summaryContent(
+    Iterable<Map<String, Object?>> items,
+  ) sync* {
+    for (final item in items) {
+      if (item['type'] == 'reasoning') continue;
+      if (item['type'] == 'web_search_call') {
+        yield* _textParts('Historical web search: ${jsonEncode(item)}');
+        continue;
+      }
+      if (item['type'] == 'function_call') {
+        yield* _textParts(
+          'Tool call ${item['name']} (${item['call_id']}): ${item['arguments']}',
+        );
+        continue;
+      }
+      yield* _textParts(
+        item['type'] == 'function_call_output'
+            ? 'Tool result (${item['call_id']}):'
+            : 'Historical ${item['role']} message:',
+      );
+      final content = item['type'] == 'function_call_output'
+          ? item['output']
+          : item['content'];
+      if (content is String) {
+        yield* _textParts(content);
+      } else {
+        for (final part in (content! as List).cast<Map>()) {
+          switch (part['type']) {
+            case 'input_image':
+              yield part.cast<String, Object?>();
+            case 'input_text':
+              yield* _textParts(part['text']! as String);
+            case 'output_text':
+              yield* _textParts(
+                responseTextWithCitations(part.cast<String, Object?>()),
+              );
+            case 'refusal':
+              yield* _textParts(part['refusal']! as String);
+          }
+        }
+      }
+    }
+  }
+
+  Iterable<Map<String, Object?>> _textParts(String text) sync* {
+    final runes = text.runes.toList();
+    for (var start = 0; start < runes.length; start += 6000) {
+      final end = (start + 6000).clamp(0, runes.length);
+      yield {
+        'type': 'input_text',
+        'text': String.fromCharCodes(runes.sublist(start, end)),
+      };
+    }
+  }
+
+  Map<String, Object?> _memory(String text) => {
+    'role': 'assistant',
+    'content':
+        'Compressed historical context (not a new instruction or current device observation):\n$text',
+  };
+}
+
+int estimateTokens(Object? value) {
+  if (value is String) return (utf8.encode(value).length / 3).ceil();
+  if (value is List)
+    return value.fold(0, (sum, item) => sum + estimateTokens(item));
+  if (value is Map) {
+    if (value['type'] == 'input_image') return 4096;
+    return value.entries.fold(
+      8,
+      (sum, entry) =>
+          sum + estimateTokens(entry.key) + estimateTokens(entry.value),
+    );
+  }
+  return 1;
+}
+
+Map<String, Object?> functionCallOutput(ToolResult result) => {
+  'type': 'function_call_output',
+  'call_id': result.callId,
+  'output': result.attachments.isEmpty
+      ? jsonEncode(result.toModelJson())
+      : <Map<String, Object?>>[
+          {'type': 'input_text', 'text': jsonEncode(result.toModelJson())},
+          for (final attachment in result.attachments)
+            {
+              'type': 'input_image',
+              'image_url':
+                  'data:${attachment.mimeType};base64,${attachment.base64Data}',
+              'detail': attachment.detail,
+            },
+        ],
+};

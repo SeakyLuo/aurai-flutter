@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:width="192dp" android:height="192dp" android:gravity="center">
+        <shape android:shape="oval">
+            <gradient android:type="radial" android:gradientRadius="50%p" android:centerX="0.5" android:centerY="0.5"
+                android:startColor="#709E75FF"
+                                android:endColor="#009E75FF" />
+        </shape>
+    </item>
+    <item android:width="144dp" android:height="112dp" android:gravity="center"
+        android:drawable="@drawable/symbol_white" />
+</layer-list>

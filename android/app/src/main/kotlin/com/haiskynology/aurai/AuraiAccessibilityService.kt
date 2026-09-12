@@ -36,6 +36,7 @@ class AuraiAccessibilityService : AccessibilityService() {
     private var pendingReply: ((Boolean) -> Unit)? = null
     private var approval: Approval? = null
     private var pageGrant: PageGrant? = null
+    private var screenTaskDecision: Boolean? = null
     private var latestVisualSnapshot: VisualSnapshot? = null
     private var visualStaleStreak = 0
     private var confirmationTimeout: Runnable? = null
@@ -60,7 +61,7 @@ class AuraiAccessibilityService : AccessibilityService() {
         }
     }
 
-    override fun onInterrupt() = cancelPending()
+    override fun onInterrupt() = cancelInteraction()
 
     override fun onDestroy() {
         sessionActive = false
@@ -92,7 +93,7 @@ class AuraiAccessibilityService : AccessibilityService() {
         }
         latestVisualSnapshot?.image?.recycle()
         latestVisualSnapshot = null
-        takeVisualSnapshot(restoreOverlay = true) { outcome ->
+        takeVisualSnapshot { outcome ->
             outcome.onSuccess { snapshot ->
                 latestVisualSnapshot?.image?.recycle()
                 latestVisualSnapshot = snapshot
@@ -136,7 +137,6 @@ class AuraiAccessibilityService : AccessibilityService() {
     }
 
     private fun takeVisualSnapshot(
-        restoreOverlay: Boolean,
         reply: (Result<VisualSnapshot>) -> Unit,
     ) {
         val root = rootInActiveWindow
@@ -160,30 +160,24 @@ class AuraiAccessibilityService : AccessibilityService() {
         )
         hideOverlay()
         handler.postDelayed(
-            { requestScreenshot(target, restoreOverlay, 0, reply) },
+            { requestScreenshot(target, 0, reply) },
             OVERLAY_SETTLE_MS,
         )
     }
 
     private fun requestScreenshot(
         target: CaptureTarget,
-        restoreOverlay: Boolean,
         retryCount: Int,
         reply: (Result<VisualSnapshot>) -> Unit,
     ) {
         val callback = object : TakeScreenshotCallback {
-            private fun finish(outcome: Result<VisualSnapshot>) {
-                if (restoreOverlay && sessionActive) showSessionPill()
-                reply(outcome)
-            }
-
             override fun onSuccess(result: ScreenshotResult) {
                 val buffer = result.hardwareBuffer
                 val wrapped = Bitmap.wrapHardwareBuffer(buffer, result.colorSpace)
                 val software = wrapped?.copy(Bitmap.Config.ARGB_8888, false)
                 buffer.close()
                 if (software == null) {
-                    finish(Result.failure(ScreenshotFailure("image_conversion_failed")))
+                    reply(Result.failure(ScreenshotFailure("image_conversion_failed")))
                     return
                 }
                 val windowImage = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -194,7 +188,7 @@ class AuraiAccessibilityService : AccessibilityService() {
                     }
                     if (safeBounds.isEmpty) {
                         software.recycle()
-                        finish(Result.failure(ScreenshotFailure("invalid_window_geometry")))
+                        reply(Result.failure(ScreenshotFailure("invalid_window_geometry")))
                         return
                     }
                     Bitmap.createBitmap(
@@ -217,7 +211,7 @@ class AuraiAccessibilityService : AccessibilityService() {
                 } else {
                     windowImage
                 }
-                finish(
+                reply(
                     Result.success(
                         VisualSnapshot(
                             packageName = target.packageName,
@@ -235,12 +229,12 @@ class AuraiAccessibilityService : AccessibilityService() {
             override fun onFailure(errorCode: Int) {
                 if (errorCode == ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT && retryCount == 0) {
                     handler.postDelayed(
-                        { requestScreenshot(target, restoreOverlay, 1, reply) },
+                        { requestScreenshot(target, 1, reply) },
                         SCREENSHOT_RETRY_DELAY_MS,
                     )
                     return
                 }
-                finish(
+                reply(
                     Result.failure(
                         ScreenshotFailure(screenshotFailureReason(errorCode), errorCode),
                     ),
@@ -328,9 +322,8 @@ class AuraiAccessibilityService : AccessibilityService() {
         }
         val normalizedX = (args["x"] as Number).toDouble()
         val normalizedY = (args["y"] as Number).toDouble()
-        takeVisualSnapshot(restoreOverlay = false) { outcome ->
+        takeVisualSnapshot { outcome ->
             outcome.onFailure { error ->
-                if (sessionActive) showSessionPill()
                 val failure = error as ScreenshotFailure
                 reply(
                     mapOf(
@@ -358,7 +351,6 @@ class AuraiAccessibilityService : AccessibilityService() {
                 current.image.recycle()
                 if (!geometryMatches || !pageMatches || localDifference > LOCAL_DIFFERENCE_LIMIT) {
                     visualStaleStreak += 1
-                    if (sessionActive) showSessionPill()
                     reply(
                         staleVisualResult(
                             "visual_changed",
@@ -379,7 +371,6 @@ class AuraiAccessibilityService : AccessibilityService() {
                 val callback = object : GestureResultCallback() {
                     override fun onCompleted(gestureDescription: GestureDescription) {
                         visualStaleStreak = 0
-                        if (sessionActive) showSessionPill()
                         reply(
                             mapOf(
                                 "performed" to true,
@@ -391,7 +382,6 @@ class AuraiAccessibilityService : AccessibilityService() {
                     }
 
                     override fun onCancelled(gestureDescription: GestureDescription) {
-                        if (sessionActive) showSessionPill()
                         reply(
                             mapOf(
                                 "performed" to false,
@@ -403,7 +393,6 @@ class AuraiAccessibilityService : AccessibilityService() {
                     }
                 }
                 if (!dispatchGesture(gesture, callback, handler)) {
-                    if (sessionActive) showSessionPill()
                     reply(
                         mapOf(
                             "performed" to false,
@@ -451,11 +440,12 @@ class AuraiAccessibilityService : AccessibilityService() {
     }
 
     fun startSession() {
+        screenTaskDecision = null
         sessionActive = true
-        showSessionPill()
     }
 
     fun endSession() {
+        screenTaskDecision = null
         sessionActive = false
         pageGrant = null
         approval = null
@@ -484,7 +474,16 @@ class AuraiAccessibilityService : AccessibilityService() {
             return
         }
         val nodeRef = args["nodeRef"] as String?
-        val eligibleForPageGrant = toolName == "act" && args["action"] == "click" &&
+        val screenTask = taskScoped && toolName in setOf("act", "tapScreen", "captureScreen")
+        val decision = screenTaskDecision
+        if (sessionActive && screenTask && decision != null) {
+            if (decision) approval = Approval(
+                callId, fingerprint, nodeRef, hashArguments(args), SystemClock.elapsedRealtime(),
+            )
+            reply(decision)
+            return
+        }
+        val eligibleForPageGrant = !taskScoped && toolName == "act" && args["action"] == "click" &&
             nodeRef != null && isSafeNavigationNode(resolveNode(nodeRef))
         val grant = pageGrant
         if (eligibleForPageGrant && grant != null && grant.fingerprint == fingerprint) {
@@ -499,7 +498,10 @@ class AuraiAccessibilityService : AccessibilityService() {
             return
         }
         cancelPending()
-        pendingReply = reply
+        pendingReply = { approved ->
+            if (sessionActive && screenTask) screenTaskDecision = approved
+            reply(approved)
+        }
         showConfirmationCard(
             callId,
             toolName,
@@ -515,38 +517,17 @@ class AuraiAccessibilityService : AccessibilityService() {
         }
     }
 
+    fun cancelInteraction() {
+        cancelPending()
+        screenTaskDecision = null
+        approval = null
+    }
+
     fun cancelPending() {
         pendingReply?.invoke(false)
         pendingReply = null
         clearConfirmationTimeout()
-        if (sessionActive) showSessionPill() else hideOverlay()
-    }
-
-    private fun showSessionPill() {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), dp(8), dp(8), dp(8))
-            setBackgroundColor(Color.rgb(22, 49, 53))
-            addView(TextView(context).apply {
-                text = "Aurai 运行中"
-                setTextColor(Color.WHITE)
-                textSize = 14f
-            })
-            addView(Button(context).apply {
-                text = "返回 Aurai"
-                setOnClickListener {
-                    packageManager.getLaunchIntentForPackage(packageName)?.apply {
-                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }?.let(::startActivity)
-                }
-            })
-            addView(Button(context).apply {
-                text = "停止"
-                setOnClickListener { AuraiApplication.requestAgentStop(); endSession() }
-            })
-        }
-        replaceOverlay(row, wrapContent = true)
+        hideOverlay()
     }
 
     private fun showConfirmationCard(
@@ -609,7 +590,7 @@ class AuraiAccessibilityService : AccessibilityService() {
                 })
             })
         }
-        replaceOverlay(card, wrapContent = false)
+        replaceOverlay(card)
     }
 
     private fun approvePending(callId: String, fingerprint: String, nodeRef: String?, args: Map<String, Any?>) {
@@ -623,7 +604,7 @@ class AuraiAccessibilityService : AccessibilityService() {
         val reply = pendingReply
         pendingReply = null
         clearConfirmationTimeout()
-        if (sessionActive) showSessionPill() else hideOverlay()
+        hideOverlay()
         reply?.invoke(true)
     }
 
@@ -631,7 +612,7 @@ class AuraiAccessibilityService : AccessibilityService() {
         val reply = pendingReply
         pendingReply = null
         clearConfirmationTimeout()
-        if (sessionActive) showSessionPill() else hideOverlay()
+        hideOverlay()
         reply?.invoke(false)
     }
 
@@ -746,13 +727,13 @@ class AuraiAccessibilityService : AccessibilityService() {
     private fun globalAction(id: Int, name: String) =
         mapOf("performed" to performGlobalAction(id), "action" to name, "next" to "observeDevice")
 
-    private fun replaceOverlay(view: View, wrapContent: Boolean) {
+    private fun replaceOverlay(view: View) {
         hideOverlay()
         overlay = view
         val manager = activeWindowManager()
         overlayWindowManager = manager
         manager.addView(view, WindowManager.LayoutParams(
-            if (wrapContent) WindowManager.LayoutParams.WRAP_CONTENT else dp(360),
+            dp(360),
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
