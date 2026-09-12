@@ -67,6 +67,7 @@ class ResponsesContext {
     final target = policy.compactTarget;
     final overhead =
         estimateTokens(agentSystemPrompt) +
+        estimateTokens(request.personalContext) +
         estimateTokens({
           'tools': request.tools
               .map(

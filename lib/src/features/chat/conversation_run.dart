@@ -5,6 +5,7 @@ extension ConversationRun on ChatController {
     final messages = runConversation.messages;
     final steps = runConversation.steps;
     final runConfig = config;
+    final memoryRevision = memory.revision;
     await _persistRun(runConversation);
     final history = await _store.reader.messages(
       runConversation.id,
@@ -41,6 +42,8 @@ extension ConversationRun on ChatController {
         ModelService.deepSeek => DeepSeekResponsesProvider(runConfig),
       };
       final tools = <AgentTool>[
+        for (final name in LocalHistoryTool.names)
+          LocalHistoryTool(_store.database.path, name),
         GetNetworkStateTool(_platform),
         GetNetworkEventsTool(_platform),
         DnsLookupTool(_platform),
@@ -79,6 +82,7 @@ extension ConversationRun on ChatController {
       await _runtime!.run(
         conversation: List.unmodifiable(history.take(lastUser + 1)),
         contextSummary: runConversation.contextSummary,
+        personalContext: () => memory.context,
         onContextSummary: (summary) async {
           runConversation.contextSummary = summary;
           await _persistRun(runConversation);
@@ -288,6 +292,12 @@ extension ConversationRun on ChatController {
         _notifyRun(runConversation);
         await _persistRun(runConversation);
         if (outcome == 'completed') {
+          memory.learn(
+            runConfig,
+            runConversation.id,
+            history[lastUser],
+            memoryRevision,
+          );
           completedReplies.value = ConversationCompletion(
             conversationId: runConversation.id,
             title: runConversation.title,

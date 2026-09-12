@@ -17,8 +17,9 @@ extension ConversationMessageEdit on ConversationStore {
       final images = await txn.query(
         'attachments',
         columns: ['file_name'],
-        where: 'message_id IN (SELECT id FROM messages WHERE $after)',
-        whereArgs: afterArgs,
+        where:
+            'message_id = ? OR message_id IN (SELECT id FROM messages WHERE $after)',
+        whereArgs: [original.id, ...afterArgs],
       );
 
       await txn.delete(
@@ -35,6 +36,25 @@ extension ConversationMessageEdit on ConversationStore {
         where: 'id = ? AND conversation_id = ?',
         whereArgs: [original.id, replacement.id],
       );
+      await txn.delete(
+        'attachments',
+        where: 'message_id = ?',
+        whereArgs: [original.id],
+      );
+      final editedImages = replacement.messages.last.images;
+      final batch = txn.batch();
+      for (var i = 0; i < editedImages.length; i++) {
+        batch.insert(
+          'attachments',
+          attachmentRow(
+            replacement.id,
+            editedImages[i],
+            i,
+            messageId: original.id,
+          ),
+        );
+      }
+      await batch.commit(noResult: true);
       final count = await txn.rawQuery(
         'SELECT COUNT(*) AS count FROM messages WHERE conversation_id = ?',
         [replacement.id],
@@ -59,8 +79,10 @@ extension ConversationMessageEdit on ConversationStore {
           'seen_run:${replacement.id}',
         ],
       );
+      final retained = editedImages.map((image) => image.path).toSet();
       return images
           .map((row) => '${reader.imageDirectory}/${row['file_name']}')
+          .where((path) => !retained.contains(path))
           .toList();
     });
     writer.retain(replacement.messages);

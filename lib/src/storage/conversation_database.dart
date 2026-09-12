@@ -1,15 +1,25 @@
 import 'package:sqflite/sqflite.dart';
+import '../memory/memory_controller.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 1,
+  version: 2,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
+  onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion < 2) {
+      final batch = db.batch();
+      for (final statement in memorySchema) {
+        batch.execute(statement);
+      }
+      await batch.commit(noResult: true);
+    }
+  },
   onCreate: (db, version) async {
     final batch = db.batch();
-    for (final statement in _schema) {
+    for (final statement in [..._schema, ...memorySchema]) {
       batch.execute(statement);
     }
     await batch.commit(noResult: true);

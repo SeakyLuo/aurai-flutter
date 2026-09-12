@@ -24,6 +24,7 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
   void initState() {
     super.initState();
     widget.controller.completedReplies.addListener(_onCompleted);
+    widget.controller.memory.notices.addListener(_onMemoryNotice);
     widget.controller.notificationOpenRequests.addListener(
       _openSystemNotification,
     );
@@ -36,6 +37,7 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
   @override
   void dispose() {
     widget.controller.completedReplies.removeListener(_onCompleted);
+    widget.controller.memory.notices.removeListener(_onMemoryNotice);
     widget.controller.notificationOpenRequests.removeListener(
       _openSystemNotification,
     );
@@ -84,6 +86,12 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
         ).showSnackBar(const SnackBar(content: Text('会话暂时无法打开，请稍后重试')));
       }
     }
+  }
+
+  void _onMemoryNotice() {
+    final notice = widget.controller.memory.notices.value;
+    if (notice == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(notice)));
   }
 
   void _onCompleted() {

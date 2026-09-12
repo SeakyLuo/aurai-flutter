@@ -475,7 +475,8 @@ class AuraiAccessibilityService : AccessibilityService() {
         }
         val nodeRef = args["nodeRef"] as String?
         val screenTask = taskScoped && toolName in setOf("act", "tapScreen", "captureScreen")
-        val decision = screenTaskDecision
+        val decision = if (getSharedPreferences("screen_access", Context.MODE_PRIVATE)
+                .getBoolean("allowed", false)) true else screenTaskDecision
         if (sessionActive && screenTask && decision != null) {
             if (decision) approval = Approval(
                 callId, fingerprint, nodeRef, hashArguments(args), SystemClock.elapsedRealtime(),
@@ -499,7 +500,11 @@ class AuraiAccessibilityService : AccessibilityService() {
         }
         cancelPending()
         pendingReply = { approved ->
-            if (sessionActive && screenTask) screenTaskDecision = approved
+            if (screenTask && approved) {
+                getSharedPreferences("screen_access", Context.MODE_PRIVATE)
+                    .edit().putBoolean("allowed", true).apply()
+            }
+            if (sessionActive && screenTask && !approved) screenTaskDecision = false
             reply(approved)
         }
         showConfirmationCard(
@@ -540,56 +545,23 @@ class AuraiAccessibilityService : AccessibilityService() {
         nodeRef: String?,
         allowPageGrant: Boolean,
     ) {
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(16), dp(18), dp(14))
-            setBackgroundColor(Color.rgb(250, 248, 244))
-            addView(TextView(context).apply {
-                text = "允许 Aurai 执行？"
-                textSize = 19f
-                setTextColor(Color.rgb(25, 36, 38))
-            })
-            addView(TextView(context).apply {
-                text = description ?: confirmationText(toolName, args, nodeRef)
-                textSize = 15f
-                setTextColor(Color.rgb(45, 60, 62))
-                setPadding(0, dp(10), 0, dp(6))
-            })
-            if (toolName == "tapScreen") {
-                val snapshot = latestVisualSnapshot!!
-                addView(ImageView(context).apply {
-                    setImageBitmap(
-                        snapshot.markedPreview(
-                            (args["x"] as Number).toDouble(),
-                            (args["y"] as Number).toDouble(),
-                        ),
-                    )
-                    adjustViewBounds = true
-                    contentDescription = "待点击位置预览"
-                    setPadding(0, dp(6), 0, dp(6))
-                })
-            }
-            addView(TextView(context).apply {
-                text = "30 秒后自动拒绝"
-                textSize = 12f
-                setTextColor(Color.GRAY)
-            })
-            addView(LinearLayout(context).apply {
-                gravity = Gravity.END
-                addView(Button(context).apply { text = "拒绝"; setOnClickListener { denyPending() } })
-                if (allowPageGrant) addView(Button(context).apply {
-                    text = "允许此页面导航"
-                    setOnClickListener {
-                        pageGrant = PageGrant(fingerprint)
-                        approvePending(callId, fingerprint, nodeRef, args)
-                    }
-                })
-                addView(Button(context).apply {
-                    text = if (taskScoped) "本任务允许" else "允许一次"
-                    setOnClickListener { approvePending(callId, fingerprint, nodeRef, args) }
-                })
-            })
-        }
+        val preview = if (toolName == "tapScreen") latestVisualSnapshot!!.markedPreview(
+            (args["x"] as Number).toDouble(), (args["y"] as Number).toDouble(),
+        ) else null
+        val persistent = taskScoped && toolName in setOf("act", "tapScreen", "captureScreen")
+        val card = ScreenAuthorizationView(
+            context = this,
+            description = description ?: confirmationText(toolName, args, nodeRef),
+            allowLabel = if (persistent) "始终允许" else if (taskScoped) "本任务允许" else "允许一次",
+            deadline = SystemClock.elapsedRealtime() + CONFIRMATION_TIMEOUT_MS,
+            preview = preview,
+            onDeny = ::denyPending,
+            onAllow = { approvePending(callId, fingerprint, nodeRef, args) },
+            onAllowPage = if (allowPageGrant) ({
+                pageGrant = PageGrant(fingerprint)
+                approvePending(callId, fingerprint, nodeRef, args)
+            }) else null,
+        )
         replaceOverlay(card)
     }
 
@@ -733,12 +705,12 @@ class AuraiAccessibilityService : AccessibilityService() {
         val manager = activeWindowManager()
         overlayWindowManager = manager
         manager.addView(view, WindowManager.LayoutParams(
-            dp(360),
+            WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             android.graphics.PixelFormat.TRANSLUCENT,
-        ).apply { gravity = Gravity.TOP or Gravity.END; y = dp(42); x = dp(8) })
+        ).apply { gravity = Gravity.BOTTOM })
     }
 
     private fun hideOverlay() {

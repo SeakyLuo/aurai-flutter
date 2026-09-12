@@ -30,6 +30,7 @@ class AgentRuntime {
     required List<AgentMessage> conversation,
     required AgentStepListener onStepsChanged,
     ContextSummary? contextSummary,
+    String Function()? personalContext,
     Future<void> Function(ContextSummary)? onContextSummary,
     FutureOr<void> Function()? onTurnStarted,
     Future<void> Function(ModelTurn)? onTurnCompleted,
@@ -49,6 +50,7 @@ class AgentRuntime {
         ModelRequest(
           messages: conversation,
           contextSummary: contextSummary,
+          personalContext: personalContext?.call() ?? '',
           onContextSummary: onContextSummary,
           onTextChanged: (text) {
             _throwIfCancelled();

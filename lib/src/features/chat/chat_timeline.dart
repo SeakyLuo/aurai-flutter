@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../domain/agent_models.dart';
 import 'chat_controller.dart';
 import 'message_item.dart';
-import 'message_editor.dart';
 import 'message_time.dart';
 import 'tool_activity_view.dart';
 
@@ -15,8 +14,9 @@ class ChatTimelineEntry {
 
 List<ChatTimelineEntry> buildChatTimeline(
   ChatController controller, {
-  required bool Function() preparingGoal,
-  required Future<void> Function() continueReply,
+  required Future<void> Function(AgentMessage) onEdit,
+  String? beforeMessageId,
+  bool allowEditing = true,
 }) {
   final hiddenIds = {
     for (final message in controller.messages)
@@ -42,8 +42,14 @@ List<ChatTimelineEntry> buildChatTimeline(
   final visibleMessages = controller.messages
       .where((message) => !hiddenIds.contains(message.id))
       .toList();
+  final end = beforeMessageId == null
+      ? visibleMessages.length
+      : visibleMessages.indexWhere((message) => message.id == beforeMessageId);
   return [
-    for (final (index, message) in visibleMessages.indexed) ...[
+    for (final (index, message)
+        in visibleMessages
+            .take(end + (beforeMessageId == null ? 0 : 1))
+            .indexed) ...[
       if (index > 0 &&
           message.createdAt.difference(visibleMessages[index - 1].createdAt) >
               const Duration(minutes: 30))
@@ -63,25 +69,20 @@ List<ChatTimelineEntry> buildChatTimeline(
             ),
           ),
         ),
-      ChatTimelineEntry(
-        message.id,
-        (context) => MessageItem(
-          key: ValueKey(message.id),
-          message: message,
-          onEdit: (message) => editChatMessage(
-            context,
-            controller: controller,
+      if (message.id != beforeMessageId)
+        ChatTimelineEntry(
+          message.id,
+          (context) => MessageItem(
+            key: ValueKey(message.id),
             message: message,
-            preparingGoal: preparingGoal,
-            continueReply: continueReply,
+            onEdit: allowEditing ? onEdit : null,
+            streaming:
+                controller.streamingMessageId == message.id ||
+                (controller.isBusy &&
+                    message.runId == controller.activeConversation.activeRunId),
           ),
-          streaming:
-              controller.streamingMessageId == message.id ||
-              (controller.isBusy &&
-                  message.runId == controller.activeConversation.activeRunId),
         ),
-      ),
-      ...?toolsByMessage[message.id],
+      if (message.id != beforeMessageId) ...?toolsByMessage[message.id],
     ],
   ];
 }

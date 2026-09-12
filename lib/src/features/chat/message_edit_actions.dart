@@ -1,11 +1,21 @@
 part of 'chat_controller.dart';
 
 extension MessageEditActions on ChatController {
+  Future<List<MessageImage>> pickEditImages(
+    ImageSource source,
+    int remaining,
+  ) => _imageStore.pick(source, remaining);
+
+  Future<void> removeEditImages(Iterable<MessageImage> images) =>
+      _imageStore.remove(images);
+
   Future<bool> editMessageAndPrepareReply(
     AgentMessage message,
-    String text,
-  ) async {
-    if (isBusy ||
+    String text, {
+    List<MessageImage>? images,
+  }) async {
+    if (hasRunningTask ||
+        isBusy ||
         addingImages ||
         changingConversation ||
         loadingEarlierMessages) {
@@ -25,7 +35,7 @@ extension MessageEditActions on ChatController {
         role: message.role,
         text: text,
         createdAt: message.createdAt,
-        images: message.images,
+        images: images ?? message.images,
       );
       final replacement = conversationFromRow(conversationRow(previous))
         ..messages.addAll([...messages.take(index), edited])

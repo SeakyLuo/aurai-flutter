@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../domain/message_image.dart';
 import 'image_preview.dart';
+import 'attachment_action_icon.dart';
 
 Future<ImageSource?> showImageSourceMenu(BuildContext context) =>
     showModalBottomSheet<ImageSource>(
@@ -19,12 +20,16 @@ Future<ImageSource?> showImageSourceMenu(BuildContext context) =>
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.photo_library_outlined),
+                leading: const AttachmentActionIcon(
+                  type: AttachmentActionIconType.gallery,
+                ),
                 title: const Text('上传图片'),
                 onTap: () => Navigator.pop(context, ImageSource.gallery),
               ),
               ListTile(
-                leading: const Icon(Icons.camera_alt_outlined),
+                leading: const AttachmentActionIcon(
+                  type: AttachmentActionIconType.camera,
+                ),
                 title: const Text('拍照'),
                 onTap: () => Navigator.pop(context, ImageSource.camera),
               ),

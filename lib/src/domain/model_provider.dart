@@ -129,6 +129,7 @@ class ModelRequest {
     required this.capabilities,
     this.continuationToken,
     this.contextSummary,
+    this.personalContext = '',
     this.onContextSummary,
     this.onTextChanged,
     this.toolResults = const <ToolResult>[],
@@ -139,6 +140,7 @@ class ModelRequest {
   final List<Capability> capabilities;
   final String? continuationToken;
   final ContextSummary? contextSummary;
+  final String personalContext;
   final Future<void> Function(ContextSummary)? onContextSummary;
   final List<ToolResult> toolResults;
   final void Function(String text)? onTextChanged;

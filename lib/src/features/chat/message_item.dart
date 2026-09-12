@@ -24,7 +24,7 @@ class MessageItem extends StatefulWidget {
   });
   final AgentMessage message;
   final bool streaming;
-  final Future<void> Function(AgentMessage) onEdit;
+  final Future<void> Function(AgentMessage)? onEdit;
 
   @override
   State<MessageItem> createState() => _MessageItemState();
@@ -34,6 +34,7 @@ class _MessageItemState extends State<MessageItem> {
   AgentMessage get message => widget.message;
   late Widget _content;
   bool _copied = false;
+  final _bubbleKey = GlobalKey();
   Timer? _copyResetTimer;
 
   @override
@@ -116,6 +117,7 @@ class _MessageItemState extends State<MessageItem> {
       context,
       message: snapshot,
       position: position,
+      allowEditing: widget.onEdit != null,
     );
     if (!mounted) return;
     switch (action) {
@@ -128,7 +130,7 @@ class _MessageItemState extends State<MessageItem> {
           ),
         );
       case MessageAction.edit:
-        await widget.onEdit(snapshot);
+        await widget.onEdit?.call(snapshot);
       case null:
         break;
     }
@@ -174,21 +176,33 @@ class _MessageItemState extends State<MessageItem> {
                 if (message.images.isNotEmpty && message.text.isNotEmpty)
                   const SizedBox(height: 8),
                 if (message.text.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(26),
-                    ),
-                    child: Text(
-                      message.text,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontSize: 16,
-                        height: 1.55,
+                  Material(
+                    key: _bubbleKey,
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(26),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onLongPress: () {
+                        final box =
+                            _bubbleKey.currentContext!.findRenderObject()!
+                                as RenderBox;
+                        _openActions(
+                          box.localToGlobal(box.size.center(Offset.zero)),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
+                        child: Text(
+                          message.text,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontSize: 16,
+                            height: 1.55,
+                          ),
+                        ),
                       ),
                     ),
                   ),

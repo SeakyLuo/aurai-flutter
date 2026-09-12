@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../domain/capability.dart';
 import 'chat_controller.dart';
+import 'settings_appearance.dart';
+import 'capability_icon.dart';
+import 'screen_access_tile.dart';
 
 class CapabilityPage extends StatefulWidget {
   const CapabilityPage({super.key, required this.controller});
@@ -65,13 +68,9 @@ class _CapabilityPageState extends State<CapabilityPage>
   Widget build(BuildContext context) => ScaffoldMessenger(
     key: _messenger,
     child: Scaffold(
-      appBar: AppBar(
-        title: const Text('设备能力'),
-        leading: IconButton(
-          tooltip: '返回',
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.maybePop(context),
-        ),
+      appBar: SettingsAppBar(
+        title: '设备能力',
+        onBack: () => Navigator.maybePop(context),
       ),
       body: SafeArea(
         top: false,
@@ -79,65 +78,13 @@ class _CapabilityPageState extends State<CapabilityPage>
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 12, 24),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
+                ScreenAccessTile(controller: widget.controller),
+                const SizedBox(height: 8),
                 for (final capability in widget.controller.capabilities)
                   if (!capability.id.startsWith('android.execution.'))
-                    Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  _icon(capability.availability),
-                                  size: 20,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      capability.name,
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      _description(capability),
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        height: 1.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              _action(capability),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                    _capabilityTile(capability),
               ],
             ),
           ),
@@ -157,40 +104,97 @@ class _CapabilityPageState extends State<CapabilityPage>
     }
   }
 
-  Widget _action(Capability capability) {
-    if (capability.availability == CapabilityAvailability.permissionRequired) {
-      final action = switch (capability.id) {
-        'android.accessibility' ||
-        'android.vision' => widget.controller.openAccessibilitySettings,
-        'android.notifications.observe' =>
-          widget.controller.openNotificationAccessSettings,
-        _ => null,
-      };
-      if (action != null)
-        return TextButton(
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            alignment: Alignment.center,
-            minimumSize: const Size(48, 48),
-            foregroundColor: Theme.of(context).colorScheme.onSurface,
-            overlayColor: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          onPressed: () => _perform(action),
-          child: const Text('去开启'),
-        );
+  Future<void> Function()? _permissionAction(Capability capability) {
+    if (capability.availability != CapabilityAvailability.permissionRequired) {
+      return null;
     }
+    return switch (capability.id) {
+      'android.accessibility' ||
+      'android.vision' => widget.controller.openAccessibilitySettings,
+      'android.notifications.observe' =>
+        widget.controller.openNotificationAccessSettings,
+      _ => null,
+    };
+  }
+
+  Widget _capabilityTile(Capability capability) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final action = _permissionAction(capability);
+    final statusColor = capability.isAvailable
+        ? (dark ? const Color(0xff34d399) : const Color(0xff009b68))
+        : colors.onSurfaceVariant;
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          SizedBox.square(
+            dimension: 32,
+            child: Center(child: CapabilityIcon(id: capability.id)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  capability.name,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    height: 1.4,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _description(capability),
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.5,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            constraints: const BoxConstraints(minWidth: 56),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: capability.isAvailable
+                  ? (dark ? const Color(0xff193b31) : const Color(0xffe8f4f3))
+                  : dark && action != null
+                  ? const Color(0xff38383d)
+                  : statusColor.withValues(alpha: .06),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              action == null ? _label(capability.availability) : '去开启',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: capability.isAvailable
+                    ? (dark ? const Color(0xff6ee7b7) : const Color(0xff008577))
+                    : dark && action != null
+                    ? Colors.white
+                    : statusColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
     return Padding(
-      padding: const EdgeInsets.only(right: 12),
-      child: Text(
-        _label(capability.availability),
-        style: TextStyle(
-          fontSize: 12,
-          color: capability.isAvailable
-              ? (Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xff90c4ad)
-                    : const Color(0xff588575))
-              : Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: settingsFieldColor(context),
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: action == null
+            ? content
+            : InkWell(onTap: () => _perform(action), child: content),
       ),
     );
   }
@@ -202,14 +206,6 @@ class _CapabilityPageState extends State<CapabilityPage>
     'android.shell.app_uid' => '仅使用 Aurai 自身权限执行命令',
     _ => capability.reason,
   };
-
-  static IconData _icon(CapabilityAvailability availability) =>
-      switch (availability) {
-        CapabilityAvailability.available => Icons.check_circle_outline_rounded,
-        CapabilityAvailability.permissionRequired => Icons.lock_outline_rounded,
-        CapabilityAvailability.unavailable => Icons.error_outline_rounded,
-        CapabilityAvailability.unsupported => Icons.block_rounded,
-      };
 
   static String _label(CapabilityAvailability availability) =>
       switch (availability) {

@@ -62,6 +62,9 @@ abstract final class GlobalUI {
       brightness: brightness,
       colorScheme: colors,
       scaffoldBackgroundColor: colors.surface,
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: dark ? Colors.white : Colors.black,
+      ),
       scrollbarTheme: ScrollbarThemeData(
         radius: const Radius.circular(99),
         thickness: const WidgetStatePropertyAll(3),

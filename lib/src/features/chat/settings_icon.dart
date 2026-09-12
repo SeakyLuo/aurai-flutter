@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 
-enum SettingsIconType { model, device, chevron, back }
+enum SettingsIconType {
+  memory,
+  appearance,
+  notifications,
+  model,
+  device,
+  chevron,
+  back,
+}
 
 class SettingsIcon extends StatelessWidget {
   const SettingsIcon({super.key, required this.type});
@@ -33,6 +41,64 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.memory:
+        canvas.drawPath(
+          Path()
+            ..moveTo(12, 5)
+            ..cubicTo(12, 1.5, 6.5, 1.5, 6.5, 5)
+            ..cubicTo(3, 5, 2.2, 9, 4.3, 11)
+            ..cubicTo(1.8, 14, 3.5, 17.5, 6.5, 17.5)
+            ..cubicTo(6.5, 21.5, 12, 21.5, 12, 18)
+            ..lineTo(12, 5)
+            ..cubicTo(12, 1.5, 17.5, 1.5, 17.5, 5)
+            ..cubicTo(21, 5, 21.8, 9, 19.7, 11)
+            ..cubicTo(22.2, 14, 20.5, 17.5, 17.5, 17.5)
+            ..cubicTo(17.5, 21.5, 12, 21.5, 12, 18)
+            ..moveTo(6.5, 8)
+            ..quadraticBezierTo(6.5, 11, 9, 11)
+            ..moveTo(17.5, 8)
+            ..quadraticBezierTo(17.5, 11, 15, 11)
+            ..moveTo(6.5, 17.5)
+            ..quadraticBezierTo(6.5, 14.5, 9, 14.5)
+            ..moveTo(17.5, 17.5)
+            ..quadraticBezierTo(17.5, 14.5, 15, 14.5),
+          pen,
+        );
+      case SettingsIconType.appearance:
+        canvas.drawPath(
+          Path()
+            ..moveTo(10, 3)
+            ..cubicTo(5.8, 3.7, 3, 7.2, 3, 11.5)
+            ..cubicTo(3, 16.5, 6.8, 20.5, 11.8, 20.5)
+            ..cubicTo(16, 20.5, 19.5, 17.8, 20.5, 14)
+            ..cubicTo(17.3, 15.3, 13.7, 14.6, 11.4, 12)
+            ..cubicTo(9.1, 9.5, 8.6, 6, 10, 3)
+            ..close()
+            ..moveTo(17.5, 2.5)
+            ..quadraticBezierTo(17.5, 6, 21, 6)
+            ..quadraticBezierTo(17.5, 6, 17.5, 9.5)
+            ..quadraticBezierTo(17.5, 6, 14, 6)
+            ..quadraticBezierTo(17.5, 6, 17.5, 2.5)
+            ..close(),
+          pen,
+        );
+      case SettingsIconType.notifications:
+        canvas.drawPath(
+          Path()
+            ..moveTo(6, 9)
+            ..cubicTo(6, 5.7, 8.2, 3.5, 12, 3.5)
+            ..cubicTo(15.8, 3.5, 18, 5.7, 18, 9)
+            ..lineTo(18, 12)
+            ..cubicTo(18, 14.2, 19.5, 15, 19.5, 16)
+            ..quadraticBezierTo(19.5, 17, 18, 17)
+            ..lineTo(6, 17)
+            ..quadraticBezierTo(4.5, 17, 4.5, 16)
+            ..cubicTo(4.5, 15, 6, 14.2, 6, 12)
+            ..close()
+            ..moveTo(9.5, 20)
+            ..quadraticBezierTo(12, 22, 14.5, 20),
+          pen,
+        );
       case SettingsIconType.model:
         canvas.drawPath(
           Path()

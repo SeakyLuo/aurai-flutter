@@ -7,7 +7,7 @@ import 'android_network_tools.dart';
 import 'aurai_platform.dart';
 
 String _screenTaskDescription(String provider) =>
-    '允许 Aurai 在当前任务中读取屏幕并发送给 $provider 分析，以及点击、输入、滚动和导航以完成你的请求。停止或结束任务后授权失效。';
+    '允许 Aurai 读取屏幕并发送给 $provider 分析，以及点击、输入、滚动和导航以完成你的请求。授权将持续有效，可随时在“设置 → 设备能力”中关闭“屏幕操作”。';
 
 typedef AccessibilityRequester = Future<Map<String, Object?>> Function();
 

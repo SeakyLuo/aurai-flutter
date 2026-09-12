@@ -85,6 +85,11 @@ class ChatViewportState extends State<ChatViewport> {
     if (_footerHeight != previousFooter) setState(() {});
   }
 
+  double _listAlignment(int index, double itemAlignment) {
+    // The first center sliver includes the list's leading padding.
+    return itemAlignment - (index == 0 ? widget.padding.top / _height : 0);
+  }
+
   void _pinSentMessage() {
     _following = false;
     _restoring = true;
@@ -92,7 +97,10 @@ class ChatViewportState extends State<ChatViewport> {
       if (!mounted) return;
       _items.jumpTo(
         index: _indices[_replyAnchorId]!,
-        alignment: widget.sentMessageTop / _height,
+        alignment: _listAlignment(
+          _indices[_replyAnchorId]!,
+          widget.sentMessageTop / _height,
+        ),
       );
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -140,7 +148,10 @@ class ChatViewportState extends State<ChatViewport> {
         _restoring = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          _items.jumpTo(index: nextIndex, alignment: anchor.alignment);
+          _items.jumpTo(
+            index: nextIndex,
+            alignment: _listAlignment(nextIndex, anchor.alignment),
+          );
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               _restoring = false;
@@ -216,7 +227,31 @@ class ChatViewportState extends State<ChatViewport> {
     _restoring = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _items.jumpTo(index: _anchorIndex(anchor), alignment: anchor.alignment);
+      _items.jumpTo(
+        index: _anchorIndex(anchor),
+        alignment: _listAlignment(_anchorIndex(anchor), anchor.alignment),
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _restoring = false;
+          _rememberPosition();
+        }
+      });
+    });
+  }
+
+  void restoreBookmark(ChatScrollBookmark bookmark) {
+    _restoring = true;
+    _anchor = bookmark;
+    _following = bookmark.followOutput;
+    setState(() => _replyAnchorId = bookmark.replyAnchorId);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final index = _anchorIndex(bookmark);
+      _items.jumpTo(
+        index: index,
+        alignment: _listAlignment(index, bookmark.alignment),
+      );
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _restoring = false;
@@ -275,10 +310,13 @@ class ChatViewportState extends State<ChatViewport> {
                 ? widget.entries.length
                 : _anchorIndex(anchor),
             initialAlignment: anchor == null && _replyAnchorId != null
-                ? widget.sentMessageTop / _height
+                ? _listAlignment(
+                    _indices[_replyAnchorId]!,
+                    widget.sentMessageTop / _height,
+                  )
                 : anchor == null || anchor.followOutput
                 ? (1 - widget.padding.bottom / _height).clamp(0.0, 1.0)
-                : anchor.alignment,
+                : _listAlignment(_anchorIndex(anchor), anchor.alignment),
             padding: EdgeInsets.only(top: widget.padding.top),
             addAutomaticKeepAlives: false,
             minCacheExtent: 240,

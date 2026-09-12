@@ -30,6 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   flutter_markdown_plus: ^1.0.12
   image_picker: ^1.2.3
   mime: ^2.1.0
