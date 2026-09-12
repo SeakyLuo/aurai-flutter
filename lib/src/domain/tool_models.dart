@@ -111,3 +111,8 @@ abstract interface class ScopedAuthorizationAgentTool {
 
   bool authorizationCovers(Object grantedScope, Object requestedScope);
 }
+
+/// Presentation snapshots for local history, never execution arguments.
+abstract interface class ToolHistoryAgentTool {
+  Map<String, Object?> historyArguments(ToolCall call);
+}

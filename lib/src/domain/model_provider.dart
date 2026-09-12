@@ -65,6 +65,7 @@ class ModelSettings {
     required this.activeService,
     required this.profiles,
     this.systemPrompt,
+    this.customInstructions = '',
   });
 
   factory ModelSettings.defaults({String openAiApiKey = ''}) => ModelSettings(
@@ -81,6 +82,7 @@ class ModelSettings {
   final ModelService activeService;
   final Map<ModelService, ModelConfig> profiles;
   final String? systemPrompt;
+  final String customInstructions;
 
   ModelConfig get activeConfig => profiles[activeService]!;
 
@@ -94,11 +96,13 @@ class ModelSettings {
           config.service: config,
         },
         systemPrompt: systemPrompt,
+        customInstructions: customInstructions,
       );
 
   Map<String, Object?> toJson() => <String, Object?>{
     'activeService': activeService.name,
     'systemPrompt': systemPrompt,
+    'customInstructions': customInstructions,
     'profiles': <String, Object?>{
       for (final entry in profiles.entries)
         entry.key.name: entry.value.toJson(),
@@ -114,6 +118,7 @@ class ModelSettings {
         .cast<String, Object?>();
     return ModelSettings(
       systemPrompt: json['systemPrompt'] as String?,
+      customInstructions: json['customInstructions'] as String? ?? '',
       activeService: ModelService.values.byName(
         json['activeService']! as String,
       ),

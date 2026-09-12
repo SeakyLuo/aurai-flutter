@@ -23,7 +23,13 @@ class ToolActionIcon extends StatelessWidget {
           color: Theme.of(context).colorScheme.onSurfaceVariant,
           type: SettingsIconType.memory,
         ),
-        'manageSkill' || 'runSkill' => SettingsIcon(
+        'listSkills' ||
+        'readSkill' ||
+        'createSkill' ||
+        'updateSkill' ||
+        'deleteSkill' ||
+        'manageSkill' ||
+        'runSkill' => SettingsIcon(
           color: Theme.of(context).colorScheme.onSurfaceVariant,
           type: SettingsIconType.skills,
         ),

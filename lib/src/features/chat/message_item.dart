@@ -315,7 +315,7 @@ class _MessageItemState extends State<MessageItem> {
                       color: Theme.of(context).colorScheme.outlineVariant,
                     ),
                     a: body.copyWith(
-                      color: GlobalUI.primary,
+                      color: GlobalUI.linkColor(context),
                       decoration: TextDecoration.underline,
                     ),
                   ),

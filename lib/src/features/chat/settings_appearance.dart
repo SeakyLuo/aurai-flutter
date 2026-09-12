@@ -53,9 +53,11 @@ class SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.title,
     required this.onBack,
     this.actions = const [],
+    this.titleWidget,
   });
 
   final String title;
+  final Widget? titleWidget;
   final VoidCallback? onBack;
   final List<Widget> actions;
 
@@ -67,7 +69,7 @@ class SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
     centerTitle: true,
     toolbarHeight: 76,
     leadingWidth: 64,
-    title: Text(title),
+    title: titleWidget ?? Text(title),
     leading: Padding(
       padding: const EdgeInsets.only(left: 16),
       child: Center(

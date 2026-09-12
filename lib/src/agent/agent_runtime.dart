@@ -112,14 +112,20 @@ class AgentRuntime {
         final nextResults = <ToolResult>[];
         for (final call in modelTurn.toolCalls) {
           _throwIfCancelled();
-          await onToolStarted?.call(call);
+          final tool = _registry.find(call.name);
+          final historyArguments = tool is ToolHistoryAgentTool
+              ? (tool as ToolHistoryAgentTool).historyArguments(call)
+              : call.arguments;
+          await onToolStarted?.call(
+            ToolCall(id: call.id, name: call.name, arguments: historyArguments),
+          );
           stepIndices[call.id] = steps.length;
           steps.add(
             AgentStep(
               toolName: call.name,
               title: toolTitle(call.name),
               status: AgentStepStatus.running,
-              requestJson: jsonEncode(call.arguments),
+              requestJson: jsonEncode(historyArguments),
             ),
           );
           onStepsChanged(List.unmodifiable(steps));

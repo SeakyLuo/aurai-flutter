@@ -1,3 +1,4 @@
+import '../../skills/skill_icon.dart';
 import '../../domain/ui_tool_actions.dart';
 import 'dart:convert';
 
@@ -50,6 +51,10 @@ class _ToolActivityViewState extends State<ToolActivityView> {
 
   @override
   Widget build(BuildContext context) {
+    final skillIcon =
+        widget.toolName == 'runSkill' && widget.requestJson != null
+        ? (jsonDecode(widget.requestJson!) as Map)['icon'] as String? ?? 'skill'
+        : null;
     final running = widget.status == AgentStepStatus.running;
     final isQuestion = widget.toolName == 'askUser';
     final canExpand = !running || isQuestion;
@@ -81,7 +86,11 @@ class _ToolActivityViewState extends State<ToolActivityView> {
       _ => null,
     };
     final legacyRequest =
-        const {'act', 'readLocalDatabase'}.contains(widget.toolName) &&
+        const {
+              'act',
+              'readLocalDatabase',
+              'manageSkill',
+            }.contains(widget.toolName) &&
             widget.requestJson != null
         ? jsonDecode(widget.requestJson!) as Map
         : null;
@@ -94,6 +103,17 @@ class _ToolActivityViewState extends State<ToolActivityView> {
         ? switch (legacyRequest?['action']) {
             'schema' => 'inspectLocalDatabase',
             'query' => 'queryLocalDatabase',
+            _ => null,
+          }
+        : widget.toolName == 'manageSkill'
+        ? switch (legacyRequest?['action']) {
+            'list' => 'listSkills',
+            'read' => 'readSkill',
+            'save' =>
+              legacyRequest?['previousName'] == null
+                  ? 'createSkill'
+                  : 'updateSkill',
+            'delete' => 'deleteSkill',
             _ => null,
           }
         : null;
@@ -133,23 +153,13 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                       AgentStepStatus.failed => '未完成',
                       AgentStepStatus.cancelled => '已停止',
                     },
-                    child: ToolActionIcon(toolName: widget.toolName),
+                    child: skillIcon == null
+                        ? ToolActionIcon(toolName: widget.toolName)
+                        : SkillIcon(skillIcon),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: showStatus
-                        ? Text(
-                            title,
-                            style: TextStyle(
-                              fontSize: 15,
-                              height: 1.5,
-                              fontWeight: FontWeight.w500,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                          )
-                        : ThinkingIndicator(label: title, animate: running),
+                    child: ThinkingIndicator(label: title, animate: running),
                   ),
                   if (showStatus) ...[
                     const SizedBox(width: 8),

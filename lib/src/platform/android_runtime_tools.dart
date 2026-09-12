@@ -74,7 +74,7 @@ class ExecuteAndroidScriptTool implements AgentTool {
           'description':
               'Explain the exact user-visible action, data accessed and side effects in the user’s language for approval.',
         },
-        'script': {'type': 'string', 'minLength': 1, 'maxLength': 16000},
+        'script': {'type': 'string', 'minLength': 1, 'maxLength': 50000},
       },
       'required': ['purpose', 'script'],
       'additionalProperties': false,

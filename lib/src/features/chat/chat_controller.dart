@@ -174,7 +174,7 @@ class ChatController extends ChangeNotifier {
     );
     _memory = MemoryController(_store.database, () => config);
     await memory.initialize();
-    await skills.initialize();
+    await skills.initialize(_store.database);
     _newConversation = await _newDraftStore.load(_imageStore.directory);
     if (await _store.hasMessages(_newConversation.id)) {
       await _newDraftStore.clear();
@@ -285,11 +285,15 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> saveSystemPrompt(String? systemPrompt) async {
+  Future<void> savePersonalization({
+    required String? systemPrompt,
+    required String customInstructions,
+  }) async {
     final nextSettings = ModelSettings(
       activeService: modelSettings.activeService,
       profiles: modelSettings.profiles,
       systemPrompt: systemPrompt,
+      customInstructions: customInstructions,
     );
     await _platform.saveModelSettings(nextSettings);
     modelSettings = nextSettings;
