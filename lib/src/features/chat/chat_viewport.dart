@@ -65,6 +65,7 @@ class ChatViewportState extends State<ChatViewport> {
   String? _replyAnchorId;
   final _entryHeights = <String, double>{};
   bool _contentBelow = false;
+  bool _bottomSyncQueued = false;
 
   double get _footerHeight {
     final start = _indices[_replyAnchorId];
@@ -141,6 +142,9 @@ class ChatViewportState extends State<ChatViewport> {
       _replyAnchorId = widget.sentMessageId;
       _pinSentMessage();
       return;
+    }
+    if (_following && widget.padding.bottom != oldWidget.padding.bottom) {
+      _scheduleBottomSync();
     }
     if (anchor != null && !_following) {
       final nextIndex = _anchorIndex(anchor);
@@ -261,6 +265,16 @@ class ChatViewportState extends State<ChatViewport> {
     });
   }
 
+  void _scheduleBottomSync() {
+    if (_bottomSyncQueued) return;
+    _bottomSyncQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _bottomSyncQueued = false;
+      if (!mounted || !_following || _userScrolling) return;
+      scrollToBottom();
+    });
+  }
+
   void scrollToBottom() {
     if (!_items.isAttached || _restoring) return;
     _following = true;
@@ -280,7 +294,9 @@ class ChatViewportState extends State<ChatViewport> {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
+      final heightChanged = _height != constraints.maxHeight;
       _height = constraints.maxHeight;
+      if (heightChanged && _following) _scheduleBottomSync();
       final anchor = widget.bookmark;
       return PaginationListener(
         hasMore: widget.hasEarlierMessages,
