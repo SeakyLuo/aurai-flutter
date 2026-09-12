@@ -34,7 +34,8 @@ class DeepSeekResponsesProvider implements ModelProvider {
     'stream': true,
     if (_context.limits case final limits?)
       'max_output_tokens': limits.outputTokens,
-    'instructions': '$agentSystemPrompt\n${_capabilitySummary(request)}',
+    'instructions':
+        '$agentSystemPrompt\n${_capabilitySummary(request)}\n${request.personalContext}',
     'input': _context.input,
     'tools': request.tools
         .map(

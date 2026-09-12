@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'global_ui.dart';
 import 'appearance_settings.dart';
@@ -18,6 +19,9 @@ class AuraiApp extends StatelessWidget {
     builder: (context, child) => MaterialApp(
       title: 'Aurai',
       debugShowCheckedModeBanner: false,
+      locale: const Locale('zh', 'CN'),
+      supportedLocales: const [Locale('zh', 'CN')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: GlobalUI.theme,
       darkTheme: GlobalUI.darkTheme,
       themeMode: AppearanceSettings.instance.mode,

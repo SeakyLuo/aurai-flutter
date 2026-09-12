@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import '../../memory/memory_controller.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../agent/agent_runtime.dart';
 import '../../agent/tool_executor.dart';
 import '../../agent/tool_registry.dart';
+import '../../agent/local_history_tools.dart';
 import '../../domain/agent_models.dart';
 import '../../domain/conversation_completion.dart';
 import '../../domain/capability.dart';
@@ -38,6 +40,7 @@ part 'accessibility_request.dart';
 
 class PendingConfirmation {
   PendingConfirmation(this.call, this.definition);
+  final deadline = DateTime.now().add(const Duration(seconds: 30));
   final ToolCall call;
   final ToolDefinition definition;
   final completer = Completer<bool>();
@@ -55,6 +58,8 @@ class ChatController extends ChangeNotifier {
       _platform.takeNotificationConversation();
   final completedReplies = ValueNotifier<ConversationCompletion?>(null);
   final _store = ConversationStore();
+  MemoryController? _memory;
+  MemoryController get memory => _memory!;
   final _newDraftStore = NewConversationDraft();
   late Conversation _newConversation;
   final List<Conversation> _conversations = [];
@@ -99,6 +104,7 @@ class ChatController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _memory?.dispose();
     _accessibilityTimer?.cancel();
     completedReplies.dispose();
     notificationOpenRequests.dispose();
@@ -133,6 +139,8 @@ class ChatController extends ChangeNotifier {
       _platform.loadLegacyAppState,
       _platform.clearLegacyAppState,
     );
+    _memory = MemoryController(_store.database);
+    await memory.initialize();
     _newConversation = await _newDraftStore.load(_imageStore.directory);
     if (await _store.hasMessages(_newConversation.id)) {
       await _newDraftStore.clear();
@@ -447,6 +455,10 @@ class ChatController extends ChangeNotifier {
       ? _newDraftStore.save(activeConversation)
       : _store.writer.save(activeConversation);
 
+  Future<bool> getScreenAccess() => _platform.getScreenAccess();
+  Future<void> setScreenAccess(bool allowed) =>
+      _platform.setScreenAccess(allowed);
+
   Future<bool> _confirm(ToolCall call, ToolDefinition definition) async {
     final fingerprint = '${call.name}:${jsonEncode(call.arguments)}';
     if (_deniedConfirmations.contains(fingerprint)) return false;
@@ -474,9 +486,24 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<bool> _confirmInApp(ToolCall call, ToolDefinition definition) async {
+    final screenAccess = const {
+      'act',
+      'tapScreen',
+      'captureScreen',
+    }.contains(call.name);
+    if (screenAccess && await _platform.getScreenAccess()) return true;
     final request = PendingConfirmation(call, definition);
     pendingConfirmation = request;
     notifyListeners();
-    return request.completer.future;
+    final timer = Timer(const Duration(seconds: 30), () {
+      if (identical(pendingConfirmation, request)) resolveConfirmation(false);
+    });
+    try {
+      final approved = await request.completer.future;
+      if (approved && screenAccess) await _platform.setScreenAccess(true);
+      return approved;
+    } finally {
+      timer.cancel();
+    }
   }
 }

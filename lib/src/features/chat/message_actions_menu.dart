@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../domain/agent_models.dart';
 import 'glass_surface.dart';
@@ -9,6 +8,7 @@ import 'message_time.dart';
 import 'copy_icon.dart';
 import 'conversation_menu_icon.dart';
 import 'text_selection_icon.dart';
+import 'settings_appearance.dart';
 
 enum MessageAction { copy, select, edit }
 
@@ -16,6 +16,7 @@ Future<MessageAction?> showMessageActionsMenu(
   BuildContext context, {
   required AgentMessage message,
   required Offset position,
+  bool allowEditing = true,
 }) => showGeneralDialog<MessageAction>(
   context: context,
   barrierDismissible: true,
@@ -38,7 +39,7 @@ Future<MessageAction?> showMessageActionsMenu(
         (MessageAction.copy, const CopyIcon(), '复制'),
         (MessageAction.select, const TextSelectionIcon(), '选择文本'),
       ],
-      if (message.role == AgentMessageRole.user)
+      if (allowEditing && message.role == AgentMessageRole.user)
         (
           MessageAction.edit,
           ConversationMenuIcon(
@@ -150,56 +151,16 @@ class _MessageTextSelectionPageState extends State<MessageTextSelectionPage> {
     super.dispose();
   }
 
-  Future<void> _copy() async {
-    final selection = _text.selection;
-    final value = selection.isValid && !selection.isCollapsed
-        ? selection.textInside(_text.text)
-        : _text.text;
-    try {
-      await Clipboard.setData(ClipboardData(text: value));
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已复制')));
-    } on Object {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('复制失败，请重试')));
-    }
-  }
-
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('选择文本'),
-      leading: IconButton(
-        tooltip: '返回',
-        onPressed: () => Navigator.maybePop(context),
-        icon: const Icon(Icons.arrow_back_rounded),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            _focus.requestFocus();
-            _text.selection = TextSelection(
-              baseOffset: 0,
-              extentOffset: _text.text.length,
-            );
-          },
-          child: const Text('全选'),
-        ),
-        IconButton(
-          tooltip: '复制',
-          onPressed: _copy,
-          icon: const Icon(Icons.copy_outlined),
-        ),
-      ],
+    appBar: SettingsAppBar(
+      title: '选择文本',
+      onBack: () => Navigator.maybePop(context),
     ),
     body: SafeArea(
       top: false,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
         child: TextField(
           controller: _text,
           focusNode: _focus,

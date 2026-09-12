@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../features/chat/chat_controller.dart';
 import '../platform/aurai_platform.dart';
@@ -63,6 +64,9 @@ class _AuraiStartupState extends State<AuraiStartup> {
       : MaterialApp(
           key: const ValueKey('startup'),
           debugShowCheckedModeBanner: false,
+          locale: const Locale('zh', 'CN'),
+          supportedLocales: const [Locale('zh', 'CN')],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
           theme: GlobalUI.theme,
           scaffoldMessengerKey: _messenger,
           home: const StartupBrand(),

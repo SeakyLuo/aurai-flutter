@@ -11,10 +11,14 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
     required this.onMenu,
     required this.controller,
     required this.beforeDelete,
+    this.editing = false,
+    this.onCancelEdit,
   });
   final VoidCallback onMenu;
   final ChatController controller;
   final bool Function() beforeDelete;
+  final bool editing;
+  final VoidCallback? onCancelEdit;
   @override
   Size get preferredSize => const Size.fromHeight(76);
   @override
@@ -32,7 +36,7 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
     flexibleSpace: Align(
       alignment: Alignment.topCenter,
       child: Container(
-        height: MediaQuery.paddingOf(context).top + 18,
+        height: MediaQuery.paddingOf(context).top + (editing ? 76 : 18),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -49,20 +53,41 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
     ),
     toolbarHeight: 76,
     titleSpacing: 18,
-    title: Row(
-      children: [
-        GlassSurface(
-          radius: 28,
-          child: RoundAction(
-            icon: Icons.menu_rounded,
-            label: '会话菜单',
-            onPressed: onMenu,
+    title: editing
+        ? Stack(
+            alignment: Alignment.center,
+            children: [
+              const Center(child: Text('编辑消息')),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: GlassSurface(
+                  radius: 28,
+                  child: RoundAction(
+                    icon: Icons.close_rounded,
+                    label: '取消编辑',
+                    onPressed: onCancelEdit,
+                  ),
+                ),
+              ),
+            ],
+          )
+        : Row(
+            children: [
+              GlassSurface(
+                radius: 28,
+                child: RoundAction(
+                  icon: Icons.menu_rounded,
+                  label: '会话菜单',
+                  onPressed: onMenu,
+                ),
+              ),
+              const Spacer(),
+              if (controller.messages.isNotEmpty)
+                ConversationMore(
+                  controller: controller,
+                  beforeDelete: beforeDelete,
+                ),
+            ],
           ),
-        ),
-        const Spacer(),
-        if (controller.messages.isNotEmpty)
-          ConversationMore(controller: controller, beforeDelete: beforeDelete),
-      ],
-    ),
   );
 }

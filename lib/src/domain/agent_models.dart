@@ -169,6 +169,9 @@ String newMessageId() =>
     DateTime.now().microsecondsSinceEpoch.toRadixString(36);
 
 String toolTitle(String name) => switch (name) {
+  'searchConversations' => '搜索历史会话',
+  'searchMessages' => '搜索历史消息',
+  'readLocalDatabase' => '读取本地记录',
   'getNetworkState' => '检查当前网络',
   'getNetworkEvents' => '读取网络变化记录',
   'dnsLookup' => '解析域名',

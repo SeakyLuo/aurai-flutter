@@ -8,6 +8,7 @@ import 'sidebar_action_icon.dart';
 import '../../domain/agent_models.dart';
 import 'chat_controller.dart';
 import 'glass_surface.dart';
+import 'message_composer.dart';
 import 'thinking_indicator.dart';
 import 'image_attachments.dart';
 import '../../domain/message_image.dart';
@@ -68,75 +69,107 @@ class EmptyConversation extends StatelessWidget {
               ),
             ])
               Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Material(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? const Color(0x882d293b)
-                      : const Color(0xbfffffff),
-                  borderRadius: BorderRadius.circular(22),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(22),
-                    onTap: () => onUseExample(example.$4),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
+                padding: const EdgeInsets.only(bottom: 10),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.12),
+                        blurRadius: 24,
+                        offset: const Offset(0, 6),
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primary.withValues(alpha: .12),
-                            ),
-                            child: Center(
-                              child: SizedBox.square(
-                                dimension: 20,
-                                child: FittedBox(child: example.$1),
+                    ],
+                  ),
+                  child: GlassSurface(
+                    radius: 24,
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(24),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(24),
+                        onTap: () => onUseExample(example.$4),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Theme.of(context).colorScheme.primary
+                                          .withValues(alpha: .22),
+                                      Theme.of(context).colorScheme.primary
+                                          .withValues(alpha: .08),
+                                    ],
+                                  ),
+                                ),
+                                child: Center(
+                                  child: SizedBox.square(
+                                    dimension: 20,
+                                    child: ColorFiltered(
+                                      colorFilter: ColorFilter.mode(
+                                        Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? const Color(0xffc4b5fd)
+                                            : const Color(0xff7959df),
+                                        BlendMode.srcIn,
+                                      ),
+                                      child: FittedBox(child: example.$1),
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  example.$2,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    height: 1.4,
-                                  ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      example.$2,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      example.$3,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        height: 1.4,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  example.$3,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    height: 1.4,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(width: 10),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 20,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 10),
-                          Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 20,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -285,6 +318,7 @@ class ChatComposer extends StatelessWidget {
     required this.images,
     required this.onRemoveImage,
     required this.addingImages,
+    this.savingEdit = false,
   });
 
   final TextEditingController controller;
@@ -300,169 +334,70 @@ class ChatComposer extends StatelessWidget {
   final ValueChanged<MessageImage> onRemoveImage;
   final List<MessageImage> images;
   final bool addingImages;
+  final bool savingEdit;
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-    top: false,
-    child: Center(
-      heightFactor: 1,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-          child: GlassSurface(
-            radius: 28,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (images.isNotEmpty)
-                    DraftImageAttachments(
-                      images: images,
-                      onRemove: enabled && !addingImages ? onRemoveImage : null,
-                    ),
-                  LayoutBuilder(
-                    builder: (context, constraints) =>
-                        ValueListenableBuilder<TextEditingValue>(
-                          valueListenable: controller,
-                          builder: (context, value, _) {
-                            final resume =
-                                canResume &&
-                                value.text.trim().isEmpty &&
-                                images.isEmpty;
-                            final style = Theme.of(context)
-                                .textTheme
-                                .titleMedium!
-                                .copyWith(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w400,
-                                  height: 1.4,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface,
-                                );
-                            const singleLinePadding = EdgeInsets.fromLTRB(
-                              48,
-                              10,
-                              48,
-                              10,
-                            );
-                            final textConstraints = constraints.deflate(
-                              singleLinePadding,
-                            );
-                            final painter = TextPainter(
-                              text: TextSpan(text: value.text, style: style),
-                              textDirection: Directionality.of(context),
-                              textScaler: MediaQuery.textScalerOf(context),
-                              maxLines: 1,
-                            )..layout(maxWidth: textConstraints.maxWidth);
-                            final multiline =
-                                value.text.contains('\n') ||
-                                painter.didExceedMaxLines;
-                            painter.dispose();
-                            return Stack(
-                              children: [
-                                ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    minHeight: 48,
-                                  ),
-                                  child: TextField(
-                                    controller: controller,
-                                    focusNode: focusNode,
-                                    enabled: enabled,
-                                    style: style,
-                                    minLines: 1,
-                                    maxLines: 5,
-                                    textInputAction: TextInputAction.newline,
-                                    decoration: InputDecoration(
-                                      hintText: '回复 Aurai',
-                                      hintStyle: TextStyle(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w400,
-                                      ),
-                                      filled: false,
-                                      border: InputBorder.none,
-                                      enabledBorder: InputBorder.none,
-                                      focusedBorder: InputBorder.none,
-                                      disabledBorder: InputBorder.none,
-                                      contentPadding: multiline
-                                          ? const EdgeInsets.fromLTRB(
-                                              16,
-                                              14,
-                                              16,
-                                              56,
-                                            )
-                                          : singleLinePadding,
-                                    ),
-                                  ),
-                                ),
-                                Positioned(
-                                  left: 0,
-                                  bottom: 0,
-                                  child: RoundAction(
-                                    label: '添加图片',
-                                    compact: true,
-                                    icon: Icons.add_rounded,
-                                    onPressed: enabled && !addingImages
-                                        ? onAddImages
-                                        : null,
-                                  ),
-                                ),
-                                Positioned(
-                                  right: 0,
-                                  bottom: 0,
-                                  child: RoundAction(
-                                    label: enabled
-                                        ? (addingImages
-                                              ? '正在处理图片'
-                                              : resume
-                                              ? '继续任务'
-                                              : '发送')
-                                        : stopping
-                                        ? '正在停止'
-                                        : '停止',
-                                    primary: true,
-                                    compact: true,
-                                    iconWidget: addingImages
-                                        ? const SizedBox.square(
-                                            dimension: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : null,
-                                    onPressed: enabled
-                                        ? (addingImages
-                                              ? null
-                                              : resume
-                                              ? onResume
-                                              : canSend
-                                              ? onSend
-                                              : null)
-                                        : (stopping ? null : onStop),
-                                    icon: enabled
-                                        ? (resume
-                                              ? Icons.play_arrow_rounded
-                                              : Icons.arrow_upward_rounded)
-                                        : Icons.stop_rounded,
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                  ),
-                ],
+  Widget build(
+    BuildContext context,
+  ) => ValueListenableBuilder<TextEditingValue>(
+    valueListenable: controller,
+    builder: (context, value, _) {
+      final resume = canResume && value.text.trim().isEmpty && images.isEmpty;
+      return MessageComposer(
+        controller: controller,
+        focusNode: focusNode,
+        enabled: enabled,
+        hintText: '回复 Aurai',
+        attachments: images.isEmpty
+            ? null
+            : DraftImageAttachments(
+                images: images,
+                onRemove: enabled && !addingImages ? onRemoveImage : null,
               ),
-            ),
-          ),
+        leading: RoundAction(
+          label: '添加图片',
+          compact: true,
+          icon: Icons.add_rounded,
+          onPressed: enabled && !addingImages ? onAddImages : null,
         ),
-      ),
-    ),
+        action: RoundAction(
+          label: savingEdit
+              ? '正在保存'
+              : enabled
+              ? (addingImages
+                    ? '正在处理图片'
+                    : resume
+                    ? '继续任务'
+                    : '发送')
+              : stopping
+              ? '正在停止'
+              : '停止',
+          primary: true,
+          compact: true,
+          iconWidget: addingImages
+              ? const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : null,
+          onPressed: savingEdit
+              ? null
+              : enabled
+              ? (addingImages
+                    ? null
+                    : resume
+                    ? onResume
+                    : canSend
+                    ? onSend
+                    : null)
+              : (stopping ? null : onStop),
+          icon: savingEdit
+              ? Icons.arrow_upward_rounded
+              : enabled
+              ? (resume ? Icons.play_arrow_rounded : Icons.arrow_upward_rounded)
+              : Icons.stop_rounded,
+        ),
+      );
+    },
   );
 }

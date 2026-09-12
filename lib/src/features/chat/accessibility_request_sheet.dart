@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'chat_controller.dart';
+import 'authorization_sheet_content.dart';
 
 Future<void> showAccessibilityRequestSheet(
   BuildContext context,
@@ -13,7 +14,7 @@ Future<void> showAccessibilityRequestSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    showDragHandle: true,
+    showDragHandle: false,
     builder: (_) => _AccessibilityRequestSheet(controller: controller),
   );
   if (controller.accessibilityRequestPending) {
@@ -102,56 +103,17 @@ class _AccessibilityRequestSheetState
     final seconds =
         ((_deadline.difference(DateTime.now()).inMilliseconds / 1000).ceil())
             .clamp(0, 120);
-    return SafeArea(
-      top: false,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              '开启无障碍权限',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Aurai 需要无障碍权限来查看和操作其他 App。开启后返回，任务会自动继续。',
-              style: TextStyle(
-                fontSize: 15,
-                height: 1.6,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '${_wentToSettings ? '等待开启无障碍，' : ''}${seconds} 秒后自动拒绝',
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('暂不开启'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _opening ? null : _enable,
-                    child: const Text('去开启'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+    return AuthorizationSheetContent(
+      title: '开启无障碍权限',
+      content: Text(
+        _wentToSettings
+            ? '等待开启无障碍。开启后返回 Aurai，任务会自动继续。'
+            : 'Aurai 需要无障碍权限来查看和操作其他 App。开启后返回，任务会自动继续。',
       ),
+      allowLabel: _opening ? '正在打开…' : '去开启',
+      onAllow: _opening ? null : _enable,
+      onDeny: () => Navigator.pop(context),
+      seconds: seconds,
     );
   }
 }

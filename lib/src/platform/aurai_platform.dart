@@ -116,6 +116,12 @@ class AuraiPlatform {
   Future<void> openNotificationSettings() =>
       _channel.invokeMethod<void>('openNotificationSettings');
 
+  Future<bool> getScreenAccess() async =>
+      (await _channel.invokeMethod<bool>('getScreenAccess'))!;
+
+  Future<void> setScreenAccess(bool allowed) =>
+      _channel.invokeMethod<void>('setScreenAccess', {'allowed': allowed});
+
   Future<bool> requestConfirmation(
     String callId,
     String toolName,

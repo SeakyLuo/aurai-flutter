@@ -80,14 +80,6 @@ class AndroidAgentBridge(private val context: Context) {
                 result.success(null)
             }
             "startAgentSession" -> {
-                if (!notificationGranted() && AuraiAccessibilityService.instance == null) {
-                    result.error(
-                        "background_visibility_required",
-                        "跨 App 执行需要通知权限，或已开启且在线的 Aurai 无障碍胶囊",
-                        null,
-                    )
-                    return true
-                }
                 sessionActive = true
                 AuraiAccessibilityService.instance?.startSession()
                 AgentSessionService.start(context)
@@ -106,6 +98,14 @@ class AndroidAgentBridge(private val context: Context) {
                     call.argument<String>("title")!!,
                     call.argument<String>("reply")!!,
                 )
+                result.success(null)
+            }
+            "getScreenAccess" -> result.success(
+                context.getSharedPreferences("screen_access", Context.MODE_PRIVATE).getBoolean("allowed", false),
+            )
+            "setScreenAccess" -> {
+                context.getSharedPreferences("screen_access", Context.MODE_PRIVATE)
+                    .edit().putBoolean("allowed", call.argument<Boolean>("allowed")!!).apply()
                 result.success(null)
             }
             "requestConfirmation" -> requestConfirmation(call, result)
