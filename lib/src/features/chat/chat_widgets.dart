@@ -35,7 +35,7 @@ class EmptyConversation extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const WelcomeLogo(),
+            const RepaintBoundary(child: WelcomeLogo()),
             const SizedBox(height: 28),
             Text(
               '有什么可以帮你？',

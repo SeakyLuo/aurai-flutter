@@ -66,6 +66,8 @@ class ChatViewportState extends State<ChatViewport> {
   final _entryHeights = <String, double>{};
   bool _contentBelow = false;
   bool _bottomSyncQueued = false;
+  bool _keepSentMessageAtTop = false;
+  bool _sentSyncQueued = false;
 
   double get _footerHeight {
     final start = _indices[_replyAnchorId];
@@ -84,6 +86,7 @@ class ChatViewportState extends State<ChatViewport> {
     final previousFooter = _footerHeight;
     _entryHeights[id] = height;
     if (_footerHeight != previousFooter) setState(() {});
+    if (_keepSentMessageAtTop) _scheduleSentSync();
   }
 
   double _listAlignment(int index, double itemAlignment) {
@@ -91,11 +94,35 @@ class ChatViewportState extends State<ChatViewport> {
     return itemAlignment - (index == 0 ? widget.padding.top / _height : 0);
   }
 
+  void _scheduleSentSync() {
+    if (_sentSyncQueued) return;
+    _sentSyncQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sentSyncQueued = false;
+      if (!mounted || !_keepSentMessageAtTop || _userScrolling || _restoring)
+        return;
+      final index = _indices[_replyAnchorId]!;
+      final position = _positions.itemPositions.value
+          .where((item) => item.index == index)
+          .firstOrNull;
+      if (position == null ||
+          (position.itemLeadingEdge * _height - widget.sentMessageTop).abs() >
+              1) {
+        _pinSentMessage();
+      }
+    });
+  }
+
   void _pinSentMessage() {
+    _keepSentMessageAtTop = true;
     _following = false;
     _restoring = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (!_keepSentMessageAtTop) {
+        _restoring = false;
+        return;
+      }
       _items.jumpTo(
         index: _indices[_replyAnchorId]!,
         alignment: _listAlignment(
@@ -120,6 +147,8 @@ class ChatViewportState extends State<ChatViewport> {
     _replyAnchorId = widget.bookmark == null
         ? widget.sentMessageId
         : widget.bookmark!.replyAnchorId;
+    _keepSentMessageAtTop =
+        widget.bookmark == null && widget.sentMessageId != null;
     _indexEntries();
     _positions.itemPositions.addListener(_rememberPosition);
   }
@@ -136,14 +165,16 @@ class ChatViewportState extends State<ChatViewport> {
     _following = widget.followOutput;
     final anchor = _anchor;
     final previousIndex = anchor == null ? null : _indices[anchor.messageId];
-    _indexEntries();
+    if (!identical(widget.entries, oldWidget.entries)) _indexEntries();
     if (widget.sentMessageId != oldWidget.sentMessageId &&
         widget.sentMessageId != null) {
       _replyAnchorId = widget.sentMessageId;
       _pinSentMessage();
       return;
     }
-    if (_following && widget.padding.bottom != oldWidget.padding.bottom) {
+    if (_following &&
+        (!oldWidget.followOutput ||
+            widget.padding.bottom != oldWidget.padding.bottom)) {
       _scheduleBottomSync();
     }
     if (anchor != null && !_following) {
@@ -174,6 +205,7 @@ class ChatViewportState extends State<ChatViewport> {
 
   void _rememberPosition() {
     if (_restoring) return;
+    if (_keepSentMessageAtTop) _scheduleSentSync();
     final visible =
         _positions.itemPositions.value
             .where(
@@ -215,6 +247,7 @@ class ChatViewportState extends State<ChatViewport> {
   }
 
   void _preserveEntry(String id) {
+    _keepSentMessageAtTop = false;
     final position = _positions.itemPositions.value.firstWhere(
       (item) => item.index == _indices[id],
     );
@@ -245,6 +278,7 @@ class ChatViewportState extends State<ChatViewport> {
   }
 
   void restoreBookmark(ChatScrollBookmark bookmark) {
+    _keepSentMessageAtTop = false;
     _restoring = true;
     _anchor = bookmark;
     _following = bookmark.followOutput;
@@ -259,6 +293,7 @@ class ChatViewportState extends State<ChatViewport> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _restoring = false;
+          if (_following) scrollToBottom();
           _rememberPosition();
         }
       });
@@ -278,6 +313,7 @@ class ChatViewportState extends State<ChatViewport> {
   void scrollToBottom() {
     if (!_items.isAttached || _restoring) return;
     _following = true;
+    _keepSentMessageAtTop = false;
     if (_replyAnchorId != null) setState(() => _replyAnchorId = null);
     _items.jumpTo(
       index: widget.entries.length,
@@ -297,6 +333,7 @@ class ChatViewportState extends State<ChatViewport> {
       final heightChanged = _height != constraints.maxHeight;
       _height = constraints.maxHeight;
       if (heightChanged && _following) _scheduleBottomSync();
+      if (_keepSentMessageAtTop) _scheduleSentSync();
       final anchor = widget.bookmark;
       return PaginationListener(
         hasMore: widget.hasEarlierMessages,
@@ -307,6 +344,7 @@ class ChatViewportState extends State<ChatViewport> {
             if (notification.depth == 0) {
               if (notification is ScrollStartNotification &&
                   notification.dragDetails != null) {
+                _keepSentMessageAtTop = false;
                 _userScrolling = true;
                 FocusManager.instance.primaryFocus?.unfocus();
               }
