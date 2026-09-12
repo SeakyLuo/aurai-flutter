@@ -12,7 +12,9 @@ class AttachmentActionIcon extends StatelessWidget {
     size: const Size.square(24),
     painter: _AttachmentActionPainter(
       type,
-      Theme.of(context).colorScheme.onSurfaceVariant,
+      Theme.of(context).brightness == Brightness.dark
+          ? Colors.white
+          : Colors.black,
     ),
   );
 }

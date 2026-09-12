@@ -65,10 +65,12 @@ class AuraiApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        if (java.io.File("/proc/self/cmdline").readText().trimEnd('\u0000').endsWith(":device_script")) return
         FlutterInjector.instance().flutterLoader().startInitialization(this)
         FlutterInjector.instance().flutterLoader().ensureInitializationComplete(this, null)
         flutterEngine = FlutterEngine(this)
         GeneratedPluginRegistrant.registerWith(flutterEngine)
+        ScheduledTasks.initialize(this, flutterEngine.dartExecutor.binaryMessenger)
         agentBridge = AndroidAgentBridge(this)
         httpProbe = AndroidHttpProbe(
             getSystemService(ConnectivityManager::class.java),
@@ -90,8 +92,32 @@ class AuraiApplication : Application() {
         FlutterEngineCache.getInstance().put(ENGINE_ID, flutterEngine)
     }
 
+    private val scriptRunner by lazy { AndroidScriptRunner(this) }
+
     private fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "inspectAndroidApi" -> result.success(AndroidApiInspector.inspect(
+                call.argument<String>("className")!!,
+                call.argument<String>("filter")!!,
+                call.argument<Int>("offset")!!,
+            ))
+            "executeAndroidScript" -> scriptRunner.execute(
+                call.argument<String>("callId")!!,
+                call.argument<String>("script")!!,
+                call.argument<String>("conversationId")!!,
+                result,
+            )
+            "cancelAndroidScript" -> {
+                scriptRunner.cancel(call.argument<String>("callId")!!)
+                result.success(null)
+            }
+            "sendNotification" -> result.success(
+                AgentNotifications(this).send(
+                    call.argument<String>("title")!!,
+                    call.argument<String>("body")!!,
+                    call.argument<String>("conversationId")!!,
+                ),
+            )
             "takeNotificationConversation" -> {
                 result.success(pendingNotificationConversation)
                 pendingNotificationConversation = null

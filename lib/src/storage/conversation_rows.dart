@@ -11,6 +11,8 @@ Map<String, Object?> conversationRow(Conversation value) => {
   'title': value.title,
   'preview': value.preview,
   'pinned': value.isPinned ? 1 : 0,
+  'archived': value.isArchived ? 1 : 0,
+  'scheduled_task': value.isScheduledTask ? 1 : 0,
   'draft': value.draft,
   'pending_goal': value.pendingGoal,
   'run_state': value.runState.name,
@@ -32,6 +34,8 @@ Conversation conversationFromRow(Map<String, Object?> row) =>
       ..storedTitle = row['title']! as String
       ..storedPreview = row['preview'] as String?
       ..isPinned = row['pinned'] == 1
+      ..isArchived = row['archived'] == 1
+      ..isScheduledTask = row['scheduled_task'] == 1
       ..draft = row['draft']! as String
       ..pendingGoal = row['pending_goal'] as String?
       ..runState = ChatRunState.values.byName(row['run_state']! as String)

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum ConversationMenuIconType { pin, unpin, rename, delete }
+enum ConversationMenuIconType { pin, unpin, rename, archive, unarchive, delete }
 
 class ConversationMenuIcon extends StatelessWidget {
   const ConversationMenuIcon({
@@ -75,6 +75,38 @@ class _MenuIconPainter extends CustomPainter {
             ..lineTo(18.2, 11.3),
           pen,
         );
+      case ConversationMenuIconType.archive:
+      case ConversationMenuIconType.unarchive:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(3, 3.5, 18, 4.5),
+            const Radius.circular(1.5),
+          ),
+          pen,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(4.5, 8)
+            ..lineTo(4.5, 18.5)
+            ..quadraticBezierTo(4.5, 20.5, 6.5, 20.5)
+            ..lineTo(17.5, 20.5)
+            ..quadraticBezierTo(19.5, 20.5, 19.5, 18.5)
+            ..lineTo(19.5, 8),
+          pen,
+        );
+        if (type == ConversationMenuIconType.archive) {
+          canvas.drawLine(const Offset(9, 12), const Offset(15, 12), pen);
+        } else {
+          canvas.drawPath(
+            Path()
+              ..moveTo(9, 14)
+              ..lineTo(12, 11)
+              ..lineTo(15, 14)
+              ..moveTo(12, 11)
+              ..lineTo(12, 17),
+            pen,
+          );
+        }
       case ConversationMenuIconType.delete:
         canvas.drawPath(
           Path()

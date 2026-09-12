@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'chat_controller.dart';
+import 'conversation_notification_toast.dart';
 
 class ConversationNotifications extends StatefulWidget {
   const ConversationNotifications({
@@ -20,6 +21,14 @@ class ConversationNotifications extends StatefulWidget {
 class _ConversationNotificationsState extends State<ConversationNotifications>
     with WidgetsBindingObserver {
   bool _openingNotification = false;
+  OverlayEntry? _completionToast;
+
+  void _hideCompletionToast() {
+    _completionToast?.remove();
+    _completionToast?.dispose();
+    _completionToast = null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -36,6 +45,7 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
 
   @override
   void dispose() {
+    _hideCompletionToast();
     widget.controller.completedReplies.removeListener(_onCompleted);
     widget.controller.memory.notices.removeListener(_onMemoryNotice);
     widget.controller.notificationOpenRequests.removeListener(
@@ -47,6 +57,7 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _hideCompletionToast();
     if (state == AppLifecycleState.resumed) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _openSystemNotification(),
@@ -98,50 +109,27 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
     final completion = widget.controller.completedReplies.value!;
     if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed)
       return;
-    if (ModalRoute.of(context)!.isCurrent &&
-        widget.controller.activeConversation.id == completion.conversationId)
+    if (widget.controller.activeConversation.id == completion.conversationId)
       return;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 7),
-        behavior: SnackBarBehavior.floating,
-        content: Row(
-          children: [
-            Icon(
-              Icons.check_rounded,
-              size: 20,
-              color: Theme.of(context).colorScheme.onInverseSurface,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '“${completion.title}”已完成回复',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    completion.reply,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        action: SnackBarAction(
-          label: '查看',
-          onPressed: () => _openConversation(completion.conversationId),
-        ),
+    _hideCompletionToast();
+    _completionToast = OverlayEntry(
+      builder: (context) => ConversationNotificationToast(
+        title: completion.title,
+        reply: completion.reply,
+        onDismiss: _hideCompletionToast,
+        onOpen: () {
+          if (!ModalRoute.of(this.context)!.isCurrent) {
+            ScaffoldMessenger.of(
+              this.context,
+            ).showSnackBar(const SnackBar(content: Text('请先完成或关闭当前页面，再查看回复')));
+            return false;
+          }
+          _openConversation(completion.conversationId);
+          return true;
+        },
       ),
     );
+    Overlay.of(context, rootOverlay: true).insert(_completionToast!);
   }
 
   @override

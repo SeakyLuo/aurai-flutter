@@ -1,123 +1,164 @@
 import 'package:flutter/material.dart';
+
 import 'memory_controller.dart';
-import 'memory_page.dart' show memoryToast;
+import 'memory_toast.dart';
 import '../features/chat/settings_appearance.dart';
+import '../features/chat/settings_icon.dart';
 
 class MemoryEditor extends StatefulWidget {
-  const MemoryEditor({required this.memory, this.entry});
+  const MemoryEditor({super.key, required this.memory, this.entry});
   final MemoryController memory;
   final Map<String, Object?>? entry;
+
   @override
   State<MemoryEditor> createState() => MemoryEditorState();
 }
 
 class MemoryEditorState extends State<MemoryEditor> {
-  late final text = TextEditingController(
-    text: widget.entry?['text'] as String? ?? '',
-  );
+  late final original = widget.entry?['text'] as String? ?? '';
+  late final text = TextEditingController(text: original);
   bool busy = false;
+  bool allowPop = false;
+  bool get dirty => text.text.trim() != original.trim();
+
   @override
   void dispose() {
     text.dispose();
     super.dispose();
   }
 
-  Future<void> _commit(bool delete) async {
+  void _close() {
+    setState(() => allowPop = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.pop(context);
+    });
+  }
+
+  Future<void> _leave() async {
+    if (busy) return;
+    if (dirty) {
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('放弃修改？'),
+          content: const Text('尚未保存的记忆修改会丢失。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('继续编辑'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('放弃修改'),
+            ),
+          ],
+        ),
+      );
+      if (discard != true || !mounted) return;
+    }
+    _close();
+  }
+
+  Future<void> _commit() async {
     setState(() => busy = true);
     try {
-      if (delete) {
-        await widget.memory.deleteEntry(widget.entry!['id'] as String);
-      } else {
-        await widget.memory.saveEntry(
-          widget.entry?['id'] as String?,
-          text.text,
-        );
-      }
-      if (mounted) {
-        memoryToast(context, delete ? '记忆已删除' : '记忆已保存');
-        setState(() => busy = false);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) Navigator.pop(context);
-        });
-      }
+      await widget.memory.saveEntry(widget.entry?['id'] as String?, text.text);
+      if (!mounted) return;
+      memoryToast(context, '记忆已保存');
+      _close();
     } on Object catch (error) {
-      if (mounted)
-        memoryToast(context, error is StateError ? error.message : '无法保存，请重试');
-    } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) {
+        memoryToast(context, error is StateError ? error.message : '操作失败，请重试');
+        setState(() => busy = false);
+      }
     }
   }
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: !busy,
-    child: Padding(
-      padding: EdgeInsets.fromLTRB(
-        24,
-        24,
-        24,
-        MediaQuery.viewInsetsOf(context).bottom + 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            widget.entry == null ? '添加记忆' : '编辑记忆',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: text,
-            autofocus: true,
-            enabled: !busy,
-            minLines: 2,
-            maxLines: 6,
-            maxLength: 300,
-            onChanged: (_) => setState(() {}),
-            style: const TextStyle(fontSize: 16),
-            decoration: memoryFieldDecoration(context, '想让 Aurai 记住什么？'),
-          ),
-          Row(
-            children: [
-              if (widget.entry != null)
-                TextButton(
-                  onPressed: busy ? null : () => _commit(true),
-                  child: const Text('删除'),
-                ),
-              const Spacer(),
-              TextButton(
-                onPressed: busy ? null : () => Navigator.pop(context),
-                child: const Text('取消'),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return PopScope(
+      canPop: allowPop || (!dirty && !busy),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _leave();
+      },
+      child: Scaffold(
+        appBar: SettingsAppBar(
+          title: widget.entry == null ? '添加记忆' : '编辑记忆',
+          onBack: busy ? null : _leave,
+          actions: [
+            SettingsGlassAction(
+              label: busy ? '正在保存' : '保存',
+              icon: Icons.check_rounded,
+              onPressed:
+                  !busy &&
+                      dirty &&
+                      text.text.trim().isNotEmpty &&
+                      text.text.length <= 300
+                  ? () => _commit()
+                  : null,
+              iconWidget: Opacity(
+                opacity:
+                    !busy &&
+                        dirty &&
+                        text.text.trim().isNotEmpty &&
+                        text.text.length <= 300
+                    ? 1
+                    : .3,
+                child: const SettingsIcon(type: SettingsIconType.check),
               ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: busy || text.text.trim().isEmpty
-                    ? null
-                    : () => _commit(false),
-                child: const Text('保存'),
+            ),
+          ],
+        ),
+        body: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                children: [
+                  TextField(
+                    controller: text,
+                    autofocus: widget.entry == null,
+                    enabled: !busy,
+                    minLines: 5,
+                    maxLines: null,
+                    maxLength: 300,
+                    onChanged: (_) => setState(() {}),
+                    style: TextStyle(
+                      fontSize: 16,
+                      height: 1.6,
+                      fontWeight: FontWeight.w400,
+                      color: colors.onSurface,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '想让 Aurai 记住什么？',
+                      hintStyle: TextStyle(
+                        color: colors.onSurfaceVariant,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      filled: true,
+                      fillColor: settingsFieldColor(context),
+                      contentPadding: const EdgeInsets.all(16),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      counterStyle: TextStyle(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ],
+        ),
       ),
-    ),
-  );
-}
-
-InputDecoration memoryFieldDecoration(BuildContext context, String hint) {
-  final border = OutlineInputBorder(
-    borderRadius: BorderRadius.circular(26),
-    borderSide: BorderSide.none,
-  );
-  return InputDecoration(
-    hintText: hint,
-    filled: true,
-    fillColor: settingsFieldColor(context),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
-    border: border,
-    enabledBorder: border,
-    focusedBorder: border,
-    disabledBorder: border,
-  );
+    );
+  }
 }

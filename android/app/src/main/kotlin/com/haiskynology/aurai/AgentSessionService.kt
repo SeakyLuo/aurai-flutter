@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -16,7 +15,7 @@ import android.os.Looper
 
 class AgentSessionService : Service() {
     private val handler = Handler(Looper.getMainLooper())
-    private val coverLogo by lazy { BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher) }
+    private val notificationBranding by lazy { NotificationBranding(resources) }
 
     override fun onCreate() {
         super.onCreate()
@@ -25,6 +24,12 @@ class AgentSessionService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action ?: ACTION_START) {
+            ACTION_SCHEDULED -> {
+                running = true
+                startForeground(NOTIFICATION_ID, runningNotification("正在启动定时任务"))
+                ScheduledTasks.dispatch()
+                handler.postDelayed({ ScheduledTasks.startupTimedOut() }, 60_000)
+            }
             ACTION_START -> {
                 running = true
                 startForeground(NOTIFICATION_ID, runningNotification("正在准备"))
@@ -64,9 +69,7 @@ class AgentSessionService : Service() {
     }
 
     private fun runningNotification(step: String): Notification =
-        Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_aurai)
-            .setLargeIcon(coverLogo)
+        notificationBranding.applyTo(Notification.Builder(this, CHANNEL_ID))
             .setContentTitle("Aurai 正在执行任务")
             .setContentText(step)
             .setContentIntent(openAppIntent())
@@ -87,9 +90,7 @@ class AgentSessionService : Service() {
             .build()
 
     private fun finishedNotification(completed: Boolean, conversationId: String?, title: String?, reply: String?): Notification =
-        Notification.Builder(this, RESULT_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_aurai)
-            .setLargeIcon(coverLogo)
+        notificationBranding.applyTo(Notification.Builder(this, RESULT_CHANNEL_ID))
             .setContentTitle(if (completed) "${title!!} · 已完成回复" else "任务未完成")
             .setContentText(if (completed) reply!!.take(240) else "点按返回 Aurai 处理")
             .setStyle(Notification.BigTextStyle().bigText(if (completed) reply!!.take(4000) else "点按返回 Aurai 处理"))
@@ -137,6 +138,7 @@ class AgentSessionService : Service() {
         private const val FINISHED_NOTIFICATION_ID = 1109
         private const val CHANNEL_ID = "aurai_agent_session"
         private const val NOTIFICATION_ID = 1107
+        private const val ACTION_SCHEDULED = "com.haiskynology.aurai.agent.SCHEDULED"
         private const val ACTION_START = "com.haiskynology.aurai.agent.START"
         private const val ACTION_STEP = "com.haiskynology.aurai.agent.STEP"
         private const val ACTION_STOP = "com.haiskynology.aurai.agent.STOP"
@@ -145,6 +147,11 @@ class AgentSessionService : Service() {
         private const val EXTRA_OUTCOME = "outcome"
         private const val STOP_TIMEOUT_MS = 10_000L
         @Volatile private var running = false
+
+        val isRunning: Boolean get() = running
+        fun startScheduled(context: Context) {
+            context.startForegroundService(Intent(context, AgentSessionService::class.java).setAction(ACTION_SCHEDULED))
+        }
 
         fun start(context: Context) {
             val intent = Intent(context, AgentSessionService::class.java).setAction(ACTION_START)

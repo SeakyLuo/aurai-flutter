@@ -20,7 +20,7 @@ class GetNotificationsTool
   ToolDefinition get definition => ToolDefinition(
     name: 'getNotifications',
     description:
-        'Read a bounded recent window from Android notifications observed while Aurai notification access is connected. Sensitive verification, login-security, payment, transfer, and bank content is redacted on-device before model access.',
+        'Read a bounded recent window from Android notifications observed while Aurai notification access is connected. Sensitive verification, login-security, payment, transfer, and bank content is redacted on-device before model access. Use only when relevant to the task. System notification access is persistent, but sending data to the model requires task-scoped authorization bounded by provider, app filter, lookback window and result limit. Explain why before opening notificationAccess settings when missing. Respect coverageStart and partial: this is not a complete history, and absence outside the observed window proves nothing. Never recover redacted content using other tools.',
     inputSchema: const <String, Object?>{
       'type': 'object',
       'properties': <String, Object?>{

@@ -115,8 +115,9 @@ class _ToolActivity extends StatelessWidget {
       AgentStepStatus.cancelled => '已停止：',
     };
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+      padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
       child: ToolActivityView(
+        toolName: step.toolName,
         storageId: storageId,
         title: '$prefix${step.title}',
         status: step.status,

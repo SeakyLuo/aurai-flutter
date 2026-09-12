@@ -42,3 +42,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    implementation("org.dmfs:lib-recur:0.17.1")
+    implementation("org.mozilla:rhino:1.7.15")
+}

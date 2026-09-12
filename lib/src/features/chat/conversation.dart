@@ -16,6 +16,8 @@ class Conversation {
   final List<AgentStep> steps = [];
   final List<({String afterMessageId, AgentStep step})> liveToolSteps = [];
   bool isPinned = false;
+  bool isArchived = false;
+  bool isScheduledTask = false;
   int messageCount = 0;
   String? storedTitle;
   String? storedPreview;
@@ -68,6 +70,8 @@ class Conversation {
         )
         .toList(),
     'isPinned': isPinned,
+    'isArchived': isArchived,
+    'isScheduledTask': isScheduledTask,
     'draft': draft,
     'draftImages': draftImages.map((image) => image.toJson()).toList(),
     'pendingGoal': pendingGoal,
@@ -101,6 +105,8 @@ class Conversation {
     );
     conversation.messageCount = conversation.messages.length;
     conversation.isPinned = json['isPinned'] == true;
+    conversation.isArchived = json['isArchived'] == true;
+    conversation.isScheduledTask = json['isScheduledTask'] == true;
     conversation.pendingGoal = json['pendingGoal'] as String?;
     final state = ChatRunState.values.byName(json['runState']! as String);
     conversation.runState =

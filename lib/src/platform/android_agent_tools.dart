@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 
 import '../domain/tool_models.dart';
+import '../domain/ui_tool_actions.dart';
 import 'android_network_tools.dart';
 import 'aurai_platform.dart';
 
@@ -72,7 +73,7 @@ class RequestAccessibilityAccessTool implements AgentTool {
     name: 'requestAccessibilityAccess',
     executionTimeout: Duration(seconds: 155),
     description:
-        'Ask the user to enable Aurai accessibility access when UI observation or interaction is needed. Waits for the user to return.',
+        'Ask the user to enable Aurai accessibility access when UI observation or interaction is needed. Request once and wait for the user to return. Respect denial; choose another route or explain the limitation.',
     inputSchema: <String, Object?>{
       'type': 'object',
       'properties': <String, Object?>{},
@@ -100,7 +101,7 @@ class ObserveDeviceTool extends _PlatformTool {
   ToolDefinition get definition => const ToolDefinition(
     name: 'observeDevice',
     description:
-        'Observe the foreground app, Android device state, and the current accessibility UI tree when authorized.',
+        'Observe the foreground app, Android device state, and the current accessibility UI tree when authorized. Observe before UI actions and again after launchApp, startIntent, openSettings or UI actions to verify the result. Use fresh state instead of historical app, node, screen, network or permission values.',
     inputSchema: <String, Object?>{
       'type': 'object',
       'properties': <String, Object?>{},
@@ -126,7 +127,7 @@ class CaptureScreenTool implements AgentTool {
   ToolDefinition get definition => ToolDefinition(
     name: 'captureScreen',
     description:
-        'Capture the current Android screen for visual inspection when the accessibility tree is insufficient. The image is attached to this tool result and is not stored in conversation history.',
+        'Capture the current Android screen for visual inspection when the accessibility tree is insufficient. The image is attached to this tool result and is not stored in conversation history. Images are sensitive remote-model input requiring runtime-enforced user confirmation. Never bypass protected screen content.',
     inputSchema: const <String, Object?>{
       'type': 'object',
       'properties': <String, Object?>{},
@@ -180,7 +181,7 @@ class TapScreenTool implements AgentTool, PreflightAgentTool {
   ToolDefinition get definition => ToolDefinition(
     name: 'tapScreen',
     description:
-        'Tap one point from the latest captureScreen result. Coordinates are normalized within that captured target window: x and y are each at least 0 and less than 1. The screenshot is invalidated after one attempt.',
+        'Tap one point from the latest captureScreen result. Coordinates are normalized within that captured target window: x and y are each at least 0 and less than 1. The screenshot is invalidated after one attempt. Observe again after every tap and never replay an uncertain tap. After two visual_changed/stale results, use accessibility nodes or ask the user instead of looping screenshots.',
     inputSchema: <String, Object?>{
       'type': 'object',
       'properties': <String, Object?>{
@@ -244,44 +245,39 @@ class TapScreenTool implements AgentTool, PreflightAgentTool {
 }
 
 class ActTool extends _PlatformTool {
-  ActTool(super.platform, this._providerLabel);
+  ActTool(super.platform, this._providerLabel, this.name);
+  final String name;
   final String _providerLabel;
 
   @override
   ToolDefinition get definition => ToolDefinition(
-    name: 'act',
+    name: name,
     description:
-        'Perform one generic Android UI action against the latest observed accessibility node. Re-observe after every action.',
+        'Perform only ${uiToolActions[name]} as an Android UI action against the latest observed accessibility node. Pass observationId from the latest observe result. Re-observe after every action and verify the expected state before claiming success.',
     inputSchema: <String, Object?>{
       'type': 'object',
       'properties': <String, Object?>{
-        'action': <String, Object?>{
-          'type': 'string',
-          'enum': <String>[
-            'click',
-            'inputText',
-            'scrollForward',
-            'scrollBackward',
-            'back',
-            'home',
-          ],
-        },
         'observationId': <String, Object?>{
           'type': 'string',
           'description':
               'observationId from the latest observeDevice UI result.',
         },
-        'nodeRef': <String, Object?>{
-          'type': <String>['string', 'null'],
-          'description':
-              'Node ref from the latest observeDevice result. Use null for back and home.',
-        },
-        'text': <String, Object?>{
-          'type': <String>['string', 'null'],
-          'description': 'Text for inputText; otherwise null.',
-        },
+        if (name != 'goBack' && name != 'goHome')
+          'nodeRef': <String, Object?>{
+            'type': 'string',
+            'description': 'Node ref from the latest observeDevice result.',
+          },
+        if (name == 'inputUiText')
+          'text': <String, Object?>{
+            'type': 'string',
+            'description': 'Text to enter in the observed field.',
+          },
       },
-      'required': <String>['action', 'observationId', 'nodeRef', 'text'],
+      'required': <String>[
+        'observationId',
+        if (name != 'goBack' && name != 'goHome') 'nodeRef',
+        if (name == 'inputUiText') 'text',
+      ],
       'additionalProperties': false,
     },
     safety: ToolSafety.sensitive,
@@ -292,7 +288,7 @@ class ActTool extends _PlatformTool {
 
   @override
   Future<Map<String, Object?>> invoke(ToolCall call) =>
-      platform.act(call.id, call.arguments);
+      platform.act(call.id, uiActionArguments(name, call.arguments));
 }
 
 class FindAppsTool extends _PlatformTool {
@@ -323,7 +319,8 @@ class LaunchAppTool extends _PlatformTool {
   @override
   ToolDefinition get definition => const ToolDefinition(
     name: 'launchApp',
-    description: 'Launch an installed app selected from findApps results.',
+    description:
+        'Launch an installed app selected from findApps results. Observe again to verify the foreground app.',
     inputSchema: <String, Object?>{
       'type': 'object',
       'properties': <String, Object?>{
@@ -346,7 +343,7 @@ class StartIntentTool extends _PlatformTool {
   ToolDefinition get definition => const ToolDefinition(
     name: 'startIntent',
     description:
-        'Start a general Android intent. The exact action, data, MIME type and extras are shown to the user before execution.',
+        'Start a general Android intent. The exact action, data, MIME type and extras are shown to the user before execution. Observe again afterwards to verify the expected state.',
     inputSchema: <String, Object?>{
       'type': 'object',
       'properties': <String, Object?>{
@@ -395,7 +392,8 @@ class OpenSettingsTool extends _PlatformTool {
   @override
   ToolDefinition get definition => const ToolDefinition(
     name: 'openSettings',
-    description: 'Open a stable Android Settings screen.',
+    description:
+        'Open a stable Android Settings screen. Observe again to verify it opened; opening settings does not mean permission was granted.',
     inputSchema: <String, Object?>{
       'type': 'object',
       'properties': <String, Object?>{

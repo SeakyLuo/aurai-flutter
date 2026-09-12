@@ -1,3 +1,4 @@
+import 'tool_search.dart';
 import '../domain/capability.dart';
 import '../domain/tool_models.dart';
 
@@ -5,12 +6,15 @@ class ToolRegistry {
   ToolRegistry({required List<AgentTool> tools, required this.capabilities})
     : _tools = <String, AgentTool>{
         for (final tool in tools) tool.definition.name: tool,
-      };
+      } {
+    final search = ToolSearch(this);
+    _tools[search.definition.name] = search;
+  }
 
   final Map<String, AgentTool> _tools;
   final List<Capability> capabilities;
 
-  List<ToolDefinition> get availableDefinitions {
+  List<ToolDefinition> get catalog {
     final availableIds = capabilities
         .where(
           (capability) =>
@@ -28,6 +32,34 @@ class ToolRegistry {
         )
         .map((tool) => tool.definition)
         .toList(growable: false);
+  }
+
+  final _loaded = <String>[];
+  Set<String> _exposed = {};
+
+  List<ToolDefinition> get availableDefinitions => catalog
+      .where(
+        (tool) =>
+            tool.name == 'searchTools' ||
+            tool.name == 'askUser' ||
+            _loaded.contains(tool.name),
+      )
+      .toList(growable: false);
+
+  List<ToolDefinition> beginTurn() {
+    final definitions = availableDefinitions;
+    _exposed = definitions.map((tool) => tool.name).toSet();
+    return definitions;
+  }
+
+  bool isExposed(String name) => _exposed.contains(name);
+
+  void load(Iterable<String> names) {
+    for (final name in names) {
+      _loaded.remove(name);
+      _loaded.add(name);
+    }
+    if (_loaded.length > 20) _loaded.removeRange(0, _loaded.length - 20);
   }
 
   AgentTool? find(String name) => _tools[name];

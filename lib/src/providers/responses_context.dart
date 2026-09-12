@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import '../agent/system_prompt.dart';
 import '../domain/agent_models.dart';
 import '../domain/context_summary.dart';
 import '../domain/model_provider.dart';
@@ -15,9 +14,10 @@ typedef _DialogueEntry = ({AgentMessage message, Map<String, Object?> input});
 /// Budgets are conservative estimates, not model-specific tokenizer counts.
 /// Full messages and original images remain in the conversation store.
 class ResponsesContext {
-  ResponsesContext(this.limits);
+  ResponsesContext(this.limits, {required this.systemPrompt});
 
   final ModelContextLimits? limits;
+  final String systemPrompt;
   static const summaryReserve = 8192;
   final _dialogue = <_DialogueEntry>[];
   final _rounds = <List<Map<String, Object?>>>[];
@@ -51,11 +51,14 @@ class ResponsesContext {
         _dialogue.add((message: messages[i], input: items[i]));
       }
       _initialized = true;
-    } else if (request.toolResults.isNotEmpty) {
+    } else if (request.toolResults.isNotEmpty ||
+        request.userUpdates.isNotEmpty) {
       // A complete model output and all its results are indivisible at compaction.
       _rounds.add([
         ..._pendingOutput,
         ...request.toolResults.map(functionCallOutput),
+        for (final update in request.userUpdates)
+          {'role': 'user', 'content': update},
       ]);
       _pendingOutput = [];
     }
@@ -66,7 +69,7 @@ class ResponsesContext {
     final budget = policy.compactThreshold;
     final target = policy.compactTarget;
     final overhead =
-        estimateTokens(agentSystemPrompt) +
+        estimateTokens(systemPrompt) +
         estimateTokens(request.personalContext) +
         estimateTokens({
           'tools': request.tools

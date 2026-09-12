@@ -14,6 +14,7 @@ abstract final class WidgetUtils {
     Color textColor = GlobalUI.onPrimary,
     double? width,
     double height = 48,
+    double fontSize = 15,
   }) {
     final shape = StadiumBorder();
     final button = SizedBox(
@@ -34,7 +35,7 @@ abstract final class WidgetUtils {
           minimumSize: Size(48, height),
           padding: const EdgeInsets.symmetric(horizontal: 20),
           shape: shape,
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600),
           backgroundBuilder: (context, states, child) => DecoratedBox(
             decoration: ShapeDecoration(
               shape: shape,

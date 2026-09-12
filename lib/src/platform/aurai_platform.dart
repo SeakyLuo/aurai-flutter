@@ -1,3 +1,4 @@
+import '../domain/ui_tool_actions.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -41,6 +42,33 @@ class AuraiPlatform {
         })
         .toList(growable: false);
   }
+
+  Future<Map<String, Object?>> inspectAndroidApi(
+    Map<String, Object?> arguments,
+  ) => _invokeMap('inspectAndroidApi', arguments);
+
+  Future<Map<String, Object?>> executeAndroidScript(
+    String callId,
+    String script,
+    String conversationId,
+  ) => _invokeMap('executeAndroidScript', {
+    'callId': callId,
+    'script': script,
+    'conversationId': conversationId,
+  });
+
+  Future<void> cancelAndroidScript(String callId) =>
+      _channel.invokeMethod<void>('cancelAndroidScript', {'callId': callId});
+
+  Future<Map<String, Object?>> sendNotification(
+    String title,
+    String body,
+    String conversationId,
+  ) => _invokeMap('sendNotification', {
+    'title': title,
+    'body': body,
+    'conversationId': conversationId,
+  });
 
   Future<Map<String, Object?>> observeDevice() => _invokeMap('observeDevice');
 
@@ -132,8 +160,10 @@ class AuraiPlatform {
       await _channel
           .invokeMethod<bool>('requestConfirmation', <String, Object?>{
             'callId': callId,
-            'toolName': toolName,
-            'arguments': arguments,
+            'toolName': uiToolActions.containsKey(toolName) ? 'act' : toolName,
+            'arguments': uiToolActions.containsKey(toolName)
+                ? uiActionArguments(toolName, arguments)
+                : arguments,
             'description': description,
             'taskScoped': taskScoped,
           }) ??

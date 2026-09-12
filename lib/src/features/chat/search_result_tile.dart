@@ -110,6 +110,14 @@ class SearchResultTile extends StatelessWidget {
                               color: colors.onSurface,
                             ),
                           ),
+                          if (conversation.isArchived)
+                            Text(
+                              '已归档',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
                           const SizedBox(height: 3),
                           Text.rich(
                             subtitle ?? TextSpan(text: _time),

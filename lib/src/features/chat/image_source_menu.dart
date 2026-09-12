@@ -60,7 +60,7 @@ Future<ImageSource?> showImageSourceMenu(BuildContext context) {
                             children: [
                               _ImageSourceItem(
                                 source: ImageSource.gallery,
-                                label: '上传图片',
+                                label: '图片',
                                 icon: AttachmentActionIconType.gallery,
                               ),
                               _ImageSourceItem(
@@ -102,7 +102,7 @@ class _ImageSourceItem extends StatelessWidget {
       borderRadius: BorderRadius.circular(17),
       onTap: () => Navigator.pop(context, source),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 17),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         child: Row(
           children: [
             AttachmentActionIcon(type: icon),

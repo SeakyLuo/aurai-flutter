@@ -7,10 +7,11 @@ import 'conversation_more.dart';
 import 'conversation_status_dot.dart';
 import 'compose_icon.dart';
 import 'sidebar_action_icon.dart';
+import 'settings_icon.dart';
 import 'glass_surface.dart';
 import 'pagination_listener.dart';
 
-enum ConversationAction { create, select, search, settings }
+enum ConversationAction { create, select, search, settings, tasks }
 
 typedef ConversationSelection = ({ConversationAction action, String? id});
 
@@ -34,8 +35,17 @@ class ConversationsDrawer extends StatelessWidget {
     clipBehavior: Clip.antiAlias,
     child: SafeArea(
       child: ListenableBuilder(
-        listenable: controller,
+        listenable: Listenable.merge([controller, controller.scheduledTasks]),
         builder: (context, _) {
+          final taskConversationIds = controller.scheduledTasks.tasks
+              .expand(
+                (task) => [
+                  task['sourceConversationId'],
+                  task['conversationId'],
+                ],
+              )
+              .whereType<String>()
+              .toSet();
           final conversations = controller.conversations
               .where((conversation) => !conversation.isEmpty)
               .toList();
@@ -70,6 +80,15 @@ class ConversationsDrawer extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                leading: const SettingsIcon(type: SettingsIconType.tasks),
+                title: const Text(
+                  '任务',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                onTap: () => _choose(ConversationAction.tasks),
               ),
               Padding(
                 padding: EdgeInsets.fromLTRB(24, 12, 24, 12),
@@ -170,6 +189,34 @@ class ConversationsDrawer extends StatelessWidget {
                                                         semanticLabel: '已置顶',
                                                       ),
                                                     ],
+                                                    if (!ConversationStatusDot.hasUnreadCompletion(
+                                                          conversation,
+                                                        ) &&
+                                                        (conversation
+                                                                .isScheduledTask ||
+                                                            taskConversationIds
+                                                                .contains(
+                                                                  conversation
+                                                                      .id,
+                                                                ))) ...[
+                                                      const SizedBox(width: 8),
+                                                      Semantics(
+                                                        label: '定时任务',
+                                                        child: SizedBox.square(
+                                                          dimension: 16,
+                                                          child: FittedBox(
+                                                            child: SettingsIcon(
+                                                              type:
+                                                                  SettingsIconType
+                                                                      .tasks,
+                                                              color: Theme.of(context)
+                                                                  .colorScheme
+                                                                  .onSurfaceVariant,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ],
                                                 ),
                                                 if (conversation.messageCount ==
@@ -203,26 +250,32 @@ class ConversationsDrawer extends StatelessWidget {
                       ),
                     ),
                     Positioned(
-                      left: 20,
+                      left: 16,
                       right: 16,
                       bottom: 20,
                       child: Row(
                         children: [
-                          WidgetUtils.primaryButton(
-                            text: '新建会话',
-                            frosted: true,
-                            liquidGlass: true,
-                            textColor: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.8),
-                            onPressed: () => _choose(ConversationAction.create),
-                            icon: ComposeIcon(
-                              color: Theme.of(
+                          Expanded(
+                            child: WidgetUtils.primaryButton(
+                              text: '新建会话',
+                              fontSize: 14,
+                              height: 40,
+                              frosted: true,
+                              liquidGlass: true,
+                              textColor: Theme.of(
                                 context,
                               ).colorScheme.onSurface.withValues(alpha: 0.8),
+                              onPressed: () =>
+                                  _choose(ConversationAction.create),
+                              icon: ComposeIcon(
+                                size: 20,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.8),
+                              ),
                             ),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 16),
                           GlassSurface(
                             radius: 24,
                             child: RoundAction(

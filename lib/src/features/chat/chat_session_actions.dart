@@ -1,6 +1,13 @@
 part of 'chat_page.dart';
 
 extension _ChatSessionActions on _ChatPageState {
+  void _openConversations() {
+    if (_editing != null) return;
+    if (_imageOperationPending()) return;
+    _focusNode.unfocus();
+    _scaffoldKey.currentState!.openDrawer();
+  }
+
   void _scheduleMarkRead() {
     final conversation = widget.controller.activeConversation;
     if (_markReadScheduled ||
@@ -39,6 +46,17 @@ extension _ChatSessionActions on _ChatPageState {
         onPressed: () => _changeConversation(controller.runningConversationId),
       ),
     );
+    return true;
+  }
+
+  bool _beforeDeleteConversation() {
+    if (_imageOperationPending()) return false;
+    if (widget.controller.isBusy || _preparingGoal) {
+      _imageNotice('请先停止当前任务，再删除会话');
+      return false;
+    }
+    _focusNode.unfocus();
+    _draftTimer?.cancel();
     return true;
   }
 }

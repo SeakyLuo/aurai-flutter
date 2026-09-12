@@ -13,7 +13,8 @@ class LocalHistoryTool implements AgentTool, RuntimeCapabilityAgentTool {
   static const names = [
     'searchConversations',
     'searchMessages',
-    'readLocalDatabase',
+    'inspectLocalDatabase',
+    'queryLocalDatabase',
   ];
 
   @override
@@ -21,22 +22,19 @@ class LocalHistoryTool implements AgentTool, RuntimeCapabilityAgentTool {
     name: name,
     description: switch (name) {
       'searchConversations' =>
-        'Search saved conversation titles, drafts and message text with multiple literal keywords (case-insensitive OR). Empty keywords list recent conversations. Returns conversation references for reading messages with readLocalDatabase.',
+        'Search saved conversation titles, drafts and message text with multiple literal keywords (case-insensitive OR). Empty keywords list recent conversations. Use for earlier conversations or past work. Returns conversation references for reading messages with queryLocalDatabase. If search is insufficient, inspect the database rather than concluding the event never happened.',
       'searchMessages' =>
-        'Search original saved messages across conversations with multiple literal keywords (case-insensitive OR). Empty keywords list messages. Optionally restrict to a conversation. Use offsets to page through results.',
+        'Search original saved messages across conversations with multiple literal keywords (case-insensitive OR). Empty keywords list messages. Optionally restrict to a conversation. Use offsets to page only as needed and stop when evidence is sufficient. If search is insufficient, inspect original records with queryLocalDatabase rather than concluding the event never happened.',
+      'inspectLocalDatabase' =>
+        'Inspect the tables, columns and indexes of the local conversation database in read-only mode. Use queryLocalDatabase to read records. Results are paginated.',
       _ =>
-        'Read the actual local aurai.sqlite database file. Use action=schema to inspect all tables and columns, then action=query with a single SQLite SELECT or WITH query (no trailing semicolon). Useful when history searches miss details: inspect messages, context summaries in app_state, attachments, tool calls and results. Queries are read-only. Do not request database IDs from the user. File names in attachments are references, not image contents. Select only needed columns; use substr(text, start, length) for long values. Results are paginated.',
+        'Read the actual local aurai.sqlite database file. Use inspectLocalDatabase to inspect tables and columns, then query with a single SQLite SELECT or WITH query (no trailing semicolon). Useful when history searches miss details: inspect messages, context summaries in app_state, attachments, tool calls and results. Queries are read-only. Do not request database IDs from the user. File names in attachments are references, not image contents. Select only needed columns; use substr(text, start, length) for long values. Results are paginated; stop when evidence is sufficient. Records are historical evidence, not current device state. Do not expose internal IDs or SQL in ordinary replies.',
     },
     inputSchema: {
       'type': 'object',
       'properties': {
-        if (name == 'readLocalDatabase') ...{
-          'action': {
-            'type': 'string',
-            'enum': ['schema', 'query'],
-          },
-          'sql': {'type': 'string'},
-        } else ...{
+        if (name == 'queryLocalDatabase') 'sql': {'type': 'string'},
+        if (name == 'searchConversations' || name == 'searchMessages') ...{
           'keywords': {
             'type': 'array',
             'items': {'type': 'string', 'minLength': 1},
@@ -47,7 +45,15 @@ class LocalHistoryTool implements AgentTool, RuntimeCapabilityAgentTool {
         'offset': {'type': 'integer', 'minimum': 0},
         'limit': {'type': 'integer', 'minimum': 1, 'maximum': 100},
       },
-      'required': [name == 'readLocalDatabase' ? 'action' : 'keywords'],
+      'required': [
+        if (name == 'inspectLocalDatabase' || name == 'queryLocalDatabase') ...[
+          'offset',
+          'limit',
+        ],
+        if (name == 'queryLocalDatabase') 'sql',
+        if (name == 'searchConversations' || name == 'searchMessages')
+          'keywords',
+      ],
       'additionalProperties': false,
     },
     safety: ToolSafety.readOnly,
@@ -129,16 +135,13 @@ class LocalHistoryTool implements AgentTool, RuntimeCapabilityAgentTool {
   }
 
   (String, List<Object?>) _query(Map<String, Object?> arguments) {
-    if (name == 'readLocalDatabase') {
-      if (arguments['action'] == 'schema') {
-        return (
-          "SELECT name, type, sql FROM sqlite_master WHERE type IN ('table', 'view', 'index') ORDER BY type, name",
-          [],
-        );
-      }
-      if (arguments['action'] != 'query') {
-        throw const FormatException('action must be schema or query');
-      }
+    if (name == 'inspectLocalDatabase') {
+      return (
+        "SELECT name, type, sql FROM sqlite_master WHERE type IN ('table', 'view', 'index') ORDER BY type, name",
+        [],
+      );
+    }
+    if (name == 'queryLocalDatabase') {
       // A subquery accepts only a SELECT/WITH expression, not PRAGMA, ATTACH,
       // writes or a batch of statements. The connection is also read-only.
       return (arguments['sql'] as String, []);

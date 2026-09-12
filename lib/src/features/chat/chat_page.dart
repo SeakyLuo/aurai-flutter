@@ -1,3 +1,4 @@
+import '../../scheduling/tasks_page.dart';
 import 'keyboard_inset.dart';
 import 'operation_request_sheet.dart';
 import 'dart:async';
@@ -13,6 +14,7 @@ import '../../domain/agent_models.dart';
 import 'message_editor.dart';
 
 import 'settings_page.dart';
+import 'user_question_card.dart';
 import 'search_aurora_background.dart';
 import 'accessibility_request_sheet.dart';
 import 'chat_controller.dart';
@@ -32,9 +34,16 @@ part 'chat_session_actions.dart';
 part 'chat_message_editing.dart';
 
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key, required this.controller});
+  const ChatPage({
+    super.key,
+    required this.controller,
+    this.fromTask = false,
+    this.originTaskId,
+  });
 
   final ChatController controller;
+  final bool fromTask;
+  final String? originTaskId;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -138,6 +147,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return PopScope(
       canPop: _editing == null,
       onPopInvokedWithResult: (didPop, result) {
+        if (didPop && widget.fromTask) unawaited(_saveDraft());
         if (!didPop && _editing != null) _cancelMessageEdit();
       },
       child: AbsorbPointer(
@@ -146,12 +156,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           child: Scaffold(
             key: _scaffoldKey,
             backgroundColor: timeline.isEmpty ? Colors.transparent : null,
-            drawer: ConversationsDrawer(
-              controller: controller,
-              onChoose: _chooseConversationAction,
-            ),
+            drawer: widget.fromTask
+                ? null
+                : ConversationsDrawer(
+                    controller: controller,
+                    onChoose: _chooseConversationAction,
+                  ),
             drawerEnableOpenDragGesture:
-                _editing == null && !controller.addingImages,
+                !widget.fromTask &&
+                _editing == null &&
+                !controller.addingImages,
             onDrawerChanged: (opened) {
               if (opened) _focusNode.unfocus();
               if (!opened) _scheduleMarkRead();
@@ -161,6 +175,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             resizeToAvoidBottomInset: false,
             appBar: ChatHeader(
               onMenu: _openConversations,
+              onBack: widget.fromTask
+                  ? () => Navigator.maybePop(context)
+                  : null,
               editing: _editing != null,
               onCancelEdit:
                   (_editing?.saving == true || _editing?.picking == true)
@@ -168,6 +185,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   : _cancelMessageEdit,
               controller: controller,
               beforeDelete: _beforeDeleteConversation,
+              originTaskId: widget.originTaskId,
             ),
             bottomNavigationBar: AnnotatedRegion<SystemUiOverlayStyle>(
               value: const SystemUiOverlayStyle(
@@ -177,35 +195,47 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 systemNavigationBarContrastEnforced: false,
               ),
               child: KeyboardInset(
-                child: ChatComposer(
-                  controller: _textController,
-                  focusNode: _focusNode,
-                  savingEdit: _editing?.saving == true,
-                  enabled: _editing != null
-                      ? !_editing!.saving
-                      : !controller.isBusy,
-                  canSend:
-                      _canSend ||
-                      (_editing?.images ?? controller.draftImages).isNotEmpty,
-                  images: _editing?.images ?? controller.draftImages,
-                  addingImages:
-                      controller.addingImages || _editing?.picking == true,
-                  onAddImages: _editing != null ? _addEditImages : _addImages,
-                  onRemoveImage: _editing != null
-                      ? _removeEditImage
-                      : _removeImage,
-                  stopping: controller.runState == ChatRunState.stopping,
-                  onSend: _editing != null ? _submitMessageEdit : _send,
-                  canResume:
-                      _editing == null &&
-                      controller.runState == ChatRunState.cancelled &&
-                      controller.pendingGoal != null,
-                  onResume: _continuePending,
-                  onStop: _stop,
-                ),
+                child:
+                    controller.pendingQuestion?.conversationId ==
+                        _conversationId
+                    ? UserQuestionCard(
+                        key: ObjectKey(controller.pendingQuestion),
+                        question: controller.pendingQuestion!,
+                      )
+                    : ChatComposer(
+                        controller: _textController,
+                        focusNode: _focusNode,
+                        savingEdit: _editing?.saving == true,
+                        enabled: _editing != null
+                            ? !_editing!.saving
+                            : !controller.isBusy,
+                        canSend:
+                            _canSend ||
+                            (_editing?.images ?? controller.draftImages)
+                                .isNotEmpty,
+                        images: _editing?.images ?? controller.draftImages,
+                        addingImages:
+                            controller.addingImages ||
+                            _editing?.picking == true,
+                        onAddImages: _editing != null
+                            ? _addEditImages
+                            : _addImages,
+                        onRemoveImage: _editing != null
+                            ? _removeEditImage
+                            : _removeImage,
+                        stopping: controller.runState == ChatRunState.stopping,
+                        onSend: _editing != null ? _submitMessageEdit : _send,
+                        canResume:
+                            _editing == null &&
+                            controller.runState == ChatRunState.cancelled &&
+                            controller.pendingGoal != null,
+                        onResume: _continuePending,
+                        onStop: _stop,
+                      ),
               ),
             ),
             body: DrawerDragRegion(
+              enabled: !widget.fromTask,
               onOpen: _openConversations,
               builder: (context) {
                 final top = MediaQuery.paddingOf(context).top;
@@ -336,6 +366,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (!mounted) {
       return;
     }
+    final requestedDraft = widget.controller.pendingComposerDraft;
+    if (requestedDraft != null) {
+      widget.controller.pendingComposerDraft = null;
+      _textController.value = TextEditingValue(
+        text: requestedDraft, selection: TextSelection.collapsed(offset: requestedDraft.length));
+    }
     final conversation = widget.controller.activeConversation;
     if (_conversationId != conversation.id) {
       final editing = _editing;
@@ -377,7 +413,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       _canSend = conversation.draft.trim().isNotEmpty;
     }
     setState(() {});
-    if (widget.controller.accessibilityRequestPending &&
+    if (!widget.fromTask &&
+        widget.controller.accessibilityRequestPending &&
         !_accessibilitySheetShowing) {
       _accessibilitySheetShowing = true;
       _focusNode.unfocus();
@@ -392,7 +429,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       });
     }
     final confirmation = widget.controller.pendingConfirmation;
-    if (confirmation != null && confirmation != _shownConfirmation) {
+    if (!widget.fromTask &&
+        confirmation != null &&
+        confirmation != _shownConfirmation) {
       _shownConfirmation = confirmation;
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _showConfirmation(confirmation),
@@ -485,18 +524,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  void _openConversations() {
-    if (_editing != null) return;
-    if (_imageOperationPending()) return;
-    _focusNode.unfocus();
-    _scaffoldKey.currentState!.openDrawer();
-  }
-
   Future<void> _chooseConversationAction(
     ConversationSelection selection,
   ) async {
     _scaffoldKey.currentState!.closeDrawer();
     final choice = selection;
+    if (choice.action == ConversationAction.tasks) {
+      await openScheduledTasks(context, widget.controller);
+      return;
+    }
     if (choice.action == ConversationAction.search) {
       final selection = await Navigator.of(context).push<ConversationSelection>(
         MaterialPageRoute(
@@ -511,7 +547,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       return;
     }
     if (choice.action == ConversationAction.settings) {
-      await Navigator.of(context).push<void>(
+      final id = await Navigator.of(context).push<String>(
         MaterialPageRoute(
           builder: (_) => SettingsPage(
             controller: widget.controller,
@@ -519,9 +555,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
         ),
       );
+      if (mounted && id != null) {
+        await _chooseConversationAction((
+          action: ConversationAction.select,
+          id: id,
+        ));
+      }
       return;
     }
     switch (choice.action) {
+      case ConversationAction.tasks:
       case ConversationAction.search:
       case ConversationAction.settings:
         break;
@@ -745,17 +788,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (saved && continueAfterSave && mounted) {
       await _continuePending();
     }
-  }
-
-  bool _beforeDeleteConversation() {
-    if (_imageOperationPending()) return false;
-    if (widget.controller.isBusy || _preparingGoal) {
-      _imageNotice('请先停止当前任务，再删除会话');
-      return false;
-    }
-    _focusNode.unfocus();
-    _draftTimer?.cancel();
-    return true;
   }
 
   void _scrollToBottom() {

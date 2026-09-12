@@ -2,25 +2,36 @@ import 'package:flutter/material.dart';
 
 enum SettingsIconType {
   memory,
+  skills,
+  personalization,
+  personalInfo,
+  balance,
   appearance,
   notifications,
   model,
   device,
   chevron,
   back,
+  check,
+  tasks,
+  filter,
 }
 
 class SettingsIcon extends StatelessWidget {
-  const SettingsIcon({super.key, required this.type});
+  const SettingsIcon({super.key, required this.type, this.color});
 
   final SettingsIconType type;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: const Size.square(24),
     painter: _SettingsIconPainter(
       type,
-      Theme.of(context).colorScheme.onSurfaceVariant,
+      color ??
+          (Theme.of(context).brightness == Brightness.dark
+              ? Theme.of(context).colorScheme.onSurfaceVariant
+              : const Color(0xff222222)),
     ),
   );
 }
@@ -41,6 +52,90 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.skills:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(4, 3, 16, 18),
+            const Radius.circular(3),
+          ),
+          pen,
+        );
+        canvas.drawLine(const Offset(8, 8), const Offset(16, 8), pen);
+        canvas.drawLine(const Offset(8, 12), const Offset(16, 12), pen);
+        canvas.drawLine(const Offset(8, 16), const Offset(12, 16), pen);
+      case SettingsIconType.personalInfo:
+        canvas.drawCircle(const Offset(12, 7), 3.5, pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(4, 20)
+            ..cubicTo(4, 11, 20, 11, 20, 20),
+          pen,
+        );
+      case SettingsIconType.personalization:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(4, 3, 16, 18),
+            const Radius.circular(3),
+          ),
+          pen,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(8, 8)
+            ..lineTo(16, 8)
+            ..moveTo(8, 12)
+            ..lineTo(16, 12)
+            ..moveTo(8, 16)
+            ..lineTo(13, 16),
+          pen,
+        );
+      case SettingsIconType.tasks:
+        canvas.drawCircle(const Offset(12, 12), 9, pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(12, 6)
+            ..lineTo(12, 12)
+            ..lineTo(8.5, 15.5),
+          pen,
+        );
+      case SettingsIconType.filter:
+        canvas.drawPath(
+          Path()
+            ..moveTo(3, 6)
+            ..lineTo(21, 6)
+            ..moveTo(6, 12)
+            ..lineTo(18, 12)
+            ..moveTo(10, 18)
+            ..lineTo(14, 18),
+          pen,
+        );
+      case SettingsIconType.check:
+        canvas.drawPath(
+          Path()
+            ..moveTo(5, 12)
+            ..lineTo(10, 17)
+            ..lineTo(19, 7),
+          pen,
+        );
+      case SettingsIconType.balance:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(3, 5, 18, 15),
+            const Radius.circular(3),
+          ),
+          pen,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(21, 10)
+            ..lineTo(16, 10)
+            ..quadraticBezierTo(13, 10, 13, 13)
+            ..quadraticBezierTo(13, 16, 16, 16)
+            ..lineTo(21, 16),
+          pen,
+        );
+        canvas.drawCircle(const Offset(16.5, 13), .8, Paint()..color = color);
+
       case SettingsIconType.memory:
         canvas.drawPath(
           Path()

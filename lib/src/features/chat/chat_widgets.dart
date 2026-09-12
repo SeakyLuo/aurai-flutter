@@ -358,11 +358,14 @@ class ChatComposer extends StatelessWidget {
           builder: (buttonContext) => RoundAction(
             label: '添加图片',
             compact: true,
+            insetResponse: true,
             icon: Icons.add_rounded,
             iconWidget: Icon(
               Icons.add_rounded,
               size: 28,
-              color: Theme.of(context).colorScheme.onSurface,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black,
             ),
             onPressed: enabled && !addingImages
                 ? () => onAddImages(buttonContext)
@@ -370,6 +373,7 @@ class ChatComposer extends StatelessWidget {
           ),
         ),
         action: RoundAction(
+          inkResponse: false,
           label: savingEdit
               ? '正在保存'
               : enabled

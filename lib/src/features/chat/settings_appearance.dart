@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 import 'glass_surface.dart';
 
@@ -6,6 +7,11 @@ Color settingsFieldColor(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
     ? const Color(0xff262626)
     : const Color(0xfff3f3f3);
+
+Color dialogControlColor(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+    ? CupertinoColors.secondarySystemFill.resolveFrom(context)
+    : settingsFieldColor(context);
 
 class SettingsGlassAction extends StatelessWidget {
   const SettingsGlassAction({

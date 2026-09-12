@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+
+import '../../utils/widget_utils.dart';
 import 'chat_controller.dart';
+import 'glass_surface.dart';
+import 'question_icon.dart';
+import 'settings_appearance.dart';
 
 class ConversationRenameDialog extends StatefulWidget {
   const ConversationRenameDialog({
@@ -53,35 +58,127 @@ class _ConversationRenameDialogState extends State<ConversationRenameDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: !_saving,
-    child: ScaffoldMessenger(
-      key: _messenger,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        resizeToAvoidBottomInset: false,
-        body: AlertDialog(
-          title: const Text('重命名会话'),
-          content: TextField(
-            controller: _text,
-            autofocus: true,
-            enabled: !_saving,
-            textInputAction: TextInputAction.done,
-            decoration: const InputDecoration(hintText: '会话名称'),
-            onSubmitted: (_) => _save(),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return PopScope(
+      canPop: !_saving,
+      child: ScaffoldMessenger(
+        key: _messenger,
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          resizeToAvoidBottomInset: false,
+          body: Dialog(
+            backgroundColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 28,
+              vertical: 24,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: GlassSurface(
+                radius: 28,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        '重命名会话',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: colors.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: dialogControlColor(context),
+                          borderRadius: BorderRadius.circular(26),
+                        ),
+                        child: TextField(
+                          controller: _text,
+                          autofocus: true,
+                          enabled: !_saving,
+                          textInputAction: TextInputAction.done,
+                          style: TextStyle(
+                            fontSize: 17,
+                            height: 1.4,
+                            color: colors.onSurface,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: '会话名称',
+                            filled: false,
+                            suffixIcon: _text.text.isEmpty
+                                ? null
+                                : RoundAction(
+                                    icon: Icons.cancel,
+                                    iconWidget: const QuestionIcon(
+                                      type: QuestionIconType.close,
+                                    ),
+                                    compact: true,
+                                    inkResponse: false,
+                                    label: '清空会话名称',
+                                    onPressed: _saving
+                                        ? null
+                                        : () => setState(_text.clear),
+                                  ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 14,
+                            ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
+                          ),
+                          onChanged: (_) => setState(() {}),
+                          onSubmitted: (_) => _save(),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: _saving
+                                  ? null
+                                  : () => Navigator.pop(context),
+                              style: TextButton.styleFrom(
+                                foregroundColor: colors.onSurface,
+                                backgroundColor: dialogControlColor(context),
+                                minimumSize: const Size(0, 46),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(23),
+                                ),
+                              ),
+                              child: const Text('取消'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: WidgetUtils.primaryButton(
+                              text: _saving ? '保存中…' : '保存',
+                              height: 46,
+                              onPressed: _saving || _text.text.trim().isEmpty
+                                  ? null
+                                  : _save,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: _saving ? null : () => Navigator.pop(context),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              child: const Text('保存'),
-            ),
-          ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }

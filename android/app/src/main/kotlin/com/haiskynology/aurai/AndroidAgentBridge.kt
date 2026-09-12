@@ -187,6 +187,8 @@ class AndroidAgentBridge(private val context: Context) {
                     else -> "需要 Android 11 或更高版本"
                 },
             ),
+            capability("android.runtime", "原生代码执行", "available", "可查询 Android API 并在独立进程中以 Aurai 权限执行代码"),
+            capability("android.notifications.send", "发送通知", "available", "可发送通知，是否展示由系统通知设置控制"),
             capability("android.permissions", "任务内权限引导", "available", "需要额外权限时会说明原因并等待你授权"),
             capability("android.apps", "可见 App 查找与启动", "available", "受 Android App 可见性规则限制，只能发现系统允许 Aurai 查询的应用"),
             capability("android.intents", "Android 操作", "available", "可在确认后启动通用 Intent"),

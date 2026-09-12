@@ -5,6 +5,7 @@ import 'chat_controller.dart';
 import 'choice_sheet.dart';
 import 'settings_appearance.dart';
 import 'glass_surface.dart';
+import 'model_balance_tile.dart';
 
 class ModelSettingsSheet extends StatefulWidget {
   const ModelSettingsSheet({
@@ -180,6 +181,18 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                   label: _loading ? '正在获取模型…' : modelDisplayName(_model),
                   onTap: _locked ? null : _selectModel,
                 ),
+                if (_service == ModelService.deepSeek) ...[
+                  const SizedBox(height: 32),
+                  const _Label('账户余额'),
+                  ModelBalanceTile(
+                    config: ModelConfig(
+                      service: _service,
+                      apiKey: _apiKey,
+                      model: _model,
+                      baseUrl: _address.text.trim(),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

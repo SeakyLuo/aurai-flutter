@@ -9,9 +9,12 @@ import '../domain/model_provider.dart';
 import '../domain/tool_models.dart';
 
 class OpenAiResponsesProvider implements ModelProvider {
-  OpenAiResponsesProvider(this.config)
+  OpenAiResponsesProvider(this.config, {required String? systemPrompt})
     : _transport = ResponsesTransport(config),
-      _context = ResponsesContext(ModelContextLimits.forModel(config.model));
+      _context = ResponsesContext(
+        ModelContextLimits.forModel(config.model),
+        systemPrompt: systemPrompt ?? agentSystemPrompt,
+      );
 
   final ModelConfig config;
   final ResponsesTransport _transport;
@@ -29,12 +32,17 @@ class OpenAiResponsesProvider implements ModelProvider {
       if (_context.limits case final limits?)
         'max_output_tokens': limits.outputTokens,
       'instructions':
-          '$agentSystemPrompt\n${_capabilitySummary(request)}\n${request.personalContext}',
+          '${_context.systemPrompt}\n${_capabilitySummary(request)}\n${request.personalContext}',
       'input': restart
           ? _context.input
-          : request.toolResults.map(functionCallOutput).toList(),
+          : [
+              ...request.toolResults.map(functionCallOutput),
+              for (final update in request.userUpdates)
+                {'role': 'user', 'content': update},
+            ],
       'tools': [
-        {'type': 'web_search'},
+        if (request.tools.any((tool) => tool.name == 'searchWeb'))
+          {'type': 'web_search'},
         ...request.tools.map(
           (tool) => <String, Object?>{
             'type': 'function',

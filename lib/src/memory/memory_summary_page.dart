@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../features/chat/glass_surface.dart';
 import '../features/chat/message_composer.dart';
+import '../features/chat/keyboard_inset.dart';
 import '../features/chat/settings_appearance.dart';
 import 'memory_controller.dart';
+import 'memory_plan_preview.dart';
+import '../providers/responses_transport.dart';
 import 'memory_editor.dart';
-import 'memory_page.dart' show memoryToast;
+import 'memory_actions_menu.dart';
+import 'memory_entry_tile.dart';
+import 'memory_delete_dialog.dart';
+import 'memory_toast.dart';
 
 class MemorySummaryPage extends StatefulWidget {
   const MemorySummaryPage({super.key, required this.memory});
@@ -19,11 +25,28 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
   final _text = TextEditingController();
   final _focus = FocusNode();
   bool _saving = false;
+  bool _planning = false;
+  int _request = 0;
+  MemoryPlan? _plan;
+  ResponsesTransport? _transport;
+
+  void _cancelPlan() {
+    _request++;
+    _transport?.cancel();
+    _transport = null;
+    setState(() {
+      _planning = false;
+      _plan = null;
+    });
+  }
+
   bool _allowPop = false;
   MemoryController get memory => widget.memory;
 
   @override
   void dispose() {
+    _request++;
+    _transport?.cancel();
     _text.dispose();
     _focus.dispose();
     super.dispose();
@@ -31,6 +54,7 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
 
   Future<void> _leave() async {
     if (_saving) return;
+    if (_planning || _plan != null) _cancelPlan();
     if (_text.text.trim().isNotEmpty) {
       final discard = await showDialog<bool>(
         context: context,
@@ -59,27 +83,84 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
 
   Future<void> _edit(Map<String, Object?> entry) async {
     FocusScope.of(context).unfocus();
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      isDismissible: false,
-      enableDrag: false,
-      useSafeArea: true,
-      builder: (_) => MemoryEditor(memory: memory, entry: entry),
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => MemoryEditor(memory: memory, entry: entry),
+      ),
     );
   }
 
-  Future<void> _add() async {
+  Future<void> _menu(Map<String, Object?> entry, Offset position) async {
+    final action = await showMemoryActionsMenu(context, position);
+    if (!mounted || action == null) return;
+    if (action == MemoryAction.edit) {
+      await _edit(entry);
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: .24),
+      builder: (_) => const MemoryDeleteDialog(),
+    );
+    if (confirmed != true || !mounted) return;
     setState(() => _saving = true);
     try {
-      await memory.saveEntry(null, _text.text.trim());
+      await memory.deleteEntry(entry['id'] as String);
+      if (mounted) memoryToast(context, '记忆已删除');
+    } on Object {
+      if (mounted) memoryToast(context, '删除失败，请重试');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _add() async {
+    final request = ++_request;
+    final transport = ResponsesTransport(memory.modelConfig());
+    _transport = transport;
+    setState(() => _planning = true);
+    _focus.unfocus();
+    try {
+      final plan = await memory.prepareChanges(
+        _text.text.trim(),
+        transport: transport,
+      );
+      if (!mounted || request != _request) return;
+      if (plan.changes.isEmpty) {
+        memoryToast(context, '没有需要调整的记忆，手动保存的内容会保留');
+      } else {
+        setState(() => _plan = plan);
+      }
+    } on Object catch (error) {
+      if (mounted && request == _request) {
+        memoryToast(
+          context,
+          error is StateError ? error.message : '无法生成建议，请检查模型配置后重试',
+        );
+      }
+    } finally {
+      if (mounted && request == _request) {
+        _transport = null;
+        setState(() => _planning = false);
+      }
+    }
+  }
+
+  Future<void> _apply() async {
+    setState(() => _saving = true);
+    try {
+      await memory.applyChanges(_plan!);
       if (!mounted) return;
+      setState(() => _plan = null);
       _text.clear();
-      _focus.unfocus();
-      memoryToast(context, '记忆已保存');
+      memoryToast(context, '记忆已更新');
     } on Object catch (error) {
       if (mounted) {
-        memoryToast(context, error is StateError ? error.message : '无法保存，请重试');
+        setState(() => _plan = null);
+        memoryToast(
+          context,
+          error is StateError ? error.message : '无法应用，请重新整理后重试',
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -90,107 +171,65 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: memory,
     builder: (context, _) {
-      final overview = [
-        if (memory.nickname.isNotEmpty) '你希望 Aurai 称呼你为${memory.nickname}。',
-        if (memory.occupation.isNotEmpty) '你的职业是${memory.occupation}。',
-        if (memory.about.isNotEmpty) memory.about,
-      ].join('\n\n');
       return PopScope(
         canPop: _allowPop || (!_saving && _text.text.trim().isEmpty),
         onPopInvokedWithResult: (didPop, result) {
           if (!didPop && !_saving) _leave();
         },
         child: Scaffold(
-          appBar: SettingsAppBar(
-            title: '记忆摘要',
-            onBack: _saving ? null : _leave,
-          ),
-          body: SafeArea(
-            top: false,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: ListView(
-                        keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
-                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-                        children: [
-                          const _Heading('概览'),
-                          Text(
-                            overview.isNotEmpty
-                                ? overview
-                                : memory.entries.isEmpty
+          extendBody: true,
+          resizeToAvoidBottomInset: false,
+          bottomNavigationBar: KeyboardInset(child: _footer()),
+          appBar: SettingsAppBar(title: '记忆', onBack: _saving ? null : _leave),
+          body: Builder(
+            builder: (context) => SafeArea(
+              top: false,
+              bottom: false,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: ListView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: EdgeInsets.fromLTRB(
+                      8,
+                      8,
+                      8,
+                      MediaQuery.paddingOf(context).bottom + 28,
+                    ),
+                    children: [
+                      if (_plan != null)
+                        MemoryPlanPreview(plan: _plan!)
+                      else ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            memory.entries.isEmpty
                                 ? '这里会逐渐记录 Aurai 对你的了解。你可以在下方补充希望记住的信息。'
                                 : '以下是你在对话中分享、或主动保存的信息。',
-                            style: const TextStyle(fontSize: 16, height: 1.8),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF6B6B6B),
+                            ),
                           ),
-                          if (memory.entries.isNotEmpty) ...[
-                            const SizedBox(height: 26),
-                            const _Heading('记忆'),
+                        ),
+                        if (memory.entries.isNotEmpty) ...[
+                          const SizedBox(height: 20),
+                          for (final entry in memory.entries)
                             Padding(
-                              padding: const EdgeInsets.only(bottom: 16),
-                              child: Text(
-                                '点按段落可编辑或删除',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: MemoryEntryTile(
+                                key: ValueKey(entry['id']),
+                                text: entry['text'] as String,
+                                enabled: !_saving && !_planning,
+                                onEdit: () => _edit(entry),
+                                onMenu: (position) => _menu(entry, position),
                               ),
                             ),
-                            for (final entry in memory.entries)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 20),
-                                child: Semantics(
-                                  button: true,
-                                  hint: '编辑或删除这条记忆',
-                                  child: InkWell(
-                                    onTap: _saving ? null : () => _edit(entry),
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Text(
-                                      entry['text'] as String,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        height: 1.8,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
                         ],
-                      ),
-                    ),
-                    MessageComposer(
-                      controller: _text,
-                      focusNode: _focus,
-                      enabled: !_saving,
-                      hintText: '补充记忆',
-                      maxLength: 300,
-                      onChanged: (_) => setState(() {}),
-                      action: RoundAction(
-                        label: _saving ? '正在保存' : '保存记忆',
-                        icon: Icons.arrow_upward_rounded,
-                        primary: true,
-                        compact: true,
-                        onPressed: _saving || _text.text.trim().isEmpty
-                            ? null
-                            : _add,
-                        iconWidget: _saving
-                            ? const SizedBox.square(
-                                dimension: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : null,
-                      ),
-                    ),
-                  ],
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -199,21 +238,65 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
       );
     },
   );
-}
-
-class _Heading extends StatelessWidget {
-  const _Heading(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Text(
-      text,
-      style: const TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.w700,
-        height: 1.4,
+  Widget _footer() => SafeArea(
+    top: false,
+    child: Center(
+      heightFactor: 1,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_plan != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: _saving ? null : _cancelPlan,
+                        child: const Text('取消'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: _saving ? null : _apply,
+                        child: Text(_saving ? '正在应用' : '确认应用'),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
+              if (_planning)
+                TextButton(onPressed: _cancelPlan, child: const Text('取消整理')),
+              MessageComposer(
+                controller: _text,
+                focusNode: _focus,
+                enabled: !_saving && !_planning,
+                hintText: '整理或补充记忆',
+                maxLength: 300,
+                onChanged: (_) => setState(() {}),
+                action: RoundAction(
+                  label: _planning ? '正在整理' : '发送',
+                  icon: Icons.arrow_upward_rounded,
+                  primary: true,
+                  compact: true,
+                  onPressed: _saving || _planning || _text.text.trim().isEmpty
+                      ? null
+                      : _add,
+                  iconWidget: _planning
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : null,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     ),
   );

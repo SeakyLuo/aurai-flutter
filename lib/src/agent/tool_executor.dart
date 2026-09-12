@@ -1,3 +1,4 @@
+import '../domain/ui_tool_actions.dart';
 import 'dart:async';
 
 import '../domain/capability.dart';
@@ -21,12 +22,14 @@ class ToolExecutor {
 
   Future<ToolResult> execute(ToolCall call) async {
     final tool = _registry.find(call.name);
-    if (tool == null) {
+    if (tool == null || !_registry.isExposed(call.name)) {
       return ToolResult(
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.error,
-        output: const <String, Object?>{'error': 'Tool is not available'},
+        output: const <String, Object?>{
+          'error': 'Tool is not loaded for this turn. Use searchTools first.',
+        },
       );
     }
     final capability = _registry.capabilityFor(tool);
@@ -71,11 +74,7 @@ class ToolExecutor {
             output: <String, Object?>{
               'error': 'Operation was not approved',
               if (tool.definition.taskScopedConfirmation &&
-                  const {
-                    'act',
-                    'tapScreen',
-                    'captureScreen',
-                  }.contains(call.name))
+                  isScreenTool(call.name))
                 'next':
                     'This screen operation was not approved. Do not repeat the same request. If the observation is stale, observe again before acting. If the user declined screen access, stop screen operations; authorization can only be requested in a new user task.',
             },

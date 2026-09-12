@@ -155,13 +155,15 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
     _scaffoldKey.currentState!.openDrawer();
   }
 
-  void _chooseConversationAction(ConversationSelection selection) {
+  Future<void> _chooseConversationAction(
+    ConversationSelection selection,
+  ) async {
     _scaffoldKey.currentState!.closeDrawer();
     switch (selection.action) {
       case ConversationAction.search:
         _focus.requestFocus();
       case ConversationAction.settings:
-        Navigator.of(context).push<void>(
+        final id = await Navigator.of(context).push<String>(
           MaterialPageRoute(
             builder: (_) => SettingsPage(
               controller: widget.controller,
@@ -169,6 +171,10 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
             ),
           ),
         );
+        if (mounted && id != null) {
+          Navigator.pop(context, (action: ConversationAction.select, id: id));
+        }
+      case ConversationAction.tasks:
       case ConversationAction.create:
       case ConversationAction.select:
         Navigator.pop(context, selection);
@@ -215,7 +221,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
       ),
       extendBody: true,
       resizeToAvoidBottomInset: false,
-      backgroundColor: Colors.transparent,
+      backgroundColor: colors.surface,
       bottomNavigationBar: Padding(
         padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
         child: SafeArea(
