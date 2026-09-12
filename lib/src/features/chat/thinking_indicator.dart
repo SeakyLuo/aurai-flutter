@@ -56,36 +56,39 @@ class _ThinkingIndicatorState extends State<ThinkingIndicator>
         animation: _animation,
         child: Text(
           widget.label,
-          style: const TextStyle(
-            fontSize: 14,
+          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+            inherit: false,
+            fontSize: 15,
             height: 1.5,
             fontWeight: FontWeight.w500,
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
-        builder: (context, child) => ShaderMask(
-          blendMode: BlendMode.srcIn,
-          shaderCallback: (bounds) =>
-              LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Theme.of(context).colorScheme.onSurfaceVariant,
-                  Theme.of(context).colorScheme.onSurfaceVariant,
-                  Theme.of(context).brightness == Brightness.dark
-                      ? const Color(0xfff0eafc)
-                      : const Color(0xffc9c6d1),
-                  Theme.of(context).colorScheme.onSurfaceVariant,
-                  Theme.of(context).colorScheme.onSurfaceVariant,
-                ],
-                stops: [0, 0.28, 0.5, 0.72, 1],
-              ).createShader(
-                bounds.shift(
-                  Offset(bounds.width * (_animation.value * 2 - 1), 0),
-                ),
+        builder: (context, child) => !widget.animate
+            ? child!
+            : ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (bounds) =>
+                    LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Theme.of(context).colorScheme.onSurfaceVariant,
+                        Theme.of(context).colorScheme.onSurfaceVariant,
+                        Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xfff0eafc)
+                            : const Color(0xffc9c6d1),
+                        Theme.of(context).colorScheme.onSurfaceVariant,
+                        Theme.of(context).colorScheme.onSurfaceVariant,
+                      ],
+                      stops: [0, 0.28, 0.5, 0.72, 1],
+                    ).createShader(
+                      bounds.shift(
+                        Offset(bounds.width * (_animation.value * 2 - 1), 0),
+                      ),
+                    ),
+                child: child,
               ),
-          child: child,
-        ),
       ),
     ),
   );

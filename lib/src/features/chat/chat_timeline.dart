@@ -1,3 +1,4 @@
+import 'task_elapsed.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/agent_models.dart';
@@ -18,6 +19,18 @@ List<ChatTimelineEntry> buildChatTimeline(
   String? beforeMessageId,
   bool allowEditing = true,
 }) {
+  final conversation = controller.activeConversation;
+  final watch = conversation.executionWatch;
+  final showElapsed =
+      watch != null &&
+      (watch.isRunning ||
+          (conversation.runState == ChatRunState.failed &&
+              conversation.liveToolSteps.isNotEmpty)) &&
+      !controller.messages.any(
+        (message) =>
+            message.runId == conversation.activeRunId &&
+            message.taskSummary != null,
+      );
   final hiddenIds = {
     for (final message in controller.messages)
       if (message.taskSummary != null)
@@ -82,6 +95,17 @@ List<ChatTimelineEntry> buildChatTimeline(
                     message.runId == controller.activeConversation.activeRunId),
           ),
         ),
+      if (showElapsed &&
+          message.id == conversation.executionUserMessageId &&
+          message.id != beforeMessageId)
+        ChatTimelineEntry(
+          'elapsed:${conversation.activeRunId}',
+          (_) => TaskElapsed(
+            key: ValueKey(conversation.activeRunId),
+            watch: watch,
+            failed: conversation.runState == ChatRunState.failed,
+          ),
+        ),
       if (message.id != beforeMessageId) ...?toolsByMessage[message.id],
     ],
   ];
@@ -91,6 +115,7 @@ Map<String, String> chatSummaryOwners(ChatController controller) => {
   for (final message in controller.messages) 'time:${message.id}': message.id,
   for (final message in controller.messages)
     if (message.taskSummary != null) ...{
+      'elapsed:${message.runId}': message.id,
       for (final id in message.taskSummary!.intermediateMessageIds)
         id: message.id,
       for (var i = 0; i < message.taskSummary!.activities.length; i++)

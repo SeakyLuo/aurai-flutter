@@ -10,6 +10,10 @@ abstract final class GlobalUI {
   static const Color primaryBackground = Color(0xfff4effb);
   static const Color onPrimaryBackground = Color(0xff493365);
   static const Color onPrimary = Color(0xff493365);
+  static Color linkColor(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? primary
+      : const Color(0xff6750a4);
   static const LinearGradient primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,

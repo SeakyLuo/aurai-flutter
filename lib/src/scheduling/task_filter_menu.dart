@@ -27,6 +27,7 @@ Future<String?> showTaskChoiceMenu(
   required Rect anchor,
   required String selected,
   required String label,
+  bool centerOnAnchor = false,
   required List<({String value, String label})> choices,
 }) => showGeneralDialog<String>(
   context: context,
@@ -53,10 +54,12 @@ Future<String?> showTaskChoiceMenu(
               media.padding.top + 8,
               math.max(media.padding.top + 8, bottom - height),
             );
-    final left = (anchor.right - width).clamp(
-      media.padding.left + 8,
-      media.size.width - media.padding.right - width - 8,
-    );
+    final left =
+        (centerOnAnchor ? anchor.center.dx - width / 2 : anchor.right - width)
+            .clamp(
+              media.padding.left + 8,
+              media.size.width - media.padding.right - width - 8,
+            );
     final curve = animation.drive(CurveTween(curve: Curves.easeOutCubic));
     return Stack(
       children: [
@@ -67,7 +70,9 @@ Future<String?> showTaskChoiceMenu(
           child: FadeTransition(
             opacity: curve,
             child: ScaleTransition(
-              alignment: Alignment.topRight,
+              alignment: centerOnAnchor
+                  ? Alignment.topCenter
+                  : Alignment.topRight,
               scale: curve.drive(Tween(begin: .94, end: 1.0)),
               child: GlassSurface(
                 radius: 24,

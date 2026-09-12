@@ -53,16 +53,26 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
       case SettingsIconType.skills:
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTWH(4, 3, 16, 18),
-            const Radius.circular(3),
-          ),
+        canvas.drawPath(
+          Path()
+            ..moveTo(5, 5)
+            ..lineTo(9, 5)
+            ..cubicTo(8, 1, 15, 1, 14, 5)
+            ..lineTo(18, 5)
+            ..quadraticBezierTo(20, 5, 20, 7)
+            ..lineTo(20, 10)
+            ..cubicTo(16, 9, 16, 16, 20, 15)
+            ..lineTo(20, 18)
+            ..quadraticBezierTo(20, 20, 18, 20)
+            ..lineTo(14, 20)
+            ..cubicTo(15, 16, 8, 16, 9, 20)
+            ..lineTo(5, 20)
+            ..quadraticBezierTo(3, 20, 3, 18)
+            ..lineTo(3, 7)
+            ..quadraticBezierTo(3, 5, 5, 5)
+            ..close(),
           pen,
         );
-        canvas.drawLine(const Offset(8, 8), const Offset(16, 8), pen);
-        canvas.drawLine(const Offset(8, 12), const Offset(16, 12), pen);
-        canvas.drawLine(const Offset(8, 16), const Offset(12, 16), pen);
       case SettingsIconType.personalInfo:
         canvas.drawCircle(const Offset(12, 7), 3.5, pen);
         canvas.drawPath(

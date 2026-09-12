@@ -6,6 +6,7 @@ extension ConversationRun on ChatController {
     final steps = runConversation.steps;
     final runConfig = config;
     final systemPrompt = modelSettings.systemPrompt;
+    final customInstructions = modelSettings.customInstructions;
     final memoryRevision = memory.revision;
     await _persistRun(runConversation);
     final history = await _store.reader.messages(
@@ -17,6 +18,8 @@ extension ConversationRun on ChatController {
       (message) => message.role == AgentMessageRole.user,
     );
     final executionWatch = Stopwatch()..start();
+    runConversation.executionWatch = executionWatch;
+    runConversation.executionUserMessageId = history[lastUser].id;
     final runId = await _store.runs.start(
       runConversation.id,
       history[lastUser].id,
@@ -49,7 +52,8 @@ extension ConversationRun on ChatController {
         ),
       };
       final tools = <AgentTool>[
-        ManageSkillTool(skills),
+        for (final operation in SkillTool.operations)
+          SkillTool(skills, operation),
         RunSkillTool(skills, _platform, runConversation.id),
         WebTool('searchWeb'),
         WebTool('readWebPage'),
@@ -107,7 +111,10 @@ extension ConversationRun on ChatController {
       await _runtime!.run(
         conversation: List.unmodifiable(history.take(lastUser + 1)),
         contextSummary: runConversation.contextSummary,
-        personalContext: () => memory.context,
+        personalContext: () => [
+          if (customInstructions.isNotEmpty) '用户自定义指令：\n$customInstructions',
+          memory.context,
+        ].join('\n\n'),
         onContextSummary: (summary) async {
           runConversation.contextSummary = summary;
           await _persistRun(runConversation);

@@ -69,20 +69,10 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _openSkills(BuildContext context) async {
-    final create = await Navigator.push<bool>(
+    await Navigator.push<void>(
       context,
       MaterialPageRoute(builder: (_) => SkillsPage(store: controller.skills)),
     );
-    if (!context.mounted || create != true) return;
-    try {
-      await controller.prepareSkillCreation();
-      if (context.mounted) Navigator.pop(context);
-    } on Object {
-      if (context.mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('无法打开聊天，请稍后重试')));
-    }
   }
 
   Future<void> _openArchive(BuildContext context) async {
@@ -153,23 +143,6 @@ class SettingsPage extends StatelessWidget {
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
                       leading: const SettingsIcon(
-                        type: SettingsIconType.skills,
-                      ),
-                      title: const Text('技能'),
-                      subtitle: const Text('管理 Aurai 保存的操作方法'),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: () => _openSkills(context),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      leading: const SettingsIcon(
                         type: SettingsIconType.personalInfo,
                       ),
                       title: const Text('个人信息'),
@@ -182,6 +155,29 @@ class SettingsPage extends StatelessWidget {
                         MaterialPageRoute<void>(
                           builder: (_) =>
                               PersonalInfoPage(memory: controller.memory),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Material(
+                    color: settingsFieldColor(context),
+                    borderRadius: BorderRadius.circular(26),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      leading: const SettingsIcon(
+                        type: SettingsIconType.personalization,
+                      ),
+                      title: const Text('个性化'),
+                      subtitle: const Text('自定义指令与系统提示词'),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              PersonalizationPage(controller: controller),
                         ),
                       ),
                     ),
@@ -215,23 +211,6 @@ class SettingsPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
-                      leading: const SettingsIcon(
-                        type: SettingsIconType.appearance,
-                      ),
-                      title: const Text('夜间模式'),
-                      subtitle: Text(AppearanceSettings.instance.label),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: () => _chooseAppearance(context),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
                       leading: const SettingsIcon(type: SettingsIconType.model),
                       title: const Text('模型设置'),
                       subtitle: Text(
@@ -254,20 +233,47 @@ class SettingsPage extends StatelessWidget {
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
                       leading: const SettingsIcon(
-                        type: SettingsIconType.personalization,
+                        type: SettingsIconType.skills,
                       ),
-                      title: const Text('个性化'),
-                      subtitle: const Text('自定义指令'),
+                      title: const Text('技能'),
+                      subtitle: const Text('管理 Aurai 保存的操作方法'),
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,
                       ),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              PersonalizationPage(controller: controller),
-                        ),
+                      onTap: () => _openSkills(context),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Material(
+                    color: settingsFieldColor(context),
+                    borderRadius: BorderRadius.circular(26),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      leading: const SettingsIcon(
+                        type: SettingsIconType.device,
                       ),
+                      title: const Text('设备能力'),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: () => CapabilityPage.show(context, controller),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Material(
+                    color: settingsFieldColor(context),
+                    borderRadius: BorderRadius.circular(26),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      leading: const SettingsIcon(
+                        type: SettingsIconType.appearance,
+                      ),
+                      title: const Text('夜间模式'),
+                      subtitle: Text(AppearanceSettings.instance.label),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: () => _chooseAppearance(context),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -285,22 +291,6 @@ class SettingsPage extends StatelessWidget {
                         type: SettingsIconType.chevron,
                       ),
                       onTap: () => _openNotifications(context),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      leading: const SettingsIcon(
-                        type: SettingsIconType.device,
-                      ),
-                      title: const Text('设备能力'),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: () => CapabilityPage.show(context, controller),
                     ),
                   ),
                   const SizedBox(height: 12),

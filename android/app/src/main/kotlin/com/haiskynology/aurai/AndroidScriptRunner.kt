@@ -9,8 +9,8 @@ class AndroidScriptRunner(private val context: Context) {
     private var active: Run? = null
 
     fun execute(id: String, script: String, conversationId: String, result: MethodChannel.Result) {
-        if (script.isBlank() || script.length > 16000) {
-            result.success(mapOf("success" to false, "error" to "Script must contain 1–16000 characters"))
+        if (script.isBlank() || script.length > 65536) {
+            result.success(mapOf("success" to false, "error" to "Script must contain 1–65536 characters"))
             return
         }
         if (active != null) {

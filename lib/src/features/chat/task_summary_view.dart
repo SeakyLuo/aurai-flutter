@@ -1,5 +1,7 @@
+import 'task_elapsed.dart';
 import 'cjk_strong_syntax.dart';
 import 'package:flutter/material.dart';
+import '../../app/global_ui.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../domain/agent_models.dart';
@@ -46,17 +48,8 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
     }
   }
 
-  String get _duration {
-    final duration = Duration(milliseconds: widget.summary.elapsedMilliseconds);
-    if (duration.inSeconds == 0) return widget.summary.stopped ? '0秒' : '不足1秒';
-    return [
-      if (duration.inHours > 0) '${duration.inHours}小时',
-      if (duration.inMinutes.remainder(60) > 0)
-        '${duration.inMinutes.remainder(60)}分钟',
-      if (duration.inSeconds.remainder(60) > 0)
-        '${duration.inSeconds.remainder(60)}秒',
-    ].join(' ');
-  }
+  String get _duration =>
+      taskDuration(Duration(milliseconds: widget.summary.elapsedMilliseconds));
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +77,7 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
                     Flexible(
                       child: Text(
                         widget.summary.stopped
-                            ? '你在 $_duration 后停止了'
+                            ? '用时 $_duration · 已停止'
                             : '用时 $_duration',
                         style: TextStyle(
                           fontSize: 14,
@@ -136,6 +129,9 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
                                     MarkdownStyleSheet.fromTheme(
                                       Theme.of(context),
                                     ).copyWith(
+                                      a: TextStyle(
+                                        color: GlobalUI.linkColor(context),
+                                      ),
                                       horizontalRuleDecoration: BoxDecoration(
                                         border: Border(
                                           top: BorderSide(

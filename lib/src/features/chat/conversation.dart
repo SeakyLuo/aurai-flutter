@@ -23,6 +23,8 @@ class Conversation {
   String? storedPreview;
   DateTime? storedUpdatedAt;
   String? activeRunId;
+  Stopwatch? executionWatch;
+  String? executionUserMessageId;
   String? seenRunId;
   bool hasEarlierMessages = false;
   ContextSummary? contextSummary;

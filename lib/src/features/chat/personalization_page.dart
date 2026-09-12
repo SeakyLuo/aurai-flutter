@@ -14,16 +14,22 @@ class PersonalizationPage extends StatefulWidget {
 
 class _PersonalizationPageState extends State<PersonalizationPage> {
   late final _prompt = TextEditingController(text: _saved);
+  late final _instructions = TextEditingController(
+    text: widget.controller.modelSettings.customInstructions,
+  );
   bool _saving = false;
   bool _allowPop = false;
   String get _saved =>
       widget.controller.modelSettings.systemPrompt ?? agentSystemPrompt;
-  bool get _dirty => _prompt.text != _saved;
+  bool get _dirty =>
+      _prompt.text != _saved ||
+      _instructions.text != widget.controller.modelSettings.customInstructions;
 
   @override
   void initState() {
     super.initState();
     _prompt.addListener(_changed);
+    _instructions.addListener(_changed);
   }
 
   void _changed() => setState(() {});
@@ -31,6 +37,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   @override
   void dispose() {
     _prompt.dispose();
+    _instructions.dispose();
     super.dispose();
   }
 
@@ -62,11 +69,10 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      if (_prompt.text != _saved) {
-        await widget.controller.saveSystemPrompt(
-          _prompt.text == agentSystemPrompt ? null : _prompt.text,
-        );
-      }
+      await widget.controller.savePersonalization(
+        systemPrompt: _prompt.text == agentSystemPrompt ? null : _prompt.text,
+        customInstructions: _instructions.text,
+      );
       if (mounted) _notice('个性化设置已保存');
     } on Object {
       if (mounted) _notice('保存失败，请重试');
@@ -112,12 +118,47 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               children: [
                 Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+                  child: Text(
+                    '自定义指令',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                TextField(
+                  controller: _instructions,
+                  enabled: !_saving,
+                  minLines: 3,
+                  maxLines: 8,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
+                  onTapOutside: (_) =>
+                      FocusManager.instance.primaryFocus?.unfocus(),
+                  style: const TextStyle(fontSize: 16),
+                  decoration: InputDecoration(
+                    hintText: '希望 Aurai 如何回复你，例如语言、表达风格或格式偏好',
+                    filled: true,
+                    fillColor: settingsFieldColor(context),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 20,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(26),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Padding(
                   padding: const EdgeInsets.fromLTRB(18, 0, 18, 0),
                   child: Row(
                     children: [
                       Expanded(
                         child: Text(
-                          '自定义指令',
+                          '系统提示词',
                           style: TextStyle(
                             fontSize: 15,
                             color: Theme.of(
@@ -137,6 +178,8 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                 ),
                 TextField(
                   controller: _prompt,
+                  onTapOutside: (_) =>
+                      FocusManager.instance.primaryFocus?.unfocus(),
                   enabled: !_saving,
                   minLines: 8,
                   maxLines: 16,
@@ -145,7 +188,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                   textAlignVertical: TextAlignVertical.top,
                   style: const TextStyle(fontSize: 16),
                   decoration: InputDecoration(
-                    hintText: '输入自定义指令',
+                    hintText: '输入系统提示词',
                     filled: true,
                     fillColor: settingsFieldColor(context),
                     contentPadding: const EdgeInsets.symmetric(

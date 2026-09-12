@@ -1,14 +1,27 @@
+import '../skills/skill_schema.dart';
 import 'package:sqflite/sqflite.dart';
 import '../memory/memory_controller.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 5,
+  version: 7,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion == 6) {
+      await db.execute(
+        "ALTER TABLE skills ADD COLUMN icon TEXT NOT NULL DEFAULT 'skill'",
+      );
+    }
+    if (oldVersion < 6) {
+      final batch = db.batch();
+      for (final statement in skillSchema) {
+        batch.execute(statement);
+      }
+      await batch.commit(noResult: true);
+    }
     if (oldVersion < 5) {
       await db.execute(
         'ALTER TABLE conversations ADD COLUMN scheduled_task INTEGER NOT NULL DEFAULT 0',
@@ -35,6 +48,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
     final batch = db.batch();
     for (final statement in [
       ..._schema,
+      ...skillSchema,
       ...memorySchema,
       forgottenMemorySchema,
     ]) {
