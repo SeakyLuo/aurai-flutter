@@ -221,14 +221,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           children: [
                             Positioned.fill(
                               child: timeline.isEmpty
-                                  ? EmptyConversation(
-                                      contentPadding: EdgeInsets.only(
-                                        top: top,
-                                        bottom: bottom,
+                                  ? RepaintBoundary(
+                                      child: EmptyConversation(
+                                        contentPadding: EdgeInsets.only(
+                                          top: top,
+                                        ),
+                                        onUseExample: _useExample,
                                       ),
-                                      onUseExample: _useExample,
                                     )
-                                  : KeyedSubtree(
+                                  : RepaintBoundary(
                                       key: PageStorageKey(
                                         'conversation:$_conversationId',
                                       ),
@@ -585,7 +586,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return true;
   }
 
-  Future<void> _addImages() async {
+  Future<void> _addImages(BuildContext buttonContext) async {
     final controller = widget.controller;
     if (controller.addingImages || controller.isBusy || _preparingGoal) return;
     if (controller.needsConfiguration) {
@@ -596,8 +597,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       _imageNotice('每条消息最多添加 4 张图片，请先移除一张');
       return;
     }
-    _focusNode.unfocus();
-    final source = await showImageSourceMenu(context);
+    final source = await showImageSourceMenu(buttonContext);
     if (source != null && mounted) await _loadImages(source);
   }
 

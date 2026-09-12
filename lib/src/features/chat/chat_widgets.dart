@@ -330,7 +330,7 @@ class ChatComposer extends StatelessWidget {
   final VoidCallback onResume;
   final bool canResume;
   final VoidCallback onStop;
-  final VoidCallback onAddImages;
+  final ValueChanged<BuildContext> onAddImages;
   final ValueChanged<MessageImage> onRemoveImage;
   final List<MessageImage> images;
   final bool addingImages;
@@ -354,11 +354,20 @@ class ChatComposer extends StatelessWidget {
                 images: images,
                 onRemove: enabled && !addingImages ? onRemoveImage : null,
               ),
-        leading: RoundAction(
-          label: '添加图片',
-          compact: true,
-          icon: Icons.add_rounded,
-          onPressed: enabled && !addingImages ? onAddImages : null,
+        leading: Builder(
+          builder: (buttonContext) => RoundAction(
+            label: '添加图片',
+            compact: true,
+            icon: Icons.add_rounded,
+            iconWidget: Icon(
+              Icons.add_rounded,
+              size: 28,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            onPressed: enabled && !addingImages
+                ? () => onAddImages(buttonContext)
+                : null,
+          ),
         ),
         action: RoundAction(
           label: savingEdit
