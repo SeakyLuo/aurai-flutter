@@ -1,3 +1,4 @@
+import 'file_attachments.dart';
 import 'reply_image_syntax.dart';
 import 'reply_image_gallery.dart';
 import 'markdown_link_underlines.dart';
@@ -177,6 +178,11 @@ class _MessageItemState extends State<MessageItem> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                for (final file in message.files)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: FileAttachmentCard(file: file),
+                  ),
                 if (message.images.isNotEmpty)
                   Wrap(
                     alignment: WrapAlignment.end,

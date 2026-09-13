@@ -8,9 +8,11 @@ class DeleteConfirmationDialog extends StatelessWidget {
     super.key,
     required this.title,
     required this.description,
+    this.confirmLabel = '删除',
   });
   final String title;
   final String description;
+  final String confirmLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +87,7 @@ class DeleteConfirmationDialog extends StatelessWidget {
                             borderRadius: BorderRadius.circular(23),
                           ),
                         ),
-                        child: const Text('删除'),
+                        child: Text(confirmLabel),
                       ),
                     ),
                   ],

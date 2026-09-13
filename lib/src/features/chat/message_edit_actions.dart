@@ -13,6 +13,7 @@ extension MessageEditActions on ChatController {
     AgentMessage message,
     String text, {
     List<MessageImage>? images,
+    List<MessageFile>? files,
   }) async {
     if (hasRunningTask ||
         isBusy ||
@@ -36,9 +37,11 @@ extension MessageEditActions on ChatController {
         text: text,
         createdAt: message.createdAt,
         images: images ?? message.images,
+        files: files ?? message.files,
       );
       final replacement = conversationFromRow(conversationRow(previous))
         ..messages.addAll([...messages.take(index), edited])
+        ..draftFiles.addAll(previous.draftFiles)
         ..draftImages.addAll(previous.draftImages)
         ..hasEarlierMessages = previous.hasEarlierMessages
         ..pendingGoal = text

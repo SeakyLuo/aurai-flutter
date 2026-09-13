@@ -71,6 +71,7 @@ class RequestAccessibilityAccessTool implements AgentTool {
   @override
   ToolDefinition get definition => const ToolDefinition(
     name: 'requestAccessibilityAccess',
+    waitsForUser: true,
     executionTimeout: Duration(seconds: 155),
     description:
         'Ask the user to enable Aurai accessibility access when UI observation or interaction is needed. Request once and wait for the user to return. Respect denial; choose another route or explain the limitation.',
@@ -393,7 +394,7 @@ class OpenSettingsTool extends _PlatformTool {
   ToolDefinition get definition => const ToolDefinition(
     name: 'openSettings',
     description:
-        'Open a stable Android Settings screen. Observe again to verify it opened; opening settings does not mean permission was granted.',
+        'Open a stable Android Settings screen. If the user must change a setting before work can continue, supply userAction to pause within this call until the user responds. Opening a page or the user reporting completion does not prove permission was granted; check actual state afterward. For navigation alone set userAction=null and reply briefly.',
     inputSchema: <String, Object?>{
       'type': 'object',
       'properties': <String, Object?>{

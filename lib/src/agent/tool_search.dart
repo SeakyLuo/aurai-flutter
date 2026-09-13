@@ -77,6 +77,7 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
     final title = toolTitle(tool.name).toLowerCase();
     final aliases = switch (tool.capabilityId) {
       'android.scheduled_tasks' => '定时 计划 提醒 scheduled schedule task reminder',
+      'local.attachments' => '附件 文档 文件 PDF Word 音频 视频 attachment file document audio video',
       'local.history' =>
         '历史 会话 消息 数据库 记录 history conversation message database',
       'android.accessibility' || 'android.observe' || 'screenAccess' =>

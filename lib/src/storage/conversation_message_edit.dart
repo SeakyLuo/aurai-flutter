@@ -42,7 +42,19 @@ extension ConversationMessageEdit on ConversationStore {
         whereArgs: [original.id],
       );
       final editedImages = replacement.messages.last.images;
+      final editedFiles = replacement.messages.last.files;
       final batch = txn.batch();
+      for (var i = 0; i < editedFiles.length; i++) {
+        batch.insert(
+          'attachments',
+          fileAttachmentRow(
+            replacement.id,
+            editedFiles[i],
+            i,
+            messageId: original.id,
+          ),
+        );
+      }
       for (var i = 0; i < editedImages.length; i++) {
         batch.insert(
           'attachments',
@@ -62,7 +74,7 @@ extension ConversationMessageEdit on ConversationStore {
       replacement.messageCount = count.single['count']! as int;
       if (replacement.messageCount == 1 && replacement.title == original.text) {
         replacement.storedTitle = replacement.messages.last.text.isEmpty
-            ? '图片对话'
+            ? (editedFiles.isEmpty ? '图片对话' : editedFiles.first.name)
             : replacement.messages.last.text;
       }
       await txn.update(
@@ -79,7 +91,10 @@ extension ConversationMessageEdit on ConversationStore {
           'seen_run:${replacement.id}',
         ],
       );
-      final retained = editedImages.map((image) => image.path).toSet();
+      final retained = {
+        ...editedImages.map((image) => image.path),
+        ...editedFiles.map((file) => file.path),
+      };
       return images
           .map((row) => '${reader.imageDirectory}/${row['file_name']}')
           .where((path) => !retained.contains(path))

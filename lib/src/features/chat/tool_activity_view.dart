@@ -1,4 +1,6 @@
 import 'tool_inline_detail.dart';
+import 'tool_expand_arrow.dart';
+import 'question_icon.dart';
 import '../../domain/source_reference.dart';
 import 'source_icon.dart';
 import 'web_page_tool_details.dart';
@@ -74,6 +76,12 @@ class _ToolActivityViewState extends State<ToolActivityView> {
             siteName: pageResult['siteName'] as String?,
           );
     final running = widget.status == AgentStepStatus.running;
+    final waitingForUser =
+        running &&
+        widget.resultJson != null &&
+        ((jsonDecode(widget.resultJson!) as Map)['userAction']
+                as Map?)?['pending'] ==
+            true;
     final isQuestion = widget.toolName == 'askUser';
     final canExpand = !running || isQuestion;
     final showStatus = !running;
@@ -168,16 +176,22 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                   Expanded(
                     child: ThinkingIndicator(
                       leading: Semantics(
-                        label: switch (widget.status) {
-                          AgentStepStatus.running => '正在执行',
-                          AgentStepStatus.completed => '已完成',
-                          AgentStepStatus.failed => '未完成',
-                          AgentStepStatus.cancelled => '已停止',
-                        },
+                        label: waitingForUser
+                            ? '等待你操作'
+                            : switch (widget.status) {
+                                AgentStepStatus.running => '正在执行',
+                                AgentStepStatus.completed => '已完成',
+                                AgentStepStatus.failed => '未完成',
+                                AgentStepStatus.cancelled => '已停止',
+                              },
                         child: SizedBox.square(
                           dimension: MediaQuery.textScalerOf(context).scale(18),
                           child: FittedBox(
-                            child: pageSource != null
+                            child: waitingForUser
+                                ? const QuestionIcon(
+                                    type: QuestionIconType.userAction,
+                                  )
+                                : pageSource != null
                                 ? SourceIcon(source: pageSource, size: 18)
                                 : skillIcon == null
                                 ? ToolActionIcon(toolName: widget.toolName)
@@ -185,10 +199,10 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                           ),
                         ),
                       ),
-                      label: title,
-                      animate: running,
+                      label: waitingForUser ? '等待你操作' : title,
+                      animate: running && !waitingForUser,
                       singleLine: true,
-                      detail: isQuestion
+                      detail: isQuestion || waitingForUser
                           ? null
                           : toolInlineDetail(
                               legacyName ?? widget.toolName,
@@ -215,16 +229,7 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                   if (canExpand)
                     Transform.translate(
                       offset: const Offset(4, 0),
-                      child: AnimatedRotation(
-                        turns: _expanded ? 0.25 : 0,
-                        duration: const Duration(milliseconds: 240),
-                        curve: Curves.easeInOutCubic,
-                        child: Icon(
-                          Icons.chevron_right_rounded,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                      child: ToolExpandArrow(expanded: _expanded),
                     ),
                 ],
               ),

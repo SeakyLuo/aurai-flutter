@@ -27,7 +27,12 @@ Map<String, SourceReference> webSourcesFromActivities(
 };
 
 List<SourceReference> _sources(Object record, String? tool, String? result) {
-  if (!{'searchWeb', 'readWebPage', 'setSourceDates'}.contains(tool))
+  if (!{
+    'searchWeb',
+    'readWebPage',
+    'setSourceDates',
+    'readDocument',
+  }.contains(tool))
     return const [];
   if (result == null) return const [];
   return _cachedSources[record] ??= _read(tool!, result);
@@ -35,7 +40,8 @@ List<SourceReference> _sources(Object record, String? tool, String? result) {
 
 List<SourceReference> _read(String tool, String result) {
   final output = jsonDecode(result) as Map<String, dynamic>;
-  final entries = tool != 'readWebPage'
+  if (tool == 'readDocument' && output['sourceRead'] != true) return const [];
+  final entries = tool != 'readWebPage' && tool != 'readDocument'
       ? (output['results'] as List).cast<Map>()
       : [output];
   return [

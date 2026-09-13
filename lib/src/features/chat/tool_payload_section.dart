@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'copy_icon.dart';
 
-class ToolPayloadSection extends StatelessWidget {
+class ToolPayloadSection extends StatefulWidget {
   const ToolPayloadSection({
     super.key,
     required this.title,
@@ -18,17 +18,41 @@ class ToolPayloadSection extends StatelessWidget {
   final String missing;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final value = json == null ? null : jsonDecode(json!);
+  State<ToolPayloadSection> createState() => _ToolPayloadSectionState();
+}
+
+class _ToolPayloadSectionState extends State<ToolPayloadSection> {
+  late String text;
+  late bool canCopy;
+  @override
+  void initState() {
+    super.initState();
+    _format();
+  }
+
+  @override
+  void didUpdateWidget(ToolPayloadSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.json != widget.json || oldWidget.missing != widget.missing) {
+      _format();
+    }
+  }
+
+  void _format() {
+    final value = widget.json == null ? null : jsonDecode(widget.json!);
     final retained =
         !(value is Map && value['contentRetention'] == 'task_only');
-    final canCopy = json != null && retained;
-    final text = !retained
+    canCopy = widget.json != null && retained;
+    text = !retained
         ? '此结果仅在执行时使用，未保留内容'
-        : json == null
-        ? missing
+        : widget.json == null
+        ? widget.missing
         : const JsonEncoder.withIndent('  ').convert(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: EdgeInsets.zero,
       child: Column(
@@ -40,7 +64,7 @@ class ToolPayloadSection extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    title,
+                    widget.title,
                     style: TextStyle(
                       fontSize: 13,
                       color: colors.onSurfaceVariant,
@@ -50,7 +74,7 @@ class ToolPayloadSection extends StatelessWidget {
                 if (canCopy)
                   Semantics(
                     button: true,
-                    label: '复制$title',
+                    label: '复制${widget.title}',
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () async {
@@ -59,7 +83,7 @@ class ToolPayloadSection extends StatelessWidget {
                           await Clipboard.setData(ClipboardData(text: text));
                           if (!context.mounted) return;
                           messenger.showSnackBar(
-                            SnackBar(content: Text('已复制$title')),
+                            SnackBar(content: Text('已复制${widget.title}')),
                           );
                         } on Object {
                           if (!context.mounted) return;
@@ -105,10 +129,10 @@ class ToolPayloadSection extends StatelessWidget {
                   : const Color(0xfff6f6f6),
               borderRadius: BorderRadius.circular(18),
             ),
-            child: _PayloadScroll(
-              child: canCopy
-                  ? _JsonCode(text: text)
-                  : SelectableText(
+            child: canCopy
+                ? _JsonCode(text: text)
+                : _PayloadScroll(
+                    child: SelectableText(
                       text,
                       style: TextStyle(
                         fontSize: 13,
@@ -116,7 +140,7 @@ class ToolPayloadSection extends StatelessWidget {
                         color: colors.onSurfaceVariant,
                       ),
                     ),
-            ),
+                  ),
           ),
         ],
       ),
@@ -152,6 +176,9 @@ class _PayloadScrollState extends State<_PayloadScroll> {
         removeBottom: true,
         child: Scrollbar(
           controller: _scroll,
+          interactive: true,
+          thumbVisibility: true,
+          thickness: 4,
           radius: const Radius.circular(3),
           child: SingleChildScrollView(
             controller: _scroll,
@@ -165,9 +192,69 @@ class _PayloadScrollState extends State<_PayloadScroll> {
   );
 }
 
-class _JsonCode extends StatelessWidget {
+class _JsonCode extends StatefulWidget {
   const _JsonCode({required this.text});
   final String text;
+
+  @override
+  State<_JsonCode> createState() => _JsonCodeState();
+}
+
+class _JsonCodeState extends State<_JsonCode> {
+  final _scroll = ScrollController();
+  late List<String> _lines = widget.text.split('\n');
+  List<double>? _lineHeights;
+  double? _measuredWidth;
+  TextScaler? _measuredScaler;
+  TextDirection? _measuredDirection;
+
+  List<double> _measureLines(
+    BuildContext context,
+    double width,
+    TextStyle style,
+  ) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final direction = Directionality.of(context);
+    if (_lineHeights != null &&
+        _measuredWidth == width &&
+        _measuredScaler == scaler &&
+        _measuredDirection == direction) {
+      return _lineHeights!;
+    }
+    final painter = TextPainter(textDirection: direction, textScaler: scaler);
+    painter.text = TextSpan(text: '1', style: style);
+    painter.layout();
+    final minimum = painter.height;
+    final heights = <String, double>{};
+    _lineHeights = [
+      for (final line in _lines)
+        heights.putIfAbsent(line, () {
+          painter.text = TextSpan(text: line, style: style);
+          painter.layout(maxWidth: width);
+          return painter.height < minimum ? minimum : painter.height;
+        }),
+    ];
+    painter.dispose();
+    _measuredWidth = width;
+    _measuredScaler = scaler;
+    _measuredDirection = direction;
+    return _lineHeights!;
+  }
+
+  @override
+  void didUpdateWidget(_JsonCode oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text) {
+      _lines = widget.text.split('\n');
+      _lineHeights = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   static final _tokens = RegExp(
     r'"(?:[^"\\]|\\.)*"|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?',
@@ -206,61 +293,102 @@ class _JsonCode extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final lines = text.split('\n');
+    final lines = _lines;
     final style = TextStyle(
       fontSize: 13,
       height: 1.75,
       fontFamily: 'monospace',
       color: colors.onSurface,
     );
-    return SelectionArea(
-      child: Column(
+    Widget lineAt(int index) => IntrinsicHeight(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (var index = 0; index < lines.length; index++)
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SelectionContainer.disabled(
-                    child: SizedBox(
-                      width: 14 + lines.length.toString().length * 8,
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: Text(
-                          '${index + 1}',
-                          textAlign: TextAlign.right,
-                          style: style.copyWith(
-                            color: colors.onSurfaceVariant.withValues(
-                              alpha: .65,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+          SelectionContainer.disabled(
+            child: SizedBox(
+              width: 14 + lines.length.toString().length * 8,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: Text(
+                  '${index + 1}',
+                  textAlign: TextAlign.right,
+                  style: style.copyWith(
+                    color: colors.onSurfaceVariant.withValues(alpha: .65),
                   ),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.only(left: 12),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          left: BorderSide(
-                            color: colors.onSurface.withValues(alpha: .10),
-                          ),
-                        ),
-                      ),
-                      child: Text.rich(
-                        TextSpan(
-                          children: _highlight(lines[index], colors, dark),
-                        ),
-                        style: style,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
+          ),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.only(left: 12),
+              decoration: BoxDecoration(
+                border: Border(
+                  left: BorderSide(
+                    color: colors.onSurface.withValues(alpha: .10),
+                  ),
+                ),
+              ),
+              child: Text.rich(
+                TextSpan(children: _highlight(lines[index], colors, dark)),
+                style: style,
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+    if (lines.length <= 12) {
+      return _PayloadScroll(
+        child: SelectionArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [for (var i = 0; i < lines.length; i++) lineAt(i)],
+          ),
+        ),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: SizedBox(
+        height: 308,
+        child: MediaQuery.removePadding(
+          context: context,
+          removeTop: true,
+          removeBottom: true,
+          child: SelectionArea(
+            child: Scrollbar(
+              controller: _scroll,
+              interactive: true,
+              thumbVisibility: true,
+              thickness: 4,
+              radius: const Radius.circular(3),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final heights = _measureLines(
+                    context,
+                    constraints.maxWidth -
+                        24 -
+                        (14 + lines.length.toString().length * 8) -
+                        13,
+                    style,
+                  );
+                  return ListView.builder(
+                    controller: _scroll,
+                    primary: false,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    itemExtentBuilder: (index, _) => heights[index],
+                    itemCount: lines.length,
+                    itemBuilder: (_, index) => lineAt(index),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

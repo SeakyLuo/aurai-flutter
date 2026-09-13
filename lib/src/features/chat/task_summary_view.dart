@@ -9,6 +9,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../domain/agent_models.dart';
 import '../../domain/web_sources.dart';
+import '../../domain/source_reference.dart';
 import 'tool_activity_view.dart';
 import 'chat_scroll_anchor.dart';
 import 'source_citation_syntax.dart';
@@ -33,10 +34,12 @@ class TaskSummaryView extends StatefulWidget {
 
 class _TaskSummaryViewState extends State<TaskSummaryView> {
   late bool _expanded;
+  List<Widget>? _activityWidgets;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _activityWidgets = null;
     _expanded =
         PageStorage.of(context).readState(context, identifier: widget.storageId)
             as bool? ??
@@ -46,6 +49,7 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
   @override
   void didUpdateWidget(TaskSummaryView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.summary, widget.summary)) _activityWidgets = null;
     if (!oldWidget.summary.stopped && widget.summary.stopped) {
       _expanded = true;
       PageStorage.of(
@@ -59,7 +63,9 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
 
   @override
   Widget build(BuildContext context) {
-    final sources = webSourcesFromActivities(widget.summary.activities);
+    final sources = _expanded && _activityWidgets == null
+        ? webSourcesFromActivities(widget.summary.activities)
+        : const <String, SourceReference>{};
     Widget activityAt(int index) {
       final activity = widget.summary.activities[index];
       return Padding(
@@ -184,7 +190,7 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
               padding: const EdgeInsets.only(bottom: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+                children: _activityWidgets ??= [
                   for (final group in groups)
                     if (group.end - group.start == 1)
                       activityAt(group.start)

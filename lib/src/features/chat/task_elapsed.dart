@@ -51,7 +51,7 @@ class _TaskElapsedState extends State<TaskElapsed> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              '${widget.watch.isRunning ? '已处理' : '用时'} ${taskDuration(widget.restoredElapsed + widget.watch.elapsed)}${widget.failed ? ' · 未完成' : ''}',
+              '${widget.watch.isRunning ? '已处理' : '用时'} ${taskDuration(widget.restoredElapsed + widget.watch.elapsed)}',
               style: TextStyle(
                 fontSize: 14,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,

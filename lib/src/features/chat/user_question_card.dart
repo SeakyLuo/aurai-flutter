@@ -68,15 +68,19 @@ class _UserQuestionCardState extends State<UserQuestionCard> {
                   children: [
                     Row(
                       children: [
-                        const QuestionIcon(type: QuestionIconType.question),
+                        QuestionIcon(
+                          type: question.isUserAction
+                              ? QuestionIconType.userAction
+                              : QuestionIconType.question,
+                        ),
                         const SizedBox(width: 8),
                         Text(
-                          '问题',
+                          question.isUserAction ? '等待你操作' : '问题',
                           style: TextStyle(color: colors.onSurfaceVariant),
                         ),
                         const Spacer(),
                         IconButton(
-                          tooltip: '跳过问题',
+                          tooltip: question.isUserAction ? '取消等待' : '跳过问题',
                           onPressed: _submitted
                               ? null
                               : () => _submit(skipped: true),
@@ -107,6 +111,17 @@ class _UserQuestionCardState extends State<UserQuestionCard> {
                                 ),
                               ),
                             ),
+                            if (question.isUserAction)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Text(
+                                  '操作完成后，请返回 Aurai 点“已完成”。遇到问题也可以在下方说明。',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
                             for (var i = 0; i < question.options.length; i++)
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 8),
@@ -134,7 +149,7 @@ class _UserQuestionCardState extends State<UserQuestionCard> {
                       controller: _text,
                       focusNode: _focus,
                       enabled: !_submitted,
-                      hintText: '或自行撰写回复',
+                      hintText: question.isUserAction ? '说明遇到的问题' : '或自行撰写回复',
                       onChanged: (value) => setState(() {
                         question.draft = value;
                         question.selected = null;

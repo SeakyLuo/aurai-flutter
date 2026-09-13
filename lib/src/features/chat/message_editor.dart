@@ -1,3 +1,4 @@
+import '../../domain/message_file.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/agent_models.dart';
@@ -12,7 +13,8 @@ class MessageEditSession {
     required this.followOutput,
     required this.contentBelow,
     required this.draft,
-  }) : images = [...message.images];
+  }) : images = [...message.images],
+       files = [...message.files];
   final AgentMessage message;
   final ChatScrollBookmark? bookmark;
   final String? sentMessageId;
@@ -20,6 +22,8 @@ class MessageEditSession {
   final bool contentBelow;
   final TextEditingValue draft;
   final List<MessageImage> images;
+  final List<MessageFile> files;
+  final List<MessageFile> addedFiles = [];
   final List<MessageImage> addedImages = [];
   bool saving = false;
   bool picking = false;
@@ -43,10 +47,7 @@ class MessageEditNotice extends StatelessWidget {
             const Icon(Icons.info_outline_rounded, size: 22),
             const SizedBox(width: 10),
             const Expanded(
-              child: Text(
-                '编辑此消息将从此处重新启动对话。',
-                style: TextStyle(fontSize: 14),
-              ),
+              child: Text('编辑此消息将从此处重新启动对话。', style: TextStyle(fontSize: 14)),
             ),
           ],
         ),

@@ -1,3 +1,4 @@
+import '../../domain/message_file.dart';
 import '../../domain/agent_models.dart';
 import '../../domain/context_summary.dart';
 import '../../domain/message_image.dart';
@@ -32,6 +33,7 @@ class Conversation {
   ContextSummary? contextSummary;
   String draft = '';
   final List<MessageImage> draftImages = [];
+  final List<MessageFile> draftFiles = [];
   String? pendingGoal;
   String? errorDetail;
   ChatRunState runState = ChatRunState.idle;
@@ -42,18 +44,31 @@ class Conversation {
       messages.isEmpty &&
       draft.isEmpty &&
       draftImages.isEmpty &&
+      draftFiles.isEmpty &&
       pendingGoal == null;
   DateTime get updatedAt =>
       messages.isEmpty ? storedUpdatedAt ?? createdAt : messages.last.createdAt;
   String get title => storedTitle != null
       ? storedTitle!
       : messages.isEmpty
-      ? (draft.isEmpty && draftImages.isEmpty ? '新对话' : '未发送的草稿')
-      : (messages.first.text.isEmpty ? '图片对话' : messages.first.text);
+      ? (draft.isEmpty && draftImages.isEmpty && draftFiles.isEmpty
+            ? '新对话'
+            : '未发送的草稿')
+      : (messages.first.text.isEmpty
+            ? (messages.first.files.isEmpty
+                  ? '图片对话'
+                  : messages.first.files.first.name)
+            : messages.first.text);
   String? get preview => draft.isNotEmpty
       ? draft
+      : draftFiles.isNotEmpty
+      ? '未发送的附件'
       : draftImages.isNotEmpty
       ? '未发送的图片'
+      : messages.isNotEmpty &&
+            messages.last.files.isNotEmpty &&
+            messages.last.text.isEmpty
+      ? '[附件] ${messages.last.files.first.name}'
       : messages.length > 1 ||
             (messages.isNotEmpty && messages.last.images.isNotEmpty)
       ? (messages.last.text.isEmpty ? '[图片]' : messages.last.text)
@@ -78,6 +93,7 @@ class Conversation {
     'isArchived': isArchived,
     'isScheduledTask': isScheduledTask,
     'draft': draft,
+    'draftFiles': draftFiles.map((file) => file.toJson()).toList(),
     'draftImages': draftImages.map((image) => image.toJson()).toList(),
     'pendingGoal': pendingGoal,
     'errorDetail': errorDetail,
@@ -120,6 +136,14 @@ class Conversation {
         : state;
     if (!legacy) {
       conversation.draft = json['draft']! as String;
+      conversation.draftFiles.addAll(
+        (json['draftFiles'] as List? ?? const []).map(
+          (file) => MessageFile.fromJson(
+            (file as Map).cast<String, Object?>(),
+            imageDirectory,
+          ),
+        ),
+      );
       conversation.draftImages.addAll(
         (json['draftImages'] as List? ?? const []).map(
           (image) => MessageImage.fromJson(

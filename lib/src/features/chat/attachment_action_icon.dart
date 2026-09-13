@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum AttachmentActionIconType { gallery, camera }
+enum AttachmentActionIconType { gallery, camera, file }
 
 class AttachmentActionIcon extends StatelessWidget {
   const AttachmentActionIcon({super.key, required this.type});
@@ -35,6 +35,24 @@ class _AttachmentActionPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case AttachmentActionIconType.file:
+        canvas.drawPath(
+          Path()
+            ..moveTo(14, 3)
+            ..lineTo(6, 3)
+            ..quadraticBezierTo(4, 3, 4, 5)
+            ..lineTo(4, 19)
+            ..quadraticBezierTo(4, 21, 6, 21)
+            ..lineTo(18, 21)
+            ..quadraticBezierTo(20, 21, 20, 19)
+            ..lineTo(20, 9)
+            ..lineTo(14, 3)
+            ..lineTo(14, 9)
+            ..lineTo(20, 9),
+          pen,
+        );
+        canvas.drawLine(const Offset(8, 14), const Offset(16, 14), pen);
+        canvas.drawLine(const Offset(8, 17), const Offset(13, 17), pen);
       case AttachmentActionIconType.gallery:
         canvas.drawRRect(
           RRect.fromRectAndRadius(

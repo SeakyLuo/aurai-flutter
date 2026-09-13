@@ -5,6 +5,8 @@ import 'chat_controller.dart';
 import 'settings_appearance.dart';
 import 'capability_icon.dart';
 import 'screen_access_tile.dart';
+import 'device_extension_tiles.dart';
+import 'document_folders_page.dart';
 
 class CapabilityPage extends StatefulWidget {
   const CapabilityPage({super.key, required this.controller});
@@ -83,8 +85,10 @@ class _CapabilityPageState extends State<CapabilityPage>
                 ScreenAccessTile(controller: widget.controller),
                 const SizedBox(height: 8),
                 for (final capability in widget.controller.capabilities)
-                  if (!capability.id.startsWith('android.execution.'))
+                  if (!capability.id.startsWith('android.execution.') &&
+                      capability.id != 'android.network.capture')
                     _capabilityTile(capability),
+                const DeviceExtensionTiles(),
               ],
             ),
           ),
@@ -105,6 +109,12 @@ class _CapabilityPageState extends State<CapabilityPage>
   }
 
   Future<void> Function()? _permissionAction(Capability capability) {
+    if (capability.id == 'android.documents')
+      return () async {
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute(builder: (_) => const DocumentFoldersPage()),
+        );
+      };
     if (capability.availability != CapabilityAvailability.permissionRequired) {
       return null;
     }
@@ -170,7 +180,11 @@ class _CapabilityPageState extends State<CapabilityPage>
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              action == null ? _label(capability.availability) : '去开启',
+              capability.id == 'android.documents'
+                  ? '管理'
+                  : action == null
+                  ? _label(capability.availability)
+                  : '去开启',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,

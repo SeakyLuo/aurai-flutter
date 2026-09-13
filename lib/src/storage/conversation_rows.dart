@@ -1,3 +1,4 @@
+import '../domain/message_file.dart';
 import 'dart:io';
 
 import '../domain/agent_models.dart';
@@ -79,4 +80,28 @@ MessageImage imageFromRow(Map<String, Object?> row, String directory) =>
     MessageImage(
       path: '$directory/${row['file_name']}',
       mimeType: row['mime_type']! as String,
+    );
+
+Map<String, Object?> fileAttachmentRow(
+  String conversationId,
+  MessageFile file,
+  int position, {
+  String? messageId,
+}) => {
+  'id': '$conversationId:${file.id}',
+  'conversation_id': conversationId,
+  'message_id': messageId,
+  'file_name': file.id,
+  'mime_type': file.mimeType,
+  'kind': 'file',
+  'display_name': file.name,
+  'byte_size': file.size,
+  'position': position,
+};
+MessageFile fileFromRow(Map<String, Object?> row, String directory) =>
+    MessageFile(
+      path: '$directory/${row['file_name']}',
+      name: row['display_name'] as String,
+      mimeType: row['mime_type'] as String,
+      size: row['byte_size'] as int,
     );

@@ -18,7 +18,7 @@ class AgentNotifications(private val context: Context) {
         }
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "AI 通知", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            NotificationChannel(CHANNEL_ID, "AI 通知", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "AI 按任务需要发送的通知"
             },
         )

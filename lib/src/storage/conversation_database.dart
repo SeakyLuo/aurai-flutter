@@ -4,12 +4,19 @@ import '../memory/memory_controller.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 8,
+  version: 9,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion < 9) {
+      await db.execute(
+        "ALTER TABLE attachments ADD COLUMN kind TEXT NOT NULL DEFAULT 'image'",
+      );
+      await db.execute('ALTER TABLE attachments ADD COLUMN display_name TEXT');
+      await db.execute('ALTER TABLE attachments ADD COLUMN byte_size INTEGER');
+    }
     if (oldVersion < 8) {
       await db.execute('ALTER TABLE model_turns ADD COLUMN response_json TEXT');
     }
@@ -124,6 +131,9 @@ const _schema = [
     message_id TEXT REFERENCES messages(id) ON DELETE CASCADE,
     file_name TEXT NOT NULL,
     mime_type TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'image',
+    display_name TEXT,
+    byte_size INTEGER,
     position INTEGER NOT NULL
   )''',
   '''CREATE TABLE tool_calls (

@@ -1,3 +1,4 @@
+import 'file_tool_icon.dart';
 import 'package:flutter/material.dart';
 
 import 'settings_icon.dart';
@@ -11,7 +12,10 @@ class CapabilityIcon extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox.square(
     dimension: 24,
     child: switch (id) {
-      'android.network' => const WelcomeIcon(type: WelcomeIconType.network),
+      'android.network' || 'android.network.capture' => const WelcomeIcon(
+        type: WelcomeIconType.network,
+      ),
+      'android.documents' => const FileToolIcon(type: FileToolIconType.folder),
       'android.observe' => const SettingsIcon(type: SettingsIconType.device),
       'android.notifications.observe' => const SettingsIcon(
         type: SettingsIconType.notifications,
@@ -128,6 +132,7 @@ class _CapabilityPainter extends CustomPainter {
             ..lineTo(11, 13),
           pen,
         );
+      case 'android.execution.shizuku':
       case 'android.shell.app_uid':
         canvas.drawRRect(
           RRect.fromRectAndRadius(

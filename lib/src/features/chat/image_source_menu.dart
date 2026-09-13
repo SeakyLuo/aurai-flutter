@@ -1,12 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import 'attachment_action_icon.dart';
 import 'glass_surface.dart';
 
-Future<ImageSource?> showImageSourceMenu(BuildContext context) {
+enum AttachmentSource { gallery, camera, file }
+
+Future<AttachmentSource?> showImageSourceMenu(BuildContext context) {
   final button = context.findRenderObject()! as RenderBox;
   final overlay =
       Navigator.of(
@@ -21,7 +22,7 @@ Future<ImageSource?> showImageSourceMenu(BuildContext context) {
     safe.left + 8,
     overlay.size.width - safe.right - width - 8,
   );
-  return showGeneralDialog<ImageSource>(
+  return showGeneralDialog<AttachmentSource>(
     context: context,
     requestFocus: false,
     barrierDismissible: true,
@@ -58,15 +59,20 @@ Future<ImageSource?> showImageSourceMenu(BuildContext context) {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              _ImageSourceItem(
-                                source: ImageSource.gallery,
+                              _AttachmentSourceItem(
+                                source: AttachmentSource.gallery,
                                 label: '图片',
                                 icon: AttachmentActionIconType.gallery,
                               ),
-                              _ImageSourceItem(
-                                source: ImageSource.camera,
+                              _AttachmentSourceItem(
+                                source: AttachmentSource.camera,
                                 label: '拍照',
                                 icon: AttachmentActionIconType.camera,
+                              ),
+                              _AttachmentSourceItem(
+                                source: AttachmentSource.file,
+                                label: '文件',
+                                icon: AttachmentActionIconType.file,
                               ),
                             ],
                           ),
@@ -85,13 +91,13 @@ Future<ImageSource?> showImageSourceMenu(BuildContext context) {
   );
 }
 
-class _ImageSourceItem extends StatelessWidget {
-  const _ImageSourceItem({
+class _AttachmentSourceItem extends StatelessWidget {
+  const _AttachmentSourceItem({
     required this.source,
     required this.label,
     required this.icon,
   });
-  final ImageSource source;
+  final AttachmentSource source;
   final String label;
   final AttachmentActionIconType icon;
 
@@ -108,14 +114,19 @@ class _ImageSourceItem extends StatelessWidget {
             AttachmentActionIcon(type: icon),
             const SizedBox(width: 13),
             Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  height: 1.3,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.3,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

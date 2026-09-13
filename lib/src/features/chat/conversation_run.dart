@@ -57,6 +57,7 @@ extension ConversationRun on ChatController {
       };
       final webSources = WebSourceRegistry();
       final tools = <AgentTool>[
+        AttachmentTool(history.expand((message) => message.files)),
         for (final operation in SkillTool.operations)
           SkillTool(skills, operation),
         RunSkillTool(skills, _platform, runConversation.id),
@@ -72,6 +73,23 @@ extension ConversationRun on ChatController {
         OpenModelTopUpTool(modelSettings),
         AskUserTool(runConversation.id, (question) {
           pendingQuestion = question;
+          unawaited(
+            _platform.updateAttentionNotification(
+              runConversation.id,
+              'question',
+              title: question == null
+                  ? null
+                  : (question.isUserAction ? '等待你操作' : '等待你的回答'),
+              body: question?.question,
+            ),
+          );
+          if (question != null) {
+            unawaited(
+              _platform.updateAgentSessionStep(
+                question.isUserAction ? '等待你操作' : '等待你的回答',
+              ),
+            );
+          }
           _notifyRun(runConversation);
         }),
         for (final name in LocalHistoryTool.names)
@@ -89,6 +107,7 @@ extension ConversationRun on ChatController {
         CaptureScreenTool(_platform, runConfig.service.label),
         TapScreenTool(_platform, runConfig.service.label),
         WaitTool(),
+        WaitForUiTool(_platform),
         RequestAccessibilityAccessTool(_requestAccessibility),
         for (final name in uiToolActions.keys)
           ActTool(_platform, runConfig.service.label, name),
@@ -97,6 +116,9 @@ extension ConversationRun on ChatController {
         StartIntentTool(_platform),
         OpenSettingsTool(_platform),
         AppShellTool(_platform),
+        for (final name in DocumentTool.names) DocumentTool(_platform, name),
+        for (final name in DeviceExtensionTool.names)
+          DeviceExtensionTool(_platform, name),
       ];
       final registry = ToolRegistry(tools: tools, capabilities: capabilities);
       final executor = ToolExecutor(registry: registry, confirm: _confirm);
