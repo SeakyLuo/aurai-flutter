@@ -90,7 +90,7 @@ class ExecuteAndroidScriptTool implements AgentTool {
     capabilityId: 'android.runtime',
     executionTimeout: const Duration(seconds: 605),
     confirmationDescriptionBuilder: (arguments) =>
-        '${arguments['purpose']}\n\n将以 Aurai 的应用权限执行设备代码，可能读取应用可访问的数据或更改设备状态。仅允许本次执行。',
+        '${arguments['purpose']}\n\n将以 Aurai 的应用权限执行设备代码，可能读取应用可访问的数据或更改设备状态。授权范围由你选择。',
   );
 
   @override

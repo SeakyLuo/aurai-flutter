@@ -11,9 +11,21 @@ import 'settings_icon.dart';
 import 'glass_surface.dart';
 import 'pagination_listener.dart';
 
-enum ConversationAction { create, select, search, settings, tasks }
+enum ConversationAction {
+  create,
+  select,
+  search,
+  settings,
+  tasks,
+  groups,
+  createGroup,
+}
 
-typedef ConversationSelection = ({ConversationAction action, String? id});
+typedef ConversationSelection = ({
+  ConversationAction action,
+  String? id,
+  String? messageId,
+});
 
 class ConversationsDrawer extends StatelessWidget {
   const ConversationsDrawer({
@@ -25,7 +37,7 @@ class ConversationsDrawer extends StatelessWidget {
   final ValueChanged<ConversationSelection> onChoose;
 
   void _choose(ConversationAction action, [String? id]) =>
-      onChoose((action: action, id: id));
+      onChoose((action: action, id: id, messageId: null));
 
   @override
   Widget build(BuildContext context) => Drawer(
@@ -47,7 +59,11 @@ class ConversationsDrawer extends StatelessWidget {
               .whereType<String>()
               .toSet();
           final conversations = controller.conversations
-              .where((conversation) => !conversation.isEmpty)
+              .where(
+                (conversation) =>
+                    conversation.kind == ConversationKind.direct &&
+                    !conversation.isEmpty,
+              )
               .toList();
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -80,6 +96,25 @@ class ConversationsDrawer extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 24, right: 16),
+                leading: const SidebarActionIcon(
+                  type: SidebarActionIconType.group,
+                ),
+                title: const Text(
+                  '群聊',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                trailing: RoundAction(
+                  icon: Icons.add_rounded,
+                  iconWidget: const SidebarActionIcon(
+                    type: SidebarActionIconType.add,
+                  ),
+                  label: '新建群聊',
+                  onPressed: () => _choose(ConversationAction.createGroup),
+                ),
+                onTap: () => _choose(ConversationAction.groups),
               ),
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 24),

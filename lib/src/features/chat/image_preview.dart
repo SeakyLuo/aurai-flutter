@@ -1,8 +1,14 @@
+import 'chat_controller.dart';
+import 'image_action_scope.dart';
+import 'image_forward_page.dart';
+import 'chat_page.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
 import 'glass_surface.dart';
+import 'image_actions_menu.dart';
+import '../../platform/preview_image_actions.dart';
 
 Future<Size> loadPreviewImageSize(
   ImageProvider image,
@@ -42,11 +48,15 @@ class ImagePreview extends StatefulWidget {
   const ImagePreview({
     super.key,
     required this.images,
+    this.originMessageId,
+    this.initialOriginMessageId,
     required this.initialIndex,
     required this.heroTag,
     required this.imageSize,
   });
   final List<ImageProvider> images;
+  final String? originMessageId;
+  final String? initialOriginMessageId;
   final int initialIndex;
   final Object heroTag;
   final Size imageSize;
@@ -73,6 +83,7 @@ class _ImagePreviewState extends State<ImagePreview> {
       fit: StackFit.expand,
       children: [
         SafeArea(
+          top: false,
           child: PageView.builder(
             controller: _pages,
             physics: _zoomed ? const NeverScrollableScrollPhysics() : null,
@@ -84,6 +95,9 @@ class _ImagePreviewState extends State<ImagePreview> {
             itemBuilder: (context, index) => _PreviewPage(
               key: ValueKey(index),
               image: widget.images[index],
+              originMessageId: index == widget.initialIndex
+                  ? widget.initialOriginMessageId ?? widget.originMessageId
+                  : widget.originMessageId,
               initialSize: index == widget.initialIndex
                   ? widget.imageSize
                   : null,
@@ -104,6 +118,7 @@ class _ImagePreviewState extends State<ImagePreview> {
             minimum: const EdgeInsets.all(16),
             child: GlassSurface(
               dark: true,
+              tintOpacity: .6,
               radius: 24,
               child: RoundAction(
                 icon: Icons.close_rounded,
@@ -127,12 +142,14 @@ class _PreviewPage extends StatefulWidget {
   const _PreviewPage({
     super.key,
     required this.image,
+    required this.originMessageId,
     required this.initialSize,
     required this.heroTag,
     required this.heroEnabled,
     required this.onZoomChanged,
   });
   final ImageProvider image;
+  final String? originMessageId;
   final Size? initialSize;
   final Object heroTag;
   final bool heroEnabled;
@@ -146,6 +163,88 @@ class _PreviewPageState extends State<_PreviewPage> {
   final _transform = TransformationController();
   late final Future<Size?> _size = _load();
   bool _zoomed = false;
+  bool _exporting = false;
+
+  Future<void> _showActions(LongPressStartDetails details) async {
+    if (_exporting) return;
+    final image = widget.image;
+    final controller = ImageActionScope.of(context);
+    ({String conversationId, String messageId})? origin;
+    try {
+      if (widget.originMessageId != null || image is FileImage) {
+        origin = await controller.imageOrigin(
+          messageId: widget.originMessageId,
+          path: image is FileImage ? image.file.path : null,
+        );
+      }
+    } on Object {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('无法读取图片来源')));
+    }
+    if (!mounted) return;
+    final action = await showImageActionsMenu(
+      context,
+      details.globalPosition,
+      canLocate: origin != null,
+    );
+    if (action == null || !mounted || _exporting) return;
+    if (action == 'share') {
+      final sent = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              ImageForwardPage(controller: controller, image: image),
+        ),
+      );
+      if (sent == true && mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('已转发')));
+      return;
+    }
+    if (action == 'locate') {
+      final source = origin!;
+      try {
+        await controller.selectConversation(source.conversationId);
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute<void>(
+            builder: (_) => ChatPage(
+              controller: controller,
+              initialMessageId: source.messageId,
+            ),
+          ),
+          (route) => route.isFirst,
+        );
+      } on Object {
+        if (mounted)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('无法定位原消息，可能已被删除')));
+      }
+      return;
+    }
+    _exporting = true;
+    try {
+      final saved = await PreviewImageActions.perform(image, action);
+      if (mounted && action == 'save' && saved) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('图片已保存')));
+      }
+    } on Object {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(action == 'save' ? '图片保存失败，请重试' : '无法转发图片，请重试'),
+          ),
+        );
+    } finally {
+      _exporting = false;
+    }
+  }
 
   Future<Size?> _load() async {
     if (widget.initialSize != null) return widget.initialSize;
@@ -218,7 +317,11 @@ class _PreviewPageState extends State<_PreviewPage> {
                             imagePreviewFlight(widget.image, animation),
                     child: SizedBox.fromSize(
                       size: fitted,
-                      child: Image(image: widget.image, fit: BoxFit.contain),
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        onLongPressStart: _showActions,
+                        child: Image(image: widget.image, fit: BoxFit.contain),
+                      ),
                     ),
                   ),
                 ),

@@ -154,8 +154,8 @@ class AuraiPlatform {
   Future<void> openAccessibilitySettings() =>
       _channel.invokeMethod<void>('openAccessibilitySettings');
 
-  Future<void> startAgentSession() =>
-      _channel.invokeMethod<void>('startAgentSession');
+  Future<void> startAgentSession(String step) =>
+      _channel.invokeMethod<void>('startAgentSession', {'step': step});
 
   Future<void> updateAgentSessionStep(String step) =>
       _channel.invokeMethod<void>('updateAgentSessionStep', <String, Object?>{
@@ -207,16 +207,18 @@ class AuraiPlatform {
   Future<void> setScreenAccess(bool allowed) =>
       _channel.invokeMethod<void>('setScreenAccess', {'allowed': allowed});
 
-  Future<bool> requestConfirmation(
+  Future<String> requestConfirmation(
     String callId,
     String toolName,
     Map<String, Object?> arguments,
     String? description,
     bool taskScoped,
-    int confirmationTimeoutSeconds,
-  ) async =>
+    int? confirmationTimeoutSeconds, {
+    bool autoApproved = false,
+  }) async =>
       await _channel
-          .invokeMethod<bool>('requestConfirmation', <String, Object?>{
+          .invokeMethod<String>('requestConfirmation', <String, Object?>{
+            'autoApproved': autoApproved,
             'callId': callId,
             'toolName': uiToolActions.containsKey(toolName) ? 'act' : toolName,
             'arguments': uiToolActions.containsKey(toolName)
@@ -226,7 +228,7 @@ class AuraiPlatform {
             'taskScoped': taskScoped,
             'confirmationTimeoutSeconds': confirmationTimeoutSeconds,
           }) ??
-      false;
+      'deny';
 
   Future<void> cancelPendingInteraction() =>
       _channel.invokeMethod<void>('cancelPendingInteraction');

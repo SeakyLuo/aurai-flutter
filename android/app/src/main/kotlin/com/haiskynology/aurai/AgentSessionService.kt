@@ -32,7 +32,7 @@ class AgentSessionService : Service() {
             }
             ACTION_START -> {
                 running = true
-                startForeground(NOTIFICATION_ID, runningNotification("正在准备"))
+                startForeground(NOTIFICATION_ID, runningNotification(intent!!.getStringExtra(EXTRA_STEP)!!))
             }
             ACTION_STEP -> notificationManager().notify(
                 NOTIFICATION_ID,
@@ -70,8 +70,8 @@ class AgentSessionService : Service() {
 
     private fun runningNotification(step: String): Notification =
         notificationBranding.applyTo(Notification.Builder(this, CHANNEL_ID))
-            .setContentTitle("Aurai 正在执行任务")
-            .setContentText(step)
+            .setContentTitle(step)
+            .setContentText("Aurai 正在执行任务")
             .setContentIntent(openAppIntent())
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -153,8 +153,8 @@ class AgentSessionService : Service() {
             context.startForegroundService(Intent(context, AgentSessionService::class.java).setAction(ACTION_SCHEDULED))
         }
 
-        fun start(context: Context) {
-            val intent = Intent(context, AgentSessionService::class.java).setAction(ACTION_START)
+        fun start(context: Context, step: String) {
+            val intent = Intent(context, AgentSessionService::class.java).setAction(ACTION_START).putExtra(EXTRA_STEP, step)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {

@@ -1,7 +1,10 @@
 import '../../domain/message_file.dart';
+import '../../domain/message_sender.dart';
 import '../../domain/agent_models.dart';
 import '../../domain/context_summary.dart';
 import '../../domain/message_image.dart';
+
+enum ConversationKind { direct, group }
 
 enum ChatRunState { idle, running, stopping, failed, cancelled, interrupted }
 
@@ -12,8 +15,15 @@ class Conversation {
       Conversation(id: newMessageId(), createdAt: DateTime.now());
 
   final String id;
+  ConversationKind kind = ConversationKind.direct;
+  String defaultSenderId = MessageSender.aurai.id;
   final DateTime createdAt;
   final List<AgentMessage> messages = [];
+  List<AgentMessage>? searchMessages;
+  String? searchMessageId;
+  bool searchHasEarlier = false;
+  bool searchHasLater = false;
+  bool loadingSearchPage = false;
   final List<AgentStep> steps = [];
   final List<({String afterMessageId, AgentStep step})> liveToolSteps = [];
   bool isPinned = false;
@@ -76,6 +86,8 @@ class Conversation {
 
   Map<String, Object?> toJson() => {
     'id': id,
+    'kind': kind.name,
+    'defaultSenderId': defaultSenderId,
     if (contextSummary != null) 'contextSummary': contextSummary!.toJson(),
     'createdAt': createdAt.toIso8601String(),
     'messages': messages.map((message) => message.toJson()).toList(),
@@ -111,6 +123,11 @@ class Conversation {
             id: json['id']! as String,
             createdAt: DateTime.parse(json['createdAt']! as String),
           );
+    conversation.kind = ConversationKind.values.byName(
+      json['kind'] as String? ?? 'direct',
+    );
+    conversation.defaultSenderId =
+        json['defaultSenderId'] as String? ?? MessageSender.aurai.id;
     if (json['contextSummary'] != null) {
       conversation.contextSummary = ContextSummary.fromJson(
         (json['contextSummary']! as Map).cast<String, Object?>(),

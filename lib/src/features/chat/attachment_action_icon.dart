@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 
-enum AttachmentActionIconType { gallery, camera, file }
+enum AttachmentActionIconType {
+  gallery,
+  camera,
+  file,
+  forward,
+  download,
+  locate,
+}
 
 class AttachmentActionIcon extends StatelessWidget {
   const AttachmentActionIcon({super.key, required this.type});
@@ -35,6 +42,45 @@ class _AttachmentActionPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case AttachmentActionIconType.locate:
+        canvas.drawCircle(const Offset(12, 12), 7, pen);
+        canvas.drawCircle(const Offset(12, 12), 2.5, pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(12, 2)
+            ..lineTo(12, 5)
+            ..moveTo(12, 19)
+            ..lineTo(12, 22)
+            ..moveTo(2, 12)
+            ..lineTo(5, 12)
+            ..moveTo(19, 12)
+            ..lineTo(22, 12),
+          pen,
+        );
+      case AttachmentActionIconType.forward:
+        canvas.drawPath(
+          Path()
+            ..moveTo(5, 17)
+            ..cubicTo(5, 10, 10, 8, 17, 8)
+            ..moveTo(13, 4)
+            ..lineTo(18, 8)
+            ..lineTo(13, 12),
+          pen,
+        );
+      case AttachmentActionIconType.download:
+        canvas.drawPath(
+          Path()
+            ..moveTo(12, 3)
+            ..lineTo(12, 15)
+            ..moveTo(7, 10)
+            ..lineTo(12, 15)
+            ..lineTo(17, 10)
+            ..moveTo(4, 17)
+            ..lineTo(4, 20)
+            ..lineTo(20, 20)
+            ..lineTo(20, 17),
+          pen,
+        );
       case AttachmentActionIconType.file:
         canvas.drawPath(
           Path()

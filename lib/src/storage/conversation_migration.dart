@@ -44,6 +44,9 @@ Future<void> migrateConversations(
     for (final conversation in conversations) {
       _importConversation(batch, conversation);
     }
+    batch.execute(
+      "INSERT INTO message_recipients SELECT id, 'agent:aurai' FROM messages WHERE role = 'user'",
+    );
     if (activeId != null) {
       batch.insert('app_state', {
         'key': 'active_conversation',

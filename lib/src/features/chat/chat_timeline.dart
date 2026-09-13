@@ -28,13 +28,13 @@ List<ChatTimelineEntry> buildChatTimeline(
       watch != null &&
       conversation.hasExecutionProcess &&
       (watch.isRunning || conversation.runState == ChatRunState.failed) &&
-      !controller.messages.any(
+      !controller.visibleMessages.any(
         (message) =>
             message.runId == conversation.activeRunId &&
             message.taskSummary != null,
       );
   final hiddenIds = {
-    for (final message in controller.messages)
+    for (final message in controller.visibleMessages)
       if (message.taskSummary != null)
         ...message.taskSummary!.intermediateMessageIds,
   };
@@ -80,8 +80,12 @@ List<ChatTimelineEntry> buildChatTimeline(
           ),
         );
   }
-  final visibleMessages = controller.messages
-      .where((message) => !hiddenIds.contains(message.id))
+  final visibleMessages = controller.visibleMessages
+      .where(
+        (message) =>
+            !hiddenIds.contains(message.id) ||
+            message.id == conversation.searchMessageId,
+      )
       .toList();
   final end = beforeMessageId == null
       ? visibleMessages.length
@@ -111,9 +115,9 @@ List<ChatTimelineEntry> buildChatTimeline(
           ),
         ),
       if (message.id != beforeMessageId)
-        ChatTimelineEntry(
-          message.id,
-          (context) => MessageItem(
+        ChatTimelineEntry(message.id, (context) {
+          final item = MessageItem(
+            excludedActivityMessageId: conversation.searchMessageId,
             key: ValueKey(message.id),
             message: message,
             availableSources:
@@ -126,8 +130,24 @@ List<ChatTimelineEntry> buildChatTimeline(
                 controller.streamingMessageId == message.id ||
                 (controller.isBusy &&
                     message.runId == controller.activeConversation.activeRunId),
-          ),
-        ),
+          );
+          if (message.id != conversation.searchMessageId) return item;
+          return TweenAnimationBuilder<double>(
+            tween: Tween(begin: .28, end: 0),
+            duration: const Duration(seconds: 4),
+            curve: const Interval(.5, 1, curve: Curves.easeOut),
+            builder: (context, opacity, child) => DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: opacity),
+              ),
+              child: child,
+            ),
+            child: item,
+          );
+        }),
       if (showElapsed &&
           message.id == conversation.executionUserMessageId &&
           message.id != beforeMessageId)
@@ -146,12 +166,13 @@ List<ChatTimelineEntry> buildChatTimeline(
 }
 
 Map<String, String> chatSummaryOwners(ChatController controller) => {
-  for (final message in controller.messages) 'time:${message.id}': message.id,
-  for (final message in controller.messages)
+  for (final message in controller.visibleMessages)
+    'time:${message.id}': message.id,
+  for (final message in controller.visibleMessages)
     if (message.taskSummary != null) ...{
       'elapsed:${message.runId}': message.id,
       for (final id in message.taskSummary!.intermediateMessageIds)
-        id: message.id,
+        if (id != controller.activeConversation.searchMessageId) id: message.id,
       for (var i = 0; i < message.taskSummary!.activities.length; i++)
         'tool:${message.runId}:$i': message.id,
       if (message.runId == controller.activeConversation.activeRunId)

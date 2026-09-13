@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../agent/system_prompt.dart';
 import 'responses_context.dart';
+import 'current_time_context.dart';
 import 'response_citations.dart';
 import 'model_context_limits.dart';
 import 'responses_transport.dart';
@@ -34,7 +35,7 @@ class OpenAiResponsesProvider implements ModelProvider {
         if (_context.limits case final limits?)
           'max_output_tokens': limits.outputTokens,
         'instructions':
-            '${_context.systemPrompt}\n${_capabilitySummary(request)}\n${request.personalContext}',
+            '${_context.systemPrompt}\n${currentTimeContext()}\n${_capabilitySummary(request)}\n${request.personalContext}',
         'input': restart
             ? _context.input
             : [

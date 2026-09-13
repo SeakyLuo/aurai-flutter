@@ -9,6 +9,7 @@ import 'skill_editor.dart';
 import 'skill_store.dart';
 import 'skill_action_menu.dart';
 import 'skill_permission_picker.dart';
+import 'skill_sort_picker.dart';
 import '../scheduling/task_action_menu.dart';
 import '../features/chat/delete_confirmation_dialog.dart';
 
@@ -64,6 +65,16 @@ class _SkillsPageState extends State<SkillsPage> {
       box.localToGlobal(Offset(0, box.size.height)),
     );
     if (!mounted || action == null) return;
+    if (action == 'sort') {
+      final selected = await showSkillSortPicker(context, widget.store.sort);
+      if (!mounted || selected == null) return;
+      try {
+        await widget.store.saveSort(selected);
+      } on Object {
+        if (mounted) _notice('保存排序失败，请重试');
+      }
+      return;
+    }
     final selection = await showSkillPermissionPicker(
       context,
       widget.store.defaultPermission,
@@ -246,17 +257,22 @@ class _SkillsPageState extends State<SkillsPage> {
                   listenable: widget.store,
                   builder: (context, _) {
                     final query = _search.text.trim().toLowerCase();
-                    final skills = widget.store.skills
-                        .where(
-                          (skill) => skill.enabled == (_filter == 'enabled'),
-                        )
-                        .where(
-                          (skill) =>
-                              query.isEmpty ||
-                              skill.name.toLowerCase().contains(query) ||
-                              skill.description.toLowerCase().contains(query),
-                        )
-                        .toList();
+                    final skills =
+                        widget.store.skills
+                            .where(
+                              (skill) =>
+                                  skill.enabled == (_filter == 'enabled'),
+                            )
+                            .where(
+                              (skill) =>
+                                  query.isEmpty ||
+                                  skill.name.toLowerCase().contains(query) ||
+                                  skill.description.toLowerCase().contains(
+                                    query,
+                                  ),
+                            )
+                            .toList()
+                          ..sort(widget.store.compareSkills);
                     if (skills.isEmpty) {
                       return Center(
                         child: Text(

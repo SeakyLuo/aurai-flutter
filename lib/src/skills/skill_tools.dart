@@ -143,6 +143,7 @@ class SkillTool
                 },
             ],
           };
+          if (unavailable == null) await store.recordUse(skill.id);
         case 'create' || 'update':
           await store.save(
             SavedSkill.fromJson({
@@ -247,7 +248,7 @@ class RunSkillTool
       'additionalProperties': false,
     },
     confirmationDescriptionBuilder: (a) =>
-        '运行技能“${a['name']}”\n${a['purpose']}\n\n将以 Aurai 的应用权限执行设备代码，仅允许本次执行。${_dependencyPermissionNotice()}',
+        '运行技能“${a['name']}”\n${a['purpose']}\n\n将以 Aurai 的应用权限执行设备代码，授权范围由你选择。${_dependencyPermissionNotice()}',
   );
   @override
   Future<ToolResult?> preflight(ToolCall call) async {
@@ -313,7 +314,7 @@ class RunSkillTool
     if (source.length > 65536) {
       throw StateError('技能和输入内容超过执行长度限制');
     }
-    return _runner.execute(
+    final result = await _runner.execute(
       ToolCall(
         id: call.id,
         name: call.name,
@@ -324,6 +325,9 @@ class RunSkillTool
         },
       ),
     );
+    if (result.status == ToolResultStatus.success)
+      await store.recordUse(skill.id);
+    return result;
   }
 
   @override

@@ -19,6 +19,7 @@ import java.time.Instant
 
 class AndroidAgentBridge(private val context: Context) {
     private val chatFiles = ChatFileAccess(context)
+    private val previewImages = PreviewImageAccess(context)
     private val documents = DocumentAccess(context)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val appUidAdapter = AppUidExecutionAdapter(File(context.filesDir, "agent-shell"))
@@ -29,6 +30,7 @@ class AndroidAgentBridge(private val context: Context) {
     )
 
     fun handle(call: MethodCall, result: MethodChannel.Result): Boolean {
+        if (previewImages.handle(call, result)) return true
         if (chatFiles.handle(call, result)) return true
         if (documents.handle(call, result)) return true
         when (call.method) {
@@ -94,7 +96,7 @@ class AndroidAgentBridge(private val context: Context) {
             "startAgentSession" -> {
                 sessionActive = true
                 AuraiAccessibilityService.instance?.startSession()
-                AgentSessionService.start(context)
+                AgentSessionService.start(context, call.argument<String>("step")!!)
                 result.success(null)
             }
             "updateAttentionNotification" -> {
@@ -315,7 +317,7 @@ class AndroidAgentBridge(private val context: Context) {
     private fun requestConfirmation(call: MethodCall, result: MethodChannel.Result) {
         val service = AuraiAccessibilityService.instance
         if (service == null) {
-            result.success(false)
+            result.success("deny")
             return
         }
         @Suppress("UNCHECKED_CAST")
@@ -326,8 +328,9 @@ class AndroidAgentBridge(private val context: Context) {
             args,
             call.argument<String>("description"),
             call.argument<Boolean>("taskScoped")!!,
-            call.argument<Number>("confirmationTimeoutSeconds")!!.toLong() * 1000,
-        ) { approved -> mainHandler.post { result.success(approved) } }
+            call.argument<Number>("confirmationTimeoutSeconds")?.toLong()?.times(1000),
+            call.argument<Boolean>("autoApproved")!!,
+        ) { approved -> mainHandler.post { result.success(if (approved) service.confirmationScope else "deny") } }
     }
 
     private fun captureScreen(result: MethodChannel.Result) {

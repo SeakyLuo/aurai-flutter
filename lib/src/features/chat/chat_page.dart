@@ -1,3 +1,5 @@
+import 'group_chat_page.dart';
+import 'group_create_page.dart';
 import '../../platform/message_file_store.dart';
 import '../../scheduling/tasks_page.dart';
 import 'keyboard_inset.dart';
@@ -31,9 +33,11 @@ import 'model_settings_sheet.dart';
 import 'conversations_sheet.dart';
 import 'conversation_search_page.dart';
 
+part 'chat_group_navigation.dart';
 part 'chat_session_actions.dart';
 part 'chat_message_editing.dart';
 part 'chat_attachments.dart';
+part 'chat_search_navigation.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({
@@ -41,11 +45,13 @@ class ChatPage extends StatefulWidget {
     required this.controller,
     this.fromTask = false,
     this.originTaskId,
+    this.initialMessageId,
   });
 
   final ChatController controller;
   final bool fromTask;
   final String? originTaskId;
+  final String? initialMessageId;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -83,7 +89,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     widget.controller.addListener(_onControllerChanged);
     _textController.addListener(_onTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom();
+      if (widget.initialMessageId case final id?) {
+        _locateSearchMessage(id);
+      } else {
+        _scrollToBottom();
+      }
       _loadImages();
     });
   }
@@ -208,6 +218,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         controller: _textController,
                         focusNode: _focusNode,
                         savingEdit: _editing?.saving == true,
+                        draftEnabled: _editing != null
+                            ? !_editing!.saving
+                            : controller.canEditDraft && !_preparingGoal,
                         enabled: _editing != null
                             ? !_editing!.saving
                             : !controller.isBusy,
@@ -301,11 +314,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           top: top + 12,
                                           bottom: bottom + 16,
                                         ),
-                                        hasEarlierMessages: controller
-                                            .activeConversation
-                                            .hasEarlierMessages,
-                                        loadEarlierMessages:
-                                            controller.loadEarlierMessages,
+                                        hasEarlierMessages:
+                                            controller.visibleHasEarlier,
+                                        hasLaterMessages:
+                                            controller.hasSearchWindow &&
+                                            controller
+                                                .activeConversation
+                                                .searchHasLater,
+                                        loadLaterMessages:
+                                            controller.loadVisibleLaterMessages,
+                                        loadEarlierMessages: controller
+                                            .loadVisibleEarlierMessages,
                                         onBookmark: (bookmark) {
                                           if (_editing == null)
                                             _scrollBookmarks[conversationId] =
@@ -314,7 +333,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                         onFollowOutputChanged: (value) {
                                           if (mounted)
                                             setState(
-                                              () => _followOutput = value,
+                                              () => _followOutput =
+                                                  controller.hasSearchWindow
+                                                  ? false
+                                                  : value,
                                             );
                                         },
                                         summaryOwners: chatSummaryOwners(
@@ -338,7 +360,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 ),
                               ),
                             if (!_followOutput &&
-                                _contentBelow &&
+                                (_contentBelow || controller.hasSearchWindow) &&
                                 timeline.isNotEmpty)
                               Positioned(
                                 left: 0,
@@ -547,8 +569,18 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _chooseConversationAction(
     ConversationSelection selection,
   ) async {
-    _scaffoldKey.currentState!.closeDrawer();
+    if (selection.action != ConversationAction.createGroup &&
+        selection.action != ConversationAction.groups) {
+      _scaffoldKey.currentState!.closeDrawer();
+    }
     final choice = selection;
+    if (choice.action == ConversationAction.groups ||
+        choice.action == ConversationAction.createGroup) {
+      await _openGroups(
+        create: choice.action == ConversationAction.createGroup,
+      );
+      return;
+    }
     if (choice.action == ConversationAction.tasks) {
       await openScheduledTasks(context, widget.controller);
       return;
@@ -579,11 +611,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         await _chooseConversationAction((
           action: ConversationAction.select,
           id: id,
+          messageId: null,
         ));
       }
       return;
     }
     switch (choice.action) {
+      case ConversationAction.groups:
+      case ConversationAction.createGroup:
       case ConversationAction.tasks:
       case ConversationAction.search:
       case ConversationAction.settings:
@@ -592,6 +627,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         await _changeConversation();
       case ConversationAction.select:
         await _changeConversation(choice.id);
+        if (mounted &&
+            choice.messageId != null &&
+            widget.controller.activeConversation.id == choice.id) {
+          await _locateSearchMessage(choice.messageId!);
+        }
     }
   }
 
@@ -657,6 +697,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
     _draftTimer?.cancel();
     _focusNode.unfocus();
+    if (widget.controller.hasSearchWindow) _scrollToBottom();
     _beforeSentMessageId = widget.controller.messages.lastOrNull?.id;
     _positionSentMessage = true;
     try {
@@ -732,7 +773,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   void _scrollToBottom() {
+    widget.controller.cancelSearchNavigation();
+    if (widget.controller.hasSearchWindow) {
+      widget.controller.leaveSearchWindow();
+      _scrollBookmarks.remove(_conversationId);
+      setState(() {
+        _viewportKey = GlobalKey<ChatViewportState>();
+        _sentMessageId = null;
+        _followOutput = true;
+      });
+      return;
+    }
     _viewportKey.currentState?.scrollToBottom();
     if (!_followOutput) setState(() => _followOutput = true);
   }
+
+  void _positionSearchResult(String id) =>
+      setState(() => _applySearchPosition(id));
 }

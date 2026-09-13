@@ -27,22 +27,14 @@ class _ConversationPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round;
     canvas.drawPath(
       Path()
-        ..moveTo(7, 3.5)
-        ..lineTo(17, 3.5)
-        ..quadraticBezierTo(21, 3.5, 21, 7.5)
-        ..lineTo(21, 14)
-        ..quadraticBezierTo(21, 18, 17, 18)
-        ..lineTo(10, 18)
-        ..lineTo(6, 21)
-        ..lineTo(6, 17.9)
-        ..quadraticBezierTo(3, 17.5, 3, 14)
-        ..lineTo(3, 7.5)
-        ..quadraticBezierTo(3, 3.5, 7, 3.5)
-        ..close()
-        ..moveTo(7.5, 8.5)
-        ..lineTo(16.5, 8.5)
-        ..moveTo(7.5, 12.5)
-        ..lineTo(13.5, 12.5),
+        ..moveTo(7, 20)
+        ..lineTo(3.5, 21)
+        ..lineTo(4.5, 17)
+        ..cubicTo(2.8, 15, 2.4, 12, 3.5, 9)
+        ..cubicTo(5, 4.5, 10, 2.5, 14.5, 3.7)
+        ..cubicTo(19, 4.7, 22, 8.5, 21, 13)
+        ..cubicTo(20, 18.8, 13, 22, 7, 20)
+        ..close(),
       pen,
     );
   }

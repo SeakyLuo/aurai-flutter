@@ -34,7 +34,7 @@ class EmptyConversation extends StatelessWidget {
       minHeight: 0,
       maxHeight: double.infinity,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(12, contentPadding.top + 48, 12, 24),
+        padding: EdgeInsets.fromLTRB(12, contentPadding.top, 12, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -216,6 +216,23 @@ class ExecutionProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (hasPendingGoal &&
+        !needsConfiguration &&
+        (state == ChatRunState.idle || state == ChatRunState.cancelled)) {
+      return TaskFailureCard(
+        error: '任务待继续',
+        actionLabel: '继续任务',
+        paused: true,
+        onRetry: onContinue,
+      );
+    }
+    if (state == ChatRunState.interrupted) {
+      return TaskFailureCard(
+        onRetry: onContinue,
+        error: '任务已中断',
+        actionLabel: '继续任务',
+      );
+    }
     if (state == ChatRunState.failed) {
       return TaskFailureCard(onRetry: onRetry, error: errorDetail ?? '任务执行失败');
     }
@@ -275,24 +292,6 @@ class ExecutionProgress extends StatelessWidget {
                 if (action != null) ...[const SizedBox(width: 12), action],
               ],
             ),
-          if (state == ChatRunState.interrupted)
-            Padding(
-              padding: const EdgeInsets.only(top: 10, bottom: 12),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  FilledButton(
-                    onPressed: onContinue,
-                    child: const Text('继续任务'),
-                  ),
-                  TextButton(
-                    onPressed: onBatterySettings,
-                    child: const Text('调整后台运行'),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
@@ -320,6 +319,7 @@ class ChatComposer extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.enabled,
+    required this.draftEnabled,
     required this.canSend,
     required this.stopping,
     required this.onSend,
@@ -338,6 +338,7 @@ class ChatComposer extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool enabled;
+  final bool draftEnabled;
   final bool canSend;
   final bool stopping;
   final VoidCallback onSend;
@@ -366,7 +367,7 @@ class ChatComposer extends StatelessWidget {
       return MessageComposer(
         controller: controller,
         focusNode: focusNode,
-        enabled: enabled,
+        enabled: draftEnabled,
         hintText: '回复 Aurai',
         attachments: images.isEmpty && files.isEmpty && !addingImages
             ? null
@@ -376,12 +377,16 @@ class ChatComposer extends StatelessWidget {
                   if (images.isNotEmpty)
                     DraftImageAttachments(
                       images: images,
-                      onRemove: enabled && !addingImages ? onRemoveImage : null,
+                      onRemove: draftEnabled && !addingImages
+                          ? onRemoveImage
+                          : null,
                     ),
                   if (files.isNotEmpty)
                     FileAttachments(
                       files: files,
-                      onRemove: enabled && !addingImages ? onRemoveFile : null,
+                      onRemove: draftEnabled && !addingImages
+                          ? onRemoveFile
+                          : null,
                     ),
                   if (addingImages)
                     const Padding(
@@ -412,7 +417,7 @@ class ChatComposer extends StatelessWidget {
                   ? Colors.white
                   : Colors.black,
             ),
-            onPressed: enabled && !addingImages
+            onPressed: draftEnabled && !addingImages
                 ? () => onAddImages(buttonContext)
                 : null,
           ),
@@ -432,7 +437,7 @@ class ChatComposer extends StatelessWidget {
               : '停止',
           primary: true,
           compact: true,
-          iconWidget: addingImages
+          iconWidget: addingImages && enabled
               ? const SizedBox.square(
                   dimension: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),

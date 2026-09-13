@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../utils/widget_utils.dart';
+import 'dialog_action_button.dart';
 import 'chat_controller.dart';
 import 'glass_surface.dart';
 import 'question_icon.dart';
@@ -144,26 +144,18 @@ class _ConversationRenameDialogState extends State<ConversationRenameDialog> {
                       Row(
                         children: [
                           Expanded(
-                            child: TextButton(
+                            child: DialogActionButton(
+                              text: '取消',
+                              role: DialogActionRole.secondary,
                               onPressed: _saving
                                   ? null
                                   : () => Navigator.pop(context),
-                              style: TextButton.styleFrom(
-                                foregroundColor: colors.onSurface,
-                                backgroundColor: dialogControlColor(context),
-                                minimumSize: const Size(0, 46),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(23),
-                                ),
-                              ),
-                              child: const Text('取消'),
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: WidgetUtils.primaryButton(
+                            child: DialogActionButton(
                               text: _saving ? '保存中…' : '保存',
-                              height: 46,
                               onPressed: _saving || _text.text.trim().isEmpty
                                   ? null
                                   : _save,

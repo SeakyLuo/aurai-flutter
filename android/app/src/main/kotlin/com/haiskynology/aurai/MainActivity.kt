@@ -33,6 +33,18 @@ class MainActivity : FlutterActivity() {
 
     override fun shouldDestroyEngineWithHost() = false
 
+    override fun onStart() {
+        super.onStart()
+        isVisible = true
+        AttentionNotifications.visibilityChanged(this)
+    }
+
+    override fun onStop() {
+        isVisible = false
+        AttentionNotifications.visibilityChanged(this)
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
         current = this
@@ -56,6 +68,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == PreviewImageAccess.REQUEST) PreviewImageAccess.picker?.selected(if (resultCode == RESULT_OK) data?.data else null)
         if (requestCode == ChatFileAccess.REQUEST) ChatFileAccess.picker?.selected(if (resultCode == RESULT_OK) data else null)
         if (requestCode == DocumentAccess.REQUEST) DocumentAccess.picker?.selected(if (resultCode == RESULT_OK) data else null)
         if (requestCode == 1402) NetworkCaptureAccess.consent(this, resultCode == RESULT_OK)
@@ -87,6 +100,7 @@ class MainActivity : FlutterActivity() {
     companion object {
         var current: MainActivity? = null
             private set
+        var isVisible = false
         var isResumed = false
             private set
         private const val NOTIFICATION_PERMISSION_REQUEST = 1108

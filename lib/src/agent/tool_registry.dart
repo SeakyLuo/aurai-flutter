@@ -55,7 +55,10 @@ class ToolRegistry {
   bool isExposed(String name) => _exposed.contains(name);
 
   void load(Iterable<String> names) {
+    final available = catalog.map((tool) => tool.name).toSet()
+      ..removeAll(['searchTools', 'askUser']);
     for (final name in names) {
+      if (!available.contains(name)) continue;
       _loaded.remove(name);
       _loaded.add(name);
     }

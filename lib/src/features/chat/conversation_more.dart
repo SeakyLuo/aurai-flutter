@@ -79,6 +79,7 @@ class _ConversationMoreState extends State<ConversationMore> {
           SnackBar(
             content: Text(message),
             action: action,
+            persist: false,
             duration: const Duration(seconds: 6),
           ),
         );

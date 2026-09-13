@@ -19,7 +19,13 @@ class ToolActionIcon extends StatelessWidget {
           color: Theme.of(context).colorScheme.onSurfaceVariant,
           type: SettingsIconType.balance,
         ),
-        'prepareMemoryChanges' || 'applyMemoryChanges' => SettingsIcon(
+        'listMemories' ||
+        'readMemory' ||
+        'createMemory' ||
+        'updateMemory' ||
+        'deleteMemory' ||
+        'prepareMemoryChanges' ||
+        'applyMemoryChanges' => SettingsIcon(
           color: Theme.of(context).colorScheme.onSurfaceVariant,
           type: SettingsIconType.memory,
         ),

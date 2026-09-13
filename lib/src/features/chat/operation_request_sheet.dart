@@ -1,11 +1,12 @@
+import '../../domain/agent_models.dart';
 import '../../domain/ui_tool_actions.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
 import 'glass_surface.dart';
+import 'dialog_action_button.dart';
 import 'question_icon.dart';
-import 'settings_appearance.dart';
 import 'chat_controller.dart';
 
 Future<bool> showOperationRequestSheet(
@@ -40,17 +41,17 @@ class _OperationRequestSheet extends StatefulWidget {
 }
 
 class _OperationRequestSheetState extends State<_OperationRequestSheet> {
-  late final Timer _ticker;
+  late final Timer? _ticker;
   bool _closing = false;
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_changed);
-    _ticker = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => setState(() {}),
-    );
+    _ticker = widget.request.deadline == null
+        ? null
+        : Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
     widget.request.completer.future.then((_) {
       if (mounted) _changed();
     });
@@ -58,7 +59,7 @@ class _OperationRequestSheetState extends State<_OperationRequestSheet> {
 
   @override
   void dispose() {
-    _ticker.cancel();
+    _ticker?.cancel();
     widget.controller.removeListener(_changed);
     super.dispose();
   }
@@ -80,53 +81,50 @@ class _OperationRequestSheetState extends State<_OperationRequestSheet> {
     });
   }
 
-  void _answer(bool approved) {
+  Future<void> _answer(bool approved, [String scope = 'once']) async {
+    if (_closing || _saving) return;
+    if (widget.request.deadline != null &&
+        !DateTime.now().isBefore(widget.request.deadline!)) {
+      _closing = true;
+      Navigator.pop(context, false);
+      return;
+    }
+    if (approved && scope != 'once') {
+      _saving = true;
+      try {
+        await widget.controller.toolApprovals.grant(
+          widget.request.conversationId,
+          widget.request.call,
+          widget.request.call.name == 'runSkill'
+              ? '技能：${widget.request.call.arguments['name']}（版本 ${widget.request.call.arguments['revision']}）'
+              : toolTitle(widget.request.call.name),
+          scope,
+        );
+      } catch (_) {
+        if (mounted)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('保存授权失败，请重试')));
+        return;
+      } finally {
+        _saving = false;
+      }
+      if (!mounted) return;
+    }
+    widget.request.scope = 'once';
     if (_closing) return;
     _closing = true;
     final valid =
         identical(widget.controller.pendingConfirmation, widget.request) &&
-        DateTime.now().isBefore(widget.request.deadline);
+        (widget.request.deadline == null ||
+            DateTime.now().isBefore(widget.request.deadline!));
     Navigator.pop(context, approved && valid);
   }
 
   bool get _screenAccess => isScreenTool(widget.request.call.name);
 
-  Widget _option(String label, VoidCallback onTap, {String? description}) =>
-      Material(
-        color: settingsFieldColor(context),
-        borderRadius: BorderRadius.circular(20),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(label, style: const TextStyle(fontSize: 15)),
-                if (description != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      );
-
   @override
   Widget build(BuildContext context) {
-    final seconds =
-        (widget.request.deadline.difference(DateTime.now()).inMilliseconds /
-                1000)
-            .ceil()
-            .clamp(0, widget.request.call.confirmationTimeoutSeconds!);
     return Dialog(
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
@@ -164,7 +162,7 @@ class _OperationRequestSheetState extends State<_OperationRequestSheet> {
                 Flexible(
                   child: SingleChildScrollView(
                     child: Text(
-                      widget.detail,
+                      '${widget.detail}\n\n授权对象：${widget.request.call.name == 'runSkill' ? widget.request.call.arguments['name'] : toolTitle(widget.request.call.name)}${widget.request.deadline == null ? '' : '\n未处理将自动拒绝'}',
                       style: TextStyle(
                         fontSize: 15,
                         height: 1.6,
@@ -174,19 +172,30 @@ class _OperationRequestSheetState extends State<_OperationRequestSheet> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                _option(
-                  _screenAccess
-                      ? '始终允许'
-                      : widget.request.definition.taskScopedConfirmation
-                      ? '本任务允许'
-                      : '允许一次',
-                  () => _answer(true),
+                DialogActionButton(
+                  text: '允许一次',
+                  onPressed: () => _answer(true),
                 ),
                 const SizedBox(height: 8),
-                _option(
-                  '拒绝',
-                  () => _answer(false),
-                  description: '$seconds 秒后自动拒绝',
+                DialogActionButton(
+                  text: '当前会话允许',
+                  role: DialogActionRole.secondary,
+                  onPressed: () => _answer(true, 'session'),
+                ),
+                const SizedBox(height: 8),
+                DialogActionButton(
+                  text: '始终允许',
+                  role: DialogActionRole.secondary,
+                  onPressed: () => _answer(true, 'always'),
+                ),
+                const SizedBox(height: 8),
+                DialogActionButton(
+                  text: '拒绝',
+                  role: DialogActionRole.reject,
+                  detail: widget.request.deadline == null
+                      ? null
+                      : '${(widget.request.deadline!.difference(DateTime.now()).inMilliseconds / 1000).ceil().clamp(0, widget.request.call.confirmationTimeoutSeconds!)} 秒后自动拒绝',
+                  onPressed: () => _answer(false),
                 ),
               ],
             ),

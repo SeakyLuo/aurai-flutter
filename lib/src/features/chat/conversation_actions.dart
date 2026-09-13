@@ -115,6 +115,7 @@ extension ConversationActions on ChatController {
         (isActive && (isBusy || addingImages))) {
       throw StateError('请等待当前操作完成，再删除会话');
     }
+    await toolApprovals.removeConversation(removed.id);
     final images = await _store.attachmentPaths(removed.id);
     if (isActive) {
       final candidates = await _store.reader.list();

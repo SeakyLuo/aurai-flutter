@@ -1,3 +1,4 @@
+import '../features/chat/image_action_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -35,7 +36,7 @@ class AuraiApp extends StatelessWidget {
                     ? Brightness.light
                     : Brightness.dark,
               ),
-          child: child!,
+          child: ImageActionScope(controller: controller, child: child!),
         );
       },
       home: child,

@@ -458,15 +458,20 @@ class AuraiAccessibilityService : AccessibilityService() {
         hideOverlay()
     }
 
+    var confirmationScope = "once"
+        private set
+
     fun requestConfirmation(
         callId: String,
         toolName: String,
         args: Map<String, Any?>,
         description: String?,
         taskScoped: Boolean,
-        confirmationTimeoutMs: Long,
+        confirmationTimeoutMs: Long?,
+        autoApproved: Boolean,
         reply: (Boolean) -> Unit,
     ) {
+        confirmationScope = "once"
         val fingerprint = pageFingerprint()
         if (toolName == "act" && args["observationId"] != fingerprint) {
             reply(false)
@@ -477,39 +482,14 @@ class AuraiAccessibilityService : AccessibilityService() {
             return
         }
         val nodeRef = args["nodeRef"] as String?
-        val screenTask = taskScoped && toolName in setOf("act", "tapScreen", "captureScreen")
-        val decision = if (getSharedPreferences("screen_access", Context.MODE_PRIVATE)
-                .getBoolean("allowed", false)) true else screenTaskDecision
-        if (sessionActive && screenTask && decision != null) {
-            if (decision) approval = Approval(
-                callId, fingerprint, nodeRef, hashArguments(args), SystemClock.elapsedRealtime(),
-            )
-            reply(decision)
-            return
-        }
-        val eligibleForPageGrant = !taskScoped && toolName == "act" && args["action"] == "click" &&
-            nodeRef != null && isSafeNavigationNode(resolveNode(nodeRef))
-        val grant = pageGrant
-        if (eligibleForPageGrant && grant != null && grant.fingerprint == fingerprint) {
-            approval = Approval(
-                callId,
-                fingerprint,
-                nodeRef,
-                hashArguments(args),
-                SystemClock.elapsedRealtime(),
-            )
+        if (autoApproved) {
+            approval = Approval(callId, fingerprint, nodeRef, hashArguments(args), SystemClock.elapsedRealtime())
             reply(true)
             return
         }
+        val eligibleForPageGrant = false
         cancelPending()
-        pendingReply = { approved ->
-            if (screenTask && approved) {
-                getSharedPreferences("screen_access", Context.MODE_PRIVATE)
-                    .edit().putBoolean("allowed", true).apply()
-            }
-            if (sessionActive && screenTask && !approved) screenTaskDecision = false
-            reply(approved)
-        }
+        pendingReply = reply
         showConfirmationCard(
             callId,
             toolName,
@@ -519,9 +499,9 @@ class AuraiAccessibilityService : AccessibilityService() {
             fingerprint,
             nodeRef,
             eligibleForPageGrant,
-            SystemClock.elapsedRealtime() + confirmationTimeoutMs,
+            confirmationTimeoutMs?.let { SystemClock.elapsedRealtime() + it },
         )
-        confirmationTimeout = Runnable(::denyPending).also {
+        if (confirmationTimeoutMs != null) confirmationTimeout = Runnable(::denyPending).also {
             handler.postDelayed(it, confirmationTimeoutMs)
         }
     }
@@ -548,7 +528,7 @@ class AuraiAccessibilityService : AccessibilityService() {
         fingerprint: String,
         nodeRef: String?,
         allowPageGrant: Boolean,
-        deadline: Long,
+        deadline: Long?,
     ) {
         val preview = if (toolName == "tapScreen") latestVisualSnapshot!!.markedPreview(
             (args["x"] as Number).toDouble(), (args["y"] as Number).toDouble(),
@@ -562,6 +542,8 @@ class AuraiAccessibilityService : AccessibilityService() {
             preview = preview,
             onDeny = ::denyPending,
             onAllow = { approvePending(callId, fingerprint, nodeRef, args) },
+            onAlways = { confirmationScope = "always"; approvePending(callId, fingerprint, nodeRef, args) },
+            onSession = { confirmationScope = "session"; approvePending(callId, fingerprint, nodeRef, args) },
             onAllowPage = if (allowPageGrant) ({
                 pageGrant = PageGrant(fingerprint)
                 approvePending(callId, fingerprint, nodeRef, args)

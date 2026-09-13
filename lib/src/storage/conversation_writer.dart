@@ -18,7 +18,11 @@ class ConversationWriter {
     }
   }
 
-  Future<void> save(Conversation conversation, {bool makeActive = true}) {
+  Future<void> save(
+    Conversation conversation, {
+    bool makeActive = true,
+    Map<String, List<String>> recipients = const {},
+  }) {
     final header = conversationRow(conversation);
     final seenRunId = conversation.seenRunId;
     final contextSummary = conversation.contextSummary;
@@ -78,6 +82,14 @@ class ConversationWriter {
               'kind': 'message',
               'message_id': row['id'],
             }, conflictAlgorithm: ConflictAlgorithm.ignore);
+          }
+        }
+        for (final entry in recipients.entries) {
+          for (final senderId in entry.value) {
+            batch.insert('message_recipients', {
+              'message_id': entry.key,
+              'sender_id': senderId,
+            });
           }
         }
         batch.delete(
