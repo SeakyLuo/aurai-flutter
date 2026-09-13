@@ -12,6 +12,7 @@ class AgentMessage {
     this.taskSummary,
     this.runId,
     this.modelTurnId,
+    this.responseInput,
   });
 
   final String id;
@@ -22,6 +23,7 @@ class AgentMessage {
   final AgentTaskSummary? taskSummary;
   final String? runId;
   final String? modelTurnId;
+  final List<Map<String, Object?>>? responseInput;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
@@ -173,7 +175,9 @@ String newMessageId() =>
     DateTime.now().microsecondsSinceEpoch.toRadixString(36);
 
 String toolTitle(String name) => switch (name) {
+  'searchImages' => '搜索图片',
   'searchWeb' => '搜索网页',
+  'setSourceDates' => '补充来源时间',
   'searchTools' => '搜索工具',
   'inspectLocalDatabase' => '查看本地记录结构',
   'queryLocalDatabase' => '查询本地记录',

@@ -105,6 +105,7 @@ class AuraiApplication : Application() {
                 call.argument<String>("callId")!!,
                 call.argument<String>("script")!!,
                 call.argument<String>("conversationId")!!,
+                call.argument<Int>("timeoutSeconds") ?: 10,
                 result,
             )
             "cancelAndroidScript" -> {

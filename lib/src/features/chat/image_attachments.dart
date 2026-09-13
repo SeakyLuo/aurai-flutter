@@ -102,7 +102,10 @@ class _ImageAttachmentState extends State<ImageAttachment> {
     try {
       final Size imageSize;
       try {
-        imageSize = await loadPreviewImageSize(widget.image, context);
+        imageSize = await loadPreviewImageSize(
+          FileImage(File(widget.image.path)),
+          context,
+        );
       } on Object {
         if (mounted) {
           ScaffoldMessenger.of(
@@ -118,7 +121,9 @@ class _ImageAttachmentState extends State<ImageAttachment> {
           transitionDuration: const Duration(milliseconds: 340),
           reverseTransitionDuration: const Duration(milliseconds: 280),
           pageBuilder: (_, animation, secondaryAnimation) => ImagePreview(
-            images: List.unmodifiable(widget.gallery),
+            images: [
+              for (final image in widget.gallery) FileImage(File(image.path)),
+            ],
             initialIndex: widget.gallery.indexOf(widget.image),
             heroTag: _heroTag,
             imageSize: imageSize,
@@ -145,7 +150,7 @@ class _ImageAttachmentState extends State<ImageAttachment> {
       tag: _heroTag,
       createRectTween: (begin, end) => RectTween(begin: begin, end: end),
       flightShuttleBuilder: (flightContext, animation, direction, from, to) =>
-          imagePreviewFlight(widget.image, animation),
+          imagePreviewFlight(FileImage(File(widget.image.path)), animation),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(widget.borderRadius),
         child: Material(

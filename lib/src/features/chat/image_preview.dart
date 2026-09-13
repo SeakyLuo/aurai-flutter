@@ -1,18 +1,14 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import '../../domain/message_image.dart';
 import 'glass_surface.dart';
 
 Future<Size> loadPreviewImageSize(
-  MessageImage image,
+  ImageProvider image,
   BuildContext context,
 ) async {
-  final stream = FileImage(
-    File(image.path),
-  ).resolve(createLocalImageConfiguration(context));
+  final stream = image.resolve(createLocalImageConfiguration(context));
   final result = Completer<Size>();
   final listener = ImageStreamListener(
     (info, _) {
@@ -32,14 +28,14 @@ Future<Size> loadPreviewImageSize(
   }
 }
 
-Widget imagePreviewFlight(MessageImage image, Animation<double> animation) =>
+Widget imagePreviewFlight(ImageProvider image, Animation<double> animation) =>
     AnimatedBuilder(
       animation: animation,
       builder: (_, child) => ClipRRect(
         borderRadius: BorderRadius.circular(16 * (1 - animation.value)),
         child: child,
       ),
-      child: Image.file(File(image.path), fit: BoxFit.cover),
+      child: Image(image: image, fit: BoxFit.cover),
     );
 
 class ImagePreview extends StatefulWidget {
@@ -50,7 +46,7 @@ class ImagePreview extends StatefulWidget {
     required this.heroTag,
     required this.imageSize,
   });
-  final List<MessageImage> images;
+  final List<ImageProvider> images;
   final int initialIndex;
   final Object heroTag;
   final Size imageSize;
@@ -136,7 +132,7 @@ class _PreviewPage extends StatefulWidget {
     required this.heroEnabled,
     required this.onZoomChanged,
   });
-  final MessageImage image;
+  final ImageProvider image;
   final Size? initialSize;
   final Object heroTag;
   final bool heroEnabled;
@@ -222,10 +218,7 @@ class _PreviewPageState extends State<_PreviewPage> {
                             imagePreviewFlight(widget.image, animation),
                     child: SizedBox.fromSize(
                       size: fitted,
-                      child: Image.file(
-                        File(widget.image.path),
-                        fit: BoxFit.contain,
-                      ),
+                      child: Image(image: widget.image, fit: BoxFit.contain),
                     ),
                   ),
                 ),

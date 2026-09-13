@@ -426,6 +426,8 @@ class AuraiAccessibilityService : AccessibilityService() {
                 return mapOf("performed" to false, "reason" to "approval_stale", "next" to "observeDevice")
             }
         }
+        val targetLabel = if (action == "click" && !node.isPassword)
+            (node.text ?: node.contentDescription)?.toString() else null
         val performed = when (action) {
             "click" -> node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             "inputText" -> node.performAction(
@@ -436,7 +438,7 @@ class AuraiAccessibilityService : AccessibilityService() {
             "scrollBackward" -> node.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
             else -> false
         }
-        return mapOf("performed" to performed, "action" to action, "next" to "observeDevice")
+        return mapOf("performed" to performed, "action" to action, "targetLabel" to targetLabel, "next" to "observeDevice")
     }
 
     fun startSession() {
@@ -462,6 +464,7 @@ class AuraiAccessibilityService : AccessibilityService() {
         args: Map<String, Any?>,
         description: String?,
         taskScoped: Boolean,
+        confirmationTimeoutMs: Long,
         reply: (Boolean) -> Unit,
     ) {
         val fingerprint = pageFingerprint()
@@ -516,9 +519,10 @@ class AuraiAccessibilityService : AccessibilityService() {
             fingerprint,
             nodeRef,
             eligibleForPageGrant,
+            SystemClock.elapsedRealtime() + confirmationTimeoutMs,
         )
         confirmationTimeout = Runnable(::denyPending).also {
-            handler.postDelayed(it, CONFIRMATION_TIMEOUT_MS)
+            handler.postDelayed(it, confirmationTimeoutMs)
         }
     }
 
@@ -544,6 +548,7 @@ class AuraiAccessibilityService : AccessibilityService() {
         fingerprint: String,
         nodeRef: String?,
         allowPageGrant: Boolean,
+        deadline: Long,
     ) {
         val preview = if (toolName == "tapScreen") latestVisualSnapshot!!.markedPreview(
             (args["x"] as Number).toDouble(), (args["y"] as Number).toDouble(),
@@ -553,7 +558,7 @@ class AuraiAccessibilityService : AccessibilityService() {
             context = this,
             description = description ?: confirmationText(toolName, args, nodeRef),
             allowLabel = if (persistent) "始终允许" else if (taskScoped) "本任务允许" else "允许一次",
-            deadline = SystemClock.elapsedRealtime() + CONFIRMATION_TIMEOUT_MS,
+            deadline = deadline,
             preview = preview,
             onDeny = ::denyPending,
             onAllow = { approvePending(callId, fingerprint, nodeRef, args) },
@@ -704,13 +709,15 @@ class AuraiAccessibilityService : AccessibilityService() {
         overlay = view
         val manager = activeWindowManager()
         overlayWindowManager = manager
+        val density = resources.displayMetrics.density
+        val dialogWidth = minOf((360 * density).toInt(), resources.displayMetrics.widthPixels - (48 * density).toInt())
         manager.addView(view, WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
+            dialogWidth,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             android.graphics.PixelFormat.TRANSLUCENT,
-        ).apply { gravity = Gravity.BOTTOM })
+        ).apply { gravity = Gravity.CENTER })
     }
 
     private fun hideOverlay() {
@@ -746,7 +753,6 @@ class AuraiAccessibilityService : AccessibilityService() {
         private const val APPROVAL_TTL_MS = 30_000L
         private const val TAP_DURATION_MS = 80L
         private const val LOCAL_DIFFERENCE_LIMIT = 0.12
-        private const val CONFIRMATION_TIMEOUT_MS = 30_000L
         private val HIGH_IMPACT = listOf(
             "发送", "提交", "授权", "安装", "删除", "购买", "支付", "发布", "拨打", "保存",
             "send", "submit", "allow", "install", "delete", "buy", "pay", "publish", "call", "save",

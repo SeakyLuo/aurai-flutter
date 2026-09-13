@@ -1,3 +1,5 @@
+import 'response_preferences.dart';
+export 'response_preferences.dart';
 import 'agent_models.dart';
 import 'context_summary.dart';
 import 'capability.dart';
@@ -66,6 +68,7 @@ class ModelSettings {
     required this.profiles,
     this.systemPrompt,
     this.customInstructions = '',
+    this.responsePreferences = const ResponsePreferences(),
   });
 
   factory ModelSettings.defaults({String openAiApiKey = ''}) => ModelSettings(
@@ -83,6 +86,7 @@ class ModelSettings {
   final Map<ModelService, ModelConfig> profiles;
   final String? systemPrompt;
   final String customInstructions;
+  final ResponsePreferences responsePreferences;
 
   ModelConfig get activeConfig => profiles[activeService]!;
 
@@ -97,12 +101,14 @@ class ModelSettings {
         },
         systemPrompt: systemPrompt,
         customInstructions: customInstructions,
+        responsePreferences: responsePreferences,
       );
 
   Map<String, Object?> toJson() => <String, Object?>{
     'activeService': activeService.name,
     'systemPrompt': systemPrompt,
     'customInstructions': customInstructions,
+    'responsePreferences': responsePreferences.toJson(),
     'profiles': <String, Object?>{
       for (final entry in profiles.entries)
         entry.key.name: entry.value.toJson(),
@@ -119,6 +125,11 @@ class ModelSettings {
     return ModelSettings(
       systemPrompt: json['systemPrompt'] as String?,
       customInstructions: json['customInstructions'] as String? ?? '',
+      responsePreferences: json['responsePreferences'] == null
+          ? const ResponsePreferences()
+          : ResponsePreferences.fromJson(
+              Map<String, dynamic>.from(json['responsePreferences'] as Map),
+            ),
       activeService: ModelService.values.byName(
         json['activeService']! as String,
       ),
@@ -149,6 +160,9 @@ class ModelRequest {
     this.personalContext = '',
     this.onContextSummary,
     this.onTextChanged,
+    this.onProcessingStarted,
+    this.onReconnect,
+    this.onMessageStarted,
     this.toolResults = const <ToolResult>[],
     this.userUpdates = const <String>[],
   });
@@ -163,6 +177,9 @@ class ModelRequest {
   final List<ToolResult> toolResults;
   final List<String> userUpdates;
   final void Function(String text)? onTextChanged;
+  final void Function()? onProcessingStarted;
+  final void Function(int attempt)? onReconnect;
+  final void Function(int index)? onMessageStarted;
 }
 
 class ModelTurn {
@@ -170,8 +187,12 @@ class ModelTurn {
     required this.continuationToken,
     required this.toolCalls,
     this.text,
+    required this.response,
+    required this.requestInput,
   });
 
+  final List<Map<String, Object?>> requestInput;
+  final Map<String, Object?> response;
   final String continuationToken;
   final String? text;
   final List<ToolCall> toolCalls;

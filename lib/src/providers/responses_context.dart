@@ -9,7 +9,10 @@ import 'response_citations.dart';
 import 'model_context_limits.dart';
 
 typedef ContextSummarizer = Future<String> Function(List<Map<String, Object?>>);
-typedef _DialogueEntry = ({AgentMessage message, Map<String, Object?> input});
+typedef _DialogueEntry = ({
+  AgentMessage message,
+  List<Map<String, Object?>> input,
+});
 
 /// Budgets are conservative estimates, not model-specific tokenizer counts.
 /// Full messages and original images remain in the conversation store.
@@ -28,7 +31,7 @@ class ResponsesContext {
 
   List<Map<String, Object?>> get input => [
     if (_dialogueMemory.isNotEmpty) _memory(_dialogueMemory),
-    ..._dialogue.map((entry) => entry.input),
+    ..._dialogue.expand((entry) => entry.input),
     if (_taskMemory.isNotEmpty) _memory(_taskMemory),
     ..._rounds.expand((round) => round),
   ];
@@ -104,7 +107,7 @@ class ResponsesContext {
     }
     if (cut > 0) {
       final memory = await _summarize(
-        _dialogue.take(cut).map((entry) => entry.input),
+        _dialogue.take(cut).expand((entry) => entry.input),
         _dialogueMemory,
         summarize,
       );
@@ -291,3 +294,20 @@ Map<String, Object?> functionCallOutput(ToolResult result) => {
             },
         ],
 };
+
+/// Preserve submitted result text and asynchronous user updates for replay.
+/// Notification bodies and tool images keep their existing task-only lifetime.
+List<Map<String, Object?>> retainedRequestInput(ModelRequest request) => [
+  for (final result in request.toolResults)
+    {
+      'type': 'function_call_output',
+      'call_id': result.callId,
+      'output': jsonEncode({
+        'status': result.status.name,
+        'result': result.toolName == 'getNotifications'
+            ? {'contentRetention': 'task_only'}
+            : result.output,
+      }),
+    },
+  for (final update in request.userUpdates) {'role': 'user', 'content': update},
+];

@@ -8,7 +8,11 @@ class AndroidScriptRunner(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
     private var active: Run? = null
 
-    fun execute(id: String, script: String, conversationId: String, result: MethodChannel.Result) {
+    fun execute(id: String, script: String, conversationId: String, timeoutSeconds: Int, result: MethodChannel.Result) {
+        if (timeoutSeconds !in 1..600) {
+            result.success(mapOf("success" to false, "error" to "timeoutSeconds must be between 1 and 600"))
+            return
+        }
         if (script.isBlank() || script.length > 65536) {
             result.success(mapOf("success" to false, "error" to "Script must contain 1–65536 characters"))
             return
@@ -17,13 +21,13 @@ class AndroidScriptRunner(private val context: Context) {
             result.success(mapOf("success" to false, "error" to "Another device script is running"))
             return
         }
-        val run = Run(id, script, conversationId, result)
+        val run = Run(id, script, conversationId, timeoutSeconds, result)
         active = run
         run.bound = context.bindService(
             Intent(context, AndroidScriptService::class.java), run, Context.BIND_AUTO_CREATE,
         )
         if (!run.bound) run.finish(mapOf("success" to false, "error" to "Cannot start script process"))
-        else handler.postDelayed(run.timeout, 10000)
+        else handler.postDelayed(run.timeout, timeoutSeconds * 1000L)
     }
 
     fun cancel(id: String) {
@@ -37,6 +41,7 @@ class AndroidScriptRunner(private val context: Context) {
         val id: String,
         val script: String,
         val conversationId: String,
+        val timeoutSeconds: Int,
         val result: MethodChannel.Result,
     ) : ServiceConnection {
         var bound = false
@@ -44,7 +49,7 @@ class AndroidScriptRunner(private val context: Context) {
         var finished = false
         val timeout = Runnable { finish(mapOf(
             "success" to false,
-            "error" to "Script timed out after 10 seconds. Earlier side effects are not rolled back; observe before retrying.",
+            "error" to "Script timed out after $timeoutSeconds seconds. Earlier side effects are not rolled back; observe before retrying.",
         )) }
         val reply = Messenger(Handler(Looper.getMainLooper()) { message ->
             when (message.what) {

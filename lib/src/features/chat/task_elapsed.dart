@@ -8,7 +8,13 @@ String taskDuration(Duration duration) => [
 ].join(' ');
 
 class TaskElapsed extends StatefulWidget {
-  const TaskElapsed({super.key, required this.watch, required this.failed});
+  const TaskElapsed({
+    super.key,
+    required this.watch,
+    required this.failed,
+    this.restoredElapsed = Duration.zero,
+  });
+  final Duration restoredElapsed;
   final Stopwatch watch;
   final bool failed;
   @override
@@ -45,7 +51,7 @@ class _TaskElapsedState extends State<TaskElapsed> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              '${widget.watch.isRunning ? '已处理' : '用时'} ${taskDuration(widget.watch.elapsed)}${widget.failed ? ' · 未完成' : ''}',
+              '${widget.watch.isRunning ? '已处理' : '用时'} ${taskDuration(widget.restoredElapsed + widget.watch.elapsed)}${widget.failed ? ' · 未完成' : ''}',
               style: TextStyle(
                 fontSize: 14,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,

@@ -1,17 +1,30 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../features/chat/glass_surface.dart';
+import '../features/chat/settings_icon.dart';
 import '../scheduling/task_action_menu.dart';
 
 Future<String?> showSkillActionMenu(
   BuildContext context,
   Offset position,
-  bool enabled,
+  bool enabled, {
+  bool showEdit = false,
+}) => _showSkillMenu(context, position, [
+  if (showEdit) ('edit', '编辑'),
+  (enabled ? 'pause' : 'resume', enabled ? '停用' : '启用'),
+  ('delete', '删除'),
+]);
+
+Future<String?> showSkillPreferencesMenu(
+  BuildContext context,
+  Offset position,
+) => _showSkillMenu(context, position, [('permissions', '偏好权限')]);
+
+Future<String?> _showSkillMenu(
+  BuildContext context,
+  Offset position,
+  List<(String, String)> entries,
 ) {
-  final entries = <(String, String)>[
-    (enabled ? 'pause' : 'resume', enabled ? '停用' : '启用'),
-    ('delete', '删除'),
-  ];
   return showGeneralDialog<String>(
     context: context,
     barrierDismissible: true,
@@ -68,7 +81,12 @@ Future<String?> showSkillActionMenu(
                                 ),
                                 child: Row(
                                   children: [
-                                    TaskActionIcon(entry.$1),
+                                    if (entry.$1 == 'permissions')
+                                      const SettingsIcon(
+                                        type: SettingsIconType.personalization,
+                                      )
+                                    else
+                                      TaskActionIcon(entry.$1),
                                     const SizedBox(width: 13),
                                     Text(
                                       entry.$2,

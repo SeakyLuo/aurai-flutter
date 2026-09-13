@@ -1,3 +1,7 @@
+import 'tool_inline_detail.dart';
+import '../../domain/source_reference.dart';
+import 'source_icon.dart';
+import 'web_page_tool_details.dart';
 import '../../skills/skill_icon.dart';
 import '../../domain/ui_tool_actions.dart';
 import 'dart:convert';
@@ -55,6 +59,20 @@ class _ToolActivityViewState extends State<ToolActivityView> {
         widget.toolName == 'runSkill' && widget.requestJson != null
         ? (jsonDecode(widget.requestJson!) as Map)['icon'] as String? ?? 'skill'
         : null;
+    final pageResult =
+        widget.toolName == 'readWebPage' &&
+            widget.status == AgentStepStatus.completed &&
+            widget.resultJson != null
+        ? jsonDecode(widget.resultJson!) as Map
+        : null;
+    final pageUrl = pageResult?['url'] as String?;
+    final pageSource = pageUrl == null
+        ? null
+        : SourceReference(
+            url: pageUrl,
+            title: pageResult!['title'] as String? ?? '',
+            siteName: pageResult['siteName'] as String?,
+          );
     final running = widget.status == AgentStepStatus.running;
     final isQuestion = widget.toolName == 'askUser';
     final canExpand = !running || isQuestion;
@@ -118,6 +136,7 @@ class _ToolActivityViewState extends State<ToolActivityView> {
           }
         : null;
     final title =
+        (widget.toolName == 'readWebPage' ? '读取网页' : null) ??
         taskTitle ??
         (legacyName == null ? null : toolTitle(legacyName)) ??
         (showStatus
@@ -146,40 +165,65 @@ class _ToolActivityViewState extends State<ToolActivityView> {
               constraints: const BoxConstraints(minHeight: 44),
               child: Row(
                 children: [
-                  Semantics(
-                    label: switch (widget.status) {
-                      AgentStepStatus.running => '正在执行',
-                      AgentStepStatus.completed => '已完成',
-                      AgentStepStatus.failed => '未完成',
-                      AgentStepStatus.cancelled => '已停止',
-                    },
-                    child: skillIcon == null
-                        ? ToolActionIcon(toolName: widget.toolName)
-                        : SkillIcon(skillIcon),
-                  ),
-                  const SizedBox(width: 8),
                   Expanded(
-                    child: ThinkingIndicator(label: title, animate: running),
+                    child: ThinkingIndicator(
+                      leading: Semantics(
+                        label: switch (widget.status) {
+                          AgentStepStatus.running => '正在执行',
+                          AgentStepStatus.completed => '已完成',
+                          AgentStepStatus.failed => '未完成',
+                          AgentStepStatus.cancelled => '已停止',
+                        },
+                        child: SizedBox.square(
+                          dimension: MediaQuery.textScalerOf(context).scale(18),
+                          child: FittedBox(
+                            child: pageSource != null
+                                ? SourceIcon(source: pageSource, size: 18)
+                                : skillIcon == null
+                                ? ToolActionIcon(toolName: widget.toolName)
+                                : SkillIcon(skillIcon),
+                          ),
+                        ),
+                      ),
+                      label: title,
+                      animate: running,
+                      singleLine: true,
+                      detail: isQuestion
+                          ? null
+                          : toolInlineDetail(
+                              legacyName ?? widget.toolName,
+                              widget.requestJson,
+                              widget.resultJson,
+                            ),
+                    ),
                   ),
-                  if (showStatus) ...[
+                  if (showStatus &&
+                      (widget.status != AgentStepStatus.completed ||
+                          skipped)) ...[
                     const SizedBox(width: 8),
-                    _ToolStatusBadge(
-                      status: skipped
-                          ? AgentStepStatus.cancelled
-                          : widget.status,
-                      label: isQuestion ? questionLabel : null,
+                    Transform.translate(
+                      offset: const Offset(4, 0),
+                      child: _ToolStatusBadge(
+                        status: skipped
+                            ? AgentStepStatus.cancelled
+                            : widget.status,
+                        label: isQuestion ? questionLabel : null,
+                      ),
                     ),
                     const SizedBox(width: 6),
                   ],
                   if (canExpand)
-                    AnimatedRotation(
-                      turns: _expanded ? 0.25 : 0,
-                      duration: const Duration(milliseconds: 240),
-                      curve: Curves.easeInOutCubic,
-                      child: Icon(
-                        Icons.chevron_right_rounded,
-                        size: 18,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    Transform.translate(
+                      offset: const Offset(4, 0),
+                      child: AnimatedRotation(
+                        turns: _expanded ? 0.25 : 0,
+                        duration: const Duration(milliseconds: 240),
+                        curve: Curves.easeInOutCubic,
+                        child: Icon(
+                          Icons.chevron_right_rounded,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                 ],
@@ -205,6 +249,7 @@ class _ToolActivityViewState extends State<ToolActivityView> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (pageSource != null) WebPageToolDetails(source: pageSource),
                 ToolPayloadSection(
                   title: '请求参数',
                   json: widget.requestJson,

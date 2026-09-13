@@ -3,11 +3,15 @@ import 'dart:io';
 
 import '../domain/agent_models.dart';
 
-Future<List<Map<String, Object?>>> responseMessageInput(
+Future<List<List<Map<String, Object?>>>> responseMessageInput(
   List<AgentMessage> messages,
 ) async {
-  final input = <Map<String, Object?>>[];
+  final input = <List<Map<String, Object?>>>[];
   for (final message in messages) {
+    if (message.responseInput case final items?) {
+      input.add(items);
+      continue;
+    }
     final content = <Map<String, Object?>>[
       if (message.text.isNotEmpty) {'type': 'input_text', 'text': message.text},
     ];
@@ -19,10 +23,12 @@ Future<List<Map<String, Object?>>> responseMessageInput(
         'detail': 'auto',
       });
     }
-    input.add({
-      'role': message.role.name,
-      'content': message.images.isEmpty ? message.text : content,
-    });
+    input.add([
+      {
+        'role': message.role.name,
+        'content': message.images.isEmpty ? message.text : content,
+      },
+    ]);
   }
   return input;
 }

@@ -1,4 +1,5 @@
 import 'skill_icon_names.dart';
+import 'skill_permission.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:sqflite/sqflite.dart';
@@ -51,6 +52,22 @@ class SavedSkill {
 class SkillStore extends ChangeNotifier {
   final _preferences = SharedPreferencesAsync();
   final Map<String, SavedSkill> _skills = {};
+  final Map<String, SkillPermission> _permissions = {};
+
+  SkillPermission permissionFor(String id) =>
+      _permissions[id] ?? defaultPermission;
+  SkillPermission? permissionOverrideFor(String id) => _permissions[id];
+  SkillPermission defaultPermission = SkillPermission.lowRisk;
+
+  Future<void> saveDefaultPermission(SkillPermission permission) =>
+      _enqueue(() async {
+        await _database.insert('app_state', {
+          'key': 'skill_default_permission',
+          'value': permission.name,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+        defaultPermission = permission;
+        notifyListeners();
+      });
   late Database _database;
   Future<void> _pending = Future.value();
   List<SavedSkill> get skills => List.unmodifiable(_skills.values);
@@ -90,7 +107,27 @@ class SkillStore extends ChangeNotifier {
     final rows = await Future.wait([
       database.query('skills'),
       database.query('skill_dependencies'),
+      database.query(
+        'app_state',
+        where: 'key IN (?, ?)',
+        whereArgs: ['skill_permissions', 'skill_default_permission'],
+      ),
     ]);
+    for (final row in rows[2]) {
+      if (row['key'] == 'skill_default_permission') {
+        defaultPermission = SkillPermission.values.byName(
+          row['value'] as String,
+        );
+      } else {
+        final permissions =
+            jsonDecode(row['value'] as String) as Map<String, dynamic>;
+        for (final entry in permissions.entries) {
+          _permissions[entry.key] = SkillPermission.values.byName(
+            entry.value as String,
+          );
+        }
+      }
+    }
     final dependencies = <String, List<String>>{};
     for (final row in rows[1]) {
       dependencies
@@ -154,64 +191,94 @@ class SkillStore extends ChangeNotifier {
     }
   }
 
-  Future<void> save(SavedSkill value, {String? previousName}) =>
-      _enqueue(() async {
-        final name = value.name.trim();
-        if (!skillIcons.containsKey(value.icon)) throw StateError('请选择有效的技能图标');
-        if (name.isEmpty ||
-            name.length > 60 ||
-            value.description.trim().isEmpty ||
-            value.description.length > 300 ||
-            value.instructions.trim().isEmpty ||
-            value.instructions.length > 10000 ||
-            value.script.length > 50000) {
-          throw StateError('请填写名称、简介和使用说明，并检查内容长度');
-        }
-        final old = previousName == null ? null : read(previousName);
-        if (old != null && old.revision != value.revision)
-          throw StateError('技能已被修改，请重新打开后编辑');
-        if (_skills.values.any((s) => s.name == name && s.id != old?.id))
-          throw StateError('已存在同名技能，请换一个名称');
-        final saved = SavedSkill(
-          id: old?.id ?? _newId(),
-          name: name,
-          description: value.description.trim(),
-          instructions: value.instructions.trim(),
-          script: value.script,
-          icon: value.icon,
-          enabled: value.enabled,
-          revision: (old?.revision ?? 0) + 1,
-          dependencyIds: List.unmodifiable(value.dependencyIds.toSet()),
+  Future<void> save(
+    SavedSkill value, {
+    String? previousName,
+    SkillPermission? permission,
+    bool updatePermission = false,
+  }) => _enqueue(() async {
+    final name = value.name.trim();
+    if (!skillIcons.containsKey(value.icon)) throw StateError('请选择有效的技能图标');
+    if (name.isEmpty ||
+        name.length > 60 ||
+        value.description.trim().isEmpty ||
+        value.description.length > 300 ||
+        value.instructions.trim().isEmpty ||
+        value.instructions.length > 10000 ||
+        value.script.length > 50000) {
+      throw StateError('请填写名称、简介和使用说明，并检查内容长度');
+    }
+    final old = previousName == null ? null : read(previousName);
+    if (old != null && old.revision != value.revision)
+      throw StateError('技能已被修改，请重新打开后编辑');
+    if (_skills.values.any((s) => s.name == name && s.id != old?.id))
+      throw StateError('已存在同名技能，请换一个名称');
+    final saved = SavedSkill(
+      id: old?.id ?? _newId(),
+      name: name,
+      description: value.description.trim(),
+      instructions: value.instructions.trim(),
+      script: value.script,
+      icon: value.icon,
+      enabled: value.enabled,
+      revision: (old?.revision ?? 0) + 1,
+      dependencyIds: List.unmodifiable(value.dependencyIds.toSet()),
+    );
+    _validateGraph({..._skills, saved.id: saved});
+    final nextPermissions = Map<String, SkillPermission>.of(_permissions);
+    final contentChanged =
+        old != null &&
+        (old.script != saved.script ||
+            old.instructions != saved.instructions ||
+            !setEquals(old.dependencyIds.toSet(), saved.dependencyIds.toSet()));
+    if (updatePermission) {
+      if (permission == null) {
+        nextPermissions.remove(saved.id);
+      } else {
+        nextPermissions[saved.id] = permission;
+      }
+    } else if (contentChanged &&
+        permissionFor(saved.id) == SkillPermission.all) {
+      nextPermissions[saved.id] = SkillPermission.lowRisk;
+    }
+
+    await _database.transaction((txn) async {
+      if (old == null) {
+        await txn.insert('skills', _row(saved));
+      } else {
+        await txn.update(
+          'skills',
+          _row(saved),
+          where: 'id = ?',
+          whereArgs: [saved.id],
         );
-        _validateGraph({..._skills, saved.id: saved});
-        await _database.transaction((txn) async {
-          if (old == null) {
-            await txn.insert('skills', _row(saved));
-          } else {
-            await txn.update(
-              'skills',
-              _row(saved),
-              where: 'id = ?',
-              whereArgs: [saved.id],
-            );
-          }
-          final batch = txn.batch();
-          batch.delete(
-            'skill_dependencies',
-            where: 'skill_id = ?',
-            whereArgs: [saved.id],
-          );
-          for (final id in saved.dependencyIds) {
-            batch.insert('skill_dependencies', {
-              'skill_id': saved.id,
-              'dependency_id': id,
-            });
-          }
-          await batch.commit(noResult: true);
+      }
+      await txn.insert('app_state', {
+        'key': 'skill_permissions',
+        'value': jsonEncode(
+          nextPermissions.map((id, value) => MapEntry(id, value.name)),
+        ),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      final batch = txn.batch();
+      batch.delete(
+        'skill_dependencies',
+        where: 'skill_id = ?',
+        whereArgs: [saved.id],
+      );
+      for (final id in saved.dependencyIds) {
+        batch.insert('skill_dependencies', {
+          'skill_id': saved.id,
+          'dependency_id': id,
         });
-        _skills[saved.id] = saved;
-        notifyListeners();
-      });
+      }
+      await batch.commit(noResult: true);
+    });
+    _permissions
+      ..clear()
+      ..addAll(nextPermissions);
+    _skills[saved.id] = saved;
+    notifyListeners();
+  });
 
   Future<void> delete(String name) => _enqueue(() async {
     final skill = read(name);
@@ -220,7 +287,18 @@ class SkillStore extends ChangeNotifier {
         .map((s) => s.name)
         .toList();
     if (users.isNotEmpty) throw StateError('“${users.join('、')}”依赖此技能，请先移除依赖');
-    await _database.delete('skills', where: 'id = ?', whereArgs: [skill.id]);
+    final nextPermissions = Map<String, SkillPermission>.of(_permissions)
+      ..remove(skill.id);
+    await _database.transaction((txn) async {
+      await txn.delete('skills', where: 'id = ?', whereArgs: [skill.id]);
+      await txn.insert('app_state', {
+        'key': 'skill_permissions',
+        'value': jsonEncode(
+          nextPermissions.map((id, value) => MapEntry(id, value.name)),
+        ),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+    _permissions.remove(skill.id);
     _skills.remove(skill.id);
     notifyListeners();
   });

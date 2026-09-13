@@ -51,10 +51,12 @@ class AuraiPlatform {
     String callId,
     String script,
     String conversationId,
+    int timeoutSeconds,
   ) => _invokeMap('executeAndroidScript', {
     'callId': callId,
     'script': script,
     'conversationId': conversationId,
+    'timeoutSeconds': timeoutSeconds,
   });
 
   Future<void> cancelAndroidScript(String callId) =>
@@ -98,6 +100,9 @@ class AuraiPlatform {
 
   Future<Map<String, Object?>> startIntent(Map<String, Object?> arguments) =>
       _invokeMap('startIntent', arguments);
+
+  Future<void> openSourceFile(String uri) =>
+      _channel.invokeMethod<void>('openSourceFile', {'uri': uri});
 
   Future<Map<String, Object?>> openSettings(String screen) =>
       _invokeMap('openSettings', <String, Object?>{'screen': screen});
@@ -156,6 +161,7 @@ class AuraiPlatform {
     Map<String, Object?> arguments,
     String? description,
     bool taskScoped,
+    int confirmationTimeoutSeconds,
   ) async =>
       await _channel
           .invokeMethod<bool>('requestConfirmation', <String, Object?>{
@@ -166,6 +172,7 @@ class AuraiPlatform {
                 : arguments,
             'description': description,
             'taskScoped': taskScoped,
+            'confirmationTimeoutSeconds': confirmationTimeoutSeconds,
           }) ??
       false;
 

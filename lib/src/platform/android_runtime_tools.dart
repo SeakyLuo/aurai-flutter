@@ -63,7 +63,7 @@ class ExecuteAndroidScriptTool implements AgentTool {
   ToolDefinition get definition => ToolDefinition(
     name: 'executeAndroidScript',
     description:
-        'Execute Rhino JavaScript with Java interop in a disposable Android process under Aurai app UID. Use for Android APIs not covered by supplied tools. Globals: app (application Context), conversationId, Packages (Java classes). Example: var bm = app.getSystemService("batterymanager"); return {percent: bm.getIntProperty(4)}; Use inspectAndroidApi for real signatures. Nested classes use Packages.android.app.Notification\$Builder. Return a small JSON-compatible JS value; convert Java strings with String(...). No Node.js, browser DOM, Java bytecode generation/JavaAdapter, root, ADB or Activity. Runs on a worker thread, max 10 seconds, fresh scope per call. Awaited synchronous operations only: callbacks, background threads and timers do not survive process exit. Android permissions still apply. Timeout/cancellation terminates the process but cannot undo prior side effects; verify before retrying. Never bypass denied permissions or recover redacted data. Each call requires approval; describe the actual data access and side effects in purpose. Do not bypass task-scoped authorization or protected screen content. Scripts cannot grant system permissions; use Android scheduling APIs for durable work. This has app-level access, not a restricted data sandbox.',
+        'Execute Rhino JavaScript with Java interop in a disposable Android process under Aurai app UID. Use for Android APIs not covered by supplied tools. Globals: app (application Context), conversationId, Packages (Java classes). Example: var bm = app.getSystemService("batterymanager"); return {percent: bm.getIntProperty(4)}; Use inspectAndroidApi for real signatures. Nested classes use Packages.android.app.Notification\$Builder. Return a small JSON-compatible JS value; convert Java strings with String(...). No Node.js, browser DOM, Java bytecode generation/JavaAdapter, root, ADB or Activity. Runs on a worker thread, timeoutSeconds controls the time budget (1–600 seconds, null defaults to 10). Use the shortest sufficient budget. Fresh scope per call. Awaited synchronous operations only: callbacks, background threads and timers do not survive process exit. Android permissions still apply. Timeout/cancellation terminates the process but cannot undo prior side effects; verify before retrying. Never bypass denied permissions or recover redacted data. Each call requires approval; describe the actual data access and side effects in purpose. Do not bypass task-scoped authorization or protected screen content. Scripts cannot grant system permissions; use Android scheduling APIs for durable work. This has app-level access, not a restricted data sandbox. When citing a local file actually read, return its file URI (java.io.File(path).toURI().toString()) or granted content URI and display name; use ordinary Markdown links in the reply. The app displays file-source icons automatically. Never invent file paths or treat directory listings as read file contents.',
     inputSchema: const {
       'type': 'object',
       'properties': {
@@ -75,13 +75,20 @@ class ExecuteAndroidScriptTool implements AgentTool {
               'Explain the exact user-visible action, data accessed and side effects in the user’s language for approval.',
         },
         'script': {'type': 'string', 'minLength': 1, 'maxLength': 50000},
+        'timeoutSeconds': {
+          'type': ['integer', 'null'],
+          'minimum': 1,
+          'maximum': 600,
+          'description':
+              'Execution time budget in seconds; null defaults to 10.',
+        },
       },
-      'required': ['purpose', 'script'],
+      'required': ['purpose', 'script', 'timeoutSeconds'],
       'additionalProperties': false,
     },
     safety: ToolSafety.destructive,
     capabilityId: 'android.runtime',
-    executionTimeout: const Duration(seconds: 15),
+    executionTimeout: const Duration(seconds: 605),
     confirmationDescriptionBuilder: (arguments) =>
         '${arguments['purpose']}\n\n将以 Aurai 的应用权限执行设备代码，可能读取应用可访问的数据或更改设备状态。仅允许本次执行。',
   );
@@ -94,6 +101,7 @@ class ExecuteAndroidScriptTool implements AgentTool {
         call.id,
         call.arguments['script']! as String,
         _conversationId,
+        (call.arguments['timeoutSeconds'] as int?) ?? 10,
       );
       final success = output['success'] == true;
       return ToolResult(

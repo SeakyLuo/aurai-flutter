@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum FileToolIconType { folder, read }
+enum FileToolIconType { folder, read, document }
 
 class FileToolIcon extends StatelessWidget {
   const FileToolIcon({super.key, required this.type});
@@ -31,6 +31,27 @@ class _FileToolPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case FileToolIconType.document:
+        canvas.drawPath(
+          Path()
+            ..moveTo(13.5, 3)
+            ..lineTo(6, 3)
+            ..quadraticBezierTo(4, 3, 4, 5)
+            ..lineTo(4, 19)
+            ..quadraticBezierTo(4, 21, 6, 21)
+            ..lineTo(18, 21)
+            ..quadraticBezierTo(20, 21, 20, 19)
+            ..lineTo(20, 9.5)
+            ..close()
+            ..moveTo(13.5, 3)
+            ..lineTo(13.5, 9.5)
+            ..lineTo(20, 9.5)
+            ..moveTo(8, 13)
+            ..lineTo(16, 13)
+            ..moveTo(8, 17)
+            ..lineTo(14, 17),
+          pen,
+        );
       case FileToolIconType.folder:
         canvas.drawPath(
           Path()

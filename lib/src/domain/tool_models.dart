@@ -18,6 +18,7 @@ class ToolDefinition {
     this.confirmationDescription,
     this.confirmationDescriptionBuilder,
     this.taskScopedConfirmation = false,
+    this.confirmationMayBeRequired = false,
   });
 
   final String name;
@@ -31,6 +32,31 @@ class ToolDefinition {
   final String? confirmationDescription;
   final ToolConfirmationDescriptionBuilder? confirmationDescriptionBuilder;
   final bool taskScopedConfirmation;
+  final bool confirmationMayBeRequired;
+
+  Map<String, Object?> get modelInputSchema {
+    final needsConfirmation = [safety, ...actionSafety.values].any(
+      (value) =>
+          value == ToolSafety.sensitive || value == ToolSafety.destructive,
+    );
+    if (!needsConfirmation && !confirmationMayBeRequired) return inputSchema;
+    return {
+      ...inputSchema,
+      'properties': {
+        ...(inputSchema['properties'] as Map),
+        'confirmationTimeoutSeconds': {
+          'type': 'integer',
+          'minimum': 1,
+          'description':
+              'Choose how many seconds to give the user to review and approve this operation. Consider the amount of detail and urgency. On timeout the app rejects the operation; timeout never grants permission.',
+        },
+      },
+      'required': [
+        ...(inputSchema['required'] as List),
+        'confirmationTimeoutSeconds',
+      ],
+    };
+  }
 
   String? confirmationDescriptionFor(Map<String, Object?> arguments) =>
       confirmationDescriptionBuilder?.call(arguments) ??
@@ -64,8 +90,25 @@ class ToolCall {
     required this.id,
     required this.name,
     required this.arguments,
+    this.confirmationTimeoutSeconds,
   });
 
+  factory ToolCall.fromModel({
+    required String id,
+    required String name,
+    required Map<String, Object?> arguments,
+  }) {
+    final executionArguments = Map<String, Object?>.of(arguments);
+    final timeout = executionArguments.remove('confirmationTimeoutSeconds');
+    return ToolCall(
+      id: id,
+      name: name,
+      arguments: executionArguments,
+      confirmationTimeoutSeconds: timeout as int?,
+    );
+  }
+
+  final int? confirmationTimeoutSeconds;
   final String id;
   final String name;
   final Map<String, Object?> arguments;
@@ -115,4 +158,8 @@ abstract interface class ScopedAuthorizationAgentTool {
 /// Presentation snapshots for local history, never execution arguments.
 abstract interface class ToolHistoryAgentTool {
   Map<String, Object?> historyArguments(ToolCall call);
+}
+
+abstract interface class ToolConfirmationPolicyAgentTool {
+  bool requiresConfirmation(ToolCall call);
 }

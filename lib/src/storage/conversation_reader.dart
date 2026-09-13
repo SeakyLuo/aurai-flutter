@@ -4,6 +4,8 @@ import '../domain/agent_models.dart';
 import '../domain/message_image.dart';
 import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
+import 'protocol_history.dart';
+import '../domain/model_provider.dart';
 
 typedef ConversationSearchResult = ({
   Conversation conversation,
@@ -92,6 +94,23 @@ class ConversationReader {
     if (conversation.activeRunId != null) {
       conversation.steps.addAll(await steps(conversation.activeRunId!));
     }
+    if (conversation.runState == ChatRunState.failed &&
+        conversation.activeRunId != null) {
+      final runs = await database.query(
+        'agent_runs',
+        where: 'id = ?',
+        whereArgs: [conversation.activeRunId],
+      );
+      final run = runs.single;
+      if (run['is_task'] == 1) {
+        conversation.hasExecutionProcess = true;
+        conversation.executionUserMessageId = run['user_message_id'] as String;
+        conversation.executionWatch = Stopwatch();
+        conversation.restoredExecutionElapsed = Duration(
+          milliseconds: run['elapsed_ms'] as int,
+        );
+      }
+    }
     return conversation;
   }
 
@@ -115,6 +134,7 @@ class ConversationReader {
     AgentMessage? before,
     int limit = messagePageSize,
     bool forModel = false,
+    ModelConfig? modelConfig,
     String? afterCheckpoint,
   }) async {
     final selectionWhere =
@@ -156,6 +176,14 @@ class ConversationReader {
     final summaries = forModel
         ? <String, AgentTaskSummary>{}
         : await _summaries(selectedMessages, selectedArgs);
+    final protocol = modelConfig == null
+        ? <String, List<Map<String, Object?>>>{}
+        : await loadProtocolHistory(
+            database,
+            conversationId,
+            rows,
+            modelConfig,
+          );
     return rows.reversed
         .map(
           (row) => AgentMessage(
@@ -169,6 +197,7 @@ class ConversationReader {
             runId: row['run_id'] as String?,
             modelTurnId: row['model_turn_id'] as String?,
             taskSummary: summaries[row['id']],
+            responseInput: protocol[row['id']],
           ),
         )
         .toList();

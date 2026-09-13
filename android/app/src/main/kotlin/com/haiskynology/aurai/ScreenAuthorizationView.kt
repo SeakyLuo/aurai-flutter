@@ -3,12 +3,13 @@ package com.haiskynology.aurai
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.SystemClock
 import android.view.View
-import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -26,32 +27,53 @@ class ScreenAuthorizationView(
     onAllowPage: (() -> Unit)?,
 ) : LinearLayout(context) {
     private val dark = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
-    private val surfaceColorValue = if (dark) Color.rgb(24, 24, 27) else Color.WHITE
+    private val surfaceColorValue = if (dark) Color.argb(245, 32, 32, 35) else Color.argb(245, 255, 255, 255)
     private val textColorValue = if (dark) Color.rgb(238, 238, 242) else Color.rgb(23, 23, 23)
     private val secondaryColorValue = if (dark) Color.rgb(170, 168, 179) else Color.rgb(115, 117, 128)
     private val outlineColorValue = if (dark) Color.rgb(57, 56, 63) else Color.rgb(233, 233, 240)
-    private val denyButton: Button
+    private val countdown: TextView
     private val ticker = object : Runnable {
         override fun run() {
             val seconds = ceil((deadline - SystemClock.elapsedRealtime()) / 1000.0).toInt().coerceAtLeast(0)
-            denyButton.text = "拒绝 · $seconds 秒后自动拒绝"
+            countdown.text = "$seconds 秒后自动拒绝"
             if (seconds > 0) postDelayed(this, 1000)
         }
     }
 
     init {
         orientation = VERTICAL
-        setPadding(dp(24), dp(24), dp(24), dp(24))
+        setPadding(dp(20), dp(12), dp(20), dp(20))
         background = GradientDrawable().apply {
             setColor(surfaceColorValue)
-            cornerRadii = floatArrayOf(dp(24).toFloat(), dp(24).toFloat(), dp(24).toFloat(), dp(24).toFloat(), 0f, 0f, 0f, 0f)
+            cornerRadius = dp(28).toFloat()
+            setStroke(dp(1), outlineColorValue)
         }
-        addView(TextView(context).apply {
-            text = if (allowLabel == "始终允许") "允许读取和操作屏幕" else "操作确认"
-            textSize = 20f
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(textColorValue)
-        }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        val header = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            addView(TextView(context).apply {
+                text = if (allowLabel == "始终允许") "允许读取和操作屏幕" else "操作确认"
+                textSize = 17f
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(textColorValue)
+            }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+            addView(object : View(context) {
+                private val pen = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = secondaryColorValue
+                    strokeWidth = resources.displayMetrics.density * 1.65f
+                    strokeCap = Paint.Cap.ROUND
+                }
+                override fun onDraw(canvas: Canvas) {
+                    val inset = dp(17).toFloat()
+                    canvas.drawLine(inset, inset, width - inset, height - inset, pen)
+                    canvas.drawLine(width - inset, inset, inset, height - inset, pen)
+                }
+            }.apply {
+                contentDescription = "拒绝并关闭"
+                setOnClickListener { onDeny() }
+            }, LayoutParams(dp(48), dp(48)))
+        }
+        addView(header, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         val content = LinearLayout(context).apply {
             orientation = VERTICAL
             addView(TextView(context).apply {
@@ -72,33 +94,40 @@ class ScreenAuthorizationView(
             addView(content)
         }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1f).apply {
             topMargin = dp(12)
-            bottomMargin = dp(24)
+            bottomMargin = dp(20)
         })
-        addView(actionButton(allowLabel, true) { answer(onAllow) }, buttonLayout())
+        addView(actionOption(allowLabel) { answer(onAllow) }, buttonLayout())
         if (onAllowPage != null) {
-            addView(actionButton("允许此页面导航", false) { answer(onAllowPage) }, buttonLayout(10))
+            addView(actionOption("允许此页面导航") { answer(onAllowPage) }, buttonLayout(10))
         }
-        denyButton = actionButton("拒绝 · 30 秒后自动拒绝", false, onDeny)
-        addView(denyButton, buttonLayout(10))
+        countdown = TextView(context).apply {
+            text = "${ceil((deadline - SystemClock.elapsedRealtime()) / 1000.0).toInt().coerceAtLeast(0)} 秒后自动拒绝"
+            textSize = 13f
+            setTextColor(secondaryColorValue)
+            setPadding(0, dp(4), 0, 0)
+        }
+        addView(actionOption("拒绝", countdown, onDeny), buttonLayout(8))
     }
 
     private fun answer(action: () -> Unit) {
         if (SystemClock.elapsedRealtime() >= deadline) onDeny() else action()
     }
 
-    private fun actionButton(label: String, primary: Boolean, action: () -> Unit) = Button(context).apply {
-        text = label
-        textSize = 15f
-        isAllCaps = false
-        minHeight = dp(52)
-        minimumHeight = dp(52)
-        setPadding(dp(12), dp(12), dp(12), dp(12))
-        setTextColor(if (primary) surfaceColorValue else textColorValue)
+    private fun actionOption(label: String, detail: TextView? = null, action: () -> Unit) = LinearLayout(context).apply {
+        orientation = VERTICAL
+        minimumHeight = dp(48)
+        setPadding(dp(16), dp(14), dp(16), dp(14))
         background = GradientDrawable().apply {
-            setColor(if (primary) textColorValue else surfaceColorValue)
-            cornerRadius = dp(16).toFloat()
-            if (!primary) setStroke(dp(1), outlineColorValue)
+            setColor(if (dark) Color.rgb(45, 45, 48) else Color.rgb(243, 243, 243))
+            cornerRadius = dp(20).toFloat()
         }
+        addView(TextView(context).apply {
+            text = label
+            textSize = 15f
+            setTextColor(textColorValue)
+        })
+        if (detail != null) addView(detail)
+        isFocusable = true
         setOnClickListener { action() }
     }
 

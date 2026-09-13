@@ -1,3 +1,4 @@
+import 'reconnect_indicator.dart';
 import 'package:flutter/material.dart';
 
 import 'welcome_icon.dart';
@@ -190,6 +191,7 @@ class ExecutionProgress extends StatelessWidget {
     required this.needsConfiguration,
     required this.hasPendingGoal,
     this.replying = false,
+    this.reconnectAttempt = 0,
     required this.onContinue,
     required this.onRetry,
     required this.accessibilityRequestPending,
@@ -201,6 +203,7 @@ class ExecutionProgress extends StatelessWidget {
   final bool needsConfiguration;
   final bool hasPendingGoal;
   final bool replying;
+  final int reconnectAttempt;
   final VoidCallback onContinue;
   final VoidCallback onRetry;
   final bool accessibilityRequestPending;
@@ -208,6 +211,10 @@ class ExecutionProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (state == ChatRunState.running && reconnectAttempt > 0) {
+      return ReconnectIndicator(attempt: reconnectAttempt);
+    }
+
     if (state == ChatRunState.cancelled || accessibilityRequestPending) {
       return const SizedBox.shrink();
     }
