@@ -30,6 +30,7 @@ const skillIcons = {
   'memory': '记忆',
   'personalization': '个性化',
   'profile': '个人信息',
+  'contacts': '通讯录',
   'balance': '余额',
   'appearance': '夜间模式',
   'model': '模型',

@@ -1,3 +1,5 @@
+import '../../domain/message_quote.dart';
+import 'message_quote_view.dart';
 import '../../domain/message_file.dart';
 import 'file_attachments.dart';
 import 'task_failure_card.dart';
@@ -195,6 +197,8 @@ class ExecutionProgress extends StatelessWidget {
     required this.errorDetail,
     required this.hasPendingGoal,
     this.replying = false,
+    this.hideThinking = false,
+    this.senderName,
     this.reconnectAttempt = 0,
     required this.onContinue,
     required this.onRetry,
@@ -208,6 +212,8 @@ class ExecutionProgress extends StatelessWidget {
   final String? errorDetail;
   final bool hasPendingGoal;
   final bool replying;
+  final bool hideThinking;
+  final String? senderName;
   final int reconnectAttempt;
   final VoidCallback onContinue;
   final VoidCallback onRetry;
@@ -262,6 +268,10 @@ class ExecutionProgress extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    if (hideThinking && state == ChatRunState.running) {
+      return const SizedBox.shrink();
+    }
+
     final active =
         (state == ChatRunState.running || state == ChatRunState.stopping) &&
         !accessibilityRequestPending;
@@ -302,7 +312,9 @@ class ExecutionProgress extends StatelessWidget {
     ChatRunState.running =>
       steps.isNotEmpty && steps.last.status == AgentStepStatus.running
           ? '正在${steps.last.title}'
-          : '正在思考',
+          : senderName == null
+          ? '正在思考'
+          : '$senderName 正在思考',
     ChatRunState.stopping => '正在停止',
     ChatRunState.failed => '任务未完成',
     ChatRunState.cancelled => '任务已停止',
@@ -317,6 +329,7 @@ class ChatComposer extends StatelessWidget {
   const ChatComposer({
     super.key,
     required this.controller,
+    required this.hintText,
     required this.focusNode,
     required this.enabled,
     required this.draftEnabled,
@@ -333,9 +346,12 @@ class ChatComposer extends StatelessWidget {
     required this.onRemoveImage,
     required this.addingImages,
     this.savingEdit = false,
+    this.quote,
+    this.onCancelQuote,
   });
 
   final TextEditingController controller;
+  final String hintText;
   final FocusNode focusNode;
   final bool enabled;
   final bool draftEnabled;
@@ -352,6 +368,8 @@ class ChatComposer extends StatelessWidget {
   final ValueChanged<MessageFile> onRemoveFile;
   final bool addingImages;
   final bool savingEdit;
+  final MessageQuote? quote;
+  final VoidCallback? onCancelQuote;
 
   @override
   Widget build(
@@ -368,12 +386,21 @@ class ChatComposer extends StatelessWidget {
         controller: controller,
         focusNode: focusNode,
         enabled: draftEnabled,
-        hintText: '回复 Aurai',
-        attachments: images.isEmpty && files.isEmpty && !addingImages
+        hintText: hintText,
+        attachments:
+            quote == null && images.isEmpty && files.isEmpty && !addingImages
             ? null
             : Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (quote != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+                      child: MessageQuoteView(
+                        quote: quote!,
+                        onClose: onCancelQuote,
+                      ),
+                    ),
                   if (images.isNotEmpty)
                     DraftImageAttachments(
                       images: images,
@@ -398,7 +425,6 @@ class ChatComposer extends StatelessWidget {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                           SizedBox(width: 8),
-                          Text('正在添加附件', style: TextStyle(fontSize: 13)),
                         ],
                       ),
                     ),
@@ -437,7 +463,7 @@ class ChatComposer extends StatelessWidget {
               : '停止',
           primary: true,
           compact: true,
-          iconWidget: addingImages && enabled
+          iconWidget: savingEdit || (addingImages && enabled)
               ? const SizedBox.square(
                   dimension: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),

@@ -1,3 +1,4 @@
+import 'home_navigation.dart';
 import 'package:flutter/material.dart';
 
 import 'chat_controller.dart';
@@ -82,13 +83,7 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
 
   Future<void> _openConversation(String id) async {
     try {
-      if (widget.controller.activeConversation.id != id) {
-        await widget.controller.selectConversation(id);
-      }
-      if (!mounted) return;
-      Navigator.of(
-        context,
-      ).popUntil((route) => route.isFirst && !route.willHandlePopInternally);
+      await openHomeConversation(context, widget.controller, id);
       await widget.controller.markActiveConversationRead();
     } on Object {
       if (mounted) {
@@ -118,12 +113,6 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
         reply: completion.reply,
         onDismiss: _hideCompletionToast,
         onOpen: () {
-          if (!ModalRoute.of(this.context)!.isCurrent) {
-            ScaffoldMessenger.of(
-              this.context,
-            ).showSnackBar(const SnackBar(content: Text('请先完成或关闭当前页面，再查看回复')));
-            return false;
-          }
           _openConversation(completion.conversationId);
           return true;
         },

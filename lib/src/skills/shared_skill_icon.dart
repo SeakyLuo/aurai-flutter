@@ -11,6 +11,7 @@ Widget? sharedSkillIcon(BuildContext context, String name) {
     'memory': SettingsIconType.memory,
     'personalization': SettingsIconType.personalization,
     'profile': SettingsIconType.personalInfo,
+    'contacts': SettingsIconType.contacts,
     'balance': SettingsIconType.balance,
     'appearance': SettingsIconType.appearance,
     'model': SettingsIconType.model,

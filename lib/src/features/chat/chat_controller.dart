@@ -1,3 +1,14 @@
+import '../../agent/self_profile_tool.dart';
+import 'avatar_symbol.dart';
+import 'avatar_background.dart';
+import '../../storage/conversation_visibility.dart';
+import '../../domain/message_quote.dart';
+import '../../agent/group_message_tool.dart';
+import '../../storage/group_participation.dart';
+import 'group_dispatcher.dart';
+import '../../agent/group_chat_tools.dart';
+import '../../agent/ai_contact_tools.dart';
+import '../../platform/ai_document_scope.dart';
 import '../../storage/attachment_search.dart';
 import '../../storage/group_chat_store.dart';
 import '../../storage/conversation_tool_history.dart';
@@ -30,12 +41,14 @@ import '../../agent/model_balance_tool.dart';
 import '../../agent/memory_tools.dart';
 import '../../agent/model_top_up_tool.dart';
 import '../../agent/tool_executor.dart';
+import '../../agent/group_tool_executor.dart';
 import '../../agent/tool_registry.dart';
 import '../../agent/local_history_tools.dart';
 import '../../agent/web_tools.dart';
 import '../../agent/source_dates_tool.dart';
 import '../../domain/agent_models.dart';
 import '../../domain/message_sender.dart';
+import '../../domain/ai_profile.dart';
 import '../../domain/conversation_completion.dart';
 import '../../domain/capability.dart';
 import '../../domain/model_provider.dart';
@@ -59,7 +72,16 @@ import '../../storage/conversation_rows.dart';
 
 export 'conversation.dart';
 
+part 'message_quote_actions.dart';
+part 'message_recall.dart';
+part 'message_submission.dart';
+part 'global_tools.dart';
 part 'group_reply_context.dart';
+part 'ai_identity_controller.dart';
+part 'group_conversation_run.dart';
+part 'group_message_delivery.dart';
+part 'group_private_conversation.dart';
+part 'group_system_events.dart';
 part 'conversation_actions.dart';
 part 'image_forwarding.dart';
 part 'conversation_search_navigation.dart';
@@ -84,6 +106,12 @@ class PendingConfirmation {
 }
 
 class ChatController extends ChangeNotifier {
+  AiProfile? _activeAi;
+  AiProfile? get activeAi => _activeAi;
+  bool hasRestoredConversation = false;
+  bool startsWithoutConversations = false;
+  final Map<String, MemoryController> _aiMemories = {};
+  final Map<String, SkillStore> _aiSkills = {};
   ChatController(this._platform);
 
   final AuraiPlatform _platform;
@@ -142,10 +170,36 @@ class ChatController extends ChangeNotifier {
   String? get errorDetail => activeConversation.errorDetail;
   set errorDetail(String? value) => activeConversation.errorDetail = value;
   bool _submitting = false;
+  final _recallingMessages = <String>{};
   AgentRuntime? _runtime;
+  final _queuedSystemNotices = <String, List<AgentMessage>>{};
+  bool _systemEventDrainScheduled = false;
+  bool _systemEventLoading = false;
+  GroupDispatcher? _groupDispatcher;
+  final _groupReplies = <String, _ReplyContext>{};
+  final _groupSenders = <String, MessageSender>{};
+  final _groupRuns = <String, Conversation>{};
+  final _removedGroupMembers = <String>{};
+  String? _confirmingSenderId;
+  final _groupRuntimes = <String, AgentRuntime>{};
+  final _groupStreaming = <String, String>{};
+  final _groupToolQueue = GroupToolQueue();
+  Iterable<Conversation> get groupRuns =>
+      activeConversation.id == runningConversationId
+      ? _groupRuns.values
+      : const [];
+  bool isStreamingMessage(String id) =>
+      streamingMessageId == id || _groupStreaming.containsValue(id);
+  bool get hasStreamingMessages =>
+      streamingMessageId != null || _groupStreaming.isNotEmpty;
   Conversation? _runningConversation;
+  Conversation? _privateConversation;
   bool get hasRunningTask =>
-      _runningConversation != null || _submitting || _claimingSchedule;
+      _systemEventLoading ||
+      _runningConversation != null ||
+      _privateConversation != null ||
+      _submitting ||
+      _claimingSchedule;
   String? get runningConversationId => _runningConversation?.id;
 
   String? streamingMessageId;
@@ -161,7 +215,16 @@ class ChatController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _groupDispatcher?.stop();
+    _queuedSystemNotices.clear();
+    groupStore.onSystemNotice = null;
     skills.dispose();
+    for (final store in _aiMemories.values) {
+      store.dispose();
+    }
+    for (final store in _aiSkills.values) {
+      store.dispose();
+    }
     scheduledTasks.dispose();
     _memory?.dispose();
     _accessibilityTimer?.cancel();
@@ -176,13 +239,22 @@ class ChatController extends ChangeNotifier {
   bool get isBusy =>
       _submitting ||
       identical(_runningConversation, activeConversation) ||
+      identical(_privateConversation, activeConversation) ||
       runState == ChatRunState.running ||
       runState == ChatRunState.stopping;
+
+  bool get canSendToRunningGroup =>
+      !_submitting &&
+      _groupDispatcher != null &&
+      !_groupDispatcher!.closed &&
+      identical(_runningConversation, activeConversation) &&
+      runState == ChatRunState.running;
 
   bool get canEditDraft =>
       !_submitting && !_claimingSchedule && !changingConversation;
 
-  ModelConfig get config => modelSettings.activeConfig;
+  ModelConfig get config =>
+      _activeAi == null ? modelSettings.activeConfig : aiConfig(_activeAi!);
 
   bool get needsConfiguration => !config.isConfigured;
 
@@ -202,95 +274,46 @@ class ChatController extends ChangeNotifier {
       _platform.loadLegacyAppState,
       _platform.clearLegacyAppState,
     );
+    groupStore.onSystemNotice = _receiveGroupSystemNotice;
     _memory = MemoryController(_store.database, () => config);
     await memory.initialize();
+    await _migrateAiSettings();
     await skills.initialize(_store.database);
     _newConversation = await _newDraftStore.load(_imageStore.directory);
     if (await _store.hasMessages(_newConversation.id)) {
       await _newDraftStore.clear();
       _newConversation = Conversation.empty();
     }
+    hasRestoredConversation = activeId != null;
     _activeConversation = activeId == null
         ? _newConversation
         : await _store.load(activeId);
     if (activeId != null &&
         activeConversation.kind == ConversationKind.direct &&
+        activeConversation.defaultSenderId == MessageSender.aurai.id &&
         activeConversation.messageCount == 0) {
       _newConversation = activeConversation;
       await _newDraftStore.save(_newConversation);
       await _store.removeDraftConversation(activeId);
     }
+    startsWithoutConversations = (await _store.database.query(
+      'conversations',
+      columns: ['id'],
+      limit: 1,
+    )).isEmpty;
+    _activeAi = activeConversation.kind == ConversationKind.direct
+        ? await groupStore.loadAi(activeConversation.defaultSenderId)
+        : null;
     await _reloadConversations();
     await scheduledTasks.initialize(_runScheduled);
     notifyListeners();
   }
 
-  Future<bool> submitGoal(String goal) async {
-    if (hasRunningTask) throw StateError('另一个会话正在运行，请等待完成');
-    cancelSearchNavigation();
-    _submitting = true;
-    final wasNew =
-        activeConversation.kind == ConversationKind.direct &&
-        activeConversation.messageCount == 0;
-    final previousDraft = activeConversation.draft;
-    try {
-      if (wasNew) await _newDraftStore.save(activeConversation);
-      activeConversation.draft = '';
-      messages.add(
-        AgentMessage(
-          id: newMessageId(),
-          role: AgentMessageRole.user,
-          senderId: MessageSender.localUser.id,
-          text: goal,
-          images: List.unmodifiable(draftImages),
-          files: List.unmodifiable(draftFiles),
-          createdAt: DateTime.now(),
-        ),
-      );
-      activeConversation.messageCount++;
-      draftImages.clear();
-      draftFiles.clear();
-      pendingGoal = goal;
-      steps.clear();
-      activeConversation.liveToolSteps.clear();
-      errorDetail = null;
-      runState = ChatRunState.idle;
-      notifyListeners();
-      try {
-        await _persist(
-          recipients: activeConversation.kind == ConversationKind.group
-              ? {
-                  messages.last.id: [activeConversation.defaultSenderId],
-                }
-              : const {},
-        );
-      } on Object {
-        final unsent = messages.removeLast();
-        activeConversation.messageCount--;
-        activeConversation.draft = previousDraft;
-        draftImages.addAll(unsent.images);
-        draftFiles.addAll(unsent.files);
-        pendingGoal = null;
-        rethrow;
-      }
-      if (wasNew) {
-        _newConversation = Conversation.empty();
-        await _newDraftStore.clear();
-      }
-      _updateConversationList();
-      if (needsConfiguration) {
-        return true;
-      }
-      _submitting = false;
-      await continuePending();
-      return false;
-    } finally {
-      _submitting = false;
-      notifyListeners();
-    }
-  }
-
   Future<void> continuePending() async {
+    if (canStartPrivateDuringGroup) {
+      await _runPrivateDuringGroup();
+      return;
+    }
     if (hasRunningTask) throw StateError('另一个会话正在运行，请等待完成');
     if (pendingGoal == null) return;
     final conversation = activeConversation;
@@ -300,50 +323,66 @@ class ChatController extends ChangeNotifier {
       await _executeConversation(conversation);
     } finally {
       _runningConversation = null;
+      _drainGroupSystemNotices();
       _updateConversationList(conversation);
       notifyListeners();
     }
   }
 
   Future<void> stop() async {
+    if (identical(activeConversation, _privateConversation)) {
+      _privateConversation!.runState = ChatRunState.stopping;
+      await _runtime?.cancel();
+      return;
+    }
     final conversation = _runningConversation;
     if (conversation == null || conversation.runState != ChatRunState.running) {
       return;
     }
     conversation.runState = ChatRunState.stopping;
+    _queuedSystemNotices.remove(conversation.id);
+    _groupDispatcher?.stop();
+    for (final member in _groupRuns.values) {
+      if (member.runState == ChatRunState.running)
+        member.runState = ChatRunState.stopping;
+    }
+
     notifyListeners();
     await _persistRun(conversation);
     pendingConfirmation?.completer.complete(false);
     pendingConfirmation = null;
     _finishAccessibility({'granted': false, 'reason': 'User stopped the task'});
     await _platform.cancelPendingInteraction();
-    await _runtime?.cancel();
+    await Future.wait([
+      if (_runtime != null && _privateConversation == null) _runtime!.cancel(),
+      for (final runtime in _groupRuntimes.values) runtime.cancel(),
+    ]);
   }
 
-  Future<void> saveConfig(ModelConfig newConfig) async {
+  Future<void> saveConfig(ModelConfig newConfig, {String? senderId}) async {
     final nextSettings = modelSettings.activate(
       newConfig,
       systemPrompt: modelSettings.systemPrompt,
     );
     await _platform.saveModelSettings(nextSettings);
     modelSettings = nextSettings;
-    notifyListeners();
-  }
-
-  Future<void> savePersonalization({
-    required String? systemPrompt,
-    required String customInstructions,
-    required ResponsePreferences responsePreferences,
-  }) async {
-    final nextSettings = ModelSettings(
-      activeService: modelSettings.activeService,
-      profiles: modelSettings.profiles,
-      systemPrompt: systemPrompt,
-      customInstructions: customInstructions,
-      responsePreferences: responsePreferences,
+    groupStore.defaultSelection = AiModelSelection(
+      provider: newConfig.service,
+      model: newConfig.model,
+      baseUrl: newConfig.baseUrl,
     );
-    await _platform.saveModelSettings(nextSettings);
-    modelSettings = nextSettings;
+    if (senderId != null) {
+      final ai = await groupStore.loadAi(senderId);
+      await saveAi(
+        ai.copyWith(
+          modelSelection: AiModelSelection(
+            provider: newConfig.service,
+            model: newConfig.model,
+            baseUrl: newConfig.baseUrl,
+          ),
+        ),
+      );
+    }
     notifyListeners();
   }
 
@@ -392,6 +431,9 @@ class ChatController extends ChangeNotifier {
 
   Future<void> selectConversation(String id) => _switchConversation(id);
 
+  Future<void> restoreConversation(String id) =>
+      _switchConversation(id == _newConversation.id ? null : id);
+
   final _loadedMessageCounts = <String, int>{};
   final _searchWindows = <String, Conversation>{};
   int _searchNavigationGeneration = 0;
@@ -407,13 +449,17 @@ class ChatController extends ChangeNotifier {
       _loadedMessageCounts[activeConversation.id] = messages.length;
       final conversation = id == null
           ? _newConversation
+          : id == _privateConversation?.id
+          ? _privateConversation!
           : id == _runningConversation?.id
           ? _runningConversation!
           : await _store.load(
               id,
               messageLimit:
-                  _loadedMessageCounts[id] ??
-                  ConversationReader.messagePageSize,
+                  (_loadedMessageCounts[id] ?? 0) <
+                      ConversationReader.messagePageSize
+                  ? ConversationReader.messagePageSize
+                  : _loadedMessageCounts[id]!,
             );
       if (id == null) {
         await _store.selectNewConversation();
@@ -427,7 +473,9 @@ class ChatController extends ChangeNotifier {
       final previousIndex = _conversations.indexWhere(
         (item) => item.id == activeConversation.id,
       );
-      if (previousIndex >= 0 && activeConversation != _runningConversation) {
+      if (previousIndex >= 0 &&
+          activeConversation != _runningConversation &&
+          activeConversation != _privateConversation) {
         _conversations[previousIndex] =
             conversationFromRow(conversationRow(activeConversation))
               ..seenRunId = activeConversation.seenRunId
@@ -435,9 +483,15 @@ class ChatController extends ChangeNotifier {
               ..draftImages.addAll(activeConversation.draftImages);
       }
       _activeConversation = conversation;
+      _activeAi = conversation.kind == ConversationKind.direct
+          ? await groupStore.loadAi(conversation.defaultSenderId)
+          : null;
       _restoreSearchWindow(conversation);
       _store.writer.retain([
         ...conversation.messages,
+        if (_privateConversation != null &&
+            _privateConversation != conversation)
+          ..._privateConversation!.messages,
         if (_runningConversation != null &&
             _runningConversation != conversation)
           ..._runningConversation!.messages,
@@ -445,6 +499,7 @@ class ChatController extends ChangeNotifier {
       _updateConversationList();
     } finally {
       changingConversation = false;
+      _drainGroupSystemNotices();
       notifyListeners();
     }
   }
@@ -453,7 +508,7 @@ class ChatController extends ChangeNotifier {
 
   void _updateConversationList([Conversation? value]) {
     final conversation = value ?? activeConversation;
-    if (conversation.kind == ConversationKind.group ||
+    if (conversation.kind == ConversationKind.direct &&
         conversation.messageCount == 0)
       return;
     final index = _conversations.indexWhere(
@@ -467,7 +522,7 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<void> _reloadConversations() async {
-    final page = await _store.reader.list(kind: ConversationKind.direct);
+    final page = await _store.reader.list();
     _conversations
       ..clear()
       ..addAll(
@@ -483,14 +538,22 @@ class ChatController extends ChangeNotifier {
     hasMoreConversations = page.length == ConversationReader.pageSize;
   }
 
+  Future<void> refreshConversations() async {
+    if (loadingConversations) return;
+    loadingConversations = true;
+    try {
+      await _reloadConversations();
+    } finally {
+      loadingConversations = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> loadMoreConversations() async {
     if (loadingConversations || !hasMoreConversations) return;
     loadingConversations = true;
     try {
-      final page = await _store.reader.list(
-        after: _conversationCursor,
-        kind: ConversationKind.direct,
-      );
+      final page = await _store.reader.list(after: _conversationCursor);
       final ids = _conversations.map((item) => item.id).toSet();
       _conversations.addAll(page.where((item) => !ids.contains(item.id)));
       if (page.isNotEmpty) _conversationCursor = page.last;
@@ -616,28 +679,45 @@ class ChatController extends ChangeNotifier {
 
   Future<void> _persist({Map<String, List<String>> recipients = const {}}) =>
       activeConversation.kind == ConversationKind.direct &&
+          activeConversation.defaultSenderId == MessageSender.aurai.id &&
           activeConversation.messageCount == 0
       ? _newDraftStore.save(activeConversation)
       : _store.writer.save(activeConversation, recipients: recipients);
 
-  Future<bool> getScreenAccess() => _platform.getScreenAccess();
-  Future<void> setScreenAccess(bool allowed) =>
-      _platform.setScreenAccess(allowed);
+  Future<bool> getScreenAccess(String senderId) async =>
+      (await groupStore.loadAi(senderId)).preferences.screenAccess;
+  Future<void> setScreenAccess(String senderId, bool allowed) async {
+    final ai = await groupStore.loadAi(senderId);
+    await saveAi(
+      ai.copyWith(preferences: ai.preferences.copyWith(screenAccess: allowed)),
+    );
+  }
 
-  Future<bool> _confirm(ToolCall call, ToolDefinition definition) async {
-    final fingerprint = '${call.name}:${jsonEncode(call.arguments)}';
+  Future<bool> _confirm(
+    ToolCall call,
+    ToolDefinition definition, {
+    String? runId,
+    String senderId = 'agent:aurai',
+    bool screenAccess = false,
+  }) async {
+    if (_removedGroupMembers.contains(senderId) &&
+        _groupRuns.containsKey(senderId))
+      return false;
+    final fingerprint = '$senderId:${call.name}:${jsonEncode(call.arguments)}';
     if (_deniedConfirmations.contains(fingerprint)) return false;
     final accessibilityAvailable = capabilities.any(
       (capability) =>
           capability.id == 'android.accessibility' && capability.isAvailable,
     );
     final approvalId = await _store.runs.requestApproval(
-      _runningConversation!.activeRunId!,
+      runId ?? _runningConversation!.activeRunId!,
       call,
       definition,
     );
     final conversationId = _runningConversation!.id;
-    final existing = toolApprovals.allows(conversationId, call);
+    final existing =
+        (screenAccess && isScreenTool(call.name)) ||
+        toolApprovals.allows(conversationId, call, senderId: senderId);
     if (!existing)
       await _platform.updateAttentionNotification(
         conversationId,
@@ -646,6 +726,7 @@ class ChatController extends ChangeNotifier {
         body: definition.confirmationDescriptionFor(call.arguments),
         timeoutSeconds: call.confirmationTimeoutSeconds,
       );
+    _confirmingSenderId = senderId;
     final bool approved;
     try {
       final scope = accessibilityAvailable
@@ -670,9 +751,11 @@ class ChatController extends ChangeNotifier {
               ? '技能：${call.arguments['name']}（版本 ${call.arguments['revision']}）'
               : toolTitle(call.name),
           scope,
+          senderId: senderId,
         );
       }
     } finally {
+      _confirmingSenderId = null;
       await _platform.updateAttentionNotification(conversationId, 'approval');
     }
     await _store.runs.resolveApproval(approvalId, approved);
@@ -681,8 +764,6 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<String> _confirmInApp(ToolCall call, ToolDefinition definition) async {
-    final screenAccess = isScreenTool(call.name);
-    if (screenAccess && await _platform.getScreenAccess()) return 'once';
     final request = PendingConfirmation(
       call,
       definition,

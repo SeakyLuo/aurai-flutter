@@ -15,6 +15,9 @@ extension MessageEditActions on ChatController {
     List<MessageImage>? images,
     List<MessageFile>? files,
   }) async {
+    if (activeConversation.kind == ConversationKind.group) {
+      throw StateError('群聊消息请撤回后重新发送');
+    }
     if (hasRunningTask ||
         isBusy ||
         addingImages ||
@@ -36,12 +39,15 @@ extension MessageEditActions on ChatController {
         id: message.id,
         role: message.role,
         senderId: message.senderId,
+        sender: message.sender,
         text: text,
+        quote: message.quote,
         createdAt: message.createdAt,
         images: images ?? message.images,
         files: files ?? message.files,
       );
       final replacement = conversationFromRow(conversationRow(previous))
+        ..draftQuote = previous.draftQuote
         ..messages.addAll([...displayed.take(index), edited])
         ..draftFiles.addAll(previous.draftFiles)
         ..draftImages.addAll(previous.draftImages)

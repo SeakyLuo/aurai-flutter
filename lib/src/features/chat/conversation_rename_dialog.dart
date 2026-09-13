@@ -155,7 +155,8 @@ class _ConversationRenameDialogState extends State<ConversationRenameDialog> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: DialogActionButton(
-                              text: _saving ? '保存中…' : '保存',
+                              text: '保存',
+                              loading: _saving,
                               onPressed: _saving || _text.text.trim().isEmpty
                                   ? null
                                   : _save,

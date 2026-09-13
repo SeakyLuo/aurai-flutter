@@ -7,6 +7,9 @@ import '../../domain/agent_models.dart';
 import '../../domain/web_sources.dart';
 import 'chat_controller.dart';
 import 'message_item.dart';
+import 'group_message_heading.dart';
+import 'ai_contact_page.dart';
+import '../../domain/message_sender.dart';
 import 'message_time.dart';
 import 'tool_activity_view.dart';
 
@@ -21,10 +24,15 @@ List<ChatTimelineEntry> buildChatTimeline(
   required Future<void> Function(AgentMessage) onEdit,
   String? beforeMessageId,
   bool allowEditing = true,
+  ValueChanged<AgentMessage>? onQuote,
+  Future<void> Function(AgentMessage)? onRecall,
+  ValueChanged<String>? onOpenQuote,
 }) {
   final conversation = controller.activeConversation;
+  final isGroup = conversation.kind == ConversationKind.group;
   final watch = conversation.executionWatch;
   final showElapsed =
+      !isGroup &&
       watch != null &&
       conversation.hasExecutionProcess &&
       (watch.isRunning || conversation.runState == ChatRunState.failed) &&
@@ -39,24 +47,55 @@ List<ChatTimelineEntry> buildChatTimeline(
         ...message.taskSummary!.intermediateMessageIds,
   };
   final toolsByMessage = <String, List<ChatTimelineEntry>>{};
-  final liveSteps = controller.activeConversation.liveToolSteps;
+  final members = controller.groupRuns.toList();
+  final liveSteps = [
+    if (members.isEmpty)
+      for (final (ordinal, entry) in conversation.liveToolSteps.indexed)
+        (
+          ordinal: ordinal,
+          afterMessageId: entry.afterMessageId,
+          step: entry.step,
+          runId: conversation.activeRunId,
+          senderName: null as String?,
+        )
+    else
+      for (final member in members)
+        for (final (ordinal, entry) in member.liveToolSteps.indexed)
+          (
+            ordinal: ordinal,
+            afterMessageId: entry.afterMessageId,
+            step: entry.step,
+            runId: member.activeRunId,
+            senderName: member.replyingSenderName,
+          ),
+  ];
+  final memberSources = {
+    for (final member in members)
+      member.activeRunId: webSourcesFromSteps(
+        member.liveToolSteps.map((entry) => entry.step),
+      ),
+  };
   final liveSources = webSourcesFromSteps(liveSteps.map((entry) => entry.step));
   final groups = toolActivityGroups([
     for (final entry in liveSteps)
       entry.step.toolName == 'askUser'
           ? null
-          : '${entry.afterMessageId}:${entry.step.toolName}',
+          : '${entry.runId}:${entry.afterMessageId}:${entry.step.toolName}',
   ]);
   for (final group in groups) {
     final entry = liveSteps[group.start];
-    final storageId = 'tool:${conversation.activeRunId}:${group.start}';
+    final storageId = 'tool:${entry.runId}:${entry.ordinal}';
     toolsByMessage
         .putIfAbsent(entry.afterMessageId, () => [])
         .add(
           ChatTimelineEntry(
             storageId,
             (_) => group.end - group.start == 1
-                ? _ToolActivity(storageId: storageId, step: entry.step)
+                ? _ToolActivity(
+                    storageId: storageId,
+                    step: entry.step,
+                    senderName: entry.senderName,
+                  )
                 : Padding(
                     padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
                     child: ToolActivityGroup(
@@ -70,7 +109,9 @@ List<ChatTimelineEntry> buildChatTimeline(
                       children: [
                         for (var i = group.start; i < group.end; i++)
                           _ToolActivity(
-                            storageId: 'tool:${conversation.activeRunId}:$i',
+                            storageId:
+                                'tool:${liveSteps[i].runId}:${liveSteps[i].ordinal}',
+                            senderName: liveSteps[i].senderName,
                             step: liveSteps[i].step,
                             grouped: true,
                           ),
@@ -91,6 +132,44 @@ List<ChatTimelineEntry> buildChatTimeline(
       ? visibleMessages.length
       : visibleMessages.indexWhere((message) => message.id == beforeMessageId);
   return [
+    if (conversation.kind == ConversationKind.group &&
+        !(conversation.searchMessages != null
+            ? conversation.searchHasEarlier
+            : conversation.hasEarlierMessages))
+      ChatTimelineEntry(
+        'creation:${conversation.id}',
+        (context) => Padding(
+          padding: const EdgeInsets.fromLTRB(28, 8, 28, 8),
+          child: Column(
+            children: [
+              Text(
+                messageTime(conversation.createdAt),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (conversation.creationMembers.isNotEmpty &&
+                  !visibleMessages.any(
+                    (m) => m.id == 'group-created:${conversation.id}',
+                  )) ...[
+                const SizedBox(height: 12),
+                Text(
+                  conversation.creationMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.6,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     for (final (index, message)
         in visibleMessages
             .take(end + (beforeMessageId == null ? 0 : 1))
@@ -116,21 +195,85 @@ List<ChatTimelineEntry> buildChatTimeline(
         ),
       if (message.id != beforeMessageId)
         ChatTimelineEntry(message.id, (context) {
-          final item = MessageItem(
+          if (message.isSystem) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+              child: Text(
+                message.text,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.6,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            );
+          }
+          final content = MessageItem(
             excludedActivityMessageId: conversation.searchMessageId,
             key: ValueKey(message.id),
             message: message,
+            groupBubble: conversation.kind == ConversationKind.group,
+            onQuote:
+                conversation.kind == ConversationKind.group &&
+                    !controller.isStreamingMessage(message.id) &&
+                    (message.text.isNotEmpty ||
+                        message.images.isNotEmpty ||
+                        message.files.isNotEmpty)
+                ? onQuote
+                : null,
+            onOpenQuote: onOpenQuote,
+            onOpenMember: (id) {
+              if (id == MessageSender.localUser.id) return;
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AiContactPage(
+                    controller: controller,
+                    senderId: id,
+                    groupId: conversation.id,
+                  ),
+                ),
+              );
+            },
             availableSources:
-                message.runId != null &&
-                    message.runId == conversation.activeRunId
-                ? liveSources
-                : const {},
-            onEdit: allowEditing ? onEdit : null,
+                memberSources[message.runId] ??
+                (message.runId != null &&
+                        message.runId == conversation.activeRunId
+                    ? liveSources
+                    : const {}),
+            onRecall:
+                conversation.kind == ConversationKind.group &&
+                    message.senderId == MessageSender.localUser.id
+                ? onRecall
+                : null,
+            onEdit: allowEditing && conversation.kind != ConversationKind.group
+                ? onEdit
+                : null,
             streaming:
-                controller.streamingMessageId == message.id ||
-                (controller.isBusy &&
+                controller.isStreamingMessage(message.id) ||
+                (members.isEmpty &&
+                    controller.isBusy &&
                     message.runId == controller.activeConversation.activeRunId),
           );
+          final item =
+              conversation.kind == ConversationKind.group &&
+                  message.role == AgentMessageRole.assistant &&
+                  message.sender != null
+              ? GroupMessageHeading(
+                  sender: message.sender!,
+                  onOpenProfile: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AiContactPage(
+                        controller: controller,
+                        senderId: message.sender!.id,
+                        groupId: conversation.id,
+                      ),
+                    ),
+                  ),
+                  child: content,
+                )
+              : content;
           if (message.id != conversation.searchMessageId) return item;
           return TweenAnimationBuilder<double>(
             tween: Tween(begin: .28, end: 0),
@@ -160,7 +303,8 @@ List<ChatTimelineEntry> buildChatTimeline(
             failed: conversation.runState == ChatRunState.failed,
           ),
         ),
-      if (message.id != beforeMessageId) ...?toolsByMessage[message.id],
+      if (!isGroup && message.id != beforeMessageId)
+        ...?toolsByMessage[message.id],
     ],
   ];
 }
@@ -185,8 +329,10 @@ class _ToolActivity extends StatelessWidget {
     required this.step,
     required this.storageId,
     this.grouped = false,
+    this.senderName,
   });
   final bool grouped;
+  final String? senderName;
   final String storageId;
 
   final AgentStep step;
@@ -206,7 +352,8 @@ class _ToolActivity extends StatelessWidget {
       child: ToolActivityView(
         toolName: step.toolName,
         storageId: storageId,
-        title: '$prefix${step.title}',
+        title:
+            '${senderName == null ? '' : '$senderName '}$prefix${step.title}',
         status: step.status,
         requestJson: step.requestJson,
         resultJson: step.resultJson,

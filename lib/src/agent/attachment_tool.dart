@@ -6,9 +6,8 @@ import '../domain/tool_models.dart';
 import '../platform/message_file_store.dart';
 
 class AttachmentTool implements AgentTool, RuntimeCapabilityAgentTool {
-  AttachmentTool(Iterable<MessageFile> files)
-    : _files = {for (final file in files) file.id: file};
-  final Map<String, MessageFile> _files;
+  AttachmentTool(this._files);
+  final Iterable<MessageFile> _files;
   bool _cancelled = false;
   @override
   Future<void> cancel() async {
@@ -38,7 +37,9 @@ class AttachmentTool implements AgentTool, RuntimeCapabilityAgentTool {
   Future<ToolResult> execute(ToolCall call) async {
     _cancelled = false;
     try {
-      final file = _files[call.arguments['attachmentId']];
+      final file = _files
+          .where((file) => file.id == call.arguments['attachmentId'])
+          .firstOrNull;
       if (file == null) throw StateError('附件不在当前会话中');
       final offset = call.arguments['offset'] as int;
       final limit = call.arguments['maxCharacters'] as int;

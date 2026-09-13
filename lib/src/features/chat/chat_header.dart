@@ -8,17 +8,15 @@ import 'chat_controller.dart';
 class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
   const ChatHeader({
     super.key,
-    required this.onMenu,
     required this.controller,
     required this.beforeDelete,
     this.editing = false,
     this.onCancelEdit,
-    this.onBack,
+    required this.onBack,
     this.originTaskId,
   });
   final String? originTaskId;
-  final VoidCallback onMenu;
-  final VoidCallback? onBack;
+  final VoidCallback onBack;
   final ChatController controller;
   final bool Function() beforeDelete;
   final bool editing;
@@ -80,15 +78,31 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
               GlassSurface(
                 radius: 28,
                 child: RoundAction(
-                  icon: onBack != null
-                      ? Icons.arrow_back_rounded
-                      : Icons.menu_rounded,
-                  label: onBack != null ? '返回' : '会话菜单',
-                  onPressed: onBack ?? onMenu,
+                  icon: Icons.arrow_back_rounded,
+                  label: '返回',
+                  onPressed: onBack,
                 ),
               ),
-              const Spacer(),
-              if (controller.messages.isNotEmpty)
+              Expanded(
+                child:
+                    controller.activeConversation.kind == ConversationKind.group
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          controller.activeConversation.title,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+              if (controller.messages.isNotEmpty ||
+                  controller.activeConversation.kind == ConversationKind.group)
                 ConversationMore(
                   controller: controller,
                   beforeDelete: beforeDelete,

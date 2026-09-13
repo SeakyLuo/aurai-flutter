@@ -1,3 +1,7 @@
+import 'conversation_preview_text.dart';
+import 'group_chat_navigation.dart';
+import 'group_avatar.dart';
+import '../../domain/message_sender.dart';
 import 'package:flutter/material.dart';
 
 import '../../storage/conversation_reader.dart';
@@ -18,6 +22,7 @@ class GroupChatPage extends StatefulWidget {
 
 class _GroupChatPageState extends State<GroupChatPage> {
   final _items = <Conversation>[];
+  final _avatars = <String, List<MessageSender>>{};
   bool _loading = false;
   bool _hasMore = true;
   bool _failed = false;
@@ -38,9 +43,16 @@ class _GroupChatPageState extends State<GroupChatPage> {
       final page = await widget.controller.groupConversations(
         after: reset || _items.isEmpty ? null : _items.last,
       );
+      final avatars = await widget.controller.groupStore.avatarMembers(
+        page.map((item) => item.id).toList(),
+      );
       if (!mounted) return;
       setState(() {
-        if (reset) _items.clear();
+        if (reset) {
+          _items.clear();
+          _avatars.clear();
+        }
+        _avatars.addAll(avatars);
         final ids = _items.map((item) => item.id).toSet();
         _items.addAll(page.where((item) => !ids.contains(item.id)));
         _hasMore = page.length == ConversationReader.pageSize;
@@ -69,7 +81,12 @@ class _GroupChatPageState extends State<GroupChatPage> {
         builder: (_) => GroupCreatePage(controller: widget.controller),
       ),
     );
-    if (mounted && id != null) Navigator.pop(context, id);
+    if (mounted && id != null) await _open(id);
+  }
+
+  Future<void> _open(String id) async {
+    await openGroupConversation(context, widget.controller, id);
+    if (mounted) await _load(reset: true);
   }
 
   @override
@@ -148,34 +165,38 @@ class _GroupChatPageState extends State<GroupChatPage> {
                           controller: widget.controller,
                           conversation: item,
                           onChanged: () => _load(reset: true),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 6,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            leading: const SidebarActionIcon(
-                              type: SidebarActionIconType.group,
-                            ),
-                            title: Text(
-                              item.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            subtitle: Text(
-                              item.preview ?? '开始群聊',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: colors.onSurfaceVariant,
+                          child: Material(
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(16),
+                            clipBehavior: Clip.antiAlias,
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
                               ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              leading: GroupAvatar(members: _avatars[item.id]!),
+                              title: Text(
+                                item.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                              subtitle: ConversationPreviewText(
+                                conversation: item,
+                                emptyText: '',
+                              ),
+                              trailing:
+                                  item.runState == ChatRunState.failed ||
+                                      ConversationStatusDot.hasUnreadCompletion(
+                                        item,
+                                      )
+                                  ? ConversationStatusDot(conversation: item)
+                                  : null,
+                              onTap: () => _open(item.id),
                             ),
-                            trailing: ConversationStatusDot(conversation: item),
-                            onTap: () => Navigator.pop(context, item.id),
                           ),
                         );
                       },

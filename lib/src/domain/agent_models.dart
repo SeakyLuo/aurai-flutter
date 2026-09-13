@@ -1,3 +1,4 @@
+import 'message_quote.dart';
 import 'message_file.dart';
 import 'message_sender.dart';
 import 'message_image.dart';
@@ -17,11 +18,37 @@ class AgentMessage {
     this.runId,
     this.modelTurnId,
     this.responseInput,
+    this.sender,
+    this.isSystem = false,
+    this.isGroupMessage = false,
+    this.quote,
   });
 
+  AgentMessage withSender(MessageSender? value) => AgentMessage(
+    id: id,
+    role: role,
+    senderId: senderId,
+    sender: value,
+    text: text,
+    createdAt: createdAt,
+    images: images,
+    files: files,
+    taskSummary: taskSummary,
+    runId: runId,
+    modelTurnId: modelTurnId,
+    responseInput: responseInput,
+    isSystem: isSystem,
+    isGroupMessage: isGroupMessage,
+    quote: quote,
+  );
+
+  final MessageQuote? quote;
+  final bool isSystem;
+  final bool isGroupMessage;
   final String id;
   final AgentMessageRole role;
   final String senderId;
+  final MessageSender? sender;
   final String text;
   final DateTime createdAt;
   final List<MessageImage> images;
@@ -35,6 +62,9 @@ class AgentMessage {
     'id': id,
     'role': role.name,
     'senderId': senderId,
+    if (quote != null) 'quote': quote!.toJson(),
+    if (isSystem) 'isSystem': true,
+    if (isGroupMessage) 'isGroupMessage': true,
     'text': text,
     'createdAt': createdAt.toIso8601String(),
     'images': images.map((image) => image.toJson()).toList(),
@@ -47,6 +77,11 @@ class AgentMessage {
     required String imageDirectory,
   }) => AgentMessage(
     id: json['id']! as String,
+    isSystem: json['isSystem'] == true,
+    isGroupMessage: json['isGroupMessage'] == true,
+    quote: json['quote'] == null
+        ? null
+        : MessageQuote.fromJson((json['quote'] as Map).cast<String, Object?>()),
     role: AgentMessageRole.values.byName(json['role']! as String),
     // JSON conversations saved before sender identities only contain a role.
     senderId:
@@ -201,6 +236,20 @@ String newMessageId() =>
     DateTime.now().microsecondsSinceEpoch.toRadixString(36);
 
 String toolTitle(String name) => switch (name) {
+  'readMyProfile' => '读取自己的资料',
+  'updateMyProfile' => '更新自己的资料',
+  'sendGroupMessages' => '发送群消息',
+  'listGroupChats' => '查询群聊',
+  'readGroupChat' => '读取群聊',
+  'createGroupChat' => '创建群聊',
+  'renameGroupChat' => '重命名群聊',
+  'updateGroupChatMembers' => '调整群成员',
+  'listAiContacts' => '查询 AI 联系人',
+  'readAiContact' => '读取 AI 联系人',
+  'createAiContact' => '创建 AI 联系人',
+  'updateAiContact' => '修改 AI 联系人',
+  'deleteAiContact' => '归档 AI 联系人',
+  'restoreAiContact' => '恢复 AI 联系人',
   'readAttachment' => '读取附件',
   'searchImages' => '搜索图片',
   'searchWeb' => '搜索网页',

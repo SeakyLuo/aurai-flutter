@@ -10,7 +10,7 @@ class MemoryTools {
     required this.messageId,
   });
   final String conversationId;
-  final String messageId;
+  final String? messageId;
   final MemoryController memory;
   MemoryPlan? plan;
   ResponsesTransport? transport;

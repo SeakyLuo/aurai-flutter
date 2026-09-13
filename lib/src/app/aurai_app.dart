@@ -1,3 +1,4 @@
+import '../features/chat/home_navigation.dart';
 import '../features/chat/image_action_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -6,7 +7,7 @@ import 'global_ui.dart';
 import 'appearance_settings.dart';
 import 'package:flutter/services.dart';
 import '../features/chat/chat_controller.dart';
-import '../features/chat/chat_page.dart';
+import '../features/chat/home_page.dart';
 import '../features/chat/conversation_notifications.dart';
 
 class AuraiApp extends StatelessWidget {
@@ -19,6 +20,7 @@ class AuraiApp extends StatelessWidget {
     listenable: AppearanceSettings.instance,
     builder: (context, child) => MaterialApp(
       title: 'Aurai',
+      navigatorObservers: [homeRouteObserver],
       debugShowCheckedModeBanner: false,
       locale: const Locale('zh', 'CN'),
       supportedLocales: const [Locale('zh', 'CN')],
@@ -39,11 +41,12 @@ class AuraiApp extends StatelessWidget {
           child: ImageActionScope(controller: controller, child: child!),
         );
       },
-      home: child,
+      routes: {'/': (_) => child!},
+      onGenerateInitialRoutes: (_) => initialHomeRoutes(controller, child!),
     ),
     child: ConversationNotifications(
       controller: controller,
-      child: ChatPage(controller: controller),
+      child: HomePage(controller: controller),
     ),
   );
 }

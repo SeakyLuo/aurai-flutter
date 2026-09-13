@@ -9,7 +9,13 @@ class PreviewImageActions {
 
   static Future<Uint8List> readBytes(ImageProvider provider) async {
     if (provider is ResizeImage) return readBytes(provider.imageProvider);
-    if (provider is FileImage) return provider.file.readAsBytes();
+    if (provider is FileImage) {
+      try {
+        return await provider.file.readAsBytes();
+      } on FileSystemException {
+        throw StateError('图片文件已丢失或无法读取');
+      }
+    }
     if (provider is MemoryImage) return provider.bytes;
     if (provider is NetworkImage) {
       final client = HttpClient()

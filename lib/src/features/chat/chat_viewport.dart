@@ -67,6 +67,7 @@ class ChatViewportState extends State<ChatViewport> {
   ChatScrollBookmark? _anchor;
   late bool _following;
   bool _restoring = false;
+  int _scrollRevision = 0;
   bool _userScrolling = false;
   double _height = 1;
   String? _replyAnchorId;
@@ -121,11 +122,12 @@ class ChatViewportState extends State<ChatViewport> {
   }
 
   void _pinSentMessage() {
+    final revision = ++_scrollRevision;
     _keepSentMessageAtTop = true;
     _following = false;
     _restoring = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted || revision != _scrollRevision) return;
       if (!_keepSentMessageAtTop) {
         _restoring = false;
         return;
@@ -138,7 +140,7 @@ class ChatViewportState extends State<ChatViewport> {
         ),
       );
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
+        if (mounted && revision == _scrollRevision) {
           _restoring = false;
           _rememberPosition();
         }
@@ -185,15 +187,16 @@ class ChatViewportState extends State<ChatViewport> {
     if (anchor != null && !_following) {
       final nextIndex = _anchorIndex(anchor);
       if (previousIndex != nextIndex) {
+        final revision = ++_scrollRevision;
         _restoring = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
+          if (!mounted || revision != _scrollRevision) return;
           _items.jumpTo(
             index: nextIndex,
             alignment: _listAlignment(nextIndex, anchor.alignment),
           );
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
+            if (mounted && revision == _scrollRevision) {
               _restoring = false;
               _rememberPosition();
             }
@@ -252,6 +255,7 @@ class ChatViewportState extends State<ChatViewport> {
   }
 
   void _preserveEntry(String id) {
+    final revision = ++_scrollRevision;
     _keepSentMessageAtTop = false;
     final position = _positions.itemPositions.value.firstWhere(
       (item) => item.index == _indices[id],
@@ -273,27 +277,28 @@ class ChatViewportState extends State<ChatViewport> {
       alignment: _listAlignment(_anchorIndex(anchor), anchor.alignment),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted || revision != _scrollRevision) return;
       _restoring = false;
       _rememberPosition();
     });
   }
 
   void restoreBookmark(ChatScrollBookmark bookmark) {
+    final revision = ++_scrollRevision;
     _keepSentMessageAtTop = false;
     _restoring = true;
     _anchor = bookmark;
     _following = bookmark.followOutput;
     setState(() => _replyAnchorId = bookmark.replyAnchorId);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted || revision != _scrollRevision) return;
       final index = _anchorIndex(bookmark);
       _items.jumpTo(
         index: index,
         alignment: _listAlignment(index, bookmark.alignment),
       );
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
+        if (mounted && revision == _scrollRevision) {
           _restoring = false;
           if (_following) scrollToBottom();
           _rememberPosition();
@@ -321,8 +326,16 @@ class ChatViewportState extends State<ChatViewport> {
     });
   }
 
-  void scrollToBottom() {
-    if (!_items.isAttached || _restoring || _userScrolling) return;
+  void scrollToBottom({bool interrupt = false}) {
+    if (!_items.isAttached) return;
+    if (interrupt) {
+      _scrollRevision++;
+      _restoring = false;
+      _userScrolling = false;
+      _anchor = null;
+    } else if (_restoring || _userScrolling) {
+      return;
+    }
     _following = true;
     _keepSentMessageAtTop = false;
     if (_replyAnchorId != null) setState(() => _replyAnchorId = null);

@@ -4,7 +4,7 @@ import '../../providers/model_catalog.dart';
 import 'chat_controller.dart';
 import 'choice_sheet.dart';
 import 'settings_appearance.dart';
-import 'glass_surface.dart';
+import 'settings_icon.dart';
 import 'model_balance_tile.dart';
 
 class ModelSettingsSheet extends StatefulWidget {
@@ -12,13 +12,19 @@ class ModelSettingsSheet extends StatefulWidget {
     super.key,
     required this.controller,
     required this.continueAfterSave,
+    this.accountOnly = false,
+    this.initialService,
   });
   final ChatController controller;
   final bool continueAfterSave;
+  final bool accountOnly;
+  final ModelService? initialService;
   static Future<bool> show(
     BuildContext context, {
     required ChatController controller,
     required bool continueAfterSave,
+    bool accountOnly = false,
+    ModelService? initialService,
   }) async {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
@@ -28,6 +34,8 @@ class ModelSettingsSheet extends StatefulWidget {
             builder: (_) => ModelSettingsSheet(
               controller: controller,
               continueAfterSave: continueAfterSave,
+              accountOnly: accountOnly,
+              initialService: initialService,
             ),
           ),
         ) ??
@@ -57,7 +65,17 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
   @override
   void initState() {
     super.initState();
-    _loadProfile(widget.controller.modelSettings.activeService);
+    final config = widget.controller.config;
+    _loadProfile(
+      widget.initialService ??
+          (widget.accountOnly
+              ? widget.controller.modelSettings.activeService
+              : config.service),
+    );
+    if (!widget.accountOnly) {
+      _model = config.model;
+      _address.text = config.baseUrl;
+    }
     _key.addListener(_changed);
     _address.addListener(_changed);
   }
@@ -92,34 +110,20 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
     },
     child: Scaffold(
       appBar: SettingsAppBar(
-        title: '模型设置',
+        title: widget.accountOnly ? '服务商账号' : '模型设置',
         onBack: _locked ? null : () => Navigator.maybePop(context),
         actions: [
-          if (widget.continueAfterSave)
-            GlassSurface(
-              radius: 28,
-              child: TextButton(
-                onPressed: _locked ? null : _save,
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.onSurface,
-                  minimumSize: const Size(48, 48),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                ),
-                child: Text(_saving ? '正在保存…' : '保存并继续'),
-              ),
-            )
-          else
-            SettingsGlassAction(
-              label: _saving ? '正在保存' : '保存并使用',
-              icon: Icons.check_rounded,
-              onPressed: _locked ? null : _save,
-              iconWidget: _saving
-                  ? const SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : null,
-            ),
+          SettingsGlassAction(
+            label: _saving ? '正在保存' : '保存',
+            icon: Icons.check_rounded,
+            onPressed: _locked ? null : _save,
+            iconWidget: _saving
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const SettingsIcon(type: SettingsIconType.check),
+          ),
         ],
       ),
       body: SafeArea(
@@ -178,10 +182,12 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                 const SizedBox(height: 32),
                 const _Label('使用的模型'),
                 _ModelChoice(
-                  label: _loading ? '正在获取模型…' : modelDisplayName(_model),
+                  label: modelDisplayName(_model),
+                  loading: _loading,
                   onTap: _locked ? null : _selectModel,
                 ),
-                if (_service == ModelService.deepSeek) ...[
+                if (_service == ModelService.deepSeek &&
+                    _saved.isConfigured) ...[
                   const SizedBox(height: 32),
                   const _Label('账户余额'),
                   ModelBalanceTile(
@@ -333,6 +339,9 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
           model: _model,
           baseUrl: uri.toString(),
         ),
+        senderId: widget.accountOnly
+            ? null
+            : widget.controller.activeConversation.defaultSenderId,
       );
       if (!mounted) return;
       _notice('模型配置已保存');
@@ -379,7 +388,13 @@ class _Label extends StatelessWidget {
 }
 
 class _ModelChoice extends StatelessWidget {
-  const _ModelChoice({required this.label, required this.onTap});
+  const _ModelChoice({
+    required this.label,
+    required this.onTap,
+    this.loading = false,
+  });
+
+  final bool loading;
 
   final String label;
   final VoidCallback? onTap;
@@ -407,11 +422,17 @@ class _ModelChoice extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 22,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+            if (loading)
+              const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 22,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
           ],
         ),
       ),

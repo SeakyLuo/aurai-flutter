@@ -139,6 +139,7 @@ object ScheduledTasks {
             .put("runAt", at).put("state", if (old?.optString("state") == "paused") "paused" else "scheduled")
         if (key != null) task.put("requestKey", key)
         if (args["sourceConversationId"] != null) task.put("sourceConversationId", args["sourceConversationId"])
+        if (args["aiSenderId"] != null) task.put("aiSenderId", args["aiSenderId"])
         if (task.getString("state") == "scheduled") arm(task)
         tasks[id] = task
         try { persist() }

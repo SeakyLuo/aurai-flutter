@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -39,7 +40,13 @@ class _AuraiStartupState extends State<AuraiStartup> {
         return;
       }
       setState(() => _controller = controller);
-    } on Object {
+    } on Object catch (error, stack) {
+      developer.log(
+        '初始化失败',
+        name: 'aurai.startup',
+        error: error,
+        stackTrace: stack,
+      );
       controller.dispose();
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -3,7 +3,7 @@ class MessageSender {
     required this.id,
     required this.name,
     required this.kind,
-    this.avatarIcon = 'orbit',
+    this.avatarIcon = 'person',
     this.avatarColor = 'violet',
     this.avatarPath,
     this.archived = false,
@@ -26,6 +26,7 @@ class MessageSender {
     id: 'agent:aurai',
     name: 'Aurai',
     kind: MessageSenderKind.agent,
+    avatarIcon: 'app_logo',
   );
 
   factory MessageSender.fromRow(Map<String, Object?> row) => MessageSender(

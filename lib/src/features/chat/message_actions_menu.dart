@@ -1,3 +1,5 @@
+import 'message_quote_view.dart';
+import 'settings_icon.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -10,13 +12,15 @@ import 'conversation_menu_icon.dart';
 import 'text_selection_icon.dart';
 import 'settings_appearance.dart';
 
-enum MessageAction { copy, select, edit }
+enum MessageAction { copy, select, edit, quote, recall }
 
 Future<MessageAction?> showMessageActionsMenu(
   BuildContext context, {
   required AgentMessage message,
   required Offset position,
   bool allowEditing = true,
+  bool allowQuote = false,
+  bool allowRecall = false,
 }) => showGeneralDialog<MessageAction>(
   context: context,
   barrierDismissible: true,
@@ -35,6 +39,13 @@ Future<MessageAction?> showMessageActionsMenu(
         math.max(media.padding.bottom, media.viewInsets.bottom) -
         16;
     final actions = [
+      if (allowRecall)
+        (
+          MessageAction.recall,
+          const SettingsIcon(type: SettingsIconType.back),
+          '撤回',
+        ),
+      if (allowQuote) (MessageAction.quote, const QuoteIcon(), '引用'),
       if (message.text.isNotEmpty) ...[
         (MessageAction.copy, const CopyIcon(), '复制'),
         (MessageAction.select, const TextSelectionIcon(), '选择文本'),

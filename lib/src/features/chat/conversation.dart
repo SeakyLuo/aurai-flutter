@@ -1,3 +1,5 @@
+import '../../domain/draft_mention.dart';
+import '../../domain/message_quote.dart';
 import '../../domain/message_file.dart';
 import '../../domain/message_sender.dart';
 import '../../domain/agent_models.dart';
@@ -31,9 +33,18 @@ class Conversation {
   bool isScheduledTask = false;
   int messageCount = 0;
   String? storedTitle;
+  List<String> creationMemberIds = [];
+  List<MessageSender> creationMembers = [];
   String? storedPreview;
+  bool storedPreviewIsSystem = false;
+  bool get previewIsSystem =>
+      draft.isEmpty &&
+      draftFiles.isEmpty &&
+      draftImages.isEmpty &&
+      (messages.isNotEmpty ? messages.last.isSystem : storedPreviewIsSystem);
   DateTime? storedUpdatedAt;
   String? activeRunId;
+  String? replyingSenderName;
   Stopwatch? executionWatch;
   Duration restoredExecutionElapsed = Duration.zero;
   bool hasExecutionProcess = false;
@@ -41,7 +52,9 @@ class Conversation {
   String? seenRunId;
   bool hasEarlierMessages = false;
   ContextSummary? contextSummary;
+  MessageQuote? draftQuote;
   String draft = '';
+  final List<DraftMention> draftMentions = [];
   final List<MessageImage> draftImages = [];
   final List<MessageFile> draftFiles = [];
   String? pendingGoal;
@@ -69,6 +82,22 @@ class Conversation {
                   ? '图片对话'
                   : messages.first.files.first.name)
             : messages.first.text);
+  String? get creationMessage => creationMembers.isEmpty
+      ? null
+      : '你邀请了 ${creationMembers.map((sender) => sender.name).join('、')} 加入群聊';
+
+  String? storedDraftAttachmentPreview;
+  String? get draftPreview {
+    final parts = [
+      if (draftImages.isNotEmpty) '[图片]',
+      for (final file in draftFiles) '[文件] ${file.name}',
+      if (storedDraftAttachmentPreview != null) storedDraftAttachmentPreview!,
+      if (draft.isNotEmpty) draft,
+    ];
+    if (parts.isNotEmpty) return parts.join(' ');
+    return draftQuote == null ? null : '[引用] ${draftQuote!.text}';
+  }
+
   String? get preview => draft.isNotEmpty
       ? draft
       : draftFiles.isNotEmpty
@@ -79,14 +108,16 @@ class Conversation {
             messages.last.files.isNotEmpty &&
             messages.last.text.isEmpty
       ? '[附件] ${messages.last.files.first.name}'
-      : messages.length > 1 ||
+      : (kind == ConversationKind.group && messages.isNotEmpty) ||
+            messages.length > 1 ||
             (messages.isNotEmpty && messages.last.images.isNotEmpty)
       ? (messages.last.text.isEmpty ? '[图片]' : messages.last.text)
-      : storedPreview;
+      : storedPreview ?? creationMessage;
 
   Map<String, Object?> toJson() => {
     'id': id,
     'kind': kind.name,
+    'creationMemberIds': creationMemberIds,
     'defaultSenderId': defaultSenderId,
     if (contextSummary != null) 'contextSummary': contextSummary!.toJson(),
     'createdAt': createdAt.toIso8601String(),
@@ -128,6 +159,8 @@ class Conversation {
     );
     conversation.defaultSenderId =
         json['defaultSenderId'] as String? ?? MessageSender.aurai.id;
+    conversation.creationMemberIds =
+        (json['creationMemberIds'] as List? ?? const []).cast<String>();
     if (json['contextSummary'] != null) {
       conversation.contextSummary = ContextSummary.fromJson(
         (json['contextSummary']! as Map).cast<String, Object?>(),

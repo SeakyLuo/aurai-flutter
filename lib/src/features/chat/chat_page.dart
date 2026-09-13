@@ -1,7 +1,6 @@
-import 'group_chat_page.dart';
-import 'group_create_page.dart';
+import '../../domain/draft_mention.dart';
+import 'group_mention_sheet.dart';
 import '../../platform/message_file_store.dart';
-import '../../scheduling/tasks_page.dart';
 import 'keyboard_inset.dart';
 import 'operation_request_sheet.dart';
 import 'dart:async';
@@ -16,48 +15,53 @@ import 'image_attachments.dart';
 import '../../domain/agent_models.dart';
 import 'message_editor.dart';
 
-import 'settings_page.dart';
 import 'user_question_card.dart';
 import 'search_aurora_background.dart';
 import 'accessibility_request_sheet.dart';
 import 'chat_controller.dart';
 import 'chat_widgets.dart';
 import 'chat_header.dart';
-import 'drawer_drag_region.dart';
 import 'thinking_indicator.dart';
 import 'chat_viewport.dart';
 import 'message_item.dart';
 import 'jump_to_bottom_button.dart';
 import 'chat_timeline.dart';
 import 'model_settings_sheet.dart';
-import 'conversations_sheet.dart';
-import 'conversation_search_page.dart';
 
 part 'chat_group_navigation.dart';
+part 'chat_mentions.dart';
+part 'chat_progress.dart';
 part 'chat_session_actions.dart';
 part 'chat_message_editing.dart';
 part 'chat_attachments.dart';
 part 'chat_search_navigation.dart';
+part 'chat_quoting.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({
     super.key,
     required this.controller,
     this.fromTask = false,
+    this.stacked = false,
     this.originTaskId,
     this.initialMessageId,
   });
 
   final ChatController controller;
   final bool fromTask;
+  final bool stacked;
   final String? originTaskId;
   final String? initialMessageId;
-
   @override
   State<ChatPage> createState() => _ChatPageState();
 }
 
 class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
+  List<DraftMention> get _mentions =>
+      widget.controller.activeConversation.draftMentions;
+  late String _mentionText = widget.controller.activeConversation.draft;
+  late String _mentionConversationId = widget.controller.activeConversation.id;
+  bool _mentionOpen = false;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _textController = TextEditingController();
   final _focusNode = FocusNode();
@@ -78,7 +82,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   MessageEditSession? _editing;
 
   void _updateEditing(VoidCallback change) => setState(change);
-
   @override
   void initState() {
     super.initState();
@@ -127,10 +130,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     if (ModalRoute.of(context)!.isCurrent) _scheduleMarkRead();
     final controller = widget.controller;
-    final conversationId = controller.activeConversation.id;
+    final active = controller.activeConversation;
+    final conversationId = active.id;
+    final isGroup = active.kind == ConversationKind.group;
     final timeline = buildChatTimeline(
       controller,
       onEdit: _beginMessageEdit,
+      onRecall: _recallMessage,
+      onQuote: _editing == null ? _quoteMessage : null,
+      onOpenQuote: _openQuotedMessage,
       beforeMessageId: _editing?.message.id,
       allowEditing: _editing == null,
     );
@@ -159,7 +167,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return PopScope(
       canPop: _editing == null,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop && widget.fromTask) unawaited(_saveDraft());
+        if (didPop) unawaited(_saveDraft());
         if (!didPop && _editing != null) _cancelMessageEdit();
       },
       child: AbsorbPointer(
@@ -167,29 +175,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         child: BackdropGroup(
           child: Scaffold(
             key: _scaffoldKey,
-            backgroundColor: timeline.isEmpty ? Colors.transparent : null,
-            drawer: widget.fromTask
-                ? null
-                : ConversationsDrawer(
-                    controller: controller,
-                    onChoose: _chooseConversationAction,
-                  ),
-            drawerEnableOpenDragGesture:
-                !widget.fromTask &&
-                _editing == null &&
-                !controller.addingImages,
-            onDrawerChanged: (opened) {
-              if (opened) _focusNode.unfocus();
-              if (!opened) _scheduleMarkRead();
-            },
+            backgroundColor: timeline.isEmpty && !isGroup
+                ? Colors.transparent
+                : null,
             extendBody: true,
             extendBodyBehindAppBar: true,
             resizeToAvoidBottomInset: false,
             appBar: ChatHeader(
-              onMenu: _openConversations,
-              onBack: widget.fromTask
-                  ? () => Navigator.maybePop(context)
-                  : null,
+              onBack: () => Navigator.maybePop(context),
               editing: _editing != null,
               onCancelEdit:
                   (_editing?.saving == true || _editing?.picking == true)
@@ -216,14 +209,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       )
                     : ChatComposer(
                         controller: _textController,
+                        hintText: _editing != null
+                            ? '编辑消息'
+                            : isGroup
+                            ? ''
+                            : '回复 ${controller.activeAi!.sender.name}',
+                        quote: _editing != null
+                            ? _editing!.message.quote
+                            : controller.activeConversation.draftQuote,
+                        onCancelQuote: _editing == null
+                            ? () => _quoteMessage(null)
+                            : null,
                         focusNode: _focusNode,
                         savingEdit: _editing?.saving == true,
                         draftEnabled: _editing != null
                             ? !_editing!.saving
                             : controller.canEditDraft && !_preparingGoal,
-                        enabled: _editing != null
+                        enabled: isGroup
+                            ? true
+                            : _editing != null
                             ? !_editing!.saving
-                            : !controller.isBusy,
+                            : !controller.isBusy ||
+                                  (controller.canSendToRunningGroup &&
+                                      _canSend),
                         canSend:
                             _canSend ||
                             (_editing?.images ?? controller.draftImages)
@@ -255,6 +263,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         stopping: controller.runState == ChatRunState.stopping,
                         onSend: _editing != null ? _submitMessageEdit : _send,
                         canResume:
+                            !isGroup &&
                             _editing == null &&
                             controller.runState == ChatRunState.cancelled &&
                             controller.pendingGoal != null,
@@ -263,15 +272,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       ),
               ),
             ),
-            body: DrawerDragRegion(
-              enabled: !widget.fromTask,
-              onOpen: _openConversations,
+            body: Builder(
               builder: (context) {
-                final top = MediaQuery.paddingOf(context).top;
+                final top = isGroup
+                    ? View.of(context).padding.top /
+                              View.of(context).devicePixelRatio +
+                          76
+                    : MediaQuery.paddingOf(context).top;
                 final bottom = MediaQuery.paddingOf(context).bottom;
                 return Stack(
                   children: [
-                    if (timeline.isEmpty)
+                    if (timeline.isEmpty && !isGroup)
                       const Positioned.fill(child: SearchAuroraBackground()),
                     Center(
                       child: ConstrainedBox(
@@ -279,7 +290,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         child: Stack(
                           children: [
                             Positioned.fill(
-                              child: timeline.isEmpty
+                              child: timeline.isEmpty && isGroup
+                                  ? const SizedBox.expand()
+                                  : timeline.isEmpty
                                   ? RepaintBoundary(
                                       child: EmptyConversation(
                                         contentPadding: EdgeInsets.only(
@@ -288,6 +301,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                         onUseExample: _useExample,
                                       ),
                                     )
+                                  : isGroup &&
+                                        controller.visibleMessages.every(
+                                          (message) => message.isSystem,
+                                        )
+                                  ? _groupIntroduction(timeline, top, bottom)
                                   : RepaintBoundary(
                                       key: PageStorageKey(
                                         'conversation:$_conversationId',
@@ -368,8 +386,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 bottom: bottom + 8,
                                 child: Center(
                                   child: JumpToBottomButton(
-                                    streaming:
-                                        controller.streamingMessageId != null,
+                                    streaming: controller.hasStreamingMessages,
                                     onPressed: _scrollToBottom,
                                   ),
                                 ),
@@ -388,21 +405,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildProgress(ChatController controller) => ExecutionProgress(
-    state: controller.runState,
-    steps: controller.steps,
-    errorDetail: controller.activeConversation.errorDetail,
-    needsConfiguration: controller.needsConfiguration,
-    hasPendingGoal: controller.pendingGoal != null,
-    replying: controller.streamingMessageId != null,
-    reconnectAttempt: controller.activeConversation.reconnectAttempt,
-    onContinue: _continuePending,
-    onRetry: _continuePending,
-    accessibilityRequestPending: controller.accessibilityRequestPending,
-    onBatterySettings: _openBatterySettings,
-  );
-
   void _onControllerChanged() {
+    if (mounted &&
+        !ModalRoute.of(context)!.isCurrent &&
+        _conversationId != widget.controller.activeConversation.id)
+      return;
     if (!mounted) {
       return;
     }
@@ -444,12 +451,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _textController.text.isNotEmpty) {
       _textController.removeListener(_onTextChanged);
       _textController.clear();
+      _mentions.clear();
+      _mentionText = '';
       _textController.addListener(_onTextChanged);
       _canSend = false;
     } else if (_editing == null &&
         !widget.controller.isBusy &&
         conversation.draft != _textController.text) {
       _textController.removeListener(_onTextChanged);
+      _mentionText = conversation.draft;
       _textController.text = conversation.draft;
       _textController.addListener(_onTextChanged);
       _canSend = conversation.draft.trim().isNotEmpty;
@@ -484,15 +494,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (!mounted || !_followOutput) return;
         _viewportKey.currentState?.scrollToBottom();
       });
-    }
-  }
-
-  Future<void> _openBatterySettings() async {
-    await widget.controller.openBatterySettings();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请在“电池”或“后台耗电管理”中允许 Aurai 后台运行')),
-      );
     }
   }
 
@@ -540,6 +541,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   ].join('\n');
 
   void _onTextChanged() {
+    _trackMentions();
     if (_editing != null) {
       final canSend = _textController.text.trim().isNotEmpty;
       if (_canSend != canSend) setState(() => _canSend = canSend);
@@ -563,75 +565,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           context,
         ).showSnackBar(const SnackBar(content: Text('草稿保存失败，请稍后重试')));
       }
-    }
-  }
-
-  Future<void> _chooseConversationAction(
-    ConversationSelection selection,
-  ) async {
-    if (selection.action != ConversationAction.createGroup &&
-        selection.action != ConversationAction.groups) {
-      _scaffoldKey.currentState!.closeDrawer();
-    }
-    final choice = selection;
-    if (choice.action == ConversationAction.groups ||
-        choice.action == ConversationAction.createGroup) {
-      await _openGroups(
-        create: choice.action == ConversationAction.createGroup,
-      );
-      return;
-    }
-    if (choice.action == ConversationAction.tasks) {
-      await openScheduledTasks(context, widget.controller);
-      return;
-    }
-    if (choice.action == ConversationAction.search) {
-      final selection = await Navigator.of(context).push<ConversationSelection>(
-        MaterialPageRoute(
-          builder: (_) => ConversationSearchPage(
-            controller: widget.controller,
-            preparingGoal: () => _preparingGoal,
-          ),
-        ),
-      );
-      if (!mounted || selection == null) return;
-      await _chooseConversationAction(selection);
-      return;
-    }
-    if (choice.action == ConversationAction.settings) {
-      final id = await Navigator.of(context).push<String>(
-        MaterialPageRoute(
-          builder: (_) => SettingsPage(
-            controller: widget.controller,
-            preparingGoal: () => _preparingGoal,
-          ),
-        ),
-      );
-      if (mounted && id != null) {
-        await _chooseConversationAction((
-          action: ConversationAction.select,
-          id: id,
-          messageId: null,
-        ));
-      }
-      return;
-    }
-    switch (choice.action) {
-      case ConversationAction.groups:
-      case ConversationAction.createGroup:
-      case ConversationAction.tasks:
-      case ConversationAction.search:
-      case ConversationAction.settings:
-        break;
-      case ConversationAction.create:
-        await _changeConversation();
-      case ConversationAction.select:
-        await _changeConversation(choice.id);
-        if (mounted &&
-            choice.messageId != null &&
-            widget.controller.activeConversation.id == choice.id) {
-          await _locateSearchMessage(choice.messageId!);
-        }
     }
   }
 
@@ -690,18 +623,28 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if ((goal.isEmpty &&
             widget.controller.draftImages.isEmpty &&
             widget.controller.draftFiles.isEmpty) ||
-        widget.controller.isBusy ||
+        (widget.controller.isBusy &&
+            !widget.controller.canSendToRunningGroup) ||
         widget.controller.addingImages ||
         _preparingGoal) {
       return;
     }
     _draftTimer?.cancel();
-    _focusNode.unfocus();
+    if (widget.controller.activeConversation.kind != ConversationKind.group)
+      _focusNode.unfocus();
     if (widget.controller.hasSearchWindow) _scrollToBottom();
     _beforeSentMessageId = widget.controller.messages.lastOrNull?.id;
-    _positionSentMessage = true;
+    _positionSentMessage =
+        widget.controller.activeConversation.kind != ConversationKind.group;
+    if (!_positionSentMessage) {
+      _sentMessageId = null;
+      _scrollToBottom();
+    }
     try {
-      final needsSettings = await widget.controller.submitGoal(goal);
+      final needsSettings = await widget.controller.submitGoal(
+        goal,
+        mentionedRecipients: _mentionedRecipients,
+      );
       if (needsSettings && mounted) {
         _preparingGoal = true;
         await _openSettings(continueAfterSave: true);
@@ -784,7 +727,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       });
       return;
     }
-    _viewportKey.currentState?.scrollToBottom();
+    _viewportKey.currentState?.scrollToBottom(interrupt: true);
     if (!_followOutput) setState(() => _followOutput = true);
   }
 

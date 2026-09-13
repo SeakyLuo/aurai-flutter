@@ -10,18 +10,20 @@ enum AttachmentActionIconType {
 }
 
 class AttachmentActionIcon extends StatelessWidget {
-  const AttachmentActionIcon({super.key, required this.type});
+  const AttachmentActionIcon({super.key, required this.type, this.color});
 
   final AttachmentActionIconType type;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: const Size.square(24),
     painter: _AttachmentActionPainter(
       type,
-      Theme.of(context).brightness == Brightness.dark
-          ? Colors.white
-          : Colors.black,
+      color ??
+          (Theme.of(context).brightness == Brightness.dark
+              ? Colors.white
+              : Colors.black),
     ),
   );
 }

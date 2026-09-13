@@ -51,7 +51,6 @@ extension ImageForwarding on ChatController {
     String text,
   ) async {
     if (hasRunningTask) throw StateError('另一个会话正在运行，请等待完成后再发送');
-    if (needsConfiguration) throw StateError('请先在设置中配置模型');
     _submitting = true;
     MessageImage? image;
     var saved = false;
@@ -61,6 +60,9 @@ extension ImageForwarding on ChatController {
           : targetId == activeConversation.id
           ? activeConversation
           : await _store.load(targetId);
+      if (target.kind == ConversationKind.direct &&
+          !(await _directReplyContext(target)).config.isConfigured)
+        throw StateError('请先配置目标 AI 的模型');
       image = await _imageStore.importBytes(bytes);
       final message = AgentMessage(
         id: newMessageId(),
@@ -94,7 +96,7 @@ extension ImageForwarding on ChatController {
     } finally {
       _submitting = false;
       if (!saved && image != null) await _imageStore.remove([image]);
-      notifyListeners();
+      _conversationChanged();
     }
   }
 
@@ -108,7 +110,7 @@ extension ImageForwarding on ChatController {
     } finally {
       _runningConversation = null;
       _updateConversationList(target);
-      notifyListeners();
+      _conversationChanged();
     }
   }
 }

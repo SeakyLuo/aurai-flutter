@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'ai_preferences.dart';
+export 'ai_preferences.dart';
 import 'message_sender.dart';
 import 'model_provider.dart';
 
@@ -22,15 +25,35 @@ class AiProfile {
     required this.updatedAt,
     this.modelSelection,
     this.isTemporary = false,
+    this.preferences = const AiPreferences(),
   });
   final MessageSender sender;
+  final AiPreferences preferences;
   final bool isTemporary;
   final String description;
   final String instructions;
-  // Null explicitly means following the application's current model settings.
+  // Legacy rows may be null while migrating; initialization fixes their model selection before use.
   final AiModelSelection? modelSelection;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  AiProfile copyWith({
+    MessageSender? sender,
+    String? description,
+    String? instructions,
+    AiModelSelection? modelSelection,
+    AiPreferences? preferences,
+    bool? isTemporary,
+  }) => AiProfile(
+    sender: sender ?? this.sender,
+    description: description ?? this.description,
+    instructions: instructions ?? this.instructions,
+    modelSelection: modelSelection ?? this.modelSelection,
+    preferences: preferences ?? this.preferences,
+    isTemporary: isTemporary ?? this.isTemporary,
+    createdAt: createdAt,
+    updatedAt: DateTime.now(),
+  );
 
   factory AiProfile.fromRows(
     MessageSender sender,
@@ -38,6 +61,11 @@ class AiProfile {
   ) => AiProfile(
     sender: sender,
     isTemporary: row['is_temporary'] == 1,
+    preferences: row['preferences'] == null
+        ? const AiPreferences()
+        : AiPreferences.fromJson(
+            jsonDecode(row['preferences'] as String) as Map<String, dynamic>,
+          ),
     description: row['description'] as String,
     instructions: row['instructions'] as String,
     modelSelection: row['provider'] == null

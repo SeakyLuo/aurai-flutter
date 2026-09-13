@@ -1,3 +1,4 @@
+import 'unavailable_image.dart';
 import '../../platform/message_image_store.dart';
 import 'package:flutter/material.dart';
 import '../../platform/preview_image_actions.dart';
@@ -106,6 +107,10 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
                           width: 96,
                           height: 96,
                           fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const SizedBox.square(
+                            dimension: 96,
+                            child: UnavailableImage(),
+                          ),
                         ),
                       ),
                     ),

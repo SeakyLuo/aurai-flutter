@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
 
-import 'settings_appearance.dart';
+import '../../domain/message_sender.dart';
+import 'member_avatar.dart';
 import 'settings_icon.dart';
 
 class GroupMemberChoice extends StatelessWidget {
   const GroupMemberChoice({
     super.key,
     required this.selected,
-    required this.title,
+    required this.sender,
     required this.onTap,
-    this.isAurai = false,
+    this.onEdit,
   });
 
   final bool selected;
-  final String title;
+  final MessageSender sender;
   final VoidCallback? onTap;
-  final bool isAurai;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -53,37 +54,26 @@ class GroupMemberChoice extends StatelessWidget {
                       : null,
                 ),
                 const SizedBox(width: 12),
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  alignment: Alignment.center,
-                  child: isAurai
-                      ? Image.asset(
-                          'assets/branding/app_logo.png',
-                          width: 36,
-                          height: 36,
-                          fit: BoxFit.cover,
-                        )
-                      : Text(
-                          title.characters.first,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w500,
+                Expanded(
+                  child: InkWell(
+                    onTap: onEdit,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Row(
+                      children: [
+                        MemberAvatar(sender: sender),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            sender.name,
+                            style: const TextStyle(fontSize: 16),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(fontSize: 16),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                        if (onEdit != null)
+                          const SettingsIcon(type: SettingsIconType.chevron),
+                      ],
+                    ),
                   ),
                 ),
               ],

@@ -10,7 +10,7 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
   ToolDefinition get definition => const ToolDefinition(
     name: 'searchTools',
     description:
-        'Find and load tools for your next model turn. Start with offset 0; use nextOffset only to inspect more matches. Search by a specific task in Chinese or English, or exact tool name. Available domains: web, reusable skills, memory, conversation history/database, scheduled tasks, notifications, model balance/top-up, Android UI/apps/settings, network diagnostics, Android API/scripts and shell. Returns at most 10 matches and loads them; up to 20 recently loaded or used tools are kept, with recent tools restored from this conversation on later user messages. Exact tool names return only that tool. Call tools already provided directly; search only when a needed tool is absent. Searching does not execute the tool or grant permission.',
+        'Find and load tools for your next model turn. Start with offset 0; use nextOffset only to inspect more matches. Search by a specific task in Chinese or English, or exact tool name. Available domains: web, reusable skills, Aurai AI contacts/address book, group chat creation/members/management, memory, conversation history/database, scheduled tasks, notifications, model balance/top-up, Android UI/apps/settings, network diagnostics, Android API/scripts and shell. Returns at most 10 matches and loads them; up to 20 recently loaded or used tools are kept, with recent tools restored from this conversation on later user messages. Exact tool names return only that tool. Call tools already provided directly; search only when a needed tool is absent. Searching does not execute the tool or grant permission.',
     inputSchema: {
       'type': 'object',
       'properties': {
@@ -79,6 +79,10 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
     final name = tool.name.toLowerCase();
     final title = toolTitle(tool.name).toLowerCase();
     final aliases = switch (tool.capabilityId) {
+      'local.group_chats' =>
+        '群聊 群组 创建建群 拉群 成员 添加 移除 退群 改名 重命名 group chat members roster create rename',
+      'local.ai_contacts' =>
+        '通讯录 联系人 AI 角色 创建 修改 删除 归档 恢复 查询 ai contact address book persona',
       'android.scheduled_tasks' => '定时 计划 提醒 scheduled schedule task reminder',
       'local.attachments' =>
         '附件 文档 文件 PDF Word 音频 视频 attachment file document audio video',

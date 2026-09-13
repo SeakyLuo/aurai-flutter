@@ -59,7 +59,8 @@ class AgentSessionService : Service() {
         handler.removeCallbacksAndMessages(null)
         running = false
         stopForeground(STOP_FOREGROUND_REMOVE)
-        if (outcome != "cancelled" && !MainActivity.isResumed) {
+        if (outcome != "cancelled" && !MainActivity.isResumed &&
+            (outcome != "completed" || reply!!.isNotBlank())) {
             notificationManager().notify(
                 conversationId, FINISHED_NOTIFICATION_ID,
                 finishedNotification(outcome == "completed", conversationId, title, reply),

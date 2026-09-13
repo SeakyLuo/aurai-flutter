@@ -141,6 +141,7 @@ class _DeviceExtensionTilesState extends State<DeviceExtensionTiles>
               : '去安装',
           shizuku == null ? null : () => _shizuku(shizuku),
           active: shizuku?['granted'] == true,
+          loading: shizuku == null,
         ),
         _row(
           'android.network.capture',
@@ -161,6 +162,8 @@ class _DeviceExtensionTilesState extends State<DeviceExtensionTiles>
               : '开启中',
           running || stopped ? () => _vpn(status!) : null,
           active: running,
+          loading:
+              status == null || status == 'stopping' || status == 'starting',
         ),
       ],
     );
@@ -173,6 +176,7 @@ class _DeviceExtensionTilesState extends State<DeviceExtensionTiles>
     String label,
     VoidCallback? action, {
     required bool active,
+    bool loading = false,
   }) {
     final colors = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
@@ -237,15 +241,22 @@ class _DeviceExtensionTilesState extends State<DeviceExtensionTiles>
                         : statusColor.withValues(alpha: .06),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.4,
-                      color: statusColor,
-                    ),
-                  ),
+                  child: loading || _busy.contains(id)
+                      ? const Center(
+                          child: SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.4,
+                            color: statusColor,
+                          ),
+                        ),
                 ),
               ],
             ),

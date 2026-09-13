@@ -1,3 +1,4 @@
+import 'unavailable_image.dart';
 import 'image_action_scope.dart';
 import 'dart:io';
 
@@ -106,10 +107,17 @@ class _ImageAttachmentState extends State<ImageAttachment> {
   Future<void> _open() async {
     if (_opening) return;
     _opening = true;
-    widget.onOpen?.call();
     try {
       final Size imageSize;
       try {
+        if (!await File(widget.image.path).exists()) {
+          if (mounted)
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('图片文件已丢失，无法打开')));
+          return;
+        }
+        if (!mounted) return;
         imageSize = await loadPreviewImageSize(
           FileImage(File(widget.image.path)),
           context,
@@ -123,6 +131,7 @@ class _ImageAttachmentState extends State<ImageAttachment> {
         return;
       }
       if (!mounted) return;
+      widget.onOpen?.call();
       final originMessageId = ImageMessageScope.of(context);
       await Navigator.of(context).push<void>(
         PageRouteBuilder<void>(
@@ -173,6 +182,11 @@ class _ImageAttachmentState extends State<ImageAttachment> {
               width: widget.size,
               height: widget.height ?? widget.size,
               fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => SizedBox(
+                width: widget.size,
+                height: widget.height ?? widget.size,
+                child: const UnavailableImage(),
+              ),
               cacheWidth: (widget.size * MediaQuery.devicePixelRatioOf(context))
                   .round(),
             ),

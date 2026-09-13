@@ -140,20 +140,22 @@ extension MemoryPlanning on MemoryController {
           batch.update(
             'user_memories',
             {'text': change.text, 'updated_at': now},
-            where: 'id = ? AND manual = 0',
-            whereArgs: [retainedId],
+            where: 'id = ? AND manual = 0 AND $_scopeWhere',
+            whereArgs: [retainedId, ..._scopeArgs],
           );
         }
         for (final id in change.ids.where((id) => id != retainedId)) {
           batch.delete(
             'user_memories',
-            where: 'id = ? AND manual = 0',
-            whereArgs: [id],
+            where: 'id = ? AND manual = 0 AND $_scopeWhere',
+            whereArgs: [id, ..._scopeArgs],
           );
         }
         if (change.text.isNotEmpty && retainedId == null) {
           batch.insert('user_memories', {
             'id': newMessageId(),
+            'owner_id': ownerId,
+            'memory_scope': scope,
             'text': change.text,
             'manual': manualAdditions && change.ids.isEmpty ? 1 : 0,
             'source_conversation_id': conversationId,

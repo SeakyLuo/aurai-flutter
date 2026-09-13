@@ -127,17 +127,6 @@ class SearchLandingContent extends StatelessWidget {
               ),
             ),
         ],
-        if (files.isEmpty && history.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 24),
-            child: Text(
-              '搜索会话和文件',
-              style: TextStyle(
-                fontSize: 15,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
       ],
     );
   }

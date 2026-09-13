@@ -1,0 +1,267 @@
+import 'conversation_more.dart';
+import 'conversation_icon.dart';
+import 'conversation_status_dot.dart';
+import 'home_navigation.dart';
+import 'pagination_listener.dart';
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import '../../scheduling/tasks_page.dart';
+import 'ai_contacts_page.dart';
+import 'chat_controller.dart';
+import 'conversation_search_page.dart';
+import 'personal_info_page.dart';
+import 'profile_avatar.dart';
+import 'settings_appearance.dart';
+import 'settings_icon.dart';
+import 'settings_page.dart';
+import 'sidebar_action_icon.dart';
+
+class HomeDrawer extends StatelessWidget {
+  const HomeDrawer({super.key, required this.controller});
+  final ChatController controller;
+
+  void _open(BuildContext context, Widget page) {
+    final navigator = Navigator.of(context);
+    Scaffold.of(context).closeDrawer();
+    navigator.push<void>(MaterialPageRoute(builder: (_) => page));
+  }
+
+  @override
+  Widget build(BuildContext context) => Drawer(
+    width: math.min(380, MediaQuery.sizeOf(context).width * .84),
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    shape: const RoundedRectangleBorder(),
+    clipBehavior: Clip.antiAlias,
+    child: SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Image.asset(
+                      'assets/branding/wordmark_white.png',
+                      width: 144,
+                      height: 48,
+                      fit: BoxFit.contain,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      colorBlendMode: BlendMode.srcIn,
+                      semanticLabel: 'Aurai',
+                    ),
+                  ),
+                ),
+                SettingsGlassAction(
+                  label: '搜索会话',
+                  icon: Icons.search_rounded,
+                  iconWidget: const SidebarActionIcon(
+                    type: SidebarActionIconType.search,
+                  ),
+                  onPressed: () => _open(
+                    context,
+                    ConversationSearchPage(
+                      controller: controller,
+                      preparingGoal: () => false,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListenableBuilder(
+              listenable: controller,
+              builder: (context, _) {
+                final conversations = controller.conversations
+                    .where(
+                      (item) =>
+                          item.kind == ConversationKind.group || !item.isEmpty,
+                    )
+                    .toList();
+                return PaginationListener(
+                  hasMore: controller.hasMoreConversations,
+                  loadMore: controller.loadMoreConversations,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    itemCount: conversations.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == 0)
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _entry(
+                              '通讯录',
+                              const SettingsIcon(
+                                type: SettingsIconType.contacts,
+                              ),
+                              () => _open(
+                                context,
+                                AiContactsPage(controller: controller),
+                              ),
+                            ),
+                            _entry(
+                              '定时任务',
+                              const SettingsIcon(type: SettingsIconType.tasks),
+                              () {
+                                Scaffold.of(context).closeDrawer();
+                                openScheduledTasks(context, controller);
+                              },
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                              child: Text(
+                                '会话列表',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            if (conversations.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: Text('暂无会话'),
+                              ),
+                          ],
+                        );
+                      return _conversation(context, conversations[index - 1]);
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ListenableBuilder(
+                    listenable: controller.memory,
+                    builder: (context, _) => InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => _open(
+                        context,
+                        PersonalInfoPage(memory: controller.memory),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          children: [
+                            ProfileAvatar(
+                              style: controller.memory.avatar,
+                              name: controller.memory.nickname,
+                              size: 36,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                controller.memory.nickname.isEmpty
+                                    ? '个人信息'
+                                    : controller.memory.nickname,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SettingsGlassAction(
+                  label: '设置',
+                  icon: Icons.settings_outlined,
+                  iconWidget: const SidebarActionIcon(
+                    type: SidebarActionIconType.settings,
+                  ),
+                  onPressed: () => _open(
+                    context,
+                    SettingsPage(
+                      controller: controller,
+                      preparingGoal: () => false,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _conversation(BuildContext context, Conversation item) {
+    final selected = item.id == controller.activeConversation.id;
+    return ConversationMore(
+      key: ValueKey(item.id),
+      controller: controller,
+      conversation: item,
+      child: Material(
+        color: selected
+            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: .05)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          selected: selected,
+          selectedColor: Theme.of(context).colorScheme.onSurface,
+          minTileHeight: 48,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          leading: item.kind == ConversationKind.group
+              ? const SidebarActionIcon(type: SidebarActionIconType.group)
+              : const ConversationIcon(),
+          title: Text(
+            item.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 16),
+          ),
+          trailing: ConversationStatusDot(conversation: item),
+          onTap: () async {
+            final navigator = Navigator.of(context);
+            final messenger = ScaffoldMessenger.of(context);
+            Scaffold.of(context).closeDrawer();
+            try {
+              await openHomeConversation(
+                navigator.context,
+                controller,
+                item.id,
+              );
+            } on Object {
+              if (messenger.mounted)
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('无法打开会话，请重试')),
+                );
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _entry(String title, Widget icon, VoidCallback onTap) => ListTile(
+    minTileHeight: 48,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    leading: icon,
+    title: Text(
+      title,
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+    ),
+    onTap: onTap,
+  );
+}

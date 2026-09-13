@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'wrench_painter.dart';
 
 enum SettingsIconType {
+  tools,
+  contacts,
   add,
   memory,
   skills,
@@ -53,6 +56,26 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.tools:
+        WrenchPainter(color).paint(canvas, const Size.square(24));
+      case SettingsIconType.contacts:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(5, 3, 15, 18),
+            const Radius.circular(3),
+          ),
+          pen,
+        );
+        canvas.drawLine(const Offset(3, 7), const Offset(6, 7), pen);
+        canvas.drawLine(const Offset(3, 12), const Offset(6, 12), pen);
+        canvas.drawLine(const Offset(3, 17), const Offset(6, 17), pen);
+        canvas.drawCircle(const Offset(12.5, 9), 2.2, pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(9, 16)
+            ..cubicTo(9, 12, 16, 12, 16, 16),
+          pen,
+        );
       case SettingsIconType.add:
         canvas.drawLine(const Offset(12, 4), const Offset(12, 20), pen);
         canvas.drawLine(const Offset(4, 12), const Offset(20, 12), pen);

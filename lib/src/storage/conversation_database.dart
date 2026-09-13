@@ -1,3 +1,6 @@
+import 'ai_identity_schema.dart';
+import 'group_participation.dart';
+import 'group_creation_migration.dart';
 import '../skills/skill_schema.dart';
 import 'message_sender_schema.dart';
 import 'group_chat_schema.dart';
@@ -6,7 +9,7 @@ import '../memory/memory_controller.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 12,
+  version: 18,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -60,12 +63,32 @@ Future<Database> openConversationDatabase() async => openDatabase(
       }
       await batch.commit(noResult: true);
     }
+    if (oldVersion < 13) await migrateAiIdentities(db);
+    if (oldVersion < 14) {
+      // Some version 13 databases already contain the group creation column.
+      final columns = await db.rawQuery('PRAGMA table_info(conversations)');
+      if (!columns.any((column) => column['name'] == 'creation_member_ids')) {
+        await db.execute(
+          'ALTER TABLE conversations ADD COLUMN creation_member_ids TEXT',
+        );
+      }
+    }
+    if (oldVersion < 15) await migrateGroupCreationData(db);
+    if (oldVersion < 16) await migrateAuraiAvatar(db);
+    if (oldVersion < 17) {
+      await db.execute('ALTER TABLE messages ADD COLUMN quote_json TEXT');
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN draft_quote_json TEXT',
+      );
+    }
+    if (oldVersion < 18) await db.execute(groupParticipationSchema);
   },
   onCreate: (db, version) async {
     final batch = db.batch();
     for (final statement in [
       ..._schema,
       ...groupChatTables,
+      groupParticipationSchema,
       temporaryAiColumn,
       ...skillSchema,
       ...memorySchema,
@@ -73,6 +96,8 @@ Future<Database> openConversationDatabase() async => openDatabase(
       batch.execute(statement);
     }
     await batch.commit(noResult: true);
+    await migrateAiIdentities(db);
+    await migrateAuraiAvatar(db);
   },
 );
 
@@ -91,6 +116,8 @@ const _schema = [
     kind TEXT NOT NULL DEFAULT 'direct',
     default_sender_id TEXT NOT NULL DEFAULT 'agent:aurai' REFERENCES message_senders(id),
     preview TEXT,
+    creation_member_ids TEXT,
+    draft_quote_json TEXT,
     pinned INTEGER NOT NULL DEFAULT 0,
     archived INTEGER NOT NULL DEFAULT 0,
     scheduled_task INTEGER NOT NULL DEFAULT 0,
@@ -135,6 +162,7 @@ const _schema = [
     run_id TEXT REFERENCES agent_runs(id) ON DELETE CASCADE,
     model_turn_id TEXT REFERENCES model_turns(id) ON DELETE CASCADE,
     sender_id TEXT NOT NULL REFERENCES message_senders(id),
+    quote_json TEXT,
     role TEXT NOT NULL,
     kind TEXT NOT NULL,
     text TEXT NOT NULL,

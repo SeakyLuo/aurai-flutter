@@ -4,7 +4,6 @@ import '../../domain/capability.dart';
 import 'chat_controller.dart';
 import 'settings_appearance.dart';
 import 'capability_icon.dart';
-import 'screen_access_tile.dart';
 import 'device_extension_tiles.dart';
 import 'document_folders_page.dart';
 
@@ -82,7 +81,6 @@ class _CapabilityPageState extends State<CapabilityPage>
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
-                ScreenAccessTile(controller: widget.controller),
                 const SizedBox(height: 8),
                 for (final capability in widget.controller.capabilities)
                   if (!capability.id.startsWith('android.execution.') &&
