@@ -30,7 +30,13 @@ class FileAttachments extends StatelessWidget {
 }
 
 class FileAttachmentCard extends StatelessWidget {
-  const FileAttachmentCard({super.key, required this.file, this.onRemove});
+  const FileAttachmentCard({
+    super.key,
+    required this.file,
+    this.onRemove,
+    this.onOpen,
+  });
+  final VoidCallback? onOpen;
   final MessageFile file;
   final VoidCallback? onRemove;
   String get _size => file.size < 1024
@@ -45,6 +51,7 @@ class FileAttachmentCard extends StatelessWidget {
     clipBehavior: Clip.antiAlias,
     child: InkWell(
       onTap: () async {
+        onOpen?.call();
         try {
           await MessageFileStore.open(file);
         } on PlatformException catch (error) {

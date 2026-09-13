@@ -1,7 +1,7 @@
+import 'dialog_action_button.dart';
 import 'package:flutter/material.dart';
 
 import 'glass_surface.dart';
-import 'settings_appearance.dart';
 
 class DeleteConfirmationDialog extends StatelessWidget {
   const DeleteConfirmationDialog({
@@ -56,38 +56,18 @@ class DeleteConfirmationDialog extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: TextButton(
+                      child: DialogActionButton(
+                        text: '取消',
                         onPressed: () => Navigator.pop(context, false),
-                        style: TextButton.styleFrom(
-                          foregroundColor: colors.onSurface,
-                          backgroundColor: dialogControlColor(context),
-                          minimumSize: const Size(0, 46),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(23),
-                          ),
-                        ),
-                        child: const Text('取消'),
+                        role: DialogActionRole.secondary,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: TextButton(
+                      child: DialogActionButton(
+                        text: confirmLabel,
                         onPressed: () => Navigator.pop(context, true),
-                        style: TextButton.styleFrom(
-                          foregroundColor:
-                              Theme.of(context).brightness == Brightness.dark
-                              ? const Color(0xffff8a80)
-                              : const Color(0xffd93025),
-                          backgroundColor:
-                              Theme.of(context).brightness == Brightness.dark
-                              ? const Color(0xff492b2b)
-                              : const Color(0xffffe9e7),
-                          minimumSize: const Size(0, 46),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(23),
-                          ),
-                        ),
-                        child: Text(confirmLabel),
+                        role: DialogActionRole.destructive,
                       ),
                     ),
                   ],

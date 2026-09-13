@@ -30,20 +30,22 @@ extension MessageEditActions on ChatController {
     try {
       await _persist();
       final previous = activeConversation;
-      final index = messages.indexWhere((item) => item.id == message.id);
+      final displayed = visibleMessages;
+      final index = displayed.indexWhere((item) => item.id == message.id);
       final edited = AgentMessage(
         id: message.id,
         role: message.role,
+        senderId: message.senderId,
         text: text,
         createdAt: message.createdAt,
         images: images ?? message.images,
         files: files ?? message.files,
       );
       final replacement = conversationFromRow(conversationRow(previous))
-        ..messages.addAll([...messages.take(index), edited])
+        ..messages.addAll([...displayed.take(index), edited])
         ..draftFiles.addAll(previous.draftFiles)
         ..draftImages.addAll(previous.draftImages)
-        ..hasEarlierMessages = previous.hasEarlierMessages
+        ..hasEarlierMessages = visibleHasEarlier
         ..pendingGoal = text
         ..runState = ChatRunState.idle
         ..errorDetail = null
@@ -54,6 +56,7 @@ extension MessageEditActions on ChatController {
         message,
       );
       _activeConversation = replacement;
+      _searchWindows.remove(replacement.id);
       _loadedMessageCounts[replacement.id] = replacement.messages.length;
       _updateConversationList();
       try {

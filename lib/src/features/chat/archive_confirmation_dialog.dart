@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../utils/widget_utils.dart';
+import 'dialog_action_button.dart';
 import 'glass_surface.dart';
-import 'settings_appearance.dart';
 
 class ArchiveConfirmationDialog extends StatelessWidget {
   const ArchiveConfirmationDialog({super.key, required this.isCurrent});
@@ -49,22 +48,16 @@ class ArchiveConfirmationDialog extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: TextButton(
+                      child: DialogActionButton(
+                        text: '取消',
                         onPressed: () => Navigator.pop(context, false),
-                        style: TextButton.styleFrom(
-                          foregroundColor: colors.onSurface,
-                          backgroundColor: dialogControlColor(context),
-                          minimumSize: const Size(0, 46),
-                          shape: const StadiumBorder(),
-                        ),
-                        child: const Text('取消'),
+                        role: DialogActionRole.secondary,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: WidgetUtils.primaryButton(
+                      child: DialogActionButton(
                         text: '归档',
-                        height: 46,
                         onPressed: () => Navigator.pop(context, true),
                       ),
                     ),

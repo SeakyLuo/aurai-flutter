@@ -20,9 +20,11 @@ class ScreenAuthorizationView(
     context: Context,
     description: String,
     allowLabel: String,
-    private val deadline: Long,
+    private val deadline: Long?,
     preview: Bitmap?,
     onAllow: () -> Unit,
+    onAlways: () -> Unit,
+    onSession: () -> Unit,
     private val onDeny: () -> Unit,
     onAllowPage: (() -> Unit)?,
 ) : LinearLayout(context) {
@@ -34,8 +36,9 @@ class ScreenAuthorizationView(
     private val countdown: TextView
     private val ticker = object : Runnable {
         override fun run() {
-            val seconds = ceil((deadline - SystemClock.elapsedRealtime()) / 1000.0).toInt().coerceAtLeast(0)
-            countdown.text = "$seconds 秒后自动拒绝"
+            val end = deadline ?: return
+            val seconds = ceil((end - SystemClock.elapsedRealtime()) / 1000.0).toInt().coerceAtLeast(0)
+            countdown.text = " · $seconds 秒后自动拒绝"
             if (seconds > 0) postDelayed(this, 1000)
         }
     }
@@ -96,35 +99,42 @@ class ScreenAuthorizationView(
             topMargin = dp(12)
             bottomMargin = dp(20)
         })
-        addView(actionOption(allowLabel) { answer(onAllow) }, buttonLayout())
+        addView(actionOption("允许一次", primary = true) { answer(onAllow) }, buttonLayout())
+        addView(actionOption("当前会话允许") { answer(onSession) }, buttonLayout(8))
+        addView(actionOption("始终允许") { answer(onAlways) }, buttonLayout(8))
         if (onAllowPage != null) {
             addView(actionOption("允许此页面导航") { answer(onAllowPage) }, buttonLayout(10))
         }
         countdown = TextView(context).apply {
-            text = "${ceil((deadline - SystemClock.elapsedRealtime()) / 1000.0).toInt().coerceAtLeast(0)} 秒后自动拒绝"
-            textSize = 13f
-            setTextColor(secondaryColorValue)
-            setPadding(0, dp(4), 0, 0)
+            text = deadline?.let { " · ${ceil((it - SystemClock.elapsedRealtime()) / 1000.0).toInt().coerceAtLeast(0)} 秒后自动拒绝" } ?: ""
+            textSize = 15f
+            setTextColor(if (dark) Color.rgb(255, 138, 128) else Color.rgb(217, 48, 37))
         }
-        addView(actionOption("拒绝", countdown, onDeny), buttonLayout(8))
+        addView(actionOption("拒绝", detail = if (deadline == null) null else countdown, reject = true, action = onDeny), buttonLayout(8))
     }
 
     private fun answer(action: () -> Unit) {
-        if (SystemClock.elapsedRealtime() >= deadline) onDeny() else action()
+        if (deadline != null && SystemClock.elapsedRealtime() >= deadline) onDeny() else action()
     }
 
-    private fun actionOption(label: String, detail: TextView? = null, action: () -> Unit) = LinearLayout(context).apply {
-        orientation = VERTICAL
+    private fun actionOption(label: String, detail: TextView? = null, primary: Boolean = false, reject: Boolean = false, action: () -> Unit) = LinearLayout(context).apply {
+        orientation = HORIZONTAL
+        gravity = android.view.Gravity.CENTER
         minimumHeight = dp(48)
         setPadding(dp(16), dp(14), dp(16), dp(14))
         background = GradientDrawable().apply {
-            setColor(if (dark) Color.rgb(45, 45, 48) else Color.rgb(243, 243, 243))
-            cornerRadius = dp(20).toFloat()
+            setColor(if (primary) Color.rgb(175, 169, 238) else if (dark) Color.rgb(45, 45, 48) else Color.rgb(243, 243, 243))
+            if (primary) {
+                colors = intArrayOf(Color.rgb(221, 197, 247), Color.rgb(200, 183, 244), Color.rgb(175, 169, 238))
+                orientation = GradientDrawable.Orientation.TL_BR
+            }
+            cornerRadius = dp(24).toFloat()
         }
         addView(TextView(context).apply {
             text = label
             textSize = 15f
-            setTextColor(textColorValue)
+            if (primary) setTypeface(typeface, Typeface.BOLD)
+            setTextColor(if (reject) { if (dark) Color.rgb(255, 138, 128) else Color.rgb(217, 48, 37) } else if (primary) Color.rgb(73, 51, 101) else textColorValue)
         })
         if (detail != null) addView(detail)
         isFocusable = true

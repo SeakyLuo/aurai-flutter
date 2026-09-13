@@ -2,6 +2,7 @@ import '../domain/message_file.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/agent_models.dart';
+import '../domain/message_sender.dart';
 import '../domain/message_image.dart';
 import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
@@ -11,6 +12,8 @@ import '../domain/model_provider.dart';
 typedef ConversationSearchResult = ({
   Conversation conversation,
   String snippet,
+  String? messageId,
+  MessageSender? sender,
 });
 
 class ConversationReader {
@@ -23,13 +26,15 @@ class ConversationReader {
   Future<List<Conversation>> list({
     Conversation? after,
     bool archived = false,
+    ConversationKind? kind,
   }) async {
     final rows = await database.query(
       'conversations',
       where:
-          'archived = ?${after == null ? '' : ' AND (pinned < ? OR (pinned = ? AND (updated_at < ? OR (updated_at = ? AND id < ?))))'}',
+          'archived = ?${kind == null ? '' : ' AND kind = ?'}${after == null ? '' : ' AND (pinned < ? OR (pinned = ? AND (updated_at < ? OR (updated_at = ? AND id < ?))))'}',
       whereArgs: [
         archived ? 1 : 0,
+        if (kind != null) kind.name,
         if (after != null) ...[
           after.isPinned ? 1 : 0,
           after.isPinned ? 1 : 0,
@@ -174,31 +179,48 @@ class ConversationReader {
   Future<List<AgentMessage>> messages(
     String conversationId, {
     AgentMessage? before,
+    AgentMessage? after,
+    String? throughMessageId,
+    String? includeMessageId,
     int limit = messagePageSize,
     bool forModel = false,
     ModelConfig? modelConfig,
     String? afterCheckpoint,
   }) async {
     final selectionWhere =
-        'conversation_id = ?${forModel ? " AND NOT (role = 'assistant' AND text = '')" : " AND kind != 'commentary'"}${afterCheckpoint == null ? '' : ' AND created_at >= (SELECT created_at FROM messages WHERE id = ?)'}${before == null ? '' : ' AND (created_at < ? OR (created_at = ? AND id < ?))'}';
+        'conversation_id = ?${forModel
+            ? " AND NOT (role = 'assistant' AND text = '')"
+            : includeMessageId == null
+            ? " AND kind != 'commentary'"
+            : " AND (kind != 'commentary' OR id = ?)"}${afterCheckpoint == null ? '' : ' AND created_at >= (SELECT created_at FROM messages WHERE id = ?)'}${before == null ? '' : ' AND (created_at < ? OR (created_at = ? AND id < ?))'}${after == null ? '' : ' AND (created_at > ? OR (created_at = ? AND id > ?))'}${throughMessageId == null ? '' : ' AND (created_at, id) <= (SELECT created_at, id FROM messages WHERE id = ?)'}';
     final selectionArgs = <Object?>[
       conversationId,
+      if (!forModel && includeMessageId != null) includeMessageId,
       if (afterCheckpoint != null) afterCheckpoint,
       if (before != null) ...[
         before.createdAt.microsecondsSinceEpoch,
         before.createdAt.microsecondsSinceEpoch,
         before.id,
       ],
+      if (after != null) ...[
+        after.createdAt.microsecondsSinceEpoch,
+        after.createdAt.microsecondsSinceEpoch,
+        after.id,
+      ],
+      if (throughMessageId != null) throughMessageId,
     ];
+    final order = after == null
+        ? 'created_at DESC, id DESC'
+        : 'created_at ASC, id ASC';
     final rows = await database.query(
       'messages',
       where: selectionWhere,
       whereArgs: selectionArgs,
-      orderBy: 'created_at DESC, id DESC',
+      orderBy: order,
       limit: forModel ? null : limit,
     );
     final selectedMessages =
-        'SELECT id FROM messages WHERE $selectionWhere ORDER BY created_at DESC, id DESC LIMIT ?';
+        'SELECT id FROM messages WHERE $selectionWhere ORDER BY $order LIMIT ?';
     final selectedArgs = [...selectionArgs, limit];
     if (rows.isEmpty) return [];
     final images = await database.query(
@@ -233,11 +255,12 @@ class ConversationReader {
             rows,
             modelConfig,
           );
-    return rows.reversed
+    return (after == null ? rows.reversed : rows)
         .map(
           (row) => AgentMessage(
             id: row['id']! as String,
             role: AgentMessageRole.values.byName(row['role']! as String),
+            senderId: row['sender_id'] as String,
             text: row['text']! as String,
             createdAt: DateTime.fromMicrosecondsSinceEpoch(
               row['created_at']! as int,
@@ -314,6 +337,7 @@ class ConversationReader {
   ) {
     if (event['kind'] == 'message') {
       return AgentTaskActivity(
+        messageId: event['message_id'] as String,
         text: messages[event['message_id']]!['text']! as String,
       );
     }
@@ -374,44 +398,77 @@ class ConversationReader {
     String query,
     int offset,
   ) async {
-    final rows = await database.query(
-      'conversations',
-      where: query.isEmpty
-          ? null
-          : 'instr(lower(title), ?) > 0 OR instr(lower(draft), ?) > 0 OR id IN '
-                '(SELECT conversation_id FROM messages WHERE instr(lower(text), ?) > 0)',
-      whereArgs: query.isEmpty ? null : [query, query, query],
-      orderBy: 'pinned DESC, updated_at DESC, id DESC',
-      limit: pageSize,
-      offset: offset,
+    if (query.isEmpty) {
+      final rows = await database.query(
+        'conversations',
+        orderBy: 'pinned DESC, updated_at DESC, id DESC',
+        limit: pageSize,
+        offset: offset,
+      );
+      return [
+        for (final row in rows)
+          (
+            conversation: conversationFromRow(row),
+            messageId: null,
+            sender: null,
+            snippet: '',
+          ),
+      ];
+    }
+    final hits = await database.rawQuery(
+      '''SELECT id AS message_id, conversation_id, text, sender_id, created_at, id AS sort_id
+         FROM messages WHERE instr(lower(text), ?) > 0
+         UNION ALL
+         SELECT NULL AS message_id, id AS conversation_id,
+           CASE WHEN instr(lower(draft), ?) > 0 THEN draft ELSE '' END AS text,
+           NULL AS sender_id, created_at, id AS sort_id
+         FROM conversations
+         WHERE (instr(lower(title), ?) > 0 OR instr(lower(draft), ?) > 0)
+           AND id NOT IN (
+             SELECT conversation_id FROM messages WHERE instr(lower(text), ?) > 0
+           )
+         ORDER BY created_at DESC, sort_id DESC
+         LIMIT ? OFFSET ?''',
+      [query, query, query, query, query, pageSize, offset],
     );
-    if (rows.isEmpty) return [];
-    final hits = query.isEmpty
-        ? <Map<String, Object?>>[]
-        : await database.query(
-            'messages',
-            columns: ['conversation_id', 'text'],
-            where:
-                'conversation_id IN (${_slots(rows.length)}) AND instr(lower(text), ?) > 0',
-            whereArgs: [...rows.map((row) => row['id']), query],
-            groupBy: 'conversation_id',
-          );
-    final snippets = {
-      for (final hit in hits) hit['conversation_id']: hit['text']! as String,
+    if (hits.isEmpty) return [];
+    final ids = hits.map((hit) => hit['conversation_id'] as String).toSet();
+    final senderIds = hits
+        .map((hit) => hit['sender_id'])
+        .whereType<String>()
+        .toSet();
+    final related = await Future.wait([
+      database.query(
+        'conversations',
+        where: 'id IN (${_slots(ids.length)})',
+        whereArgs: ids.toList(),
+      ),
+      if (senderIds.isNotEmpty)
+        database.query(
+          'message_senders',
+          where: 'id IN (${_slots(senderIds.length)})',
+          whereArgs: senderIds.toList(),
+        ),
+    ]);
+    final conversations = {
+      for (final row in related.first)
+        row['id'] as String: conversationFromRow(row),
     };
-    return rows.map((row) {
-      final conversation = conversationFromRow(row);
-      final text = conversation.draft.toLowerCase().contains(query)
-          ? conversation.draft
-          : snippets[conversation.id] ?? '';
+    final senders = {
+      if (senderIds.isNotEmpty)
+        for (final row in related[1])
+          row['id'] as String: MessageSender.fromRow(row),
+    };
+    return hits.map((hit) {
+      final text = hit['text'] as String;
       final index = text.toLowerCase().indexOf(query);
-      final start = index > 16 ? index - 16 : 0;
+      final start = index > 4 ? index - 4 : 0;
       return (
-        conversation: conversation,
+        conversation: conversations[hit['conversation_id']]!,
+        messageId: hit['message_id'] as String?,
+        sender: hit['sender_id'] == null ? null : senders[hit['sender_id']]!,
         snippet:
-            query.isEmpty || conversation.title.toLowerCase().contains(query)
-            ? ''
-            : '${start > 0 ? '…' : ''}${text.substring(start).replaceAll('\n', ' ')}',
+            '${start > 0 ? '…' : ''}${text.substring(start).replaceAll('\n', ' ')}',
       );
     }).toList();
   }

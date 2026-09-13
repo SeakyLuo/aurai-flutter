@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-enum SidebarActionIconType { search, settings }
+enum SidebarActionIconType { search, settings, group, add }
 
 class SidebarActionIcon extends StatelessWidget {
   const SidebarActionIcon({super.key, required this.type, this.color});
@@ -39,6 +39,32 @@ class _SidebarActionPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SidebarActionIconType.add:
+        canvas.drawLine(const Offset(5, 12), const Offset(19, 12), pen);
+        canvas.drawLine(const Offset(12, 5), const Offset(12, 19), pen);
+      case SidebarActionIconType.group:
+        canvas.drawCircle(const Offset(9, 7.5), 3, pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(3, 20)
+            ..lineTo(3, 18)
+            ..cubicTo(3, 11.5, 15, 11.5, 15, 18)
+            ..lineTo(15, 20),
+          pen,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(16, 4.8)
+            ..cubicTo(20.8, 4.6, 21.2, 10, 17, 10.5),
+          pen,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(18, 14)
+            ..cubicTo(20.4, 14.6, 21, 16.3, 21, 18.5)
+            ..lineTo(21, 20),
+          pen,
+        );
       case SidebarActionIconType.search:
         canvas.drawCircle(const Offset(10.5, 10.5), 6.75, pen);
         canvas.drawLine(

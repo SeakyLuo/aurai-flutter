@@ -1,3 +1,4 @@
+import 'image_action_scope.dart';
 import 'file_attachments.dart';
 import 'reply_image_syntax.dart';
 import 'reply_image_gallery.dart';
@@ -32,8 +33,10 @@ class MessageItem extends StatefulWidget {
     required this.onEdit,
     this.streaming = false,
     this.availableSources = const {},
+    this.excludedActivityMessageId,
   });
   final AgentMessage message;
+  final String? excludedActivityMessageId;
   final bool streaming;
   final Map<String, SourceReference> availableSources;
   final Future<void> Function(AgentMessage)? onEdit;
@@ -72,13 +75,18 @@ class _MessageItemState extends State<MessageItem> {
   }
 
   @override
-  Widget build(BuildContext context) => message.role == AgentMessageRole.user
+  Widget build(BuildContext context) =>
+      ImageMessageScope(messageId: message.id, child: _buildMessage(context));
+
+  Widget _buildMessage(BuildContext context) =>
+      message.role == AgentMessageRole.user
       ? _withActions(_content)
       : Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (message.taskSummary != null)
               TaskSummaryView(
+                excludedMessageId: widget.excludedActivityMessageId,
                 messageId: message.id,
                 summary: message.taskSummary!,
                 onOpenLink: (href) => _openLink(context, href),

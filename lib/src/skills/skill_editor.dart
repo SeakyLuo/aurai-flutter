@@ -9,6 +9,7 @@ import '../features/chat/glass_surface.dart';
 import '../features/chat/settings_icon.dart';
 import '../scheduling/task_unsaved_dialog.dart';
 import 'skill_store.dart';
+import 'skill_statistics_view.dart';
 import 'skill_permission.dart';
 import 'skill_permission_picker.dart';
 import 'skill_action_menu.dart';
@@ -442,6 +443,7 @@ class _SkillEditorState extends State<SkillEditor> {
                 ),
                 _field('使用说明', _instructions, 10000, multiline: true),
                 _field('执行脚本（可选）', _script, 50000, multiline: true),
+                SkillStatisticsView(store: widget.store, skillId: _saved.id),
               ],
             ),
           ),

@@ -1,3 +1,4 @@
+import 'image_action_scope.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -81,12 +82,18 @@ class ImageAttachment extends StatefulWidget {
     required this.image,
     required this.gallery,
     required this.size,
+    this.height,
     this.borderRadius = 16,
+    this.onOpen,
+    this.sourceMessageId,
   });
   final MessageImage image;
   final List<MessageImage> gallery;
   final double size;
+  final double? height;
   final double borderRadius;
+  final VoidCallback? onOpen;
+  final String? sourceMessageId;
 
   @override
   State<ImageAttachment> createState() => _ImageAttachmentState();
@@ -99,6 +106,7 @@ class _ImageAttachmentState extends State<ImageAttachment> {
   Future<void> _open() async {
     if (_opening) return;
     _opening = true;
+    widget.onOpen?.call();
     try {
       final Size imageSize;
       try {
@@ -115,12 +123,15 @@ class _ImageAttachmentState extends State<ImageAttachment> {
         return;
       }
       if (!mounted) return;
+      final originMessageId = ImageMessageScope.of(context);
       await Navigator.of(context).push<void>(
         PageRouteBuilder<void>(
           opaque: false,
           transitionDuration: const Duration(milliseconds: 340),
           reverseTransitionDuration: const Duration(milliseconds: 280),
           pageBuilder: (_, animation, secondaryAnimation) => ImagePreview(
+            originMessageId: originMessageId,
+            initialOriginMessageId: widget.sourceMessageId,
             images: [
               for (final image in widget.gallery) FileImage(File(image.path)),
             ],
@@ -160,7 +171,7 @@ class _ImageAttachmentState extends State<ImageAttachment> {
             child: Image.file(
               File(widget.image.path),
               width: widget.size,
-              height: widget.size,
+              height: widget.height ?? widget.size,
               fit: BoxFit.cover,
               cacheWidth: (widget.size * MediaQuery.devicePixelRatioOf(context))
                   .round(),

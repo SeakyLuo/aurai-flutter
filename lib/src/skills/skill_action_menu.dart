@@ -18,7 +18,10 @@ Future<String?> showSkillActionMenu(
 Future<String?> showSkillPreferencesMenu(
   BuildContext context,
   Offset position,
-) => _showSkillMenu(context, position, [('permissions', '偏好权限')]);
+) => _showSkillMenu(context, position, [
+  ('permissions', '偏好权限'),
+  ('sort', '排序'),
+]);
 
 Future<String?> _showSkillMenu(
   BuildContext context,
@@ -81,7 +84,11 @@ Future<String?> _showSkillMenu(
                                 ),
                                 child: Row(
                                   children: [
-                                    if (entry.$1 == 'permissions')
+                                    if (entry.$1 == 'sort')
+                                      const SettingsIcon(
+                                        type: SettingsIconType.filter,
+                                      )
+                                    else if (entry.$1 == 'permissions')
                                       const SettingsIcon(
                                         type: SettingsIconType.personalization,
                                       )

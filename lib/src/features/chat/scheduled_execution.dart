@@ -24,6 +24,7 @@ extension ScheduledExecution on ChatController {
         AgentMessage(
           id: newMessageId(),
           role: AgentMessageRole.user,
+          senderId: MessageSender.localUser.id,
           text: instruction,
           createdAt: DateTime.now(),
         ),
@@ -33,7 +34,7 @@ extension ScheduledExecution on ChatController {
       _updateConversationList(conversation);
       _conversationChanged();
       enteredRuntime = true;
-      await _executeConversation(conversation);
+      await _executeConversation(conversation, scheduled: true);
       outcome = 'completed';
     } on Object catch (error) {
       failure = error is StateError

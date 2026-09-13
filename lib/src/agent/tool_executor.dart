@@ -20,7 +20,6 @@ class ToolExecutor {
   final ToolConfirmation _confirm;
   AgentTool? _activeTool;
   bool _cancelRequested = false;
-  final Map<String, Object> _authorizationGrants = <String, Object>{};
 
   Future<ToolResult> execute(
     ToolCall call, {
@@ -38,6 +37,7 @@ class ToolExecutor {
         },
       );
     }
+    _registry.load([call.name]);
     final capability = _registry.capabilityFor(tool);
     final questions = _registry.find('askUser') as AskUserTool?;
     if (call.userAction != null &&
@@ -79,25 +79,16 @@ class ToolExecutor {
         ? (tool as ToolConfirmationPolicyAgentTool).requiresConfirmation(call)
         : safety == ToolSafety.sensitive || safety == ToolSafety.destructive;
     if (needsConfirmation) {
-      final scopedTool = tool is ScopedAuthorizationAgentTool
-          ? tool as ScopedAuthorizationAgentTool
-          : null;
-      final requestedScope = scopedTool?.authorizationScope(call);
-      final grantedScope = _authorizationGrants[call.name];
-      final alreadyGranted =
-          scopedTool != null &&
-          grantedScope != null &&
-          scopedTool.authorizationCovers(grantedScope, requestedScope!);
-      if (!alreadyGranted) {
+      {
         final seconds = call.confirmationTimeoutSeconds;
-        if (seconds == null || seconds <= 0) {
+        if (seconds != null && seconds <= 0) {
           return ToolResult(
             callId: call.id,
             toolName: call.name,
             status: ToolResultStatus.error,
             output: const {
               'error':
-                  'Specify a positive integer confirmationTimeoutSeconds to choose the user approval waiting time.',
+                  'Specify null or a positive integer confirmationTimeoutSeconds to choose the user approval waiting time.',
             },
           );
         }
@@ -115,9 +106,6 @@ class ToolExecutor {
                     'This screen operation was not approved. Do not repeat the same request. If the observation is stale, observe again before acting. If the user declined screen access, stop screen operations; authorization can only be requested in a new user task.',
             },
           );
-        }
-        if (requestedScope != null) {
-          _authorizationGrants[call.name] = requestedScope;
         }
       }
     }

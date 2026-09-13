@@ -9,7 +9,8 @@ extension _ChatAttachments on _ChatPageState {
 
   Future<void> _addImages(BuildContext buttonContext) async {
     final controller = widget.controller;
-    if (controller.addingImages || controller.isBusy || _preparingGoal) return;
+    if (controller.addingImages || !controller.canEditDraft || _preparingGoal)
+      return;
     final source = await showImageSourceMenu(buttonContext);
     if (source == null || !mounted) return;
     if (source == AttachmentSource.file) {

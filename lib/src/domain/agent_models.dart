@@ -1,4 +1,5 @@
 import 'message_file.dart';
+import 'message_sender.dart';
 import 'message_image.dart';
 
 enum AgentMessageRole { user, assistant }
@@ -7,6 +8,7 @@ class AgentMessage {
   const AgentMessage({
     required this.id,
     required this.role,
+    required this.senderId,
     required this.text,
     required this.createdAt,
     this.images = const [],
@@ -19,6 +21,7 @@ class AgentMessage {
 
   final String id;
   final AgentMessageRole role;
+  final String senderId;
   final String text;
   final DateTime createdAt;
   final List<MessageImage> images;
@@ -31,6 +34,7 @@ class AgentMessage {
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
     'role': role.name,
+    'senderId': senderId,
     'text': text,
     'createdAt': createdAt.toIso8601String(),
     'images': images.map((image) => image.toJson()).toList(),
@@ -44,6 +48,12 @@ class AgentMessage {
   }) => AgentMessage(
     id: json['id']! as String,
     role: AgentMessageRole.values.byName(json['role']! as String),
+    // JSON conversations saved before sender identities only contain a role.
+    senderId:
+        json['senderId'] as String? ??
+        (json['role'] == 'user'
+            ? MessageSender.localUser.id
+            : MessageSender.aurai.id),
     text: json['text']! as String,
     createdAt: DateTime.parse(json['createdAt']! as String),
     taskSummary: json['taskSummary'] == null
@@ -142,6 +152,7 @@ class AgentTaskSummary {
 class AgentTaskActivity {
   const AgentTaskActivity({
     required this.text,
+    this.messageId,
     this.status,
     this.toolName,
     this.requestJson,
@@ -149,6 +160,7 @@ class AgentTaskActivity {
   });
 
   final String text;
+  final String? messageId;
   final String? toolName;
   final AgentStepStatus? status;
   final String? requestJson;
@@ -156,6 +168,7 @@ class AgentTaskActivity {
 
   Map<String, Object?> toJson() => {
     'text': text,
+    if (messageId != null) 'messageId': messageId,
     if (toolName != null) 'toolName': toolName,
     'status': status?.name,
     if (requestJson != null) 'requestJson': requestJson,
@@ -166,6 +179,7 @@ class AgentTaskActivity {
     final status = json['status'] as String?;
     return AgentTaskActivity(
       text: json['text']! as String,
+      messageId: json['messageId'] as String?,
       toolName: json['toolName'] as String?,
       status: status == null ? null : AgentStepStatus.values.byName(status),
       requestJson: json['requestJson'] as String?,
@@ -201,6 +215,11 @@ String toolTitle(String name) => switch (name) {
   'goBack' => '返回上一页',
   'goHome' => '返回主屏幕',
   'readWebPage' => '读取网页',
+  'listMemories' => '查询记忆',
+  'readMemory' => '读取记忆',
+  'createMemory' => '新增记忆',
+  'updateMemory' => '修改记忆',
+  'deleteMemory' => '删除记忆',
   'prepareMemoryChanges' => '整理记忆建议',
   'applyMemoryChanges' => '应用记忆调整',
   'getModelBalance' => '查询模型账户余额',

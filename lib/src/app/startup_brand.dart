@@ -64,7 +64,7 @@ class StartupBrand extends StatelessWidget {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 48,
+            bottom: 72,
             child: SafeArea(
               top: false,
               child: Center(

@@ -1,4 +1,8 @@
+import '../../storage/attachment_search.dart';
+import '../../storage/group_chat_store.dart';
+import '../../storage/conversation_tool_history.dart';
 import '../../agent/attachment_tool.dart';
+import 'tool_approval_store.dart';
 import '../../domain/message_file.dart';
 import '../../platform/message_file_store.dart';
 import '../../platform/document_tools.dart';
@@ -20,6 +24,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../agent/agent_runtime.dart';
+import '../../agent/system_prompt.dart';
 import '../../agent/ask_user_tool.dart';
 import '../../agent/model_balance_tool.dart';
 import '../../agent/memory_tools.dart';
@@ -30,6 +35,7 @@ import '../../agent/local_history_tools.dart';
 import '../../agent/web_tools.dart';
 import '../../agent/source_dates_tool.dart';
 import '../../domain/agent_models.dart';
+import '../../domain/message_sender.dart';
 import '../../domain/conversation_completion.dart';
 import '../../domain/capability.dart';
 import '../../domain/model_provider.dart';
@@ -53,20 +59,27 @@ import '../../storage/conversation_rows.dart';
 
 export 'conversation.dart';
 
+part 'group_reply_context.dart';
 part 'conversation_actions.dart';
+part 'image_forwarding.dart';
+part 'conversation_search_navigation.dart';
 part 'conversation_run.dart';
 part 'scheduled_execution.dart';
 part 'message_edit_actions.dart';
 part 'accessibility_request.dart';
 
 class PendingConfirmation {
-  PendingConfirmation(this.call, this.definition)
-    : deadline = DateTime.now().add(
-        Duration(seconds: call.confirmationTimeoutSeconds!),
-      );
-  final DateTime deadline;
+  PendingConfirmation(this.call, this.definition, this.conversationId)
+    : deadline = call.confirmationTimeoutSeconds == null
+          ? null
+          : DateTime.now().add(
+              Duration(seconds: call.confirmationTimeoutSeconds!),
+            );
+  final String conversationId;
+  final DateTime? deadline;
   final ToolCall call;
   final ToolDefinition definition;
+  String scope = 'once';
   final completer = Completer<bool>();
 }
 
@@ -76,6 +89,7 @@ class ChatController extends ChangeNotifier {
   final AuraiPlatform _platform;
   final scheduledTasks = ScheduledTasks();
   final skills = SkillStore();
+  final toolApprovals = ToolApprovalStore();
   String? pendingComposerDraft;
 
   Future<void> prepareSkillCreation() async {
@@ -165,6 +179,9 @@ class ChatController extends ChangeNotifier {
       runState == ChatRunState.running ||
       runState == ChatRunState.stopping;
 
+  bool get canEditDraft =>
+      !_submitting && !_claimingSchedule && !changingConversation;
+
   ModelConfig get config => modelSettings.activeConfig;
 
   bool get needsConfiguration => !config.isConfigured;
@@ -177,6 +194,7 @@ class ChatController extends ChangeNotifier {
   Future<void> initialize() async {
     _platform.setStopHandler(stop, () => notificationOpenRequests.value++);
     await _imageStore.initialize();
+    await toolApprovals.initialize();
     modelSettings = await _platform.loadModelSettings();
     await refreshCapabilities();
     final activeId = await _store.initialize(
@@ -195,7 +213,9 @@ class ChatController extends ChangeNotifier {
     _activeConversation = activeId == null
         ? _newConversation
         : await _store.load(activeId);
-    if (activeId != null && activeConversation.messageCount == 0) {
+    if (activeId != null &&
+        activeConversation.kind == ConversationKind.direct &&
+        activeConversation.messageCount == 0) {
       _newConversation = activeConversation;
       await _newDraftStore.save(_newConversation);
       await _store.removeDraftConversation(activeId);
@@ -207,8 +227,11 @@ class ChatController extends ChangeNotifier {
 
   Future<bool> submitGoal(String goal) async {
     if (hasRunningTask) throw StateError('另一个会话正在运行，请等待完成');
+    cancelSearchNavigation();
     _submitting = true;
-    final wasNew = activeConversation.messageCount == 0;
+    final wasNew =
+        activeConversation.kind == ConversationKind.direct &&
+        activeConversation.messageCount == 0;
     final previousDraft = activeConversation.draft;
     try {
       if (wasNew) await _newDraftStore.save(activeConversation);
@@ -217,6 +240,7 @@ class ChatController extends ChangeNotifier {
         AgentMessage(
           id: newMessageId(),
           role: AgentMessageRole.user,
+          senderId: MessageSender.localUser.id,
           text: goal,
           images: List.unmodifiable(draftImages),
           files: List.unmodifiable(draftFiles),
@@ -233,7 +257,13 @@ class ChatController extends ChangeNotifier {
       runState = ChatRunState.idle;
       notifyListeners();
       try {
-        await _persist();
+        await _persist(
+          recipients: activeConversation.kind == ConversationKind.group
+              ? {
+                  messages.last.id: [activeConversation.defaultSenderId],
+                }
+              : const {},
+        );
       } on Object {
         final unsent = messages.removeLast();
         activeConversation.messageCount--;
@@ -363,10 +393,13 @@ class ChatController extends ChangeNotifier {
   Future<void> selectConversation(String id) => _switchConversation(id);
 
   final _loadedMessageCounts = <String, int>{};
+  final _searchWindows = <String, Conversation>{};
+  int _searchNavigationGeneration = 0;
 
   Future<void> _switchConversation(String? id) async {
     if (_submitting || addingImages || changingConversation)
       throw StateError('请等待当前操作完成，再切换会话');
+    cancelSearchNavigation();
     changingConversation = true;
     notifyListeners();
     try {
@@ -402,6 +435,7 @@ class ChatController extends ChangeNotifier {
               ..draftImages.addAll(activeConversation.draftImages);
       }
       _activeConversation = conversation;
+      _restoreSearchWindow(conversation);
       _store.writer.retain([
         ...conversation.messages,
         if (_runningConversation != null &&
@@ -419,7 +453,9 @@ class ChatController extends ChangeNotifier {
 
   void _updateConversationList([Conversation? value]) {
     final conversation = value ?? activeConversation;
-    if (conversation.messageCount == 0) return;
+    if (conversation.kind == ConversationKind.group ||
+        conversation.messageCount == 0)
+      return;
     final index = _conversations.indexWhere(
       (item) => item.id == conversation.id,
     );
@@ -431,7 +467,7 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<void> _reloadConversations() async {
-    final page = await _store.reader.list();
+    final page = await _store.reader.list(kind: ConversationKind.direct);
     _conversations
       ..clear()
       ..addAll(
@@ -451,7 +487,10 @@ class ChatController extends ChangeNotifier {
     if (loadingConversations || !hasMoreConversations) return;
     loadingConversations = true;
     try {
-      final page = await _store.reader.list(after: _conversationCursor);
+      final page = await _store.reader.list(
+        after: _conversationCursor,
+        kind: ConversationKind.direct,
+      );
       final ids = _conversations.map((item) => item.id).toSet();
       _conversations.addAll(page.where((item) => !ids.contains(item.id)));
       if (page.isNotEmpty) _conversationCursor = page.last;
@@ -461,6 +500,11 @@ class ChatController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  GroupChatStore get groupStore => _store.groups;
+
+  Future<List<Conversation>> groupConversations({Conversation? after}) =>
+      _store.reader.list(after: after, kind: ConversationKind.group);
 
   Future<void> loadEarlierMessages() async {
     if (loadingEarlierMessages || !activeConversation.hasEarlierMessages)
@@ -482,6 +526,15 @@ class ChatController extends ChangeNotifier {
     String query,
     int offset,
   ) => _store.reader.search(query, offset);
+
+  Future<List<AttachmentSearchResult>> searchAttachments(
+    String query,
+    int offset, {
+    int limit = AttachmentSearch.pageSize,
+  }) => AttachmentSearch(
+    _store.database,
+    _imageStore.directory,
+  ).search(query, offset, limit: limit);
 
   Future<void> addImages([ImageSource? source]) async {
     addingImages = true;
@@ -561,9 +614,11 @@ class ChatController extends ChangeNotifier {
 
   Future<void> saveDraft() => _persist();
 
-  Future<void> _persist() => activeConversation.messageCount == 0
+  Future<void> _persist({Map<String, List<String>> recipients = const {}}) =>
+      activeConversation.kind == ConversationKind.direct &&
+          activeConversation.messageCount == 0
       ? _newDraftStore.save(activeConversation)
-      : _store.writer.save(activeConversation);
+      : _store.writer.save(activeConversation, recipients: recipients);
 
   Future<bool> getScreenAccess() => _platform.getScreenAccess();
   Future<void> setScreenAccess(bool allowed) =>
@@ -582,25 +637,41 @@ class ChatController extends ChangeNotifier {
       definition,
     );
     final conversationId = _runningConversation!.id;
-    await _platform.updateAttentionNotification(
-      conversationId,
-      'approval',
-      title: '等待你的授权',
-      body: definition.confirmationDescriptionFor(call.arguments),
-      timeoutSeconds: call.confirmationTimeoutSeconds!,
-    );
+    final existing = toolApprovals.allows(conversationId, call);
+    if (!existing)
+      await _platform.updateAttentionNotification(
+        conversationId,
+        'approval',
+        title: '等待你的授权',
+        body: definition.confirmationDescriptionFor(call.arguments),
+        timeoutSeconds: call.confirmationTimeoutSeconds,
+      );
     final bool approved;
     try {
-      approved = accessibilityAvailable
+      final scope = accessibilityAvailable
           ? await _platform.requestConfirmation(
               call.id,
               call.name,
               call.arguments,
-              definition.confirmationDescriptionFor(call.arguments),
+              '${definition.confirmationDescriptionFor(call.arguments) ?? definition.description}\n\n授权对象：${call.name == 'runSkill' ? call.arguments['name'] : toolTitle(call.name)}',
               definition.taskScopedConfirmation,
-              call.confirmationTimeoutSeconds!,
+              call.confirmationTimeoutSeconds,
+              autoApproved: existing,
             )
+          : existing
+          ? 'once'
           : await _confirmInApp(call, definition);
+      approved = scope != 'deny';
+      if (approved) {
+        await toolApprovals.grant(
+          conversationId,
+          call,
+          call.name == 'runSkill'
+              ? '技能：${call.arguments['name']}（版本 ${call.arguments['revision']}）'
+              : toolTitle(call.name),
+          scope,
+        );
+      }
     } finally {
       await _platform.updateAttentionNotification(conversationId, 'approval');
     }
@@ -609,24 +680,27 @@ class ChatController extends ChangeNotifier {
     return approved;
   }
 
-  Future<bool> _confirmInApp(ToolCall call, ToolDefinition definition) async {
+  Future<String> _confirmInApp(ToolCall call, ToolDefinition definition) async {
     final screenAccess = isScreenTool(call.name);
-    if (screenAccess && await _platform.getScreenAccess()) return true;
-    final request = PendingConfirmation(call, definition);
+    if (screenAccess && await _platform.getScreenAccess()) return 'once';
+    final request = PendingConfirmation(
+      call,
+      definition,
+      _runningConversation!.id,
+    );
     pendingConfirmation = request;
     notifyListeners();
-    final timer = Timer(
-      Duration(seconds: call.confirmationTimeoutSeconds!),
-      () {
-        if (identical(pendingConfirmation, request)) resolveConfirmation(false);
-      },
-    );
+    final timer = call.confirmationTimeoutSeconds == null
+        ? null
+        : Timer(Duration(seconds: call.confirmationTimeoutSeconds!), () {
+            if (identical(pendingConfirmation, request))
+              resolveConfirmation(false);
+          });
     try {
       final approved = await request.completer.future;
-      if (approved && screenAccess) await _platform.setScreenAccess(true);
-      return approved;
+      return approved ? request.scope : 'deny';
     } finally {
-      timer.cancel();
+      timer?.cancel();
     }
   }
 }

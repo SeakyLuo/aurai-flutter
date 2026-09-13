@@ -1,11 +1,15 @@
 part of 'chat_controller.dart';
 
 extension ConversationRun on ChatController {
-  Future<void> _executeConversation(Conversation runConversation) async {
+  Future<void> _executeConversation(
+    Conversation runConversation, {
+    bool scheduled = false,
+  }) async {
     final messages = runConversation.messages;
     final steps = runConversation.steps;
-    final runConfig = config;
-    final systemPrompt = modelSettings.systemPrompt;
+    final reply = await _replyContext(runConversation);
+    final runConfig = reply.config;
+    final systemPrompt = reply.systemPrompt;
     final customInstructions = modelSettings.customInstructions;
     final responsePreferences = modelSettings.responsePreferences;
     final memoryRevision = memory.revision;
@@ -28,6 +32,10 @@ extension ConversationRun on ChatController {
       runConversation.id,
       history[lastUser].id,
       runConfig,
+      senderId: reply.senderId,
+      systemPrompt: systemPrompt ?? agentSystemPrompt,
+      customInstructions: customInstructions,
+      responsePreferences: responsePreferences,
     );
     runConversation.activeRunId = runId;
     steps.clear();
@@ -68,7 +76,11 @@ extension ConversationRun on ChatController {
         if (scheduledTasks.supported)
           for (final operation in ScheduleTaskTool.operations)
             ScheduleTaskTool(scheduledTasks, runConversation.id, operation),
-        ...MemoryTools(memory).tools,
+        ...MemoryTools(
+          memory,
+          conversationId: runConversation.id,
+          messageId: history[lastUser].id,
+        ).tools,
         GetModelBalanceTool(modelSettings),
         OpenModelTopUpTool(modelSettings),
         AskUserTool(runConversation.id, (question) {
@@ -83,7 +95,7 @@ extension ConversationRun on ChatController {
               body: question?.question,
             ),
           );
-          if (question != null) {
+          if (question != null && sessionStarted) {
             unawaited(
               _platform.updateAgentSessionStep(
                 question.isUserAction ? '等待你操作' : '等待你的回答',
@@ -121,14 +133,19 @@ extension ConversationRun on ChatController {
           DeviceExtensionTool(_platform, name),
       ];
       final registry = ToolRegistry(tools: tools, capabilities: capabilities);
+      registry.load(
+        await recentConversationTools(_store.database, runConversation.id),
+      );
       final executor = ToolExecutor(registry: registry, confirm: _confirm);
       _runtime = AgentRuntime(
         provider: provider,
         registry: registry,
         executor: executor,
       );
-      await _platform.startAgentSession();
-      sessionStarted = true;
+      if (scheduled) {
+        await _platform.startAgentSession('正在执行定时任务');
+        sessionStarted = true;
+      }
       if (runConversation.runState == ChatRunState.stopping)
         throw const AgentCancelled();
       var turnOrdinal = 0;
@@ -166,8 +183,18 @@ extension ConversationRun on ChatController {
           await _persistRun(runConversation);
           await _store.runs.finishTurn(modelTurnId, turn);
         },
-        onToolStarted: (call) =>
-            _store.runs.startTool(runConversation.id, runId, modelTurnId, call),
+        onToolStarted: (call) async {
+          if (!sessionStarted) {
+            await _platform.startAgentSession(toolTitle(call.name));
+            sessionStarted = true;
+          }
+          await _store.runs.startTool(
+            runConversation.id,
+            runId,
+            modelTurnId,
+            call,
+          );
+        },
         onToolCompleted: (result) => _store.runs.finishTool(runId, result),
         onReconnect: (attempt) {
           if (runConversation.reconnectAttempt == attempt) return;
@@ -191,11 +218,14 @@ extension ConversationRun on ChatController {
             turnMessageId = newMessageId();
             runMessageIds.add(turnMessageId!);
             turnActivityIndex = activities.length;
-            activities.add(AgentTaskActivity(text: text));
+            activities.add(
+              AgentTaskActivity(text: text, messageId: turnMessageId),
+            );
             messages.add(
               AgentMessage(
                 id: turnMessageId!,
                 role: AgentMessageRole.assistant,
+                senderId: reply.senderId,
                 runId: runId,
                 modelTurnId: modelTurnId,
                 text: text,
@@ -208,13 +238,17 @@ extension ConversationRun on ChatController {
             messages[messages.length - 1] = AgentMessage(
               id: previous.id,
               role: previous.role,
+              senderId: previous.senderId,
               runId: previous.runId,
               modelTurnId: previous.modelTurnId,
               text: text,
               createdAt: previous.createdAt,
             );
           }
-          activities[turnActivityIndex!] = AgentTaskActivity(text: text);
+          activities[turnActivityIndex!] = AgentTaskActivity(
+            text: text,
+            messageId: turnMessageId,
+          );
           streamingMessageId = turnMessageId;
           _notifyRun(runConversation);
         },
@@ -253,11 +287,12 @@ extension ConversationRun on ChatController {
           final runningStep = newSteps.where(
             (step) => step.status == AgentStepStatus.running,
           );
-          unawaited(
-            _platform.updateAgentSessionStep(
-              runningStep.isEmpty ? '正在分析结果' : runningStep.last.title,
-            ),
-          );
+          if (sessionStarted)
+            unawaited(
+              _platform.updateAgentSessionStep(
+                runningStep.isEmpty ? '正在分析结果' : runningStep.last.title,
+              ),
+            );
           _notifyRun(runConversation);
         },
       );
@@ -267,6 +302,7 @@ extension ConversationRun on ChatController {
         messages[messages.length - 1] = AgentMessage(
           id: answer.id,
           role: answer.role,
+          senderId: answer.senderId,
           runId: answer.runId,
           modelTurnId: answer.modelTurnId,
           text: answer.text,
@@ -304,6 +340,7 @@ extension ConversationRun on ChatController {
             AgentMessage(
               id: newMessageId(),
               role: AgentMessageRole.assistant,
+              senderId: reply.senderId,
               text: '',
               runId: runId,
               createdAt: DateTime.now(),
@@ -315,6 +352,7 @@ extension ConversationRun on ChatController {
         messages[messages.length - 1] = AgentMessage(
           id: last.id,
           role: last.role,
+          senderId: last.senderId,
           text: last.text,
           runId: last.runId,
           modelTurnId: last.modelTurnId,
@@ -333,6 +371,7 @@ extension ConversationRun on ChatController {
                     for (final activity in activities)
                       AgentTaskActivity(
                         text: activity.text,
+                        messageId: activity.messageId,
                         toolName: activity.toolName,
                         requestJson: activity.requestJson,
                         resultJson: activity.resultJson,

@@ -1,4 +1,5 @@
 import 'skill_icon_names.dart';
+import 'skill_sort.dart';
 import 'skill_permission.dart';
 import 'dart:convert';
 import 'dart:math';
@@ -53,6 +54,53 @@ class SkillStore extends ChangeNotifier {
   final _preferences = SharedPreferencesAsync();
   final Map<String, SavedSkill> _skills = {};
   final Map<String, SkillPermission> _permissions = {};
+  final Map<String, Map<String, int>> _statistics = {};
+  SkillSort sort = SkillSort.createdDescending;
+
+  DateTime? createdAt(String id) => _statisticTime(id, 'created');
+  DateTime? updatedAt(String id) => _statisticTime(id, 'updated');
+  int useCount(String id) => _statistics[id]?['uses'] ?? 0;
+
+  DateTime? _statisticTime(String id, String field) {
+    final value = _statistics[id]?[field];
+    return value == null ? null : DateTime.fromMicrosecondsSinceEpoch(value);
+  }
+
+  Future<void> saveSort(SkillSort value) => _enqueue(() async {
+    await _database.insert('app_state', {
+      'key': 'skill_sort',
+      'value': value.name,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    sort = value;
+    notifyListeners();
+  });
+
+  int compareSkills(SavedSkill a, SavedSkill b) {
+    final first =
+        _statistics[a.id]?[sort.field] ?? (sort.field == 'uses' ? 0 : null);
+    final second =
+        _statistics[b.id]?[sort.field] ?? (sort.field == 'uses' ? 0 : null);
+    if (first == null && second != null) return 1;
+    if (first != null && second == null) return -1;
+    final comparison = first == null ? 0 : first.compareTo(second!);
+    if (comparison != 0) return sort.descending ? -comparison : comparison;
+    final byName = a.name.compareTo(b.name);
+    return byName != 0 ? byName : a.id.compareTo(b.id);
+  }
+
+  Future<void> recordUse(String id) => _enqueue(() async {
+    if (!_skills.containsKey(id)) return;
+    final stats = {
+      ...?_statistics[id],
+      'uses': (_statistics[id]?['uses'] ?? 0) + 1,
+    };
+    await _database.insert('app_state', {
+      'key': 'skill_statistics',
+      'value': jsonEncode({..._statistics, id: stats}),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    _statistics[id] = stats;
+    notifyListeners();
+  });
 
   SkillPermission permissionFor(String id) =>
       _permissions[id] ?? defaultPermission;
@@ -109,12 +157,26 @@ class SkillStore extends ChangeNotifier {
       database.query('skill_dependencies'),
       database.query(
         'app_state',
-        where: 'key IN (?, ?)',
-        whereArgs: ['skill_permissions', 'skill_default_permission'],
+        where: 'key IN (?, ?, ?, ?)',
+        whereArgs: [
+          'skill_permissions',
+          'skill_default_permission',
+          'skill_statistics',
+          'skill_sort',
+        ],
       ),
     ]);
     for (final row in rows[2]) {
-      if (row['key'] == 'skill_default_permission') {
+      if (row['key'] == 'skill_sort') {
+        sort = SkillSort.values.byName(row['value'] as String);
+      } else if (row['key'] == 'skill_statistics') {
+        final stored = jsonDecode(row['value'] as String) as Map;
+        for (final entry in stored.entries) {
+          _statistics[entry.key as String] = Map<String, int>.from(
+            entry.value as Map,
+          );
+        }
+      } else if (row['key'] == 'skill_default_permission') {
         defaultPermission = SkillPermission.values.byName(
           row['value'] as String,
         );
@@ -225,6 +287,12 @@ class SkillStore extends ChangeNotifier {
       dependencyIds: List.unmodifiable(value.dependencyIds.toSet()),
     );
     _validateGraph({..._skills, saved.id: saved});
+    final now = DateTime.now().microsecondsSinceEpoch;
+    final statistics = {
+      ...?_statistics[saved.id],
+      if (old == null) 'created': now,
+      'updated': now,
+    };
     final nextPermissions = Map<String, SkillPermission>.of(_permissions);
     final contentChanged =
         old != null &&
@@ -243,6 +311,10 @@ class SkillStore extends ChangeNotifier {
     }
 
     await _database.transaction((txn) async {
+      await txn.insert('app_state', {
+        'key': 'skill_statistics',
+        'value': jsonEncode({..._statistics, saved.id: statistics}),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
       if (old == null) {
         await txn.insert('skills', _row(saved));
       } else {
@@ -276,6 +348,7 @@ class SkillStore extends ChangeNotifier {
     _permissions
       ..clear()
       ..addAll(nextPermissions);
+    _statistics[saved.id] = statistics;
     _skills[saved.id] = saved;
     notifyListeners();
   });
@@ -292,6 +365,10 @@ class SkillStore extends ChangeNotifier {
     await _database.transaction((txn) async {
       await txn.delete('skills', where: 'id = ?', whereArgs: [skill.id]);
       await txn.insert('app_state', {
+        'key': 'skill_statistics',
+        'value': jsonEncode(Map.of(_statistics)..remove(skill.id)),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await txn.insert('app_state', {
         'key': 'skill_permissions',
         'value': jsonEncode(
           nextPermissions.map((id, value) => MapEntry(id, value.name)),
@@ -299,6 +376,7 @@ class SkillStore extends ChangeNotifier {
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     });
     _permissions.remove(skill.id);
+    _statistics.remove(skill.id);
     _skills.remove(skill.id);
     notifyListeners();
   });

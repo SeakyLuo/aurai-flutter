@@ -373,16 +373,28 @@ class _JsonCodeState extends State<_JsonCode> {
                         13,
                     style,
                   );
-                  return ListView.builder(
+                  return CustomScrollView(
                     controller: _scroll,
                     primary: false,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 14,
-                    ),
-                    itemExtentBuilder: (index, _) => heights[index],
-                    itemCount: lines.length,
-                    itemBuilder: (_, index) => lineAt(index),
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 14,
+                        ),
+                        sliver: SliverVariedExtentList(
+                          itemExtentBuilder: (index, _) => heights[index],
+                          delegate: _MeasuredPayloadDelegate(
+                            (_, index) => lineAt(index),
+                            childCount: lines.length,
+                            totalExtent: heights.fold(
+                              0.0,
+                              (sum, height) => sum + height,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   );
                 },
               ),
@@ -392,4 +404,24 @@ class _JsonCodeState extends State<_JsonCode> {
       ),
     );
   }
+}
+
+// Varied extents still use a visible-child estimate unless the delegate
+// supplies the full extent. Keep thumb dragging independent of visible rows.
+class _MeasuredPayloadDelegate extends SliverChildBuilderDelegate {
+  _MeasuredPayloadDelegate(
+    super.builder, {
+    required super.childCount,
+    required this.totalExtent,
+  });
+
+  final double totalExtent;
+
+  @override
+  double estimateMaxScrollOffset(
+    int firstIndex,
+    int lastIndex,
+    double leadingScrollOffset,
+    double trailingScrollOffset,
+  ) => totalExtent;
 }

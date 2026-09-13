@@ -1,3 +1,4 @@
+import 'tool_approvals_page.dart';
 import '../../skills/skills_page.dart';
 import 'package:flutter/material.dart';
 import '../../memory/memory_summary_page.dart';
@@ -241,6 +242,29 @@ class SettingsPage extends StatelessWidget {
                         type: SettingsIconType.chevron,
                       ),
                       onTap: () => _openSkills(context),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Material(
+                    color: settingsFieldColor(context),
+                    borderRadius: BorderRadius.circular(26),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      leading: const SettingsIcon(
+                        type: SettingsIconType.device,
+                      ),
+                      title: const Text('工具授权'),
+                      subtitle: const Text('管理始终允许和当前会话的授权'),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              ToolApprovalsPage(controller: controller),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),

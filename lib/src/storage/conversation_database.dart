@@ -1,15 +1,23 @@
 import '../skills/skill_schema.dart';
+import 'message_sender_schema.dart';
+import 'group_chat_schema.dart';
 import 'package:sqflite/sqflite.dart';
 import '../memory/memory_controller.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 9,
+  version: 12,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion < 10) await migrateMessageSenders(db);
+    if (oldVersion < 11) await migrateGroupChats(db);
+    if (oldVersion < 12) await db.execute(temporaryAiColumn);
+    if (oldVersion < 9 && oldVersion >= 4) {
+      await db.execute('DROP TABLE forgotten_memories');
+    }
     if (oldVersion < 9) {
       await db.execute(
         "ALTER TABLE attachments ADD COLUMN kind TEXT NOT NULL DEFAULT 'image'",
@@ -37,7 +45,6 @@ Future<Database> openConversationDatabase() async => openDatabase(
         'ALTER TABLE conversations ADD COLUMN scheduled_task INTEGER NOT NULL DEFAULT 0',
       );
     }
-    if (oldVersion < 4) await db.execute(forgottenMemorySchema);
     if (oldVersion < 3) {
       await db.execute(
         'ALTER TABLE conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0',
@@ -58,9 +65,10 @@ Future<Database> openConversationDatabase() async => openDatabase(
     final batch = db.batch();
     for (final statement in [
       ..._schema,
+      ...groupChatTables,
+      temporaryAiColumn,
       ...skillSchema,
       ...memorySchema,
-      forgottenMemorySchema,
     ]) {
       batch.execute(statement);
     }
@@ -69,6 +77,8 @@ Future<Database> openConversationDatabase() async => openDatabase(
 );
 
 const _schema = [
+  ...messageSenderSchema,
+  ...messageSenderAvatarColumns,
   '''CREATE TABLE app_state (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -78,6 +88,8 @@ const _schema = [
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     title TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'direct',
+    default_sender_id TEXT NOT NULL DEFAULT 'agent:aurai' REFERENCES message_senders(id),
     preview TEXT,
     pinned INTEGER NOT NULL DEFAULT 0,
     archived INTEGER NOT NULL DEFAULT 0,
@@ -93,6 +105,8 @@ const _schema = [
     id TEXT PRIMARY KEY,
     conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     user_message_id TEXT,
+    sender_id TEXT NOT NULL DEFAULT 'agent:aurai' REFERENCES message_senders(id),
+    configuration_json TEXT,
     provider TEXT,
     model TEXT,
     status TEXT NOT NULL,
@@ -120,6 +134,7 @@ const _schema = [
     conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     run_id TEXT REFERENCES agent_runs(id) ON DELETE CASCADE,
     model_turn_id TEXT REFERENCES model_turns(id) ON DELETE CASCADE,
+    sender_id TEXT NOT NULL REFERENCES message_senders(id),
     role TEXT NOT NULL,
     kind TEXT NOT NULL,
     text TEXT NOT NULL,

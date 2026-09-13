@@ -57,10 +57,10 @@ class ToolDefinition {
           },
         if (confirmation)
           'confirmationTimeoutSeconds': {
-            'type': 'integer',
+            'type': ['integer', 'null'],
             'minimum': 1,
             'description':
-                'Choose how many seconds to give the user to review and approve this operation. Consider the amount of detail and urgency. On timeout the app rejects the operation; timeout never grants permission.',
+                'Use null to wait until the user answers, without a deadline. Set a positive number of seconds only when a timeout is needed. On timeout the app rejects the operation; timeout never grants permission.',
           },
       },
       'required': [

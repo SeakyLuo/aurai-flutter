@@ -21,9 +21,11 @@ class TaskSummaryView extends StatefulWidget {
     required this.summary,
     required this.messageId,
     required this.onOpenLink,
+    this.excludedMessageId,
   });
 
   final AgentTaskSummary summary;
+  final String? excludedMessageId;
   final String messageId;
   String get storageId => 'task-expanded:$messageId';
   final ValueChanged<String?> onOpenLink;
@@ -50,6 +52,8 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
   void didUpdateWidget(TaskSummaryView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.summary, widget.summary)) _activityWidgets = null;
+    if (oldWidget.excludedMessageId != widget.excludedMessageId)
+      _activityWidgets = null;
     if (!oldWidget.summary.stopped && widget.summary.stopped) {
       _expanded = true;
       PageStorage.of(
@@ -68,6 +72,10 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
         : const <String, SourceReference>{};
     Widget activityAt(int index) {
       final activity = widget.summary.activities[index];
+      if (widget.excludedMessageId != null &&
+          activity.messageId == widget.excludedMessageId) {
+        return const SizedBox.shrink();
+      }
       return Padding(
         padding: EdgeInsets.symmetric(
           vertical: activity.status == null ? 9 : 5,

@@ -1,14 +1,31 @@
 import '../domain/tool_models.dart';
 import '../memory/memory_controller.dart';
 import '../providers/responses_transport.dart';
+import 'memory_record_tools.dart';
 
 class MemoryTools {
-  MemoryTools(this.memory);
+  MemoryTools(
+    this.memory, {
+    required this.conversationId,
+    required this.messageId,
+  });
+  final String conversationId;
+  final String messageId;
   final MemoryController memory;
   MemoryPlan? plan;
   ResponsesTransport? transport;
   int generation = 0;
-  List<AgentTool> get tools => [_PrepareMemory(this), _ApplyMemory(this)];
+  List<AgentTool> get tools => [
+    for (final operation in MemoryRecordTool.operations)
+      MemoryRecordTool(
+        memory,
+        operation,
+        conversationId: conversationId,
+        messageId: messageId,
+      ),
+    _PrepareMemory(this),
+    _ApplyMemory(this),
+  ];
 }
 
 class _PrepareMemory implements AgentTool, RuntimeCapabilityAgentTool {
@@ -81,6 +98,7 @@ class _ApplyMemory
     inputSchema: const {
       'type': 'object',
       'properties': {},
+      'required': [],
       'additionalProperties': false,
     },
     safety: ToolSafety.sensitive,

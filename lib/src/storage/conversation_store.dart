@@ -6,6 +6,7 @@ import '../domain/agent_models.dart';
 import '../domain/context_summary.dart';
 import '../features/chat/conversation.dart';
 import 'agent_run_store.dart';
+import 'group_chat_store.dart';
 import 'conversation_database.dart';
 import 'conversation_migration.dart';
 import 'conversation_reader.dart';
@@ -19,6 +20,7 @@ class ConversationStore {
   late final ConversationReader reader;
   late final ConversationWriter writer;
   late final AgentRunStore runs;
+  late final GroupChatStore groups;
 
   Future<String?> initialize(
     String imageDirectory,
@@ -30,6 +32,7 @@ class ConversationStore {
       reader = ConversationReader(database, imageDirectory);
       writer = ConversationWriter(database);
       runs = AgentRunStore(database);
+      groups = GroupChatStore(database);
       final initialized = await database.query(
         'app_state',
         where: 'key = ?',
@@ -80,7 +83,7 @@ class ConversationStore {
       await database.delete(
         'conversations',
         where:
-            "message_count = 0 AND draft = '' AND pending_goal IS NULL AND NOT EXISTS (SELECT 1 FROM attachments WHERE conversation_id = conversations.id)",
+            "kind = 'direct' AND message_count = 0 AND draft = '' AND pending_goal IS NULL AND NOT EXISTS (SELECT 1 FROM attachments WHERE conversation_id = conversations.id)",
       );
       await database.delete(
         'app_state',
@@ -120,7 +123,7 @@ class ConversationStore {
     await writer.flush();
     await database.delete(
       'conversations',
-      where: 'id = ? AND message_count = 0',
+      where: "id = ? AND kind = 'direct' AND message_count = 0",
       whereArgs: [id],
     );
     await selectNewConversation();

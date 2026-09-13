@@ -10,6 +10,8 @@ Map<String, Object?> conversationRow(Conversation value) => {
   'created_at': value.createdAt.microsecondsSinceEpoch,
   'updated_at': value.updatedAt.microsecondsSinceEpoch,
   'title': value.title,
+  'kind': value.kind.name,
+  'default_sender_id': value.defaultSenderId,
   'preview': value.preview,
   'pinned': value.isPinned ? 1 : 0,
   'archived': value.isArchived ? 1 : 0,
@@ -29,6 +31,8 @@ Conversation conversationFromRow(Map<String, Object?> row) =>
           row['created_at']! as int,
         ),
       )
+      ..kind = ConversationKind.values.byName(row['kind'] as String)
+      ..defaultSenderId = row['default_sender_id'] as String
       ..storedUpdatedAt = DateTime.fromMicrosecondsSinceEpoch(
         row['updated_at']! as int,
       )
@@ -50,6 +54,7 @@ Map<String, Object?> messageRow(String conversationId, AgentMessage value) => {
   'run_id': value.runId,
   'model_turn_id': value.modelTurnId,
   'role': value.role.name,
+  'sender_id': value.senderId,
   'kind': value.role == AgentMessageRole.user
       ? 'user'
       : value.taskSummary != null
@@ -72,6 +77,7 @@ Map<String, Object?> attachmentRow(
     'message_id': messageId,
     'file_name': fileName,
     'mime_type': image.mimeType,
+    'display_name': image.name,
     'position': position,
   };
 }
@@ -80,6 +86,7 @@ MessageImage imageFromRow(Map<String, Object?> row, String directory) =>
     MessageImage(
       path: '$directory/${row['file_name']}',
       mimeType: row['mime_type']! as String,
+      name: row['display_name'] as String?,
     );
 
 Map<String, Object?> fileAttachmentRow(

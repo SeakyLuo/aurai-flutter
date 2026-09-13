@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -79,13 +80,26 @@ class MessageImageStore {
         final path =
             '$directory/${DateTime.now().microsecondsSinceEpoch}.$extension';
         await File(path).writeAsBytes(bytes, flush: true);
-        images.add(MessageImage(path: path, mimeType: mimeType!));
+        images.add(
+          MessageImage(
+            path: path,
+            mimeType: mimeType!,
+            name: Platform.isAndroid && file.name.startsWith('scaled_')
+                ? file.name.substring(7)
+                : file.name,
+          ),
+        );
       }
       return images;
     } on Object {
       await remove(images);
       rethrow;
     }
+  }
+
+  Future<MessageImage> importBytes(List<int> bytes) async {
+    final file = XFile.fromData(Uint8List.fromList(bytes));
+    return (await _store([file], 1)).single;
   }
 
   Future<void> remove(Iterable<MessageImage> images) async {

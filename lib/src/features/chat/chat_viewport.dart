@@ -27,6 +27,8 @@ class ChatViewport extends StatefulWidget {
     required this.sentMessageTop,
     required this.followOutput,
     required this.hasEarlierMessages,
+    required this.hasLaterMessages,
+    required this.loadLaterMessages,
     required this.loadEarlierMessages,
     required this.onBookmark,
     required this.onFollowOutputChanged,
@@ -41,6 +43,8 @@ class ChatViewport extends StatefulWidget {
   final double sentMessageTop;
   final bool followOutput;
   final bool hasEarlierMessages;
+  final bool hasLaterMessages;
+  final Future<void> Function() loadLaterMessages;
   final Future<void> Function() loadEarlierMessages;
   final ValueChanged<ChatScrollBookmark> onBookmark;
   final ValueChanged<bool> onFollowOutputChanged;
@@ -54,6 +58,9 @@ class ChatViewport extends StatefulWidget {
 }
 
 class ChatViewportState extends State<ChatViewport> {
+  // Message bookmarks own restoration; do not reuse the list package
+  // position cache from an earlier viewport or search window.
+  final _pageStorage = PageStorageBucket();
   final _items = ItemScrollController();
   final _positions = ItemPositionsListener.create();
   late Map<String, int> _indices;
@@ -332,72 +339,79 @@ class ChatViewportState extends State<ChatViewport> {
   }
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final heightChanged = _height != constraints.maxHeight;
-      _height = constraints.maxHeight;
-      if (heightChanged && _following) _scheduleBottomSync();
-      if (_keepSentMessageAtTop) _scheduleSentSync();
-      final anchor = widget.bookmark;
-      return PaginationListener(
-        hasMore: widget.hasEarlierMessages,
-        loadMore: widget.loadEarlierMessages,
-        loadAtStart: true,
-        child: NotificationListener<ScrollNotification>(
-          onNotification: (notification) {
-            if (notification.depth == 0) {
-              if (notification is ScrollStartNotification &&
-                  notification.dragDetails != null) {
-                _keepSentMessageAtTop = false;
-                _userScrolling = true;
-                FocusManager.instance.primaryFocus?.unfocus();
-              }
-              if (notification is ScrollEndNotification) {
-                _rememberPosition();
-                _userScrolling = false;
-              }
-            }
-            return false;
-          },
-          child: ScrollablePositionedList.builder(
-            itemScrollController: _items,
-            itemPositionsListener: _positions,
-            initialScrollIndex: anchor == null && _replyAnchorId != null
-                ? _indices[_replyAnchorId]!
-                : anchor == null || anchor.followOutput
-                ? widget.entries.length
-                : _anchorIndex(anchor),
-            initialAlignment: anchor == null && _replyAnchorId != null
-                ? _listAlignment(
-                    _indices[_replyAnchorId]!,
-                    widget.sentMessageTop / _height,
-                  )
-                : anchor == null || anchor.followOutput
-                ? (1 - widget.padding.bottom / _height).clamp(0.0, 1.0)
-                : _listAlignment(_anchorIndex(anchor), anchor.alignment),
-            padding: EdgeInsets.only(top: widget.padding.top),
-            addAutomaticKeepAlives: false,
-            minCacheExtent: 240,
-            itemCount: widget.entries.length + 1,
-            itemBuilder: (context, index) {
-              if (index == widget.entries.length) {
-                return SizedBox(height: _footerHeight);
-              }
-              final entry = widget.entries[index];
-              return KeyedSubtree(
-                key: PageStorageKey(entry.id),
-                child: ChatScrollAnchor(
-                  preserve: () => _preserveEntry(entry.id),
-                  child: ChatEntrySize(
-                    onHeight: (height) => _measureEntry(entry.id, height),
-                    child: entry.builder(context),
-                  ),
-                ),
-              );
-            },
+  Widget build(BuildContext context) => PageStorage(
+    bucket: _pageStorage,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final heightChanged = _height != constraints.maxHeight;
+        _height = constraints.maxHeight;
+        if (heightChanged && _following) _scheduleBottomSync();
+        if (_keepSentMessageAtTop) _scheduleSentSync();
+        final anchor = widget.bookmark;
+        return PaginationListener(
+          hasMore: widget.hasEarlierMessages,
+          loadMore: widget.loadEarlierMessages,
+          loadAtStart: true,
+          child: PaginationListener(
+            hasMore: widget.hasLaterMessages,
+            loadMore: widget.loadLaterMessages,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification.depth == 0) {
+                  if (notification is ScrollStartNotification &&
+                      notification.dragDetails != null) {
+                    _keepSentMessageAtTop = false;
+                    _userScrolling = true;
+                    FocusManager.instance.primaryFocus?.unfocus();
+                  }
+                  if (notification is ScrollEndNotification) {
+                    _rememberPosition();
+                    _userScrolling = false;
+                  }
+                }
+                return false;
+              },
+              child: ScrollablePositionedList.builder(
+                itemScrollController: _items,
+                itemPositionsListener: _positions,
+                initialScrollIndex: anchor == null && _replyAnchorId != null
+                    ? _indices[_replyAnchorId]!
+                    : anchor == null || anchor.followOutput
+                    ? widget.entries.length
+                    : _anchorIndex(anchor),
+                initialAlignment: anchor == null && _replyAnchorId != null
+                    ? _listAlignment(
+                        _indices[_replyAnchorId]!,
+                        widget.sentMessageTop / _height,
+                      )
+                    : anchor == null || anchor.followOutput
+                    ? (1 - widget.padding.bottom / _height).clamp(0.0, 1.0)
+                    : _listAlignment(_anchorIndex(anchor), anchor.alignment),
+                padding: EdgeInsets.only(top: widget.padding.top),
+                addAutomaticKeepAlives: false,
+                minCacheExtent: 240,
+                itemCount: widget.entries.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == widget.entries.length) {
+                    return SizedBox(height: _footerHeight);
+                  }
+                  final entry = widget.entries[index];
+                  return KeyedSubtree(
+                    key: PageStorageKey(entry.id),
+                    child: ChatScrollAnchor(
+                      preserve: () => _preserveEntry(entry.id),
+                      child: ChatEntrySize(
+                        onHeight: (height) => _measureEntry(entry.id, height),
+                        child: entry.builder(context),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           ),
-        ),
-      );
-    },
+        );
+      },
+    ),
   );
 }

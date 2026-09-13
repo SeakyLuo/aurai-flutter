@@ -1,3 +1,4 @@
+import 'image_action_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -113,6 +114,7 @@ class _ReplyImageCardState extends State<_ReplyImageCard> {
       }
       final size = await loadPreviewImageSize(_provider, context);
       if (!mounted) return;
+      final originMessageId = ImageMessageScope.of(context);
       await Navigator.push<void>(
         context,
         PageRouteBuilder(
@@ -120,6 +122,7 @@ class _ReplyImageCardState extends State<_ReplyImageCard> {
           transitionDuration: const Duration(milliseconds: 340),
           reverseTransitionDuration: const Duration(milliseconds: 280),
           pageBuilder: (_, animation, secondaryAnimation) => ImagePreview(
+            originMessageId: originMessageId,
             images: [
               for (final image in widget.images) NetworkImage(image.url),
             ],

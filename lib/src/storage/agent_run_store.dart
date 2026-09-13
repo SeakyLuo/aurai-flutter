@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/agent_models.dart';
+import '../domain/message_sender.dart';
 import '../domain/model_provider.dart';
 import '../domain/tool_models.dart';
 
@@ -13,17 +14,59 @@ class AgentRunStore {
   Future<String> start(
     String conversationId,
     String userMessageId,
-    ModelConfig config,
-  ) async {
+    ModelConfig config, {
+    String senderId = 'agent:aurai',
+    required String systemPrompt,
+    required String customInstructions,
+    required ResponsePreferences responsePreferences,
+  }) async {
     final id = newMessageId();
-    await database.insert('agent_runs', {
-      'id': id,
-      'conversation_id': conversationId,
-      'user_message_id': userMessageId,
-      'provider': config.service.name,
-      'model': config.model,
-      'status': 'running',
-      'started_at': DateTime.now().microsecondsSinceEpoch,
+    await database.transaction((txn) async {
+      // Single chats have one implicit target; group targets are captured at send time.
+      await txn.rawInsert(
+        '''INSERT OR IGNORE INTO message_recipients (message_id, sender_id)
+        SELECT m.id, c.default_sender_id FROM messages m
+        INNER JOIN conversations c ON c.id = m.conversation_id
+        WHERE m.id = ? AND c.id = ? AND c.kind = 'direct' AND m.role = 'user'
+        AND NOT EXISTS (SELECT 1 FROM message_recipients WHERE message_id = m.id)
+        ''',
+        [userMessageId, conversationId],
+      );
+      final target = await txn.query(
+        'message_recipients',
+        where:
+            'message_id = ? AND sender_id = ? AND message_id IN '
+            '(SELECT id FROM messages WHERE conversation_id = ?)',
+        whereArgs: [userMessageId, senderId, conversationId],
+        limit: 1,
+      );
+      if (target.isEmpty) throw StateError('该 AI 不在这条消息的回复对象中');
+      final senderRows = await txn.query(
+        'message_senders',
+        where: 'id = ?',
+        whereArgs: [senderId],
+        limit: 1,
+      );
+      final sender = MessageSender.fromRow(senderRows.single);
+      await txn.insert('agent_runs', {
+        'id': id,
+        'conversation_id': conversationId,
+        'user_message_id': userMessageId,
+        'sender_id': senderId,
+        'provider': config.service.name,
+        'model': config.model,
+        'configuration_json': jsonEncode({
+          'senderName': sender.name,
+          'provider': config.service.name,
+          'model': config.model,
+          'baseUrl': config.baseUrl,
+          'systemPrompt': systemPrompt,
+          'customInstructions': customInstructions,
+          'responsePreferences': responsePreferences.toJson(),
+        }),
+        'status': 'running',
+        'started_at': DateTime.now().microsecondsSinceEpoch,
+      });
     });
     return id;
   }
