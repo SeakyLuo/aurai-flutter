@@ -1,3 +1,6 @@
+import '../../domain/tool_activity_groups.dart';
+import 'tool_activity_group.dart';
+import 'markdown_link_underlines.dart';
 import 'task_elapsed.dart';
 import 'cjk_strong_syntax.dart';
 import 'package:flutter/material.dart';
@@ -5,8 +8,11 @@ import '../../app/global_ui.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../domain/agent_models.dart';
+import '../../domain/web_sources.dart';
 import 'tool_activity_view.dart';
 import 'chat_scroll_anchor.dart';
+import 'source_citation_syntax.dart';
+import 'source_citation_view.dart';
 
 class TaskSummaryView extends StatefulWidget {
   const TaskSummaryView({
@@ -53,6 +59,76 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
 
   @override
   Widget build(BuildContext context) {
+    final sources = webSourcesFromActivities(widget.summary.activities);
+    Widget activityAt(int index) {
+      final activity = widget.summary.activities[index];
+      return Padding(
+        padding: EdgeInsets.symmetric(
+          vertical: activity.status == null ? 9 : 5,
+        ),
+        child: activity.status == null
+            ? MediaQuery.removePadding(
+                context: context,
+                removeBottom: true,
+                child: SelectionArea(
+                  child: MarkdownLinkUnderlines(
+                    child: MarkdownBody(
+                      inlineSyntaxes: [
+                        SourceCitationSyntax(sources),
+                        SourceLinkSyntax(sources),
+                        CjkStrongSyntax(),
+                      ],
+                      builders: {
+                        'source-citation': SourceCitationBuilder(
+                          onOpenLink: widget.onOpenLink,
+                        ),
+                      },
+                      data: activity.text,
+                      selectable: false,
+                      onTapLink: (text, href, title) => widget.onOpenLink(href),
+                      styleSheet:
+                          MarkdownStyleSheet.fromTheme(
+                            Theme.of(context),
+                          ).copyWith(
+                            a: GlobalUI.linkStyle(context),
+                            horizontalRuleDecoration: BoxDecoration(
+                              border: Border(
+                                top: BorderSide(
+                                  width: 0.5,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.outlineVariant,
+                                ),
+                              ),
+                            ),
+                            tableColumnWidth: const IntrinsicColumnWidth(),
+                            tableScrollbarThumbVisibility: true,
+                            tablePadding: const EdgeInsets.only(bottom: 12),
+                            p: TextStyle(
+                              fontSize: 16,
+                              height: 1.65,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                    ),
+                  ),
+                ),
+              )
+            : ToolActivityView(
+                storageId: '${widget.messageId}:$index',
+                title: activity.text,
+                toolName: activity.toolName,
+                status: activity.status!,
+                requestJson: activity.requestJson,
+                resultJson: activity.resultJson,
+              ),
+      );
+    }
+
+    final groups = toolActivityGroups([
+      for (final activity in widget.summary.activities)
+        activity.status == null ? null : activity.toolName,
+    ]);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Column(
@@ -109,64 +185,24 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final (index, activity)
-                      in widget.summary.activities.indexed)
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: activity.status == null ? 9 : 5,
+                  for (final group in groups)
+                    if (group.end - group.start == 1)
+                      activityAt(group.start)
+                    else
+                      ToolActivityGroup(
+                        key: ValueKey('${widget.messageId}:${group.start}'),
+                        storageId: '${widget.messageId}:${group.start}',
+                        toolName:
+                            widget.summary.activities[group.start].toolName!,
+                        statuses: [
+                          for (var i = group.start; i < group.end; i++)
+                            widget.summary.activities[i].status!,
+                        ],
+                        children: [
+                          for (var i = group.start; i < group.end; i++)
+                            activityAt(i),
+                        ],
                       ),
-                      child: activity.status == null
-                          ? MediaQuery.removePadding(
-                              context: context,
-                              removeBottom: true,
-                              child: MarkdownBody(
-                                inlineSyntaxes: [CjkStrongSyntax()],
-                                data: activity.text,
-                                selectable: true,
-                                onTapLink: (text, href, title) =>
-                                    widget.onOpenLink(href),
-                                styleSheet:
-                                    MarkdownStyleSheet.fromTheme(
-                                      Theme.of(context),
-                                    ).copyWith(
-                                      a: TextStyle(
-                                        color: GlobalUI.linkColor(context),
-                                      ),
-                                      horizontalRuleDecoration: BoxDecoration(
-                                        border: Border(
-                                          top: BorderSide(
-                                            width: 0.5,
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.outlineVariant,
-                                          ),
-                                        ),
-                                      ),
-                                      tableColumnWidth:
-                                          const IntrinsicColumnWidth(),
-                                      tableScrollbarThumbVisibility: true,
-                                      tablePadding: const EdgeInsets.only(
-                                        bottom: 12,
-                                      ),
-                                      p: TextStyle(
-                                        fontSize: 16,
-                                        height: 1.65,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurface,
-                                      ),
-                                    ),
-                              ),
-                            )
-                          : ToolActivityView(
-                              storageId: '${widget.messageId}:$index',
-                              title: activity.text,
-                              toolName: activity.toolName,
-                              status: activity.status!,
-                              requestJson: activity.requestJson,
-                              resultJson: activity.resultJson,
-                            ),
-                    ),
                 ],
               ),
             ),

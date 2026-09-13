@@ -5,6 +5,7 @@ import 'package:html/dom.dart';
 import 'package:html/parser.dart';
 
 import 'web_http.dart';
+import 'web_publication_date.dart';
 
 List<Map<String, Object?>> searchResults(WebResponse response, int limit) {
   final document = parse(response.bytes);
@@ -32,9 +33,11 @@ List<Map<String, Object?>> searchResults(WebResponse response, int limit) {
     }
     if (!{'http', 'https'}.contains(url.scheme)) continue;
     final snippet = row.querySelector('.b_caption p')?.text ?? '';
+    final siteName = row.querySelector('.tptt')?.text.trim();
     results.add({
       'title': anchor.text.trim(),
       'url': url.toString(),
+      if (siteName != null && siteName.isNotEmpty) 'siteName': siteName,
       'snippet': snippet.substring(0, math.min(snippet.length, 1200)),
     });
   }
@@ -51,6 +54,11 @@ Map<String, Object?> pageContent(
 ) {
   final document = parse(response.bytes);
   final title = document.querySelector('title')?.text.trim() ?? '';
+  final publishedAt = webPublicationDate(document);
+  final siteName = document
+      .querySelector('meta[property="og:site_name"]')
+      ?.attributes['content']
+      ?.trim();
   for (final node in document.querySelectorAll(
     'script, style, noscript, nav, header, footer, svg, form, [hidden], [aria-hidden="true"]',
   )) {
@@ -92,6 +100,8 @@ Map<String, Object?> pageContent(
   return {
     'url': response.url.toString(),
     'title': title,
+    if (publishedAt != null) 'publishedAt': publishedAt,
+    if (siteName != null && siteName.isNotEmpty) 'siteName': siteName,
     'text': text.substring(start, end),
     'totalChars': text.length,
     'startChar': start,

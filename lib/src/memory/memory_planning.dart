@@ -120,11 +120,6 @@ extension MemoryPlanning on MemoryController {
         (automatic &&
             additions > (decoded['explicitRemember'] == true ? 10 : 2)))
       throw const FormatException('Too many memory changes');
-    final count =
-        entries.length -
-        changes.fold<int>(0, (n, e) => n + e.ids.length) +
-        changes.where((e) => e.text.isNotEmpty).length;
-    if (count > 40) throw StateError('记忆已满，请先整理或删除部分内容');
     return MemoryPlan(revision, changes);
   }
 

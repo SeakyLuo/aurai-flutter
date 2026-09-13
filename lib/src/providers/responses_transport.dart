@@ -11,6 +11,9 @@ class ResponsesTransport {
   final ModelConfig config;
   HttpClient? _client;
   bool _cancelled = false;
+  void Function(int attempt)? onReconnect;
+  Timer? _retryTimer;
+  Completer<void>? _retryWaiter;
 
   void beginTurn() => _cancelled = false;
 
@@ -21,6 +24,52 @@ class ResponsesTransport {
   Future<Map<String, Object?>> send(
     Map<String, Object?> body, {
     void Function(String)? onTextChanged,
+    void Function()? onProcessingStarted,
+    void Function(int index)? onMessageStarted,
+  }) async {
+    var hasText = false;
+    try {
+      for (var attempt = 0; ; attempt++) {
+        checkCancelled();
+        try {
+          return await _sendOnce(
+            body,
+            onTextChanged: (text) {
+              if (text.isNotEmpty) hasText = true;
+              onReconnect?.call(0);
+              onTextChanged?.call(text);
+            },
+            onProcessingStarted: () {
+              onReconnect?.call(0);
+              onProcessingStarted?.call();
+            },
+            onMessageStarted: onMessageStarted,
+          );
+        } on _RetryableFailure catch (failure) {
+          checkCancelled();
+          if (hasText || attempt == 5) throw failure.error;
+          onReconnect?.call(attempt + 1);
+          final waiter = Completer<void>();
+          _retryWaiter = waiter;
+          _retryTimer = Timer(Duration(seconds: 1 << attempt), () {
+            _retryWaiter = null;
+            waiter.complete();
+          });
+          await waiter.future;
+          _retryTimer = null;
+          _retryWaiter = null;
+        }
+      }
+    } finally {
+      onReconnect?.call(0);
+    }
+  }
+
+  Future<Map<String, Object?>> _sendOnce(
+    Map<String, Object?> body, {
+    void Function(String)? onTextChanged,
+    void Function()? onProcessingStarted,
+    void Function(int index)? onMessageStarted,
   }) async {
     checkCancelled();
     final client = HttpClient()
@@ -42,16 +91,31 @@ class ResponsesTransport {
       checkCancelled();
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final detail = await utf8.decoder.bind(response).join();
-        throw ModelProviderException(switch (response.statusCode) {
+        final error = ModelProviderException(switch (response.statusCode) {
           401 || 403 => '模型服务认证失败，请检查 API 密钥',
           402 => '模型服务余额不足，请先充值',
           429 => '模型服务当前繁忙或额度不足，请稍后重试',
           >= 500 => '模型服务暂时不可用，请稍后重试',
           _ => '模型服务请求失败',
         }, detail: detail);
+        final quotaExhausted = RegExp(
+          r'"code"\s*:\s*"(insufficient_quota|billing_hard_limit_reached)"',
+        ).hasMatch(detail);
+        if (!quotaExhausted &&
+            (response.statusCode == 408 ||
+                response.statusCode == 429 ||
+                response.statusCode >= 500)) {
+          throw _RetryableFailure(error);
+        }
+        throw error;
       }
       final result = await readResponsesStream(
         response,
+        onMessageStarted: onMessageStarted,
+        onProcessingStarted: () {
+          checkCancelled();
+          onProcessingStarted?.call();
+        },
         onTextChanged: (text) {
           checkCancelled();
           onTextChanged?.call(text);
@@ -61,10 +125,21 @@ class ResponsesTransport {
       return result;
     } on TimeoutException {
       checkCancelled();
-      throw const ModelProviderException('模型响应超时，请重试');
+      throw const _RetryableFailure(ModelProviderException('模型响应超时，请重试'));
     } on SocketException catch (error) {
       checkCancelled();
-      throw ModelProviderException('无法连接模型服务，请检查网络', detail: '$error');
+      throw _RetryableFailure(
+        ModelProviderException('无法连接模型服务，请检查网络', detail: '$error'),
+      );
+    } on HttpException catch (error) {
+      checkCancelled();
+      throw _RetryableFailure(
+        ModelProviderException('模型连接中断，请重试', detail: '$error'),
+      );
+    } on ModelProviderException catch (error) {
+      checkCancelled();
+      if (error.message == '模型连接中断，回复未完成，请重试') throw _RetryableFailure(error);
+      rethrow;
     } on HandshakeException catch (error) {
       checkCancelled();
       throw ModelProviderException('模型服务的安全连接失败', detail: '$error');
@@ -85,6 +160,9 @@ class ResponsesTransport {
         {'role': 'user', 'content': content},
       ],
     });
+    if (response['status'] != 'completed') {
+      throw const ModelProviderException('上下文整理未完成，请重试');
+    }
     final parts = <String>[];
     for (final item in (response['output']! as List).cast<Map>()) {
       if (item['type'] != 'message') continue;
@@ -101,6 +179,14 @@ class ResponsesTransport {
 
   Future<void> cancel() async {
     _cancelled = true;
+    _retryTimer?.cancel();
+    _retryWaiter?.complete();
+    _retryWaiter = null;
     _client?.close(force: true);
   }
+}
+
+class _RetryableFailure implements Exception {
+  const _RetryableFailure(this.error);
+  final ModelProviderException error;
 }

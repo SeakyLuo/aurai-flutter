@@ -22,49 +22,55 @@ class OpenAiResponsesProvider implements ModelProvider {
 
   @override
   Future<ModelTurn> respond(ModelRequest request) async {
+    _transport.onReconnect = request.onReconnect;
     _transport.beginTurn();
     final compacted = await _context.prepare(request, _transport.summarize);
     _transport.checkCancelled();
     final restart = request.continuationToken == null || compacted;
-    final json = await _transport.send({
-      'model': config.model,
-      'stream': true,
-      if (_context.limits case final limits?)
-        'max_output_tokens': limits.outputTokens,
-      'instructions':
-          '${_context.systemPrompt}\n${_capabilitySummary(request)}\n${request.personalContext}',
-      'input': restart
-          ? _context.input
-          : [
-              ...request.toolResults.map(functionCallOutput),
-              for (final update in request.userUpdates)
-                {'role': 'user', 'content': update},
-            ],
-      'tools': [
-        if (request.tools.any((tool) => tool.name == 'searchWeb'))
-          {'type': 'web_search'},
-        ...request.tools.map(
-          (tool) => <String, Object?>{
-            'type': 'function',
-            'name': tool.name,
-            'description': tool.description,
-            'parameters': tool.inputSchema,
-            'strict': true,
-          },
-        ),
-      ],
-      'tool_choice': 'auto',
-      'parallel_tool_calls': false,
-      'store': true,
-      'include': ['reasoning.encrypted_content'],
-      if (!restart) 'previous_response_id': request.continuationToken,
-    }, onTextChanged: request.onTextChanged);
+    final json = await _transport.send(
+      {
+        'model': config.model,
+        'stream': true,
+        if (_context.limits case final limits?)
+          'max_output_tokens': limits.outputTokens,
+        'instructions':
+            '${_context.systemPrompt}\n${_capabilitySummary(request)}\n${request.personalContext}',
+        'input': restart
+            ? _context.input
+            : [
+                ...request.toolResults.map(functionCallOutput),
+                for (final update in request.userUpdates)
+                  {'role': 'user', 'content': update},
+              ],
+        'tools': [
+          if (request.tools.any((tool) => tool.name == 'searchWeb'))
+            {'type': 'web_search'},
+          ...request.tools.map(
+            (tool) => <String, Object?>{
+              'type': 'function',
+              'name': tool.name,
+              'description': tool.description,
+              'parameters': tool.modelInputSchema,
+              'strict': true,
+            },
+          ),
+        ],
+        'tool_choice': 'auto',
+        'parallel_tool_calls': false,
+        'store': true,
+        'include': ['reasoning.encrypted_content'],
+        if (!restart) 'previous_response_id': request.continuationToken,
+      },
+      onTextChanged: request.onTextChanged,
+      onMessageStarted: request.onMessageStarted,
+      onProcessingStarted: request.onProcessingStarted,
+    );
     _context.recordOutput(
       (json['output']! as List)
           .map((item) => (item as Map).cast<String, Object?>())
           .toList(),
     );
-    return _parseResponse(json);
+    return _parseResponse(json, request);
   }
 
   String _capabilitySummary(ModelRequest request) {
@@ -75,16 +81,16 @@ class OpenAiResponsesProvider implements ModelProvider {
     return 'Current device capabilities:\n${lines.join('\n')}';
   }
 
-  ModelTurn _parseResponse(Map<String, Object?> json) {
+  ModelTurn _parseResponse(Map<String, Object?> json, ModelRequest request) {
     final output = (json['output']! as List<Object?>)
         .cast<Map<Object?, Object?>>();
     final calls = <ToolCall>[];
     final textParts = <String>[];
     for (final rawItem in output) {
       final item = rawItem.cast<String, Object?>();
-      if (item['type'] == 'function_call') {
+      if (item['type'] == 'function_call' && json['status'] == 'completed') {
         calls.add(
-          ToolCall(
+          ToolCall.fromModel(
             id: item['call_id']! as String,
             name: item['name']! as String,
             arguments:
@@ -95,23 +101,27 @@ class OpenAiResponsesProvider implements ModelProvider {
         );
       }
       if (item['type'] == 'message') {
+        final messageParts = <String>[];
         final content = (item['content']! as List<Object?>)
             .cast<Map<Object?, Object?>>();
         for (final rawContent in content) {
           final contentItem = rawContent.cast<String, Object?>();
           if (contentItem['type'] == 'refusal') {
-            textParts.add(contentItem['refusal']! as String);
+            messageParts.add(contentItem['refusal']! as String);
           }
           if (contentItem['type'] == 'output_text') {
-            textParts.add(responseTextWithCitations(contentItem));
+            messageParts.add(responseTextWithCitations(contentItem));
           }
         }
+        textParts.add(messageParts.join('\n'));
       }
     }
     return ModelTurn(
+      response: json,
+      requestInput: retainedRequestInput(request),
       continuationToken: json['id']! as String,
       toolCalls: calls,
-      text: textParts.isEmpty ? null : textParts.join('\n'),
+      text: textParts.isEmpty ? null : textParts.last,
     );
   }
 

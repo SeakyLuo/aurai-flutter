@@ -7,11 +7,13 @@ extension ConversationRun on ChatController {
     final runConfig = config;
     final systemPrompt = modelSettings.systemPrompt;
     final customInstructions = modelSettings.customInstructions;
+    final responsePreferences = modelSettings.responsePreferences;
     final memoryRevision = memory.revision;
     await _persistRun(runConversation);
     final history = await _store.reader.messages(
       runConversation.id,
       forModel: true,
+      modelConfig: runConfig,
       afterCheckpoint: runConversation.contextSummary?.throughMessageId,
     );
     final lastUser = history.lastIndexWhere(
@@ -19,6 +21,8 @@ extension ConversationRun on ChatController {
     );
     final executionWatch = Stopwatch()..start();
     runConversation.executionWatch = executionWatch;
+    runConversation.restoredExecutionElapsed = Duration.zero;
+    runConversation.hasExecutionProcess = false;
     runConversation.executionUserMessageId = history[lastUser].id;
     final runId = await _store.runs.start(
       runConversation.id,
@@ -51,12 +55,15 @@ extension ConversationRun on ChatController {
           systemPrompt: systemPrompt,
         ),
       };
+      final webSources = WebSourceRegistry();
       final tools = <AgentTool>[
         for (final operation in SkillTool.operations)
           SkillTool(skills, operation),
         RunSkillTool(skills, _platform, runConversation.id),
-        WebTool('searchWeb'),
-        WebTool('readWebPage'),
+        WebTool('searchWeb', webSources),
+        SourceDatesTool(webSources),
+        ImageSearchTool(),
+        WebTool('readWebPage', webSources),
         if (scheduledTasks.supported)
           for (final operation in ScheduleTaskTool.operations)
             ScheduleTaskTool(scheduledTasks, runConversation.id, operation),
@@ -108,10 +115,12 @@ extension ConversationRun on ChatController {
       final stepActivityIndices = <int>[];
       String? turnMessageId;
       int? turnActivityIndex;
+      int? outputMessageIndex;
       await _runtime!.run(
         conversation: List.unmodifiable(history.take(lastUser + 1)),
         contextSummary: runConversation.contextSummary,
         personalContext: () => [
+          responsePreferences.instructions,
           if (customInstructions.isNotEmpty) '用户自定义指令：\n$customInstructions',
           memory.context,
         ].join('\n\n'),
@@ -127,16 +136,33 @@ extension ConversationRun on ChatController {
           );
           turnMessageId = null;
           turnActivityIndex = null;
+          outputMessageIndex = null;
           streamingMessageId = null;
           _notifyRun(runConversation);
         },
         onTurnCompleted: (turn) async {
           await _persistRun(runConversation);
-          await _store.runs.finishTurn(modelTurnId, turn.continuationToken);
+          await _store.runs.finishTurn(modelTurnId, turn);
         },
         onToolStarted: (call) =>
             _store.runs.startTool(runConversation.id, runId, modelTurnId, call),
         onToolCompleted: (result) => _store.runs.finishTool(runId, result),
+        onReconnect: (attempt) {
+          if (runConversation.reconnectAttempt == attempt) return;
+          runConversation.reconnectAttempt = attempt;
+          _notifyRun(runConversation);
+        },
+        onMessageStarted: (index) {
+          if (outputMessageIndex == index) return;
+          outputMessageIndex = index;
+          turnMessageId = null;
+          turnActivityIndex = null;
+        },
+        onProcessingStarted: () {
+          if (runConversation.hasExecutionProcess) return;
+          runConversation.hasExecutionProcess = true;
+          _notifyRun(runConversation);
+        },
         onTextChanged: (text) {
           if (text.isEmpty) return;
           if (turnMessageId == null) {
@@ -214,7 +240,7 @@ extension ConversationRun on ChatController {
         },
       );
       executionWatch.stop();
-      if (steps.isNotEmpty) {
+      if (runConversation.hasExecutionProcess) {
         final answer = messages.last;
         messages[messages.length - 1] = AgentMessage(
           id: answer.id,
@@ -239,7 +265,7 @@ extension ConversationRun on ChatController {
         'completed',
         executionWatch.elapsedMilliseconds,
         finalMessageId: messages.last.id,
-        isTask: steps.isNotEmpty,
+        isTask: runConversation.hasExecutionProcess,
       );
       runConversation.liveToolSteps.clear();
       runConversation.pendingGoal = null;
@@ -271,26 +297,29 @@ extension ConversationRun on ChatController {
           runId: last.runId,
           modelTurnId: last.modelTurnId,
           createdAt: last.createdAt,
-          taskSummary: AgentTaskSummary(
-            elapsedMilliseconds: executionWatch.elapsedMilliseconds,
-            stopped: true,
-            intermediateMessageIds: [
-              for (final message in messages)
-                if (message.runId == runId && message.id != last.id) message.id,
-            ],
-            activities: [
-              for (final activity in activities)
-                AgentTaskActivity(
-                  text: activity.text,
-                  toolName: activity.toolName,
-                  requestJson: activity.requestJson,
-                  resultJson: activity.resultJson,
-                  status: activity.status == AgentStepStatus.running
-                      ? AgentStepStatus.cancelled
-                      : activity.status,
+          taskSummary: !runConversation.hasExecutionProcess
+              ? null
+              : AgentTaskSummary(
+                  elapsedMilliseconds: executionWatch.elapsedMilliseconds,
+                  stopped: true,
+                  intermediateMessageIds: [
+                    for (final message in messages)
+                      if (message.runId == runId && message.id != last.id)
+                        message.id,
+                  ],
+                  activities: [
+                    for (final activity in activities)
+                      AgentTaskActivity(
+                        text: activity.text,
+                        toolName: activity.toolName,
+                        requestJson: activity.requestJson,
+                        resultJson: activity.resultJson,
+                        status: activity.status == AgentStepStatus.running
+                            ? AgentStepStatus.cancelled
+                            : activity.status,
+                      ),
+                  ],
                 ),
-            ],
-          ),
         );
         runConversation.liveToolSteps.clear();
         await _persistRun(runConversation);
@@ -313,7 +342,7 @@ extension ConversationRun on ChatController {
             executionWatch.elapsedMilliseconds,
             error: runConversation.errorDetail,
             finalMessageId: outcome == 'cancelled' ? messages.last.id : null,
-            isTask: outcome == 'cancelled',
+            isTask: runConversation.hasExecutionProcess,
           );
         }
         if (sessionStarted) {

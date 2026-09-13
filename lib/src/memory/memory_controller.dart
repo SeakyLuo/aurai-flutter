@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import '../domain/agent_models.dart';
@@ -38,7 +39,7 @@ class MemoryController extends ChangeNotifier {
   Future<void> initialize() async {
     final results = await Future.wait([
       database.query('memory_settings', where: 'id = 1'),
-      database.query('user_memories', orderBy: 'created_at, id', limit: 40),
+      database.query('user_memories', orderBy: 'created_at, id'),
     ]);
     final settings = results.first.single;
     nickname = settings['nickname'] as String;
@@ -76,16 +77,10 @@ ${jsonEncode({'nickname': nickname, 'occupation': occupation, 'about': about, 'm
   Future<void> saveEntry(String? id, String text) async {
     if (text.trim().isEmpty || text.length > 300)
       throw StateError('请填写不超过300字的记忆');
-    if (id == null && entries.length >= 40)
-      throw StateError('最多保存40条记忆，请先删除一些');
     _invalidate();
     final now = DateTime.now().millisecondsSinceEpoch;
     await database.transaction((txn) async {
       if (id == null) {
-        final count = Sqflite.firstIntValue(
-          await txn.rawQuery('SELECT COUNT(*) FROM user_memories'),
-        )!;
-        if (count >= 40) throw StateError('最多保存40条记忆，请先删除一些');
         await txn.insert('user_memories', {
           'id': newMessageId(),
           'text': text.trim(),
@@ -128,11 +123,7 @@ ${jsonEncode({'nickname': nickname, 'occupation': occupation, 'about': about, 'm
   }
 
   Future<void> _reload() async {
-    entries = await database.query(
-      'user_memories',
-      orderBy: 'created_at, id',
-      limit: 40,
-    );
+    entries = await database.query('user_memories', orderBy: 'created_at, id');
     if (!_disposed) notifyListeners();
   }
 
@@ -148,16 +139,28 @@ ${jsonEncode({'nickname': nickname, 'occupation': occupation, 'about': about, 'm
       if (_disposed || epoch != _epoch) return;
       final transport = ResponsesTransport(config);
       _transport = transport;
+      var stage = 'plan';
       try {
         final plan = await _plan(transport, user.text, automatic: true);
         if (_disposed || epoch != _epoch) return;
+        stage = 'save';
         await _apply(
           plan,
           manualAdditions: false,
           conversationId: conversationId,
           messageId: user.id,
         );
-      } on Object {
+      } on Object catch (error, stackTrace) {
+        developer.log(
+          'Automatic memory update failed: stage=$stage, '
+          'model=${config.model}, conversation=$conversationId, '
+          'message=${user.id}, entries=${entries.length}, '
+          'invalidated=${_disposed || epoch != _epoch}',
+          name: 'aurai.memory',
+          level: 1000,
+          error: error,
+          stackTrace: stackTrace,
+        );
         if (!_disposed && epoch == _epoch) {
           notices.value = null;
           notices.value = '本次记忆未能更新，已有记忆仍保留';

@@ -4,12 +4,15 @@ import '../memory/memory_controller.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 7,
+  version: 8,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion < 8) {
+      await db.execute('ALTER TABLE model_turns ADD COLUMN response_json TEXT');
+    }
     if (oldVersion == 6) {
       await db.execute(
         "ALTER TABLE skills ADD COLUMN icon TEXT NOT NULL DEFAULT 'skill'",
@@ -99,6 +102,7 @@ const _schema = [
     run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
     ordinal INTEGER NOT NULL,
     response_id TEXT,
+    response_json TEXT,
     status TEXT NOT NULL,
     started_at INTEGER NOT NULL,
     finished_at INTEGER,

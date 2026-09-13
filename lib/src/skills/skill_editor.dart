@@ -9,6 +9,8 @@ import '../features/chat/glass_surface.dart';
 import '../features/chat/settings_icon.dart';
 import '../scheduling/task_unsaved_dialog.dart';
 import 'skill_store.dart';
+import 'skill_permission.dart';
+import 'skill_permission_picker.dart';
 import 'skill_action_menu.dart';
 import '../scheduling/task_action_menu.dart';
 
@@ -28,6 +30,9 @@ class _SkillEditorState extends State<SkillEditor> {
   late final _script = TextEditingController(text: _saved.script);
   late String _icon = _saved.icon;
   late bool _enabled = _saved.enabled;
+  late SkillPermission? _permission = widget.store.permissionOverrideFor(
+    _saved.id,
+  );
   late Set<String> _dependencies = _saved.dependencyIds.toSet();
   bool _busy = false, _leaving = false;
   bool get _dirty =>
@@ -37,6 +42,7 @@ class _SkillEditorState extends State<SkillEditor> {
       _script.text != _saved.script ||
       _enabled != _saved.enabled ||
       _icon != _saved.icon ||
+      _permission != widget.store.permissionOverrideFor(_saved.id) ||
       !setEquals(_dependencies, _saved.dependencyIds.toSet());
   @override
   void dispose() {
@@ -65,6 +71,8 @@ class _SkillEditorState extends State<SkillEditor> {
           icon: _icon,
         ),
         previousName: _saved.name,
+        permission: _permission,
+        updatePermission: true,
       );
       if (!mounted) return true;
       setState(() {
@@ -344,6 +352,57 @@ class _SkillEditorState extends State<SkillEditor> {
                 ),
                 _field('名称', _name, 60),
                 _field('简介', _description, 300, multiline: true),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+                  child: Text(
+                    '权限',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Material(
+                    color: settingsFieldColor(context),
+                    borderRadius: BorderRadius.circular(26),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 8,
+                      ),
+                      title: Text(
+                        _permission?.label ??
+                            '默认 · ${widget.store.defaultPermission.label}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: _busy
+                          ? null
+                          : () async {
+                              FocusManager.instance.primaryFocus?.unfocus();
+                              final permission =
+                                  await showSkillPermissionPicker(
+                                    context,
+                                    _permission ??
+                                        widget.store.defaultPermission,
+                                  );
+                              if (permission != null && mounted)
+                                setState(
+                                  () => _permission = permission.permission,
+                                );
+                            },
+                    ),
+                  ),
+                ),
+
                 Padding(
                   padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
                   child: Text(

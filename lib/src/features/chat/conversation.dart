@@ -24,6 +24,8 @@ class Conversation {
   DateTime? storedUpdatedAt;
   String? activeRunId;
   Stopwatch? executionWatch;
+  Duration restoredExecutionElapsed = Duration.zero;
+  bool hasExecutionProcess = false;
   String? executionUserMessageId;
   String? seenRunId;
   bool hasEarlierMessages = false;
@@ -33,6 +35,7 @@ class Conversation {
   String? pendingGoal;
   String? errorDetail;
   ChatRunState runState = ChatRunState.idle;
+  int reconnectAttempt = 0;
 
   bool get isEmpty =>
       messageCount == 0 &&

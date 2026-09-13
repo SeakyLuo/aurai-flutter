@@ -1,7 +1,10 @@
+import '../../domain/tool_activity_groups.dart';
+import 'tool_activity_group.dart';
 import 'task_elapsed.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/agent_models.dart';
+import '../../domain/web_sources.dart';
 import 'chat_controller.dart';
 import 'message_item.dart';
 import 'message_time.dart';
@@ -23,9 +26,8 @@ List<ChatTimelineEntry> buildChatTimeline(
   final watch = conversation.executionWatch;
   final showElapsed =
       watch != null &&
-      (watch.isRunning ||
-          (conversation.runState == ChatRunState.failed &&
-              conversation.liveToolSteps.isNotEmpty)) &&
+      conversation.hasExecutionProcess &&
+      (watch.isRunning || conversation.runState == ChatRunState.failed) &&
       !controller.messages.any(
         (message) =>
             message.runId == conversation.activeRunId &&
@@ -38,17 +40,43 @@ List<ChatTimelineEntry> buildChatTimeline(
   };
   final toolsByMessage = <String, List<ChatTimelineEntry>>{};
   final liveSteps = controller.activeConversation.liveToolSteps;
-  for (var i = 0; i < liveSteps.length; i++) {
-    final entry = liveSteps[i];
+  final liveSources = webSourcesFromSteps(liveSteps.map((entry) => entry.step));
+  final groups = toolActivityGroups([
+    for (final entry in liveSteps)
+      entry.step.toolName == 'askUser'
+          ? null
+          : '${entry.afterMessageId}:${entry.step.toolName}',
+  ]);
+  for (final group in groups) {
+    final entry = liveSteps[group.start];
+    final storageId = 'tool:${conversation.activeRunId}:${group.start}';
     toolsByMessage
         .putIfAbsent(entry.afterMessageId, () => [])
         .add(
           ChatTimelineEntry(
-            'tool:${controller.activeConversation.activeRunId}:$i',
-            (_) => _ToolActivity(
-              storageId: 'tool:${controller.activeConversation.activeRunId}:$i',
-              step: entry.step,
-            ),
+            storageId,
+            (_) => group.end - group.start == 1
+                ? _ToolActivity(storageId: storageId, step: entry.step)
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
+                    child: ToolActivityGroup(
+                      key: ValueKey(storageId),
+                      storageId: storageId,
+                      toolName: entry.step.toolName,
+                      statuses: [
+                        for (var i = group.start; i < group.end; i++)
+                          liveSteps[i].step.status,
+                      ],
+                      children: [
+                        for (var i = group.start; i < group.end; i++)
+                          _ToolActivity(
+                            storageId: 'tool:${conversation.activeRunId}:$i',
+                            step: liveSteps[i].step,
+                            grouped: true,
+                          ),
+                      ],
+                    ),
+                  ),
           ),
         );
   }
@@ -88,6 +116,11 @@ List<ChatTimelineEntry> buildChatTimeline(
           (context) => MessageItem(
             key: ValueKey(message.id),
             message: message,
+            availableSources:
+                message.runId != null &&
+                    message.runId == conversation.activeRunId
+                ? liveSources
+                : const {},
             onEdit: allowEditing ? onEdit : null,
             streaming:
                 controller.streamingMessageId == message.id ||
@@ -103,6 +136,7 @@ List<ChatTimelineEntry> buildChatTimeline(
           (_) => TaskElapsed(
             key: ValueKey(conversation.activeRunId),
             watch: watch,
+            restoredElapsed: conversation.restoredExecutionElapsed,
             failed: conversation.runState == ChatRunState.failed,
           ),
         ),
@@ -126,7 +160,12 @@ Map<String, String> chatSummaryOwners(ChatController controller) => {
 };
 
 class _ToolActivity extends StatelessWidget {
-  const _ToolActivity({required this.step, required this.storageId});
+  const _ToolActivity({
+    required this.step,
+    required this.storageId,
+    this.grouped = false,
+  });
+  final bool grouped;
   final String storageId;
 
   final AgentStep step;
@@ -140,7 +179,9 @@ class _ToolActivity extends StatelessWidget {
       AgentStepStatus.cancelled => '已停止：',
     };
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
+      padding: grouped
+          ? const EdgeInsets.symmetric(vertical: 5)
+          : const EdgeInsets.fromLTRB(18, 4, 18, 8),
       child: ToolActivityView(
         toolName: step.toolName,
         storageId: storageId,

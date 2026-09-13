@@ -3,7 +3,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'authorization_sheet_content.dart';
+import 'glass_surface.dart';
+import 'question_icon.dart';
+import 'settings_appearance.dart';
 import 'chat_controller.dart';
 
 Future<bool> showOperationRequestSheet(
@@ -12,11 +14,9 @@ Future<bool> showOperationRequestSheet(
   required PendingConfirmation request,
   required String detail,
 }) async =>
-    await showModalBottomSheet<bool>(
+    await showDialog<bool>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: false,
+      barrierColor: Colors.black.withValues(alpha: .24),
       builder: (_) => _OperationRequestSheet(
         controller: controller,
         request: request,
@@ -91,21 +91,108 @@ class _OperationRequestSheetState extends State<_OperationRequestSheet> {
 
   bool get _screenAccess => isScreenTool(widget.request.call.name);
 
+  Widget _option(String label, VoidCallback onTap, {String? description}) =>
+      Material(
+        color: settingsFieldColor(context),
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 15)),
+                if (description != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+
   @override
-  Widget build(BuildContext context) => AuthorizationSheetContent(
-    title: _screenAccess ? '允许读取和操作屏幕' : '操作确认',
-    content: Text(widget.detail),
-    allowLabel: _screenAccess
-        ? '始终允许'
-        : widget.request.definition.taskScopedConfirmation
-        ? '本任务允许'
-        : '允许一次',
-    onAllow: () => _answer(true),
-    onDeny: () => _answer(false),
-    seconds:
+  Widget build(BuildContext context) {
+    final seconds =
         (widget.request.deadline.difference(DateTime.now()).inMilliseconds /
                 1000)
             .ceil()
-            .clamp(0, 30),
-  );
+            .clamp(0, widget.request.call.confirmationTimeoutSeconds!);
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: GlassSurface(
+          radius: 28,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _screenAccess ? '允许读取和操作屏幕' : '操作确认',
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: '拒绝并关闭',
+                      onPressed: () => _answer(false),
+                      icon: const QuestionIcon(type: QuestionIconType.close),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Text(
+                      widget.detail,
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.6,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _option(
+                  _screenAccess
+                      ? '始终允许'
+                      : widget.request.definition.taskScopedConfirmation
+                      ? '本任务允许'
+                      : '允许一次',
+                  () => _answer(true),
+                ),
+                const SizedBox(height: 8),
+                _option(
+                  '拒绝',
+                  () => _answer(false),
+                  description: '$seconds 秒后自动拒绝',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

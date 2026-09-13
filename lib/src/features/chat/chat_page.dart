@@ -356,6 +356,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     needsConfiguration: controller.needsConfiguration,
     hasPendingGoal: controller.pendingGoal != null,
     replying: controller.streamingMessageId != null,
+    reconnectAttempt: controller.activeConversation.reconnectAttempt,
     onContinue: _continuePending,
     onRetry: _continuePending,
     accessibilityRequestPending: controller.accessibilityRequestPending,
@@ -370,7 +371,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (requestedDraft != null) {
       widget.controller.pendingComposerDraft = null;
       _textController.value = TextEditingValue(
-        text: requestedDraft, selection: TextSelection.collapsed(offset: requestedDraft.length));
+        text: requestedDraft,
+        selection: TextSelection.collapsed(offset: requestedDraft.length),
+      );
     }
     final conversation = widget.controller.activeConversation;
     if (_conversationId != conversation.id) {

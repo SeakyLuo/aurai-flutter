@@ -53,8 +53,11 @@ class ToolExecutor {
         },
       );
     }
-    if (tool.definition.safetyFor(call.arguments)
-        case ToolSafety.sensitive || ToolSafety.destructive) {
+    final safety = tool.definition.safetyFor(call.arguments);
+    final needsConfirmation = tool is ToolConfirmationPolicyAgentTool
+        ? (tool as ToolConfirmationPolicyAgentTool).requiresConfirmation(call)
+        : safety == ToolSafety.sensitive || safety == ToolSafety.destructive;
+    if (needsConfirmation) {
       final scopedTool = tool is ScopedAuthorizationAgentTool
           ? tool as ScopedAuthorizationAgentTool
           : null;
@@ -65,6 +68,18 @@ class ToolExecutor {
           grantedScope != null &&
           scopedTool.authorizationCovers(grantedScope, requestedScope!);
       if (!alreadyGranted) {
+        final seconds = call.confirmationTimeoutSeconds;
+        if (seconds == null || seconds <= 0) {
+          return ToolResult(
+            callId: call.id,
+            toolName: call.name,
+            status: ToolResultStatus.error,
+            output: const {
+              'error':
+                  'Specify a positive integer confirmationTimeoutSeconds to choose the user approval waiting time.',
+            },
+          );
+        }
         final approved = await _confirm(call, tool.definition);
         if (!approved) {
           return ToolResult(

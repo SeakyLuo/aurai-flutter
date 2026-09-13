@@ -1,3 +1,4 @@
+import '../../agent/image_search_tool.dart';
 import '../../skills/skill_store.dart';
 import '../../skills/skill_tools.dart';
 import 'dart:async';
@@ -21,6 +22,7 @@ import '../../agent/tool_executor.dart';
 import '../../agent/tool_registry.dart';
 import '../../agent/local_history_tools.dart';
 import '../../agent/web_tools.dart';
+import '../../agent/source_dates_tool.dart';
 import '../../domain/agent_models.dart';
 import '../../domain/conversation_completion.dart';
 import '../../domain/capability.dart';
@@ -52,8 +54,11 @@ part 'message_edit_actions.dart';
 part 'accessibility_request.dart';
 
 class PendingConfirmation {
-  PendingConfirmation(this.call, this.definition);
-  final deadline = DateTime.now().add(const Duration(seconds: 30));
+  PendingConfirmation(this.call, this.definition)
+    : deadline = DateTime.now().add(
+        Duration(seconds: call.confirmationTimeoutSeconds!),
+      );
+  final DateTime deadline;
   final ToolCall call;
   final ToolDefinition definition;
   final completer = Completer<bool>();
@@ -288,12 +293,14 @@ class ChatController extends ChangeNotifier {
   Future<void> savePersonalization({
     required String? systemPrompt,
     required String customInstructions,
+    required ResponsePreferences responsePreferences,
   }) async {
     final nextSettings = ModelSettings(
       activeService: modelSettings.activeService,
       profiles: modelSettings.profiles,
       systemPrompt: systemPrompt,
       customInstructions: customInstructions,
+      responsePreferences: responsePreferences,
     );
     await _platform.saveModelSettings(nextSettings);
     modelSettings = nextSettings;
@@ -531,6 +538,7 @@ class ChatController extends ChangeNotifier {
             call.arguments,
             definition.confirmationDescriptionFor(call.arguments),
             definition.taskScopedConfirmation,
+            call.confirmationTimeoutSeconds!,
           )
         : await _confirmInApp(call, definition);
     await _store.runs.resolveApproval(approvalId, approved);
@@ -544,9 +552,12 @@ class ChatController extends ChangeNotifier {
     final request = PendingConfirmation(call, definition);
     pendingConfirmation = request;
     notifyListeners();
-    final timer = Timer(const Duration(seconds: 30), () {
-      if (identical(pendingConfirmation, request)) resolveConfirmation(false);
-    });
+    final timer = Timer(
+      Duration(seconds: call.confirmationTimeoutSeconds!),
+      () {
+        if (identical(pendingConfirmation, request)) resolveConfirmation(false);
+      },
+    );
     try {
       final approved = await request.completer.future;
       if (approved && screenAccess) await _platform.setScreenAccess(true);

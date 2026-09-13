@@ -5,10 +5,16 @@ class ThinkingIndicator extends StatefulWidget {
     super.key,
     required this.label,
     this.animate = true,
+    this.detail,
+    this.leading,
+    this.singleLine = false,
   });
 
   final String label;
   final bool animate;
+  final String? detail;
+  final Widget? leading;
+  final bool singleLine;
 
   @override
   State<ThinkingIndicator> createState() => _ThinkingIndicatorState();
@@ -54,39 +60,67 @@ class _ThinkingIndicatorState extends State<ThinkingIndicator>
     child: RepaintBoundary(
       child: AnimatedBuilder(
         animation: _animation,
-        child: Text(
-          widget.label,
-          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-            inherit: false,
-            fontSize: 15,
-            height: 1.5,
-            fontWeight: FontWeight.w500,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.leading != null) ...[
+              widget.leading!,
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Text.rich(
+                TextSpan(
+                  text: widget.label,
+                  children: [
+                    if (widget.detail != null)
+                      TextSpan(
+                        text: '  ${widget.detail}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w400,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant.withValues(alpha: .72),
+                        ),
+                      ),
+                  ],
+                ),
+                textWidthBasis: TextWidthBasis.longestLine,
+                maxLines: widget.singleLine ? 1 : null,
+                overflow: widget.singleLine ? TextOverflow.ellipsis : null,
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  inherit: false,
+                  fontSize: 15,
+                  height: 1.5,
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
         ),
-        builder: (context, child) => !widget.animate
+        builder: (context, child) =>
+            !widget.animate || MediaQuery.disableAnimationsOf(context)
             ? child!
             : ShaderMask(
                 blendMode: BlendMode.srcIn,
-                shaderCallback: (bounds) =>
-                    LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        Theme.of(context).colorScheme.onSurfaceVariant,
-                        Theme.of(context).colorScheme.onSurfaceVariant,
-                        Theme.of(context).brightness == Brightness.dark
-                            ? const Color(0xfff0eafc)
-                            : const Color(0xffc9c6d1),
-                        Theme.of(context).colorScheme.onSurfaceVariant,
-                        Theme.of(context).colorScheme.onSurfaceVariant,
-                      ],
-                      stops: [0, 0.28, 0.5, 0.72, 1],
-                    ).createShader(
-                      bounds.shift(
-                        Offset(bounds.width * (_animation.value * 2 - 1), 0),
-                      ),
-                    ),
+                shaderCallback: (bounds) {
+                  final bandWidth = bounds.width * .35;
+                  final left =
+                      (bounds.width + bandWidth) * _animation.value - bandWidth;
+                  final base = Theme.of(context).colorScheme.onSurfaceVariant;
+                  return LinearGradient(
+                    colors: [
+                      base,
+                      Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xfff0eafc)
+                          : const Color(0xffc9c6d1),
+                      base,
+                    ],
+                    stops: const [0, .5, 1],
+                  ).createShader(
+                    Rect.fromLTWH(left, bounds.top, bandWidth, bounds.height),
+                  );
+                },
                 child: child,
               ),
       ),

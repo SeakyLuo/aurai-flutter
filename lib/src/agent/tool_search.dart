@@ -81,6 +81,7 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
         '历史 会话 消息 数据库 记录 history conversation message database',
       'android.accessibility' || 'android.observe' || 'screenAccess' =>
         '屏幕 界面 点击 输入 滚动 返回 主页 screen ui click input scroll back home',
+      'web.images' => '图片 配图 参考图 找图 搜图 照片 image images photo gallery visual',
       'web.read' => '网页 搜索 浏览 新闻 联网 web search browse news',
       'skills' => '技能 工具 自定义 复用 skill reusable custom',
       'memory.manage' => '记忆 记住 整理 补充 memory remember organize',

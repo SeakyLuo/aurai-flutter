@@ -7,6 +7,10 @@ import '../features/chat/question_icon.dart';
 import '../scheduling/task_filter_menu.dart';
 import 'skill_editor.dart';
 import 'skill_store.dart';
+import 'skill_action_menu.dart';
+import 'skill_permission_picker.dart';
+import '../scheduling/task_action_menu.dart';
+import '../features/chat/delete_confirmation_dialog.dart';
 
 class SkillsPage extends StatefulWidget {
   const SkillsPage({super.key, required this.store});
@@ -50,11 +54,98 @@ class _SkillsPageState extends State<SkillsPage> {
     });
   }
 
+  void _notice(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+
+  Future<void> _preferences(BuildContext buttonContext) async {
+    final box = buttonContext.findRenderObject()! as RenderBox;
+    final action = await showSkillPreferencesMenu(
+      context,
+      box.localToGlobal(Offset(0, box.size.height)),
+    );
+    if (!mounted || action == null) return;
+    final selection = await showSkillPermissionPicker(
+      context,
+      widget.store.defaultPermission,
+      defaults: true,
+    );
+    if (!mounted || selection == null) return;
+    try {
+      await widget.store.saveDefaultPermission(selection.permission!);
+      if (mounted) _notice('偏好权限已保存');
+    } on Object {
+      if (mounted) _notice('保存失败，请重试');
+    }
+  }
+
+  Future<void> _skillMenu(SavedSkill skill, Offset position) async {
+    final action = await showSkillActionMenu(
+      context,
+      position,
+      skill.enabled,
+      showEdit: true,
+    );
+    if (!mounted || action == null) return;
+    if (action == 'edit') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => SkillEditor(store: widget.store, skill: skill),
+        ),
+      );
+      return;
+    }
+    if (action == 'delete') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: .24),
+        builder: (_) => const DeleteConfirmationDialog(
+          title: '删除技能？',
+          description: '删除后，Aurai 将无法再查找和调用这个技能。',
+        ),
+      );
+      if (!mounted || confirmed != true) return;
+    }
+    try {
+      if (action == 'delete') {
+        await widget.store.delete(skill.name);
+      } else {
+        await widget.store.save(
+          SavedSkill.fromJson({
+            ...skill.toJson(),
+            'enabled': action == 'resume',
+          }),
+          previousName: skill.name,
+        );
+      }
+      if (mounted)
+        _notice(
+          action == 'delete'
+              ? '技能已删除'
+              : action == 'resume'
+              ? '技能已启用'
+              : '技能已停用',
+        );
+    } on Object catch (error) {
+      if (mounted) _notice(error is StateError ? error.message : '操作失败，请重试');
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: SettingsAppBar(
       title: '技能',
       onBack: () => Navigator.pop(context),
+      actions: [
+        Builder(
+          builder: (buttonContext) => SettingsGlassAction(
+            label: '更多',
+            icon: Icons.more_vert,
+            iconWidget: const TaskActionIcon('more'),
+            onPressed: () => _preferences(buttonContext),
+          ),
+        ),
+      ],
       titleWidget: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -188,6 +279,8 @@ class _SkillsPageState extends State<SkillsPage> {
                         final skill = skills[index];
                         return SkillListTile(
                           skill: skill,
+                          onLongPressStart: (details) =>
+                              _skillMenu(skill, details.globalPosition),
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute<void>(

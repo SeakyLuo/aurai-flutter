@@ -65,6 +65,7 @@ class AndroidAgentBridge(private val context: Context) {
             "findApps" -> result.success(findApps(call.argument<String>("query")!!))
             "launchApp" -> result.success(launchApp(call.argument<String>("packageName")!!))
             "startIntent" -> result.success(startIntent(call))
+            "openSourceFile" -> SourceFileOpener.open(context, call.argument<String>("uri")!!, result)
             "openSettings" -> result.success(openSettings(call.argument<String>("screen")!!))
             "openBatterySettings" -> {
                 startActivity(
@@ -240,7 +241,10 @@ class AndroidAgentBridge(private val context: Context) {
         val intent = context.packageManager.getLaunchIntentForPackage(packageName)
             ?: return mapOf("launched" to false, "reason" to "not_visible_or_not_launchable")
         startActivity(intent)
-        return mapOf("launched" to true, "packageName" to packageName, "next" to "observeDevice")
+        val appName = context.packageManager.getApplicationLabel(
+            context.packageManager.getApplicationInfo(packageName, 0),
+        ).toString()
+        return mapOf("launched" to true, "packageName" to packageName, "appName" to appName, "next" to "observeDevice")
     }
 
     private fun startIntent(call: MethodCall): Map<String, Any?> {
@@ -297,6 +301,7 @@ class AndroidAgentBridge(private val context: Context) {
             args,
             call.argument<String>("description"),
             call.argument<Boolean>("taskScoped")!!,
+            call.argument<Number>("confirmationTimeoutSeconds")!!.toLong() * 1000,
         ) { approved -> mainHandler.post { result.success(approved) } }
     }
 

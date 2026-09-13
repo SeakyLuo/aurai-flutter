@@ -1,0 +1,106 @@
+import 'package:flutter/material.dart';
+import '../../domain/agent_models.dart';
+import 'chat_scroll_anchor.dart';
+import 'thinking_indicator.dart';
+import 'tool_action_icon.dart';
+
+class ToolActivityGroup extends StatefulWidget {
+  const ToolActivityGroup({
+    super.key,
+    required this.storageId,
+    required this.toolName,
+    required this.statuses,
+    required this.children,
+  });
+  final String storageId;
+  final String toolName;
+  final List<AgentStepStatus> statuses;
+  final List<Widget> children;
+  @override
+  State<ToolActivityGroup> createState() => _ToolActivityGroupState();
+}
+
+class _ToolActivityGroupState extends State<ToolActivityGroup> {
+  bool? _manualExpanded;
+  String get _storageId => 'tool-group:${widget.storageId}';
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _manualExpanded =
+        PageStorage.of(context).readState(context, identifier: _storageId)
+            as bool?;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final running = widget.statuses.contains(AgentStepStatus.running);
+    final failed = widget.statuses
+        .where((s) => s == AgentStepStatus.failed)
+        .length;
+    final cancelled = widget.statuses
+        .where((s) => s == AgentStepStatus.cancelled)
+        .length;
+    final expanded =
+        _manualExpanded ?? (running || failed > 0 || cancelled > 0);
+    final label = [
+      '${toolTitle(widget.toolName)} · ${widget.statuses.length} 次',
+      if (running) '执行中',
+      if (failed > 0) '$failed 项失败',
+      if (cancelled > 0) '$cancelled 项已停止',
+    ].join(' · ');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          button: true,
+          expanded: expanded,
+          label: label,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              ChatScrollAnchor.beforeResize(context);
+              setState(() => _manualExpanded = !expanded);
+              PageStorage.of(
+                context,
+              ).writeState(context, _manualExpanded, identifier: _storageId);
+            },
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ThinkingIndicator(
+                      label: label,
+                      animate: running,
+                      leading: SizedBox.square(
+                        dimension: MediaQuery.textScalerOf(context).scale(18),
+                        child: FittedBox(
+                          child: ToolActionIcon(toolName: widget.toolName),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Transform.translate(
+                    offset: const Offset(4, 0),
+                    child: AnimatedRotation(
+                      turns: expanded ? .25 : 0,
+                      duration: const Duration(milliseconds: 240),
+                      curve: Curves.easeInOutCubic,
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (expanded) ...widget.children,
+      ],
+    );
+  }
+}

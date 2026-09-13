@@ -38,6 +38,9 @@ class AgentRuntime {
     Future<void> Function(ToolCall)? onToolStarted,
     Future<void> Function(ToolResult)? onToolCompleted,
     void Function(String text)? onTextChanged,
+    void Function()? onProcessingStarted,
+    void Function(int attempt)? onReconnect,
+    void Function(int index)? onMessageStarted,
   }) async {
     _cancelRequested = false;
     final steps = <AgentStep>[];
@@ -69,6 +72,12 @@ class AgentRuntime {
             contextSummary: contextSummary,
             personalContext: personalContext?.call() ?? '',
             onContextSummary: onContextSummary,
+            onMessageStarted: onMessageStarted,
+            onReconnect: onReconnect,
+            onProcessingStarted: () {
+              _throwIfCancelled();
+              onProcessingStarted?.call();
+            },
             onTextChanged: (text) {
               _throwIfCancelled();
               onTextChanged?.call(text);
@@ -91,7 +100,28 @@ class AgentRuntime {
         }
 
         await onTurnCompleted?.call(modelTurn);
+        if (modelTurn.response['status'] == 'failed') {
+          throw ModelProviderException(
+            '模型回复失败，已保留生成的内容，请重试',
+            detail: jsonEncode(modelTurn.response['error']),
+          );
+        }
+        if (modelTurn.response['status'] == 'incomplete') {
+          final reason =
+              (modelTurn.response['incomplete_details'] as Map?)?['reason'];
+          throw ModelProviderException(switch (reason) {
+            'max_output_tokens' => '回复达到长度上限，已保留生成的内容，请继续或重试',
+            'content_filter' => '回复因内容限制未完成，已保留生成的内容',
+            _ => '回复未完成，已保留生成的内容，请重试',
+          }, detail: jsonEncode(modelTurn.response['incomplete_details']));
+        }
         if (modelTurn.toolCalls.isEmpty) {
+          final messages = (modelTurn.response['output'] as List? ?? const [])
+              .cast<Map>()
+              .where((item) => item['type'] == 'message');
+          if (messages.isNotEmpty && messages.last['phase'] == 'commentary') {
+            throw const ModelProviderException('模型只返回了过程说明，尚未给出最终答复，请继续或重试');
+          }
           if (questions != null &&
               (questions.hasPending || questions.hasUpdates)) {
             await questions.waitForPending();
@@ -112,6 +142,7 @@ class AgentRuntime {
         final nextResults = <ToolResult>[];
         for (final call in modelTurn.toolCalls) {
           _throwIfCancelled();
+          onProcessingStarted?.call();
           final tool = _registry.find(call.name);
           final historyArguments = tool is ToolHistoryAgentTool
               ? (tool as ToolHistoryAgentTool).historyArguments(call)

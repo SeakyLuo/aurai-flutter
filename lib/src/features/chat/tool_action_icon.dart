@@ -45,6 +45,7 @@ class ToolActionIcon extends StatelessWidget {
         ),
         'askUser' => const QuestionIcon(type: QuestionIconType.question),
         'searchTools' ||
+        'searchImages' ||
         'searchWeb' ||
         'searchConversations' ||
         'searchMessages' ||
@@ -54,7 +55,7 @@ class ToolActionIcon extends StatelessWidget {
         ),
         'listFiles' ||
         'listDirectory' => const FileToolIcon(type: FileToolIconType.folder),
-        'readWebPage' => CustomPaint(
+        'readWebPage' || 'setSourceDates' => CustomPaint(
           size: const Size.square(24),
           painter: _GlobePainter(
             Theme.of(context).colorScheme.onSurfaceVariant,

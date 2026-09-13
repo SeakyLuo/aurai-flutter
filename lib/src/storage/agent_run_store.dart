@@ -45,12 +45,19 @@ class AgentRunStore {
     return id;
   }
 
-  Future<void> finishTurn(String id, String responseId) async {
+  Future<void> finishTurn(String id, ModelTurn turn) async {
     await database.update(
       'model_turns',
       {
-        'response_id': responseId,
-        'status': 'completed',
+        'response_id': turn.continuationToken,
+        'response_json': jsonEncode({
+          'input': turn.requestInput,
+          'output': turn.response['output'],
+          'status': turn.response['status'],
+          'incomplete_details': turn.response['incomplete_details'],
+          'error': turn.response['error'],
+        }),
+        'status': turn.response['status'],
         'finished_at': DateTime.now().microsecondsSinceEpoch,
       },
       where: 'id = ?',
