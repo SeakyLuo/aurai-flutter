@@ -1,3 +1,4 @@
+import '../domain/message_file.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/agent_models.dart';
@@ -55,6 +56,12 @@ class ConversationReader {
       final drafts = results[0] as List<Map<String, Object?>>;
       final byId = {for (final value in values) value.id: value};
       for (final image in drafts) {
+        if (image['kind'] == 'file') {
+          byId[image['conversation_id']]!.draftFiles.add(
+            fileFromRow(image, imageDirectory),
+          );
+          continue;
+        }
         byId[image['conversation_id']]!.draftImages.add(
           imageFromRow(image, imageDirectory),
         );
@@ -87,9 +94,14 @@ class ConversationReader {
     conversation.hasEarlierMessages =
         conversation.messages.length == messageLimit;
     conversation.draftImages.addAll(
-      (results[1] as List<Map<String, Object?>>).map(
-        (row) => imageFromRow(row, imageDirectory),
-      ),
+      (results[1] as List<Map<String, Object?>>)
+          .where((row) => row['kind'] != 'file')
+          .map((row) => imageFromRow(row, imageDirectory)),
+    );
+    conversation.draftFiles.addAll(
+      (results[1] as List<Map<String, Object?>>)
+          .where((row) => row['kind'] == 'file')
+          .map((row) => fileFromRow(row, imageDirectory)),
     );
     if (conversation.activeRunId != null) {
       conversation.steps.addAll(await steps(conversation.activeRunId!));
@@ -102,6 +114,36 @@ class ConversationReader {
         whereArgs: [conversation.activeRunId],
       );
       final run = runs.single;
+      final events = await database.query(
+        'run_events',
+        where: 'run_id = ?',
+        whereArgs: [conversation.activeRunId],
+        orderBy: 'id',
+      );
+      final toolRows = await database.query(
+        'tool_calls',
+        where: 'run_id = ?',
+        whereArgs: [conversation.activeRunId],
+      );
+      final tools = {for (final row in toolRows) row['id']: row};
+      var afterMessageId = run['user_message_id'] as String;
+      for (final event in events) {
+        if (event['kind'] == 'message') {
+          afterMessageId = event['message_id'] as String;
+        } else if (event['kind'] == 'tool') {
+          final tool = tools[event['tool_call_id']]!;
+          conversation.liveToolSteps.add((
+            afterMessageId: afterMessageId,
+            step: AgentStep(
+              toolName: tool['name']! as String,
+              title: tool['title']! as String,
+              requestJson: tool['arguments_json'] as String?,
+              resultJson: tool['result_json'] as String?,
+              status: AgentStepStatus.values.byName(tool['status']! as String),
+            ),
+          ));
+        }
+      }
       if (run['is_task'] == 1) {
         conversation.hasExecutionProcess = true;
         conversation.executionUserMessageId = run['user_message_id'] as String;
@@ -168,7 +210,14 @@ class ConversationReader {
       orderBy: 'position',
     );
     final imageMap = <String, List<MessageImage>>{};
+    final fileMap = <String, List<MessageFile>>{};
     for (final image in images) {
+      if (image['kind'] == 'file') {
+        fileMap
+            .putIfAbsent(image['message_id'] as String, () => [])
+            .add(fileFromRow(image, imageDirectory));
+        continue;
+      }
       imageMap
           .putIfAbsent(image['message_id']! as String, () => [])
           .add(imageFromRow(image, imageDirectory));
@@ -194,6 +243,7 @@ class ConversationReader {
               row['created_at']! as int,
             ),
             images: imageMap[row['id']] ?? const [],
+            files: fileMap[row['id']] ?? const [],
             runId: row['run_id'] as String?,
             modelTurnId: row['model_turn_id'] as String?,
             taskSummary: summaries[row['id']],

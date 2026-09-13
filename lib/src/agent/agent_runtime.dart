@@ -140,13 +140,18 @@ class AgentRuntime {
         }
 
         final nextResults = <ToolResult>[];
+        var userHandoffOccurred = false;
         for (final call in modelTurn.toolCalls) {
           _throwIfCancelled();
           onProcessingStarted?.call();
           final tool = _registry.find(call.name);
-          final historyArguments = tool is ToolHistoryAgentTool
+          final toolArguments = tool is ToolHistoryAgentTool
               ? (tool as ToolHistoryAgentTool).historyArguments(call)
               : call.arguments;
+          final historyArguments = {
+            ...toolArguments,
+            if (call.userAction != null) 'userAction': call.userAction,
+          };
           await onToolStarted?.call(
             ToolCall(id: call.id, name: call.name, arguments: historyArguments),
           );
@@ -160,7 +165,34 @@ class AgentRuntime {
             ),
           );
           onStepsChanged(List.unmodifiable(steps));
-          final result = await _executor.execute(call);
+          final result = userHandoffOccurred
+              ? ToolResult(
+                  callId: call.id,
+                  toolName: call.name,
+                  status: ToolResultStatus.cancelled,
+                  output: const {
+                    'cancelled': true,
+                    'performed': false,
+                    'reason': '前一步已交给用户操作，此次预排动作未执行。请先根据用户反馈核实状态，再决定后续操作。',
+                  },
+                )
+              : await _executor.execute(
+                  call,
+                  onWaitingForUser: (actionResult) {
+                    steps[steps.length - 1] = steps.last.copyWith(
+                      resultJson: jsonEncode({
+                        ...actionResult.output,
+                        'userAction': {
+                          'pending': true,
+                          'instruction': call.userAction,
+                        },
+                      }),
+                    );
+                    onStepsChanged(List.unmodifiable(steps));
+                  },
+                );
+          if (result.output.containsKey('userAction'))
+            userHandoffOccurred = true;
           await onToolCompleted?.call(result);
           _throwIfCancelled();
           final status =
@@ -169,6 +201,8 @@ class AgentRuntime {
               ? AgentStepStatus.running
               : result.status == ToolResultStatus.success
               ? AgentStepStatus.completed
+              : result.status == ToolResultStatus.cancelled
+              ? AgentStepStatus.cancelled
               : AgentStepStatus.failed;
           steps[steps.length - 1] = steps.last.copyWith(
             status: status,

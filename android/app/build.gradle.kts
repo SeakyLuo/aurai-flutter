@@ -24,11 +24,14 @@ android {
         versionName = flutter.versionName
     }
 
+    buildFeatures { aidl = true }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            proguardFile("proguard-rules.pro")
         }
     }
 }
@@ -44,6 +47,11 @@ flutter {
 }
 
 dependencies {
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("org.dmfs:lib-recur:0.17.1")
     implementation("org.mozilla:rhino:1.7.15")
 }
+
+apply(from = "tunnel.gradle")

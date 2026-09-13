@@ -50,6 +50,17 @@ class MainActivity : FlutterActivity() {
         super.onDestroy()
     }
 
+    fun requestVpnPermission(intent: Intent) {
+        startActivityForResult(intent, 1402)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == ChatFileAccess.REQUEST) ChatFileAccess.picker?.selected(if (resultCode == RESULT_OK) data else null)
+        if (requestCode == DocumentAccess.REQUEST) DocumentAccess.picker?.selected(if (resultCode == RESULT_OK) data else null)
+        if (requestCode == 1402) NetworkCaptureAccess.consent(this, resultCode == RESULT_OK)
+    }
+
     fun requestNotificationPermission(reply: (Boolean) -> Unit) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED

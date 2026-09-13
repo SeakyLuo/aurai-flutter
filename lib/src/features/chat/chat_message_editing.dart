@@ -86,16 +86,36 @@ extension _ChatMessageEditing on _ChatPageState {
   Future<void> _addEditImages(BuildContext buttonContext) async {
     final session = _editing!;
     if (session.saving || session.picking) return;
-    final remaining = MessageImageStore.maxImages - session.images.length;
-    if (remaining == 0) {
-      _imageNotice('每条消息最多添加 4 张图片，请先移除一张');
-      return;
-    }
     _updateEditing(() => session.picking = true);
     try {
       final source = await showImageSourceMenu(buttonContext);
       if (source == null || !mounted || !identical(_editing, session)) return;
-      final images = await widget.controller.pickEditImages(source, remaining);
+      if (source == AttachmentSource.file) {
+        final remaining = MessageFileStore.maxFiles - session.files.length;
+        if (remaining == 0) {
+          _imageNotice('每条消息最多添加 10 个文件');
+          return;
+        }
+        final files = await widget.controller.pickFiles(remaining);
+        session.addedFiles.addAll(files);
+        if (!mounted || !identical(_editing, session)) {
+          await _discardEditImages(session);
+          return;
+        }
+        _updateEditing(() => session.files.addAll(files));
+        return;
+      }
+      final remaining = MessageImageStore.maxImages - session.images.length;
+      if (remaining == 0) {
+        _imageNotice('每条消息最多添加 4 张图片');
+        return;
+      }
+      final images = await widget.controller.pickEditImages(
+        source == AttachmentSource.camera
+            ? ImageSource.camera
+            : ImageSource.gallery,
+        remaining,
+      );
       session.addedImages.addAll(images);
       if (!mounted || !identical(_editing, session)) {
         await _discardEditImages(session);
@@ -105,7 +125,11 @@ extension _ChatMessageEditing on _ChatPageState {
     } on Object catch (error) {
       if (mounted)
         _imageNotice(
-          error is ImageInputException ? error.message : '图片添加失败，请重试',
+          error is ImageInputException
+              ? error.message
+              : error is PlatformException
+              ? error.message ?? '附件添加失败'
+              : '附件添加失败，请重试',
         );
     } finally {
       if (mounted && identical(_editing, session))
@@ -120,10 +144,13 @@ extension _ChatMessageEditing on _ChatPageState {
   }
 
   Future<void> _discardEditImages(MessageEditSession session) async {
+    final files = [...session.addedFiles];
+    session.addedFiles.clear();
     final images = [...session.addedImages];
     session.addedImages.clear();
     try {
       await widget.controller.removeEditImages(images);
+      await MessageFileStore.remove(files);
     } on Object {
       if (mounted) _imageNotice('部分临时图片清理失败');
     }
@@ -134,7 +161,9 @@ extension _ChatMessageEditing on _ChatPageState {
     final controller = widget.controller;
     if (session.saving ||
         session.picking ||
-        (_textController.text.trim().isEmpty && session.images.isEmpty))
+        (_textController.text.trim().isEmpty &&
+            session.images.isEmpty &&
+            session.files.isEmpty))
       return;
     if (controller.hasRunningTask ||
         controller.isBusy ||
@@ -151,8 +180,10 @@ extension _ChatMessageEditing on _ChatPageState {
         session.message,
         _textController.text.trim(),
         images: session.images,
+        files: session.files,
       );
       // Committed images now belong to the message, even if the page closes.
+      session.addedFiles.removeWhere(session.files.contains);
       session.addedImages.removeWhere(
         (image) => session.images.contains(image),
       );

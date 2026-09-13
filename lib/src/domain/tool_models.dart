@@ -19,6 +19,7 @@ class ToolDefinition {
     this.confirmationDescriptionBuilder,
     this.taskScopedConfirmation = false,
     this.confirmationMayBeRequired = false,
+    this.waitsForUser = false,
   });
 
   final String name;
@@ -33,27 +34,39 @@ class ToolDefinition {
   final ToolConfirmationDescriptionBuilder? confirmationDescriptionBuilder;
   final bool taskScopedConfirmation;
   final bool confirmationMayBeRequired;
+  final bool waitsForUser;
 
   Map<String, Object?> get modelInputSchema {
     final needsConfirmation = [safety, ...actionSafety.values].any(
       (value) =>
           value == ToolSafety.sensitive || value == ToolSafety.destructive,
     );
-    if (!needsConfirmation && !confirmationMayBeRequired) return inputSchema;
+    final confirmation = needsConfirmation || confirmationMayBeRequired;
+    final handoff = !waitsForUser;
     return {
       ...inputSchema,
       'properties': {
         ...(inputSchema['properties'] as Map),
-        'confirmationTimeoutSeconds': {
-          'type': 'integer',
-          'minimum': 1,
-          'description':
-              'Choose how many seconds to give the user to review and approve this operation. Consider the amount of detail and urgency. On timeout the app rejects the operation; timeout never grants permission.',
-        },
+        if (handoff)
+          'userAction': {
+            'type': ['string', 'null'],
+            'minLength': 1,
+            'maxLength': 600,
+            'description':
+                '需要用户接手时填简短操作说明，动作成功后暂停等待用户确认；无需接手或工具已有等待流程时填 null。这不是权限审批，恢复后须验证实际结果。',
+          },
+        if (confirmation)
+          'confirmationTimeoutSeconds': {
+            'type': 'integer',
+            'minimum': 1,
+            'description':
+                'Choose how many seconds to give the user to review and approve this operation. Consider the amount of detail and urgency. On timeout the app rejects the operation; timeout never grants permission.',
+          },
       },
       'required': [
-        ...(inputSchema['required'] as List),
-        'confirmationTimeoutSeconds',
+        ...(inputSchema['required'] as List? ?? const []),
+        if (handoff) 'userAction',
+        if (confirmation) 'confirmationTimeoutSeconds',
       ],
     };
   }
@@ -91,6 +104,7 @@ class ToolCall {
     required this.name,
     required this.arguments,
     this.confirmationTimeoutSeconds,
+    this.userAction,
   });
 
   factory ToolCall.fromModel({
@@ -100,15 +114,18 @@ class ToolCall {
   }) {
     final executionArguments = Map<String, Object?>.of(arguments);
     final timeout = executionArguments.remove('confirmationTimeoutSeconds');
+    final userAction = executionArguments.remove('userAction');
     return ToolCall(
       id: id,
       name: name,
       arguments: executionArguments,
       confirmationTimeoutSeconds: timeout as int?,
+      userAction: userAction as String?,
     );
   }
 
   final int? confirmationTimeoutSeconds;
+  final String? userAction;
   final String id;
   final String name;
   final Map<String, Object?> arguments;

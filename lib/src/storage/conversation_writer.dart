@@ -32,6 +32,16 @@ class ConversationWriter {
       for (final message in changed) messageRow(conversation.id, message),
     ];
     final imageRows = [
+      for (var i = 0; i < conversation.draftFiles.length; i++)
+        fileAttachmentRow(conversation.id, conversation.draftFiles[i], i),
+      for (final message in changed)
+        for (var i = 0; i < message.files.length; i++)
+          fileAttachmentRow(
+            conversation.id,
+            message.files[i],
+            i,
+            messageId: message.id,
+          ),
       for (var i = 0; i < conversation.draftImages.length; i++)
         attachmentRow(conversation.id, conversation.draftImages[i], i),
       for (final message in changed)

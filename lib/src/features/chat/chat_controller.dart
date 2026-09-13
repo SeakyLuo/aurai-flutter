@@ -1,3 +1,9 @@
+import '../../agent/attachment_tool.dart';
+import '../../domain/message_file.dart';
+import '../../platform/message_file_store.dart';
+import '../../platform/document_tools.dart';
+import '../../platform/wait_for_ui_tool.dart';
+import '../../platform/device_extension_tools.dart';
 import '../../agent/image_search_tool.dart';
 import '../../skills/skill_store.dart';
 import '../../skills/skill_tools.dart';
@@ -86,6 +92,7 @@ class ChatController extends ChangeNotifier {
   final _imageStore = MessageImageStore();
   bool addingImages = false;
   List<MessageImage> get draftImages => activeConversation.draftImages;
+  List<MessageFile> get draftFiles => activeConversation.draftFiles;
   final notificationOpenRequests = ValueNotifier<int>(0);
   Future<String?> takeNotificationConversation() =>
       _platform.takeNotificationConversation();
@@ -212,11 +219,13 @@ class ChatController extends ChangeNotifier {
           role: AgentMessageRole.user,
           text: goal,
           images: List.unmodifiable(draftImages),
+          files: List.unmodifiable(draftFiles),
           createdAt: DateTime.now(),
         ),
       );
       activeConversation.messageCount++;
       draftImages.clear();
+      draftFiles.clear();
       pendingGoal = goal;
       steps.clear();
       activeConversation.liveToolSteps.clear();
@@ -230,6 +239,7 @@ class ChatController extends ChangeNotifier {
         activeConversation.messageCount--;
         activeConversation.draft = previousDraft;
         draftImages.addAll(unsent.images);
+        draftFiles.addAll(unsent.files);
         pendingGoal = null;
         rethrow;
       }
@@ -388,6 +398,7 @@ class ChatController extends ChangeNotifier {
         _conversations[previousIndex] =
             conversationFromRow(conversationRow(activeConversation))
               ..seenRunId = activeConversation.seenRunId
+              ..draftFiles.addAll(activeConversation.draftFiles)
               ..draftImages.addAll(activeConversation.draftImages);
       }
       _activeConversation = conversation;
@@ -509,6 +520,45 @@ class ChatController extends ChangeNotifier {
     await _imageStore.remove([image]);
   }
 
+  Future<List<MessageFile>> pickFiles(int remaining) =>
+      MessageFileStore.pick(_imageStore.directory, remaining);
+
+  Future<void> addFiles() async {
+    addingImages = true;
+    notifyListeners();
+    try {
+      await _persist();
+      final files = await pickFiles(
+        MessageFileStore.maxFiles - draftFiles.length,
+      );
+      draftFiles.addAll(files);
+      try {
+        await _persist();
+      } on Object {
+        draftFiles.removeWhere(files.contains);
+        await MessageFileStore.remove(files);
+        rethrow;
+      }
+    } finally {
+      addingImages = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeDraftFile(MessageFile file) async {
+    final index = draftFiles.indexOf(file);
+    draftFiles.removeAt(index);
+    notifyListeners();
+    try {
+      await _persist();
+    } on Object {
+      draftFiles.insert(index, file);
+      notifyListeners();
+      rethrow;
+    }
+    await MessageFileStore.remove([file]);
+  }
+
   Future<void> saveDraft() => _persist();
 
   Future<void> _persist() => activeConversation.messageCount == 0
@@ -531,16 +581,29 @@ class ChatController extends ChangeNotifier {
       call,
       definition,
     );
-    final approved = accessibilityAvailable
-        ? await _platform.requestConfirmation(
-            call.id,
-            call.name,
-            call.arguments,
-            definition.confirmationDescriptionFor(call.arguments),
-            definition.taskScopedConfirmation,
-            call.confirmationTimeoutSeconds!,
-          )
-        : await _confirmInApp(call, definition);
+    final conversationId = _runningConversation!.id;
+    await _platform.updateAttentionNotification(
+      conversationId,
+      'approval',
+      title: '等待你的授权',
+      body: definition.confirmationDescriptionFor(call.arguments),
+      timeoutSeconds: call.confirmationTimeoutSeconds!,
+    );
+    final bool approved;
+    try {
+      approved = accessibilityAvailable
+          ? await _platform.requestConfirmation(
+              call.id,
+              call.name,
+              call.arguments,
+              definition.confirmationDescriptionFor(call.arguments),
+              definition.taskScopedConfirmation,
+              call.confirmationTimeoutSeconds!,
+            )
+          : await _confirmInApp(call, definition);
+    } finally {
+      await _platform.updateAttentionNotification(conversationId, 'approval');
+    }
     await _store.runs.resolveApproval(approvalId, approved);
     if (!approved) _deniedConfirmations.add(fingerprint);
     return approved;

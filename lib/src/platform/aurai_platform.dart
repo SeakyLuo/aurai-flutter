@@ -72,6 +72,44 @@ class AuraiPlatform {
     'conversationId': conversationId,
   });
 
+  Future<Map<String, Object?>> documentOperation(
+    String callId,
+    String operation,
+    Map<String, Object?> arguments,
+  ) => _invokeMap('documentOperation', {
+    'callId': callId,
+    'operation': operation,
+    'arguments': arguments,
+  });
+
+  Future<void> cancelDocumentPicker(String callId) =>
+      _channel.invokeMethod<void>('cancelDocumentPicker', {'callId': callId});
+
+  Future<void> cancelDocumentOperation(String callId) => _channel
+      .invokeMethod<void>('cancelDocumentOperation', {'callId': callId});
+
+  Future<void> manageDocumentFolder(
+    String action,
+    String uri, {
+    String? name,
+  }) => _channel.invokeMethod<void>(action, {
+    'uri': uri,
+    if (name != null) 'name': name,
+  });
+
+  Future<Map<String, Object?>> deviceExtension(
+    String operation, [
+    Map<String, Object?> arguments = const {},
+  ]) => _invokeMap(operation, arguments);
+
+  Future<void> openShizukuManager() =>
+      _channel.invokeMethod<void>('openShizukuManager');
+
+  Future<void> cancelShizuku() => _channel.invokeMethod<void>('cancelShizuku');
+
+  Future<void> cancelNetworkCaptureStart() =>
+      _channel.invokeMethod<void>('cancelNetworkCaptureStart');
+
   Future<Map<String, Object?>> observeDevice() => _invokeMap('observeDevice');
 
   Future<Map<String, Object?>> getNotificationAccessState() =>
@@ -123,6 +161,20 @@ class AuraiPlatform {
       _channel.invokeMethod<void>('updateAgentSessionStep', <String, Object?>{
         'step': step,
       });
+
+  Future<void> updateAttentionNotification(
+    String conversationId,
+    String kind, {
+    String? title,
+    String? body,
+    int? timeoutSeconds,
+  }) => _channel.invokeMethod<void>('updateAttentionNotification', {
+    'conversationId': conversationId,
+    'kind': kind,
+    'title': title,
+    'body': body,
+    'timeoutSeconds': timeoutSeconds,
+  });
 
   Future<void> endAgentSession(
     String outcome, {

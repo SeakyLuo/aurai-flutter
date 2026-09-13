@@ -65,7 +65,7 @@ class AuraiApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        if (java.io.File("/proc/self/cmdline").readText().trimEnd('\u0000').endsWith(":device_script")) return
+        if (java.io.File("/proc/self/cmdline").readText().trimEnd('\u0000').let { it.endsWith(":device_script") || it.endsWith(":documents") }) return
         FlutterInjector.instance().flutterLoader().startInitialization(this)
         FlutterInjector.instance().flutterLoader().ensureInitializationComplete(this, null)
         flutterEngine = FlutterEngine(this)

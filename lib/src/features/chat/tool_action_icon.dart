@@ -53,6 +53,9 @@ class ToolActionIcon extends StatelessWidget {
           type: SidebarActionIconType.search,
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
+        'getDocumentFolders' ||
+        'requestDocumentFolder' ||
+        'searchFiles' ||
         'listFiles' ||
         'listDirectory' => const FileToolIcon(type: FileToolIconType.folder),
         'readWebPage' || 'setSourceDates' => CustomPaint(
@@ -61,14 +64,25 @@ class ToolActionIcon extends StatelessWidget {
             Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
+        'readAttachment' ||
+        'readDocument' ||
+        'createTextFile' ||
+        'shareFile' ||
         'readFile' ||
         'inspectLocalDatabase' ||
         'queryLocalDatabase' ||
         'readLocalDatabase' ||
         'inspectAndroidApi' => const FileToolIcon(type: FileToolIconType.read),
-        'shell' || 'executeAndroidScript' => const CapabilityIcon(
-          id: 'android.shell.app_uid',
+        'shell' || 'executeShizuku' || 'executeAndroidScript' =>
+          const CapabilityIcon(id: 'android.shell.app_uid'),
+        'requestShizukuAccess' => const CapabilityIcon(
+          id: 'android.permissions',
         ),
+        'getDeviceExtensions' ||
+        'startNetworkCapture' ||
+        'stopNetworkCapture' ||
+        'readNetworkTraffic' ||
+        'clearNetworkTraffic' => const CapabilityIcon(id: 'android.network'),
         'captureScreen' => const CapabilityIcon(id: 'android.vision'),
         'clickUiElement' ||
         'inputUiText' ||
@@ -78,7 +92,7 @@ class ToolActionIcon extends StatelessWidget {
         'goHome' ||
         'act' ||
         'tapScreen' => const CapabilityIcon(id: 'screenAccess'),
-        'observeDevice' => SettingsIcon(
+        'observeDevice' || 'waitForUi' => SettingsIcon(
           color: Theme.of(context).colorScheme.onSurfaceVariant,
           type: SettingsIconType.device,
         ),

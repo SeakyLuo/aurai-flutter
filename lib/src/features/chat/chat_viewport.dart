@@ -260,18 +260,15 @@ class ChatViewportState extends State<ChatViewport> {
     _anchor = anchor;
     widget.onBookmark(anchor);
     _restoring = true;
+    // Establish the item's anchor before its height changes, in the same frame.
+    _items.jumpTo(
+      index: _anchorIndex(anchor),
+      alignment: _listAlignment(_anchorIndex(anchor), anchor.alignment),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _items.jumpTo(
-        index: _anchorIndex(anchor),
-        alignment: _listAlignment(_anchorIndex(anchor), anchor.alignment),
-      );
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _restoring = false;
-          _rememberPosition();
-        }
-      });
+      _restoring = false;
+      _rememberPosition();
     });
   }
 

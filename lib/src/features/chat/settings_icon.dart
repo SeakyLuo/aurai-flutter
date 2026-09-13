@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 enum SettingsIconType {
+  add,
   memory,
   skills,
   personalization,
@@ -52,6 +53,9 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.add:
+        canvas.drawLine(const Offset(12, 4), const Offset(12, 20), pen);
+        canvas.drawLine(const Offset(4, 12), const Offset(20, 12), pen);
       case SettingsIconType.skills:
         canvas.drawPath(
           Path()

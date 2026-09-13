@@ -1,3 +1,6 @@
+import '../../domain/message_file.dart';
+import 'file_attachments.dart';
+import 'task_failure_card.dart';
 import 'reconnect_indicator.dart';
 import 'package:flutter/material.dart';
 
@@ -189,6 +192,7 @@ class ExecutionProgress extends StatelessWidget {
     required this.state,
     required this.steps,
     required this.needsConfiguration,
+    required this.errorDetail,
     required this.hasPendingGoal,
     this.replying = false,
     this.reconnectAttempt = 0,
@@ -201,6 +205,7 @@ class ExecutionProgress extends StatelessWidget {
   final ChatRunState state;
   final List<AgentStep> steps;
   final bool needsConfiguration;
+  final String? errorDetail;
   final bool hasPendingGoal;
   final bool replying;
   final int reconnectAttempt;
@@ -211,6 +216,10 @@ class ExecutionProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (state == ChatRunState.failed) {
+      return TaskFailureCard(onRetry: onRetry, error: errorDetail ?? '任务执行失败');
+    }
+
     if (state == ChatRunState.running && reconnectAttempt > 0) {
       return ReconnectIndicator(attempt: reconnectAttempt);
     }
@@ -241,10 +250,6 @@ class ExecutionProgress extends StatelessWidget {
         !accessibilityRequestPending;
     final title = _title;
     final action = switch (state) {
-      ChatRunState.failed => TextButton(
-        onPressed: onRetry,
-        child: const Text('重试'),
-      ),
       ChatRunState.interrupted => null,
       ChatRunState.idle when needsConfiguration => TextButton(
         onPressed: onContinue,
@@ -323,6 +328,8 @@ class ChatComposer extends StatelessWidget {
     required this.onStop,
     required this.onAddImages,
     required this.images,
+    required this.files,
+    required this.onRemoveFile,
     required this.onRemoveImage,
     required this.addingImages,
     this.savingEdit = false,
@@ -340,6 +347,8 @@ class ChatComposer extends StatelessWidget {
   final ValueChanged<BuildContext> onAddImages;
   final ValueChanged<MessageImage> onRemoveImage;
   final List<MessageImage> images;
+  final List<MessageFile> files;
+  final ValueChanged<MessageFile> onRemoveFile;
   final bool addingImages;
   final bool savingEdit;
 
@@ -349,21 +358,50 @@ class ChatComposer extends StatelessWidget {
   ) => ValueListenableBuilder<TextEditingValue>(
     valueListenable: controller,
     builder: (context, value, _) {
-      final resume = canResume && value.text.trim().isEmpty && images.isEmpty;
+      final resume =
+          canResume &&
+          value.text.trim().isEmpty &&
+          images.isEmpty &&
+          files.isEmpty;
       return MessageComposer(
         controller: controller,
         focusNode: focusNode,
         enabled: enabled,
         hintText: '回复 Aurai',
-        attachments: images.isEmpty
+        attachments: images.isEmpty && files.isEmpty && !addingImages
             ? null
-            : DraftImageAttachments(
-                images: images,
-                onRemove: enabled && !addingImages ? onRemoveImage : null,
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (images.isNotEmpty)
+                    DraftImageAttachments(
+                      images: images,
+                      onRemove: enabled && !addingImages ? onRemoveImage : null,
+                    ),
+                  if (files.isNotEmpty)
+                    FileAttachments(
+                      files: files,
+                      onRemove: enabled && !addingImages ? onRemoveFile : null,
+                    ),
+                  if (addingImages)
+                    const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          SizedBox(width: 8),
+                          Text('正在添加附件', style: TextStyle(fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                ],
               ),
         leading: Builder(
           builder: (buttonContext) => RoundAction(
-            label: '添加图片',
+            label: '添加附件',
             compact: true,
             insetResponse: true,
             icon: Icons.add_rounded,
@@ -385,7 +423,7 @@ class ChatComposer extends StatelessWidget {
               ? '正在保存'
               : enabled
               ? (addingImages
-                    ? '正在处理图片'
+                    ? '正在处理附件'
                     : resume
                     ? '继续任务'
                     : '发送')

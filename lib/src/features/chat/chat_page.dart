@@ -1,3 +1,4 @@
+import '../../platform/message_file_store.dart';
 import '../../scheduling/tasks_page.dart';
 import 'keyboard_inset.dart';
 import 'operation_request_sheet.dart';
@@ -32,6 +33,7 @@ import 'conversation_search_page.dart';
 
 part 'chat_session_actions.dart';
 part 'chat_message_editing.dart';
+part 'chat_attachments.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({
@@ -212,8 +214,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         canSend:
                             _canSend ||
                             (_editing?.images ?? controller.draftImages)
+                                .isNotEmpty ||
+                            (_editing?.files ?? controller.draftFiles)
                                 .isNotEmpty,
                         images: _editing?.images ?? controller.draftImages,
+                        files: _editing?.files ?? controller.draftFiles,
+                        onRemoveFile: (file) async {
+                          if (_editing != null) {
+                            _updateEditing(() => _editing!.files.remove(file));
+                            return;
+                          }
+                          try {
+                            await controller.removeDraftFile(file);
+                          } on Object {
+                            if (mounted) _imageNotice('附件移除失败，请重试');
+                          }
+                        },
                         addingImages:
                             controller.addingImages ||
                             _editing?.picking == true,
@@ -353,6 +369,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Widget _buildProgress(ChatController controller) => ExecutionProgress(
     state: controller.runState,
     steps: controller.steps,
+    errorDetail: controller.activeConversation.errorDetail,
     needsConfiguration: controller.needsConfiguration,
     hasPendingGoal: controller.pendingGoal != null,
     replying: controller.streamingMessageId != null,
@@ -626,92 +643,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _focusNode.requestFocus();
   }
 
-  bool _imageOperationPending() {
-    if (!widget.controller.addingImages) return false;
-    _imageNotice('正在处理图片，请稍候');
-    return true;
-  }
-
-  Future<void> _addImages(BuildContext buttonContext) async {
-    final controller = widget.controller;
-    if (controller.addingImages || controller.isBusy || _preparingGoal) return;
-    if (controller.needsConfiguration) {
-      _showModelConfigurationNotice();
-      return;
-    }
-    if (controller.draftImages.length == MessageImageStore.maxImages) {
-      _imageNotice('每条消息最多添加 4 张图片，请先移除一张');
-      return;
-    }
-    final source = await showImageSourceMenu(buttonContext);
-    if (source != null && mounted) await _loadImages(source);
-  }
-
-  Future<void> _loadImages([ImageSource? source]) async {
-    try {
-      await widget.controller.addImages(source);
-    } on Object catch (error) {
-      if (!mounted) return;
-      final permissionDenied =
-          error is PlatformException &&
-          {
-            'camera_access_denied',
-            'camera_access_denied_without_prompt',
-            'camera_access_restricted',
-            'photo_access_denied',
-            'photo_access_denied_without_prompt',
-            'photo_access_restricted',
-          }.contains(error.code);
-      _imageNotice(
-        permissionDenied
-            ? '请在系统设置中允许相机或照片访问'
-            : switch (error) {
-                ImageInputException() => error.message,
-                PlatformException(code: 'no_available_camera') => '当前设备没有可用的相机',
-                _ => '图片添加失败，请重新选择',
-              },
-        action: permissionDenied
-            ? SnackBarAction(
-                label: '去设置',
-                onPressed: () async {
-                  try {
-                    await widget.controller.openAppSettings();
-                  } on Object {
-                    if (mounted) _imageNotice('无法打开设置，请在系统设置中找到 Aurai');
-                  }
-                },
-              )
-            : null,
-      );
-    }
-  }
-
-  Future<void> _removeImage(MessageImage image) async {
-    try {
-      await widget.controller.removeDraftImage(image);
-    } on Object {
-      if (mounted) _imageNotice('图片移除后保存失败，请重试');
-    }
-  }
-
-  void _showModelConfigurationNotice() => _imageNotice(
-    '请先连接模型',
-    action: SnackBarAction(
-      label: '模型设置',
-      onPressed: () => _openSettings(continueAfterSave: false),
-    ),
-  );
-
-  void _imageNotice(String message, {SnackBarAction? action}) =>
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message), action: action));
-
   Future<void> _send() async {
     if (_otherConversationRunning()) return;
     final conversationId = widget.controller.activeConversation.id;
     final goal = _textController.text.trim();
-    if ((goal.isEmpty && widget.controller.draftImages.isEmpty) ||
+    if ((goal.isEmpty &&
+            widget.controller.draftImages.isEmpty &&
+            widget.controller.draftFiles.isEmpty) ||
         widget.controller.isBusy ||
         widget.controller.addingImages ||
         _preparingGoal) {

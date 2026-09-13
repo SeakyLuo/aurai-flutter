@@ -3,6 +3,7 @@ import '../../domain/agent_models.dart';
 import 'chat_scroll_anchor.dart';
 import 'thinking_indicator.dart';
 import 'tool_action_icon.dart';
+import 'tool_expand_arrow.dart';
 
 class ToolActivityGroup extends StatefulWidget {
   const ToolActivityGroup({
@@ -83,16 +84,7 @@ class _ToolActivityGroupState extends State<ToolActivityGroup> {
                   const SizedBox(width: 6),
                   Transform.translate(
                     offset: const Offset(4, 0),
-                    child: AnimatedRotation(
-                      turns: expanded ? .25 : 0,
-                      duration: const Duration(milliseconds: 240),
-                      curve: Curves.easeInOutCubic,
-                      child: Icon(
-                        Icons.chevron_right_rounded,
-                        size: 18,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
+                    child: ToolExpandArrow(expanded: expanded),
                   ),
                 ],
               ),

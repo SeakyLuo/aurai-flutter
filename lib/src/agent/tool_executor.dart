@@ -4,6 +4,7 @@ import 'dart:async';
 import '../domain/capability.dart';
 import '../domain/tool_models.dart';
 import 'tool_registry.dart';
+import 'ask_user_tool.dart';
 
 typedef ToolConfirmation =
     Future<bool> Function(ToolCall call, ToolDefinition definition);
@@ -18,9 +19,14 @@ class ToolExecutor {
   final ToolRegistry _registry;
   final ToolConfirmation _confirm;
   AgentTool? _activeTool;
+  bool _cancelRequested = false;
   final Map<String, Object> _authorizationGrants = <String, Object>{};
 
-  Future<ToolResult> execute(ToolCall call) async {
+  Future<ToolResult> execute(
+    ToolCall call, {
+    void Function(ToolResult)? onWaitingForUser,
+  }) async {
+    _cancelRequested = false;
     final tool = _registry.find(call.name);
     if (tool == null || !_registry.isExposed(call.name)) {
       return ToolResult(
@@ -33,6 +39,21 @@ class ToolExecutor {
       );
     }
     final capability = _registry.capabilityFor(tool);
+    final questions = _registry.find('askUser') as AskUserTool?;
+    if (call.userAction != null &&
+        (tool.definition.waitsForUser ||
+            questions == null ||
+            questions.hasPending)) {
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: ToolResultStatus.error,
+        output: const {
+          'error':
+              '当前工具已有用户等待流程，或已有问题未处理，不能再添加人工交接。此次动作尚未执行，请移除 userAction 或先处理已有问题。',
+        },
+      );
+    }
     if (tool is PreflightAgentTool) {
       final rejected = await (tool as PreflightAgentTool).preflight(call);
       if (rejected != null) return rejected;
@@ -100,9 +121,49 @@ class ToolExecutor {
         }
       }
     }
+    if (_cancelRequested) {
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: ToolResultStatus.cancelled,
+        output: const {'cancelled': true, 'performed': false},
+      );
+    }
     _activeTool = tool;
     try {
-      return await tool.execute(call).timeout(tool.definition.executionTimeout);
+      final result = await tool
+          .execute(call)
+          .timeout(tool.definition.executionTimeout);
+      if (_cancelRequested ||
+          call.userAction == null ||
+          result.status != ToolResultStatus.success ||
+          result.output.containsKey('error') ||
+          result.output['cancelled'] == true ||
+          result.output['pending'] == true ||
+          result.output['performed'] == false ||
+          result.output['opened'] == false ||
+          result.output['started'] == false ||
+          result.output['granted'] == false)
+        return result;
+      _activeTool = questions;
+      onWaitingForUser?.call(result);
+      final answer = await questions!.waitForUserAction(call.userAction!);
+      return ToolResult(
+        callId: result.callId,
+        toolName: result.toolName,
+        status: result.status,
+        attachments: result.attachments,
+        output: {
+          ...result.output,
+          'userAction': {
+            'instruction': call.userAction,
+            ...answer,
+            'next': answer['reportedCompleted'] == true
+                ? '用户报告手动步骤完成。重新观察或检查实际状态后再继续，不将此确认当作系统授权或任务成功。'
+                : '用户取消或反馈了问题，未确认完成。不要继续依赖该步骤的操作；取消不撤销之前已执行的动作，不自动重新交接。',
+          },
+        },
+      );
     } on TimeoutException {
       await tool.cancel();
       return ToolResult(
@@ -120,6 +181,7 @@ class ToolExecutor {
   }
 
   Future<void> cancel() async {
+    _cancelRequested = true;
     final tool = _activeTool;
     if (tool != null) {
       await tool.cancel();

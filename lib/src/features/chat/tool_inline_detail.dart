@@ -8,11 +8,18 @@ String? toolInlineDetail(
   final request = requestJson == null
       ? const <String, Object?>{}
       : jsonDecode(requestJson) as Map;
-  final result = resultJson == null
+  final needsResult = const {
+    'readWebPage',
+    'clickUiElement',
+    'launchApp',
+  }.contains(name);
+  final result = !needsResult || resultJson == null
       ? const <String, Object?>{}
       : jsonDecode(resultJson) as Map;
   final value = switch (name) {
-    'shell' => request['command'],
+    'createTextFile' => request['fileName'],
+    'searchFiles' => request['query'],
+    'shell' || 'executeShizuku' => request['command'],
     'searchWeb' ||
     'searchImages' ||
     'searchTools' ||

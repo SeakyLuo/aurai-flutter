@@ -24,10 +24,12 @@ class UserQuestion {
     required this.conversationId,
     required this.question,
     required this.options,
+    this.isUserAction = false,
   });
   final String conversationId;
   final String question;
   final List<Object> options;
+  final bool isUserAction;
   UserQuestionOption optionAt(int index) =>
       UserQuestionOption.fromValue(options[index]);
   final result = Completer<Map<String, Object?>>();
@@ -39,6 +41,10 @@ class UserQuestion {
     final text = draft.trim();
     result.complete({
       'skipped': skipped,
+      if (isUserAction) ...{
+        'cancelled': skipped || (text.isEmpty && selected == 1),
+        'reportedCompleted': !skipped && text.isEmpty && selected == 0,
+      },
       if (!skipped)
         'answer': text.isNotEmpty ? text : optionAt(selected!).answer,
     });
@@ -64,9 +70,30 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
     await _pending?.result.future;
   }
 
+  Future<Map<String, Object?>> waitForUserAction(String instruction) async {
+    final question = UserQuestion(
+      conversationId: conversationId,
+      question: instruction,
+      options: const ['已完成', '取消'],
+      isUserAction: true,
+    );
+    _pending = question;
+    onQuestion(question);
+    try {
+      return await question.result.future.timeout(const Duration(days: 1));
+    } on TimeoutException {
+      await cancel();
+      return {'cancelled': true, 'timedOut': true};
+    } finally {
+      _pending = null;
+      onQuestion(null);
+    }
+  }
+
   @override
   ToolDefinition get definition => const ToolDefinition(
     name: 'askUser',
+    waitsForUser: true,
     description:
         'Ask one concise question when a user preference or missing information is needed. Present up to four options, or no options for a free-text question. Each option may be plain text or an object with a short title and supporting content. Use title=null for content only; avoid repeating the title in content. The user may select one, write their own answer, or skip. waitForResponse=true or null waits for the answer. Set false only when independent work can continue without it: returns pending immediately and the actual answer arrives as a user update on a later model turn. Do not perform answer-dependent work or claim a final outcome while pending. Never infer an answer from skipping. Do not repeat the question in prose before calling. Incorporate later answers or skips before finalizing; a skip is not consent. For skipped optional details, use a reasonable stated assumption; otherwise explain what is still needed. Do not use this for device permission approval.',
     inputSchema: {

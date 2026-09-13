@@ -114,7 +114,7 @@ class AgentSessionService : Service() {
 
     private fun createChannel() {
         notificationManager().createNotificationChannel(
-            NotificationChannel(RESULT_CHANNEL_ID, "回复完成", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            NotificationChannel(RESULT_CHANNEL_ID, "回复完成", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "会话在后台完成后的回复通知"
             },
         )

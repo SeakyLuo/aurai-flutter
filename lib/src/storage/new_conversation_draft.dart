@@ -1,3 +1,4 @@
+import '../domain/message_file.dart';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +21,14 @@ class NewConversationDraft {
       )
       ..storedTitle = data['title'] as String?
       ..draft = data['text']! as String
+      ..draftFiles.addAll(
+        (data['files'] as List? ?? const []).map(
+          (file) => MessageFile.fromJson(
+            (file as Map).cast<String, Object?>(),
+            imageDirectory,
+          ),
+        ),
+      )
       ..draftImages.addAll(
         (data['images']! as List).map(
           (image) => MessageImage.fromJson(
@@ -36,6 +45,7 @@ class NewConversationDraft {
       'createdAt': conversation.createdAt.toIso8601String(),
       'text': conversation.draft,
       'title': conversation.storedTitle,
+      'files': conversation.draftFiles.map((file) => file.toJson()).toList(),
       'images': conversation.draftImages
           .map((image) => image.toJson())
           .toList(),

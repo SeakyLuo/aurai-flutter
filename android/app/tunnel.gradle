@@ -1,0 +1,50 @@
+// Pinned, offline source archives: no downloads or mutable branches during builds.
+import groovy.json.JsonSlurper
+import java.security.MessageDigest
+
+def vendor = file('../native/vendor')
+def tunnelRoot = layout.buildDirectory.dir('tunnel-source')
+def entries = new JsonSlurper().parse(new File(vendor, 'sources.json'))
+def prepare = tasks.register('prepareTunnel') {
+    inputs.dir(vendor)
+    outputs.dir(tunnelRoot)
+    doLast {
+        entries.each { entry ->
+            def archive = new File(vendor, "${entry.name}.tar.gz")
+            def digest = MessageDigest.getInstance('SHA-256').digest(archive.bytes).encodeHex().toString()
+            if (digest != entry.sha256) throw new GradleException("Tunnel source checksum mismatch: ${entry.name}")
+            copy {
+                from tarTree(resources.gzip(archive))
+                into new File(tunnelRoot.get().asFile, entry.path)
+                eachFile { details ->
+                    details.relativePath = new RelativePath(!details.directory, *details.relativePath.segments.drop(1))
+                }
+                includeEmptyDirs = false
+            }
+            entry.links.each { path, target ->
+                def root = new File(tunnelRoot.get().asFile, entry.path)
+                new File(root, path).bytes = new File(root, target).bytes
+            }
+        }
+    }
+}
+def nativeLibraries = layout.buildDirectory.dir('tunnel-libs')
+def buildTunnel = tasks.register('buildTunnel', Exec) {
+    dependsOn(prepare)
+    inputs.dir(file('../native'))
+    outputs.dir(nativeLibraries)
+    doFirst {
+        commandLine new File(android.ndkDirectory, 'ndk-build').absolutePath,
+            '-j4', 'NDK_PROJECT_PATH=null',
+            "APP_BUILD_SCRIPT=${file('../native/Android.mk').absolutePath}",
+            "AURAI_TUNNEL_PATH=${tunnelRoot.get().asFile.absolutePath}",
+            "NDK_OUT=${layout.buildDirectory.dir('tunnel-objects').get().asFile.absolutePath}",
+            "NDK_LIBS_OUT=${nativeLibraries.get().asFile.absolutePath}",
+            'APP_ABI=arm64-v8a armeabi-v7a x86_64', 'APP_PLATFORM=android-24',
+            'APP_STL=c++_static'
+    }
+}
+android.sourceSets.main.jniLibs.srcDir(nativeLibraries)
+tasks.configureEach {
+    if (name == 'preBuild' || name.startsWith('merge') && name.endsWith('JniLibFolders')) dependsOn(buildTunnel)
+}

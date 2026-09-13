@@ -18,20 +18,31 @@ import java.io.File
 import java.time.Instant
 
 class AndroidAgentBridge(private val context: Context) {
+    private val chatFiles = ChatFileAccess(context)
+    private val documents = DocumentAccess(context)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val appUidAdapter = AppUidExecutionAdapter(File(context.filesDir, "agent-shell"))
-    private val shizukuAdapter = UnavailableExecutionAdapter(
-        ExecutionIdentity.SHIZUKU,
-        "Adapter reserved; no Shizuku authorization is connected",
-    )
+    private val shizuku = ShizukuAccess(context)
     private val adbAdapter = UnavailableExecutionAdapter(
         ExecutionIdentity.ADB,
         "Adapter reserved; no ADB transport is connected",
     )
 
     fun handle(call: MethodCall, result: MethodChannel.Result): Boolean {
+        if (chatFiles.handle(call, result)) return true
+        if (documents.handle(call, result)) return true
         when (call.method) {
             "getCapabilities" -> result.success(capabilities())
+            "getDeviceExtensions" -> result.success(mapOf("shizuku" to shizuku.state(), "vpn" to NetworkCaptureAccess.state(context)))
+            "requestShizukuAccess" -> shizuku.requestPermission(result)
+            "openShizukuManager" -> { shizuku.openManager(); result.success(null) }
+            "executeShizuku" -> shizuku.execute(call.argument<String>("command")!!, call.argument<Int>("timeoutSeconds")!!, result)
+            "cancelShizuku" -> { shizuku.cancel(); result.success(null) }
+            "startNetworkCapture" -> NetworkCaptureAccess.start(context, call.argument<Int>("durationSeconds")!!, result)
+            "stopNetworkCapture" -> { NetworkCaptureAccess.stop(context); result.success(NetworkCaptureAccess.state(context)) }
+            "cancelNetworkCaptureStart" -> { NetworkCaptureAccess.cancelStart(context); result.success(null) }
+            "readNetworkTraffic" -> result.success(NetworkTrafficLog.read(call.argument<Int>("limit")!!, call.argument<Number>("after")!!.toLong()))
+            "clearNetworkTraffic" -> { NetworkTrafficLog.clear(); result.success(mapOf("cleared" to true)) }
             "getNotificationAccessState" -> result.success(
                 AuraiNotificationListenerService.accessState(context),
             )
@@ -86,6 +97,17 @@ class AndroidAgentBridge(private val context: Context) {
                 AgentSessionService.start(context)
                 result.success(null)
             }
+            "updateAttentionNotification" -> {
+                AttentionNotifications.update(
+                    context,
+                    call.argument<String>("conversationId")!!,
+                    call.argument<String>("kind")!!,
+                    call.argument<String>("title"),
+                    call.argument<String>("body"),
+                    call.argument<Int>("timeoutSeconds"),
+                )
+                result.success(null)
+            }
             "updateAgentSessionStep" -> {
                 AgentSessionService.updateStep(context, call.argument<String>("step")!!)
                 result.success(null)
@@ -111,6 +133,7 @@ class AndroidAgentBridge(private val context: Context) {
             }
             "requestConfirmation" -> requestConfirmation(call, result)
             "cancelPendingInteraction" -> {
+                documents.cancelTasks()
                 appUidAdapter.cancel()
                 AuraiAccessibilityService.instance?.cancelInteraction()
                 result.success(null)
@@ -168,6 +191,7 @@ class AndroidAgentBridge(private val context: Context) {
             else -> accessAvailability
         }
         return listOf(
+            capability("android.documents", "文件与文档", "available", "访问你授权的文件夹，读取文档并保存文件"),
             capability("android.network", "网络状态与连接诊断", "available", "可读取网络状态并执行 DNS 与 TLS 探测"),
             capability("android.observe", "设备与界面观察", "available", if (accessibility) "可观察前台 App 和无障碍界面树" else "可观察基础设备状态；界面树需要无障碍权限"),
             capability(
@@ -195,7 +219,8 @@ class AndroidAgentBridge(private val context: Context) {
             capability("android.intents", "Android 操作", "available", "可在确认后启动通用 Intent"),
             capability("android.settings", "系统设置", "available", "可打开稳定的 Android 设置页面"),
             capability("android.shell.app_uid", "本机命令（仅限 Aurai 权限）", "available", "不是 ADB 或 root，无法读取其他 App 私有数据或修改受保护设置"),
-            capability("android.execution.shizuku", "Shizuku 执行", "unavailable", shizukuAdapter.reason),
+            capability("android.execution.shizuku", "Shizuku", shizuku.state()["availability"] as String, shizuku.state()["reason"] as String),
+            capability("android.network.capture", "本地 VPN", "available", NetworkCaptureAccess.state(context)["reason"] as String),
             capability("android.execution.adb", "ADB 执行", "unavailable", adbAdapter.reason),
         )
     }
