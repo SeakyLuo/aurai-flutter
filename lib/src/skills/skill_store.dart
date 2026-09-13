@@ -51,6 +51,9 @@ class SavedSkill {
 }
 
 class SkillStore extends ChangeNotifier {
+  SkillStore({this.ownerId = 'agent:aurai'});
+  final String ownerId;
+  String _key(String key) => ownerId == 'agent:aurai' ? key : '$ownerId:$key';
   final _preferences = SharedPreferencesAsync();
   final Map<String, SavedSkill> _skills = {};
   final Map<String, SkillPermission> _permissions = {};
@@ -68,7 +71,7 @@ class SkillStore extends ChangeNotifier {
 
   Future<void> saveSort(SkillSort value) => _enqueue(() async {
     await _database.insert('app_state', {
-      'key': 'skill_sort',
+      'key': _key('skill_sort'),
       'value': value.name,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
     sort = value;
@@ -95,7 +98,7 @@ class SkillStore extends ChangeNotifier {
       'uses': (_statistics[id]?['uses'] ?? 0) + 1,
     };
     await _database.insert('app_state', {
-      'key': 'skill_statistics',
+      'key': _key('skill_statistics'),
       'value': jsonEncode({..._statistics, id: stats}),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
     _statistics[id] = stats;
@@ -110,7 +113,7 @@ class SkillStore extends ChangeNotifier {
   Future<void> saveDefaultPermission(SkillPermission permission) =>
       _enqueue(() async {
         await _database.insert('app_state', {
-          'key': 'skill_default_permission',
+          'key': _key('skill_default_permission'),
           'value': permission.name,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
         defaultPermission = permission;
@@ -153,30 +156,34 @@ class SkillStore extends ChangeNotifier {
     }
     await _preferences.remove('saved_skills');
     final rows = await Future.wait([
-      database.query('skills'),
-      database.query('skill_dependencies'),
+      database.query('skills', where: 'owner_id = ?', whereArgs: [ownerId]),
+      database.query(
+        'skill_dependencies',
+        where: 'skill_id IN (SELECT id FROM skills WHERE owner_id = ?)',
+        whereArgs: [ownerId],
+      ),
       database.query(
         'app_state',
         where: 'key IN (?, ?, ?, ?)',
         whereArgs: [
-          'skill_permissions',
-          'skill_default_permission',
-          'skill_statistics',
-          'skill_sort',
+          _key('skill_permissions'),
+          _key('skill_default_permission'),
+          _key('skill_statistics'),
+          _key('skill_sort'),
         ],
       ),
     ]);
     for (final row in rows[2]) {
-      if (row['key'] == 'skill_sort') {
+      if (row['key'] == _key('skill_sort')) {
         sort = SkillSort.values.byName(row['value'] as String);
-      } else if (row['key'] == 'skill_statistics') {
+      } else if (row['key'] == _key('skill_statistics')) {
         final stored = jsonDecode(row['value'] as String) as Map;
         for (final entry in stored.entries) {
           _statistics[entry.key as String] = Map<String, int>.from(
             entry.value as Map,
           );
         }
-      } else if (row['key'] == 'skill_default_permission') {
+      } else if (row['key'] == _key('skill_default_permission')) {
         defaultPermission = SkillPermission.values.byName(
           row['value'] as String,
         );
@@ -312,11 +319,11 @@ class SkillStore extends ChangeNotifier {
 
     await _database.transaction((txn) async {
       await txn.insert('app_state', {
-        'key': 'skill_statistics',
+        'key': _key('skill_statistics'),
         'value': jsonEncode({..._statistics, saved.id: statistics}),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
       if (old == null) {
-        await txn.insert('skills', _row(saved));
+        await txn.insert('skills', {..._row(saved), 'owner_id': ownerId});
       } else {
         await txn.update(
           'skills',
@@ -326,7 +333,7 @@ class SkillStore extends ChangeNotifier {
         );
       }
       await txn.insert('app_state', {
-        'key': 'skill_permissions',
+        'key': _key('skill_permissions'),
         'value': jsonEncode(
           nextPermissions.map((id, value) => MapEntry(id, value.name)),
         ),
@@ -365,11 +372,11 @@ class SkillStore extends ChangeNotifier {
     await _database.transaction((txn) async {
       await txn.delete('skills', where: 'id = ?', whereArgs: [skill.id]);
       await txn.insert('app_state', {
-        'key': 'skill_statistics',
+        'key': _key('skill_statistics'),
         'value': jsonEncode(Map.of(_statistics)..remove(skill.id)),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
       await txn.insert('app_state', {
-        'key': 'skill_permissions',
+        'key': _key('skill_permissions'),
         'value': jsonEncode(
           nextPermissions.map((id, value) => MapEntry(id, value.name)),
         ),

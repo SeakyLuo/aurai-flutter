@@ -16,6 +16,7 @@ class AgentRunStore {
     String userMessageId,
     ModelConfig config, {
     String senderId = 'agent:aurai',
+    bool group = false,
     required String systemPrompt,
     required String customInstructions,
     required ResponsePreferences responsePreferences,
@@ -32,14 +33,24 @@ class AgentRunStore {
         ''',
         [userMessageId, conversationId],
       );
-      final target = await txn.query(
-        'message_recipients',
-        where:
-            'message_id = ? AND sender_id = ? AND message_id IN '
-            '(SELECT id FROM messages WHERE conversation_id = ?)',
-        whereArgs: [userMessageId, senderId, conversationId],
-        limit: 1,
-      );
+      final target = group
+          ? await txn.query(
+              'conversation_members',
+              columns: ['sender_id'],
+              where:
+                  'conversation_id = ? AND sender_id = ? AND left_at IS NULL '
+                  'AND conversation_id IN (SELECT conversation_id FROM messages WHERE id = ?)',
+              whereArgs: [conversationId, senderId, userMessageId],
+              limit: 1,
+            )
+          : await txn.query(
+              'message_recipients',
+              where:
+                  'message_id = ? AND sender_id = ? AND message_id IN '
+                  '(SELECT id FROM messages WHERE conversation_id = ?)',
+              whereArgs: [userMessageId, senderId, conversationId],
+              limit: 1,
+            );
       if (target.isEmpty) throw StateError('该 AI 不在这条消息的回复对象中');
       final senderRows = await txn.query(
         'message_senders',
@@ -213,20 +224,20 @@ class AgentRunStore {
           'error_detail': error,
           if (status == 'completed') 'pending_goal': null,
         },
-        where: 'active_run_id = ?',
+        where: "active_run_id = ? AND kind != 'group'",
         whereArgs: [runId],
       );
       if (finalMessageId != null) {
         batch.update(
           'messages',
           {'kind': 'commentary'},
-          where: 'run_id = ? AND id != ?',
+          where: "run_id = ? AND id != ? AND kind != 'group_message'",
           whereArgs: [runId, finalMessageId],
         );
         batch.update(
           'messages',
           {'kind': 'final'},
-          where: 'id = ?',
+          where: "id = ? AND kind != 'group_message'",
           whereArgs: [finalMessageId],
         );
       }

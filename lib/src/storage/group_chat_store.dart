@@ -1,3 +1,6 @@
+import 'dart:convert';
+import '../domain/agent_models.dart';
+import 'group_system_notice.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/ai_profile.dart';
@@ -8,8 +11,174 @@ import 'conversation_rows.dart';
 class GroupChatStore {
   GroupChatStore(this.database);
   final Database database;
+  Future<void> Function(String groupId, AgentMessage notice)? onSystemNotice;
+
+  Future<void> _notifySystem(String id, AgentMessage? notice) async {
+    if (notice != null) await onSystemNotice?.call(id, notice);
+  }
+
+  late AiModelSelection defaultSelection;
   static const pageSize = 50;
   static const maxAiMembers = 32;
+
+  Future<Map<String, List<MessageSender>>> avatarMembers(
+    List<String> groupIds,
+  ) async {
+    if (groupIds.isEmpty) return {};
+    final rows = await database.rawQuery('''
+      SELECT conversation_id, sender_id FROM (
+        SELECT conversation_id, sender_id,
+          ROW_NUMBER() OVER (PARTITION BY conversation_id ORDER BY position, sender_id) AS member_rank
+        FROM conversation_members
+        WHERE conversation_id IN (${_slots(groupIds.length)}) AND left_at IS NULL
+      ) WHERE member_rank <= 9 ORDER BY conversation_id, member_rank
+    ''', groupIds);
+    if (rows.isEmpty) return {};
+    final senders = await _senders(
+      database,
+      rows.map((row) => row['sender_id'] as String).toSet().toList(),
+    );
+    final result = <String, List<MessageSender>>{};
+    for (final row in rows) {
+      result
+          .putIfAbsent(row['conversation_id'] as String, () => [])
+          .add(senders[row['sender_id']]!);
+    }
+    return result;
+  }
+
+  Future<List<AiProfile>> contacts(
+    String query, {
+    required bool archived,
+    int offset = 0,
+  }) async {
+    final rows = await database.query(
+      'ai_profiles',
+      where:
+          'is_temporary = 0 AND sender_id IN (SELECT id FROM message_senders WHERE archived = ? AND instr(lower(name), ?) > 0)',
+      whereArgs: [archived ? 1 : 0, query.toLowerCase()],
+      orderBy: 'created_at DESC, sender_id DESC',
+      limit: pageSize,
+      offset: offset,
+    );
+    if (rows.isEmpty) return [];
+    final senders = await _senders(
+      database,
+      rows.map((r) => r['sender_id'] as String).toList(),
+    );
+    return [
+      for (final row in rows)
+        AiProfile.fromRows(senders[row['sender_id']]!, row),
+    ];
+  }
+
+  Future<List<Map<String, Object?>>> aiGroups(
+    String senderId, {
+    bool joined = true,
+    int offset = 0,
+  }) => database.query(
+    'conversations',
+    columns: ['id', 'title'],
+    where:
+        "kind = 'group' AND archived = 0 AND id ${joined ? 'IN' : 'NOT IN'} (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)",
+    whereArgs: [senderId],
+    orderBy: 'updated_at DESC, id DESC',
+    limit: pageSize,
+    offset: offset,
+  );
+
+  Future<void> addAiToGroup(String senderId, String conversationId) =>
+      inviteMembers(conversationId, [senderId]);
+
+  Future<void> removeMembers(
+    String conversationId,
+    List<String> ids,
+  ) => database
+      .transaction((txn) async {
+        if (ids.isEmpty ||
+            ids.length > maxAiMembers ||
+            ids.contains(MessageSender.localUser.id)) {
+          throw ArgumentError('请选择要移除的 AI');
+        }
+        final members = await txn.query(
+          'conversation_members',
+          columns: ['sender_id'],
+          where: 'conversation_id = ? AND left_at IS NULL AND sender_id != ?',
+          whereArgs: [conversationId, MessageSender.localUser.id],
+          limit: maxAiMembers,
+        );
+        if (members.every((row) => ids.contains(row['sender_id']))) {
+          throw StateError('群聊至少保留一位 AI');
+        }
+        final now = DateTime.now().microsecondsSinceEpoch;
+        final changed = await txn.update(
+          'conversations',
+          {'updated_at': now},
+          where: "id = ? AND kind = 'group'",
+          whereArgs: [conversationId],
+        );
+        if (changed != 1) throw StateError('群聊已不存在');
+        await txn.update(
+          'conversation_members',
+          {'left_at': now},
+          where:
+              'conversation_id = ? AND left_at IS NULL AND sender_id IN (${_slots(ids.length)})',
+          whereArgs: [conversationId, ...ids],
+        );
+        return writeGroupMemberNotice(txn, conversationId, [], [
+          for (final row in members)
+            if (ids.contains(row['sender_id'])) row['sender_id'] as String,
+        ]);
+      })
+      .then((notice) => _notifySystem(conversationId, notice));
+
+  Future<void> inviteMembers(String conversationId, List<String> ids) =>
+      database
+          .transaction((txn) async {
+            await _validateMembers(txn, ids);
+            final current = await txn.query(
+              'conversation_members',
+              columns: ['sender_id', 'position'],
+              where: 'conversation_id = ? AND left_at IS NULL',
+              whereArgs: [conversationId],
+              limit: maxAiMembers + 1,
+            );
+            final activeIds = current
+                .map((row) => row['sender_id'] as String)
+                .toSet();
+            final added = ids.where((id) => !activeIds.contains(id)).toList();
+            if (activeIds.length - 1 + added.length > maxAiMembers) {
+              throw StateError('群聊最多可加入 32 位 AI');
+            }
+            final now = DateTime.now().microsecondsSinceEpoch;
+            final changed = await txn.update(
+              'conversations',
+              {'updated_at': now},
+              where: "id = ? AND kind = 'group'",
+              whereArgs: [conversationId],
+            );
+            if (changed != 1) throw StateError('群聊已不存在');
+            final position = current.fold<int>(
+              0,
+              (value, row) => (row['position'] as int) > value
+                  ? row['position'] as int
+                  : value,
+            );
+            final batch = txn.batch();
+            for (final (index, id) in added.indexed) {
+              batch.rawInsert(
+                '''INSERT INTO conversation_members
+            (conversation_id, sender_id, position, joined_at, left_at)
+            VALUES (?, ?, ?, ?, NULL)
+            ON CONFLICT(conversation_id, sender_id) DO UPDATE SET
+            position = excluded.position, joined_at = excluded.joined_at, left_at = NULL''',
+                [conversationId, id, position + index + 1, now],
+              );
+            }
+            await batch.commit(noResult: true);
+            return writeGroupMemberNotice(txn, conversationId, added, []);
+          })
+          .then((notice) => _notifySystem(conversationId, notice));
 
   Future<List<AiProfile>> listAi({
     int offset = 0,
@@ -31,6 +200,109 @@ class GroupChatStore {
       for (final row in rows)
         AiProfile.fromRows(senders[row['sender_id']]!, row),
     ];
+  }
+
+  Future<List<AiProfile>> selectedContacts(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    if (ids.length > maxAiMembers) throw ArgumentError('群成员过多');
+    final rows = await database.query(
+      'ai_profiles',
+      where:
+          'sender_id IN (${_slots(ids.length)}) AND is_temporary = 0 AND sender_id IN (SELECT id FROM message_senders WHERE archived = 0)',
+      whereArgs: ids,
+      limit: maxAiMembers,
+    );
+    if (rows.isEmpty) return [];
+    final senders = await _senders(
+      database,
+      rows.map((row) => row['sender_id'] as String).toList(),
+    );
+    final profiles = {
+      for (final row in rows)
+        row['sender_id']: AiProfile.fromRows(senders[row['sender_id']]!, row),
+    };
+    return [
+      for (final id in ids)
+        if (profiles.containsKey(id)) profiles[id]!,
+    ];
+  }
+
+  Future<List<AiProfile>> groupProfiles(String conversationId) async {
+    final results = await Future.wait([
+      database.query(
+        'ai_profiles',
+        where:
+            'sender_id IN (SELECT sender_id FROM conversation_members WHERE conversation_id = ? AND left_at IS NULL)',
+        whereArgs: [conversationId],
+        limit: maxAiMembers,
+      ),
+      database.query(
+        'message_senders',
+        where:
+            "kind = 'agent' AND id IN (SELECT sender_id FROM conversation_members WHERE conversation_id = ? AND left_at IS NULL)",
+        whereArgs: [conversationId],
+        limit: maxAiMembers,
+      ),
+    ]);
+    final senders = {
+      for (final row in results[1]) row['id']: MessageSender.fromRow(row),
+    };
+    return [
+      for (final row in results[0])
+        AiProfile.fromRows(senders[row['sender_id']]!, row),
+    ];
+  }
+
+  Future<List<AiProfile>> replyProfiles(String messageId) async {
+    final results = await Future.wait([
+      database.query(
+        'ai_profiles',
+        where:
+            'sender_id IN (SELECT sender_id FROM message_recipients WHERE message_id = ?)',
+        whereArgs: [messageId],
+        limit: maxAiMembers,
+      ),
+      database.query(
+        'message_senders',
+        where:
+            'id IN (SELECT sender_id FROM message_recipients WHERE message_id = ?)',
+        whereArgs: [messageId],
+        limit: maxAiMembers,
+      ),
+      database.query(
+        'conversation_members',
+        columns: ['sender_id'],
+        where:
+            'conversation_id = (SELECT conversation_id FROM messages WHERE id = ?) '
+            'AND sender_id IN (SELECT sender_id FROM message_recipients WHERE message_id = ?)',
+        whereArgs: [messageId, messageId],
+        orderBy: 'position, sender_id',
+        limit: maxAiMembers,
+      ),
+    ]);
+    final profiles = {for (final row in results[0]) row['sender_id']: row};
+    final senders = {
+      for (final row in results[1]) row['id']: MessageSender.fromRow(row),
+    };
+    return [
+      for (final row in results[2])
+        AiProfile.fromRows(
+          senders[row['sender_id']]!,
+          profiles[row['sender_id']]!,
+        ),
+    ];
+  }
+
+  Future<Set<String>> completedReplySenders(String messageId) async {
+    final rows = await database.query(
+      'agent_runs',
+      columns: ['sender_id'],
+      distinct: true,
+      where: "user_message_id = ? AND status = 'completed'",
+      whereArgs: [messageId],
+      limit: maxAiMembers,
+    );
+    return rows.map((row) => row['sender_id'] as String).toSet();
   }
 
   Future<AiProfile> loadAi(String senderId) async {
@@ -81,15 +353,6 @@ class GroupChatStore {
 
   // Archive an identity rather than deleting the author of historical messages.
   Future<void> archiveAi(String senderId) => database.transaction((txn) async {
-    if (senderId == MessageSender.aurai.id) throw StateError('默认助手不能归档');
-    final active = await txn.query(
-      'conversation_members',
-      columns: ['conversation_id'],
-      where: 'sender_id = ? AND left_at IS NULL',
-      whereArgs: [senderId],
-      limit: 1,
-    );
-    if (active.isNotEmpty) throw StateError('请先将 AI 移出正在参与的会话');
     await txn.update(
       'message_senders',
       {'archived': 1},
@@ -108,12 +371,12 @@ class GroupChatStore {
   }
 
   Future<Conversation> createGroup({
-    required String title,
+    String title = '',
     required List<String> aiIds,
-    String? defaultSenderId,
     int temporaryCount = 0,
+    List<AiProfile> newMembers = const [],
   }) async {
-    final total = aiIds.length + temporaryCount;
+    final total = aiIds.length + temporaryCount + newMembers.length;
     if (temporaryCount < 0 || total < 1 || total > maxAiMembers) {
       throw ArgumentError('群聊需要 1–32 位 AI');
     }
@@ -121,6 +384,7 @@ class GroupChatStore {
       ..kind = ConversationKind.group
       ..storedTitle = title;
     final temporary = [
+      for (final member in newMembers) member.copyWith(isTemporary: true),
       for (var i = 0; i < temporaryCount; i++)
         AiProfile(
           sender: MessageSender(
@@ -128,6 +392,7 @@ class GroupChatStore {
             name: '临时 AI ${i + 1}',
             kind: MessageSenderKind.agent,
           ),
+          modelSelection: defaultSelection,
           description: '',
           instructions: '',
           isTemporary: true,
@@ -136,18 +401,23 @@ class GroupChatStore {
         ),
     ];
     final allIds = [...aiIds, ...temporary.map((ai) => ai.sender.id)];
-    conversation.defaultSenderId = defaultSenderId ?? allIds.first;
-    if (!allIds.contains(conversation.defaultSenderId)) {
-      throw ArgumentError('默认回复者必须在成员中');
-    }
     await database.transaction((txn) async {
-      if (aiIds.isNotEmpty) await _validateMembers(txn, aiIds, aiIds.first);
+      if (aiIds.isNotEmpty) await _validateMembers(txn, aiIds);
       final profiles = txn.batch();
       for (final profile in temporary) {
         profiles.insert('message_senders', _senderRow(profile.sender));
         profiles.insert('ai_profiles', _profileRow(profile));
       }
       await profiles.commit(noResult: true);
+      final memberIds = [MessageSender.localUser.id, ...allIds];
+      final senders = await _senders(txn, memberIds);
+      if (title.isEmpty) {
+        conversation.storedTitle = memberIds
+            .map((id) => senders[id]!.name)
+            .join('、');
+      }
+      conversation.creationMemberIds = allIds;
+      conversation.creationMembers = [for (final id in allIds) senders[id]!];
       await txn.insert('conversations', conversationRow(conversation));
       final batch = txn.batch();
       for (final (position, senderId) in [
@@ -162,7 +432,16 @@ class GroupChatStore {
         });
       }
       await batch.commit(noResult: true);
+      final notice = await writeGroupNotice(
+        txn,
+        conversation.id,
+        conversation.creationMessage!,
+        id: 'group-created:${conversation.id}',
+      );
+      conversation.messages.add(notice);
+      conversation.messageCount++;
     });
+    await _notifySystem(conversation.id, conversation.messages.single);
     return conversation;
   }
 
@@ -202,59 +481,67 @@ class GroupChatStore {
 
   Future<void> updateMembers(
     String conversationId,
-    List<String> aiIds, {
-    required String defaultSenderId,
-  }) => database.transaction((txn) async {
-    await _validateMembers(
-      txn,
-      aiIds,
-      defaultSenderId,
-      conversationId: conversationId,
-    );
-    final changed = await txn.update(
-      'conversations',
-      {'default_sender_id': defaultSenderId},
-      where: "id = ? AND kind = 'group'",
-      whereArgs: [conversationId],
-    );
-    if (changed != 1) throw StateError('群聊已不存在');
-    final active = await txn.query(
-      'conversation_members',
-      columns: ['sender_id'],
-      where: 'conversation_id = ? AND left_at IS NULL',
-      whereArgs: [conversationId],
-      limit: maxAiMembers + 1,
-    );
-    final activeIds = active.map((row) => row['sender_id'] as String).toSet();
-    final now = DateTime.now().microsecondsSinceEpoch;
-    final batch = txn.batch();
-    batch.update(
-      'conversation_members',
-      {'left_at': now},
-      where:
-          'conversation_id = ? AND left_at IS NULL AND sender_id NOT IN (${_slots(aiIds.length + 1)})',
-      whereArgs: [conversationId, MessageSender.localUser.id, ...aiIds],
-    );
-    for (final (index, id) in aiIds.indexed) {
-      if (activeIds.contains(id)) {
+    List<String> aiIds,
+  ) => database
+      .transaction((txn) async {
+        await _validateMembers(txn, aiIds, conversationId: conversationId);
+        final changed = await txn.update(
+          'conversations',
+          {'updated_at': DateTime.now().microsecondsSinceEpoch},
+          where: "id = ? AND kind = 'group'",
+          whereArgs: [conversationId],
+        );
+        if (changed != 1) throw StateError('群聊已不存在');
+        final active = await txn.query(
+          'conversation_members',
+          columns: ['sender_id'],
+          where: 'conversation_id = ? AND left_at IS NULL',
+          whereArgs: [conversationId],
+          limit: maxAiMembers + 1,
+        );
+        final activeIds = active
+            .map((row) => row['sender_id'] as String)
+            .toSet();
+        final now = DateTime.now().microsecondsSinceEpoch;
+        final batch = txn.batch();
         batch.update(
           'conversation_members',
-          {'position': index + 1},
-          where: 'conversation_id = ? AND sender_id = ?',
-          whereArgs: [conversationId, id],
+          {'left_at': now},
+          where:
+              'conversation_id = ? AND left_at IS NULL AND sender_id NOT IN (${_slots(aiIds.length + 1)})',
+          whereArgs: [conversationId, MessageSender.localUser.id, ...aiIds],
         );
-      } else {
-        batch.rawInsert(
-          '''INSERT INTO conversation_members
+        for (final (index, id) in aiIds.indexed) {
+          if (activeIds.contains(id)) {
+            batch.update(
+              'conversation_members',
+              {'position': index + 1},
+              where: 'conversation_id = ? AND sender_id = ?',
+              whereArgs: [conversationId, id],
+            );
+          } else {
+            batch.rawInsert(
+              '''INSERT INTO conversation_members
           (conversation_id, sender_id, position, joined_at, left_at) VALUES (?, ?, ?, ?, NULL)
           ON CONFLICT(conversation_id, sender_id) DO UPDATE SET
           position = excluded.position, joined_at = excluded.joined_at, left_at = NULL''',
-          [conversationId, id, index + 1, now],
+              [conversationId, id, index + 1, now],
+            );
+          }
+        }
+        await batch.commit(noResult: true);
+        return writeGroupMemberNotice(
+          txn,
+          conversationId,
+          aiIds.where((id) => !activeIds.contains(id)).toList(),
+          activeIds
+              .where(
+                (id) => id != MessageSender.localUser.id && !aiIds.contains(id),
+              )
+              .toList(),
         );
-      }
-    }
-    await batch.commit(noResult: true);
-  });
+      })
+      .then((notice) => _notifySystem(conversationId, notice));
 
   // Capture the resolved @ targets once; later roster changes do not rewrite them.
   Future<void> recordRecipients(
@@ -317,15 +604,13 @@ class GroupChatStore {
 
   Future<void> _validateMembers(
     DatabaseExecutor db,
-    List<String> aiIds,
-    String defaultId, {
+    List<String> aiIds, {
     String? conversationId,
   }) async {
     if (aiIds.isEmpty ||
         aiIds.length > maxAiMembers ||
-        aiIds.toSet().length != aiIds.length ||
-        !aiIds.contains(defaultId)) {
-      throw ArgumentError('群聊需要 1–32 位不同的 AI，默认回复者必须在成员中');
+        aiIds.toSet().length != aiIds.length) {
+      throw ArgumentError('群聊需要 1–32 位不同的 AI');
     }
     final rows = await db.query(
       'ai_profiles',
@@ -368,6 +653,7 @@ class GroupChatStore {
     'sender_id': profile.sender.id,
     'description': profile.description,
     'instructions': profile.instructions,
+    'preferences': jsonEncode(profile.preferences.toJson()),
     'is_temporary': profile.isTemporary ? 1 : 0,
     'provider': profile.modelSelection?.provider.name,
     'model': profile.modelSelection?.model,

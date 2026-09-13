@@ -3,6 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'chat_controller.dart';
+import 'group_members_page.dart';
+import 'group_info_page.dart';
+import 'sidebar_action_icon.dart';
 import 'conversation_task_navigation.dart';
 import 'settings_icon.dart';
 import 'archive_confirmation_dialog.dart';
@@ -47,10 +50,8 @@ class _ConversationMoreState extends State<ConversationMore> {
 
   Future<void> _pin() async {
     setState(() => _saving = true);
-    final wasPinned = _conversation.isPinned;
     try {
       await widget.controller.toggleConversationPin(_conversation.id);
-      _notice(wasPinned ? '已取消置顶' : '会话已置顶');
     } on Object {
       _notice('置顶保存失败，请重试');
     } finally {
@@ -110,15 +111,16 @@ class _ConversationMoreState extends State<ConversationMore> {
       return;
     }
     try {
-      if (!wasArchived && controller.activeConversation.id == target.id) {
+      if (!wasArchived && widget.conversation == null && mounted) {
         await controller.createConversation();
+        if (mounted) _closeDetails();
       }
       notice(
         wasArchived ? '已取消归档' : '会话已归档',
         action: wasArchived ? null : undo,
       );
     } on Object {
-      notice('会话已归档，退出失败，请从侧边栏新建会话', action: undo);
+      notice('会话已归档，请返回会话列表', action: undo);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -140,6 +142,7 @@ class _ConversationMoreState extends State<ConversationMore> {
     try {
       await widget.controller.deleteConversation(deletedId);
       _notice('会话已删除');
+      if (mounted && widget.conversation == null) _closeDetails();
     } on FileSystemException {
       _notice('会话已删除，部分图片文件清理失败');
     } on Object {
@@ -147,6 +150,13 @@ class _ConversationMoreState extends State<ConversationMore> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  void _closeDetails() {
+    final navigator = Navigator.of(context);
+    final route = ModalRoute.of(context)!;
+    navigator.popUntil((candidate) => candidate == route);
+    navigator.pop();
   }
 
   bool _canDelete() {
@@ -163,11 +173,32 @@ class _ConversationMoreState extends State<ConversationMore> {
   }
 
   Future<void> _openMenu([Offset? position]) async {
+    if (widget.child == null && _conversation.kind == ConversationKind.group) {
+      final leftGroup = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => GroupInfoPage(
+            controller: widget.controller,
+            conversation: _conversation,
+            originTaskId: widget.originTaskId,
+            onPin: _pin,
+            onArchive: _archive,
+            onDelete: _delete,
+          ),
+        ),
+      );
+      if (!mounted) return;
+      widget.onChanged?.call();
+      if (leftGroup == true && Navigator.canPop(context))
+        Navigator.pop(context);
+      return;
+    }
     final button = context.findRenderObject()! as RenderBox;
     final overlay =
         Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
     final origin = button.localToGlobal(Offset.zero, ancestor: overlay);
     final pinned = _conversation.isPinned;
+    final isGroup = _conversation.kind == ConversationKind.group;
     final targetId = _conversation.id;
     final hasTask = conversationTasks(
       widget.controller,
@@ -177,7 +208,9 @@ class _ConversationMoreState extends State<ConversationMore> {
     final safe = MediaQuery.paddingOf(context);
     final menuWidth = 212.0;
     final menuHeight =
-        (_conversation.isArchived ? 202.0 : 264.0) + (hasTask ? 54 : 0);
+        (_conversation.isArchived ? 202.0 : 264.0) +
+        (hasTask ? 54 : 0) +
+        (isGroup ? 54 : 0);
     final anchor =
         position ??
         Offset(
@@ -220,6 +253,17 @@ class _ConversationMoreState extends State<ConversationMore> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            if (isGroup)
+                              _GlassMenuItem(
+                                iconWidget: const SidebarActionIcon(
+                                  type: SidebarActionIconType.group,
+                                ),
+                                label: '群成员',
+                                onTap: () => Navigator.pop(
+                                  menuContext,
+                                  _MoreAction.members,
+                                ),
+                              ),
                             if (hasTask)
                               _GlassMenuItem(
                                 iconWidget: const SettingsIcon(
@@ -292,6 +336,16 @@ class _ConversationMoreState extends State<ConversationMore> {
         );
       case _MoreAction.pin:
         await _pin();
+      case _MoreAction.members:
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => GroupMembersPage(
+              controller: widget.controller,
+              conversationId: targetId,
+            ),
+          ),
+        );
       case _MoreAction.rename:
         await showDialog<void>(
           context: context,
@@ -331,7 +385,7 @@ class _ConversationMoreState extends State<ConversationMore> {
         );
 }
 
-enum _MoreAction { task, pin, rename, archive, delete }
+enum _MoreAction { task, members, pin, rename, archive, delete }
 
 class _GlassMenuItem extends StatelessWidget {
   const _GlassMenuItem({

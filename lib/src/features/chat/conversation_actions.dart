@@ -77,6 +77,42 @@ extension ConversationActions on ChatController {
     if (name.isEmpty) throw ArgumentError('请输入会话名称');
     final conversation = await _targetConversation(id);
     final previous = conversation.storedTitle;
+    if (previous == name) return;
+    if (conversation.kind == ConversationKind.group) {
+      final notice = AgentMessage(
+        id: newMessageId(),
+        role: AgentMessageRole.user,
+        senderId: MessageSender.localUser.id,
+        isSystem: true,
+        text: '你将群名改为“$name”',
+        createdAt: DateTime.now(),
+      );
+      await _store.writer.flush();
+      await _store.database.transaction((txn) async {
+        await txn.update(
+          'conversations',
+          {
+            'title': name,
+            'updated_at': notice.createdAt.microsecondsSinceEpoch,
+            'preview': notice.text,
+            'message_count': conversation.messageCount + 1,
+          },
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+        await txn.insert('messages', messageRow(id, notice));
+      });
+      conversation.storedTitle = name;
+      conversation.messages.add(notice);
+      conversation.messageCount++;
+      conversation.storedPreview = notice.text;
+      conversation.storedPreviewIsSystem = true;
+      _store.writer.remember([notice]);
+      _updateConversationList(conversation);
+      _conversationChanged();
+      await _receiveGroupSystemNotice(id, notice);
+      return;
+    }
     conversation.storedTitle = name;
     try {
       await _saveConversationHeader(conversation, {'title': name});
@@ -118,15 +154,10 @@ extension ConversationActions on ChatController {
     await toolApprovals.removeConversation(removed.id);
     final images = await _store.attachmentPaths(removed.id);
     if (isActive) {
-      final candidates = await _store.reader.list();
-      final remaining = candidates.where((item) => item.id != removed.id);
-      final replacement = remaining.isEmpty
-          ? _newConversation
-          : remaining.first.id == runningConversationId
-          ? _runningConversation!
-          : await _store.load(remaining.first.id);
+      final replacement = _newConversation;
       await _store.delete(removed, replacement);
       _activeConversation = replacement;
+      _activeAi = await groupStore.loadAi(replacement.defaultSenderId);
       _store.writer.retain([
         ...replacement.messages,
         if (_runningConversation != null && _runningConversation != replacement)

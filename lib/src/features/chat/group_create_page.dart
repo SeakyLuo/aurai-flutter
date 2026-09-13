@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
-
+import '../../domain/agent_models.dart';
 import '../../domain/ai_profile.dart';
 import '../../domain/message_sender.dart';
 import '../../storage/group_chat_store.dart';
+import '../../storage/new_group_draft.dart';
+import 'ai_contact_editor.dart';
 import 'chat_controller.dart';
-import 'pagination_listener.dart';
+import 'group_member_choice.dart';
+import 'random_contact.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
-import 'group_member_choice.dart';
+import 'dialog_action_button.dart';
+import 'glass_surface.dart';
 
 class GroupCreatePage extends StatefulWidget {
   const GroupCreatePage({super.key, required this.controller});
@@ -18,15 +22,19 @@ class GroupCreatePage extends StatefulWidget {
 
 class _GroupCreatePageState extends State<GroupCreatePage> {
   final _name = TextEditingController();
-  final _profiles = <AiProfile>[];
-  final _selected = <String>{};
-  bool _loading = false;
-  bool _hasMore = true;
-  bool _failed = false;
-  bool _saving = false;
-  int _temporaryCount = 0;
-  int get _memberCount => _selected.length + _temporaryCount;
-
+  final _draft = NewGroupDraft();
+  List<AiProfile> _contacts = [], _members = [];
+  final _directory = <AiProfile>[];
+  bool _directoryLoading = false,
+      _directoryMore = true,
+      _directoryFailed = false;
+  bool _loading = true, _saving = false, _changing = false;
+  bool _leaving = false, _allowPop = false;
+  Set<String> _excluded = {};
+  int get _newCount =>
+      _members.where((ai) => !_excluded.contains(ai.sender.id)).length;
+  int get _count => _contacts.length + _newCount;
+  bool get _enabled => !_loading && !_saving && !_changing && !_leaving;
   @override
   void initState() {
     super.initState();
@@ -41,54 +49,216 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
 
   void _notice(String text) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-
   Future<void> _load() async {
-    if (_loading || !_hasMore) return;
-    setState(() {
-      _loading = true;
-      _failed = false;
-    });
     try {
-      final page = await widget.controller.groupStore.listAi(
-        offset: _profiles.length,
+      final saved = await _draft.load();
+      final contacts = await widget.controller.groupStore.selectedContacts(
+        saved.contacts,
       );
       if (!mounted) return;
       setState(() {
-        _profiles.addAll(page);
-        _hasMore = page.length == GroupChatStore.pageSize;
+        _name.text = saved.title;
+        _contacts = contacts;
+        _members = saved.members;
+        _excluded = saved.excluded.toSet();
+        _loading = false;
       });
-    } on Object {
+      if (contacts.length != saved.contacts.length) {
+        _notice('已移除不可用的通讯录成员');
+        await _persist();
+      }
+      await _loadDirectory();
+    } catch (_) {
       if (mounted) {
-        setState(() => _failed = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('AI 列表加载失败'),
-            action: SnackBarAction(label: '重试', onPressed: _load),
-          ),
-        );
+        _notice('群聊草稿读取失败');
+        Navigator.pop(context);
+      }
+    }
+  }
+
+  Future<void> _persist() => _draft.save(
+    _name.text,
+    _contacts.map((ai) => ai.sender.id).toList(),
+    _members,
+    excluded: _excluded.toList(),
+  );
+  Future<void> _changedName() async {
+    try {
+      await _persist();
+    } catch (_) {
+      if (mounted) _notice('草稿保存失败，请重试');
+    }
+  }
+
+  Future<void> _change(
+    List<AiProfile> contacts,
+    List<AiProfile> members,
+  ) async {
+    setState(() => _changing = true);
+    try {
+      await _draft.save(
+        _name.text,
+        contacts.map((ai) => ai.sender.id).toList(),
+        members,
+        excluded: _excluded.toList(),
+      );
+      if (mounted)
+        setState(() {
+          _contacts = contacts;
+          _members = members;
+        });
+    } finally {
+      if (mounted) setState(() => _changing = false);
+    }
+  }
+
+  Future<void> _roll() async {
+    setState(() => _changing = true);
+    try {
+      final color = await RandomContact.savedAvatarColor();
+      if (!mounted) return;
+      final rolled = RandomContact.roll(avatarColor: color);
+      final now = DateTime.now();
+      final config = widget.controller.modelSettings.activeConfig;
+      final ai = AiProfile(
+        sender: MessageSender(
+          id: 'agent:${newMessageId()}',
+          name: rolled.name,
+          kind: MessageSenderKind.agent,
+          avatarIcon: rolled.avatar.icon,
+          avatarColor: rolled.avatar.color,
+        ),
+        description: rolled.description,
+        instructions: '',
+        isTemporary: true,
+        preferences: AiPreferences(
+          customInstructions: rolled.role,
+          responses: rolled.responses,
+        ),
+        modelSelection: AiModelSelection(
+          provider: config.service,
+          model: config.model,
+          baseUrl: config.baseUrl,
+        ),
+        createdAt: now,
+        updatedAt: now,
+      );
+      await _change(_contacts, [..._members, ai]);
+    } catch (_) {
+      if (mounted) _notice('添加失败，请检查头像色库是否有配色后重试');
+    } finally {
+      if (mounted) setState(() => _changing = false);
+    }
+  }
+
+  Future<void> _loadDirectory() async {
+    if (_directoryLoading || !_directoryMore) return;
+    setState(() {
+      _directoryLoading = true;
+      _directoryFailed = false;
+    });
+    try {
+      final page = await widget.controller.groupStore.listAi(
+        offset: _directory.length,
+      );
+      if (mounted)
+        setState(() {
+          _directory.addAll(page);
+          _directoryMore = page.length == GroupChatStore.pageSize;
+        });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _directoryFailed = true);
+        _notice('通讯录读取失败，请重试');
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _directoryLoading = false);
+    }
+  }
+
+  Future<void> _toggle(AiProfile ai) async {
+    final selected = _contacts.any((p) => p.sender.id == ai.sender.id);
+    if (!selected && _count == GroupChatStore.maxAiMembers) {
+      _notice('群成员已达上限');
+      return;
+    }
+    try {
+      await _change(
+        selected
+            ? [
+                for (final p in _contacts)
+                  if (p.sender.id != ai.sender.id) p,
+              ]
+            : [..._contacts, ai],
+        _members,
+      );
+    } catch (_) {
+      if (mounted) _notice('成员保存失败，请重试');
+    }
+  }
+
+  Future<void> _edit(AiProfile ai) async {
+    await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AiContactEditor(
+          controller: widget.controller,
+          profile: ai,
+          onSaveDraft: (updated) => _change(_contacts, [
+            for (final member in _members)
+              if (member.sender.id == updated.sender.id) updated else member,
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toggleNew(AiProfile ai) async {
+    final excluded = {..._excluded};
+    if (excluded.contains(ai.sender.id)) {
+      if (_count == GroupChatStore.maxAiMembers) {
+        _notice('群成员已达上限');
+        return;
+      }
+      excluded.remove(ai.sender.id);
+    } else {
+      excluded.add(ai.sender.id);
+    }
+    setState(() => _changing = true);
+    try {
+      await _draft.save(
+        _name.text,
+        _contacts.map((p) => p.sender.id).toList(),
+        _members,
+        excluded: excluded.toList(),
+      );
+      if (mounted) setState(() => _excluded = excluded);
+    } catch (_) {
+      if (mounted) _notice('成员保存失败，请重试');
+    } finally {
+      if (mounted) setState(() => _changing = false);
     }
   }
 
   Future<void> _create() async {
-    if (_saving) return;
-    final name = _name.text.trim();
-    if (_memberCount == 0) {
-      _notice('请选择 AI 成员');
-      return;
-    }
     setState(() => _saving = true);
     try {
+      await _persist();
       final group = await widget.controller.groupStore.createGroup(
-        title: name.isEmpty ? '群聊' : name,
-        aiIds: _selected.toList(),
-        defaultSenderId: _selected.firstOrNull,
-        temporaryCount: _temporaryCount,
+        title: _name.text.trim(),
+        aiIds: _contacts.map((ai) => ai.sender.id).toList(),
+        newMembers: [
+          for (final ai in _members)
+            if (!_excluded.contains(ai.sender.id)) ai,
+        ],
       );
+      try {
+        await _draft.clear();
+      } catch (_) {
+        if (mounted) _notice('群聊已创建，但草稿清理失败');
+      }
       if (mounted) Navigator.pop(context, group.id);
-    } on Object {
+    } catch (_) {
       if (mounted) {
         setState(() => _saving = false);
         _notice('创建失败，请重试');
@@ -96,176 +266,224 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
     }
   }
 
-  Widget _countButton(String label, String text, int? delta) => Tooltip(
-    message: label,
-    child: TextButton(
-      onPressed: _saving || delta == null
-          ? null
-          : () => setState(() => _temporaryCount += delta),
-      style: TextButton.styleFrom(
-        minimumSize: const Size(44, 44),
-        padding: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-      child: Text(
-        text,
-        semanticsLabel: label,
-        style: const TextStyle(fontSize: 22),
-      ),
-    ),
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return PopScope(
-      canPop: !_saving,
-      child: Scaffold(
-        appBar: SettingsAppBar(
-          title: '新建群聊',
-          onBack: _saving ? null : () => Navigator.pop(context),
-          actions: [
-            SettingsGlassAction(
-              label: _saving ? '正在创建' : '完成',
-              icon: Icons.check_rounded,
-              onPressed: _saving || _memberCount == 0 ? null : _create,
-              iconWidget: SettingsIcon(
-                type: SettingsIconType.check,
-                color: _saving || _memberCount == 0
-                    ? colors.onSurface.withValues(alpha: 0.3)
-                    : colors.onSurface,
-              ),
-            ),
-          ],
-        ),
-        body: Center(
+  Future<void> _leave() async {
+    if (!_enabled) return;
+    setState(() => _leaving = true);
+    if (_members.isNotEmpty) {
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (context) => Dialog(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 28,
+            vertical: 24,
+          ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: PaginationListener(
-              hasMore: _hasMore && !_failed,
-              loadMore: _load,
-              child: ListView(
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  8,
-                  16,
-                  24 + MediaQuery.paddingOf(context).bottom,
-                ),
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                children: [
-                  TextField(
-                    controller: _name,
-                    enabled: !_saving,
-                    maxLength: 80,
-                    style: const TextStyle(fontSize: 16),
-                    decoration: InputDecoration(
-                      hintText: '群名称（选填）',
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      counterText: '',
-                      filled: true,
-                      fillColor: settingsFieldColor(context),
-                      border: OutlineInputBorder(
-                        borderSide: BorderSide.none,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 8),
-                    child: Text(
-                      '选择成员',
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: GlassSurface(
+              radius: 28,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      '放弃创建群聊？',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 13,
-                        color: colors.onSurfaceVariant,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                  for (final profile in _profiles)
-                    GroupMemberChoice(
-                      selected: _selected.contains(profile.sender.id),
-                      title: profile.sender.name,
-                      isAurai: profile.sender.id == MessageSender.aurai.id,
-                      onTap: _saving
-                          ? null
-                          : () => setState(() {
-                              if (_selected.contains(profile.sender.id)) {
-                                _selected.remove(profile.sender.id);
-                              } else if (_memberCount <
-                                  GroupChatStore.maxAiMembers) {
-                                _selected.add(profile.sender.id);
-                              } else {
-                                _notice(
-                                  '最多选择 ${GroupChatStore.maxAiMembers} 位 AI',
-                                );
-                              }
-                            }),
+                    const SizedBox(height: 8),
+                    Text(
+                      '已生成的成员和本次群聊设置将被丢弃，下次进入不会恢复。',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.5,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 12,
-                    ),
-                    child: Row(
+                    const SizedBox(height: 24),
+                    Row(
                       children: [
-                        const Expanded(
-                          child: Text('临时 AI', style: TextStyle(fontSize: 16)),
-                        ),
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: settingsFieldColor(context),
-                            borderRadius: BorderRadius.circular(14),
+                        Expanded(
+                          child: DialogActionButton(
+                            text: '继续编辑',
+                            role: DialogActionRole.secondary,
+                            onPressed: () => Navigator.pop(context, false),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _countButton(
-                                '减少临时 AI',
-                                '−',
-                                _temporaryCount > 0 ? -1 : null,
-                              ),
-                              Semantics(
-                                liveRegion: true,
-                                label: '$_temporaryCount 位临时 AI',
-                                child: SizedBox(
-                                  width: 36,
-                                  child: Text(
-                                    '$_temporaryCount',
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                              _countButton(
-                                '增加临时 AI',
-                                '+',
-                                _memberCount < GroupChatStore.maxAiMembers
-                                    ? 1
-                                    : null,
-                              ),
-                            ],
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DialogActionButton(
+                            text: '放弃创建',
+                            role: DialogActionRole.destructive,
+                            onPressed: () => Navigator.pop(context, true),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  if (_loading)
-                    const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                  if (_failed)
-                    TextButton(onPressed: _load, child: const Text('重试')),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
+      if (!mounted) return;
+      if (discard != true) {
+        setState(() => _leaving = false);
+        return;
+      }
+    }
+    try {
+      await _draft.clear();
+      if (!mounted) return;
+      setState(() => _allowPop = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.pop(context);
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _leaving = false);
+        _notice('草稿清理失败，请重试');
+      }
+    }
   }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: _allowPop,
+    onPopInvokedWithResult: (didPop, result) {
+      if (!didPop) _leave();
+    },
+    child: Scaffold(
+      appBar: SettingsAppBar(
+        title: _count == 0 ? '新建群聊' : '新建群聊（$_count 人）',
+        onBack: _enabled ? _leave : null,
+        actions: [
+          SettingsGlassAction(
+            label: _saving ? '正在创建' : '创建',
+            icon: Icons.check_rounded,
+            onPressed: _enabled && _count > 0 ? _create : null,
+          ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : SafeArea(
+              top: false,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    children: [
+                      TextField(
+                        controller: _name,
+                        enabled: _enabled,
+                        maxLength: 80,
+                        onChanged: (_) => _changedName(),
+                        style: const TextStyle(fontSize: 16),
+                        decoration: InputDecoration(
+                          hintText: '群名称（选填）',
+                          counterText: '',
+                          contentPadding: const EdgeInsets.all(18),
+                          filled: true,
+                          fillColor: settingsFieldColor(context),
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide.none,
+                            borderRadius: BorderRadius.circular(26),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '选择成员',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: '随机添加成员',
+                              onPressed:
+                                  _enabled &&
+                                      _count < GroupChatStore.maxAiMembers
+                                  ? _roll
+                                  : null,
+                              icon: SettingsIcon(
+                                type: SettingsIconType.add,
+                                color:
+                                    _enabled &&
+                                        _count < GroupChatStore.maxAiMembers
+                                    ? Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant
+                                    : Theme.of(context).disabledColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      for (final ai in _members) _member(ai),
+                      for (final ai in [
+                        ..._contacts.where(
+                          (selected) => !_directory.any(
+                            (p) => p.sender.id == selected.sender.id,
+                          ),
+                        ),
+                        ..._directory,
+                      ])
+                        GroupMemberChoice(
+                          selected: _contacts.any(
+                            (p) => p.sender.id == ai.sender.id,
+                          ),
+                          sender: ai.sender,
+                          onTap: _enabled ? () => _toggle(ai) : null,
+                        ),
+                      if (_directoryLoading)
+                        const Center(child: CircularProgressIndicator()),
+                      if (!_directoryLoading && _directoryMore)
+                        TextButton(
+                          onPressed: _loadDirectory,
+                          child: Text(_directoryFailed ? '重试' : '加载更多朋友'),
+                        ),
+                      if (!_directoryLoading &&
+                          !_directoryFailed &&
+                          _directory.isEmpty &&
+                          _contacts.isEmpty &&
+                          _members.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Text('暂无成员，点击右上方＋添加'),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+    ),
+  );
+  Widget _member(AiProfile ai) => GroupMemberChoice(
+    selected: !_excluded.contains(ai.sender.id),
+    sender: ai.sender,
+    onTap: _enabled ? () => _toggleNew(ai) : null,
+    onEdit: _enabled ? () => _edit(ai) : null,
+  );
 }

@@ -2,7 +2,13 @@ import '../domain/tool_models.dart';
 import 'scheduled_tasks.dart';
 
 class ScheduleTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
-  ScheduleTaskTool(this.tasks, this.conversationId, this.operation);
+  ScheduleTaskTool(
+    this.tasks,
+    this.conversationId,
+    this.operation, {
+    required this.senderId,
+  });
+  final String senderId;
   final String operation;
   static const operations = [
     'create',
@@ -54,10 +60,20 @@ class ScheduleTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
     try {
       final a = call.arguments;
       Object? output;
+      bool owned(Map<String, Object?> task) =>
+          (task['aiSenderId'] ?? 'agent:aurai') == senderId;
+      if (operation != 'list' && operation != 'create') {
+        await tasks.reload();
+        if (!tasks.tasks.any((task) => task['id'] == a['id'] && owned(task)))
+          throw StateError('任务不属于当前 AI 或已不存在');
+      }
       switch (operation) {
         case 'list':
           await tasks.reload();
-          output = {'tasks': tasks.tasks, 'allowed': tasks.allowed};
+          output = {
+            'tasks': tasks.tasks.where(owned).toList(),
+            'allowed': tasks.allowed,
+          };
         case 'create' || 'update':
           final at = DateTime.parse(a['runAt'] as String);
           if (!RegExp(r'(Z|[+-]\d\d:\d\d)$').hasMatch(a['runAt'] as String))
@@ -66,6 +82,7 @@ class ScheduleTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
             ...a,
             'runAt': at.millisecondsSinceEpoch,
             'sourceConversationId': conversationId,
+            'aiSenderId': senderId,
             'requestKey': '$conversationId:${call.id}',
           });
         case 'pause' || 'resume' || 'delete':

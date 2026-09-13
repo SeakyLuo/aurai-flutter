@@ -1,16 +1,14 @@
-import 'tool_approvals_page.dart';
+import 'archived_conversations_page.dart';
+import 'conversation_menu_icon.dart';
+import 'home_navigation.dart';
+import 'tools_page.dart';
 import '../../skills/skills_page.dart';
 import 'package:flutter/material.dart';
-import '../../memory/memory_summary_page.dart';
 
 import '../../providers/model_catalog.dart';
 import 'capability_page.dart';
-import 'archived_conversations_page.dart';
-import 'conversation_menu_icon.dart';
 import 'chat_controller.dart';
 import 'model_settings_sheet.dart';
-import 'personalization_page.dart';
-import 'personal_info_page.dart';
 import 'settings_icon.dart';
 import 'settings_appearance.dart';
 import 'choice_sheet.dart';
@@ -25,6 +23,26 @@ class SettingsPage extends StatelessWidget {
 
   final ChatController controller;
   final bool Function() preparingGoal;
+
+  Future<void> _archive(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    try {
+      final id = await navigator.push<String>(
+        MaterialPageRoute(
+          builder: (_) => ArchivedConversationsPage(controller: controller),
+        ),
+      );
+      if (navigator.mounted && id != null) {
+        await openHomeConversation(navigator.context, controller, id);
+      }
+    } on Object {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('无法打开会话，请重试')));
+      }
+    }
+  }
 
   Future<void> _openModel(BuildContext context) async {
     if (controller.addingImages) {
@@ -43,6 +61,7 @@ class SettingsPage extends StatelessWidget {
       context,
       controller: controller,
       continueAfterSave: false,
+      accountOnly: true,
     );
   }
 
@@ -67,23 +86,6 @@ class SettingsPage extends StatelessWidget {
         context,
       ).showSnackBar(const SnackBar(content: Text('无法保存夜间模式，请重试')));
     }
-  }
-
-  Future<void> _openSkills(BuildContext context) async {
-    await Navigator.push<void>(
-      context,
-      MaterialPageRoute(builder: (_) => SkillsPage(store: controller.skills)),
-    );
-  }
-
-  Future<void> _openArchive(BuildContext context) async {
-    final id = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ArchivedConversationsPage(controller: controller),
-      ),
-    );
-    if (context.mounted && id != null) Navigator.pop(context, id);
   }
 
   Future<void> _openNotifications(BuildContext context) async {
@@ -143,67 +145,15 @@ class SettingsPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
-                      leading: const SettingsIcon(
-                        type: SettingsIconType.personalInfo,
+                      leading: ConversationMenuIcon(
+                        type: ConversationMenuIconType.archive,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                      title: const Text('个人信息'),
-                      subtitle: const Text('昵称、职业与更多信息'),
+                      title: const Text('已归档会话'),
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,
                       ),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              PersonalInfoPage(memory: controller.memory),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      leading: const SettingsIcon(
-                        type: SettingsIconType.personalization,
-                      ),
-                      title: const Text('个性化'),
-                      subtitle: const Text('自定义指令与系统提示词'),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              PersonalizationPage(controller: controller),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      leading: const SettingsIcon(
-                        type: SettingsIconType.memory,
-                      ),
-                      title: const Text('记忆'),
-                      subtitle: const Text('查看和管理跨会话记忆'),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              MemorySummaryPage(memory: controller.memory),
-                        ),
-                      ),
+                      onTap: () => _archive(context),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -233,15 +183,18 @@ class SettingsPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
-                      leading: const SettingsIcon(
-                        type: SettingsIconType.skills,
-                      ),
-                      title: const Text('技能'),
-                      subtitle: const Text('管理 Aurai 保存的操作方法'),
+                      leading: const SettingsIcon(type: SettingsIconType.tools),
+                      title: const Text('工具'),
+                      subtitle: const Text('查看工具与管理授权'),
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,
                       ),
-                      onTap: () => _openSkills(context),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => ToolsPage(controller: controller),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -251,18 +204,16 @@ class SettingsPage extends StatelessWidget {
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
                       leading: const SettingsIcon(
-                        type: SettingsIconType.device,
+                        type: SettingsIconType.skills,
                       ),
-                      title: const Text('工具授权'),
-                      subtitle: const Text('管理始终允许和当前会话的授权'),
+                      title: const Text('技能'),
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,
                       ),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute<void>(
-                          builder: (_) =>
-                              ToolApprovalsPage(controller: controller),
+                          builder: (_) => SkillsPage(store: controller.skills),
                         ),
                       ),
                     ),
@@ -315,25 +266,6 @@ class SettingsPage extends StatelessWidget {
                         type: SettingsIconType.chevron,
                       ),
                       onTap: () => _openNotifications(context),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      leading: ConversationMenuIcon(
-                        type: ConversationMenuIconType.archive,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Theme.of(context).colorScheme.onSurfaceVariant
-                            : const Color(0xff222222),
-                      ),
-                      title: const Text('已归档会话'),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: () => _openArchive(context),
                     ),
                   ),
                 ],

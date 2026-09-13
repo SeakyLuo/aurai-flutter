@@ -1,3 +1,5 @@
+import '../domain/message_quote.dart';
+import 'dart:convert';
 import '../domain/message_file.dart';
 import 'dart:io';
 
@@ -11,12 +13,16 @@ Map<String, Object?> conversationRow(Conversation value) => {
   'updated_at': value.updatedAt.microsecondsSinceEpoch,
   'title': value.title,
   'kind': value.kind.name,
+  'creation_member_ids': jsonEncode(value.creationMemberIds),
   'default_sender_id': value.defaultSenderId,
   'preview': value.preview,
   'pinned': value.isPinned ? 1 : 0,
   'archived': value.isArchived ? 1 : 0,
   'scheduled_task': value.isScheduledTask ? 1 : 0,
   'draft': value.draft,
+  'draft_quote_json': value.draftQuote == null
+      ? null
+      : jsonEncode(value.draftQuote!.toJson()),
   'pending_goal': value.pendingGoal,
   'run_state': value.runState.name,
   'error_detail': value.errorDetail,
@@ -32,6 +38,10 @@ Conversation conversationFromRow(Map<String, Object?> row) =>
         ),
       )
       ..kind = ConversationKind.values.byName(row['kind'] as String)
+      ..creationMemberIds = row['creation_member_ids'] == null
+          ? []
+          : (jsonDecode(row['creation_member_ids'] as String) as List)
+                .cast<String>()
       ..defaultSenderId = row['default_sender_id'] as String
       ..storedUpdatedAt = DateTime.fromMicrosecondsSinceEpoch(
         row['updated_at']! as int,
@@ -41,6 +51,12 @@ Conversation conversationFromRow(Map<String, Object?> row) =>
       ..isPinned = row['pinned'] == 1
       ..isArchived = row['archived'] == 1
       ..isScheduledTask = row['scheduled_task'] == 1
+      ..draftQuote = row['draft_quote_json'] == null
+          ? null
+          : MessageQuote.fromJson(
+              (jsonDecode(row['draft_quote_json'] as String) as Map)
+                  .cast<String, Object?>(),
+            )
       ..draft = row['draft']! as String
       ..pendingGoal = row['pending_goal'] as String?
       ..runState = ChatRunState.values.byName(row['run_state']! as String)
@@ -53,10 +69,15 @@ Map<String, Object?> messageRow(String conversationId, AgentMessage value) => {
   'conversation_id': conversationId,
   'run_id': value.runId,
   'model_turn_id': value.modelTurnId,
+  'quote_json': value.quote == null ? null : jsonEncode(value.quote!.toJson()),
   'role': value.role.name,
   'sender_id': value.senderId,
-  'kind': value.role == AgentMessageRole.user
+  'kind': value.isSystem
+      ? 'system'
+      : value.role == AgentMessageRole.user
       ? 'user'
+      : value.isGroupMessage
+      ? 'group_message'
       : value.taskSummary != null
       ? 'final'
       : 'assistant',

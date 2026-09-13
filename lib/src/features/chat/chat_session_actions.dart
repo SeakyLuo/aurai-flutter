@@ -1,11 +1,13 @@
 part of 'chat_page.dart';
 
 extension _ChatSessionActions on _ChatPageState {
-  void _openConversations() {
-    if (_editing != null) return;
-    if (_imageOperationPending()) return;
-    _focusNode.unfocus();
-    _scaffoldKey.currentState!.openDrawer();
+  Future<void> _openBatterySettings() async {
+    await widget.controller.openBatterySettings();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请在“电池”或“后台耗电管理”中允许 Aurai 后台运行')),
+      );
+    }
   }
 
   void _scheduleMarkRead() {
@@ -38,7 +40,10 @@ extension _ChatSessionActions on _ChatPageState {
 
   bool _otherConversationRunning() {
     final controller = widget.controller;
-    if (!controller.hasRunningTask || controller.isBusy) return false;
+    if (!controller.hasRunningTask ||
+        controller.isBusy ||
+        controller.canStartPrivateDuringGroup)
+      return false;
     _imageNotice(
       '另一个会话正在回复，完成后可发送；你可以继续浏览或编辑草稿',
       action: SnackBarAction(

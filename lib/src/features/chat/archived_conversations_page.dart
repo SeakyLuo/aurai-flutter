@@ -1,3 +1,4 @@
+import 'conversation_preview_text.dart';
 import 'package:flutter/material.dart';
 
 import '../../storage/conversation_reader.dart';
@@ -97,38 +98,42 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
                       final conversation = _items[index];
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: Material(
-                          color: settingsFieldColor(context),
-                          borderRadius: BorderRadius.circular(26),
-                          clipBehavior: Clip.antiAlias,
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
+                        child: ConversationMore(
+                          controller: widget.controller,
+                          conversation: conversation,
+                          onChanged: () => _load(reset: true),
+                          child: Material(
+                            color: settingsFieldColor(context),
+                            borderRadius: BorderRadius.circular(26),
+                            clipBehavior: Clip.antiAlias,
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              leading: ConversationMenuIcon(
+                                type: ConversationMenuIconType.archive,
+                                color: colors.onSurfaceVariant,
+                              ),
+                              title: Text(
+                                conversation.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: conversation.draftPreview != null
+                                  ? ConversationPreviewText(
+                                      conversation: conversation,
+                                    )
+                                  : conversation.preview == null
+                                  ? null
+                                  : Text(
+                                      conversation.preview!,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                              onTap: () =>
+                                  Navigator.pop(context, conversation.id),
                             ),
-                            leading: ConversationMenuIcon(
-                              type: ConversationMenuIconType.archive,
-                              color: colors.onSurfaceVariant,
-                            ),
-                            title: Text(
-                              conversation.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            subtitle: conversation.preview == null
-                                ? null
-                                : Text(
-                                    conversation.preview!,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                            trailing: ConversationMore(
-                              controller: widget.controller,
-                              conversation: conversation,
-                              onChanged: () => _load(reset: true),
-                            ),
-                            onTap: () =>
-                                Navigator.pop(context, conversation.id),
                           ),
                         ),
                       );

@@ -9,6 +9,7 @@ abstract final class WidgetUtils {
     required String text,
     required VoidCallback? onPressed,
     Widget? icon,
+    bool loading = false,
     bool frosted = false,
     bool liquidGlass = false,
     Color textColor = GlobalUI.onPrimary,
@@ -21,7 +22,7 @@ abstract final class WidgetUtils {
       width: width,
       height: height,
       child: FilledButton(
-        onPressed: onPressed,
+        onPressed: loading ? null : onPressed,
         clipBehavior: Clip.antiAlias,
         style: FilledButton.styleFrom(
           foregroundColor: textColor,
@@ -58,14 +59,19 @@ abstract final class WidgetUtils {
                 : child,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (icon != null) ...[icon, const SizedBox(width: 8)],
-            Flexible(child: Text(text, textAlign: TextAlign.center)),
-          ],
-        ),
+        child: loading
+            ? const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (icon != null) ...[icon, const SizedBox(width: 8)],
+                  Flexible(child: Text(text, textAlign: TextAlign.center)),
+                ],
+              ),
       ),
     );
     if (!liquidGlass) return button;

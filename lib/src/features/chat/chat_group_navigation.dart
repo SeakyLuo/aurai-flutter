@@ -1,19 +1,14 @@
 part of 'chat_page.dart';
 
 extension _ChatGroupNavigation on _ChatPageState {
-  Future<void> _openGroups({required bool create}) async {
-    if (_imageOperationPending()) return;
-    final id = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => create
-            ? GroupCreatePage(controller: widget.controller)
-            : GroupChatPage(controller: widget.controller),
-      ),
-    );
-    if (mounted && id != null) {
-      _scaffoldKey.currentState!.closeDrawer();
-      await _changeConversation(id);
-    }
-  }
+  Widget _groupIntroduction(
+    List<ChatTimelineEntry> timeline,
+    double top,
+    double bottom,
+  ) => ListView(
+    key: ValueKey('introduction:$_conversationId'),
+    primary: false,
+    padding: EdgeInsets.only(top: top, bottom: bottom + 16),
+    children: [for (final entry in timeline) entry.builder(context)],
+  );
 }

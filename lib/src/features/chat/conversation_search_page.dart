@@ -1,15 +1,12 @@
+import 'home_navigation.dart';
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
 import '../../storage/conversation_reader.dart';
 
 import 'chat_controller.dart';
-import 'chat_page.dart';
-import 'conversations_sheet.dart';
-import 'settings_page.dart';
-import 'group_create_page.dart';
-import 'group_chat_page.dart';
 import 'glass_surface.dart';
 import 'pagination_listener.dart';
 import 'sidebar_action_icon.dart';
@@ -239,7 +236,26 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
   Future<void> _loadRecent() async {
     try {
       final files = await widget.controller.searchAttachments('', 0, limit: 10);
-      if (mounted) setState(() => _recentFiles = files);
+      final available = await Future.wait(
+        files.map((result) async {
+          try {
+            final stat = await File(
+              result.image?.path ?? result.file!.path,
+            ).stat();
+            return stat.type == FileSystemEntityType.file && stat.size > 0;
+          } on FileSystemException {
+            return false;
+          }
+        }),
+      );
+      if (mounted) {
+        setState(
+          () => _recentFiles = [
+            for (var i = 0; i < files.length; i++)
+              if (available[i]) files[i],
+          ],
+        );
+      }
     } on Object {
       if (mounted)
         ScaffoldMessenger.of(
@@ -266,78 +282,15 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
     _load(reset: true);
   }
 
-  void _openDrawer() {
-    _focus.unfocus();
-    _scaffoldKey.currentState!.openDrawer();
-  }
-
-  Future<void> _chooseConversationAction(
-    ConversationSelection selection,
-  ) async {
-    if (selection.action == ConversationAction.createGroup ||
-        selection.action == ConversationAction.groups) {
-      final id = await Navigator.push<String>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => selection.action == ConversationAction.createGroup
-              ? GroupCreatePage(controller: widget.controller)
-              : GroupChatPage(controller: widget.controller),
-        ),
-      );
-      if (!mounted || id == null) return;
-      // Remove the drawer's local history before returning the search route.
-      if (_scaffoldKey.currentState!.isDrawerOpen) Navigator.pop(context);
-      Navigator.pop(context, (
-        action: ConversationAction.select,
-        id: id,
-        messageId: null,
-      ));
-      return;
-    }
-    _scaffoldKey.currentState!.closeDrawer();
-    switch (selection.action) {
-      case ConversationAction.search:
-        _focus.requestFocus();
-      case ConversationAction.settings:
-        final id = await Navigator.of(context).push<String>(
-          MaterialPageRoute(
-            builder: (_) => SettingsPage(
-              controller: widget.controller,
-              preparingGoal: widget.preparingGoal,
-            ),
-          ),
-        );
-        if (mounted && id != null) {
-          Navigator.pop(context, (
-            action: ConversationAction.select,
-            id: id,
-            messageId: null,
-          ));
-        }
-      case ConversationAction.groups:
-      case ConversationAction.createGroup:
-      case ConversationAction.tasks:
-      case ConversationAction.create:
-      case ConversationAction.select:
-        Navigator.pop(context, selection);
-    }
-  }
-
   Future<void> _openSearchConversation(String id, String? messageId) async {
     _rememberQuery();
     _focus.unfocus();
     try {
-      await widget.controller.selectConversation(id);
-      if (!mounted) return;
-      await Navigator.push<void>(
+      await openHomeConversation(
         context,
-        MaterialPageRoute(
-          builder: (_) => ChatPage(
-            controller: widget.controller,
-            fromTask: true,
-            initialMessageId: messageId,
-          ),
-        ),
+        widget.controller,
+        id,
+        messageId: messageId,
       );
     } on Object {
       if (mounted) {
@@ -359,15 +312,6 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
       key: _scaffoldKey,
-      drawer: ConversationsDrawer(
-        controller: widget.controller,
-        onChoose: _chooseConversationAction,
-      ),
-      drawerEnableOpenDragGesture: !widget.controller.addingImages,
-      drawerEdgeDragWidth: 24,
-      onDrawerChanged: (opened) {
-        if (opened) _focus.unfocus();
-      },
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -383,9 +327,9 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
             child: GlassSurface(
               radius: 28,
               child: RoundAction(
-                icon: Icons.menu_rounded,
-                label: '会话菜单',
-                onPressed: _openDrawer,
+                icon: Icons.arrow_back_rounded,
+                label: '返回',
+                onPressed: () => Navigator.pop(context),
               ),
             ),
           ),

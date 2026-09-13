@@ -1,3 +1,4 @@
+import 'message_quote_view.dart';
 import 'image_action_scope.dart';
 import 'file_attachments.dart';
 import 'reply_image_syntax.dart';
@@ -32,12 +33,22 @@ class MessageItem extends StatefulWidget {
     required this.message,
     required this.onEdit,
     this.streaming = false,
+    this.groupBubble = false,
+    this.onQuote,
+    this.onRecall,
+    this.onOpenQuote,
+    this.onOpenMember,
     this.availableSources = const {},
     this.excludedActivityMessageId,
   });
   final AgentMessage message;
+  final ValueChanged<AgentMessage>? onQuote;
+  final Future<void> Function(AgentMessage)? onRecall;
+  final ValueChanged<String>? onOpenQuote;
+  final ValueChanged<String>? onOpenMember;
   final String? excludedActivityMessageId;
   final bool streaming;
+  final bool groupBubble;
   final Map<String, SourceReference> availableSources;
   final Future<void> Function(AgentMessage)? onEdit;
 
@@ -69,6 +80,7 @@ class _MessageItemState extends State<MessageItem> {
   void didUpdateWidget(MessageItem oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.message != message ||
+        oldWidget.groupBubble != widget.groupBubble ||
         !mapEquals(oldWidget.availableSources, widget.availableSources)) {
       _content = _buildContent(context);
     }
@@ -84,16 +96,28 @@ class _MessageItemState extends State<MessageItem> {
       : Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (message.taskSummary != null)
+            if (!widget.groupBubble && message.taskSummary != null)
               TaskSummaryView(
                 excludedMessageId: widget.excludedActivityMessageId,
                 messageId: message.id,
                 summary: message.taskSummary!,
                 onOpenLink: (href) => _openLink(context, href),
               ),
-            if (message.taskSummary?.stopped != true)
-              SelectionArea(child: _content),
-            if (!widget.streaming && message.taskSummary?.stopped != true)
+            if (message.taskSummary?.stopped != true) _selectableContent(),
+            if (widget.groupBubble &&
+                !widget.streaming &&
+                message.taskSummary?.stopped != true &&
+                _sources.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: MessageSourcesButton(
+                  sources: _sources,
+                  onOpenLink: (href) => _openLink(context, href),
+                ),
+              ),
+            if (!widget.groupBubble &&
+                !widget.streaming &&
+                message.taskSummary?.stopped != true)
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 0, 18, 20),
                 child: Row(
@@ -112,6 +136,18 @@ class _MessageItemState extends State<MessageItem> {
                       ),
                       visualDensity: VisualDensity.compact,
                     ),
+                    if (widget.onQuote != null)
+                      IconButton(
+                        tooltip: '引用',
+                        onPressed: () => widget.onQuote!(message),
+                        icon: const QuoteIcon(),
+                        visualDensity: VisualDensity.compact,
+                        style: IconButton.styleFrom(
+                          fixedSize: const Size.square(32),
+                          minimumSize: const Size.square(32),
+                          padding: const EdgeInsets.all(4),
+                        ),
+                      ),
                     const SizedBox(width: 6),
                     Tooltip(
                       message: messageTime(message.createdAt),
@@ -138,6 +174,30 @@ class _MessageItemState extends State<MessageItem> {
           ],
         );
 
+  Widget _selectableContent() {
+    if (widget.groupBubble) return _content;
+    final content = SelectionArea(
+      contextMenuBuilder: (context, selection) =>
+          AdaptiveTextSelectionToolbar.buttonItems(
+            anchors: selection.contextMenuAnchors,
+            buttonItems: [
+              ...selection.contextMenuButtonItems,
+              if (widget.onQuote != null)
+                ContextMenuButtonItem(
+                  label: '引用',
+                  onPressed: () {
+                    selection.hideToolbar();
+                    selection.clearSelection();
+                    widget.onQuote!(message);
+                  },
+                ),
+            ],
+          ),
+      child: _content,
+    );
+    return widget.onQuote == null ? content : _withActions(content);
+  }
+
   Widget _withActions(Widget child) => GestureDetector(
     onLongPressStart: (details) => _openActions(details.globalPosition),
     child: child,
@@ -150,9 +210,15 @@ class _MessageItemState extends State<MessageItem> {
       message: snapshot,
       position: position,
       allowEditing: widget.onEdit != null,
+      allowQuote: widget.onQuote != null,
+      allowRecall: widget.onRecall != null,
     );
     if (!mounted) return;
     switch (action) {
+      case MessageAction.recall:
+        await widget.onRecall?.call(snapshot);
+      case MessageAction.quote:
+        widget.onQuote?.call(snapshot);
       case MessageAction.copy:
         await _copy(context, snapshot.text);
       case MessageAction.select:
@@ -175,17 +241,28 @@ class _MessageItemState extends State<MessageItem> {
           alignment: Alignment.centerRight,
           child: Container(
             constraints: BoxConstraints(
-              maxWidth: (constraints.maxWidth - 32) * 0.82,
+              maxWidth: widget.groupBubble
+                  ? (constraints.maxWidth - 36) * 0.86
+                  : (constraints.maxWidth - 32) * 0.82,
             ),
-            margin: const EdgeInsets.fromLTRB(
-              16,
+            margin: EdgeInsets.fromLTRB(
+              widget.groupBubble ? 18 : 16,
               MessageItem.userTopMargin,
-              16,
+              widget.groupBubble ? 18 : 16,
               24,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                if (message.quote != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: MessageQuoteView(
+                      quote: message.quote!,
+                      onTap: () =>
+                          widget.onOpenQuote?.call(message.quote!.messageId),
+                    ),
+                  ),
                 for (final file in message.files)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -257,124 +334,167 @@ class _MessageItemState extends State<MessageItem> {
     final body = TextStyle(
       color: Theme.of(context).colorScheme.onSurface,
       fontSize: 16,
-      height: 1.65,
+      height: widget.groupBubble ? 1.55 : 1.65,
     );
     final availableSources = {
       ...widget.availableSources,
       ...webSourcesFromActivities(message.taskSummary?.activities ?? const []),
     };
     _sources = messageSources(message.text, availableSources: availableSources);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          MediaQuery.removePadding(
-            context: context,
-            removeBottom: true,
-            child: MarkdownLinkUnderlines(
-              child: MarkdownBody(
-                blockSyntaxes: [ReplyImageSyntax()],
-                inlineSyntaxes: [
-                  SourceCitationSyntax(availableSources),
-                  SourceLinkSyntax(availableSources),
-                  CjkStrongSyntax(),
-                ],
-                builders: {
-                  'reference-gallery': ReplyImageGalleryBuilder(
-                    (url) => _openLink(context, url),
-                  ),
-                  'source-citation': SourceCitationBuilder(
-                    onOpenLink: (href) => _openLink(context, href),
-                  ),
-                },
-                data: imageMarkdownForDisplay(message.text, widget.streaming),
-                selectable: false,
-                fitContent: false,
-                onTapLink: (text, href, title) => _openLink(context, href),
-                styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context))
-                    .copyWith(
-                      horizontalRuleDecoration: BoxDecoration(
-                        border: Border(
-                          top: BorderSide(
-                            width: 0.5,
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (message.quote != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: MessageQuoteView(
+              quote: message.quote!,
+              onTap: () => widget.onOpenQuote?.call(message.quote!.messageId),
+            ),
+          ),
+        MediaQuery.removePadding(
+          context: context,
+          removeBottom: true,
+          child: MarkdownLinkUnderlines(
+            child: MarkdownBody(
+              blockSyntaxes: [ReplyImageSyntax()],
+              inlineSyntaxes: [
+                SourceCitationSyntax(availableSources),
+                SourceLinkSyntax(availableSources),
+                CjkStrongSyntax(),
+              ],
+              builders: {
+                'reference-gallery': ReplyImageGalleryBuilder(
+                  (url) => _openLink(context, url),
+                ),
+                'source-citation': SourceCitationBuilder(
+                  onOpenLink: (href) => _openLink(context, href),
+                ),
+              },
+              data: imageMarkdownForDisplay(message.text, widget.streaming),
+              selectable: false,
+              fitContent: widget.groupBubble,
+              onTapLink: (text, href, title) => _openLink(context, href),
+              styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context))
+                  .copyWith(
+                    horizontalRuleDecoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          width: 0.5,
+                          color: Theme.of(context).colorScheme.outlineVariant,
                         ),
                       ),
-                      p: body,
-                      strong: const TextStyle(fontWeight: FontWeight.w700),
-                      h1: body.copyWith(
-                        fontSize: 25,
-                        fontWeight: FontWeight.w700,
-                        height: 1.4,
-                      ),
-                      h2: body.copyWith(
-                        fontSize: 21,
-                        fontWeight: FontWeight.w700,
-                        height: 1.4,
-                      ),
-                      h3: body.copyWith(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      h1Padding: const EdgeInsets.only(top: 12),
-                      h2Padding: const EdgeInsets.only(top: 12),
-                      h3Padding: const EdgeInsets.only(top: 8),
-                      blockSpacing: 20,
-                      listIndent: 24,
-                      listBullet: body,
-                      blockquote: body,
-                      blockquotePadding: const EdgeInsets.only(
-                        left: 18,
-                        top: 2,
-                        bottom: 2,
-                      ),
-                      blockquoteDecoration: BoxDecoration(
-                        border: Border(
-                          left: BorderSide(
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                            width: 3,
-                          ),
-                        ),
-                      ),
-                      code: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 14,
-                        height: 1.6,
-                        color: Theme.of(context).colorScheme.onSurface,
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest,
-                      ),
-                      codeblockDecoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      codeblockPadding: const EdgeInsets.all(16),
-                      tableColumnWidth: const IntrinsicColumnWidth(),
-                      tableScrollbarThumbVisibility: true,
-                      tablePadding: const EdgeInsets.only(bottom: 12),
-                      tableBody: body.copyWith(fontSize: 15),
-                      tableHead: body.copyWith(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      tableCellsPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      tableBorder: TableBorder.all(
-                        color: Theme.of(context).colorScheme.outlineVariant,
-                      ),
-                      a: body.merge(GlobalUI.linkStyle(context)),
                     ),
+                    p: body,
+                    strong: const TextStyle(fontWeight: FontWeight.w700),
+                    h1: body.copyWith(
+                      fontSize: 25,
+                      fontWeight: FontWeight.w700,
+                      height: 1.4,
+                    ),
+                    h2: body.copyWith(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w700,
+                      height: 1.4,
+                    ),
+                    h3: body.copyWith(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    h1Padding: const EdgeInsets.only(top: 12),
+                    h2Padding: const EdgeInsets.only(top: 12),
+                    h3Padding: const EdgeInsets.only(top: 8),
+                    blockSpacing: 20,
+                    listIndent: 24,
+                    listBullet: body,
+                    blockquote: body,
+                    blockquotePadding: const EdgeInsets.only(
+                      left: 18,
+                      top: 2,
+                      bottom: 2,
+                    ),
+                    blockquoteDecoration: BoxDecoration(
+                      border: Border(
+                        left: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                          width: 3,
+                        ),
+                      ),
+                    ),
+                    code: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 14,
+                      height: 1.6,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                    ),
+                    codeblockDecoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    codeblockPadding: const EdgeInsets.all(16),
+                    tableColumnWidth: const IntrinsicColumnWidth(),
+                    tableScrollbarThumbVisibility: true,
+                    tablePadding: const EdgeInsets.only(bottom: 12),
+                    tableBody: body.copyWith(fontSize: 15),
+                    tableHead: body.copyWith(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    tableCellsPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    tableBorder: TableBorder.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                    a: body.merge(GlobalUI.linkStyle(context)),
+                  ),
+            ),
+          ),
+        ),
+      ],
+    );
+    if (!widget.groupBubble) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+        child: content,
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) => Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          margin: const EdgeInsets.only(top: 6, bottom: 4),
+          constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+          child: Material(
+            key: _bubbleKey,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xff2a292f)
+                : const Color(0xffefeff3),
+            borderRadius: BorderRadius.circular(22),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onLongPress: () {
+                final box =
+                    _bubbleKey.currentContext!.findRenderObject()! as RenderBox;
+                _openActions(box.localToGlobal(box.size.center(Offset.zero)));
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: content,
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -394,6 +514,13 @@ class _MessageItemState extends State<MessageItem> {
   }
 
   Future<void> _openLink(BuildContext context, String? href) async {
+    final memberLink = Uri.tryParse(href ?? '');
+    if (memberLink?.scheme == 'aurai' &&
+        memberLink?.host == 'member' &&
+        memberLink!.pathSegments.length == 1) {
+      widget.onOpenMember?.call(memberLink.pathSegments.single);
+      return;
+    }
     final file = href == null
         ? null
         : SourceReference.fromLocalLink(href, '本地文件');

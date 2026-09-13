@@ -4,8 +4,13 @@ import 'settings_appearance.dart';
 import 'capability_icon.dart';
 
 class ScreenAccessTile extends StatefulWidget {
-  const ScreenAccessTile({super.key, required this.controller});
+  const ScreenAccessTile({
+    super.key,
+    required this.controller,
+    required this.senderId,
+  });
   final ChatController controller;
+  final String senderId;
 
   @override
   State<ScreenAccessTile> createState() => _ScreenAccessTileState();
@@ -16,7 +21,7 @@ class _ScreenAccessTileState extends State<ScreenAccessTile> {
 
   Future<bool?> _load() async {
     try {
-      return await widget.controller.getScreenAccess();
+      return await widget.controller.getScreenAccess(widget.senderId);
     } on Object {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -33,7 +38,7 @@ class _ScreenAccessTileState extends State<ScreenAccessTile> {
   Future<void> _change(bool value) async {
     setState(() => _saving = true);
     try {
-      await widget.controller.setScreenAccess(value);
+      await widget.controller.setScreenAccess(widget.senderId, value);
       if (mounted) setState(() => _allowed = value);
     } on Object {
       if (mounted) {
@@ -78,27 +83,6 @@ class _ScreenAccessTileState extends State<ScreenAccessTile> {
           height: 48,
           child: snapshot.hasData
               ? Switch(
-                  activeTrackColor:
-                      Theme.of(context).brightness == Brightness.dark
-                      ? const Color(0xff34d399)
-                      : const Color(0xff009b68),
-                  activeThumbColor: Theme.of(context).colorScheme.surface,
-                  inactiveTrackColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest,
-                  inactiveThumbColor: Theme.of(
-                    context,
-                  ).colorScheme.onSurfaceVariant,
-                  trackOutlineColor: WidgetStateProperty.resolveWith(
-                    (states) => states.contains(WidgetState.selected)
-                        ? Colors.transparent
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  overlayColor: WidgetStatePropertyAll(
-                    Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.08),
-                  ),
                   value: _allowed ?? snapshot.data!,
                   onChanged: _saving ? null : _change,
                 )

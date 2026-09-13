@@ -11,7 +11,8 @@ class MemoryRecordTool
   });
   static const operations = ['list', 'read', 'create', 'update', 'delete'];
   final MemoryController memory;
-  final String operation, conversationId, messageId;
+  final String operation, conversationId;
+  final String? messageId;
   bool get reading => operation == 'list' || operation == 'read';
   bool get hasId =>
       operation == 'read' || operation == 'update' || operation == 'delete';

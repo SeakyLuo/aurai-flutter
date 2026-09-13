@@ -167,7 +167,10 @@ class _PersonalizationChoiceRowState extends State<PersonalizationChoiceRow> {
             AnimatedRotation(
               turns: _open ? -.25 : .25,
               duration: const Duration(milliseconds: 180),
-              child: const SettingsIcon(type: SettingsIconType.chevron),
+              child: const SizedBox.square(
+                dimension: 24,
+                child: SettingsIcon(type: SettingsIconType.chevron),
+              ),
             ),
           ],
         ),

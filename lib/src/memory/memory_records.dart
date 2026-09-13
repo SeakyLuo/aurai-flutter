@@ -29,7 +29,7 @@ extension MemoryRecords on MemoryController {
     String? text,
     required int expectedRevision,
     required String conversationId,
-    required String messageId,
+    required String? messageId,
   }) async {
     if (expectedRevision != revision) throw StateError('记忆已变化，请重新查询后操作');
     if (operation != 'delete' && (text!.trim().isEmpty || text.length > 300)) {
@@ -45,12 +45,14 @@ extension MemoryRecords on MemoryController {
       if (operation == 'delete') {
         await txn.delete(
           'user_memories',
-          where: 'id = ?',
-          whereArgs: [recordId],
+          where: 'id = ? AND $_scopeWhere',
+          whereArgs: [recordId, ..._scopeArgs],
         );
       } else if (operation == 'create') {
         await txn.insert('user_memories', {
           'id': recordId,
+          'owner_id': ownerId,
+          'memory_scope': scope,
           'text': text!.trim(),
           'manual': 1,
           'source_conversation_id': conversationId,
@@ -62,8 +64,8 @@ extension MemoryRecords on MemoryController {
         await txn.update(
           'user_memories',
           {'text': text!.trim(), 'manual': 1, 'updated_at': now},
-          where: 'id = ?',
-          whereArgs: [recordId],
+          where: 'id = ? AND $_scopeWhere',
+          whereArgs: [recordId, ..._scopeArgs],
         );
       }
     });

@@ -1,3 +1,4 @@
+import 'ai_document_scope.dart';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
@@ -8,7 +9,8 @@ import 'aurai_platform.dart';
 
 class DocumentTool
     implements AgentTool, RuntimeCapabilityAgentTool, PreflightAgentTool {
-  DocumentTool(this.platform, this.name);
+  DocumentTool(this.platform, this.name, {required this.access});
+  final AiDocumentScope access;
   final AuraiPlatform platform;
   final String name;
   String? _activeId;
@@ -126,6 +128,13 @@ class DocumentTool
 
   @override
   Future<ToolResult?> preflight(ToolCall call) async {
+    if (name != 'getDocumentFolders' &&
+        name != 'requestDocumentFolder' &&
+        !access.allows(call.arguments['uri'] as String)) {
+      return _result(call, {
+        'error': '此 AI 尚未获得该文件夹授权，请使用 requestDocumentFolder 由用户选择文件夹',
+      });
+    }
     if (name != 'createTextFile') return null;
     try {
       final info = await _operation(call, 'prepareTextFile');
@@ -154,16 +163,23 @@ class DocumentTool
   Future<ToolResult> execute(ToolCall call) async {
     _activeId = call.id;
     try {
-      final output =
+      var output =
           name == 'getDocumentFolders' ||
               name == 'requestDocumentFolder' ||
               name == 'shareFile'
           ? await platform.deviceExtension(name, {
               ...call.arguments,
+              if (name == 'requestDocumentFolder' &&
+                  (call.arguments['uri'] == null ||
+                      !access.allows(call.arguments['uri'] as String)))
+                'uri': null,
               if (name == 'requestDocumentFolder' || name == 'shareFile')
                 'callId': call.id,
             })
           : await _operation(call, name);
+      if (name == 'requestDocumentFolder' && output['selectedUri'] != null)
+        await access.grant(output['selectedUri'] as String);
+      if (output.containsKey('folders')) output = access.filter(output);
       return _result(call, output);
     } on PlatformException catch (error) {
       return platformToolError(call, error);

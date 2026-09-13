@@ -17,6 +17,7 @@ enum ConversationAction {
   search,
   settings,
   tasks,
+  contacts,
   groups,
   createGroup,
 }
@@ -98,6 +99,15 @@ class ConversationsDrawer extends StatelessWidget {
                 ),
               ),
               ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                leading: const SettingsIcon(type: SettingsIconType.contacts),
+                title: const Text(
+                  '通讯录',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                onTap: () => _choose(ConversationAction.contacts),
+              ),
+              ListTile(
                 contentPadding: const EdgeInsets.only(left: 24, right: 16),
                 leading: const SidebarActionIcon(
                   type: SidebarActionIconType.group,
@@ -174,6 +184,7 @@ class ConversationsDrawer extends StatelessWidget {
                                                   .withValues(alpha: 0.05)
                                             : Colors.transparent,
                                         borderRadius: BorderRadius.circular(14),
+                                        clipBehavior: Clip.antiAlias,
                                         child: InkWell(
                                           borderRadius: BorderRadius.circular(
                                             14,

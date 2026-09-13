@@ -5,7 +5,9 @@ class SearchTypeSegment extends StatelessWidget {
     super.key,
     required this.files,
     required this.onChanged,
+    this.labels = const ['会话', '文件'],
   });
+  final List<String> labels;
   final bool files;
   final ValueChanged<bool> onChanged;
 
@@ -61,7 +63,7 @@ class SearchTypeSegment extends StatelessWidget {
                           },
                           child: Center(
                             child: Text(
-                              value ? '文件' : '会话',
+                              labels[value ? 1 : 0],
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w400,

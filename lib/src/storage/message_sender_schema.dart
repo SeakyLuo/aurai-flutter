@@ -29,8 +29,17 @@ Future<void> migrateMessageSenders(Database db) async {
 }
 
 const messageSenderAvatarColumns = [
-  "ALTER TABLE message_senders ADD COLUMN avatar_icon TEXT NOT NULL DEFAULT 'orbit'",
+  "ALTER TABLE message_senders ADD COLUMN avatar_icon TEXT NOT NULL DEFAULT 'person'",
   "ALTER TABLE message_senders ADD COLUMN avatar_color TEXT NOT NULL DEFAULT 'violet'",
   'ALTER TABLE message_senders ADD COLUMN avatar_path TEXT',
   'ALTER TABLE message_senders ADD COLUMN archived INTEGER NOT NULL DEFAULT 0',
 ];
+
+Future<void> migrateAuraiAvatar(Database db) async {
+  await db.update(
+    'message_senders',
+    {'avatar_icon': 'app_logo', 'avatar_path': null},
+    where: 'id = ?',
+    whereArgs: [MessageSender.aurai.id],
+  );
+}

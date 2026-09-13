@@ -1,3 +1,4 @@
+import '../../domain/ai_profile.dart';
 import 'package:flutter/material.dart';
 import '../../agent/system_prompt.dart';
 import '../../domain/response_preferences.dart';
@@ -9,28 +10,32 @@ import 'settings_appearance.dart';
 import 'settings_icon.dart';
 
 class PersonalizationPage extends StatefulWidget {
-  const PersonalizationPage({super.key, required this.controller});
+  const PersonalizationPage({
+    super.key,
+    required this.controller,
+    required this.profile,
+  });
   final ChatController controller;
+  final AiProfile profile;
   @override
   State<PersonalizationPage> createState() => _PersonalizationPageState();
 }
 
 class _PersonalizationPageState extends State<PersonalizationPage> {
+  late AiProfile _profile = widget.profile;
   late final _prompt = TextEditingController(text: _saved);
   late final _instructions = TextEditingController(
-    text: widget.controller.modelSettings.customInstructions,
+    text: _profile.preferences.customInstructions,
   );
-  late var _preferences = widget.controller.modelSettings.responsePreferences;
+  late var _preferences = _profile.preferences.responses;
   bool _saving = false;
   bool _allowPop = false;
   bool _advanced = false;
-  String get _saved =>
-      widget.controller.modelSettings.systemPrompt ?? agentSystemPrompt;
+  String get _saved => _profile.preferences.systemPrompt;
   bool get _dirty =>
       _prompt.text != _saved ||
-      _instructions.text !=
-          widget.controller.modelSettings.customInstructions ||
-      !_preferences.sameAs(widget.controller.modelSettings.responsePreferences);
+      _instructions.text != _profile.preferences.customInstructions ||
+      !_preferences.sameAs(_profile.preferences.responses);
 
   @override
   void initState() {
@@ -64,11 +69,16 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
   Future<bool> _save() async {
     setState(() => _saving = true);
     try {
-      await widget.controller.savePersonalization(
-        systemPrompt: _prompt.text == agentSystemPrompt ? null : _prompt.text,
-        customInstructions: _instructions.text,
-        responsePreferences: _preferences,
+      final next = _profile.copyWith(
+        preferences: AiPreferences(
+          systemPrompt: _prompt.text,
+          customInstructions: _instructions.text,
+          responses: _preferences,
+          screenAccess: _profile.preferences.screenAccess,
+        ),
       );
+      await widget.controller.saveAi(next);
+      _profile = next;
       if (mounted) _notice('个性化设置已保存');
       return true;
     } on Object {
@@ -154,7 +164,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     },
     child: Scaffold(
       appBar: SettingsAppBar(
-        title: '个性化',
+        title: '${_profile.sender.name}的个性',
         onBack: _saving ? null : () => Navigator.maybePop(context),
         actions: [
           SettingsGlassAction(
@@ -200,7 +210,9 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                           ),
                         ),
                 ),
-                _description('这是 Aurai 在与你对话时使用的主要语言风格和语气。这不会影响 Aurai 的功能。'),
+                _description(
+                  '这是 ${_profile.sender.name} 在与你对话时使用的主要语言风格和语气。这不会影响 ${_profile.sender.name} 的功能。',
+                ),
                 const SizedBox(height: 26),
                 _label('特征'),
                 for (final trait in ResponseTrait.values)
@@ -223,7 +235,10 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                 _description('在基本风格和语调的基础上选择额外的自定义项。'),
                 const SizedBox(height: 26),
                 _label('自定义指令'),
-                _field(_instructions, '共享你希望 Aurai 纳入其回复考虑范围的内容。'),
+                _field(
+                  _instructions,
+                  '共享你希望 ${_profile.sender.name} 纳入其回复考虑范围的内容。',
+                ),
                 const SizedBox(height: 26),
                 Align(
                   alignment: Alignment.centerLeft,

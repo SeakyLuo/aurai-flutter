@@ -5,26 +5,28 @@ import '../domain/tool_models.dart';
 /// Each invocation opens the live SQLite file independently in read-only mode.
 /// WAL-backed messages remain visible without copying or exporting the database.
 class LocalHistoryTool implements AgentTool, RuntimeCapabilityAgentTool {
-  LocalHistoryTool(this.databasePath, this.name);
+  LocalHistoryTool(
+    this.databasePath,
+    this.name, {
+    required this.senderId,
+    this.groupId,
+  });
+  final String senderId;
+  final String? groupId;
 
   final String databasePath;
   final String name;
 
-  static const names = [
-    'searchConversations',
-    'searchMessages',
-    'inspectLocalDatabase',
-    'queryLocalDatabase',
-  ];
+  static const names = ['searchConversations', 'searchMessages'];
 
   @override
   ToolDefinition get definition => ToolDefinition(
     name: name,
     description: switch (name) {
       'searchConversations' =>
-        'Search saved conversation titles, drafts and message text with multiple literal keywords (case-insensitive OR). Empty keywords list recent conversations. Use for earlier conversations or past work. Returns conversation references for reading messages with queryLocalDatabase. If search is insufficient, inspect the database rather than concluding the event never happened.',
+        'Search saved conversation titles, drafts and message text with multiple literal keywords (case-insensitive OR). Empty keywords list recent conversations. Use for earlier conversations or past work. Returns only conversations accessible to this AI.',
       'searchMessages' =>
-        'Search original saved messages across conversations with multiple literal keywords (case-insensitive OR). Empty keywords list messages. Optionally restrict to a conversation. Use offsets to page only as needed and stop when evidence is sufficient. If search is insufficient, inspect original records with queryLocalDatabase rather than concluding the event never happened.',
+        'Search original saved messages across conversations with multiple literal keywords (case-insensitive OR). Empty keywords list messages. Optionally restrict to a conversation. Use offsets to page only as needed and stop when evidence is sufficient. Results are restricted to this AI private conversations, or only the current group when in a group.',
       'inspectLocalDatabase' =>
         'Inspect the tables, columns and indexes of the local conversation database in read-only mode. Use queryLocalDatabase to read records. Results are paginated.',
       _ =>
@@ -135,17 +137,6 @@ class LocalHistoryTool implements AgentTool, RuntimeCapabilityAgentTool {
   }
 
   (String, List<Object?>) _query(Map<String, Object?> arguments) {
-    if (name == 'inspectLocalDatabase') {
-      return (
-        "SELECT name, type, sql FROM sqlite_master WHERE type IN ('table', 'view', 'index') ORDER BY type, name",
-        [],
-      );
-    }
-    if (name == 'queryLocalDatabase') {
-      // A subquery accepts only a SELECT/WITH expression, not PRAGMA, ATTACH,
-      // writes or a batch of statements. The connection is also read-only.
-      return (arguments['sql'] as String, []);
-    }
     final keywords = (arguments['keywords'] as List).cast<String>();
     if (keywords.length > 10 || keywords.any((word) => word.isEmpty)) {
       throw const FormatException('Use at most 10 nonempty keywords');
@@ -160,15 +151,20 @@ class LocalHistoryTool implements AgentTool, RuntimeCapabilityAgentTool {
     if (name == 'searchConversations') {
       final where = keywords.isEmpty
           ? ''
-          : 'WHERE (${matches('title')}) OR (${matches('draft')}) OR id IN '
-                '(SELECT conversation_id FROM messages WHERE ${matches('text')})';
+          : 'AND ( (${matches('title')}) OR (${matches('draft')}) OR id IN '
+                '(SELECT conversation_id FROM messages WHERE ${matches('text')}))';
       return (
         'SELECT id, title, preview, created_at, updated_at, message_count '
-            'FROM conversations $where ORDER BY updated_at DESC, id DESC',
-        parameters,
+            'FROM conversations WHERE ${groupId == null ? "kind = 'direct' AND default_sender_id = ?" : 'id = ?'} $where ORDER BY updated_at DESC, id DESC',
+        [groupId ?? senderId, ...parameters],
       );
     }
-    final filters = <String>[];
+    final filters = <String>[
+      groupId == null
+          ? "conversation_id IN (SELECT id FROM conversations WHERE kind = 'direct' AND default_sender_id = ?)"
+          : 'conversation_id = ?',
+    ];
+    parameters.insert(0, groupId ?? senderId);
     if (keywords.isNotEmpty) filters.add('(${matches('text')})');
     final conversationId = arguments['conversationId'] as String?;
     if (conversationId != null) {

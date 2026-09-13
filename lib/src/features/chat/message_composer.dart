@@ -68,9 +68,9 @@ class MessageComposer extends StatelessWidget {
                                   );
                               final singleLinePadding = EdgeInsets.fromLTRB(
                                 leading == null ? 16 : 48,
-                                10,
+                                0,
                                 48,
-                                10,
+                                0,
                               );
                               final painter =
                                   TextPainter(
@@ -98,39 +98,49 @@ class MessageComposer extends StatelessWidget {
                                     constraints: const BoxConstraints(
                                       minHeight: 48,
                                     ),
-                                    child: TextField(
-                                      controller: controller,
-                                      focusNode: focusNode,
-                                      enabled: enabled,
-                                      style: style,
-                                      minLines: 1,
-                                      maxLines: 5,
-                                      maxLength: maxLength,
-                                      onChanged: onChanged,
-                                      textInputAction: TextInputAction.newline,
-                                      decoration: InputDecoration(
-                                        hintText: hintText,
-                                        hintStyle: TextStyle(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.onSurfaceVariant,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w400,
+                                    child: Align(
+                                      alignment: multiline
+                                          ? Alignment.topCenter
+                                          : Alignment.center,
+                                      heightFactor: 1,
+                                      child: TextField(
+                                        controller: controller,
+                                        focusNode: focusNode,
+                                        enabled: enabled,
+                                        style: style,
+                                        textAlignVertical: multiline
+                                            ? TextAlignVertical.top
+                                            : TextAlignVertical.center,
+                                        minLines: 1,
+                                        maxLines: 5,
+                                        maxLength: maxLength,
+                                        onChanged: onChanged,
+                                        textInputAction:
+                                            TextInputAction.newline,
+                                        decoration: InputDecoration(
+                                          hintText: hintText,
+                                          isDense: true,
+                                          isCollapsed: !multiline,
+                                          hintStyle: style.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                          ),
+                                          counterText: '',
+                                          filled: false,
+                                          border: InputBorder.none,
+                                          enabledBorder: InputBorder.none,
+                                          focusedBorder: InputBorder.none,
+                                          disabledBorder: InputBorder.none,
+                                          contentPadding: multiline
+                                              ? const EdgeInsets.fromLTRB(
+                                                  16,
+                                                  14,
+                                                  16,
+                                                  56,
+                                                )
+                                              : singleLinePadding,
                                         ),
-                                        counterText: '',
-                                        filled: false,
-                                        border: InputBorder.none,
-                                        enabledBorder: InputBorder.none,
-                                        focusedBorder: InputBorder.none,
-                                        disabledBorder: InputBorder.none,
-                                        contentPadding: multiline
-                                            ? const EdgeInsets.fromLTRB(
-                                                16,
-                                                14,
-                                                16,
-                                                56,
-                                              )
-                                            : singleLinePadding,
                                       ),
                                     ),
                                   ),

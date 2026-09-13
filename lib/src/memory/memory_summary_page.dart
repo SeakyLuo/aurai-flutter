@@ -1,3 +1,4 @@
+import '../features/chat/search_type_segment.dart';
 import 'package:flutter/material.dart';
 
 import '../features/chat/glass_surface.dart';
@@ -14,14 +15,25 @@ import 'memory_delete_dialog.dart';
 import 'memory_toast.dart';
 
 class MemorySummaryPage extends StatefulWidget {
-  const MemorySummaryPage({super.key, required this.memory});
+  const MemorySummaryPage({
+    super.key,
+    required this.memory,
+    this.title = '记忆',
+    this.groupMemories,
+    this.initialGroup = false,
+  });
   final MemoryController memory;
+  final String title;
+  final Widget? groupMemories;
+  final bool initialGroup;
 
   @override
   State<MemorySummaryPage> createState() => _MemorySummaryPageState();
 }
 
 class _MemorySummaryPageState extends State<MemorySummaryPage> {
+  late bool _group = widget.initialGroup;
+  late bool _groupVisited = widget.initialGroup;
   final _text = TextEditingController();
   final _focus = FocusNode();
   bool _saving = false;
@@ -179,60 +191,91 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
         child: Scaffold(
           extendBody: true,
           resizeToAvoidBottomInset: false,
-          bottomNavigationBar: KeyboardInset(child: _footer()),
-          appBar: SettingsAppBar(title: '记忆', onBack: _saving ? null : _leave),
-          body: Builder(
-            builder: (context) => SafeArea(
-              top: false,
-              bottom: false,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 640),
-                  child: ListView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: EdgeInsets.fromLTRB(
-                      8,
-                      8,
-                      8,
-                      MediaQuery.paddingOf(context).bottom + 28,
-                    ),
-                    children: [
-                      if (_plan != null)
-                        MemoryPlanPreview(plan: _plan!)
-                      else ...[
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text(
-                            memory.entries.isEmpty
-                                ? '这里会逐渐记录 Aurai 对你的了解。你可以在下方补充希望记住的信息。'
-                                : '以下是你在对话中分享、或主动保存的信息。',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF6B6B6B),
-                            ),
-                          ),
+          bottomNavigationBar: _group ? null : KeyboardInset(child: _footer()),
+          appBar: SettingsAppBar(
+            title: widget.title,
+            titleWidget: widget.groupMemories == null
+                ? null
+                : SearchTypeSegment(
+                    files: _group,
+                    labels: const ['私聊', '群聊'],
+                    onChanged: (group) {
+                      if (_saving || _planning) return;
+                      _focus.unfocus();
+                      setState(() {
+                        _group = group;
+                        _groupVisited |= group;
+                      });
+                    },
+                  ),
+            onBack: _saving ? null : _leave,
+          ),
+          body: IndexedStack(
+            index: _group ? 1 : 0,
+            children: [
+              Builder(
+                builder: (context) => SafeArea(
+                  top: false,
+                  bottom: false,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 640),
+                      child: ListView(
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        padding: EdgeInsets.fromLTRB(
+                          8,
+                          8,
+                          8,
+                          MediaQuery.paddingOf(context).bottom + 28,
                         ),
-                        if (memory.entries.isNotEmpty) ...[
-                          const SizedBox(height: 20),
-                          for (final entry in memory.entries)
+                        children: [
+                          if (_plan != null)
+                            MemoryPlanPreview(plan: _plan!)
+                          else ...[
                             Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: MemoryEntryTile(
-                                key: ValueKey(entry['id']),
-                                text: entry['text'] as String,
-                                enabled: !_saving && !_planning,
-                                onEdit: () => _edit(entry),
-                                onMenu: (position) => _menu(entry, position),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              child: Text(
+                                memory.entries.isEmpty
+                                    ? (memory.scope.isEmpty
+                                          ? '这里会逐渐记录对你的了解。你可以在下方补充希望记住的信息。'
+                                          : '这里会记录在这个群聊中形成的记忆。你可以在下方补充信息。')
+                                    : '以下是对话中形成、或主动保存的记忆。',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF6B6B6B),
+                                ),
                               ),
                             ),
+                            if (memory.entries.isNotEmpty) ...[
+                              const SizedBox(height: 20),
+                              for (final entry in memory.entries)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: MemoryEntryTile(
+                                    key: ValueKey(entry['id']),
+                                    text: entry['text'] as String,
+                                    enabled: !_saving && !_planning,
+                                    onEdit: () => _edit(entry),
+                                    onMenu: (position) =>
+                                        _menu(entry, position),
+                                  ),
+                                ),
+                            ],
+                          ],
                         ],
-                      ],
-                    ],
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+              if (_groupVisited)
+                widget.groupMemories!
+              else
+                const SizedBox.shrink(),
+            ],
           ),
         ),
       );

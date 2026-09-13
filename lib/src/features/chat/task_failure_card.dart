@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/global_ui.dart';
 import 'glass_surface.dart';
 import 'task_failure_icon.dart';
 
@@ -40,10 +41,7 @@ class TaskFailureCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          if (paused == null)
-            const TaskFailureIcon(size: 22)
-          else
-            _PlaybackIcon(paused: paused!),
+          const TaskFailureIcon(size: 22),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -61,7 +59,12 @@ class TaskFailureCard extends StatelessWidget {
               icon: Icons.refresh_rounded,
               iconWidget: paused == null
                   ? null
-                  : _PlaybackIcon(paused: paused!),
+                  : _PlaybackIcon(
+                      paused: paused!,
+                      color: enabled
+                          ? GlobalUI.onPrimary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               primary: true,
               compact: true,
               inkResponse: false,
@@ -75,16 +78,13 @@ class TaskFailureCard extends StatelessWidget {
 }
 
 class _PlaybackIcon extends StatelessWidget {
-  const _PlaybackIcon({required this.paused});
+  const _PlaybackIcon({required this.paused, required this.color});
   final bool paused;
+  final Color color;
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: const Size.square(24),
-    painter: _PlaybackPainter(
-      paused,
-      IconTheme.of(context).color ??
-          Theme.of(context).colorScheme.onSurfaceVariant,
-    ),
+    painter: _PlaybackPainter(paused, color),
   );
 }
 

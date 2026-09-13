@@ -54,10 +54,14 @@ class SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onBack,
     this.actions = const [],
     this.titleWidget,
+    this.leadingAction,
+    this.root = false,
   });
 
   final String title;
+  final bool root;
   final Widget? titleWidget;
+  final Widget? leadingAction;
   final VoidCallback? onBack;
   final List<Widget> actions;
 
@@ -70,16 +74,24 @@ class SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
     toolbarHeight: 76,
     leadingWidth: 64,
     title: titleWidget ?? Text(title),
-    leading: Padding(
-      padding: const EdgeInsets.only(left: 16),
-      child: Center(
-        child: SettingsGlassAction(
-          label: '返回',
-          icon: Icons.arrow_back_rounded,
-          onPressed: onBack,
-        ),
-      ),
-    ),
+    automaticallyImplyLeading: false,
+    leading: leadingAction != null
+        ? Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Align(alignment: Alignment.centerLeft, child: leadingAction),
+          )
+        : root
+        ? null
+        : Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Center(
+              child: SettingsGlassAction(
+                label: '返回',
+                icon: Icons.arrow_back_rounded,
+                onPressed: onBack,
+              ),
+            ),
+          ),
     actions: [
       for (final action in actions)
         Padding(padding: const EdgeInsets.only(right: 16), child: action),

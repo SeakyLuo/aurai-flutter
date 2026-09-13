@@ -12,6 +12,12 @@ class ConversationWriter {
   final Map<String, AgentMessage> _savedMessages = {};
   Future<void> _saving = Future.value();
 
+  Future<void> mutate(Future<void> Function() action) {
+    final write = _saving.then((_) => action());
+    _saving = write.catchError((Object _) {});
+    return write;
+  }
+
   void remember(Iterable<AgentMessage> messages) {
     for (final message in messages) {
       _savedMessages[message.id] = message;
@@ -24,6 +30,9 @@ class ConversationWriter {
     Map<String, List<String>> recipients = const {},
   }) {
     final header = conversationRow(conversation);
+    final mentions = jsonEncode(
+      conversation.draftMentions.map((m) => m.toJson()).toList(),
+    );
     final seenRunId = conversation.seenRunId;
     final contextSummary = conversation.contextSummary;
     final encodedSummary = contextSummary == null
@@ -61,6 +70,10 @@ class ConversationWriter {
       await database.transaction((txn) async {
         final batch = txn.batch();
         upsert(batch, 'conversations', header);
+        batch.insert('app_state', {
+          'key': 'draft_mentions:${conversation.id}',
+          'value': mentions,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
         if (seenRunId != null) {
           batch.insert('app_state', {
             'key': 'seen_run:${conversation.id}',

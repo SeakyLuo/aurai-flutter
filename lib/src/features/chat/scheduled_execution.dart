@@ -13,10 +13,13 @@ extension ScheduledExecution on ChatController {
     try {
       task = await scheduledTasks.take(wasBusy);
       if (task == null) return;
-      if (needsConfiguration) throw StateError('请先配置模型');
       conversation = Conversation.empty()
+        ..defaultSenderId =
+            task['aiSenderId'] as String? ?? MessageSender.aurai.id
         ..isScheduledTask = true
         ..storedTitle = task['title'] as String;
+      if (!(await _directReplyContext(conversation)).config.isConfigured)
+        throw StateError('请先配置任务所属 AI 的模型');
       _runningConversation = conversation;
       final instruction =
           '现在执行已安排的任务，不要重复创建计划。原计划：${task['scheduleLabel']}。任务内容：\n${task['prompt']}';
@@ -65,9 +68,11 @@ extension ScheduledExecution on ChatController {
       } finally {
         if (task != null) {
           _runningConversation = null;
+          _drainGroupSystemNotices();
           if (conversation != null) _updateConversationList(conversation);
         }
         _claimingSchedule = false;
+        _drainGroupSystemNotices();
         _conversationChanged();
       }
     }

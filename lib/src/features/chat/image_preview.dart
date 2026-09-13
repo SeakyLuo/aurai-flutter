@@ -1,7 +1,8 @@
+import 'unavailable_image.dart';
 import 'chat_controller.dart';
 import 'image_action_scope.dart';
 import 'image_forward_page.dart';
-import 'chat_page.dart';
+import 'home_navigation.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -41,7 +42,11 @@ Widget imagePreviewFlight(ImageProvider image, Animation<double> animation) =>
         borderRadius: BorderRadius.circular(16 * (1 - animation.value)),
         child: child,
       ),
-      child: Image(image: image, fit: BoxFit.cover),
+      child: Image(
+        image: image,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const UnavailableImage(dark: true),
+      ),
     );
 
 class ImagePreview extends StatefulWidget {
@@ -168,6 +173,14 @@ class _PreviewPageState extends State<_PreviewPage> {
   Future<void> _showActions(LongPressStartDetails details) async {
     if (_exporting) return;
     final image = widget.image;
+    if (image is FileImage && !await image.file.exists()) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('图片文件已丢失，无法保存或转发')));
+      return;
+    }
+    if (!mounted) return;
     final controller = ImageActionScope.of(context);
     ({String conversationId, String messageId})? origin;
     try {
@@ -207,16 +220,11 @@ class _PreviewPageState extends State<_PreviewPage> {
     if (action == 'locate') {
       final source = origin!;
       try {
-        await controller.selectConversation(source.conversationId);
-        if (!mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute<void>(
-            builder: (_) => ChatPage(
-              controller: controller,
-              initialMessageId: source.messageId,
-            ),
-          ),
-          (route) => route.isFirst,
+        await openHomeConversation(
+          context,
+          controller,
+          source.conversationId,
+          messageId: source.messageId,
         );
       } on Object {
         if (mounted)
@@ -251,11 +259,6 @@ class _PreviewPageState extends State<_PreviewPage> {
     try {
       return await loadPreviewImageSize(widget.image, context);
     } on Object {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('图片无法打开，请重试')));
-      }
       return null;
     }
   }
@@ -287,7 +290,7 @@ class _PreviewPageState extends State<_PreviewPage> {
       final size = snapshot.data;
       if (size == null) {
         return snapshot.connectionState == ConnectionState.done
-            ? const SizedBox.shrink()
+            ? const UnavailableImage(dark: true)
             : const Center(
                 child: CircularProgressIndicator(color: Colors.white70),
               );
@@ -320,7 +323,12 @@ class _PreviewPageState extends State<_PreviewPage> {
                       child: GestureDetector(
                         onTap: () => Navigator.pop(context),
                         onLongPressStart: _showActions,
-                        child: Image(image: widget.image, fit: BoxFit.contain),
+                        child: Image(
+                          image: widget.image,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, _, _) =>
+                              const UnavailableImage(dark: true),
+                        ),
                       ),
                     ),
                   ),

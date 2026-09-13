@@ -28,20 +28,32 @@ class ToolApprovalStore {
         ])
       : call.name;
 
-  bool allows(String conversation, ToolCall call) =>
-      persistent.containsKey(key(call)) ||
-      (sessions[conversation]?.containsKey(key(call)) ?? false);
+  String _identityKey(String senderId, ToolCall call) =>
+      senderId == 'agent:aurai' ? key(call) : '$senderId:${key(call)}';
+
+  bool allows(
+    String conversation,
+    ToolCall call, {
+    String senderId = 'agent:aurai',
+  }) =>
+      persistent.containsKey(_identityKey(senderId, call)) ||
+      (sessions[conversation]?.containsKey(_identityKey(senderId, call)) ??
+          false);
 
   Future<void> grant(
     String conversation,
     ToolCall call,
     String label,
-    String scope,
-  ) async {
+    String scope, {
+    String senderId = 'agent:aurai',
+  }) async {
     if (scope == 'session') {
       final updated = {
         ...sessions,
-        conversation: {...?sessions[conversation], key(call): label},
+        conversation: {
+          ...?sessions[conversation],
+          _identityKey(senderId, call): label,
+        },
       };
       if (!await _preferences.setString(
         'session_tool_approvals',
@@ -51,7 +63,7 @@ class ToolApprovalStore {
       }
       sessions[conversation] = updated[conversation]!;
     } else if (scope == 'always') {
-      final updated = {...persistent, key(call): label};
+      final updated = {...persistent, _identityKey(senderId, call): label};
       if (!await _preferences.setString(
         'tool_approvals',
         jsonEncode(updated),

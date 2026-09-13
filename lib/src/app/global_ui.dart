@@ -74,6 +74,34 @@ abstract final class GlobalUI {
       brightness: brightness,
       colorScheme: colors,
       scaffoldBackgroundColor: colors.surface,
+      switchTheme: SwitchThemeData(
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          final color = states.contains(WidgetState.selected)
+              ? (dark ? const Color(0xff34d399) : const Color(0xff009b68))
+              : colors.surfaceContainerHighest;
+          return states.contains(WidgetState.disabled)
+              ? color.withValues(alpha: .38)
+              : color;
+        }),
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          final color = states.contains(WidgetState.selected)
+              ? colors.surface
+              : colors.onSurfaceVariant;
+          return states.contains(WidgetState.disabled)
+              ? color.withValues(alpha: .38)
+              : color;
+        }),
+        trackOutlineColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? Colors.transparent
+              : colors.onSurfaceVariant.withValues(
+                  alpha: states.contains(WidgetState.disabled) ? .38 : 1,
+                ),
+        ),
+        overlayColor: WidgetStatePropertyAll(
+          colors.onSurface.withValues(alpha: .08),
+        ),
+      ),
       textSelectionTheme: TextSelectionThemeData(
         cursorColor: dark ? Colors.white : Colors.black,
         selectionHandleColor: dark ? Colors.white : Colors.black,
