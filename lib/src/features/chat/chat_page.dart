@@ -94,7 +94,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.initialMessageId case final id?) {
         _locateSearchMessage(id);
-      } else {
+      } else if (widget.controller.activeConversation.kind !=
+          ConversationKind.group) {
         _scrollToBottom();
       }
       _loadImages();
