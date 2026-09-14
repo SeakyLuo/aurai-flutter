@@ -73,6 +73,7 @@ class ChatViewportState extends State<ChatViewport> {
   int _scrollRevision = 0;
   bool _userScrolling = false;
   double _height = 1;
+  bool _hasLayout = false;
   String? _replyAnchorId;
   final _entryHeights = <String, double>{};
   bool _contentBelow = false;
@@ -341,6 +342,15 @@ class ChatViewportState extends State<ChatViewport> {
     }
     _following = true;
     _keepSentMessageAtTop = false;
+    final footer = _positions.itemPositions.value
+        .where((item) => item.index == widget.entries.length)
+        .firstOrNull;
+    if (_replyAnchorId == null &&
+        footer != null &&
+        (footer.itemLeadingEdge * _height - (_height - widget.padding.bottom))
+                .abs() <
+            .5)
+      return;
     if (_replyAnchorId != null) setState(() => _replyAnchorId = null);
     _items.jumpTo(
       index: widget.entries.length,
@@ -359,8 +369,9 @@ class ChatViewportState extends State<ChatViewport> {
     bucket: _pageStorage,
     child: LayoutBuilder(
       builder: (context, constraints) {
-        final heightChanged = _height != constraints.maxHeight;
+        final heightChanged = _hasLayout && _height != constraints.maxHeight;
         _height = constraints.maxHeight;
+        _hasLayout = true;
         if (heightChanged && _following) _scheduleBottomSync();
         if (_keepSentMessageAtTop) _scheduleSentSync();
         final anchor = widget.bookmark;

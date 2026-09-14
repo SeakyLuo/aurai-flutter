@@ -412,7 +412,13 @@ extension ConversationRun on ChatController {
         runConversation.runState = ChatRunState.idle;
       }
       outcome = 'completed';
-    } on Object catch (error) {
+    } on Object catch (error, stack) {
+      developer.log(
+        '会话执行失败',
+        name: 'aurai.execution',
+        error: error,
+        stackTrace: stack,
+      );
       if (runConversation.runState == ChatRunState.stopping ||
           error is AgentCancelled) {
         runConversation.runState = ChatRunState.cancelled;
@@ -485,7 +491,8 @@ extension ConversationRun on ChatController {
           StateError() => error.message,
           ModelProviderException() => error.displayMessage,
           PlatformException() => error.message ?? '设备能力调用失败',
-          _ => '任务执行失败',
+          FileSystemException() => '文件读取失败，请检查附件是否存在或重新添加',
+          _ => '任务执行失败，请重试',
         };
       }
       rethrow;
