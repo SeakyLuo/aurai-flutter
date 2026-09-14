@@ -31,12 +31,13 @@ class AgentRuntime {
     required List<AgentMessage> conversation,
     required AgentStepListener onStepsChanged,
     ContextSummary? contextSummary,
-    String Function()? personalContext,
+    FutureOr<String> Function()? personalContext,
     Future<void> Function(ContextSummary)? onContextSummary,
     FutureOr<void> Function()? onTurnStarted,
     Future<void> Function(ModelTurn)? onTurnCompleted,
     Future<void> Function(ToolCall)? onToolStarted,
     Future<void> Function(ToolResult)? onToolCompleted,
+    bool Function(ToolResult)? endsRun,
     void Function(String text)? onTextChanged,
     void Function()? onProcessingStarted,
     void Function(int attempt)? onReconnect,
@@ -70,7 +71,7 @@ class AgentRuntime {
           ModelRequest(
             messages: conversation,
             contextSummary: contextSummary,
-            personalContext: personalContext?.call() ?? '',
+            personalContext: await personalContext?.call() ?? '',
             onContextSummary: onContextSummary,
             onMessageStarted: onMessageStarted,
             onReconnect: onReconnect,
@@ -129,12 +130,8 @@ class AgentRuntime {
             toolResults = const [];
             continue;
           }
-          final answer = modelTurn.text;
-          if (answer == null || answer.trim().isEmpty) {
-            throw const ModelProviderException('模型没有返回可显示的答复');
-          }
           return AgentRunResult(
-            answer: answer.trim(),
+            answer: modelTurn.text?.trim() ?? '',
             steps: List.unmodifiable(steps),
           );
         }
@@ -215,6 +212,9 @@ class AgentRuntime {
           );
           onStepsChanged(List.unmodifiable(steps));
           nextResults.add(result);
+          if (endsRun?.call(result) == true) {
+            return AgentRunResult(answer: '', steps: List.unmodifiable(steps));
+          }
         }
         toolResults = nextResults;
       }

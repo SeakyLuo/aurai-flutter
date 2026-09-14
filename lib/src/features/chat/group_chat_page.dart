@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'conversation_preview_text.dart';
 import 'group_chat_navigation.dart';
 import 'group_avatar.dart';
@@ -57,12 +58,12 @@ class _GroupChatPageState extends State<GroupChatPage> {
         _items.addAll(page.where((item) => !ids.contains(item.id)));
         _hasMore = page.length == ConversationReader.pageSize;
       });
-    } on Object {
+    } on Object catch (error) {
       if (!mounted) return;
       setState(() => _failed = true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('群聊加载失败，请重试'),
+          content: Text('群聊加载失败，请重试：${errorMessage(error)}'),
           action: SnackBarAction(
             label: '重试',
             onPressed: () => _load(reset: reset),

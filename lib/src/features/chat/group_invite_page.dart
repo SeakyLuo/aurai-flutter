@@ -1,6 +1,9 @@
+import '../../domain/error_message.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
+import '../../domain/agent_models.dart';
+import 'random_contact.dart';
 import '../../domain/message_sender.dart';
 import '../../storage/group_chat_store.dart';
 import 'ai_contact_editor.dart';
@@ -27,6 +30,7 @@ class GroupInvitePage extends StatefulWidget {
 class _GroupInvitePageState extends State<GroupInvitePage> {
   final _search = TextEditingController();
   final _profiles = <AiProfile>[];
+  final _created = <AiProfile>[];
   final _selected = <String>{};
   late final _joined = widget.members
       .where((m) => m.sender.kind == MessageSenderKind.agent)
@@ -34,6 +38,7 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
       .toSet();
   Timer? _debounce;
   int _generation = 0;
+  bool _creating = false;
   bool _loading = false, _hasMore = true, _failed = false, _saving = false;
 
   @override
@@ -74,10 +79,10 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
         _profiles.addAll(page);
         _hasMore = page.length == GroupChatStore.pageSize;
       });
-    } on Object {
+    } on Object catch (error) {
       if (mounted && generation == _generation) {
         setState(() => _failed = true);
-        _notice('通讯录加载失败，请重试');
+        _notice('通讯录加载失败，请重试：${errorMessage(error)}');
       }
     } finally {
       if (mounted && generation == _generation)
@@ -86,25 +91,83 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
   }
 
   Future<void> _create() async {
-    await Navigator.push<void>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AiContactEditor(controller: widget.controller),
-      ),
-    );
-    if (!mounted) return;
-    _debounce?.cancel();
-    _search.clear();
-    await _load(reset: true);
+    if (_creating ||
+        _joined.length + _selected.length >= GroupChatStore.maxAiMembers)
+      return;
+    setState(() => _creating = true);
+    try {
+      final color = await RandomContact.savedAvatarColor();
+      if (!mounted) return;
+      final rolled = RandomContact.roll(avatarColor: color);
+      final now = DateTime.now();
+      final config = widget.controller.modelSettings.activeConfig;
+      final ai = AiProfile(
+        sender: MessageSender(
+          id: 'agent:${newMessageId()}',
+          name: rolled.name,
+          kind: MessageSenderKind.agent,
+          avatarIcon: rolled.avatar.icon,
+          avatarColor: rolled.avatar.color,
+        ),
+        description: rolled.description,
+        instructions: '',
+        isTemporary: true,
+        preferences: AiPreferences(
+          customInstructions: rolled.role,
+          responses: rolled.responses,
+        ),
+        modelSelection: AiModelSelection(
+          provider: config.service,
+          model: config.model,
+          baseUrl: config.baseUrl,
+        ),
+        createdAt: now,
+        updatedAt: now,
+      );
+      _debounce?.cancel();
+      _search.clear();
+      setState(() {
+        _created.add(ai);
+        _selected.add(ai.sender.id);
+      });
+      await _load(reset: true);
+    } catch (caughtError) {
+      if (mounted) _notice('添加失败，请检查头像色库是否有配色后重试：${errorMessage(caughtError)}');
+    } finally {
+      if (mounted) setState(() => _creating = false);
+    }
   }
 
+  Future<void> _edit(AiProfile ai) => Navigator.push<String>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => AiContactEditor(
+        controller: widget.controller,
+        profile: ai,
+        onSaveDraft: (updated) async {
+          setState(() {
+            final index = _created.indexWhere(
+              (member) => member.sender.id == updated.sender.id,
+            );
+            _created[index] = updated.copyWith(isTemporary: true);
+          });
+        },
+      ),
+    ),
+  );
+
   Future<void> _invite() async {
-    if (_saving || _selected.isEmpty) return;
+    if (_saving || _creating || _selected.isEmpty) return;
     setState(() => _saving = true);
     try {
       await widget.controller.groupStore.inviteMembers(
         widget.conversationId,
-        _selected.toList(),
+        _selected
+            .where((id) => !_created.any((ai) => ai.sender.id == id))
+            .toList(),
+        newMembers: _created
+            .where((ai) => _selected.contains(ai.sender.id))
+            .toList(),
       );
       if (mounted) {
         _notice('已邀请加入群聊');
@@ -112,7 +175,11 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
       }
     } on Object catch (error) {
       if (mounted)
-        _notice(error is StateError ? error.message.toString() : '邀请失败，请重试');
+        _notice(
+          error is StateError
+              ? error.message.toString()
+              : '邀请失败，请重试：${errorMessage(error)}',
+        );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -120,11 +187,11 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
 
   @override
   Widget build(BuildContext context) => PopScope(
-    canPop: !_saving,
+    canPop: !_saving && !_creating,
     child: Scaffold(
       appBar: SettingsAppBar(
         title: '邀请朋友',
-        onBack: _saving ? null : () => Navigator.pop(context),
+        onBack: _saving || _creating ? null : () => Navigator.pop(context),
         actions: [
           SettingsGlassAction(
             label: '邀请',
@@ -135,14 +202,16 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const SettingsIcon(type: SettingsIconType.check),
-            onPressed: _saving || _selected.isEmpty ? null : _invite,
+            onPressed: _saving || _creating || _selected.isEmpty
+                ? null
+                : _invite,
           ),
         ],
       ),
       body: SafeArea(
         top: false,
         child: AbsorbPointer(
-          absorbing: _saving,
+          absorbing: _saving || _creating,
           child: Column(
             children: [
               Padding(
@@ -175,12 +244,29 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
                       child: Text(
                         '已选择 ${_selected.length} 位',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 15,
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
-                    TextButton(onPressed: _create, child: const Text('创建 AI')),
+                    IconButton(
+                      tooltip: '随机添加成员',
+                      onPressed:
+                          !_creating &&
+                              _joined.length + _selected.length <
+                                  GroupChatStore.maxAiMembers
+                          ? _create
+                          : null,
+                      icon: SettingsIcon(
+                        type: SettingsIconType.add,
+                        color:
+                            !_creating &&
+                                _joined.length + _selected.length <
+                                    GroupChatStore.maxAiMembers
+                            ? Theme.of(context).colorScheme.onSurfaceVariant
+                            : Theme.of(context).disabledColor,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -191,7 +277,14 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                     children: [
-                      for (final ai in _profiles)
+                      for (final ai in [
+                        ..._created.where(
+                          (ai) => ai.sender.name.toLowerCase().contains(
+                            _search.text.trim().toLowerCase(),
+                          ),
+                        ),
+                        ..._profiles,
+                      ])
                         _joined.contains(ai.sender.id)
                             ? Row(
                                 children: [
@@ -216,6 +309,13 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
                             : GroupMemberChoice(
                                 selected: _selected.contains(ai.sender.id),
                                 sender: ai.sender,
+                                onEdit:
+                                    _created.any(
+                                      (member) =>
+                                          member.sender.id == ai.sender.id,
+                                    )
+                                    ? () => _edit(ai)
+                                    : null,
                                 onTap: () {
                                   if (!_selected.contains(ai.sender.id) &&
                                       _joined.length + _selected.length >=
@@ -239,12 +339,15 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
                           onPressed: () => _load(reset: _profiles.isEmpty),
                           child: const Text('重试'),
                         ),
-                      if (!_loading && !_failed && _profiles.isEmpty)
+                      if (!_loading &&
+                          !_failed &&
+                          _profiles.isEmpty &&
+                          _created.isEmpty)
                         Padding(
                           padding: const EdgeInsets.all(32),
                           child: Text(
                             _search.text.trim().isEmpty
-                                ? '通讯录暂无 AI，可先创建 AI 再邀请'
+                                ? '暂无成员，点击右上方＋添加'
                                 : '没有找到匹配的 AI',
                             textAlign: TextAlign.center,
                           ),

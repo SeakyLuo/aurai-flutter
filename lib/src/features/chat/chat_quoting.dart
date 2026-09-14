@@ -4,8 +4,8 @@ extension _ChatQuoting on _ChatPageState {
   Future<void> _recallMessage(AgentMessage message) async {
     try {
       await widget.controller.recallMessage(message);
-    } on Object {
-      if (mounted) _imageNotice('撤回失败，请重试');
+    } on Object catch (caughtError) {
+      if (mounted) _imageNotice('撤回失败，请重试：${errorMessage(caughtError)}');
     }
   }
 
@@ -17,8 +17,8 @@ extension _ChatQuoting on _ChatPageState {
           message != null &&
           identical(conversation, widget.controller.activeConversation))
         _focusNode.requestFocus();
-    } on Object {
-      if (mounted) _imageNotice('引用保存失败，请重试');
+    } on Object catch (caughtError) {
+      if (mounted) _imageNotice('引用保存失败，请重试：${errorMessage(caughtError)}');
     }
   }
 
@@ -31,8 +31,8 @@ extension _ChatQuoting on _ChatPageState {
         return;
       _focusNode.unfocus();
       _positionSearchResult(id);
-    } on Object {
-      if (mounted) _imageNotice('原消息已不存在');
+    } on Object catch (caughtError) {
+      if (mounted) _imageNotice('原消息已不存在：${errorMessage(caughtError)}');
     }
   }
 }

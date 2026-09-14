@@ -1,3 +1,6 @@
+import '../html_games/html_game_store.dart';
+import '../html_games/html_game.dart';
+import '../domain/interactive_message.dart';
 import '../domain/draft_mention.dart';
 import 'conversation_visibility.dart';
 import 'dart:convert';
@@ -36,7 +39,7 @@ class ConversationReader {
     final rows = await database.query(
       'conversations',
       where:
-          '$visibleConversation AND archived = ?${kind == null ? '' : ' AND kind = ?'}${after == null ? '' : ' AND (pinned < ? OR (pinned = ? AND (updated_at < ? OR (updated_at = ? AND id < ?))))'}',
+          '$visibleConversation AND $localUserConversation AND archived = ?${kind == null ? '' : ' AND kind = ?'}${after == null ? '' : ' AND (pinned < ? OR (pinned = ? AND (updated_at < ? OR (updated_at = ? AND id < ?))))'}',
       whereArgs: [
         archived ? 1 : 0,
         if (kind != null) kind.name,
@@ -64,7 +67,7 @@ class ConversationReader {
         _loadSeenRuns(values),
         _loadDraftQuotes(values),
         _loadListCreationMembers(values),
-        loadGroupListPreviews(database, values),
+        loadConversationListPreviews(database, values),
       ]);
       final drafts = results[0] as List<Map<String, Object?>>;
       final byId = {for (final value in values) value.id: value};
@@ -312,6 +315,19 @@ class ConversationReader {
                 .cast<String, Object?>(),
           ),
     };
+    final gameIds = rows
+        .where((r) => r['kind'] == 'html_game')
+        .map((r) => r['id'])
+        .toList();
+    final previews = gameIds.isEmpty || forModel
+        ? <Map<String, Object?>>[]
+        : await database.rawQuery(
+            'SELECT message_id, title, preview, display_mode, display_width, display_height, version, status, ${HtmlGameStore.retryColumn} FROM html_games WHERE message_id IN (${_slots(gameIds.length)})',
+            gameIds,
+          );
+    final gameCards = {
+      for (final row in previews) row['message_id']: HtmlGameCard.fromRow(row),
+    };
     final senderIds = rows
         .map((row) => row['sender_id'] as String)
         .followedBy(quotes.values.map((q) => q.senderId))
@@ -370,10 +386,22 @@ class ConversationReader {
             id: row['id']! as String,
             isSystem: row['kind'] == 'system',
             isFailure: row['kind'] == 'message_failure',
+            htmlGame: row['kind'] == 'html_game'
+                ? (forModel
+                      ? HtmlGameCard(title: row['text'] as String)
+                      : gameCards[row['id']])
+                : null,
             isGroupMessage:
                 row['kind'] == 'group_message' ||
+                row['kind'] == 'html_game' ||
                 row['kind'] == 'message_failure',
             quote: quotes[row['id']],
+            interactive: row['interactive_json'] == null
+                ? null
+                : InteractiveMessage.fromJson(
+                    jsonDecode(row['interactive_json'] as String)
+                        as Map<String, dynamic>,
+                  ),
             role: AgentMessageRole.values.byName(row['role']! as String),
             senderId: row['sender_id'] as String,
             sender: senders[row['sender_id']]!,
@@ -430,7 +458,11 @@ class ConversationReader {
             for (final event
                 in events[run['id']] ?? const <Map<String, Object?>>[])
               if (event['message_id'] != null &&
-                  messages[event['message_id']]!['kind'] != 'group_message' &&
+                  !const {
+                    'group_message',
+                    'html_game',
+                  }.contains(messages[event['message_id']]!['kind']) &&
+                  messages[event['message_id']]!['interactive_json'] == null &&
                   event['message_id'] != run['final_message_id'])
                 event['message_id']! as String,
           ],
@@ -441,8 +473,10 @@ class ConversationReader {
                       messages[event['message_id']]!['kind'] !=
                           'group_message') &&
                   (event['tool_call_id'] == null ||
-                      tools[event['tool_call_id']]!['name'] !=
-                          'sendGroupMessages') &&
+                      !const {
+                        'sendGroupMessages',
+                        'sendGroupMessage',
+                      }.contains(tools[event['tool_call_id']]!['name'])) &&
                   (event['message_id'] != run['final_message_id'] ||
                       (run['status'] == 'cancelled' &&
                           event['kind'] == 'message' &&
@@ -524,7 +558,7 @@ class ConversationReader {
     if (query.isEmpty) {
       final rows = await database.query(
         'conversations',
-        where: visibleConversation,
+        where: '$visibleConversation AND $localUserConversation',
         orderBy: 'pinned DESC, updated_at DESC, id DESC',
         limit: pageSize,
         offset: offset,
@@ -541,13 +575,13 @@ class ConversationReader {
     }
     final hits = await database.rawQuery(
       '''SELECT id AS message_id, conversation_id, text, sender_id, created_at, id AS sort_id
-         FROM messages WHERE kind != 'system' AND instr(lower(text), ?) > 0
+         FROM messages WHERE kind != 'system' AND conversation_id IN (SELECT id FROM conversations WHERE $localUserConversation) AND instr(lower(text), ?) > 0
          UNION ALL
          SELECT NULL AS message_id, id AS conversation_id,
            CASE WHEN instr(lower(draft), ?) > 0 THEN draft ELSE '' END AS text,
            NULL AS sender_id, created_at, id AS sort_id
          FROM conversations
-         WHERE $visibleConversation AND (instr(lower(title), ?) > 0 OR instr(lower(draft), ?) > 0)
+         WHERE $visibleConversation AND $localUserConversation AND (instr(lower(title), ?) > 0 OR instr(lower(draft), ?) > 0)
            AND id NOT IN (
              SELECT conversation_id FROM messages WHERE kind != 'system' AND instr(lower(text), ?) > 0
            )

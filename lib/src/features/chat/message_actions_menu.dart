@@ -1,3 +1,5 @@
+import '../../html_games/html_game_icon.dart';
+import 'attachment_action_icon.dart';
 import 'message_quote_view.dart';
 import 'settings_icon.dart';
 import 'dart:math' as math;
@@ -12,7 +14,7 @@ import 'conversation_menu_icon.dart';
 import 'text_selection_icon.dart';
 import 'settings_appearance.dart';
 
-enum MessageAction { copy, select, edit, quote, recall }
+enum MessageAction { copy, select, edit, quote, recall, forward, fullscreen }
 
 Future<MessageAction?> showMessageActionsMenu(
   BuildContext context, {
@@ -21,8 +23,10 @@ Future<MessageAction?> showMessageActionsMenu(
   bool allowEditing = true,
   bool allowQuote = false,
   bool allowRecall = false,
+  bool allowForward = false,
 }) => showGeneralDialog<MessageAction>(
   context: context,
+  requestFocus: false,
   barrierDismissible: true,
   barrierLabel: '关闭消息菜单',
   barrierColor: Colors.transparent,
@@ -39,13 +43,31 @@ Future<MessageAction?> showMessageActionsMenu(
         math.max(media.padding.bottom, media.viewInsets.bottom) -
         16;
     final actions = [
+      if (message.htmlGame != null && message.htmlGame!.displayMode != 'inline')
+        (
+          MessageAction.fullscreen,
+          const HtmlGameIcon(HtmlGameIconType.expand),
+          '全屏运行',
+        ),
       if (allowRecall)
         (
           MessageAction.recall,
-          const SettingsIcon(type: SettingsIconType.back),
+          SettingsIcon(
+            type: SettingsIconType.back,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           '撤回',
         ),
       if (allowQuote) (MessageAction.quote, const QuoteIcon(), '引用'),
+      if (allowForward)
+        (
+          MessageAction.forward,
+          AttachmentActionIcon(
+            type: AttachmentActionIconType.forward,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          '转发',
+        ),
       if (message.text.isNotEmpty) ...[
         (MessageAction.copy, const CopyIcon(), '复制'),
         (MessageAction.select, const TextSelectionIcon(), '选择文本'),

@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import 'chat_controller.dart';
 import 'settings_appearance.dart';
@@ -22,10 +23,12 @@ class _ScreenAccessTileState extends State<ScreenAccessTile> {
   Future<bool?> _load() async {
     try {
       return await widget.controller.getScreenAccess(widget.senderId);
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('无法读取屏幕操作授权，请重新启动 App 后再试')),
+          SnackBar(
+            content: Text('无法读取屏幕操作授权，请重新启动 App 后再试：${errorMessage(error)}'),
+          ),
         );
       }
       return null;
@@ -40,11 +43,11 @@ class _ScreenAccessTileState extends State<ScreenAccessTile> {
     try {
       await widget.controller.setScreenAccess(widget.senderId, value);
       if (mounted) setState(() => _allowed = value);
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('无法保存屏幕操作授权，请重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法保存屏幕操作授权，请重试：${errorMessage(error)}')),
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);

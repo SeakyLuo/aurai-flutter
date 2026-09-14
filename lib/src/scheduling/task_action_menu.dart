@@ -1,3 +1,4 @@
+import '../domain/error_message.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -231,7 +232,9 @@ Future<bool> manageTask(
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            e is PlatformException ? e.message ?? '操作失败' : '操作失败，请重试',
+            e is PlatformException
+                ? e.message ?? '操作失败：${errorMessage(e)}'
+                : '操作失败，请重试：${errorMessage(e)}',
           ),
         ),
       );
@@ -257,10 +260,10 @@ Future<void> openTaskConversation(
           ),
         ),
       );
-  } on Object {
+  } on Object catch (error) {
     if (context.mounted)
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('无法打开对应会话，可能已被删除')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('无法打开对应会话，可能已被删除：${errorMessage(error)}')),
+      );
   }
 }

@@ -3,8 +3,7 @@ part of 'chat_page.dart';
 extension _ChatProgress on _ChatPageState {
   Widget _buildProgress(ChatController controller) =>
       controller.groupRuns.isNotEmpty ||
-          (controller.activeConversation.kind == ConversationKind.group &&
-              controller.isBusy)
+          controller.activeConversation.kind == ConversationKind.group
       ? const SizedBox.shrink()
       : ExecutionProgress(
           hideThinking:

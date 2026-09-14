@@ -200,6 +200,7 @@ class AgentRunStore {
     int elapsedMs, {
     String? finalMessageId,
     String? error,
+    String? diagnostic,
     bool isTask = false,
   }) async {
     await database.transaction((txn) async {
@@ -211,7 +212,7 @@ class AgentRunStore {
           'elapsed_ms': elapsedMs,
           'finished_at': DateTime.now().microsecondsSinceEpoch,
           'final_message_id': finalMessageId,
-          'error_detail': error,
+          'error_detail': diagnostic ?? error,
           'is_task': isTask ? 1 : 0,
         },
         where: 'id = ?',
@@ -231,13 +232,14 @@ class AgentRunStore {
         batch.update(
           'messages',
           {'kind': 'commentary'},
-          where: "run_id = ? AND id != ? AND kind != 'group_message'",
+          where:
+              "run_id = ? AND id != ? AND kind NOT IN ('group_message', 'html_game') AND interactive_json IS NULL",
           whereArgs: [runId, finalMessageId],
         );
         batch.update(
           'messages',
           {'kind': 'final'},
-          where: "id = ? AND kind != 'group_message'",
+          where: "id = ? AND kind NOT IN ('group_message', 'html_game')",
           whereArgs: [finalMessageId],
         );
       }

@@ -16,6 +16,56 @@ extension GlobalTools on ChatController {
   }) {
     final conversationId = conversation.id;
     return <AgentTool>[
+      ExecutionLogTool(),
+      for (final name in FriendTool.names)
+        FriendTool(
+          ContactRelationships(_store.database),
+          senderId,
+          name,
+          _conversationChanged,
+        ),
+      HtmlMessageTool((args) async {
+        await _store.writer.flush();
+        if (conversation.kind == ConversationKind.group) {
+          _checkGroupStopped(conversation);
+          if (_removedGroupMembers.contains(senderId))
+            throw const AgentCancelled();
+        }
+        final profile = await groupStore.loadAi(senderId);
+        final message = await htmlGames.create(
+          conversationId: conversation.id,
+          creator: profile.sender,
+          standalone: true,
+          groupMessage: conversation.kind == ConversationKind.group,
+          args: {
+            ...args,
+            'state': <String, Object?>{},
+            'participants': [senderId, MessageSender.localUser.id],
+            'turnSenderId': null,
+          },
+        );
+        _publishInteractiveChange(
+          conversation.id,
+          message,
+          source: conversation,
+        );
+        HtmlGameSignals.changes.add(message.id);
+        return {'sent': true, 'messageId': message.id};
+      }),
+      if (HtmlGameFeature.enabled &&
+          conversation.kind == ConversationKind.group)
+        for (final name in HtmlGameTool.names)
+          HtmlGameTool(
+            name,
+            (operation, args) =>
+                _htmlGameTool(operation, args, conversation, senderId),
+          ),
+      for (final name in InteractiveMessageTool.names)
+        InteractiveMessageTool(
+          name,
+          (operation, args) =>
+              _interactiveMessage(operation, args, conversation, senderId),
+        ),
       for (final name in AppControlTool.descriptions.keys)
         AppControlTool(
           name,
@@ -50,14 +100,27 @@ extension GlobalTools on ChatController {
           _conversationChanged,
         ),
       for (final operation in AiContactTool.operations)
-        AiContactTool(groupStore, operation, saveAi, () {
-          final current = modelSettings.activeConfig;
-          return AiModelSelection(
-            provider: current.service,
-            model: current.model,
-            baseUrl: current.baseUrl,
-          );
-        }),
+        AiContactTool(
+          groupStore,
+          operation,
+          (ai, {bool create = false}) async {
+            if (create) {
+              await groupStore.createAi(ai, ownerId: senderId);
+              _conversationChanged();
+            } else {
+              await saveAi(ai, addToMyContacts: false);
+            }
+          },
+          () {
+            final current = modelSettings.activeConfig;
+            return AiModelSelection(
+              provider: current.service,
+              model: current.model,
+              baseUrl: current.baseUrl,
+            );
+          },
+          ownerId: senderId,
+        ),
       AttachmentTool(history.expand((message) => message.files)),
       for (final operation in SkillTool.operations)
         SkillTool(skills, operation),
@@ -82,6 +145,19 @@ extension GlobalTools on ChatController {
       GetModelBalanceTool(modelSettings),
       OpenModelTopUpTool(modelSettings),
       questionTool,
+      for (final name in HistoryMessageTool.names)
+        HistoryMessageTool(
+          _store.database,
+          _store.reader.imageDirectory,
+          senderId: senderId,
+          name: name,
+          inGroup: groupId != null,
+        ),
+      ReadGroupMessagesTool(
+        groupStore,
+        senderId: senderId,
+        currentGroupId: groupId,
+      ),
       for (final name in ['searchConversations', 'searchMessages'])
         LocalHistoryTool(
           _store.database.path,

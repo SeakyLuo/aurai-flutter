@@ -1,3 +1,4 @@
+import '../domain/error_message.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -33,11 +34,11 @@ class WebHttp {
       return await _get(client, url).timeout(const Duration(seconds: 20));
     } on TimeoutException {
       throw const WebRequestException('网页请求超时，请稍后重试');
-    } on HandshakeException {
-      throw const WebRequestException('网站安全连接失败');
-    } on SocketException {
-      if (_cancelled) throw const WebRequestException('请求已取消');
-      throw const WebRequestException('无法连接网站，请检查网络');
+    } on HandshakeException catch (error) {
+      throw WebRequestException('网站安全连接失败：${errorMessage(error)}');
+    } on SocketException catch (error) {
+      if (_cancelled) throw WebRequestException('请求已取消');
+      throw WebRequestException('无法连接网站，请检查网络：${errorMessage(error)}');
     } on HttpException {
       if (_cancelled) throw const WebRequestException('请求已取消');
       throw const WebRequestException('网页连接中断');

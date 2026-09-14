@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'conversation_preview_text.dart';
 import 'package:flutter/material.dart';
 
@@ -45,12 +46,12 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
         _items.addAll(page);
         _hasMore = page.length == ConversationReader.pageSize;
       });
-    } on Object {
+    } on Object catch (error) {
       if (!mounted) return;
       setState(() => _failed = true);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('无法加载归档会话，请重试')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('无法加载归档会话，请重试：${errorMessage(error)}')),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }

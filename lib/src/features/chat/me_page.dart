@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import '../../scheduling/tasks_page.dart';
 import 'archived_conversations_page.dart';
@@ -25,11 +26,11 @@ class MePage extends StatelessWidget {
       );
       if (context.mounted && id != null)
         await openHomeConversation(context, controller, id);
-    } on Object {
+    } on Object catch (error) {
       if (context.mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('无法打开会话，请重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
+        );
     }
   }
 
@@ -116,7 +117,9 @@ class MePage extends StatelessWidget {
                   '已归档会话',
                   ConversationMenuIcon(
                     type: ConversationMenuIconType.archive,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : const Color(0xff222222),
                   ),
                   () => _archive(context),
                 ),

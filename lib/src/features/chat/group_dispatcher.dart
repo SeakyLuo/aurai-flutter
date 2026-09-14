@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import '../../domain/agent_models.dart';
 
@@ -23,7 +22,6 @@ class GroupDispatcher {
   final Future<void> Function(String senderId, Object error) failed;
   final Set<String> paused;
   final _members = <String, _Mailbox>{};
-  final _random = Random();
   final _done = Completer<void>();
   bool stopped = false;
   int _activeCount = 0;
@@ -41,8 +39,13 @@ class GroupDispatcher {
     history.addAll(messages);
     final authors = messages.map((m) => m.senderId).toSet();
     for (final entry in _members.entries) {
-      if (entry.value.failed || authors.contains(entry.key)) continue;
+      if (authors.contains(entry.key)) continue;
       if (paused.contains(entry.key) && !mentions.contains(entry.key)) continue;
+      if (mentions.contains(entry.key)) {
+        entry.value.timer?.cancel();
+        entry.value.timer = null;
+        entry.value.sleepUntil = null;
+      }
       _markPending(entry.value);
       _schedule(entry.key, entry.value);
     }
@@ -65,7 +68,9 @@ class GroupDispatcher {
     if (mailbox != null) {
       mailbox.timer = null;
       mailbox.pending = false;
+      mailbox.sleepUntil = null;
     }
+    _finishIfIdle();
   }
 
   void remove(String id) {
@@ -86,25 +91,46 @@ class GroupDispatcher {
     _finishIfIdle();
   }
 
-  void _markPending(_Mailbox mailbox) {
-    if (!mailbox.pending) {
-      mailbox.readyAt = DateTime.now().add(
-        Duration(milliseconds: _random.nextInt(15001)),
-      );
+  DateTime? sleepUntil(String id, DateTime? until) {
+    if (stopped || closed || !_members.containsKey(id)) {
+      throw StateError('群聊已停止');
     }
+    if (paused.contains(id)) throw StateError('已暂停自动接话，不能安排唤醒');
+    final mailbox = _members[id]!;
+    mailbox.sleepUntil = until;
+    return until;
+  }
+
+  void restoreSleeps(Map<String, DateTime> sleeps) {
+    for (final entry in sleeps.entries) {
+      final mailbox = _members[entry.key];
+      if (mailbox != null && !paused.contains(entry.key)) {
+        mailbox.sleepUntil = entry.value;
+      }
+    }
+  }
+
+  bool wokeFromSleep(String id) => _members[id]!.wokeFromSleep;
+
+  void _markPending(_Mailbox mailbox) {
     mailbox.pending = true;
   }
 
   void _schedule(String id, _Mailbox mailbox) {
     if (stopped || mailbox.active || mailbox.timer != null) return;
-    mailbox.timer = Timer(mailbox.readyAt.difference(DateTime.now()), () {
-      mailbox.timer = null;
-      mailbox.active = true;
-      _activeCount++;
-      mailbox.pending = false;
-      final snapshot = List<AgentMessage>.unmodifiable(history);
-      unawaited(_run(id, mailbox, snapshot));
-    });
+    mailbox.timer = Timer(
+      mailbox.sleepUntil?.difference(DateTime.now()) ?? Duration.zero,
+      () {
+        mailbox.wokeFromSleep = mailbox.sleepUntil != null;
+        mailbox.sleepUntil = null;
+        mailbox.timer = null;
+        mailbox.active = true;
+        _activeCount++;
+        mailbox.pending = false;
+        final snapshot = List<AgentMessage>.unmodifiable(history);
+        unawaited(_run(id, mailbox, snapshot));
+      },
+    );
   }
 
   Future<void> _run(
@@ -115,13 +141,14 @@ class GroupDispatcher {
     try {
       await respond(id, snapshot);
     } on Object catch (error) {
-      mailbox.pending = false;
-      mailbox.failed = !stopped && !paused.contains(id);
+      mailbox.sleepUntil = null;
       await failed(id, error);
     } finally {
       mailbox.active = false;
       _activeCount--;
-      if (!stopped && identical(_members[id], mailbox) && mailbox.pending) {
+      if (!stopped &&
+          identical(_members[id], mailbox) &&
+          (mailbox.pending || mailbox.sleepUntil != null)) {
         _schedule(id, mailbox);
       }
       _finishIfIdle();
@@ -145,8 +172,8 @@ class GroupDispatcher {
 
 class _Mailbox {
   Timer? timer;
-  DateTime readyAt = DateTime.now();
+  DateTime? sleepUntil;
+  bool wokeFromSleep = false;
   bool active = false;
-  bool failed = false;
   bool pending = false;
 }

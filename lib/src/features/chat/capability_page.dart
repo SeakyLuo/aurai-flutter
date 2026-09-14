@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/capability.dart';
@@ -18,11 +19,11 @@ class CapabilityPage extends StatefulWidget {
   ) async {
     try {
       await controller.refreshCapabilities();
-    } on Object {
+    } on Object catch (error) {
       if (context.mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('无法读取设备能力，请稍后再试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法读取设备能力，请稍后再试：${errorMessage(error)}')),
+        );
       return;
     }
     if (!context.mounted) {

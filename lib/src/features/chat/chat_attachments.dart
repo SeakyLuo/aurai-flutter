@@ -24,8 +24,8 @@ extension _ChatAttachments on _ChatPageState {
         if (mounted)
           _imageNotice(
             error is PlatformException
-                ? error.message ?? '附件添加失败'
-                : '附件添加失败，请重试',
+                ? error.message ?? '附件添加失败：${errorMessage(error)}'
+                : '附件添加失败，请重试：${errorMessage(error)}',
           );
       }
     } else {
@@ -62,7 +62,7 @@ extension _ChatAttachments on _ChatPageState {
             : switch (error) {
                 ImageInputException() => error.message,
                 PlatformException(code: 'no_available_camera') => '当前设备没有可用的相机',
-                _ => '图片添加失败，请重新选择',
+                _ => '图片添加失败，请重新选择：${errorMessage(error)}',
               },
         action: permissionDenied
             ? SnackBarAction(
@@ -70,8 +70,11 @@ extension _ChatAttachments on _ChatPageState {
                 onPressed: () async {
                   try {
                     await widget.controller.openAppSettings();
-                  } on Object {
-                    if (mounted) _imageNotice('无法打开设置，请在系统设置中找到 Aurai');
+                  } on Object catch (settingsError) {
+                    if (mounted)
+                      _imageNotice(
+                        '无法打开设置，请在系统设置中找到 Aurai：${errorMessage(settingsError)}',
+                      );
                   }
                 },
               )
@@ -83,8 +86,8 @@ extension _ChatAttachments on _ChatPageState {
   Future<void> _removeImage(MessageImage image) async {
     try {
       await widget.controller.removeDraftImage(image);
-    } on Object {
-      if (mounted) _imageNotice('图片移除后保存失败，请重试');
+    } on Object catch (caughtError) {
+      if (mounted) _imageNotice('图片移除后保存失败，请重试：${errorMessage(caughtError)}');
     }
   }
 

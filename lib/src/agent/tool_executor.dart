@@ -26,6 +26,19 @@ class ToolExecutor {
     void Function(ToolResult)? onWaitingForUser,
   }) async {
     _cancelRequested = false;
+    if (call.userAction != null &&
+        (call.userAction!.trim().isEmpty ||
+            call.userAction!.trim() == 'null')) {
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: ToolResultStatus.error,
+        output: const {
+          'error':
+              'userAction 必须是具体的用户操作说明；不需要用户接手时请传 JSON null，不要传字符串 "null"。此次工具尚未执行，请修正参数。',
+        },
+      );
+    }
     final tool = _registry.find(call.name);
     if (tool == null || !_registry.isExposed(call.name)) {
       return ToolResult(

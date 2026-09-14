@@ -11,15 +11,15 @@ class GetModelBalanceTool implements AgentTool, RuntimeCapabilityAgentTool {
   ToolDefinition get definition => const ToolDefinition(
     name: 'getModelBalance',
     description:
-        'Query the real remaining account balance using the saved provider credentials. Currently supports official DeepSeek accounts only; other providers and custom gateways return an explicit error. No API key is exposed to the model. Return currency, available total, remaining top-up funds, remaining grants, and observation time. Total already includes grants: do not add them again. Preserve currencies, never infer initial recharge, spending or future call counts from this snapshot. This is account-wide balance, not Aurai-only usage. Query fresh when asked.',
+        'Query the real remaining account balance using the saved provider credentials. Currently supports official DeepSeek and Kimi accounts; other providers and custom gateways return an explicit error. No API key is exposed to the model. Return currency, available total, remaining top-up funds, remaining grants, and observation time. Total already includes grants: do not add them again. Preserve currencies, never infer initial recharge, spending or future call counts from this snapshot. This is account-wide balance, not Aurai-only usage. Query fresh when asked.',
     inputSchema: {
       'type': 'object',
       'properties': {
         'provider': {
           'type': 'string',
-          'enum': ['current', 'deepSeek', 'openAi'],
+          'enum': ['current', 'deepSeek', 'kimi', 'qwen', 'glm', 'openAi'],
           'description':
-              'current uses the active provider; select deepSeek to query its saved account even when another model is active.',
+              'current uses the active provider; select a provider to query its saved account even when another model is active.',
         },
       },
       'required': ['provider'],
@@ -36,6 +36,9 @@ class GetModelBalanceTool implements AgentTool, RuntimeCapabilityAgentTool {
       'current' => settings.activeService,
       'deepSeek' => ModelService.deepSeek,
       'openAi' => ModelService.openAi,
+      'kimi' => ModelService.kimi,
+      'qwen' => ModelService.qwen,
+      'glm' => ModelService.glm,
       _ => throw const FormatException('Unknown model provider'),
     };
     try {

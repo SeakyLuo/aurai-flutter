@@ -1,3 +1,6 @@
+import '../../domain/error_message.dart';
+import '../../domain/agent_models.dart';
+import 'message_forward_preview.dart';
 import 'unavailable_image.dart';
 import '../../platform/message_image_store.dart';
 import 'package:flutter/material.dart';
@@ -11,12 +14,22 @@ class ImageForwardDialog extends StatefulWidget {
   const ImageForwardDialog({
     super.key,
     required this.controller,
-    required this.image,
+    required ImageProvider image,
     required this.targetId,
     required this.title,
-  });
+  }) : image = image,
+       message = null;
+  const ImageForwardDialog.message({
+    super.key,
+    required this.controller,
+    required AgentMessage message,
+    required this.targetId,
+    required this.title,
+  }) : message = message,
+       image = null;
   final ChatController controller;
-  final ImageProvider image;
+  final ImageProvider? image;
+  final AgentMessage? message;
   final String? targetId;
   final String title;
   @override
@@ -37,12 +50,20 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
     if (_sending) return;
     setState(() => _sending = true);
     try {
-      final bytes = await PreviewImageActions.readBytes(widget.image);
-      await widget.controller.forwardImage(
-        widget.targetId,
-        bytes,
-        _text.text.trim(),
-      );
+      if (widget.message case final message?) {
+        await widget.controller.forwardMessage(
+          widget.targetId,
+          message,
+          _text.text.trim(),
+        );
+      } else {
+        final bytes = await PreviewImageActions.readBytes(widget.image!);
+        await widget.controller.forwardImage(
+          widget.targetId,
+          bytes,
+          _text.text.trim(),
+        );
+      }
       if (mounted) Navigator.pop(context, true);
     } on Object catch (error) {
       if (mounted) {
@@ -54,7 +75,7 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
                   ? error.message.toString()
                   : error is ImageInputException
                   ? error.message
-                  : '转发失败，请重试',
+                  : '转发失败，请重试：${errorMessage(error)}',
             ),
           ),
         );
@@ -98,22 +119,25 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
                       style: const TextStyle(fontSize: 15),
                     ),
                     const SizedBox(height: 16),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image(
-                          image: widget.image,
-                          width: 96,
-                          height: 96,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const SizedBox.square(
-                            dimension: 96,
-                            child: UnavailableImage(),
+                    if (widget.message case final message?)
+                      MessageForwardPreview(message: message)
+                    else
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image(
+                            image: widget.image!,
+                            width: 96,
+                            height: 96,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const SizedBox.square(
+                              dimension: 96,
+                              child: UnavailableImage(),
+                            ),
                           ),
                         ),
                       ),
-                    ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _text,

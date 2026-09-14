@@ -9,22 +9,39 @@ class ConversationListStatus extends StatelessWidget {
     super.key,
     required this.controller,
     required this.conversation,
+    this.showUnread = true,
   });
 
   final ChatController controller;
   final Conversation conversation;
+  final bool showUnread;
+
+  static bool hasStatus(
+    ChatController controller,
+    Conversation conversation, {
+    bool showUnread = true,
+  }) =>
+      (conversation.kind != ConversationKind.group &&
+          conversation.runState == ChatRunState.failed) ||
+      (showUnread && ConversationStatusDot.hasUnreadCompletion(conversation)) ||
+      _isScheduled(controller, conversation);
+
+  static bool _isScheduled(
+    ChatController controller,
+    Conversation conversation,
+  ) =>
+      conversation.isScheduledTask ||
+      controller.scheduledTasks.tasks.any(
+        (task) =>
+            task['sourceConversationId'] == conversation.id ||
+            task['conversationId'] == conversation.id,
+      );
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: controller.scheduledTasks,
     builder: (context, _) {
-      final scheduled =
-          conversation.isScheduledTask ||
-          controller.scheduledTasks.tasks.any(
-            (task) =>
-                task['sourceConversationId'] == conversation.id ||
-                task['conversationId'] == conversation.id,
-          );
+      final scheduled = _isScheduled(controller, conversation);
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -42,7 +59,9 @@ class ConversationListStatus extends StatelessWidget {
                 ),
               ),
             ),
-          ConversationStatusDot(conversation: conversation),
+          if (showUnread ||
+              !ConversationStatusDot.hasUnreadCompletion(conversation))
+            ConversationStatusDot(conversation: conversation),
         ],
       );
     },

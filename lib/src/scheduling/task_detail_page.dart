@@ -1,3 +1,4 @@
+import '../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../features/chat/chat_controller.dart';
@@ -121,7 +122,11 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       return true;
     } on Object catch (e) {
       if (mounted)
-        _notice(e is PlatformException ? e.message ?? '保存失败' : '保存失败，请重试');
+        _notice(
+          e is PlatformException
+              ? e.message ?? '保存失败：${errorMessage(e)}'
+              : '保存失败，请重试：${errorMessage(e)}',
+        );
       return false;
     } finally {
       if (mounted) {
@@ -170,10 +175,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             await widget.controller.selectConversation(
               widget.returnConversationId!,
             );
-          } on Object {
+          } on Object catch (error) {
             if (mounted) {
               setState(() => _leaving = false);
-              _notice('无法返回原会话');
+              _notice('无法返回原会话：${errorMessage(error)}');
             }
             return;
           }

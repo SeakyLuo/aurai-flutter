@@ -70,6 +70,9 @@ class AuraiApplication : Application() {
         FlutterInjector.instance().flutterLoader().ensureInitializationComplete(this, null)
         flutterEngine = FlutterEngine(this)
         GeneratedPluginRegistrant.registerWith(flutterEngine)
+        flutterEngine.platformViewsController.registry.registerViewFactory(
+            "aurai/html_game", HtmlGameViewFactory(flutterEngine.dartExecutor.binaryMessenger),
+        )
         ScheduledTasks.initialize(this, flutterEngine.dartExecutor.binaryMessenger)
         agentBridge = AndroidAgentBridge(this)
         httpProbe = AndroidHttpProbe(
@@ -117,6 +120,7 @@ class AuraiApplication : Application() {
                     call.argument<String>("title")!!,
                     call.argument<String>("body")!!,
                     call.argument<String>("conversationId")!!,
+                    call.argument<ByteArray>("avatar")!!,
                 ),
             )
             "takeNotificationConversation" -> {

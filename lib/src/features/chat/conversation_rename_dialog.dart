@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 
 import 'dialog_action_button.dart';
@@ -49,10 +50,10 @@ class _ConversationRenameDialogState extends State<ConversationRenameDialog> {
         _text.text,
       );
       if (mounted) Navigator.pop(context);
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
         setState(() => _saving = false);
-        _notice('重命名失败，请重试');
+        _notice('重命名失败，请重试：${errorMessage(error)}');
       }
     }
   }

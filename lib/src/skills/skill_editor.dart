@@ -1,3 +1,4 @@
+import '../domain/error_message.dart';
 import 'package:flutter/foundation.dart';
 import 'skill_dependency_picker.dart';
 import 'skill_icon.dart';
@@ -85,7 +86,8 @@ class _SkillEditorState extends State<SkillEditor> {
       _notice('技能已保存');
       return true;
     } on Object catch (e) {
-      if (mounted) _notice(e is StateError ? e.message : '保存失败，请重试');
+      if (mounted)
+        _notice(e is StateError ? e.message : '保存失败，请重试：${errorMessage(e)}');
       return false;
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -148,7 +150,8 @@ class _SkillEditorState extends State<SkillEditor> {
       });
       _notice(_enabled ? '技能已启用' : '技能已停用');
     } on Object catch (e) {
-      if (mounted) _notice(e is StateError ? e.message : '操作失败，请重试');
+      if (mounted)
+        _notice(e is StateError ? e.message : '操作失败，请重试：${errorMessage(e)}');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -172,7 +175,12 @@ class _SkillEditorState extends State<SkillEditor> {
         _leave();
       }
     } on Object catch (error) {
-      if (mounted) _notice(error is StateError ? error.message : '删除失败，请重试');
+      if (mounted)
+        _notice(
+          error is StateError
+              ? error.message
+              : '删除失败，请重试：${errorMessage(error)}',
+        );
     } finally {
       if (mounted) setState(() => _busy = false);
     }

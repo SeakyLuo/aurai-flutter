@@ -1,4 +1,5 @@
 import '../features/chat/home_navigation.dart';
+import '../html_games/html_route_observer.dart';
 import '../features/chat/image_action_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -20,7 +21,7 @@ class AuraiApp extends StatelessWidget {
     listenable: AppearanceSettings.instance,
     builder: (context, child) => MaterialApp(
       title: 'Aurai',
-      navigatorObservers: [homeRouteObserver],
+      navigatorObservers: [homeRouteObserver, htmlRouteObserver],
       debugShowCheckedModeBanner: false,
       locale: const Locale('zh', 'CN'),
       supportedLocales: const [Locale('zh', 'CN')],

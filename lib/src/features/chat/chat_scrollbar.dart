@@ -23,7 +23,27 @@ class ChatScrollbar extends StatefulWidget {
 }
 
 class _ChatScrollbarState extends State<ChatScrollbar> {
-  bool _scrolling = false;
+  final _scrolling = ValueNotifier(false);
+  bool _nextScrolling = false;
+  bool _visibilityQueued = false;
+
+  void _setScrolling(bool value) {
+    _nextScrolling = value;
+    if (_visibilityQueued) return;
+    _visibilityQueued = true;
+    // Scroll notifications can arrive during layout. Update only the overlay
+    // after that frame, without rebuilding the virtual list under it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _visibilityQueued = false;
+      if (mounted) _scrolling.value = _nextScrolling;
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrolling.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => Stack(
@@ -34,9 +54,9 @@ class _ChatScrollbarState extends State<ChatScrollbar> {
           if (notification is ScrollStartNotification ||
               notification is ScrollUpdateNotification ||
               notification is OverscrollNotification) {
-            if (!_scrolling) setState(() => _scrolling = true);
+            _setScrolling(true);
           } else if (notification is ScrollEndNotification) {
-            if (_scrolling) setState(() => _scrolling = false);
+            _setScrolling(false);
           }
           return false;
         },
@@ -48,9 +68,13 @@ class _ChatScrollbarState extends State<ChatScrollbar> {
         right: 3,
         width: 3,
         child: IgnorePointer(
-          child: AnimatedOpacity(
-            opacity: _scrolling ? 1 : 0,
-            duration: Duration(milliseconds: _scrolling ? 80 : 250),
+          child: ValueListenableBuilder<bool>(
+            valueListenable: _scrolling,
+            builder: (context, scrolling, child) => AnimatedOpacity(
+              opacity: scrolling ? 1 : 0,
+              duration: Duration(milliseconds: scrolling ? 80 : 250),
+              child: child,
+            ),
             child: LayoutBuilder(
               builder: (context, constraints) => ValueListenableBuilder(
                 valueListenable: widget.positions,

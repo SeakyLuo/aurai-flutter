@@ -22,14 +22,15 @@ class ToolActivityGroup extends StatefulWidget {
 }
 
 class _ToolActivityGroupState extends State<ToolActivityGroup> {
-  bool? _manualExpanded;
+  bool _expanded = false;
   String get _storageId => 'tool-group:${widget.storageId}';
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _manualExpanded =
+    _expanded =
         PageStorage.of(context).readState(context, identifier: _storageId)
-            as bool?;
+            as bool? ??
+        false;
   }
 
   @override
@@ -41,8 +42,7 @@ class _ToolActivityGroupState extends State<ToolActivityGroup> {
     final cancelled = widget.statuses
         .where((s) => s == AgentStepStatus.cancelled)
         .length;
-    final expanded =
-        _manualExpanded ?? (running || failed > 0 || cancelled > 0);
+    final expanded = _expanded;
     final label = [
       '${toolTitle(widget.toolName)} · ${widget.statuses.length} 次',
       if (running) '执行中',
@@ -60,10 +60,10 @@ class _ToolActivityGroupState extends State<ToolActivityGroup> {
             behavior: HitTestBehavior.opaque,
             onTap: () {
               ChatScrollAnchor.beforeResize(context);
-              setState(() => _manualExpanded = !expanded);
+              setState(() => _expanded = !expanded);
               PageStorage.of(
                 context,
-              ).writeState(context, _manualExpanded, identifier: _storageId);
+              ).writeState(context, _expanded, identifier: _storageId);
             },
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 44),

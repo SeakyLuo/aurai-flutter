@@ -19,6 +19,8 @@ enum SettingsIconType {
   check,
   tasks,
   filter,
+  eye,
+  eyeOff,
 }
 
 class SettingsIcon extends StatelessWidget {
@@ -56,6 +58,20 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.eye:
+      case SettingsIconType.eyeOff:
+        canvas.drawPath(
+          Path()
+            ..moveTo(2.5, 12)
+            ..cubicTo(7, 4.5, 17, 4.5, 21.5, 12)
+            ..cubicTo(17, 19.5, 7, 19.5, 2.5, 12),
+          pen,
+        );
+        canvas.drawCircle(const Offset(12, 12), 2.7, pen);
+        if (type == SettingsIconType.eyeOff) {
+          canvas.drawLine(const Offset(4, 4), const Offset(20, 20), pen);
+        }
+
       case SettingsIconType.tools:
         WrenchPainter(color).paint(canvas, const Size.square(24));
       case SettingsIconType.contacts:

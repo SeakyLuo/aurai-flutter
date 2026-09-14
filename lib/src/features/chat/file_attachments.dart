@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../domain/message_file.dart';
@@ -56,9 +57,11 @@ class FileAttachmentCard extends StatelessWidget {
           await MessageFileStore.open(file);
         } on PlatformException catch (error) {
           if (context.mounted)
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(error.message ?? '附件无法打开')));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(error.message ?? '附件无法打开：${errorMessage(error)}'),
+              ),
+            );
         }
       },
       child: Padding(

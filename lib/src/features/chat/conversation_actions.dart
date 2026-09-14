@@ -1,6 +1,38 @@
 part of 'chat_controller.dart';
 
 extension ConversationActions on ChatController {
+  void _updateConversationList([Conversation? value]) {
+    final conversation = value ?? activeConversation;
+    if (conversation.kind == ConversationKind.direct &&
+        conversation.messageCount == 0)
+      return;
+    final index = _conversations.indexWhere(
+      (item) => item.id == conversation.id,
+    );
+    if (index == -1) {
+      _conversations.add(conversation);
+    } else {
+      _conversations[index] = conversation;
+    }
+  }
+
+  Future<void> _reloadConversations() async {
+    final page = await _store.reader.list();
+    _conversations
+      ..clear()
+      ..addAll(
+        page.map(
+          (item) => item.id == activeConversation.id
+              ? activeConversation
+              : item.id == _runningConversation?.id
+              ? _runningConversation!
+              : item,
+        ),
+      );
+    _conversationCursor = page.isEmpty ? null : page.last;
+    hasMoreConversations = page.length == ConversationReader.pageSize;
+  }
+
   Future<void> markActiveConversationRead() async {
     final conversation = activeConversation;
     if (conversation.runState != ChatRunState.idle ||
@@ -140,7 +172,14 @@ extension ConversationActions on ChatController {
         where: 'id = ?',
         whereArgs: [conversation.id],
       );
-      _updateConversationList(conversation);
+      final membership = await _store.database.query(
+        'conversation_members',
+        columns: ['sender_id'],
+        where: 'conversation_id = ? AND sender_id = ? AND left_at IS NULL',
+        whereArgs: [conversation.id, MessageSender.localUser.id],
+        limit: 1,
+      );
+      if (membership.isNotEmpty) _updateConversationList(conversation);
     }
   }
 

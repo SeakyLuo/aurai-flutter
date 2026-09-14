@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -8,12 +9,14 @@ class ConversationNotificationToast extends StatefulWidget {
   const ConversationNotificationToast({
     super.key,
     required this.title,
+    required this.avatar,
     required this.reply,
     required this.onOpen,
     required this.onDismiss,
   });
 
   final String title;
+  final Future<Uint8List> avatar;
   final String reply;
   final bool Function() onOpen;
   final VoidCallback onDismiss;
@@ -98,14 +101,19 @@ class _ConversationNotificationToastState
                           children: [
                             Row(
                               children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Image.asset(
-                                    'assets/branding/app_logo.png',
-                                    width: 38,
-                                    height: 38,
-                                    cacheWidth: 114,
-                                    excludeFromSemantics: true,
+                                SizedBox.square(
+                                  dimension: 38,
+                                  child: FutureBuilder<Uint8List>(
+                                    future: widget.avatar,
+                                    builder: (context, snapshot) =>
+                                        snapshot.hasData
+                                        ? Image.memory(
+                                            snapshot.data!,
+                                            width: 38,
+                                            height: 38,
+                                            excludeFromSemantics: true,
+                                          )
+                                        : const SizedBox.shrink(),
                                   ),
                                 ),
                                 const SizedBox(width: 14),

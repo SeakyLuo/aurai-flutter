@@ -15,7 +15,6 @@ extension MessageSubmission on ChatController {
     _submitting = true;
     final wasNew =
         activeConversation.kind == ConversationKind.direct &&
-        activeConversation.defaultSenderId == MessageSender.aurai.id &&
         activeConversation.messageCount == 0;
     final previousQuote = activeConversation.draftQuote;
     final previousDraft = activeConversation.draft;
@@ -82,8 +81,12 @@ extension MessageSubmission on ChatController {
         rethrow;
       }
       if (wasNew) {
-        _newConversation = Conversation.empty();
-        await _newDraftStore.clear();
+        if (activeConversation.defaultSenderId == MessageSender.aurai.id) {
+          _newConversation = Conversation.empty();
+        }
+        await _newDraftStore.clear(
+          senderId: activeConversation.defaultSenderId,
+        );
       }
       _updateConversationList();
       if (needsConfiguration) {

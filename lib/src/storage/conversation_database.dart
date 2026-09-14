@@ -1,3 +1,5 @@
+import 'contact_relationships.dart';
+import '../html_games/html_game_schema.dart';
 import 'ai_identity_schema.dart';
 import 'group_participation.dart';
 import 'group_creation_migration.dart';
@@ -9,7 +11,7 @@ import '../memory/memory_controller.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 18,
+  version: 24,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -81,15 +83,40 @@ Future<Database> openConversationDatabase() async => openDatabase(
         'ALTER TABLE conversations ADD COLUMN draft_quote_json TEXT',
       );
     }
+    if (oldVersion < 19)
+      await db.execute('ALTER TABLE messages ADD COLUMN interactive_json TEXT');
     if (oldVersion < 18) await db.execute(groupParticipationSchema);
+    if (oldVersion < 20) {
+      for (final statement in htmlGameSchema) {
+        await db.execute(statement);
+      }
+    }
+    if (oldVersion >= 20 && oldVersion < 22) {
+      await db.execute(
+        "ALTER TABLE html_games ADD COLUMN display_mode TEXT NOT NULL DEFAULT 'hybrid'",
+      );
+    }
+    if (oldVersion >= 20 && oldVersion < 23) {
+      await db.execute(
+        'ALTER TABLE html_games ADD COLUMN stateful INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    if (oldVersion < 21) {
+      for (final statement in contactRelationshipSchema) {
+        await db.execute(statement);
+      }
+    }
+    if (oldVersion < 24) await migrateAuraiDescription(db);
   },
   onCreate: (db, version) async {
     final batch = db.batch();
     for (final statement in [
       ..._schema,
+      ...htmlGameSchema,
       ...groupChatTables,
       groupParticipationSchema,
       temporaryAiColumn,
+      ...contactRelationshipSchema,
       ...skillSchema,
       ...memorySchema,
     ]) {
@@ -98,6 +125,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
     await batch.commit(noResult: true);
     await migrateAiIdentities(db);
     await migrateAuraiAvatar(db);
+    await migrateAuraiDescription(db);
   },
 );
 
@@ -163,6 +191,7 @@ const _schema = [
     model_turn_id TEXT REFERENCES model_turns(id) ON DELETE CASCADE,
     sender_id TEXT NOT NULL REFERENCES message_senders(id),
     quote_json TEXT,
+    interactive_json TEXT,
     role TEXT NOT NULL,
     kind TEXT NOT NULL,
     text TEXT NOT NULL,

@@ -1,4 +1,6 @@
+import '../../domain/error_message.dart';
 import 'ai_contacts_page.dart';
+import 'message_time.dart';
 import 'conversation_icon.dart';
 import 'conversation_preview_text.dart';
 import 'header_action_menu.dart';
@@ -8,10 +10,11 @@ import 'package:flutter/material.dart';
 import '../../domain/avatar_style.dart';
 import '../../domain/message_sender.dart';
 import '../../storage/home_conversations.dart';
-import 'ai_conversations_page.dart';
+import '../../domain/ai_profile.dart';
+import 'conversation_more.dart';
 import 'chat_controller.dart';
-import 'group_avatar.dart';
 import 'group_create_page.dart';
+import 'group_avatar.dart';
 import 'home_navigation.dart';
 import 'pagination_listener.dart';
 import 'profile_avatar.dart';
@@ -63,12 +66,12 @@ class RecentChatsPageState extends State<RecentChatsPage> {
     try {
       final reader = HomeConversations(widget.controller.groupStore);
       final page = await reader.recent(offset: reset ? 0 : _items.length);
-      final result = await Future.wait<Object>([
+      final avatars = await Future.wait<Object>([
         reader.senders(page),
         widget.controller.groupStore.avatarMembers(
           page
-              .where((c) => c.kind == ConversationKind.group)
-              .map((c) => c.id)
+              .where((item) => item.kind == ConversationKind.group)
+              .map((item) => item.id)
               .toList(),
         ),
       ]);
@@ -80,16 +83,16 @@ class RecentChatsPageState extends State<RecentChatsPage> {
           _groups.clear();
         }
         _items.addAll(page);
-        _senders.addAll(result[0] as Map<String, MessageSender>);
-        _groups.addAll(result[1] as Map<String, List<MessageSender>>);
+        _senders.addAll(avatars[0] as Map<String, MessageSender>);
+        _groups.addAll(avatars[1] as Map<String, List<MessageSender>>);
         _more = page.length == HomeConversations.pageSize;
         _loaded = true;
       });
-    } on Object {
+    } on Object catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('会话加载失败'),
+            content: Text('会话加载失败：${errorMessage(error)}'),
             action: SnackBarAction(label: '重试', onPressed: reload),
           ),
         );
@@ -98,25 +101,33 @@ class RecentChatsPageState extends State<RecentChatsPage> {
     }
   }
 
-  Future<void> _openAi(String id) async {
+  bool _opening = false;
+  Future<void> _newConversation() async {
+    if (_opening) return;
+    _opening = true;
     try {
-      final profile = await widget.controller.groupStore.loadAi(id);
-      if (!mounted) return;
-      await Navigator.push<void>(
+      final ai = await Navigator.push<AiProfile>(
         context,
         MaterialPageRoute(
-          builder: (_) => AiConversationsPage(
+          builder: (_) => AiContactsPage(
             controller: widget.controller,
-            profile: profile,
+            selectForConversation: true,
           ),
         ),
       );
-      if (mounted) reload();
-    } on Object {
+      if (!mounted || ai == null) return;
+      final id = await widget.controller.openAiConversation(
+        ai,
+        newConversation: true,
+      );
+      if (mounted) await openHomeConversation(context, widget.controller, id);
+    } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('无法打开会话，请重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法新建会话，请重试：${errorMessage(error)}')),
+        );
+    } finally {
+      _opening = false;
     }
   }
 
@@ -153,28 +164,27 @@ class RecentChatsPageState extends State<RecentChatsPage> {
             onPressed: () async {
               final action = await showHeaderActionMenu(
                 buttonContext,
-                items: const [
+                items: [
                   (
                     value: 'conversation',
                     label: '发起会话',
-                    icon: ConversationIcon(),
+                    icon: const ConversationIcon(),
                   ),
                   (
                     value: 'group',
                     label: '发起群聊',
-                    icon: SidebarActionIcon(type: SidebarActionIconType.group),
+                    icon: SidebarActionIcon(
+                      type: SidebarActionIconType.group,
+                      color: Theme.of(
+                        buttonContext,
+                      ).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               );
               if (!mounted) return;
               if (action == 'conversation') {
-                await Navigator.push<void>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        AiContactsPage(controller: widget.controller),
-                  ),
-                );
+                await _newConversation();
               } else if (action == 'group') {
                 await _group();
               }
@@ -211,12 +221,19 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                         name: 'Aurai',
                         size: 48,
                       ),
-                      title: const Text('Aurai'),
-                      subtitle: const Text('开始新会话'),
-                      onTap: () => _openAi(MessageSender.aurai.id),
+                      title: const Text('开始新会话'),
+                      subtitle: const Text('选择一个 AI 开始聊天'),
+                      onTap: _newConversation,
                     ),
                   ),
-                for (final item in _items) _tile(item),
+                for (final item in _items)
+                  ConversationMore(
+                    key: ValueKey(item.id),
+                    controller: widget.controller,
+                    conversation: item,
+                    onChanged: reload,
+                    child: _tile(item),
+                  ),
               ],
             ),
           ),
@@ -245,34 +262,42 @@ class RecentChatsPageState extends State<RecentChatsPage> {
           children: [
             Expanded(
               child: Text(
-                group ? item.title : sender!.name,
+                item.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 16),
               ),
             ),
             ConversationListStatus(
+              showUnread: false,
               controller: widget.controller,
               conversation: item,
             ),
+            if (item.lastMessageAt != null) ...[
+              const SizedBox(width: 8),
+              Text(
+                conversationMessageTime(item.lastMessageAt!),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ],
         ),
         subtitle: ConversationPreviewText(
+          showUnread: true,
           conversation: item,
-          emptyText: group ? '开始聊天' : item.title,
+          emptyText: '开始聊天',
         ),
         onTap: () async {
-          if (!group) {
-            await _openAi(item.defaultSenderId);
-            return;
-          }
           try {
             await openHomeConversation(context, widget.controller, item.id);
-          } on Object {
+          } on Object catch (error) {
             if (mounted)
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('无法打开群聊，请重试')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
+              );
           }
           if (mounted) reload();
         },

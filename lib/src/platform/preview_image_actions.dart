@@ -1,8 +1,10 @@
+import '../domain/error_message.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart';
 import 'package:mime/mime.dart';
+import 'package:path_provider/path_provider.dart';
 
 class PreviewImageActions {
   static const _channel = MethodChannel('com.haiskynology.aurai/platform');
@@ -12,8 +14,8 @@ class PreviewImageActions {
     if (provider is FileImage) {
       try {
         return await provider.file.readAsBytes();
-      } on FileSystemException {
-        throw StateError('图片文件已丢失或无法读取');
+      } on FileSystemException catch (error) {
+        throw StateError('图片文件已丢失或无法读取：${errorMessage(error)}');
       }
     }
     if (provider is MemoryImage) return provider.bytes;
@@ -41,12 +43,21 @@ class PreviewImageActions {
     final mime = lookupMimeType('', headerBytes: bytes);
     if (mime == null || !mime.startsWith('image/'))
       throw StateError('无法识别图片格式');
+    final name =
+        'Aurai_${DateTime.now().microsecondsSinceEpoch}.${extensionFromMime(mime)}';
+    if (action == 'save') {
+      final support = await getApplicationSupportDirectory();
+      final directory = await Directory(
+        '${support.path}/downloads',
+      ).create(recursive: true);
+      await File('${directory.path}/$name').writeAsBytes(bytes, flush: true);
+      return true;
+    }
     return await _channel.invokeMethod<bool>('previewImageAction', {
           'bytes': bytes,
           'mimeType': mime,
           'action': action,
-          'name':
-              'Aurai_${DateTime.now().millisecondsSinceEpoch}.${extensionFromMime(mime)}',
+          'name': name,
         }) ??
         false;
   }

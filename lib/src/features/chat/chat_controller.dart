@@ -1,3 +1,22 @@
+import 'notification_avatar.dart';
+import '../../agent/friend_tools.dart';
+import '../../storage/contact_relationships.dart';
+import '../../domain/error_message.dart';
+import '../../agent/execution_log_tool.dart';
+import '../../diagnostics/execution_log.dart';
+import '../../agent/html_message_tool.dart';
+import '../../html_games/html_game.dart';
+import '../../html_games/html_game_store.dart';
+import '../../html_games/html_game_tool.dart';
+import '../../html_games/html_game_session.dart';
+import '../../html_games/html_game_event_pump.dart';
+import '../../domain/interactive_message.dart';
+import '../../storage/interactive_message_store.dart';
+import '../../agent/interactive_message_tool.dart';
+import '../../agent/history_message_tools.dart';
+import '../../storage/group_sleep_store.dart';
+import '../../agent/group_history_tool.dart';
+import 'markdown_preview_text.dart';
 import 'dart:developer' as developer;
 import '../../agent/app_control_tool.dart';
 import '../../agent/recall_message_tool.dart';
@@ -7,6 +26,7 @@ import 'avatar_background.dart';
 import '../../storage/conversation_visibility.dart';
 import '../../domain/message_quote.dart';
 import '../../agent/group_message_tool.dart';
+import '../../agent/group_sleep_tool.dart';
 import '../../storage/group_participation.dart';
 import 'group_dispatcher.dart';
 import '../../agent/group_chat_tools.dart';
@@ -34,7 +54,6 @@ import 'dart:io';
 import '../../memory/memory_controller.dart';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../agent/agent_runtime.dart';
@@ -87,27 +106,18 @@ part 'group_private_conversation.dart';
 part 'group_system_events.dart';
 part 'conversation_actions.dart';
 part 'app_control_actions.dart';
+part 'peer_conversations.dart';
+part 'interactive_message_actions.dart';
+part 'html_game_actions.dart';
+part 'model_config_actions.dart';
 part 'image_forwarding.dart';
 part 'conversation_search_navigation.dart';
 part 'conversation_run.dart';
 part 'scheduled_execution.dart';
 part 'message_edit_actions.dart';
 part 'accessibility_request.dart';
-
-class PendingConfirmation {
-  PendingConfirmation(this.call, this.definition, this.conversationId)
-    : deadline = call.confirmationTimeoutSeconds == null
-          ? null
-          : DateTime.now().add(
-              Duration(seconds: call.confirmationTimeoutSeconds!),
-            );
-  final String conversationId;
-  final DateTime? deadline;
-  final ToolCall call;
-  final ToolDefinition definition;
-  String scope = 'once';
-  final completer = Completer<bool>();
-}
+part 'pending_confirmation.dart';
+part 'group_sleep_recovery.dart';
 
 class ChatController extends ChangeNotifier {
   AiProfile? _activeAi;
@@ -120,6 +130,7 @@ class ChatController extends ChangeNotifier {
 
   final AuraiPlatform _platform;
   final scheduledTasks = ScheduledTasks();
+  final _groupSleeps = GroupSleepStore();
   final skills = SkillStore();
   final toolApprovals = ToolApprovalStore();
   String? pendingComposerDraft;
@@ -145,6 +156,7 @@ class ChatController extends ChangeNotifier {
       _platform.takeNotificationConversation();
   final completedReplies = ValueNotifier<ConversationCompletion?>(null);
   final _store = ConversationStore();
+  HtmlGameEventPump? _htmlGameEvents;
   MemoryController? _memory;
   MemoryController get memory => _memory!;
   final _newDraftStore = NewConversationDraft();
@@ -189,6 +201,7 @@ class ChatController extends ChangeNotifier {
   final _groupRuntimes = <String, AgentRuntime>{};
   final _groupStreaming = <String, String>{};
   final _groupToolQueue = GroupToolQueue();
+  final _peerSessions = <String, Future<_PeerSession>>{};
   Iterable<Conversation> get groupRuns =>
       activeConversation.id == runningConversationId
       ? _groupRuns.values
@@ -221,6 +234,7 @@ class ChatController extends ChangeNotifier {
   @override
   void dispose() {
     _groupDispatcher?.stop();
+    _stopPeerSessions();
     _queuedSystemNotices.clear();
     groupStore.onSystemNotice = null;
     skills.dispose();
@@ -231,6 +245,8 @@ class ChatController extends ChangeNotifier {
       store.dispose();
     }
     scheduledTasks.dispose();
+    _groupSleeps.dispose();
+    _htmlGameEvents?.dispose();
     _memory?.dispose();
     _accessibilityTimer?.cancel();
     completedReplies.dispose();
@@ -280,6 +296,7 @@ class ChatController extends ChangeNotifier {
       _platform.clearLegacyAppState,
     );
     groupStore.onSystemNotice = _receiveGroupSystemNotice;
+    _platform.notificationAvatar = NotificationAvatar(groupStore).render;
     _memory = MemoryController(_store.database, () => config);
     await memory.initialize();
     await _migrateAiSettings();
@@ -311,6 +328,14 @@ class ChatController extends ChangeNotifier {
         : null;
     await _reloadConversations();
     await scheduledTasks.initialize(_runScheduled);
+    await _groupSleeps.initialize(_recoverGroupSleep);
+    if (HtmlGameFeature.enabled) {
+      _htmlGameEvents = HtmlGameEventPump(
+        htmlGames,
+        () => hasRunningTask || changingConversation,
+        _recoverGroupSleep,
+      )..start();
+    }
     notifyListeners();
   }
 
@@ -347,6 +372,8 @@ class ChatController extends ChangeNotifier {
     conversation.runState = ChatRunState.stopping;
     _queuedSystemNotices.remove(conversation.id);
     _groupDispatcher?.stop();
+    if (conversation.kind == ConversationKind.group)
+      await _groupSleeps.remove(conversation.id);
     for (final member in _groupRuns.values) {
       if (member.runState == ChatRunState.running)
         member.runState = ChatRunState.stopping;
@@ -362,33 +389,6 @@ class ChatController extends ChangeNotifier {
       if (_runtime != null && _privateConversation == null) _runtime!.cancel(),
       for (final runtime in _groupRuntimes.values) runtime.cancel(),
     ]);
-  }
-
-  Future<void> saveConfig(ModelConfig newConfig, {String? senderId}) async {
-    final nextSettings = modelSettings.activate(
-      newConfig,
-      systemPrompt: modelSettings.systemPrompt,
-    );
-    await _platform.saveModelSettings(nextSettings);
-    modelSettings = nextSettings;
-    groupStore.defaultSelection = AiModelSelection(
-      provider: newConfig.service,
-      model: newConfig.model,
-      baseUrl: newConfig.baseUrl,
-    );
-    if (senderId != null) {
-      final ai = await groupStore.loadAi(senderId);
-      await saveAi(
-        ai.copyWith(
-          modelSelection: AiModelSelection(
-            provider: newConfig.service,
-            model: newConfig.model,
-            baseUrl: newConfig.baseUrl,
-          ),
-        ),
-      );
-    }
-    notifyListeners();
   }
 
   Future<void> refreshCapabilities() async {
@@ -440,6 +440,7 @@ class ChatController extends ChangeNotifier {
       _switchConversation(id == _newConversation.id ? null : id);
 
   final _loadedMessageCounts = <String, int>{};
+  Conversation? _pendingAiConversation;
   final _searchWindows = <String, Conversation>{};
   int _searchNavigationGeneration = 0;
 
@@ -455,6 +456,8 @@ class ChatController extends ChangeNotifier {
       _loadedMessageCounts[activeConversation.id] = messages.length;
       final conversation = id == null
           ? _newConversation
+          : id == _pendingAiConversation?.id
+          ? _pendingAiConversation!
           : id == _privateConversation?.id
           ? _privateConversation!
           : id == _runningConversation?.id
@@ -474,7 +477,13 @@ class ChatController extends ChangeNotifier {
             conversation.pendingGoal == null) {
           conversation.seenRunId = conversation.activeRunId;
         }
-        await _store.writer.save(conversation);
+        if (conversation.kind == ConversationKind.direct &&
+            conversation.messageCount == 0) {
+          await _newDraftStore.save(conversation);
+          await _store.selectNewConversation();
+        } else {
+          await _store.writer.save(conversation);
+        }
       }
       final previousIndex = _conversations.indexWhere(
         (item) => item.id == activeConversation.id,
@@ -489,6 +498,7 @@ class ChatController extends ChangeNotifier {
               ..draftImages.addAll(activeConversation.draftImages);
       }
       _activeConversation = conversation;
+      _pendingAiConversation = null;
       _activeAi = conversation.kind == ConversationKind.direct
           ? await groupStore.loadAi(conversation.defaultSenderId)
           : null;
@@ -511,38 +521,6 @@ class ChatController extends ChangeNotifier {
   }
 
   void _conversationChanged() => notifyListeners();
-
-  void _updateConversationList([Conversation? value]) {
-    final conversation = value ?? activeConversation;
-    if (conversation.kind == ConversationKind.direct &&
-        conversation.messageCount == 0)
-      return;
-    final index = _conversations.indexWhere(
-      (item) => item.id == conversation.id,
-    );
-    if (index == -1) {
-      _conversations.add(conversation);
-    } else {
-      _conversations[index] = conversation;
-    }
-  }
-
-  Future<void> _reloadConversations() async {
-    final page = await _store.reader.list();
-    _conversations
-      ..clear()
-      ..addAll(
-        page.map(
-          (item) => item.id == activeConversation.id
-              ? activeConversation
-              : item.id == _runningConversation?.id
-              ? _runningConversation!
-              : item,
-        ),
-      );
-    _conversationCursor = page.isEmpty ? null : page.last;
-    hasMoreConversations = page.length == ConversationReader.pageSize;
-  }
 
   Future<void> refreshConversations() async {
     if (loadingConversations) return;
@@ -685,7 +663,6 @@ class ChatController extends ChangeNotifier {
 
   Future<void> _persist({Map<String, List<String>> recipients = const {}}) =>
       activeConversation.kind == ConversationKind.direct &&
-          activeConversation.defaultSenderId == MessageSender.aurai.id &&
           activeConversation.messageCount == 0
       ? _newDraftStore.save(activeConversation)
       : _store.writer.save(activeConversation, recipients: recipients);
@@ -703,6 +680,7 @@ class ChatController extends ChangeNotifier {
     ToolCall call,
     ToolDefinition definition, {
     String? runId,
+    String? conversationId,
     String senderId = 'agent:aurai',
     bool screenAccess = false,
   }) async {
@@ -720,7 +698,7 @@ class ChatController extends ChangeNotifier {
       call,
       definition,
     );
-    final conversationId = _runningConversation!.id;
+    conversationId ??= _runningConversation!.id;
     final existing =
         (screenAccess && isScreenTool(call.name)) ||
         toolApprovals.allows(conversationId, call, senderId: senderId);

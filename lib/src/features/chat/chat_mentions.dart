@@ -73,12 +73,33 @@ extension _ChatMentions on _ChatPageState {
         _mentions.add(
           DraftMention(start, label, result.isEmpty ? null : result.single.id),
         );
+        _textController.refreshMentions();
       } else {
         _textController.selection = selection;
       }
       _focusNode.requestFocus();
     }
     _mentionOpen = false;
+  }
+
+  void _mentionMember(MessageSender sender) {
+    final value = _textController.value;
+    final start = value.selection.isValid
+        ? value.selection.start
+        : value.text.length;
+    final end = value.selection.isValid ? value.selection.end : start;
+    final prefix = start > 0 && !RegExp(r'\s').hasMatch(value.text[start - 1])
+        ? ' '
+        : '';
+    final label = '@${sender.name}';
+    final inserted = '$prefix$label ';
+    _textController.value = TextEditingValue(
+      text: value.text.replaceRange(start, end, inserted),
+      selection: TextSelection.collapsed(offset: start + inserted.length),
+    );
+    _mentions.add(DraftMention(start + prefix.length, label, sender.id));
+    _textController.refreshMentions();
+    _focusNode.requestFocus();
   }
 
   List<String>? get _mentionedRecipients =>

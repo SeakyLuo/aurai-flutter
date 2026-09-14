@@ -16,6 +16,14 @@ class ToolActionIcon extends StatelessWidget {
     dimension: 21,
     child: FittedBox(
       child: switch (toolName) {
+        'sendHtmlMessage' ||
+        'sendInteractiveMessage' ||
+        'findContacts' ||
+        'listFriends' ||
+        'addFriend' ||
+        'readExecutionLogs' ||
+        'readInteractiveMessage' ||
+        'updateInteractiveMessage' ||
         'createConversation' ||
         'renameConversation' ||
         'setConversationPinned' ||
@@ -25,7 +33,7 @@ class ToolActionIcon extends StatelessWidget {
         'openAppPage' ||
         'listGroupChats' ||
         'readGroupChat' ||
-        'sendGroupMessages' ||
+        'sendGroupMessage' ||
         'recallMessage' ||
         'createGroupChat' ||
         'renameGroupChat' ||
@@ -80,6 +88,9 @@ class ToolActionIcon extends StatelessWidget {
         'searchImages' ||
         'searchWeb' ||
         'searchConversations' ||
+        'readMessage' ||
+        'readMessageAttachment' ||
+        'readGroupMessages' ||
         'searchMessages' ||
         'findApps' => SidebarActionIcon(
           type: SidebarActionIconType.search,

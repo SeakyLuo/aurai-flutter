@@ -95,12 +95,12 @@ class WebTool implements AgentTool, RuntimeCapabilityAgentTool {
             : ToolResultStatus.error,
         output: {'error': error.message},
       );
-    } on FormatException {
+    } on FormatException catch (error) {
       return ToolResult(
         callId: call.id,
         toolName: name,
         status: ToolResultStatus.error,
-        output: {'error': '网页内容或链接格式无法解析'},
+        output: {'error': '网页内容或链接格式无法解析：$error'},
       );
     }
   }

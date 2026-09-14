@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -48,7 +49,7 @@ class _DocumentFoldersPageState extends State<DocumentFoldersPage>
     try {
       await action();
     } on PlatformException catch (error) {
-      if (mounted) _notice(error.message ?? '操作未完成，请稍后重试');
+      if (mounted) _notice(errorMessage(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

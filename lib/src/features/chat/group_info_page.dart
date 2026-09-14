@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'dart:math' as math;
 import 'dialog_action_button.dart';
 import 'group_invite_page.dart';
@@ -72,12 +73,12 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
         _members = results[1] as List<ConversationMember>;
         _failed = false;
       });
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
         setState(() => _failed = true);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('群聊信息加载失败，请重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('群聊信息加载失败，请重试：${errorMessage(error)}')),
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -204,8 +205,9 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                                       _member(member.sender),
                                     _memberAction(
                                       '邀请',
-                                      const SettingsIcon(
+                                      SettingsIcon(
                                         type: SettingsIconType.add,
+                                        color: colors.onSurfaceVariant,
                                       ),
                                       () => _open(
                                         GroupInvitePage(

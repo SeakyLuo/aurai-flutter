@@ -1,3 +1,5 @@
+import '../html_games/html_game.dart';
+import 'interactive_message.dart';
 import 'message_quote.dart';
 import 'message_file.dart';
 import 'message_sender.dart';
@@ -23,14 +25,23 @@ class AgentMessage {
     this.isFailure = false,
     this.isGroupMessage = false,
     this.quote,
+    this.interactive,
+    this.htmlGame,
   });
 
-  AgentMessage withSender(MessageSender? value) => AgentMessage(
+  AgentMessage withSender(
+    MessageSender? value, {
+    InteractiveMessage? interactive,
+  }) => AgentMessage(
     id: id,
     role: role,
     senderId: senderId,
     sender: value,
-    text: text,
+    text: interactive == null
+        ? text
+        : '${interactive.title}\n${interactive.body}',
+    interactive: interactive ?? this.interactive,
+    htmlGame: htmlGame,
     createdAt: createdAt,
     images: images,
     files: files,
@@ -44,6 +55,8 @@ class AgentMessage {
     quote: quote,
   );
 
+  final HtmlGameCard? htmlGame;
+  final InteractiveMessage? interactive;
   final MessageQuote? quote;
   final bool isSystem;
   final bool isFailure;
@@ -65,6 +78,8 @@ class AgentMessage {
     'id': id,
     'role': role.name,
     'senderId': senderId,
+    if (interactive != null) 'interactive': interactive!.toJson(),
+    if (htmlGame != null) 'htmlGameTitle': htmlGame!.title,
     if (quote != null) 'quote': quote!.toJson(),
     if (isSystem) 'isSystem': true,
     if (isFailure) 'isFailure': true,
@@ -81,6 +96,14 @@ class AgentMessage {
     required String imageDirectory,
   }) => AgentMessage(
     id: json['id']! as String,
+    htmlGame: json['htmlGameTitle'] == null
+        ? null
+        : HtmlGameCard(title: json['htmlGameTitle'] as String),
+    interactive: json['interactive'] == null
+        ? null
+        : InteractiveMessage.fromJson(
+            Map<String, Object?>.from(json['interactive'] as Map),
+          ),
     isSystem: json['isSystem'] == true,
     isFailure: json['isFailure'] == true,
     isGroupMessage: json['isGroupMessage'] == true,
@@ -243,6 +266,14 @@ String newMessageId() =>
 String toolTitle(String name) => switch (name) {
   'readMyProfile' => '读取自己的资料',
   'updateMyProfile' => '更新自己的资料',
+  'sendHtmlMessage' => '发送 HTML 消息',
+  'sendInteractiveMessage' => '发送交互消息',
+  'findContacts' => '查找联系人',
+  'listFriends' => '查看好友',
+  'addFriend' => '添加好友',
+  'readExecutionLogs' => '读取执行日志',
+  'readInteractiveMessage' => '读取交互消息',
+  'updateInteractiveMessage' => '更新交互消息',
   'createConversation' => '新建会话',
   'renameConversation' => '重命名会话',
   'setConversationPinned' => '调整会话置顶',
@@ -250,9 +281,13 @@ String toolTitle(String name) => switch (name) {
   'deleteConversation' => '删除会话',
   'sendConversationMessage' => '发送会话消息',
   'openAppPage' => '打开应用页面',
-  'sendGroupMessages' => '发送群消息',
+  'sendGroupMessage' => '发送群消息',
+  'sleepGroupChat' => '稍后查看群聊',
   'recallMessage' => '撤回消息',
   'listGroupChats' => '查询群聊',
+  'readMessage' => '读取历史消息',
+  'readMessageAttachment' => '读取历史附件',
+  'readGroupMessages' => '读取群历史消息',
   'readGroupChat' => '读取群聊',
   'createGroupChat' => '创建群聊',
   'renameGroupChat' => '重命名群聊',

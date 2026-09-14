@@ -4,18 +4,16 @@ import '../features/chat/conversation.dart';
 import '../domain/message_sender.dart';
 
 /// Resolve the latest visible message for the current page, not cached names.
-Future<void> loadGroupListPreviews(
+Future<void> loadConversationListPreviews(
   Database database,
   List<Conversation> conversations,
 ) async {
   final groups = {
-    for (final conversation in conversations)
-      if (conversation.kind == ConversationKind.group)
-        conversation.id: conversation,
+    for (final conversation in conversations) conversation.id: conversation,
   };
   if (groups.isEmpty) return;
   final rows = await database.rawQuery(
-    '''SELECT id, conversation_id, sender_id, kind, text
+    '''SELECT id, conversation_id, sender_id, kind, text, created_at
        FROM messages WHERE id IN (
          SELECT (SELECT id FROM messages
            WHERE conversation_id = conversations.id AND kind != 'commentary'
@@ -50,7 +48,9 @@ Future<void> loadGroupListPreviews(
     for (final row in results[0]) row['id']: MessageSender.fromRow(row),
   };
   final groupsWithMessages = rows.map((r) => r['conversation_id']).toSet();
-  for (final group in groups.values) {
+  for (final group in groups.values.where(
+    (c) => c.kind == ConversationKind.group,
+  )) {
     group.creationMembers = [
       for (final id in group.creationMemberIds) senders[id]!,
     ];
@@ -67,6 +67,8 @@ Future<void> loadGroupListPreviews(
     attachments.putIfAbsent(row['message_id'], () => []).add(row);
   }
   for (final row in rows) {
+    groups[row['conversation_id']]!.lastMessageAt =
+        DateTime.fromMicrosecondsSinceEpoch(row['created_at'] as int);
     final text = row['id'] == 'group-created:${row['conversation_id']}'
         ? groups[row['conversation_id']]!.creationMessage!
         : row['text'] as String;
@@ -86,7 +88,9 @@ Future<void> loadGroupListPreviews(
     final body = [...labels, if (text.isNotEmpty) text].join(' ');
     groups[row['conversation_id']]!.storedPreviewIsSystem =
         row['kind'] == 'system';
-    groups[row['conversation_id']]!.storedPreview = row['kind'] == 'system'
+    groups[row['conversation_id']]!.storedPreview =
+        row['kind'] == 'system' ||
+            row['sender_id'] == MessageSender.localUser.id
         ? body
         : '${names[row['sender_id']]}：$body';
   }

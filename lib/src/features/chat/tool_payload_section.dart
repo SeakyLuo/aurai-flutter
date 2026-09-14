@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -11,11 +12,15 @@ class ToolPayloadSection extends StatefulWidget {
     required this.title,
     required this.json,
     required this.missing,
+    this.headerPadding = EdgeInsets.zero,
+    this.titleStyle,
   });
 
   final String title;
   final String? json;
   final String missing;
+  final EdgeInsetsGeometry headerPadding;
+  final TextStyle? titleStyle;
 
   @override
   State<ToolPayloadSection> createState() => _ToolPayloadSectionState();
@@ -59,16 +64,15 @@ class _ToolPayloadSectionState extends State<ToolPayloadSection> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: EdgeInsets.zero,
+            padding: widget.headerPadding,
             child: Row(
               children: [
                 Expanded(
                   child: Text(
                     widget.title,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: colors.onSurfaceVariant,
-                    ),
+                    style:
+                        widget.titleStyle ??
+                        TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
                   ),
                 ),
                 if (canCopy)
@@ -85,10 +89,12 @@ class _ToolPayloadSectionState extends State<ToolPayloadSection> {
                           messenger.showSnackBar(
                             SnackBar(content: Text('已复制${widget.title}')),
                           );
-                        } on Object {
+                        } on Object catch (error) {
                           if (!context.mounted) return;
                           messenger.showSnackBar(
-                            const SnackBar(content: Text('复制失败，请重试')),
+                            SnackBar(
+                              content: Text('复制失败，请重试：${errorMessage(error)}'),
+                            ),
                           );
                         }
                       },

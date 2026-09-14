@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
 import '../../domain/message_sender.dart';
@@ -61,7 +62,11 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
       }
     } on Object catch (error) {
       if (mounted)
-        _notice(error is StateError ? error.message.toString() : '移除失败，请重试');
+        _notice(
+          error is StateError
+              ? error.message.toString()
+              : '移除失败，请重试：${errorMessage(error)}',
+        );
     } finally {
       if (mounted) setState(() => _saving = false);
     }

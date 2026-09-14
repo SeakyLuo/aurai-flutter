@@ -56,7 +56,7 @@ class ChatFileAccess(private val context: Context) {
                         call.argument<String>("name")!!, call.argument<String>("mimeType")!!,
                         call.argument<Int>("offset")!!, call.argument<Int>("maxCharacters")!!)
                     main.post { result.success(output) }
-                } catch (error: Exception) { main.post { result.error("read_file", error.message ?: "附件读取失败", null) } }
+                } catch (error: Exception) { main.post { result.error("read_file", error.toString(), null) } }
             }
             else -> return false
         }
@@ -110,7 +110,7 @@ class ChatFileAccess(private val context: Context) {
                 main.post { reply = null; picker = null; result.success(output) }
             } catch (error: Exception) {
                 copied.forEach { it.delete() }
-                main.post { reply = null; picker = null; result.error("attachment", error.message ?: "附件添加失败", null) }
+                main.post { reply = null; picker = null; result.error("attachment", error.toString(), null) }
             }
         }
     }

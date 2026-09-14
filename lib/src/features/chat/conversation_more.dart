@@ -1,8 +1,10 @@
+import '../../domain/error_message.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 
 import 'chat_controller.dart';
+import 'ai_contact_page.dart';
 import 'group_members_page.dart';
 import 'group_info_page.dart';
 import 'sidebar_action_icon.dart';
@@ -52,8 +54,8 @@ class _ConversationMoreState extends State<ConversationMore> {
     setState(() => _saving = true);
     try {
       await widget.controller.toggleConversationPin(_conversation.id);
-    } on Object {
-      _notice('置顶保存失败，请重试');
+    } on Object catch (error) {
+      _notice('置顶保存失败，请重试：${errorMessage(error)}');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -93,8 +95,8 @@ class _ConversationMoreState extends State<ConversationMore> {
         try {
           await controller.setConversationArchived(target.id, archived: false);
           notice('已撤销归档');
-        } on Object {
-          notice('撤销归档失败，请在已归档会话中重试');
+        } on Object catch (error) {
+          notice('撤销归档失败，请在已归档会话中重试：${errorMessage(error)}');
         }
       },
     );
@@ -105,8 +107,8 @@ class _ConversationMoreState extends State<ConversationMore> {
         target.id,
         archived: !wasArchived,
       );
-    } on Object {
-      notice('归档保存失败，请重试');
+    } on Object catch (error) {
+      notice('归档保存失败，请重试：${errorMessage(error)}');
       if (mounted) setState(() => _saving = false);
       return;
     }
@@ -143,10 +145,10 @@ class _ConversationMoreState extends State<ConversationMore> {
       await widget.controller.deleteConversation(deletedId);
       _notice('会话已删除');
       if (mounted && widget.conversation == null) _closeDetails();
-    } on FileSystemException {
-      _notice('会话已删除，部分图片文件清理失败');
-    } on Object {
-      _notice('删除失败，请重试');
+    } on FileSystemException catch (error) {
+      _notice('会话已删除，部分图片文件清理失败：${errorMessage(error)}');
+    } on Object catch (error) {
+      _notice('删除失败，请重试：${errorMessage(error)}');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -200,6 +202,7 @@ class _ConversationMoreState extends State<ConversationMore> {
     final pinned = _conversation.isPinned;
     final isGroup = _conversation.kind == ConversationKind.group;
     final targetId = _conversation.id;
+    final senderId = _conversation.defaultSenderId;
     final hasTask = conversationTasks(
       widget.controller,
       targetId,
@@ -208,9 +211,7 @@ class _ConversationMoreState extends State<ConversationMore> {
     final safe = MediaQuery.paddingOf(context);
     final menuWidth = 212.0;
     final menuHeight =
-        (_conversation.isArchived ? 202.0 : 264.0) +
-        (hasTask ? 54 : 0) +
-        (isGroup ? 54 : 0);
+        (_conversation.isArchived ? 202.0 : 264.0) + (hasTask ? 54 : 0) + 54;
     final anchor =
         position ??
         Offset(
@@ -253,6 +254,17 @@ class _ConversationMoreState extends State<ConversationMore> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            if (!isGroup)
+                              _GlassMenuItem(
+                                iconWidget: const SettingsIcon(
+                                  type: SettingsIconType.personalInfo,
+                                ),
+                                label: '查看资料',
+                                onTap: () => Navigator.pop(
+                                  menuContext,
+                                  _MoreAction.profile,
+                                ),
+                              ),
                             if (isGroup)
                               _GlassMenuItem(
                                 iconWidget: const SidebarActionIcon(
@@ -327,6 +339,16 @@ class _ConversationMoreState extends State<ConversationMore> {
     );
     if (!mounted) return;
     switch (action) {
+      case _MoreAction.profile:
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AiContactPage(
+              controller: widget.controller,
+              senderId: senderId,
+            ),
+          ),
+        );
       case _MoreAction.task:
         await openConversationTask(
           context,
@@ -385,7 +407,7 @@ class _ConversationMoreState extends State<ConversationMore> {
         );
 }
 
-enum _MoreAction { task, members, pin, rename, archive, delete }
+enum _MoreAction { profile, task, members, pin, rename, archive, delete }
 
 class _GlassMenuItem extends StatelessWidget {
   const _GlassMenuItem({

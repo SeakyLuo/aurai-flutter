@@ -110,6 +110,7 @@ extension MessageRecall on ChatController {
         _store.writer.remember([notice]);
       });
       await _store.writer.save(conversation, makeActive: false);
+      HtmlGameSignals.changes.add(message.id);
       _conversationChanged();
       if (userInitiated && live) {
         dispatcher.start(
@@ -155,6 +156,8 @@ extension MessageRecall on ChatController {
           responseInput: m.responseInput,
           isSystem: m.isSystem,
           isGroupMessage: m.isGroupMessage,
+          htmlGame: m.htmlGame,
+          interactive: m.interactive,
           isFailure: m.isFailure,
           quote: _recalledQuote(m.quote!),
         );

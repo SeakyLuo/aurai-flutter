@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import '../../domain/ai_profile.dart';
 import 'package:flutter/material.dart';
 import '../../agent/system_prompt.dart';
@@ -81,8 +82,8 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
       _profile = next;
       if (mounted) _notice('个性化设置已保存');
       return true;
-    } on Object {
-      if (mounted) _notice('保存失败，请重试');
+    } on Object catch (error) {
+      if (mounted) _notice('保存失败，请重试：${errorMessage(error)}');
       return false;
     } finally {
       if (mounted) setState(() => _saving = false);

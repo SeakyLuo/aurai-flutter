@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import '../../domain/message_sender.dart';
 import 'header_action_menu.dart';
 import 'ai_contact_actions.dart';
@@ -22,10 +23,12 @@ class AiContactsPage extends StatefulWidget {
     required this.controller,
     this.archived = false,
     this.root = false,
+    this.selectForConversation = false,
   });
   final ChatController controller;
   final bool archived;
   final bool root;
+  final bool selectForConversation;
   @override
   State<AiContactsPage> createState() => _AiContactsPageState();
 }
@@ -67,11 +70,11 @@ class _AiContactsPageState extends State<AiContactsPage> {
         _items.addAll(page);
         _more = page.length == 50;
       });
-    } on Object {
+    } on Object catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('朋友加载失败'),
+            content: Text('朋友加载失败：${errorMessage(error)}'),
             action: SnackBarAction(
               label: '重试',
               onPressed: () => _load(reset: true),
@@ -103,6 +106,11 @@ class _AiContactsPageState extends State<AiContactsPage> {
       ),
     );
     if (!mounted) return;
+    if (id != null && widget.selectForConversation) {
+      final ai = await widget.controller.groupStore.loadAi(id);
+      if (mounted) Navigator.pop(context, ai);
+      return;
+    }
     if (id != null) await _open(id);
     if (mounted) _load(reset: true);
   }
@@ -149,10 +157,19 @@ class _AiContactsPageState extends State<AiContactsPage> {
                             type: ai.sender.archived
                                 ? ConversationMenuIconType.unarchive
                                 : ConversationMenuIconType.archive,
-                            color: Theme.of(context).colorScheme.onSurface,
+                            color: ai.sender.archived
+                                ? Theme.of(context).colorScheme.onSurface
+                                : Theme.of(context).colorScheme.error,
                           )
                         : SettingsIcon(type: item.$3),
-                    title: Text(item.$2),
+                    title: Text(
+                      item.$2,
+                      style: TextStyle(
+                        color: item.$1 == 'archive' && !ai.sender.archived
+                            ? Theme.of(context).colorScheme.error
+                            : null,
+                      ),
+                    ),
                     onTap: () => Navigator.pop(context, item.$1),
                   ),
               ],
@@ -189,11 +206,22 @@ class _AiContactsPageState extends State<AiContactsPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: SettingsAppBar(
-      title: widget.archived ? '已归档朋友' : '通讯录',
+      title: widget.selectForConversation
+          ? '选择朋友'
+          : widget.archived
+          ? '已归档朋友'
+          : '通讯录',
       root: widget.root,
       onBack: () => Navigator.pop(context),
       actions: [
-        if (!widget.archived)
+        if (widget.selectForConversation)
+          SettingsGlassAction(
+            label: '添加 AI',
+            icon: Icons.add_rounded,
+            iconWidget: const SettingsIcon(type: SettingsIconType.add),
+            onPressed: _create,
+          ),
+        if (!widget.archived && !widget.selectForConversation)
           Builder(
             builder: (buttonContext) => SettingsGlassAction(
               label: '更多',
@@ -311,8 +339,12 @@ class _AiContactsPageState extends State<AiContactsPage> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                        onTap: () => _open(ai.sender.id),
-                        onLongPress: () => _menu(ai),
+                        onTap: () => widget.selectForConversation
+                            ? Navigator.pop(context, ai)
+                            : _open(ai.sender.id),
+                        onLongPress: widget.selectForConversation
+                            ? null
+                            : () => _menu(ai),
                       );
                     },
                   ),

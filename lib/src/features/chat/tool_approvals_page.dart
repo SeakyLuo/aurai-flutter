@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import 'chat_controller.dart';
 import 'settings_appearance.dart';
@@ -21,11 +22,11 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
         key,
         conversation: conversation,
       );
-    } catch (_) {
+    } catch (caughtError) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('撤销授权失败，请重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('撤销授权失败，请重试：${errorMessage(caughtError)}')),
+        );
     } finally {
       if (mounted) setState(() => _removing.remove(token));
     }

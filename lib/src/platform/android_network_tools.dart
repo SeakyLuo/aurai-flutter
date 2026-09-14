@@ -1,3 +1,4 @@
+import '../domain/error_message.dart';
 import 'package:flutter/services.dart';
 
 import '../domain/tool_models.dart';
@@ -305,10 +306,7 @@ ToolResult _platformError(ToolCall call, PlatformException error) => ToolResult(
   status: error.code == 'cancelled'
       ? ToolResultStatus.cancelled
       : ToolResultStatus.error,
-  output: <String, Object?>{
-    'error': error.message ?? error.code,
-    'code': error.code,
-  },
+  output: <String, Object?>{'error': errorMessage(error), 'code': error.code},
 );
 
 ToolResult platformToolError(ToolCall call, PlatformException error) =>

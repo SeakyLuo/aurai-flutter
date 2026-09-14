@@ -92,27 +92,39 @@ extension AiIdentityController on ChatController {
       'conversations',
       columns: ['id'],
       where:
-          "kind = 'direct' AND default_sender_id = ? AND archived = 0"
+          "kind = 'direct' AND default_sender_id = ? AND archived = 0 AND $localUserConversation"
           "${newConversation ? ' AND ($emptyDirectConversation)' : ''}",
       whereArgs: [ai.sender.id],
       orderBy: 'updated_at DESC, id DESC',
       limit: 1,
     );
     if (rows.isNotEmpty) return rows.single['id'] as String;
-    final conversation = Conversation.empty()
-      ..defaultSenderId = ai.sender.id
-      ..storedTitle = '新会话';
-    await _store.writer.save(conversation, makeActive: false);
-    _updateConversationList(conversation);
-    _conversationChanged();
+    var conversation = await _newDraftStore.load(
+      _imageStore.directory,
+      senderId: ai.sender.id,
+    );
+    if (await _store.hasMessages(conversation.id)) {
+      await _newDraftStore.clear(senderId: ai.sender.id);
+      conversation = Conversation.empty()..defaultSenderId = ai.sender.id;
+    }
+    _pendingAiConversation = conversation;
     return conversation.id;
   }
 
-  Future<void> saveAi(AiProfile ai, {bool create = false}) async {
+  Future<void> saveAi(
+    AiProfile ai, {
+    bool create = false,
+    bool addToMyContacts = true,
+  }) async {
     if (create) {
       await groupStore.createAi(ai);
     } else {
       await groupStore.updateAi(ai);
+    }
+    if (addToMyContacts && !ai.isTemporary && !ai.sender.archived) {
+      await ContactRelationships(
+        _store.database,
+      ).add(MessageSender.localUser.id, ai.sender.id);
     }
     if (_activeAi?.sender.id == ai.sender.id) _activeAi = ai;
     if (_groupReplies.containsKey(ai.sender.id)) {

@@ -10,6 +10,9 @@ import '../domain/model_provider.dart';
 class AuraiPlatform {
   AuraiPlatform._();
 
+  late Future<Uint8List> Function(String conversationId) notificationAvatar;
+  final _attentionRequests = <(String, String), Object>{};
+
   static final AuraiPlatform instance = AuraiPlatform._();
   static const MethodChannel _channel = MethodChannel(
     'com.haiskynology.aurai/platform',
@@ -66,10 +69,11 @@ class AuraiPlatform {
     String title,
     String body,
     String conversationId,
-  ) => _invokeMap('sendNotification', {
+  ) async => _invokeMap('sendNotification', {
     'title': title,
     'body': body,
     'conversationId': conversationId,
+    'avatar': await notificationAvatar(conversationId),
   });
 
   Future<Map<String, Object?>> documentOperation(
@@ -154,8 +158,26 @@ class AuraiPlatform {
   Future<void> openAccessibilitySettings() =>
       _channel.invokeMethod<void>('openAccessibilitySettings');
 
-  Future<void> startAgentSession(String step) =>
-      _channel.invokeMethod<void>('startAgentSession', {'step': step});
+  Future<void> startAgentSession(
+    String step, {
+    required String conversationId,
+    bool groupChat = false,
+  }) async => _channel.invokeMethod<void>('startAgentSession', {
+    'step': step,
+    'groupChat': groupChat,
+    'avatar': groupChat ? null : await notificationAvatar(conversationId),
+  });
+
+  Future<void> notifyGroupMessage(
+    String conversationId,
+    String title,
+    String body,
+  ) async => _channel.invokeMethod<void>('notifyGroupMessage', {
+    'conversationId': conversationId,
+    'title': title,
+    'body': body,
+    'avatar': await notificationAvatar(conversationId),
+  });
 
   Future<void> updateAgentSessionStep(String step) =>
       _channel.invokeMethod<void>('updateAgentSessionStep', <String, Object?>{
@@ -168,24 +190,41 @@ class AuraiPlatform {
     String? title,
     String? body,
     int? timeoutSeconds,
-  }) => _channel.invokeMethod<void>('updateAttentionNotification', {
-    'conversationId': conversationId,
-    'kind': kind,
-    'title': title,
-    'body': body,
-    'timeoutSeconds': timeoutSeconds,
-  });
+  }) async {
+    final key = (conversationId, kind);
+    final request = Object();
+    _attentionRequests[key] = request;
+    try {
+      final avatar = title == null
+          ? null
+          : await notificationAvatar(conversationId);
+      // Clearing or replacing a reminder supersedes an avatar still rendering.
+      if (!identical(_attentionRequests[key], request)) return;
+      await _channel.invokeMethod<void>('updateAttentionNotification', {
+        'conversationId': conversationId,
+        'kind': kind,
+        'avatar': avatar,
+        'title': title,
+        'body': body,
+        'timeoutSeconds': timeoutSeconds,
+      });
+    } finally {
+      if (identical(_attentionRequests[key], request))
+        _attentionRequests.remove(key);
+    }
+  }
 
   Future<void> endAgentSession(
     String outcome, {
     required String conversationId,
     required String title,
     required String reply,
-  }) => _channel.invokeMethod<void>('endAgentSession', {
+  }) async => _channel.invokeMethod<void>('endAgentSession', {
     'outcome': outcome,
     'conversationId': conversationId,
     'title': title,
     'reply': reply,
+    'avatar': await notificationAvatar(conversationId),
   });
 
   Future<String?> takeNotificationConversation() =>

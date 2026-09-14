@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../domain/ui_tool_actions.dart';
 import '../domain/tool_models.dart';
 import 'tool_executor.dart';
 import 'tool_registry.dart';
@@ -44,15 +45,30 @@ class GroupToolExecutor extends ToolExecutor {
           )
         : super.execute(call, onWaitingForUser: onWaitingForUser);
     // Device mutations and user dialogs share one surface; read-only work can overlap.
+    final safety = definition?.safetyFor(call.arguments);
+    final confirmation = tool is ToolConfirmationPolicyAgentTool
+        ? (tool as ToolConfirmationPolicyAgentTool).requiresConfirmation(call)
+        : safety == ToolSafety.sensitive || safety == ToolSafety.destructive;
+    final deviceSurface =
+        isScreenTool(call.name) ||
+        const {
+          'observeDevice',
+          'waitForUi',
+          'launchApp',
+          'startIntent',
+          'openSettings',
+          'openAppPage',
+          'executeAndroidScript',
+          'executeShizuku',
+          'shell',
+          'runSkill',
+          'requestAccessibilityAccess',
+        }.contains(call.name);
     final exclusive =
         call.userAction != null ||
         definition?.waitsForUser == true ||
-        (tool is ToolConfirmationPolicyAgentTool &&
-            (tool as ToolConfirmationPolicyAgentTool).requiresConfirmation(
-              call,
-            )) ||
-        (definition != null &&
-            definition.safetyFor(call.arguments) != ToolSafety.readOnly);
+        confirmation ||
+        deviceSurface;
     return exclusive
         ? queue.run(() async {
             await waitForInteraction();

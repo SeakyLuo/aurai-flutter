@@ -1,3 +1,8 @@
+import '../../html_games/html_game_view.dart';
+import '../../domain/error_message.dart';
+import 'image_forward_page.dart';
+import 'group_mention_text.dart';
+import 'interactive_message_view.dart';
 import 'group_message_heading.dart';
 import 'task_failure_icon.dart';
 import 'message_quote_view.dart';
@@ -38,12 +43,18 @@ class MessageItem extends StatefulWidget {
     this.groupBubble = false,
     this.onQuote,
     this.onRecall,
+    this.onInteractiveClick,
+    this.htmlGameView,
     this.onOpenQuote,
     this.onOpenMember,
     this.availableSources = const {},
+    this.mentionMembers = const {},
     this.excludedActivityMessageId,
   });
   final AgentMessage message;
+  final Map<String, String> mentionMembers;
+  final Future<String?> Function(String buttonId, int revision)?
+  onInteractiveClick;
   final ValueChanged<AgentMessage>? onQuote;
   final Future<void> Function(AgentMessage)? onRecall;
   final ValueChanged<String>? onOpenQuote;
@@ -51,6 +62,7 @@ class MessageItem extends StatefulWidget {
   final String? excludedActivityMessageId;
   final bool streaming;
   final bool groupBubble;
+  final Widget? htmlGameView;
   final Map<String, SourceReference> availableSources;
   final Future<void> Function(AgentMessage)? onEdit;
 
@@ -83,6 +95,7 @@ class _MessageItemState extends State<MessageItem> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.message != message ||
         oldWidget.groupBubble != widget.groupBubble ||
+        !mapEquals(oldWidget.mentionMembers, widget.mentionMembers) ||
         !mapEquals(oldWidget.availableSources, widget.availableSources)) {
       _content = _buildContent(context);
     }
@@ -108,6 +121,7 @@ class _MessageItemState extends State<MessageItem> {
             if (widget.groupBubble || message.taskSummary?.stopped != true)
               _selectableContent(),
             if (!widget.groupBubble &&
+                message.htmlGame == null &&
                 !widget.streaming &&
                 message.taskSummary?.stopped != true)
               Padding(
@@ -167,7 +181,7 @@ class _MessageItemState extends State<MessageItem> {
         );
 
   Widget _selectableContent() {
-    if (widget.groupBubble) return _content;
+    if (widget.groupBubble || message.htmlGame != null) return _content;
     final content = SelectionArea(
       contextMenuBuilder: (context, selection) =>
           AdaptiveTextSelectionToolbar.buttonItems(
@@ -204,9 +218,38 @@ class _MessageItemState extends State<MessageItem> {
       allowEditing: widget.onEdit != null,
       allowQuote: widget.onQuote != null,
       allowRecall: widget.onRecall != null,
+      allowForward:
+          !widget.streaming &&
+          !message.isFailure &&
+          (message.text.isNotEmpty ||
+              message.images.isNotEmpty ||
+              message.files.isNotEmpty),
     );
     if (!mounted) return;
     switch (action) {
+      case MessageAction.fullscreen:
+        await (widget.htmlGameView! as HtmlGameView).openFullscreen(context);
+      case MessageAction.forward:
+        final sent = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => ImageForwardPage.message(
+              controller: ImageActionScope.of(context),
+              message: AgentMessage(
+                id: snapshot.id,
+                senderId: snapshot.senderId,
+                role: snapshot.role,
+                text: snapshot.text,
+                images: List.of(snapshot.images),
+                files: List.of(snapshot.files),
+                createdAt: snapshot.createdAt,
+              ),
+            ),
+          ),
+        );
+        if (mounted && sent == true)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('已转发')));
       case MessageAction.recall:
         await widget.onRecall?.call(snapshot);
       case MessageAction.quote:
@@ -227,6 +270,69 @@ class _MessageItemState extends State<MessageItem> {
   }
 
   Widget _buildContent(BuildContext context) {
+    if (message.htmlGame != null) {
+      return Padding(
+        padding: widget.groupBubble
+            ? EdgeInsets.zero
+            : const EdgeInsets.symmetric(horizontal: 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    message.sender!.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                Builder(
+                  builder: (buttonContext) => Semantics(
+                    button: true,
+                    label: '消息菜单',
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () {
+                        final box =
+                            buttonContext.findRenderObject()! as RenderBox;
+                        _openActions(
+                          box.localToGlobal(box.size.center(Offset.zero)),
+                        );
+                      },
+                      child: SizedBox(
+                        width: 32,
+                        height: 18,
+                        child: Icon(
+                          Icons.more_horiz_rounded,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Material(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xff2a292f)
+                  : const Color(0xffefeff3),
+              borderRadius: BorderRadius.circular(22),
+              clipBehavior: Clip.antiAlias,
+              child: widget.htmlGameView!,
+            ),
+          ],
+        ),
+      );
+    }
     if (message.role == AgentMessageRole.user) {
       return LayoutBuilder(
         builder: (context, constraints) => Align(
@@ -303,8 +409,12 @@ class _MessageItemState extends State<MessageItem> {
                           horizontal: 20,
                           vertical: 14,
                         ),
-                        child: Text(
-                          message.text,
+                        child: GroupMentionText(
+                          text: message.text,
+                          members: widget.groupBubble
+                              ? widget.mentionMembers
+                              : const {},
+                          onOpen: widget.onOpenMember,
                           style: TextStyle(
                             color:
                                 Theme.of(context).brightness == Brightness.dark
@@ -361,113 +471,125 @@ class _MessageItemState extends State<MessageItem> {
               onTap: () => widget.onOpenQuote?.call(message.quote!.messageId),
             ),
           ),
-        MediaQuery.removePadding(
-          context: context,
-          removeBottom: true,
-          child: MarkdownLinkUnderlines(
-            child: MarkdownBody(
-              blockSyntaxes: [ReplyImageSyntax()],
-              inlineSyntaxes: [
-                SourceCitationSyntax(availableSources),
-                SourceLinkSyntax(availableSources),
-                CjkStrongSyntax(),
-              ],
-              builders: {
-                'reference-gallery': ReplyImageGalleryBuilder(
-                  (url) => _openLink(context, url),
-                ),
-                'source-citation': SourceCitationBuilder(
-                  onOpenLink: (href) => _openLink(context, href),
-                ),
-              },
-              data: imageMarkdownForDisplay(message.text, widget.streaming),
-              selectable: false,
-              fitContent: widget.groupBubble,
-              onTapLink: (text, href, title) => _openLink(context, href),
-              styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context))
-                  .copyWith(
-                    horizontalRuleDecoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(
-                          width: 0.5,
-                          color: Theme.of(context).colorScheme.outlineVariant,
-                        ),
-                      ),
-                    ),
-                    p: body,
-                    strong: const TextStyle(fontWeight: FontWeight.w700),
-                    h1: body.copyWith(
-                      fontSize: widget.groupBubble ? 22 : 25,
-                      fontWeight: FontWeight.w700,
-                      height: 1.4,
-                    ),
-                    h2: body.copyWith(
-                      fontSize: widget.groupBubble ? 19 : 21,
-                      fontWeight: FontWeight.w700,
-                      height: 1.4,
-                    ),
-                    h3: body.copyWith(
-                      fontSize: widget.groupBubble ? 17 : 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    h1Padding: const EdgeInsets.only(top: 12),
-                    h2Padding: const EdgeInsets.only(top: 12),
-                    h3Padding: const EdgeInsets.only(top: 8),
-                    blockSpacing: 20,
-                    listIndent: 24,
-                    listBullet: body,
-                    blockquote: body,
-                    blockquotePadding: const EdgeInsets.only(
-                      left: 18,
-                      top: 2,
-                      bottom: 2,
-                    ),
-                    blockquoteDecoration: BoxDecoration(
-                      border: Border(
-                        left: BorderSide(
-                          color: Theme.of(context).colorScheme.outlineVariant,
-                          width: 3,
-                        ),
-                      ),
-                    ),
-                    code: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: widget.groupBubble ? 13 : 14,
-                      height: widget.groupBubble ? 1.4 : 1.6,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest,
-                    ),
-                    codeblockDecoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    codeblockPadding: const EdgeInsets.all(16),
-                    tableColumnWidth: const IntrinsicColumnWidth(),
-                    tableScrollbarThumbVisibility: true,
-                    tablePadding: const EdgeInsets.only(bottom: 12),
-                    tableBody: body.copyWith(
-                      fontSize: widget.groupBubble ? 14 : 15,
-                    ),
-                    tableHead: body.copyWith(
-                      fontSize: widget.groupBubble ? 14 : 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    tableCellsPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    tableBorder: TableBorder.all(
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                    ),
-                    a: body.merge(GlobalUI.linkStyle(context)),
+        if (message.htmlGame != null)
+          widget.htmlGameView!
+        else if (message.interactive != null)
+          InteractiveMessageView(
+            card: message.interactive!,
+            onClick: widget.onInteractiveClick!,
+            onOpenLink: (url) => _openLink(context, url),
+          )
+        else
+          MediaQuery.removePadding(
+            context: context,
+            removeBottom: true,
+            child: MarkdownLinkUnderlines(
+              child: MarkdownBody(
+                blockSyntaxes: [ReplyImageSyntax()],
+                inlineSyntaxes: [
+                  SourceCitationSyntax(availableSources),
+                  SourceLinkSyntax(availableSources),
+                  CjkStrongSyntax(),
+                  if (widget.groupBubble)
+                    MemberMentionSyntax(widget.mentionMembers),
+                ],
+                builders: {
+                  'member-mention': MemberMentionBuilder(widget.onOpenMember),
+                  'reference-gallery': ReplyImageGalleryBuilder(
+                    (url) => _openLink(context, url),
                   ),
+                  'source-citation': SourceCitationBuilder(
+                    onOpenLink: (href) => _openLink(context, href),
+                  ),
+                },
+                data: imageMarkdownForDisplay(message.text, widget.streaming),
+                selectable: false,
+                fitContent: widget.groupBubble,
+                onTapLink: (text, href, title) => _openLink(context, href),
+                styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context))
+                    .copyWith(
+                      horizontalRuleDecoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(
+                            width: 0.5,
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                        ),
+                      ),
+                      p: body,
+                      strong: const TextStyle(fontWeight: FontWeight.w700),
+                      h1: body.copyWith(
+                        fontSize: widget.groupBubble ? 22 : 25,
+                        fontWeight: FontWeight.w700,
+                        height: 1.4,
+                      ),
+                      h2: body.copyWith(
+                        fontSize: widget.groupBubble ? 19 : 21,
+                        fontWeight: FontWeight.w700,
+                        height: 1.4,
+                      ),
+                      h3: body.copyWith(
+                        fontSize: widget.groupBubble ? 17 : 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      h1Padding: const EdgeInsets.only(top: 12),
+                      h2Padding: const EdgeInsets.only(top: 12),
+                      h3Padding: const EdgeInsets.only(top: 8),
+                      blockSpacing: 20,
+                      listIndent: 24,
+                      listBullet: body,
+                      blockquote: body,
+                      blockquotePadding: const EdgeInsets.only(
+                        left: 18,
+                        top: 2,
+                        bottom: 2,
+                      ),
+                      blockquoteDecoration: BoxDecoration(
+                        border: Border(
+                          left: BorderSide(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                            width: 3,
+                          ),
+                        ),
+                      ),
+                      code: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: widget.groupBubble ? 13 : 14,
+                        height: widget.groupBubble ? 1.4 : 1.6,
+                        color: Theme.of(context).colorScheme.onSurface,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                      ),
+                      codeblockDecoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      codeblockPadding: const EdgeInsets.all(16),
+                      tableColumnWidth: const IntrinsicColumnWidth(),
+                      tableScrollbarThumbVisibility: true,
+                      tablePadding: const EdgeInsets.only(bottom: 12),
+                      tableBody: body.copyWith(
+                        fontSize: widget.groupBubble ? 14 : 15,
+                      ),
+                      tableHead: body.copyWith(
+                        fontSize: widget.groupBubble ? 14 : 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      tableCellsPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      tableBorder: TableBorder.all(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                      a: body.merge(GlobalUI.linkStyle(context)),
+                    ),
+              ),
             ),
           ),
-        ),
       ],
     );
     if (!widget.groupBubble) {
@@ -476,45 +598,47 @@ class _MessageItemState extends State<MessageItem> {
         child: content,
       );
     }
-    return LayoutBuilder(
-      builder: (context, constraints) => Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          margin: const EdgeInsets.only(top: 6),
-          constraints: BoxConstraints(maxWidth: constraints.maxWidth),
-          child: Material(
-            key: _bubbleKey,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? const Color(0xff2a292f)
-                : const Color(0xffefeff3),
-            borderRadius: BorderRadius.circular(22),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onLongPress: () {
-                final box =
-                    _bubbleKey.currentContext!.findRenderObject()! as RenderBox;
-                _openActions(box.localToGlobal(box.size.center(Offset.zero)));
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: message.isFailure
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.only(top: 2),
-                            child: TaskFailureIcon(size: 18),
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(child: Text(message.text, style: body)),
-                        ],
-                      )
-                    : content,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(top: 6),
+        constraints: message.htmlGame?.width == null
+            ? null
+            : BoxConstraints(
+                maxWidth: message.htmlGame!.width!.toDouble() + 32,
               ),
+        child: Material(
+          key: _bubbleKey,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xff2a292f)
+              : const Color(0xffefeff3),
+          borderRadius: BorderRadius.circular(22),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onLongPress: () {
+              final box =
+                  _bubbleKey.currentContext!.findRenderObject()! as RenderBox;
+              _openActions(box.localToGlobal(box.size.center(Offset.zero)));
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: message.isFailure
+                  ? Text.rich(
+                      TextSpan(
+                        children: [
+                          const WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: Padding(
+                              padding: EdgeInsets.only(right: 6),
+                              child: TaskFailureIcon(size: 14),
+                            ),
+                          ),
+                          TextSpan(text: message.text),
+                        ],
+                      ),
+                      style: body,
+                    )
+                  : content,
             ),
           ),
         ),
@@ -531,8 +655,8 @@ class _MessageItemState extends State<MessageItem> {
       _copyResetTimer = Timer(const Duration(milliseconds: 1500), () {
         setState(() => _copied = false);
       });
-    } on Object {
-      if (context.mounted) _notice(context, '复制失败，请重试');
+    } on Object catch (error) {
+      if (context.mounted) _notice(context, '复制失败，请重试：${errorMessage(error)}');
     }
   }
 
@@ -551,9 +675,10 @@ class _MessageItemState extends State<MessageItem> {
       try {
         await AuraiPlatform.instance.openSourceFile(file.url);
       } on PlatformException catch (error) {
-        if (context.mounted) _notice(context, error.message ?? '无法打开此文件');
-      } on Object {
-        if (context.mounted) _notice(context, '无法打开此文件');
+        if (context.mounted)
+          _notice(context, error.message ?? '无法打开此文件：${errorMessage(error)}');
+      } on Object catch (error) {
+        if (context.mounted) _notice(context, '无法打开此文件：${errorMessage(error)}');
       }
       return;
     }
@@ -569,8 +694,9 @@ class _MessageItemState extends State<MessageItem> {
         'action': 'android.intent.action.VIEW',
         'data': uri.toString(),
       });
-    } on Object {
-      if (context.mounted) _notice(context, '无法打开链接，请稍后再试');
+    } on Object catch (error) {
+      if (context.mounted)
+        _notice(context, '无法打开链接，请稍后再试：${errorMessage(error)}');
     }
   }
 

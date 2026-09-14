@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'unavailable_image.dart';
 import 'image_action_scope.dart';
 import 'dart:io';
@@ -122,11 +123,11 @@ class _ImageAttachmentState extends State<ImageAttachment> {
           FileImage(File(widget.image.path)),
           context,
         );
-      } on Object {
+      } on Object catch (error) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('图片无法打开，请重试')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('图片无法打开，请重试：${errorMessage(error)}')),
+          );
         }
         return;
       }

@@ -54,7 +54,7 @@ object NetworkCaptureAccess {
             val intent = VpnService.prepare(context)
             if (intent == null) consent(context, true)
             else activity.requestVpnPermission(intent)
-        } catch (error: Exception) { failed(error.message ?: "无法申请 VPN 授权") }
+        } catch (error: Exception) { failed(error.toString()) }
     }
 
     fun consent(context: Context, granted: Boolean) {
@@ -63,7 +63,7 @@ object NetworkCaptureAccess {
         status = "starting"
         try {
             context.startForegroundService(Intent(context, AuraiVpnService::class.java).putExtra("seconds", duration))
-        } catch (error: Exception) { failed(error.message ?: "无法启动本地 VPN") }
+        } catch (error: Exception) { failed(error.toString()) }
     }
 
     fun started(context: Context, seconds: Int) {

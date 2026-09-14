@@ -5,10 +5,12 @@ import 'package:sqflite/sqflite.dart';
 import '../domain/agent_models.dart';
 import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
+import 'new_conversation_draft.dart';
 
 class ConversationWriter {
   ConversationWriter(this.database);
   final Database database;
+  final _draftStore = NewConversationDraft();
   final Map<String, AgentMessage> _savedMessages = {};
   Future<void> _saving = Future.value();
 
@@ -29,6 +31,11 @@ class ConversationWriter {
     bool makeActive = true,
     Map<String, List<String>> recipients = const {},
   }) {
+    if (conversation.kind == ConversationKind.direct &&
+        conversation.messageCount == 0 &&
+        conversation.messages.isEmpty) {
+      return _draftStore.save(conversation);
+    }
     final header = conversationRow(conversation);
     final mentions = jsonEncode(
       conversation.draftMentions.map((m) => m.toJson()).toList(),

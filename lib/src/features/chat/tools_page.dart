@@ -6,6 +6,7 @@ import 'chat_controller.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'tool_action_icon.dart';
+import 'tool_detail_page.dart';
 import 'tool_approvals_page.dart';
 
 class ToolsPage extends StatelessWidget {
@@ -43,6 +44,7 @@ class ToolsPage extends StatelessWidget {
             borderRadius: BorderRadius.circular(26),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
+              contentPadding: const EdgeInsets.only(left: 16, right: 8),
               leading: const SettingsIcon(type: SettingsIconType.tools),
               title: const Text('工具授权'),
               trailing: const SettingsIcon(type: SettingsIconType.chevron),
@@ -73,8 +75,18 @@ class ToolsPage extends StatelessWidget {
                 children: [
                   for (final tool in group.value)
                     ListTile(
+                      contentPadding: const EdgeInsets.only(left: 16, right: 8),
                       leading: ToolActionIcon(toolName: tool.name),
                       title: Text(toolTitle(tool.name)),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: () => Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ToolDetailPage(tool: tool),
+                        ),
+                      ),
                     ),
                 ],
               ),
