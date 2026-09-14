@@ -2,7 +2,7 @@ part of 'chat_controller.dart';
 
 extension GlobalTools on ChatController {
   List<AgentTool> _createTools({
-    required String conversationId,
+    required Conversation conversation,
     required String senderId,
     required String? messageId,
     required String providerLabel,
@@ -14,7 +14,16 @@ extension GlobalTools on ChatController {
     required WebSourceRegistry webSources,
     String? groupId,
   }) {
+    final conversationId = conversation.id;
     return <AgentTool>[
+      for (final name in AppControlTool.descriptions.keys)
+        AppControlTool(
+          name,
+          (operation, args) =>
+              _controlApp(operation, args, senderId, conversationId),
+        ),
+      if (conversation.kind == ConversationKind.group)
+        RecallMessageTool((id) => _recallAiMessage(conversation, senderId, id)),
       for (final update in [false, true])
         SelfProfileTool(
           store: groupStore,
@@ -112,7 +121,7 @@ extension GlobalTools on ChatController {
   List<ToolDefinition> get globalToolDefinitions {
     final conversation = activeConversation;
     final tools = _createTools(
-      conversationId: conversation.id,
+      conversation: conversation,
       senderId: MessageSender.aurai.id,
       messageId: null,
       providerLabel: config.service.label,

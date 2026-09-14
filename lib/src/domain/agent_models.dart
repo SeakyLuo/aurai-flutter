@@ -20,6 +20,7 @@ class AgentMessage {
     this.responseInput,
     this.sender,
     this.isSystem = false,
+    this.isFailure = false,
     this.isGroupMessage = false,
     this.quote,
   });
@@ -38,12 +39,14 @@ class AgentMessage {
     modelTurnId: modelTurnId,
     responseInput: responseInput,
     isSystem: isSystem,
+    isFailure: isFailure,
     isGroupMessage: isGroupMessage,
     quote: quote,
   );
 
   final MessageQuote? quote;
   final bool isSystem;
+  final bool isFailure;
   final bool isGroupMessage;
   final String id;
   final AgentMessageRole role;
@@ -64,6 +67,7 @@ class AgentMessage {
     'senderId': senderId,
     if (quote != null) 'quote': quote!.toJson(),
     if (isSystem) 'isSystem': true,
+    if (isFailure) 'isFailure': true,
     if (isGroupMessage) 'isGroupMessage': true,
     'text': text,
     'createdAt': createdAt.toIso8601String(),
@@ -78,6 +82,7 @@ class AgentMessage {
   }) => AgentMessage(
     id: json['id']! as String,
     isSystem: json['isSystem'] == true,
+    isFailure: json['isFailure'] == true,
     isGroupMessage: json['isGroupMessage'] == true,
     quote: json['quote'] == null
         ? null
@@ -238,7 +243,15 @@ String newMessageId() =>
 String toolTitle(String name) => switch (name) {
   'readMyProfile' => '读取自己的资料',
   'updateMyProfile' => '更新自己的资料',
+  'createConversation' => '新建会话',
+  'renameConversation' => '重命名会话',
+  'setConversationPinned' => '调整会话置顶',
+  'setConversationArchived' => '调整会话归档',
+  'deleteConversation' => '删除会话',
+  'sendConversationMessage' => '发送会话消息',
+  'openAppPage' => '打开应用页面',
   'sendGroupMessages' => '发送群消息',
+  'recallMessage' => '撤回消息',
   'listGroupChats' => '查询群聊',
   'readGroupChat' => '读取群聊',
   'createGroupChat' => '创建群聊',

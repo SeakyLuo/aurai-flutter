@@ -16,9 +16,17 @@ class ToolActionIcon extends StatelessWidget {
     dimension: 21,
     child: FittedBox(
       child: switch (toolName) {
+        'createConversation' ||
+        'renameConversation' ||
+        'setConversationPinned' ||
+        'setConversationArchived' ||
+        'deleteConversation' ||
+        'sendConversationMessage' ||
+        'openAppPage' ||
         'listGroupChats' ||
         'readGroupChat' ||
         'sendGroupMessages' ||
+        'recallMessage' ||
         'createGroupChat' ||
         'renameGroupChat' ||
         'updateGroupChatMembers' ||

@@ -1,3 +1,5 @@
+import '../../agent/app_control_tool.dart';
+import '../../agent/recall_message_tool.dart';
 import '../../agent/self_profile_tool.dart';
 import 'avatar_symbol.dart';
 import 'avatar_background.dart';
@@ -83,6 +85,7 @@ part 'group_message_delivery.dart';
 part 'group_private_conversation.dart';
 part 'group_system_events.dart';
 part 'conversation_actions.dart';
+part 'app_control_actions.dart';
 part 'image_forwarding.dart';
 part 'conversation_search_navigation.dart';
 part 'conversation_run.dart';
@@ -135,6 +138,7 @@ class ChatController extends ChangeNotifier {
   bool addingImages = false;
   List<MessageImage> get draftImages => activeConversation.draftImages;
   List<MessageFile> get draftFiles => activeConversation.draftFiles;
+  Future<void> Function(Map<String, Object?>)? openAppPage;
   final notificationOpenRequests = ValueNotifier<int>(0);
   Future<String?> takeNotificationConversation() =>
       _platform.takeNotificationConversation();
@@ -441,6 +445,7 @@ class ChatController extends ChangeNotifier {
   Future<void> _switchConversation(String? id) async {
     if (_submitting || addingImages || changingConversation)
       throw StateError('请等待当前操作完成，再切换会话');
+    if (id == activeConversation.id && !hasSearchWindow) return;
     cancelSearchNavigation();
     changingConversation = true;
     notifyListeners();

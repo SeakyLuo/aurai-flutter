@@ -30,16 +30,32 @@ class _LinkUnderlines extends RenderPadding {
     markNeedsPaint();
   }
 
+  Path? _underlinePath;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    _underlinePath = null;
+  }
+
   @override
   void paint(PaintingContext context, Offset offset) {
     super.paint(context, offset);
     final canvas = context.canvas;
     final pen = Paint()
       ..color = _color.withValues(alpha: .55)
+      ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5
       ..strokeCap = StrokeCap.round;
     canvas.save();
     canvas.clipRect(offset & size);
+    canvas.translate(offset.dx, offset.dy);
+    canvas.drawPath(_underlinePath ??= _buildUnderlinePath(), pen);
+    canvas.restore();
+  }
+
+  Path _buildUnderlinePath() {
+    final path = Path();
     void drawParagraph(RenderParagraph paragraph) {
       var position = 0;
       void visitSpan(InlineSpan span, bool linked) {
@@ -52,25 +68,18 @@ class _LinkUnderlines extends RenderPadding {
               TextSelection(baseOffset: start, extentOffset: position),
             );
             for (final box in boxes) {
-              final left =
-                  paragraph.localToGlobal(
-                    Offset(box.left, box.bottom),
-                    ancestor: this,
-                  ) +
-                  offset;
-              final right =
-                  paragraph.localToGlobal(
-                    Offset(box.right, box.bottom),
-                    ancestor: this,
-                  ) +
-                  offset;
+              final left = paragraph.localToGlobal(
+                Offset(box.left, box.bottom),
+                ancestor: this,
+              );
+              final right = paragraph.localToGlobal(
+                Offset(box.right, box.bottom),
+                ancestor: this,
+              );
               final y = left.dy + 2;
               for (var x = left.dx + .75; x < right.dx - .75; x += 6) {
-                canvas.drawLine(
-                  Offset(x, y),
-                  Offset(math.min(x + 2.5, right.dx - .75), y),
-                  pen,
-                );
+                path.moveTo(x, y);
+                path.lineTo(math.min(x + 2.5, right.dx - .75), y);
               }
             }
           }
@@ -92,6 +101,6 @@ class _LinkUnderlines extends RenderPadding {
 
     child?.visitChildren(visit);
     if (child is RenderParagraph) drawParagraph(child! as RenderParagraph);
-    canvas.restore();
+    return path;
   }
 }

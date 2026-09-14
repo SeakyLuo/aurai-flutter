@@ -89,7 +89,7 @@ extension ConversationRun on ChatController {
       };
       final webSources = WebSourceRegistry();
       final tools = _createTools(
-        conversationId: runConversation.id,
+        conversation: groupParent ?? runConversation,
         senderId: reply.senderId,
         messageId: userMessage.id,
         providerLabel: runConfig.service.label,
@@ -139,6 +139,7 @@ extension ConversationRun on ChatController {
       if (alongsideGroup) {
         tools.retainWhere(
           (tool) => {
+            ...AppControlTool.descriptions.keys,
             'sendGroupMessages',
             'readMyProfile',
             'updateMyProfile',
@@ -445,6 +446,8 @@ extension ConversationRun on ChatController {
             senderId: last.senderId,
             sender: last.sender,
             text: last.text,
+            images: last.images,
+            files: last.files,
             runId: last.runId,
             modelTurnId: last.modelTurnId,
             createdAt: last.createdAt,
@@ -480,14 +483,10 @@ extension ConversationRun on ChatController {
         runConversation.runState = ChatRunState.failed;
         runConversation.errorDetail = switch (error) {
           StateError() => error.message,
-          ModelProviderException() => error.message,
+          ModelProviderException() => error.displayMessage,
           PlatformException() => error.message ?? '设备能力调用失败',
           _ => '任务执行失败',
         };
-        if (groupHistory != null) {
-          runConversation.errorDetail =
-              '${reply.sender.name}：${runConversation.errorDetail}';
-        }
       }
       rethrow;
     } finally {

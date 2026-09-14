@@ -1,5 +1,5 @@
 import 'conversation_preview_text.dart';
-import 'conversation_status_dot.dart';
+import 'conversation_list_status.dart';
 import 'home_page.dart';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
@@ -185,7 +185,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 8,
-                        vertical: 8,
+                        vertical: 5,
                       ),
                       leading: const ConversationIcon(),
                       title: Text(
@@ -197,11 +197,10 @@ class _AiConversationsPageState extends State<AiConversationsPage>
                         conversation: item,
                         emptyText: '新会话',
                       ),
-                      trailing:
-                          item.runState == ChatRunState.failed ||
-                              ConversationStatusDot.hasUnreadCompletion(item)
-                          ? ConversationStatusDot(conversation: item)
-                          : null,
+                      trailing: ConversationListStatus(
+                        controller: widget.controller,
+                        conversation: item,
+                      ),
                       onTap: () => _open(item.id),
                     ),
                   ),

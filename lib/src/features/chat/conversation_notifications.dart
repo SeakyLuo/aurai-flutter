@@ -1,3 +1,4 @@
+import 'app_page_navigation.dart';
 import 'home_navigation.dart';
 import 'package:flutter/material.dart';
 
@@ -33,6 +34,8 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
   @override
   void initState() {
     super.initState();
+    widget.controller.openAppPage = (args) =>
+        navigateAppPage(context, widget.controller, args);
     widget.controller.completedReplies.addListener(_onCompleted);
     widget.controller.memory.notices.addListener(_onMemoryNotice);
     widget.controller.notificationOpenRequests.addListener(
@@ -47,6 +50,7 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
   @override
   void dispose() {
     _hideCompletionToast();
+    widget.controller.openAppPage = null;
     widget.controller.completedReplies.removeListener(_onCompleted);
     widget.controller.memory.notices.removeListener(_onMemoryNotice);
     widget.controller.notificationOpenRequests.removeListener(

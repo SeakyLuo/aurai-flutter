@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'response_preferences.dart';
 export 'response_preferences.dart';
 import 'agent_models.dart';
@@ -205,11 +206,38 @@ abstract interface class ModelProvider {
 }
 
 class ModelProviderException implements Exception {
-  const ModelProviderException(this.message, {this.detail});
+  const ModelProviderException(this.message, {this.detail, this.statusCode});
 
   final String message;
   final String? detail;
+  final int? statusCode;
+
+  String get displayMessage {
+    var reason = detail?.trim() ?? '';
+    if (reason.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(reason);
+        final error = decoded is Map ? decoded['error'] ?? decoded : decoded;
+        if (error is Map) {
+          final text =
+              error['message'] ?? error['detail'] ?? error['description'];
+          final code = error['code'];
+          reason = [
+            if (text != null) '$text',
+            if (code != null) '错误码：$code',
+          ].join('\n');
+          if (reason.isEmpty) reason = detail!.trim();
+        } else if (error is String) {
+          reason = error;
+        }
+      } on FormatException {
+        // Non-JSON error bodies are returned by some gateways.
+      }
+    }
+    final heading = statusCode == null ? message : '$message（HTTP $statusCode）';
+    return reason.isEmpty || reason == message ? heading : '$heading\n$reason';
+  }
 
   @override
-  String toString() => message;
+  String toString() => displayMessage;
 }

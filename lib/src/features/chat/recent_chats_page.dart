@@ -3,7 +3,7 @@ import 'conversation_icon.dart';
 import 'conversation_preview_text.dart';
 import 'header_action_menu.dart';
 import 'dart:async';
-import 'conversation_status_dot.dart';
+import 'conversation_list_status.dart';
 import 'package:flutter/material.dart';
 import '../../domain/avatar_style.dart';
 import '../../domain/message_sender.dart';
@@ -193,7 +193,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
             hasMore: _more,
             loadMore: _load,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
               children: [
                 if (_loaded && _items.isEmpty)
                   _roundedTile(
@@ -202,9 +202,10 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 10,
+                        horizontal: 4,
+                        vertical: 7,
                       ),
+                      horizontalTitleGap: 12,
                       leading: const ProfileAvatar(
                         style: AvatarStyle(icon: 'app_logo'),
                         name: 'Aurai',
@@ -227,7 +228,8 @@ class RecentChatsPageState extends State<RecentChatsPage> {
     return _roundedTile(
       ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+        horizontalTitleGap: 12,
         leading: group
             ? GroupAvatar(members: _groups[item.id]!, size: 48)
             : ProfileAvatar(
@@ -239,17 +241,26 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                 name: sender.name,
                 size: 48,
               ),
-        title: Text(
-          group ? item.title : sender!.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 16),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                group ? item.title : sender!.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 16),
+              ),
+            ),
+            ConversationListStatus(
+              controller: widget.controller,
+              conversation: item,
+            ),
+          ],
         ),
         subtitle: ConversationPreviewText(
           conversation: item,
           emptyText: group ? '开始聊天' : item.title,
         ),
-        trailing: ConversationStatusDot(conversation: item),
         onTap: () async {
           if (!group) {
             await _openAi(item.defaultSenderId);

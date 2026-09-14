@@ -1,3 +1,4 @@
+import '../../domain/message_sender.dart';
 import 'header_action_menu.dart';
 import 'ai_contact_actions.dart';
 import 'conversation_menu_icon.dart';
@@ -124,11 +125,13 @@ class _AiContactsPageState extends State<AiContactsPage> {
                   if (!ai.sender.archived)
                     ('message', '发消息', SettingsIconType.personalization),
                   ('edit', '编辑', SettingsIconType.filter),
-                  (
-                    'archive',
-                    ai.sender.archived ? '恢复朋友' : '归档朋友',
-                    SettingsIconType.filter,
-                  ),
+                  if (ai.sender.id != MessageSender.aurai.id ||
+                      ai.sender.archived)
+                    (
+                      'archive',
+                      ai.sender.archived ? '恢复朋友' : '归档朋友',
+                      SettingsIconType.filter,
+                    ),
                 ])
                   ListTile(
                     shape: RoundedRectangleBorder(

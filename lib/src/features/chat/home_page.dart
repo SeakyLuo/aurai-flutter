@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'chat_controller.dart';
 import 'recent_chats_page.dart';
 import 'home_drawer.dart';
+import 'drawer_drag_region.dart';
 
 final homeRouteObserver = RouteObserver<PageRoute<dynamic>>();
 
@@ -50,10 +51,13 @@ class _HomePageState extends State<HomePage> with RouteAware {
           ).showSnackBar(const SnackBar(content: Text('会话加载失败，请重试')));
       }
     },
-    body: RecentChatsPage(
-      key: _recentKey,
-      controller: widget.controller,
-      onOpenMenu: () => _scaffoldKey.currentState!.openDrawer(),
+    body: DrawerDragRegion(
+      onOpen: () => _scaffoldKey.currentState!.openDrawer(),
+      builder: (_) => RecentChatsPage(
+        key: _recentKey,
+        controller: widget.controller,
+        onOpenMenu: () => _scaffoldKey.currentState!.openDrawer(),
+      ),
     ),
   );
 }

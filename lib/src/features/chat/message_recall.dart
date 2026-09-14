@@ -7,13 +7,43 @@ extension MessageRecall on ChatController {
         message.senderId != MessageSender.localUser.id ||
         message.isSystem)
       return;
+    await _recallMessageIn(conversation, message, userInitiated: true);
+  }
+
+  Future<void> _recallAiMessage(
+    Conversation conversation,
+    String senderId,
+    String messageId,
+  ) async {
+    final found = await _store.reader.messages(
+      conversation.id,
+      throughMessageId: messageId,
+      limit: 1,
+    );
+    if (found.isEmpty || found.single.id != messageId) {
+      throw StateError('当前会话中未找到这条消息');
+    }
+    final message = found.single;
+    if (message.senderId != senderId ||
+        message.role != AgentMessageRole.assistant ||
+        message.isSystem) {
+      throw StateError('只能撤回自己发送的消息，不能撤回系统消息');
+    }
+    await _recallMessageIn(conversation, message, userInitiated: false);
+  }
+
+  Future<void> _recallMessageIn(
+    Conversation conversation,
+    AgentMessage message, {
+    required bool userInitiated,
+  }) async {
     if (!_recallingMessages.add(message.id)) return;
     final notice = AgentMessage(
       id: message.id,
       role: message.role,
       senderId: message.senderId,
       sender: message.sender,
-      text: '你撤回了一条消息',
+      text: userInitiated ? '你撤回了一条消息' : '${message.sender!.name}撤回了一条消息',
       createdAt: message.createdAt,
       isSystem: true,
     );
@@ -61,6 +91,7 @@ extension MessageRecall on ChatController {
         });
         final copies = <Conversation>{
           conversation,
+          if (activeConversation.id == conversation.id) activeConversation,
           if (_runningConversation?.id == conversation.id)
             _runningConversation!,
           if (_runningConversation?.id == conversation.id) ..._groupRuns.values,
@@ -80,11 +111,11 @@ extension MessageRecall on ChatController {
       });
       await _store.writer.save(conversation, makeActive: false);
       _conversationChanged();
-      if (live) {
+      if (userInitiated && live) {
         dispatcher.start(
           _groupReplies.keys.where((id) => !dispatcher.paused.contains(id)),
         );
-      } else {
+      } else if (userInitiated) {
         await _receiveGroupSystemNotice(conversation.id, notice);
       }
     } finally {
@@ -124,6 +155,7 @@ extension MessageRecall on ChatController {
           responseInput: m.responseInput,
           isSystem: m.isSystem,
           isGroupMessage: m.isGroupMessage,
+          isFailure: m.isFailure,
           quote: _recalledQuote(m.quote!),
         );
       }

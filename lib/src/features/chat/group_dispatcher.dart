@@ -20,7 +20,7 @@ class GroupDispatcher {
   final List<AgentMessage> history;
   final Future<void> Function(String senderId, List<AgentMessage> history)
   respond;
-  final void Function(String senderId, Object error) failed;
+  final Future<void> Function(String senderId, Object error) failed;
   final Set<String> paused;
   final _members = <String, _Mailbox>{};
   final _random = Random();
@@ -117,7 +117,7 @@ class GroupDispatcher {
     } on Object catch (error) {
       mailbox.pending = false;
       mailbox.failed = !stopped && !paused.contains(id);
-      failed(id, error);
+      await failed(id, error);
     } finally {
       mailbox.active = false;
       _activeCount--;

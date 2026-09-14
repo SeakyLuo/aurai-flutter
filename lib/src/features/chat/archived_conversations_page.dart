@@ -126,10 +126,9 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
                                     )
                                   : conversation.preview == null
                                   ? null
-                                  : Text(
-                                      conversation.preview!,
+                                  : ConversationPreviewText(
+                                      conversation: conversation,
                                       maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
                                     ),
                               onTap: () =>
                                   Navigator.pop(context, conversation.id),

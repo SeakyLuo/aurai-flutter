@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import 'chat_timeline.dart';
+import 'chat_scrollbar.dart';
 import 'chat_entry_size.dart';
 import 'chat_scroll_anchor.dart';
 import 'pagination_listener.dart';
@@ -35,6 +36,7 @@ class ChatViewport extends StatefulWidget {
     required this.summaryOwners,
     this.bookmark,
     this.sentMessageId,
+    this.showScrollbar = false,
     required this.onContentBelowChanged,
   });
 
@@ -51,6 +53,7 @@ class ChatViewport extends StatefulWidget {
   final Map<String, String> summaryOwners;
   final ChatScrollBookmark? bookmark;
   final String? sentMessageId;
+  final bool showScrollbar;
   final ValueChanged<bool> onContentBelowChanged;
 
   @override
@@ -361,7 +364,7 @@ class ChatViewportState extends State<ChatViewport> {
         if (heightChanged && _following) _scheduleBottomSync();
         if (_keepSentMessageAtTop) _scheduleSentSync();
         final anchor = widget.bookmark;
-        return PaginationListener(
+        final list = PaginationListener(
           hasMore: widget.hasEarlierMessages,
           loadMore: widget.loadEarlierMessages,
           loadAtStart: true,
@@ -423,6 +426,13 @@ class ChatViewportState extends State<ChatViewport> {
               ),
             ),
           ),
+        );
+        if (!widget.showScrollbar) return list;
+        return ChatScrollbar(
+          positions: _positions.itemPositions,
+          itemCount: widget.entries.length + 1,
+          padding: widget.padding,
+          child: list,
         );
       },
     ),

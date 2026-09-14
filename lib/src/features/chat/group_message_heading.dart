@@ -9,13 +9,19 @@ class GroupMessageHeading extends StatelessWidget {
     required this.child,
     required this.onOpenProfile,
   });
+  static const leftInset = 12.0;
+  static const rightInset = 18.0;
+  static const avatarSize = 36.0;
+  static const avatarGap = 8.0;
+  static const contentInset = leftInset + avatarSize + avatarGap + rightInset;
+
   final MessageSender sender;
   final Widget child;
   final VoidCallback onOpenProfile;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+    padding: const EdgeInsets.fromLTRB(leftInset, 0, rightInset, 0),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -25,10 +31,10 @@ class GroupMessageHeading extends StatelessWidget {
           child: InkWell(
             onTap: onOpenProfile,
             borderRadius: BorderRadius.circular(18),
-            child: MemberAvatar(sender: sender, size: 36),
+            child: MemberAvatar(sender: sender, size: avatarSize),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: avatarGap),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
