@@ -72,7 +72,9 @@ Map<String, Object?> messageRow(String conversationId, AgentMessage value) => {
   'quote_json': value.quote == null ? null : jsonEncode(value.quote!.toJson()),
   'role': value.role.name,
   'sender_id': value.senderId,
-  'kind': value.isSystem
+  'kind': value.isFailure
+      ? 'message_failure'
+      : value.isSystem
       ? 'system'
       : value.role == AgentMessageRole.user
       ? 'user'

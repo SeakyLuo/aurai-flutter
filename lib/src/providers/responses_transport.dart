@@ -91,13 +91,17 @@ class ResponsesTransport {
       checkCancelled();
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final detail = await utf8.decoder.bind(response).join();
-        final error = ModelProviderException(switch (response.statusCode) {
-          401 || 403 => '模型服务认证失败，请检查 API 密钥',
-          402 => '模型服务余额不足，请先充值',
-          429 => '模型服务当前繁忙或额度不足，请稍后重试',
-          >= 500 => '模型服务暂时不可用，请稍后重试',
-          _ => '模型服务请求失败',
-        }, detail: detail);
+        final error = ModelProviderException(
+          switch (response.statusCode) {
+            401 || 403 => '模型服务认证失败，请检查 API 密钥',
+            402 => '模型服务余额不足，请先充值',
+            429 => '模型服务当前繁忙或额度不足，请稍后重试',
+            >= 500 => '模型服务暂时不可用，请稍后重试',
+            _ => '模型服务请求失败',
+          },
+          detail: detail,
+          statusCode: response.statusCode,
+        );
         final quotaExhausted = RegExp(
           r'"code"\s*:\s*"(insufficient_quota|billing_hard_limit_reached)"',
         ).hasMatch(detail);

@@ -51,12 +51,6 @@ class SettingsPage extends StatelessWidget {
       ).showSnackBar(const SnackBar(content: Text('正在处理图片，请稍候')));
       return;
     }
-    if (controller.hasRunningTask || preparingGoal()) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先停止当前任务，再修改模型')));
-      return;
-    }
     await ModelSettingsSheet.show(
       context,
       controller: controller,
@@ -140,23 +134,6 @@ class SettingsPage extends StatelessWidget {
                   vertical: 16,
                 ),
                 children: [
-                  Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      leading: ConversationMenuIcon(
-                        type: ConversationMenuIconType.archive,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      title: const Text('已归档会话'),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: () => _archive(context),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
                   Material(
                     color: settingsFieldColor(context),
                     borderRadius: BorderRadius.circular(26),
@@ -266,6 +243,23 @@ class SettingsPage extends StatelessWidget {
                         type: SettingsIconType.chevron,
                       ),
                       onTap: () => _openNotifications(context),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Material(
+                    color: settingsFieldColor(context),
+                    borderRadius: BorderRadius.circular(26),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      leading: ConversationMenuIcon(
+                        type: ConversationMenuIconType.archive,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      title: const Text('已归档会话'),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: () => _archive(context),
                     ),
                   ),
                 ],

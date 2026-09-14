@@ -1,3 +1,4 @@
+import '../../domain/message_sender.dart';
 import 'dialog_action_button.dart';
 import 'tool_approvals_page.dart';
 import 'ai_contact_actions.dart';
@@ -132,10 +133,7 @@ class _AiContactPageState extends State<AiContactPage> {
   Widget build(BuildContext context) {
     final ai = _ai;
     return Scaffold(
-      appBar: SettingsAppBar(
-        title: '朋友',
-        onBack: () => Navigator.pop(context),
-      ),
+      appBar: SettingsAppBar(title: '朋友', onBack: () => Navigator.pop(context)),
       body: ai == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -221,7 +219,9 @@ class _AiContactPageState extends State<AiContactPage> {
                       ? _addFriend
                       : _message,
                 ),
-                if (!ai.sender.archived && !ai.isTemporary) ...[
+                if (!ai.sender.archived &&
+                    !ai.isTemporary &&
+                    ai.sender.id != MessageSender.aurai.id) ...[
                   const SizedBox(height: 12),
                   DialogActionButton(
                     text: '归档朋友',

@@ -43,13 +43,13 @@ List<ChatTimelineEntry> buildChatTimeline(
       );
   final hiddenIds = {
     for (final message in controller.visibleMessages)
-      if (message.taskSummary != null)
+      if (!isGroup && message.taskSummary != null)
         ...message.taskSummary!.intermediateMessageIds,
   };
   final toolsByMessage = <String, List<ChatTimelineEntry>>{};
   final members = controller.groupRuns.toList();
   final liveSteps = [
-    if (members.isEmpty)
+    if (!isGroup && members.isEmpty)
       for (final (ordinal, entry) in conversation.liveToolSteps.indexed)
         (
           ordinal: ordinal,
@@ -58,7 +58,7 @@ List<ChatTimelineEntry> buildChatTimeline(
           runId: conversation.activeRunId,
           senderName: null as String?,
         )
-    else
+    else if (!isGroup)
       for (final member in members)
         for (final (ordinal, entry) in member.liveToolSteps.indexed)
           (
@@ -70,7 +70,7 @@ List<ChatTimelineEntry> buildChatTimeline(
           ),
   ];
   final memberSources = {
-    for (final member in members)
+    for (final member in members.where((_) => !isGroup))
       member.activeRunId: webSourcesFromSteps(
         member.liveToolSteps.map((entry) => entry.step),
       ),
@@ -216,6 +216,7 @@ List<ChatTimelineEntry> buildChatTimeline(
             groupBubble: conversation.kind == ConversationKind.group,
             onQuote:
                 conversation.kind == ConversationKind.group &&
+                    !message.isFailure &&
                     !controller.isStreamingMessage(message.id) &&
                     (message.text.isNotEmpty ||
                         message.images.isNotEmpty ||
@@ -255,7 +256,7 @@ List<ChatTimelineEntry> buildChatTimeline(
                     controller.isBusy &&
                     message.runId == controller.activeConversation.activeRunId),
           );
-          final item =
+          final messageBody =
               conversation.kind == ConversationKind.group &&
                   message.role == AgentMessageRole.assistant &&
                   message.sender != null
@@ -274,6 +275,12 @@ List<ChatTimelineEntry> buildChatTimeline(
                   child: content,
                 )
               : content;
+          final item = conversation.kind == ConversationKind.group
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: messageBody,
+                )
+              : messageBody;
           if (message.id != conversation.searchMessageId) return item;
           return TweenAnimationBuilder<double>(
             tween: Tween(begin: .28, end: 0),

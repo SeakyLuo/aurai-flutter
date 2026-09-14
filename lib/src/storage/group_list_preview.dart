@@ -15,7 +15,7 @@ Future<void> loadGroupListPreviews(
   };
   if (groups.isEmpty) return;
   final rows = await database.rawQuery(
-    '''SELECT id, conversation_id, sender_id, kind, substr(text, 1, 160) AS text
+    '''SELECT id, conversation_id, sender_id, kind, text
        FROM messages WHERE id IN (
          SELECT (SELECT id FROM messages
            WHERE conversation_id = conversations.id AND kind != 'commentary'

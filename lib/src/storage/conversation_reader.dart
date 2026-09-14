@@ -174,10 +174,12 @@ class ConversationReader {
           .where((row) => row['kind'] == 'file')
           .map((row) => fileFromRow(row, imageDirectory)),
     );
-    if (conversation.activeRunId != null) {
+    if (conversation.kind == ConversationKind.direct &&
+        conversation.activeRunId != null) {
       conversation.steps.addAll(await steps(conversation.activeRunId!));
     }
-    if (conversation.runState == ChatRunState.failed &&
+    if (conversation.kind == ConversationKind.direct &&
+        conversation.runState == ChatRunState.failed &&
         conversation.activeRunId != null) {
       final runs = await database.query(
         'agent_runs',
@@ -268,7 +270,7 @@ class ConversationReader {
   }) async {
     final selectionWhere =
         'conversation_id = ?${forModel
-            ? "${includeSystem ? '' : " AND kind != 'system'"} AND NOT (role = 'assistant' AND text = '')"
+            ? "${includeSystem ? '' : " AND kind != 'system'"} AND kind != 'message_failure' AND NOT (role = 'assistant' AND text = '')"
             : includeMessageId == null
             ? " AND kind != 'commentary'"
             : " AND (kind != 'commentary' OR id = ?)"}${afterCheckpoint == null ? '' : ' AND created_at >= (SELECT created_at FROM messages WHERE id = ?)'}${before == null ? '' : ' AND (created_at < ? OR (created_at = ? AND id < ?))'}${after == null ? '' : ' AND (created_at > ? OR (created_at = ? AND id > ?))'}${throughMessageId == null ? '' : ' AND (created_at, id) <= (SELECT created_at, id FROM messages WHERE id = ?)'}';
@@ -367,7 +369,10 @@ class ConversationReader {
           (row) => AgentMessage(
             id: row['id']! as String,
             isSystem: row['kind'] == 'system',
-            isGroupMessage: row['kind'] == 'group_message',
+            isFailure: row['kind'] == 'message_failure',
+            isGroupMessage:
+                row['kind'] == 'group_message' ||
+                row['kind'] == 'message_failure',
             quote: quotes[row['id']],
             role: AgentMessageRole.values.byName(row['role']! as String),
             senderId: row['sender_id'] as String,
@@ -392,7 +397,7 @@ class ConversationReader {
     List<Object?> selectedArgs,
   ) async {
     final runWhere =
-        'final_message_id IN ($selectedMessages) AND elapsed_ms IS NOT NULL AND is_task = 1';
+        "final_message_id IN ($selectedMessages) AND elapsed_ms IS NOT NULL AND is_task = 1 AND conversation_id IN (SELECT id FROM conversations WHERE kind = 'direct')";
     final runs = await database.query(
       'agent_runs',
       where: runWhere,

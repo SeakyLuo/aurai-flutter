@@ -56,7 +56,8 @@ extension GroupMessageDelivery on ChatController {
     for (final raw in arguments['messages'] as List) {
       final item = (raw as Map).cast<String, Object?>();
       final text = (item['text'] as String).trim();
-      if (text.isEmpty) throw ArgumentError('消息不能为空');
+      final images = item['_images'] as List<MessageImage>;
+      if (text.isEmpty && images.isEmpty) throw ArgumentError('消息不能为空');
       final ids = List<String>.from(item['mentionIds'] as List);
       if (ids.any((id) => !senders.containsKey(id))) {
         throw ArgumentError('只能 @ 当前群成员');
@@ -97,6 +98,7 @@ extension GroupMessageDelivery on ChatController {
             text,
           ].join(' '),
           quote: quote,
+          images: images,
           createdAt: DateTime.now(),
         ),
       );

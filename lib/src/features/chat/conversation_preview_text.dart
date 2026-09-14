@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../app/global_ui.dart';
 import 'conversation.dart';
+import 'markdown_preview_text.dart';
 
 class ConversationPreviewText extends StatelessWidget {
   const ConversationPreviewText({
     super.key,
     required this.conversation,
     this.emptyText = '',
+    this.maxLines = 1,
   });
   final Conversation conversation;
   final String emptyText;
+  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -27,10 +30,13 @@ class ConversationPreviewText extends StatelessWidget {
                     : GlobalUI.onPrimaryBackground,
               ),
             ),
-          TextSpan(text: draft ?? conversation.preview ?? emptyText),
+          TextSpan(
+            text:
+                draft ?? markdownPreviewText(conversation.preview ?? emptyText),
+          ),
         ],
       ),
-      maxLines: 1,
+      maxLines: maxLines,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
     );

@@ -313,6 +313,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       child: ChatViewport(
                                         key: _viewportKey,
                                         entries: timeline,
+                                        showScrollbar:
+                                            controller
+                                                .activeConversation
+                                                .kind ==
+                                            ConversationKind.group,
                                         bookmark:
                                             _scrollBookmarks[_conversationId],
                                         followOutput: _followOutput,
@@ -699,12 +704,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   Future<void> _openSettings({required bool continueAfterSave}) async {
     if (_imageOperationPending()) return;
-    if (widget.controller.hasRunningTask) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先停止当前任务，再修改模型')));
-      return;
-    }
     final saved = await ModelSettingsSheet.show(
       context,
       controller: widget.controller,

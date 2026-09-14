@@ -1,3 +1,5 @@
+import 'group_message_heading.dart';
+import 'task_failure_icon.dart';
 import 'message_quote_view.dart';
 import 'image_action_scope.dart';
 import 'file_attachments.dart';
@@ -103,18 +105,8 @@ class _MessageItemState extends State<MessageItem> {
                 summary: message.taskSummary!,
                 onOpenLink: (href) => _openLink(context, href),
               ),
-            if (message.taskSummary?.stopped != true) _selectableContent(),
-            if (widget.groupBubble &&
-                !widget.streaming &&
-                message.taskSummary?.stopped != true &&
-                _sources.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: MessageSourcesButton(
-                  sources: _sources,
-                  onOpenLink: (href) => _openLink(context, href),
-                ),
-              ),
+            if (widget.groupBubble || message.taskSummary?.stopped != true)
+              _selectableContent(),
             if (!widget.groupBubble &&
                 !widget.streaming &&
                 message.taskSummary?.stopped != true)
@@ -242,14 +234,14 @@ class _MessageItemState extends State<MessageItem> {
           child: Container(
             constraints: BoxConstraints(
               maxWidth: widget.groupBubble
-                  ? (constraints.maxWidth - 36) * 0.86
+                  ? constraints.maxWidth - GroupMessageHeading.contentInset
                   : (constraints.maxWidth - 32) * 0.82,
             ),
             margin: EdgeInsets.fromLTRB(
               widget.groupBubble ? 18 : 16,
-              MessageItem.userTopMargin,
+              widget.groupBubble ? 0 : MessageItem.userTopMargin,
               widget.groupBubble ? 18 : 16,
-              24,
+              widget.groupBubble ? 0 : 24,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -293,7 +285,7 @@ class _MessageItemState extends State<MessageItem> {
                   Material(
                     key: _bubbleKey,
                     color: Theme.of(context).brightness == Brightness.dark
-                        ? const Color(0xff393047)
+                        ? const Color(0xff51406c)
                         : GlobalUI.userMessageBackground,
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
@@ -318,8 +310,8 @@ class _MessageItemState extends State<MessageItem> {
                                 Theme.of(context).brightness == Brightness.dark
                                 ? const Color(0xffeee8f7)
                                 : const Color(0xff352b43),
-                            fontSize: 16,
-                            height: 1.55,
+                            fontSize: widget.groupBubble ? 15 : 16,
+                            height: widget.groupBubble ? 1.4 : 1.55,
                           ),
                         ),
                       ),
@@ -333,8 +325,8 @@ class _MessageItemState extends State<MessageItem> {
     }
     final body = TextStyle(
       color: Theme.of(context).colorScheme.onSurface,
-      fontSize: 16,
-      height: widget.groupBubble ? 1.55 : 1.65,
+      fontSize: widget.groupBubble ? 15 : 16,
+      height: widget.groupBubble ? 1.4 : 1.65,
     );
     final availableSources = {
       ...widget.availableSources,
@@ -345,6 +337,22 @@ class _MessageItemState extends State<MessageItem> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (message.images.isNotEmpty)
+          Padding(
+            padding: EdgeInsets.only(bottom: message.text.isEmpty ? 0 : 8),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final image in message.images)
+                  ImageAttachment(
+                    image: image,
+                    gallery: message.images,
+                    size: message.images.length == 1 ? 220 : 120,
+                  ),
+              ],
+            ),
+          ),
         if (message.quote != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -389,17 +397,17 @@ class _MessageItemState extends State<MessageItem> {
                     p: body,
                     strong: const TextStyle(fontWeight: FontWeight.w700),
                     h1: body.copyWith(
-                      fontSize: 25,
+                      fontSize: widget.groupBubble ? 22 : 25,
                       fontWeight: FontWeight.w700,
                       height: 1.4,
                     ),
                     h2: body.copyWith(
-                      fontSize: 21,
+                      fontSize: widget.groupBubble ? 19 : 21,
                       fontWeight: FontWeight.w700,
                       height: 1.4,
                     ),
                     h3: body.copyWith(
-                      fontSize: 18,
+                      fontSize: widget.groupBubble ? 17 : 18,
                       fontWeight: FontWeight.w700,
                     ),
                     h1Padding: const EdgeInsets.only(top: 12),
@@ -424,8 +432,8 @@ class _MessageItemState extends State<MessageItem> {
                     ),
                     code: TextStyle(
                       fontFamily: 'monospace',
-                      fontSize: 14,
-                      height: 1.6,
+                      fontSize: widget.groupBubble ? 13 : 14,
+                      height: widget.groupBubble ? 1.4 : 1.6,
                       color: Theme.of(context).colorScheme.onSurface,
                       backgroundColor: Theme.of(
                         context,
@@ -441,9 +449,11 @@ class _MessageItemState extends State<MessageItem> {
                     tableColumnWidth: const IntrinsicColumnWidth(),
                     tableScrollbarThumbVisibility: true,
                     tablePadding: const EdgeInsets.only(bottom: 12),
-                    tableBody: body.copyWith(fontSize: 15),
+                    tableBody: body.copyWith(
+                      fontSize: widget.groupBubble ? 14 : 15,
+                    ),
                     tableHead: body.copyWith(
-                      fontSize: 15,
+                      fontSize: widget.groupBubble ? 14 : 15,
                       fontWeight: FontWeight.w600,
                     ),
                     tableCellsPadding: const EdgeInsets.symmetric(
@@ -470,7 +480,7 @@ class _MessageItemState extends State<MessageItem> {
       builder: (context, constraints) => Align(
         alignment: Alignment.centerLeft,
         child: Container(
-          margin: const EdgeInsets.only(top: 6, bottom: 4),
+          margin: const EdgeInsets.only(top: 6),
           constraints: BoxConstraints(maxWidth: constraints.maxWidth),
           child: Material(
             key: _bubbleKey,
@@ -490,7 +500,20 @@ class _MessageItemState extends State<MessageItem> {
                   horizontal: 16,
                   vertical: 12,
                 ),
-                child: content,
+                child: message.isFailure
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: TaskFailureIcon(size: 18),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(child: Text(message.text, style: body)),
+                        ],
+                      )
+                    : content,
               ),
             ),
           ),

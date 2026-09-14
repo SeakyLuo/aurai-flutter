@@ -23,6 +23,7 @@ extension ConversationActions on ChatController {
   Future<Conversation> _targetConversation(String? id) async {
     if (id == null || id == activeConversation.id) return activeConversation;
     if (id == _runningConversation?.id) return _runningConversation!;
+    if (id == _privateConversation?.id) return _privateConversation!;
     for (final conversation in _conversations) {
       if (conversation.id == id) return conversation;
     }

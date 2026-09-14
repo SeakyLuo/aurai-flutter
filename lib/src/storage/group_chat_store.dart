@@ -334,6 +334,10 @@ class GroupChatStore {
   });
 
   Future<void> updateAi(AiProfile profile) => database.transaction((txn) async {
+    if (profile.sender.id == MessageSender.aurai.id &&
+        profile.sender.archived) {
+      throw StateError('内置 Aurai 不能归档');
+    }
     if (profile.sender.kind != MessageSenderKind.agent)
       throw ArgumentError('AI 配置必须属于 AI 身份');
     final count = await txn.update(
@@ -353,6 +357,9 @@ class GroupChatStore {
 
   // Archive an identity rather than deleting the author of historical messages.
   Future<void> archiveAi(String senderId) => database.transaction((txn) async {
+    if (senderId == MessageSender.aurai.id) {
+      throw StateError('内置 Aurai 不能归档');
+    }
     await txn.update(
       'message_senders',
       {'archived': 1},
