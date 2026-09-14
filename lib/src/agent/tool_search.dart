@@ -79,15 +79,19 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
     final name = tool.name.toLowerCase();
     final title = toolTitle(tool.name).toLowerCase();
     final aliases = switch (tool.capabilityId) {
+      'local.app' =>
+        '会话 私聊 创建聊天 发消息 发送 消息 conversation direct private chat create send message',
+      'local.diagnostics' =>
+        '日志 报错 错误 执行失败 排查 诊断 log logs error failure diagnostics',
       'local.group_chats' =>
         '群聊 群组 创建建群 拉群 成员 添加 移除 退群 改名 重命名 group chat members roster create rename',
       'local.ai_contacts' =>
-        '通讯录 联系人 AI 角色 创建 修改 删除 归档 恢复 查询 ai contact address book persona',
+        '好友 加好友 添加好友 私聊 通讯录 联系人 AI 角色 创建 修改 删除 归档 恢复 查询 friends friend private chat ai contact address book persona',
       'android.scheduled_tasks' => '定时 计划 提醒 scheduled schedule task reminder',
       'local.attachments' =>
         '附件 文档 文件 PDF Word 音频 视频 attachment file document audio video',
       'local.history' =>
-        '历史 会话 消息 数据库 记录 history conversation message database',
+        '群历史 群聊记录 读取群消息 历史 会话 消息 数据库 记录 group chat history conversation message database',
       'android.accessibility' || 'android.observe' || 'screenAccess' =>
         '屏幕 界面 点击 输入 滚动 返回 主页 screen ui click input scroll back home',
       'web.images' => '图片 配图 参考图 找图 搜图 照片 image images photo gallery visual',

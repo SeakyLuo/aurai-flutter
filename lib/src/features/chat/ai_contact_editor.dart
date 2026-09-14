@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'dart:async';
 import 'contact_generator.dart';
 import 'glass_surface.dart';
@@ -98,8 +99,8 @@ class _AiContactEditorState extends State<AiContactEditor> {
         );
         _changed = true;
       });
-    } catch (_) {
-      if (mounted) _notice('生成失败，请检查头像色库是否有配色后重试');
+    } catch (caughtError) {
+      if (mounted) _notice('生成失败，请检查头像色库是否有配色后重试：${errorMessage(caughtError)}');
     } finally {
       if (mounted) setState(() => _rolling = false);
     }
@@ -164,8 +165,8 @@ class _AiContactEditorState extends State<AiContactEditor> {
             _changed = true;
           });
       }
-    } on Object {
-      if (mounted) _notice('头像修改失败，请重试');
+    } on Object catch (error) {
+      if (mounted) _notice('头像修改失败，请重试：${errorMessage(error)}');
     }
   }
 
@@ -219,8 +220,8 @@ class _AiContactEditorState extends State<AiContactEditor> {
         setState(() => _allowPop = true);
         Navigator.pop(context, ai.sender.id);
       }
-    } on Object {
-      if (mounted) _notice('保存失败，请重试');
+    } on Object catch (error) {
+      if (mounted) _notice('保存失败，请重试：${errorMessage(error)}');
     } finally {
       if (mounted) setState(() => _saving = false);
     }

@@ -34,7 +34,7 @@ object AttentionNotifications {
         }
     }
 
-    fun update(context: Context, conversationId: String, kind: String, title: String?, body: String?, timeoutSeconds: Int?) {
+    fun update(context: Context, conversationId: String, kind: String, title: String?, body: String?, timeoutSeconds: Int?, avatar: ByteArray?) {
         val manager = context.getSystemService(NotificationManager::class.java)
         val tag = "$conversationId:$kind"
         if (title == null) {
@@ -57,7 +57,7 @@ object AttentionNotifications {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val builder = NotificationBranding(context.resources)
-            .applyTo(Notification.Builder(context, CHANNEL))
+            .applyTo(Notification.Builder(context, CHANNEL), avatar = avatar)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(Notification.BigTextStyle().bigText(body))

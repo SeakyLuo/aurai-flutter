@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import '../../domain/agent_models.dart';
 import '../../domain/ai_profile.dart';
@@ -68,9 +69,9 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
         await _persist();
       }
       await _loadDirectory();
-    } catch (_) {
+    } catch (caughtError) {
       if (mounted) {
-        _notice('群聊草稿读取失败');
+        _notice('群聊草稿读取失败：${errorMessage(caughtError)}');
         Navigator.pop(context);
       }
     }
@@ -85,8 +86,8 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
   Future<void> _changedName() async {
     try {
       await _persist();
-    } catch (_) {
-      if (mounted) _notice('草稿保存失败，请重试');
+    } catch (caughtError) {
+      if (mounted) _notice('草稿保存失败，请重试：${errorMessage(caughtError)}');
     }
   }
 
@@ -144,8 +145,8 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
         updatedAt: now,
       );
       await _change(_contacts, [..._members, ai]);
-    } catch (_) {
-      if (mounted) _notice('添加失败，请检查头像色库是否有配色后重试');
+    } catch (caughtError) {
+      if (mounted) _notice('添加失败，请检查头像色库是否有配色后重试：${errorMessage(caughtError)}');
     } finally {
       if (mounted) setState(() => _changing = false);
     }
@@ -166,10 +167,10 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
           _directory.addAll(page);
           _directoryMore = page.length == GroupChatStore.pageSize;
         });
-    } catch (_) {
+    } catch (caughtError) {
       if (mounted) {
         setState(() => _directoryFailed = true);
-        _notice('通讯录读取失败，请重试');
+        _notice('通讯录读取失败，请重试：${errorMessage(caughtError)}');
       }
     } finally {
       if (mounted) setState(() => _directoryLoading = false);
@@ -192,8 +193,8 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
             : [..._contacts, ai],
         _members,
       );
-    } catch (_) {
-      if (mounted) _notice('成员保存失败，请重试');
+    } catch (caughtError) {
+      if (mounted) _notice('成员保存失败，请重试：${errorMessage(caughtError)}');
     }
   }
 
@@ -233,8 +234,8 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
         excluded: excluded.toList(),
       );
       if (mounted) setState(() => _excluded = excluded);
-    } catch (_) {
-      if (mounted) _notice('成员保存失败，请重试');
+    } catch (caughtError) {
+      if (mounted) _notice('成员保存失败，请重试：${errorMessage(caughtError)}');
     } finally {
       if (mounted) setState(() => _changing = false);
     }
@@ -254,14 +255,14 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
       );
       try {
         await _draft.clear();
-      } catch (_) {
-        if (mounted) _notice('群聊已创建，但草稿清理失败');
+      } catch (caughtError) {
+        if (mounted) _notice('群聊已创建，但草稿清理失败：${errorMessage(caughtError)}');
       }
       if (mounted) Navigator.pop(context, group.id);
-    } catch (_) {
+    } catch (caughtError) {
       if (mounted) {
         setState(() => _saving = false);
-        _notice('创建失败，请重试');
+        _notice('创建失败，请重试：${errorMessage(caughtError)}');
       }
     }
   }
@@ -348,10 +349,10 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) Navigator.pop(context);
       });
-    } catch (_) {
+    } catch (caughtError) {
       if (mounted) {
         setState(() => _leaving = false);
-        _notice('草稿清理失败，请重试');
+        _notice('草稿清理失败，请重试：${errorMessage(caughtError)}');
       }
     }
   }

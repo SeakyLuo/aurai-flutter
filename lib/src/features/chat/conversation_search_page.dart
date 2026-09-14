@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'home_navigation.dart';
 import 'dart:async';
 import 'dart:io';
@@ -129,13 +130,13 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
           _filesMore =
               query.isNotEmpty && files.length == AttachmentSearch.pageSize;
       });
-    } on Object {
+    } on Object catch (error) {
       if (mounted && generation == _generation) {
         setState(() => _searchFailed = true);
         if (_submitted)
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('搜索失败，请重试'),
+              content: Text('搜索失败，请重试：${errorMessage(error)}'),
               action: SnackBarAction(
                 label: '重试',
                 onPressed: () => _load(reset: reset),
@@ -200,21 +201,21 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
     try {
       final values = await _historyStore.read();
       if (mounted) setState(() => _history = values);
-    } on Object {
-      if (mounted) _historyNotice();
+    } on Object catch (error) {
+      if (mounted) _historyNotice(error);
     }
   }
 
-  void _historyNotice() => ScaffoldMessenger.of(
+  void _historyNotice(Object error) => ScaffoldMessenger.of(
     context,
-  ).showSnackBar(const SnackBar(content: Text('搜索记录保存或读取失败，请重试')));
+  ).showSnackBar(SnackBar(content: Text('搜索记录保存或读取失败：${errorMessage(error)}')));
 
   Future<void> _saveHistory(List<String> values) async {
     setState(() => _history = values);
     try {
       await _historyStore.save(values);
-    } on Object {
-      if (mounted) _historyNotice();
+    } on Object catch (error) {
+      if (mounted) _historyNotice(error);
     }
   }
 
@@ -256,11 +257,11 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
           ],
         );
       }
-    } on Object {
+    } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('最近文件加载失败')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('最近文件加载失败：${errorMessage(error)}')),
+        );
     } finally {
       if (mounted) setState(() => _loadingRecent = false);
     }
@@ -292,11 +293,11 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
         id,
         messageId: messageId,
       );
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('无法打开会话，请重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
+        );
       }
     }
   }

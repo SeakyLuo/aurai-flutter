@@ -6,22 +6,35 @@ import 'context_summary.dart';
 import 'capability.dart';
 import 'tool_models.dart';
 
-enum ModelService { openAi, deepSeek }
+enum ModelService { openAi, deepSeek, qwen, kimi, glm }
 
 extension ModelServiceDetails on ModelService {
+  bool get usesChatCompletions =>
+      this == ModelService.qwen ||
+      this == ModelService.kimi ||
+      this == ModelService.glm;
   String get label => switch (this) {
     ModelService.openAi => 'OpenAI',
     ModelService.deepSeek => 'DeepSeek',
+    ModelService.qwen => '千问',
+    ModelService.kimi => 'Kimi',
+    ModelService.glm => 'GLM',
   };
 
   String get defaultModel => switch (this) {
     ModelService.openAi => 'gpt-5.4-mini',
     ModelService.deepSeek => 'deepseek-v4-flash',
+    ModelService.qwen => 'qwen-plus',
+    ModelService.kimi => 'kimi-k2.6',
+    ModelService.glm => 'glm-4.7',
   };
 
   String get defaultBaseUrl => switch (this) {
     ModelService.openAi => 'https://api.openai.com/v1',
     ModelService.deepSeek => 'https://api.deepseek.com',
+    ModelService.qwen => 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    ModelService.kimi => 'https://api.moonshot.cn/v1',
+    ModelService.glm => 'https://open.bigmodel.cn/api/paas/v4',
   };
 }
 
@@ -79,7 +92,10 @@ class ModelSettings {
         ModelService.openAi,
         apiKey: openAiApiKey,
       ),
-      ModelService.deepSeek: ModelConfig.defaults(ModelService.deepSeek),
+      for (final service in ModelService.values.where(
+        (s) => s != ModelService.openAi,
+      ))
+        service: ModelConfig.defaults(service),
     },
   );
 
@@ -136,10 +152,12 @@ class ModelSettings {
       ),
       profiles: <ModelService, ModelConfig>{
         for (final service in ModelService.values)
-          service: ModelConfig.fromJson(
-            (rawProfiles[service.name]! as Map<Object?, Object?>)
-                .cast<String, Object?>(),
-          ),
+          service: !rawProfiles.containsKey(service.name)
+              ? ModelConfig.defaults(service)
+              : ModelConfig.fromJson(
+                  (rawProfiles[service.name]! as Map<Object?, Object?>)
+                      .cast<String, Object?>(),
+                ),
       },
     );
   }
@@ -148,6 +166,9 @@ class ModelSettings {
 ModelService _serviceFromStored(String value) => switch (value) {
   'OpenAI' || 'openAi' => ModelService.openAi,
   'DeepSeek' || 'deepSeek' => ModelService.deepSeek,
+  'qwen' => ModelService.qwen,
+  'kimi' => ModelService.kimi,
+  'glm' => ModelService.glm,
   _ => throw FormatException('Unknown model service: $value'),
 };
 

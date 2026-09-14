@@ -12,7 +12,7 @@ import java.util.UUID
 class AgentNotifications(private val context: Context) {
     private val notificationBranding by lazy { NotificationBranding(context.resources) }
 
-    fun send(title: String, body: String, conversationId: String): Map<String, Any> {
+    fun send(title: String, body: String, conversationId: String, avatar: ByteArray): Map<String, Any> {
         if (title.isBlank() || title.length > 120 || body.isBlank() || body.length > 4000) {
             return mapOf("sent" to false, "message" to "通知标题须为 1–120 字，正文须为 1–4000 字")
         }
@@ -37,7 +37,7 @@ class AgentNotifications(private val context: Context) {
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val notification = notificationBranding.applyTo(Notification.Builder(context, CHANNEL_ID))
+        val notification = notificationBranding.applyTo(Notification.Builder(context, CHANNEL_ID), avatar = avatar)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(Notification.BigTextStyle().bigText(body))

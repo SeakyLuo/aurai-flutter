@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/model_provider.dart';
@@ -76,10 +77,15 @@ class _ModelBalanceTileState extends State<ModelBalanceTile>
     setState(() => _opening = true);
     _awaitingReturn = true;
     try {
-      await ModelTopUp.open(widget.config);
-    } on Object {
+      if (ModelBalanceClient.supports(widget.config) &&
+          widget.config.service == ModelService.deepSeek) {
+        await ModelTopUp.open(widget.config);
+      } else {
+        await ModelTopUp.openConsole(widget.config.service);
+      }
+    } on Object catch (error) {
       _awaitingReturn = false;
-      if (mounted) _notice('无法打开充值页面，请稍后再试');
+      if (mounted) _notice('无法打开服务商后台，请稍后再试：${errorMessage(error)}');
     } finally {
       if (mounted) setState(() => _opening = false);
     }
@@ -100,24 +106,28 @@ class _ModelBalanceTileState extends State<ModelBalanceTile>
     final balance = _balance;
     final time = balance?.checkedAt.toLocal();
     final official = ModelBalanceClient.supports(widget.config);
+    final canTopUp =
+        !official || widget.config.service == ModelService.deepSeek;
     final colors = Theme.of(context).colorScheme;
     return Material(
       color: settingsFieldColor(context),
       borderRadius: BorderRadius.circular(26),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
+        minTileHeight: 64,
+        contentPadding: EdgeInsets.symmetric(
           horizontal: 18,
-          vertical: 14,
+          vertical: official && balance != null ? 14 : 0,
         ),
-        onTap: official && !_opening ? _topUp : null,
-        titleTextStyle: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
+        onTap: canTopUp && !_opening ? _topUp : null,
+        titleTextStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          fontSize: 16,
+          color: colors.onSurfaceVariant,
+        ),
         title: balance == null || !official
             ? Text(
                 !official
-                    ? '自定义服务的余额与充值，请前往对应服务商查看'
+                    ? '${widget.config.service.label} 官方后台'
                     : _loading
                     ? '正在查询余额…'
                     : widget.config.isConfigured
@@ -145,7 +155,9 @@ class _ModelBalanceTileState extends State<ModelBalanceTile>
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text('充值余额 ${item.toppedUp} · 赠金 ${item.granted}'),
+                    Text(
+                      '充值余额 ${item.toppedUp} · ${widget.config.service == ModelService.kimi ? '代金券' : '赠金'} ${item.granted}',
+                    ),
                   ],
                   if (!balance.available) const Text('当前账户无余额可供调用'),
                   const SizedBox(height: 4),
@@ -159,7 +171,7 @@ class _ModelBalanceTileState extends State<ModelBalanceTile>
                 dimension: 20,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            : official
+            : canTopUp
             ? const SettingsIcon(type: SettingsIconType.chevron)
             : null,
       ),

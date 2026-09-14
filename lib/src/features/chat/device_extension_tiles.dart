@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -68,7 +69,7 @@ class _DeviceExtensionTilesState extends State<DeviceExtensionTiles>
       if (mounted) setState(() => _state = state);
     } on PlatformException catch (error) {
       _timer?.cancel();
-      _notice(error.message ?? '无法读取设备能力');
+      _notice(error.message ?? '无法读取设备能力：${errorMessage(error)}');
     } finally {
       _loading = false;
     }
@@ -80,7 +81,7 @@ class _DeviceExtensionTilesState extends State<DeviceExtensionTiles>
       await action();
       await _load();
     } on PlatformException catch (error) {
-      _notice(error.message ?? '操作未完成，请稍后重试');
+      _notice(errorMessage(error));
     } finally {
       if (mounted) setState(() => _busy.remove(id));
     }

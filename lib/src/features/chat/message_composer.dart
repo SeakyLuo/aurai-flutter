@@ -62,6 +62,8 @@ class MessageComposer extends StatelessWidget {
                                     fontSize: 16,
                                     fontWeight: FontWeight.w400,
                                     height: 1.4,
+                                    leadingDistribution:
+                                        TextLeadingDistribution.even,
                                     color: Theme.of(
                                       context,
                                     ).colorScheme.onSurface,
@@ -112,7 +114,7 @@ class MessageComposer extends StatelessWidget {
                                             ? TextAlignVertical.top
                                             : TextAlignVertical.center,
                                         minLines: 1,
-                                        maxLines: 5,
+                                        maxLines: multiline ? 5 : 1,
                                         maxLength: maxLength,
                                         onChanged: onChanged,
                                         textInputAction:

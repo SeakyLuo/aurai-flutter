@@ -1,8 +1,10 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import '../../domain/model_provider.dart';
 import '../../providers/model_catalog.dart';
 import 'chat_controller.dart';
 import 'choice_sheet.dart';
+import 'delete_confirmation_dialog.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'model_balance_tile.dart';
@@ -49,7 +51,12 @@ class ModelSettingsSheet extends StatefulWidget {
 class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
   final _key = TextEditingController();
   final _address = TextEditingController();
+  final _drafts =
+      <ModelService, ({String key, String address, String model})>{};
   late ModelService _service;
+  late final ModelService _originalDefault =
+      widget.controller.modelSettings.activeService;
+  late ModelService _defaultService = _originalDefault;
   late String _model;
   var _obscure = true;
   var _saving = false;
@@ -58,10 +65,27 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
   ModelCatalog? _catalog;
   ModelConfig get _saved => widget.controller.modelSettings.profile(_service);
   bool get _locked => _saving || _loading;
-  bool get _dirty =>
-      _key.text.isNotEmpty ||
+  bool get _currentDirty =>
+      _apiKey != _saved.apiKey ||
       _address.text != _saved.baseUrl ||
       _model != _saved.model;
+  bool get _dirty =>
+      _currentDirty ||
+      _defaultService != _originalDefault ||
+      _drafts.keys.any((service) => service != _service);
+
+  void _keepDraft() {
+    if (_currentDirty) {
+      _drafts[_service] = (
+        key: _key.text,
+        address: _address.text,
+        model: _model,
+      );
+    } else {
+      _drafts.remove(_service);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -83,9 +107,10 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
   void _changed() => setState(() {});
   void _loadProfile(ModelService service) {
     _service = service;
-    _key.clear();
-    _address.text = _saved.baseUrl;
-    _model = _saved.model;
+    final draft = _drafts[service];
+    _key.text = draft?.key ?? _saved.apiKey;
+    _address.text = draft?.address ?? _saved.baseUrl;
+    _model = draft?.model ?? _saved.model;
     _obscure = true;
   }
 
@@ -135,7 +160,7 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
-                const _Label('模型服务'),
+                const _Label('模型供应商'),
                 _ModelChoice(
                   label: _service.label,
                   onTap: _locked ? null : _selectService,
@@ -153,16 +178,26 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                     hint: _saved.isConfigured ? '已保存密钥 · 留空保持不变' : '粘贴 API 密钥',
                     suffixIcon: Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: IconButton(
-                        onPressed: _locked
-                            ? null
-                            : () => setState(() => _obscure = !_obscure),
-                        tooltip: _obscure ? '显示密钥' : '隐藏密钥',
-                        icon: Icon(
-                          _obscure
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          size: 21,
+                      child: Center(
+                        widthFactor: 1,
+                        heightFactor: 1,
+                        child: SizedBox.square(
+                          dimension: 40,
+                          child: IconButton(
+                            style: IconButton.styleFrom(
+                              shape: const CircleBorder(),
+                              padding: const EdgeInsets.all(8),
+                            ),
+                            onPressed: _locked
+                                ? null
+                                : () => setState(() => _obscure = !_obscure),
+                            tooltip: _obscure ? '显示密钥' : '隐藏密钥',
+                            icon: SettingsIcon(
+                              type: _obscure
+                                  ? SettingsIconType.eye
+                                  : SettingsIconType.eyeOff,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -186,11 +221,32 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                   loading: _loading,
                   onTap: _locked ? null : _selectModel,
                 ),
-                if (_service == ModelService.deepSeek &&
-                    _saved.isConfigured) ...[
+                const SizedBox(height: 12),
+                Material(
+                  color: settingsFieldColor(context),
+                  borderRadius: BorderRadius.circular(26),
+                  clipBehavior: Clip.antiAlias,
+                  child: SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+                    title: const Text('设为默认', style: TextStyle(fontSize: 16)),
+                    value: _defaultService == _service,
+                    onChanged:
+                        _locked ||
+                            (_service == _originalDefault &&
+                                _defaultService == _originalDefault)
+                        ? null
+                        : (value) => setState(() {
+                            _defaultService = value
+                                ? _service
+                                : _originalDefault;
+                          }),
+                  ),
+                ),
+                if (_saved.isConfigured) ...[
                   const SizedBox(height: 32),
                   const _Label('账户余额'),
                   ModelBalanceTile(
+                    key: ValueKey(_service),
                     config: ModelConfig(
                       service: _service,
                       apiKey: _apiKey,
@@ -232,7 +288,7 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
     FocusScope.of(context).unfocus();
     final service = await showChoiceSheet<ModelService>(
       context,
-      title: '选择模型服务',
+      title: '选择模型供应商',
       selected: _service,
       choices: [
         for (final service in ModelService.values)
@@ -240,7 +296,7 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
       ],
     );
     if (!mounted || service == null || service == _service) return;
-    if (_dirty && !await _discardChanges()) return;
+    _keepDraft();
     if (mounted) setState(() => _loadProfile(service));
   }
 
@@ -264,19 +320,11 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
   Future<bool> _discardChanges() async =>
       await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('放弃未保存的修改？'),
-          content: const Text('当前服务的修改尚未保存。'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('保留编辑'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('放弃修改'),
-            ),
-          ],
+        builder: (context) => const DeleteConfirmationDialog(
+          title: '放弃未保存的修改？',
+          description: '所有服务商未保存的修改都将丢失。',
+          cancelLabel: '保留编辑',
+          confirmLabel: '放弃修改',
         ),
       ) ??
       false;
@@ -317,8 +365,8 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
       return models;
     } on ModelProviderException catch (error) {
       if (mounted) _notice(error.message);
-    } on Object {
-      if (mounted) _notice('无法读取模型列表，请检查服务地址');
+    } on Object catch (error) {
+      if (mounted) _notice('无法读取模型列表，请检查服务地址：${errorMessage(error)}');
     } finally {
       catalog.close();
       _catalog = null;
@@ -328,6 +376,29 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
   }
 
   Future<void> _save() async {
+    _keepDraft();
+    final selected = _service;
+    final configs = <ModelConfig>[];
+    for (final service in {
+      ..._drafts.keys,
+      if (_defaultService != _originalDefault) _defaultService,
+    }) {
+      _loadProfile(service);
+      final uri = _validatedAddress();
+      if (uri == null) {
+        setState(() {});
+        return;
+      }
+      configs.add(
+        ModelConfig(
+          service: service,
+          apiKey: _apiKey,
+          model: _model,
+          baseUrl: uri.toString(),
+        ),
+      );
+    }
+    _loadProfile(selected);
     final uri = _validatedAddress();
     if (uri == null) return;
     setState(() => _saving = true);
@@ -339,6 +410,8 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
           model: _model,
           baseUrl: uri.toString(),
         ),
+        profiles: configs,
+        defaultService: _defaultService,
         senderId: widget.accountOnly
             ? null
             : widget.controller.activeConversation.defaultSenderId,
@@ -349,10 +422,10 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) Navigator.pop(context, true);
       });
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
         setState(() => _saving = false);
-        _notice('保存失败，请稍后重试');
+        _notice('保存失败，请稍后重试：${errorMessage(error)}');
       }
     }
   }

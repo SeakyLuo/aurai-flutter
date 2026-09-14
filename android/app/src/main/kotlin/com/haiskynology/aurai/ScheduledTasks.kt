@@ -32,8 +32,12 @@ object ScheduledTasks {
         val stored = JSONArray(app.getSharedPreferences("scheduled_tasks", 0).getString("tasks", "[]"))
         for (i in 0 until stored.length()) {
             val task = stored.getJSONObject(i)
-            if (task.getString("state") in activeStates) {
-                task.put("state", "paused").put("lastOutcome", "interrupted")
+            when (task.getString("state")) {
+                "starting" -> task.put("state", "scheduled")
+                "running" -> {
+                    task.put("lastOutcome", "interrupted")
+                    task.put("state", if (next(task)) "scheduled" else "interrupted")
+                }
             }
             tasks[task.getString("id")] = task
         }
@@ -192,10 +196,6 @@ object ScheduledTasks {
     fun restore() {
         for (task in tasks.values) {
             if (task.getString("state") != "scheduled") continue
-            if (task.getLong("runAt") < System.currentTimeMillis() - 600_000) {
-                task.put("lastOutcome", "missed")
-                if (!next(task)) { task.put("state", "missed"); continue }
-            }
             if (allowed()) arm(task, maxOf(task.getLong("runAt"), System.currentTimeMillis() + 1000))
         }
         persist()
@@ -203,7 +203,6 @@ object ScheduledTasks {
     fun due(id: String) {
         val task = tasks[id] ?: return
         if (task.getString("state") != "scheduled") return
-        if (System.currentTimeMillis() - task.getLong("runAt") > 600_000) { restore(); return }
         if (AgentSessionService.isRunning || pendingId != null) { arm(task, System.currentTimeMillis() + 60_000); return }
         task.put("state", "starting")
         pendingId = id

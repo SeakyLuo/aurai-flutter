@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'ai_contact_page.dart';
 import '../../domain/message_sender.dart';
 import 'package:flutter/material.dart';
@@ -40,12 +41,12 @@ class _GroupMembersPageState extends State<GroupMembersPage> {
         widget.conversationId,
       );
       if (mounted) setState(() => _members = members);
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
         setState(() => _failed = true);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('群成员加载失败，请重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('群成员加载失败，请重试：${errorMessage(error)}')),
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);

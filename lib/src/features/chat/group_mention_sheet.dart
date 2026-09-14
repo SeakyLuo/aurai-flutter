@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import '../../domain/message_sender.dart';
 import '../../storage/group_chat_store.dart';
@@ -44,11 +45,11 @@ class _MentionSheetState extends State<_MentionSheet> {
               .where((m) => m.sender.kind == MessageSenderKind.agent)
               .toList(),
         );
-    } on Object {
+    } on Object catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('成员读取失败，请重试')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('成员读取失败，请重试：${errorMessage(error)}')),
+      );
       Navigator.pop(context);
     }
   }

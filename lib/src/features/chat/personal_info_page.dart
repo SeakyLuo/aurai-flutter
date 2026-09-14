@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:developer' as developer;
@@ -75,8 +76,8 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
           path: path,
         ),
       );
-    } catch (_) {
-      if (mounted) _notice('头像读取失败，请重试');
+    } catch (caughtError) {
+      if (mounted) _notice('头像读取失败，请重试：${errorMessage(caughtError)}');
     } finally {
       if (mounted) setState(() => _picking = false);
     }
@@ -157,8 +158,8 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
       _draftPaths.remove(_avatar.path);
       await _cleanDrafts();
       if (mounted) _notice('个人信息已保存');
-    } on Object {
-      if (mounted) _notice('保存失败，请重试');
+    } on Object catch (error) {
+      if (mounted) _notice('保存失败，请重试：${errorMessage(error)}');
     } finally {
       if (mounted) setState(() => _saving = false);
     }

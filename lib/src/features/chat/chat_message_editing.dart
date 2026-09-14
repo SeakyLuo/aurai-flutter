@@ -128,8 +128,8 @@ extension _ChatMessageEditing on _ChatPageState {
           error is ImageInputException
               ? error.message
               : error is PlatformException
-              ? error.message ?? '附件添加失败'
-              : '附件添加失败，请重试',
+              ? error.message ?? '附件添加失败：${errorMessage(error)}'
+              : '附件添加失败，请重试：${errorMessage(error)}',
         );
     } finally {
       if (mounted && identical(_editing, session))
@@ -151,8 +151,8 @@ extension _ChatMessageEditing on _ChatPageState {
     try {
       await widget.controller.removeEditImages(images);
       await MessageFileStore.remove(files);
-    } on Object {
-      if (mounted) _imageNotice('部分临时图片清理失败');
+    } on Object catch (caughtError) {
+      if (mounted) _imageNotice('部分临时图片清理失败：${errorMessage(caughtError)}');
     }
   }
 
@@ -199,10 +199,10 @@ extension _ChatMessageEditing on _ChatPageState {
       });
       if (!cleaned) _imageNotice('消息已更新，部分旧图片清理失败');
       await _continuePending();
-    } on Object {
+    } on Object catch (caughtError) {
       if (!mounted || !identical(_editing, session)) return;
       _updateEditing(() => session.saving = false);
-      _imageNotice('消息保存失败，请重试');
+      _imageNotice('消息保存失败，请重试：${errorMessage(caughtError)}');
     }
   }
 }

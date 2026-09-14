@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/source_reference.dart';
@@ -13,11 +14,11 @@ class WebPageToolDetails extends StatelessWidget {
         'action': 'android.intent.action.VIEW',
         'data': source.url,
       });
-    } on Object {
+    } on Object catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('无法打开链接，请稍后再试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法打开链接，请稍后再试：${errorMessage(error)}')),
+        );
       }
     }
   }

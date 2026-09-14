@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import '../../providers/model_catalog.dart';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
@@ -6,6 +7,7 @@ import 'chat_controller.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'choice_sheet.dart';
+import 'model_balance_tile.dart';
 import '../../scheduling/task_unsaved_dialog.dart';
 
 class AiModelPage extends StatefulWidget {
@@ -66,11 +68,11 @@ class _AiModelPageState extends State<AiModelPage> {
         });
         Navigator.pop(context);
       }
-    } on Object {
+    } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('保存失败，请重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存失败，请重试：${errorMessage(error)}')),
+        );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -147,6 +149,17 @@ class _AiModelPageState extends State<AiModelPage> {
             _saving || _loading ? null : _selectModel,
             loading: _loading,
           ),
+          const SizedBox(height: 16),
+          _label('账户余额'),
+          ModelBalanceTile(
+            key: ValueKey((_service, _url.text)),
+            config: ModelConfig(
+              service: _service,
+              apiKey: widget.controller.modelSettings.profile(_service).apiKey,
+              model: _model.text,
+              baseUrl: _url.text,
+            ),
+          ),
         ],
       ),
     ),
@@ -190,8 +203,8 @@ class _AiModelPageState extends State<AiModelPage> {
       });
     } on ModelProviderException catch (error) {
       if (mounted) _notice(error.message);
-    } on Object {
-      if (mounted) _notice('无法获取模型，请检查设置中的供应商配置');
+    } on Object catch (error) {
+      if (mounted) _notice('无法获取模型，请检查设置中的供应商配置：${errorMessage(error)}');
     } finally {
       catalog.close();
       _catalog = null;

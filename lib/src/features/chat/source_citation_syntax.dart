@@ -16,6 +16,13 @@ class SourceLinkSyntax extends md.LinkSyntax {
         super.createNode(destination, title, getChildren: getChildren)
             as md.Element;
     final href = link.attributes['href']!;
+    final member = Uri.tryParse(href);
+    if (member?.scheme == 'aurai' &&
+        member?.host == 'member' &&
+        member!.pathSegments.length == 1) {
+      return md.Element.text('member-mention', link.textContent)
+        ..attributes['sender'] = member.pathSegments.single;
+    }
     final source =
         sources[href] ?? SourceReference.fromLocalLink(href, link.textContent);
     if (source == null || title == '来源' || title?.startsWith('来源：') == true) {

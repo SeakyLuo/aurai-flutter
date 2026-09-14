@@ -43,6 +43,7 @@ class Conversation {
       draftImages.isEmpty &&
       (messages.isNotEmpty ? messages.last.isSystem : storedPreviewIsSystem);
   DateTime? storedUpdatedAt;
+  DateTime? lastMessageAt;
   String? activeRunId;
   String? replyingSenderName;
   Stopwatch? executionWatch;

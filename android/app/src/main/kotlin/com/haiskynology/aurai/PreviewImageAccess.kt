@@ -55,9 +55,9 @@ class PreviewImageAccess(private val context: Context) {
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             }, "转发图片"))
                             result.success(true)
-                        } catch (error: Exception) { result.error("share", "无法打开分享面板", null) }
+                        } catch (error: Exception) { result.error("share", "无法打开分享面板：$error", null) }
                     }
-                } catch (error: Exception) { main.post { result.error("share", "无法准备图片", null) } }
+                } catch (error: Exception) { main.post { result.error("share", "无法准备图片：$error", null) } }
             }
         }
         return true
@@ -72,7 +72,7 @@ class PreviewImageAccess(private val context: Context) {
             try {
                 context.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(data) }
                 main.post { result.success(true) }
-            } catch (error: Exception) { main.post { result.error("save", "图片保存失败", null) } }
+            } catch (error: Exception) { main.post { result.error("save", "图片保存失败：$error", null) } }
         }
     }
     companion object {

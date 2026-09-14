@@ -1,3 +1,4 @@
+import '../domain/error_message.dart';
 import '../features/chat/search_type_segment.dart';
 import 'package:flutter/material.dart';
 
@@ -119,8 +120,8 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
     try {
       await memory.deleteEntry(entry['id'] as String);
       if (mounted) memoryToast(context, '记忆已删除');
-    } on Object {
-      if (mounted) memoryToast(context, '删除失败，请重试');
+    } on Object catch (error) {
+      if (mounted) memoryToast(context, '删除失败，请重试：${errorMessage(error)}');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -147,7 +148,9 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
       if (mounted && request == _request) {
         memoryToast(
           context,
-          error is StateError ? error.message : '无法生成建议，请检查模型配置后重试',
+          error is StateError
+              ? error.message
+              : '无法生成建议，请检查模型配置后重试：${errorMessage(error)}',
         );
       }
     } finally {
@@ -171,7 +174,9 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
         setState(() => _plan = null);
         memoryToast(
           context,
-          error is StateError ? error.message : '无法应用，请重新整理后重试',
+          error is StateError
+              ? error.message
+              : '无法应用，请重新整理后重试：${errorMessage(error)}',
         );
       }
     } finally {

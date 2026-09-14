@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'archived_conversations_page.dart';
 import 'conversation_menu_icon.dart';
 import 'home_navigation.dart';
@@ -35,11 +36,11 @@ class SettingsPage extends StatelessWidget {
       if (navigator.mounted && id != null) {
         await openHomeConversation(navigator.context, controller, id);
       }
-    } on Object {
+    } on Object catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('无法打开会话，请重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
+        );
       }
     }
   }
@@ -74,22 +75,22 @@ class SettingsPage extends StatelessWidget {
     if (mode == null || mode == settings.mode) return;
     try {
       await settings.setMode(mode);
-    } on Object {
+    } on Object catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('无法保存夜间模式，请重试')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('无法保存夜间模式，请重试：${errorMessage(error)}')),
+      );
     }
   }
 
   Future<void> _openNotifications(BuildContext context) async {
     try {
       await controller.openNotificationSettings();
-    } on Object {
+    } on Object catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('无法打开通知设置，请重试')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('无法打开通知设置，请重试：${errorMessage(error)}')),
+      );
     }
   }
 
@@ -253,7 +254,9 @@ class SettingsPage extends StatelessWidget {
                     child: ListTile(
                       leading: ConversationMenuIcon(
                         type: ConversationMenuIconType.archive,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).colorScheme.onSurfaceVariant
+                            : const Color(0xff222222),
                       ),
                       title: const Text('已归档会话'),
                       trailing: const SettingsIcon(

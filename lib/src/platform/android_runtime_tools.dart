@@ -95,6 +95,18 @@ class ExecuteAndroidScriptTool implements AgentTool {
 
   @override
   Future<ToolResult> execute(ToolCall call) async {
+    final timeout = call.arguments['timeoutSeconds'];
+    if (timeout != null && timeout is! int) {
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: ToolResultStatus.error,
+        output: {
+          'error':
+              'timeoutSeconds 必须是整数，收到 ${timeout.runtimeType}：$timeout。脚本尚未执行，请修正参数，不要把数字放在引号里。',
+        },
+      );
+    }
     _callId = call.id;
     try {
       final output = await _platform.executeAndroidScript(

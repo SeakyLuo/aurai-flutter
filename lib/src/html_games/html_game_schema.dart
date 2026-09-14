@@ -1,0 +1,40 @@
+const htmlGameSchema = [
+  '''CREATE TABLE html_games (
+    message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    creator_id TEXT NOT NULL REFERENCES message_senders(id),
+    title TEXT NOT NULL,
+    html TEXT NOT NULL,
+    stateful INTEGER NOT NULL DEFAULT 0,
+    display_mode TEXT NOT NULL DEFAULT 'hybrid',
+    display_width INTEGER,
+    display_height INTEGER NOT NULL,
+    state_json TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 0,
+    participants_json TEXT NOT NULL,
+    status TEXT NOT NULL,
+    turn_sender_id TEXT,
+    preview BLOB,
+    updated_at INTEGER NOT NULL
+  )''',
+  'CREATE INDEX html_games_conversation ON html_games(conversation_id)',
+  '''CREATE TABLE html_game_events (
+    id TEXT PRIMARY KEY,
+    message_id TEXT NOT NULL REFERENCES html_games(message_id) ON DELETE CASCADE,
+    actor_id TEXT NOT NULL REFERENCES message_senders(id),
+    version INTEGER NOT NULL,
+    request_json TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    UNIQUE(message_id, version)
+  )''',
+  '''CREATE TABLE html_game_receipts (
+    event_id TEXT NOT NULL REFERENCES html_game_events(id) ON DELETE CASCADE,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    sender_id TEXT NOT NULL REFERENCES message_senders(id),
+    processed_at INTEGER,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(event_id, sender_id)
+  )''',
+  'CREATE INDEX html_game_pending ON html_game_receipts(sender_id, processed_at, attempts, conversation_id)',
+];

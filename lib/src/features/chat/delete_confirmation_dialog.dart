@@ -9,10 +9,12 @@ class DeleteConfirmationDialog extends StatelessWidget {
     required this.title,
     required this.description,
     this.confirmLabel = '删除',
+    this.cancelLabel = '取消',
   });
   final String title;
   final String description;
   final String confirmLabel;
+  final String cancelLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +59,7 @@ class DeleteConfirmationDialog extends StatelessWidget {
                   children: [
                     Expanded(
                       child: DialogActionButton(
-                        text: '取消',
+                        text: cancelLabel,
                         onPressed: () => Navigator.pop(context, false),
                         role: DialogActionRole.secondary,
                       ),

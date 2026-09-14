@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'unavailable_image.dart';
 import 'chat_controller.dart';
 import 'image_action_scope.dart';
@@ -190,11 +191,11 @@ class _PreviewPageState extends State<_PreviewPage> {
           path: image is FileImage ? image.file.path : null,
         );
       }
-    } on Object {
+    } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('无法读取图片来源')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法读取图片来源：${errorMessage(error)}')),
+        );
     }
     if (!mounted) return;
     final action = await showImageActionsMenu(
@@ -226,11 +227,11 @@ class _PreviewPageState extends State<_PreviewPage> {
           source.conversationId,
           messageId: source.messageId,
         );
-      } on Object {
+      } on Object catch (error) {
         if (mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('无法定位原消息，可能已被删除')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('无法定位原消息，可能已被删除：${errorMessage(error)}')),
+          );
       }
       return;
     }
@@ -240,13 +241,17 @@ class _PreviewPageState extends State<_PreviewPage> {
       if (mounted && action == 'save' && saved) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('图片已保存')));
+        ).showSnackBar(const SnackBar(content: Text('图片已保存到应用目录')));
       }
-    } on Object {
+    } on Object catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(action == 'save' ? '图片保存失败，请重试' : '无法转发图片，请重试'),
+            content: Text(
+              action == 'save'
+                  ? '图片保存失败，请重试：${errorMessage(error)}'
+                  : '无法转发图片，请重试：${errorMessage(error)}',
+            ),
           ),
         );
     } finally {

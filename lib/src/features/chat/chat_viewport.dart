@@ -415,7 +415,7 @@ class ChatViewportState extends State<ChatViewport> {
                     ? (1 - widget.padding.bottom / _height).clamp(0.0, 1.0)
                     : _listAlignment(_anchorIndex(anchor), anchor.alignment),
                 padding: EdgeInsets.only(top: widget.padding.top),
-                addAutomaticKeepAlives: false,
+                addAutomaticKeepAlives: true,
                 minCacheExtent: 240,
                 itemCount: widget.entries.length + 1,
                 itemBuilder: (context, index) {

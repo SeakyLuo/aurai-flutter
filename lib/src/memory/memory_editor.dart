@@ -1,3 +1,4 @@
+import '../domain/error_message.dart';
 import 'package:flutter/material.dart';
 
 import 'memory_controller.dart';
@@ -68,7 +69,12 @@ class MemoryEditorState extends State<MemoryEditor> {
       _close();
     } on Object catch (error) {
       if (mounted) {
-        memoryToast(context, error is StateError ? error.message : '操作失败，请重试');
+        memoryToast(
+          context,
+          error is StateError
+              ? error.message
+              : '操作失败，请重试：${errorMessage(error)}',
+        );
         setState(() => busy = false);
       }
     }

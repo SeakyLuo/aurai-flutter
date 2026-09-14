@@ -1,3 +1,4 @@
+import '../domain/error_message.dart';
 import 'skill_list_tile.dart';
 import 'package:flutter/material.dart';
 import '../features/chat/settings_appearance.dart';
@@ -70,8 +71,8 @@ class _SkillsPageState extends State<SkillsPage> {
       if (!mounted || selected == null) return;
       try {
         await widget.store.saveSort(selected);
-      } on Object {
-        if (mounted) _notice('保存排序失败，请重试');
+      } on Object catch (error) {
+        if (mounted) _notice('保存排序失败，请重试：${errorMessage(error)}');
       }
       return;
     }
@@ -84,8 +85,8 @@ class _SkillsPageState extends State<SkillsPage> {
     try {
       await widget.store.saveDefaultPermission(selection.permission!);
       if (mounted) _notice('偏好权限已保存');
-    } on Object {
-      if (mounted) _notice('保存失败，请重试');
+    } on Object catch (error) {
+      if (mounted) _notice('保存失败，请重试：${errorMessage(error)}');
     }
   }
 
@@ -138,7 +139,12 @@ class _SkillsPageState extends State<SkillsPage> {
               : '技能已停用',
         );
     } on Object catch (error) {
-      if (mounted) _notice(error is StateError ? error.message : '操作失败，请重试');
+      if (mounted)
+        _notice(
+          error is StateError
+              ? error.message
+              : '操作失败，请重试：${errorMessage(error)}',
+        );
     }
   }
 

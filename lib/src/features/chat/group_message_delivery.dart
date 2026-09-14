@@ -2,7 +2,7 @@ part of 'chat_controller.dart';
 
 /// This is the publication boundary: model text remains private until this call.
 extension GroupMessageDelivery on ChatController {
-  Future<Map<String, Object?>> _deliverGroupMessages({
+  Future<Map<String, Object?>> _deliverGroupMessage({
     required Map<String, Object?> arguments,
     required Conversation member,
     required Conversation parent,
@@ -12,7 +12,9 @@ extension GroupMessageDelivery on ChatController {
   }) async {
     final groupId = arguments['groupId'] as String?;
     if (groupId != null && groupId != parent.id) {
-      throw ArgumentError('群内只能向当前群发送消息');
+      throw ArgumentError(
+        'sendGroupMessage 只能向当前群发送；请将 groupId 设为 JSON null（不是字符串）。如用户要求发送到其他会话，请使用 sendConversationMessage',
+      );
     }
     _checkGroupStopped(parent);
     if (_removedGroupMembers.contains(reply.senderId) ||
@@ -53,8 +55,8 @@ extension GroupMessageDelivery on ChatController {
     final byId = {for (final m in dispatcher.history) m.id: m};
     final mentions = <String>{};
     final output = <AgentMessage>[];
-    for (final raw in arguments['messages'] as List) {
-      final item = (raw as Map).cast<String, Object?>();
+    final item = arguments['message'] as Map<String, Object?>?;
+    if (item != null) {
       final text = (item['text'] as String).trim();
       final images = item['_images'] as List<MessageImage>;
       if (text.isEmpty && images.isEmpty) throw ArgumentError('消息不能为空');
@@ -77,6 +79,12 @@ extension GroupMessageDelivery on ChatController {
               ..senderName =
                   source.sender?.name ?? MessageSender.localUser.name);
       mentions.addAll(ids);
+      final inlineMentions = RegExp(
+        r'\]\(aurai://member/([^)]+)\)',
+      ).allMatches(text).map((match) => match.group(1)!).toSet();
+      final missingMentions = ids.toSet().where(
+        (id) => !inlineMentions.contains(Uri.encodeComponent(id)),
+      );
       output.add(
         AgentMessage(
           id: newMessageId(),
@@ -86,8 +94,8 @@ extension GroupMessageDelivery on ChatController {
           sender: _groupSenders[reply.senderId]!,
           runId: member.activeRunId,
           text: [
-            if (ids.isNotEmpty)
-              ids
+            if (missingMentions.isNotEmpty)
+              missingMentions
                   .map((id) {
                     final name = senders[id]!.name
                         .replaceAll('[', r'\[')
@@ -110,6 +118,7 @@ extension GroupMessageDelivery on ChatController {
         _store.database,
       ).set(parent.id, reply.senderId, participation == 'paused');
       if (participation == 'paused') {
+        await _groupSleeps.remove(parent.id, reply.senderId);
         dispatcher.pause(reply.senderId);
       } else {
         dispatcher.paused.remove(reply.senderId);
@@ -123,7 +132,7 @@ extension GroupMessageDelivery on ChatController {
             (old) => old.id == m.id && old.isSystem != m.isSystem,
           ),
         )) {
-      return _deliverGroupMessages(
+      return _deliverGroupMessage(
         arguments: {...arguments, 'participation': 'unchanged'},
         member: member,
         parent: parent,
@@ -152,13 +161,30 @@ extension GroupMessageDelivery on ChatController {
     observed.addAll(output);
     if (output.isNotEmpty) dispatcher.receive(output, mentions: mentions);
     _notifyMember(member, parent);
+    if (output.isNotEmpty) {
+      final body =
+          '${reply.sender.name}：${output.map((m) => markdownPreviewText(m.text)).join('\n')}';
+      completedReplies.value = ConversationCompletion(
+        conversationId: parent.id,
+        title: parent.title,
+        runId: member.activeRunId!,
+        reply: body,
+      );
+      unawaited(
+        _platform.notifyGroupMessage(parent.id, parent.title, body).catchError((
+          Object error,
+        ) {
+          debugPrint('Group notification failed: $error');
+        }),
+      );
+    }
     return {
       'sent': true,
-      'messageIds': output.map((m) => m.id).toList(),
+      'messageId': output.isEmpty ? null : output.single.id,
       'participation': dispatcher.paused.contains(reply.senderId)
           ? 'paused'
           : 'active',
-      'instruction': '这些消息已发送，不要再重复。没有新的内容就结束本次执行。',
+      'instruction': '消息已发送，不要再重复。没有新的内容就结束本次执行。',
     };
   }
 
@@ -168,7 +194,7 @@ extension GroupMessageDelivery on ChatController {
   ) async {
     final groupId = arguments['groupId'] as String?;
     if (groupId == null) throw ArgumentError('请先确认要调整哪个群聊');
-    if ((arguments['messages'] as List).isNotEmpty) {
+    if (arguments['message'] != null) {
       throw ArgumentError('私聊中此工具仅调整接话状态，不能发送群消息');
     }
     final participation = arguments['participation'] as String;
@@ -180,6 +206,7 @@ extension GroupMessageDelivery on ChatController {
       throw ArgumentError('你不是这个群的成员');
     }
     final paused = participation == 'paused';
+    if (paused) await _groupSleeps.remove(groupId, senderId);
     await GroupParticipation(_store.database).set(groupId, senderId, paused);
     if (_runningConversation?.id == groupId) {
       if (paused) {

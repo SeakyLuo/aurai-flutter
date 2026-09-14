@@ -1,7 +1,8 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
 import 'chat_controller.dart';
-import 'ai_conversations_page.dart';
+import 'home_navigation.dart';
 import 'glass_surface.dart';
 import 'dialog_action_button.dart';
 
@@ -11,19 +12,13 @@ Future<void> openAiChat(
   AiProfile ai,
 ) async {
   try {
-    final navigator = Navigator.of(context);
-    navigator.popUntil((route) => route.isFirst);
-    await navigator.push<void>(
-      MaterialPageRoute(
-        builder: (_) =>
-            AiConversationsPage(controller: controller, profile: ai),
-      ),
-    );
-  } on Object {
+    final id = await controller.openAiConversation(ai);
+    if (context.mounted) await openHomeConversation(context, controller, id);
+  } on Object catch (error) {
     if (context.mounted)
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('无法打开会话，请稍后重试')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('无法打开会话，请稍后重试：${errorMessage(error)}')),
+      );
   }
 }
 
@@ -46,7 +41,13 @@ Future<void> changeAiArchive(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('归档朋友？', style: TextStyle(fontSize: 17)),
+                Text(
+                  '归档朋友？',
+                  style: TextStyle(
+                    fontSize: 17,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 const Text(
                   '保留聊天记录和已有群聊关系，可在已归档朋友中恢复。',
@@ -55,6 +56,7 @@ Future<void> changeAiArchive(
                 const SizedBox(height: 20),
                 DialogActionButton(
                   text: '归档',
+                  role: DialogActionRole.destructive,
                   onPressed: () => Navigator.pop(context, true),
                 ),
                 const SizedBox(height: 10),
@@ -81,10 +83,10 @@ Future<void> changeAiArchive(
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(ai.sender.archived ? '已恢复朋友' : '已归档朋友')),
       );
-  } on Object {
+  } on Object catch (error) {
     if (context.mounted)
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('操作失败，请重试')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('操作失败，请重试：${errorMessage(error)}')),
+      );
   }
 }

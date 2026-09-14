@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -89,9 +90,11 @@ class _AccessibilityRequestSheetState
     });
     try {
       await widget.controller.enableRequestedAccessibility();
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
-        _messenger.showSnackBar(const SnackBar(content: Text('无法打开无障碍设置，请重试')));
+        _messenger.showSnackBar(
+          SnackBar(content: Text('无法打开无障碍设置，请重试：${errorMessage(error)}')),
+        );
       }
     } finally {
       if (mounted) setState(() => _opening = false);

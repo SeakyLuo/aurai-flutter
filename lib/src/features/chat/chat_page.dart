@@ -1,4 +1,7 @@
+import '../../domain/message_sender.dart';
+import '../../domain/error_message.dart';
 import '../../domain/draft_mention.dart';
+import 'mention_text_controller.dart';
 import 'group_mention_sheet.dart';
 import '../../platform/message_file_store.dart';
 import 'keyboard_inset.dart';
@@ -63,7 +66,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   late String _mentionConversationId = widget.controller.activeConversation.id;
   bool _mentionOpen = false;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
-  final _textController = TextEditingController();
+  late final _textController = MentionTextController(() => _mentions);
   final _focusNode = FocusNode();
   var _viewportKey = GlobalKey<ChatViewportState>();
   final _scrollBookmarks = <String, ChatScrollBookmark>{};
@@ -139,6 +142,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       onEdit: _beginMessageEdit,
       onRecall: _recallMessage,
       onQuote: _editing == null ? _quoteMessage : null,
+      onMention: controller.canEditDraft && _editing == null
+          ? _mentionMember
+          : null,
       onOpenQuote: _openQuotedMessage,
       beforeMessageId: _editing?.message.id,
       allowEditing: _editing == null,
@@ -157,7 +163,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         ),
       );
     }
-    if (showProgress && _editing == null) {
+    if (!isGroup && showProgress && _editing == null) {
       timeline.add(
         ChatTimelineEntry(
           'progress:${controller.activeConversation.id}',
@@ -248,8 +254,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                           }
                           try {
                             await controller.removeDraftFile(file);
-                          } on Object {
-                            if (mounted) _imageNotice('附件移除失败，请重试');
+                          } on Object catch (error) {
+                            if (mounted)
+                              _imageNotice('附件移除失败，请重试：${errorMessage(error)}');
                           }
                         },
                         addingImages:
@@ -565,11 +572,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Future<void> _saveDraft() async {
     try {
       await widget.controller.saveDraft();
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('草稿保存失败，请稍后重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('草稿保存失败，请稍后重试：${errorMessage(error)}')),
+        );
       }
     }
   }
@@ -579,8 +586,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (id == controller.activeConversation.id) {
       try {
         await controller.markActiveConversationRead();
-      } on Object {
-        if (mounted) _imageNotice('已读状态保存失败，请重试');
+      } on Object catch (error) {
+        if (mounted) _imageNotice('已读状态保存失败，请重试：${errorMessage(error)}');
       }
       return;
     }
@@ -605,11 +612,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         });
       }
       setState(() {});
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('会话保存失败，请稍后重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('会话保存失败，请稍后重试：${errorMessage(error)}')),
+        );
       }
     }
   }
@@ -655,9 +662,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _preparingGoal = true;
         await _openSettings(continueAfterSave: true);
       }
-    } on Object {
+    } on Object catch (error) {
       if (widget.controller.activeConversation.id == conversationId)
-        _showRunNotice();
+        _showRunNotice(error);
     } finally {
       _preparingGoal = false;
       _positionSentMessage = false;
@@ -679,9 +686,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
     try {
       await widget.controller.continuePending();
-    } on Object {
+    } on Object catch (error) {
       if (widget.controller.activeConversation.id == conversationId)
-        _showRunNotice();
+        _showRunNotice(error);
     }
   }
 
@@ -689,17 +696,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     await widget.controller.stop();
   }
 
-  void _showRunNotice() {
+  void _showRunNotice(Object error) {
     if (!mounted) {
       return;
     }
     final stopped = widget.controller.runState == ChatRunState.cancelled;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          stopped ? '任务已停止' : widget.controller.errorDetail ?? '任务没有完成，可以重试',
-        ),
-      ),
+      SnackBar(content: Text(stopped ? '任务已停止' : errorMessage(error))),
     );
   }
 

@@ -1,3 +1,4 @@
+import '../domain/error_message.dart';
 import '../domain/tool_models.dart';
 import '../memory/memory_controller.dart';
 import '../providers/responses_transport.dart';
@@ -35,7 +36,7 @@ class _PrepareMemory implements AgentTool, RuntimeCapabilityAgentTool {
   ToolDefinition get definition => const ToolDefinition(
     name: 'prepareMemoryChanges',
     description:
-        'Only when the user requests organizing, supplementing, correcting or forgetting memories, prepare proposed changes with reasons. Does not save changes. Manual memories are protected. Call applyMemoryChanges for the prepared proposal to show the real confirmation; do not claim saved before application succeeds. Do not call for routine chat or invent a memory request.',
+        'Only when the user requests organizing, supplementing, correcting or forgetting memories, prepare proposed changes with reasons. Does not save changes. Manual memories are protected. Call applyMemoryChanges to apply the prepared proposal; do not claim saved before application succeeds. Do not call for routine chat or invent a memory request.',
     inputSchema: {
       'type': 'object',
       'properties': {
@@ -68,11 +69,11 @@ class _PrepareMemory implements AgentTool, RuntimeCapabilityAgentTool {
         'saved': false,
         'next': plan.changes.isEmpty
             ? 'No changes needed.'
-            : 'Call applyMemoryChanges to present these exact changes for user confirmation.',
+            : 'Call applyMemoryChanges to save these exact changes.',
       });
-    } on Object {
+    } on Object catch (error) {
       return _result(call, ToolResultStatus.error, {
-        'error': '无法生成整理建议，请检查模型配置或重试',
+        'error': '无法生成整理建议，请检查模型配置或重试：${errorMessage(error)}',
       });
     } finally {
       if (identical(owner.transport, transport)) owner.transport = null;
@@ -94,17 +95,15 @@ class _ApplyMemory
   ToolDefinition get definition => ToolDefinition(
     name: 'applyMemoryChanges',
     description:
-        'Apply the exact prepared memory proposal after the built-in real user confirmation. Uses only the latest proposal prepared in this run. Cancellation or denied confirmation changes nothing. Never substitute a claimed confirmation.',
+        'Apply the exact prepared memory proposal requested by the user. Uses only the latest proposal prepared in this run. Do not apply changes outside the user request.',
     inputSchema: const {
       'type': 'object',
       'properties': {},
       'required': [],
       'additionalProperties': false,
     },
-    safety: ToolSafety.sensitive,
+    safety: ToolSafety.lowRisk,
     capabilityId: 'memory.manage',
-    confirmationDescriptionBuilder: (_) =>
-        '确认应用以下记忆调整？\n\n${owner.plan!.description}',
   );
   @override
   Future<ToolResult?> preflight(ToolCall call) async {
@@ -126,10 +125,8 @@ class _ApplyMemory
       await owner.memory.applyChanges(owner.plan!);
       owner.plan = null;
       return _result(call, ToolResultStatus.success, {'saved': true});
-    } on Object {
-      return _result(call, ToolResultStatus.error, {
-        'error': '记忆未能更新，请重新整理后重试',
-      });
+    } on Object catch (error) {
+      return _result(call, ToolResultStatus.error, {'error': '记忆未能更新：$error'});
     }
   }
 

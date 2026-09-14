@@ -1,8 +1,16 @@
+import '../../domain/error_message.dart';
+import '../../domain/avatar_style.dart';
+import '../../domain/message_sender.dart';
+import '../../storage/home_conversations.dart';
+import 'group_avatar.dart';
+import 'profile_avatar.dart';
+import '../../domain/agent_models.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../platform/preview_image_actions.dart';
 import 'chat_controller.dart';
-import 'conversation_icon.dart';
+import 'markdown_preview_text.dart';
+import '../../storage/group_list_preview.dart';
 import 'image_forward_dialog.dart';
 import 'attachment_action_icon.dart';
 import 'settings_appearance.dart';
@@ -11,10 +19,18 @@ class ImageForwardPage extends StatefulWidget {
   const ImageForwardPage({
     super.key,
     required this.controller,
-    required this.image,
-  });
+    required ImageProvider image,
+  }) : image = image,
+       message = null;
+  const ImageForwardPage.message({
+    super.key,
+    required this.controller,
+    required AgentMessage message,
+  }) : message = message,
+       image = null;
   final ChatController controller;
-  final ImageProvider image;
+  final ImageProvider? image;
+  final AgentMessage? message;
   @override
   State<ImageForwardPage> createState() => _ImageForwardPageState();
 }
@@ -22,7 +38,9 @@ class ImageForwardPage extends StatefulWidget {
 class _ImageForwardPageState extends State<ImageForwardPage> {
   final _search = TextEditingController();
   final _scroll = ScrollController();
-  final _items = <({String id, String title})>[];
+  final _items = <Conversation>[];
+  final _senders = <String, MessageSender>{};
+  final _groups = <String, List<MessageSender>>{};
   Timer? _debounce;
   int _generation = 0;
   bool _loading = false, _more = true, _sharing = false;
@@ -54,16 +72,35 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
         _search.text.trim(),
         _items.length,
       );
+      final avatars = await Future.wait<Object?>([
+        HomeConversations(widget.controller.groupStore).senders(page),
+        widget.controller.groupStore.avatarMembers(
+          page
+              .where((c) => c.kind == ConversationKind.group)
+              .map((c) => c.id)
+              .toList(),
+        ),
+        loadConversationListPreviews(
+          widget.controller.groupStore.database,
+          page,
+        ),
+      ]);
       if (!mounted || generation != _generation) return;
       setState(() {
+        if (reset) {
+          _senders.clear();
+          _groups.clear();
+        }
+        _senders.addAll(avatars[0] as Map<String, MessageSender>);
+        _groups.addAll(avatars[1] as Map<String, List<MessageSender>>);
         _items.addAll(page);
         _more = page.length == 30;
       });
-    } on Object {
+    } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('会话加载失败，请重新搜索')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('会话加载失败，请重新搜索：${errorMessage(error)}')),
+        );
     } finally {
       if (mounted && generation == _generation)
         setState(() => _loading = false);
@@ -74,12 +111,19 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
     final sent = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => ImageForwardDialog(
-        controller: widget.controller,
-        image: widget.image,
-        targetId: id,
-        title: title,
-      ),
+      builder: (_) => widget.message != null
+          ? ImageForwardDialog.message(
+              controller: widget.controller,
+              message: widget.message!,
+              targetId: id,
+              title: title,
+            )
+          : ImageForwardDialog(
+              controller: widget.controller,
+              image: widget.image!,
+              targetId: id,
+              title: title,
+            ),
     );
     if (sent == true && mounted) Navigator.pop(context, true);
   }
@@ -88,12 +132,12 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
     if (_sharing) return;
     setState(() => _sharing = true);
     try {
-      await PreviewImageActions.perform(widget.image, 'share');
-    } on Object {
+      await PreviewImageActions.perform(widget.image!, 'share');
+    } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('无法打开分享，请重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法打开分享，请重试：${errorMessage(error)}')),
+        );
     } finally {
       if (mounted) setState(() => _sharing = false);
     }
@@ -101,13 +145,9 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('转发图片'),
-      leading: SettingsGlassAction(
-        label: '返回',
-        icon: Icons.arrow_back_rounded,
-        onPressed: () => Navigator.pop(context),
-      ),
+    appBar: SettingsAppBar(
+      title: widget.message == null ? '转发图片' : '转发消息',
+      onBack: () => Navigator.pop(context),
     ),
     body: Column(
       children: [
@@ -137,25 +177,22 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
         Expanded(
           child: ListView(
             controller: _scroll,
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
             children: [
-              _row(
-                '其他应用',
-                const AttachmentActionIcon(
-                  type: AttachmentActionIconType.forward,
+              if (widget.message == null)
+                _row(
+                  '其他应用',
+                  const AttachmentActionIcon(
+                    type: AttachmentActionIconType.forward,
+                  ),
+                  _sharing ? null : _external,
                 ),
-                _sharing ? null : _external,
-              ),
-              _row(
-                '新建会话',
-                const ConversationIcon(),
-                () => _select(null, '新建会话'),
-              ),
               for (final item in _items)
                 _row(
                   item.title,
-                  const ConversationIcon(),
+                  _avatar(item),
                   () => _select(item.id, item.title),
+                  preview: item.preview,
                 ),
               if (_loading)
                 const Padding(
@@ -178,15 +215,54 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
       ],
     ),
   );
-  Widget _row(String title, Widget icon, VoidCallback? action) => ListTile(
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-    leading: icon,
-    title: Text(
-      title,
-      style: const TextStyle(fontSize: 15),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
+  Widget _avatar(Conversation item) {
+    if (item.kind == ConversationKind.group) {
+      return GroupAvatar(members: _groups[item.id]!, size: 48);
+    }
+    final sender = _senders[item.defaultSenderId]!;
+    return ProfileAvatar(
+      style: AvatarStyle(
+        icon: sender.avatarIcon,
+        color: sender.avatarColor,
+        path: sender.avatarPath,
+      ),
+      name: sender.name,
+      size: 48,
+    );
+  }
+
+  Widget _row(
+    String title,
+    Widget icon,
+    VoidCallback? action, {
+    String? preview,
+  }) => Material(
+    color: Colors.transparent,
+    borderRadius: BorderRadius.circular(16),
+    clipBehavior: Clip.antiAlias,
+    child: ListTile(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+      leading: SizedBox.square(dimension: 48, child: Center(child: icon)),
+      horizontalTitleGap: 12,
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 16),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: preview == null
+          ? null
+          : Text(
+              markdownPreviewText(preview),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+      onTap: action,
     ),
-    onTap: action,
   );
 }

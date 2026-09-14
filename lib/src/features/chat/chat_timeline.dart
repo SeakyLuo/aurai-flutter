@@ -1,3 +1,4 @@
+import '../../html_games/html_game_view.dart';
 import '../../domain/tool_activity_groups.dart';
 import 'tool_activity_group.dart';
 import 'task_elapsed.dart';
@@ -25,10 +26,27 @@ List<ChatTimelineEntry> buildChatTimeline(
   String? beforeMessageId,
   bool allowEditing = true,
   ValueChanged<AgentMessage>? onQuote,
+  ValueChanged<MessageSender>? onMention,
   Future<void> Function(AgentMessage)? onRecall,
   ValueChanged<String>? onOpenQuote,
 }) {
   final conversation = controller.activeConversation;
+  final mentionSenders = {
+    for (final sender in conversation.creationMembers) sender.id: sender,
+    for (final message in [
+      ...conversation.messages,
+      ...?conversation.searchMessages,
+    ])
+      if (message.sender != null) message.sender!.id: message.sender!,
+  };
+  final mentionMembers = <String, String>{};
+  final ambiguousNames = <String>{};
+  for (final sender in mentionSenders.values) {
+    if (mentionMembers.containsKey(sender.name))
+      ambiguousNames.add(sender.name);
+    mentionMembers[sender.name] = sender.id;
+  }
+  mentionMembers.removeWhere((name, _) => ambiguousNames.contains(name));
   final isGroup = conversation.kind == ConversationKind.group;
   final watch = conversation.executionWatch;
   final showElapsed =
@@ -139,7 +157,7 @@ List<ChatTimelineEntry> buildChatTimeline(
       ChatTimelineEntry(
         'creation:${conversation.id}',
         (context) => Padding(
-          padding: const EdgeInsets.fromLTRB(28, 8, 28, 8),
+          padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
           child: Column(
             children: [
               Text(
@@ -180,7 +198,12 @@ List<ChatTimelineEntry> buildChatTimeline(
         ChatTimelineEntry(
           'time:${message.id}',
           (context) => Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            padding: EdgeInsets.fromLTRB(
+              18,
+              12,
+              18,
+              conversation.kind == ConversationKind.group ? 0 : 12,
+            ),
             child: Center(
               child: Text(
                 messageTime(message.createdAt),
@@ -197,7 +220,12 @@ List<ChatTimelineEntry> buildChatTimeline(
         ChatTimelineEntry(message.id, (context) {
           if (message.isSystem) {
             return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+              padding: EdgeInsets.fromLTRB(
+                28,
+                12,
+                28,
+                conversation.kind == ConversationKind.group ? 0 : 12,
+              ),
               child: Text(
                 message.text,
                 textAlign: TextAlign.center,
@@ -213,6 +241,17 @@ List<ChatTimelineEntry> buildChatTimeline(
             excludedActivityMessageId: conversation.searchMessageId,
             key: ValueKey(message.id),
             message: message,
+            mentionMembers: mentionMembers,
+            htmlGameView: message.htmlGame == null
+                ? null
+                : HtmlGameView(
+                    card: message.htmlGame!,
+                    messageId: message.id,
+                    conversationId: conversation.id,
+                    store: controller.htmlGames,
+                  ),
+            onInteractiveClick: (button, revision) => controller
+                .clickInteractiveMessage(message.id, button, revision),
             groupBubble: conversation.kind == ConversationKind.group,
             onQuote:
                 conversation.kind == ConversationKind.group &&
@@ -261,7 +300,11 @@ List<ChatTimelineEntry> buildChatTimeline(
                   message.role == AgentMessageRole.assistant &&
                   message.sender != null
               ? GroupMessageHeading(
+                  showName: message.htmlGame == null,
                   sender: message.sender!,
+                  onMention: onMention == null
+                      ? null
+                      : () => onMention(message.sender!),
                   onOpenProfile: () => Navigator.push<void>(
                     context,
                     MaterialPageRoute(

@@ -1,4 +1,6 @@
+import '../../domain/error_message.dart';
 import 'conversation_preview_text.dart';
+import 'message_time.dart';
 import 'conversation_list_status.dart';
 import 'home_page.dart';
 import 'package:flutter/material.dart';
@@ -18,9 +20,11 @@ class AiConversationsPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.profile,
+    this.openEmptyConversation = true,
   });
   final ChatController controller;
   final AiProfile profile;
+  final bool openEmptyConversation;
   @override
   State<AiConversationsPage> createState() => _AiConversationsPageState();
 }
@@ -71,15 +75,18 @@ class _AiConversationsPageState extends State<AiConversationsPage>
         _failed = false;
       });
       final openEmpty =
-          _firstLoad && _items.isEmpty && ModalRoute.of(context)!.isCurrent;
+          widget.openEmptyConversation &&
+          _firstLoad &&
+          _items.isEmpty &&
+          ModalRoute.of(context)!.isCurrent;
       _firstLoad = false;
       if (openEmpty) await _open(null, true);
-    } on Object {
+    } on Object catch (error) {
       if (mounted) setState(() => _failed = true);
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('会话加载失败'),
+            content: Text('会话加载失败：${errorMessage(error)}'),
             action: SnackBarAction(
               label: '重试',
               onPressed: () => _load(reset: true),
@@ -112,11 +119,11 @@ class _AiConversationsPageState extends State<AiConversationsPage>
       }
       await Navigator.push<void>(context, route);
       if (mounted) await _load(reset: true);
-    } on Object {
+    } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('无法打开会话，请重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
+        );
     } finally {
       if (mounted) setState(() => _opening = false);
     }
@@ -179,29 +186,52 @@ class _AiConversationsPageState extends State<AiConversationsPage>
                     color: Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
                     clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                    child: ListenableBuilder(
+                      listenable: widget.controller.scheduledTasks,
+                      builder: (context, _) => ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        leading: const ConversationIcon(),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                item.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            ConversationListStatus(
+                              showUnread: false,
+                              controller: widget.controller,
+                              conversation: item,
+                            ),
+                            if (item.lastMessageAt != null) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                conversationMessageTime(item.lastMessageAt!),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        subtitle: ConversationPreviewText(
+                          showUnread: true,
+                          conversation: item,
+                          emptyText: '新会话',
+                        ),
+                        onTap: () => _open(item.id),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-                      leading: const ConversationIcon(),
-                      title: Text(
-                        item.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: ConversationPreviewText(
-                        conversation: item,
-                        emptyText: '新会话',
-                      ),
-                      trailing: ConversationListStatus(
-                        controller: widget.controller,
-                        conversation: item,
-                      ),
-                      onTap: () => _open(item.id),
                     ),
                   ),
                 );

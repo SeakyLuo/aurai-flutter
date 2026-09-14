@@ -46,15 +46,15 @@ class MemoryRecordTool
       name: operation == 'list' ? 'listMemories' : '${operation}Memory',
       description: switch (operation) {
         'list' =>
-          'Search or list saved memories, newest updated first, 20 per page. Returns IDs, UTC creation/update timestamps, source references and revision. Use nextOffset for more. IDs are internal, do not display them to users.',
+          'Search or list this AI own memories across private chat and all groups, newest updated first, 20 per page. Returns IDs, UTC creation/update timestamps, source references and revision. Use nextOffset for more. IDs are internal, do not display them to users.',
         'read' =>
-          'Read one saved memory including creation/update times, source references and revision.',
+          'Read one of this AI own memories from any scene, including creation/update times, source references and revision.',
         'create' =>
-          'Save one lasting fact only when the user explicitly asks to remember it. Requires real confirmation. Query existing memories first to avoid duplicates. Do not store routine tasks, guesses or secrets.',
+          'Save one lasting fact only when the user explicitly asks to remember it. Query existing memories first to avoid duplicates. Do not store routine tasks, guesses or secrets.',
         'update' =>
-          'Correct a specific saved memory only at the user’s explicit request and after real confirmation. Preserves ID, creation time and original source. Explicit corrections become protected manual memories.',
+          'Correct a specific saved memory only at the user’s explicit request. Preserves ID, creation time and original source. Explicit corrections become protected manual memories. Only editableHere memories can be changed here.',
         _ =>
-          'Forget one saved memory only at the user’s explicit request and after real confirmation. Deletes the memory without retaining a copy or creating a future exclusion rule. Can delete manual memories when explicitly requested.',
+          'Forget one saved memory only at the user’s explicit request. Deletes the memory without retaining a copy or creating a future exclusion rule. Can delete manual memories when explicitly requested.',
       },
       inputSchema: {
         'type': 'object',
@@ -62,24 +62,15 @@ class MemoryRecordTool
         'required': properties.keys.toList(),
         'additionalProperties': false,
       },
-      safety: reading ? ToolSafety.readOnly : ToolSafety.sensitive,
+      safety: reading ? ToolSafety.readOnly : ToolSafety.lowRisk,
       capabilityId: 'memory.manage',
-      confirmationDescriptionBuilder: reading
-          ? null
-          : (args) => switch (operation) {
-              'create' => '记住以下内容？\n\n${args['text']}',
-              'update' =>
-                '修改这条记忆？\n\n${memory.entryById(args['id'] as String)['text']}\n→ ${args['text']}',
-              _ =>
-                '忘记这条记忆？\n\n${memory.entryById(args['id'] as String)['text']}',
-            },
     );
   }
 
   @override
   Future<ToolResult?> preflight(ToolCall call) async {
     try {
-      if (hasId) memory.entryById(call.arguments['id'] as String);
+      if (hasId && !reading) memory.entryById(call.arguments['id'] as String);
       if (!reading && call.arguments['expectedRevision'] != memory.revision) {
         throw StateError('记忆已变化，请重新查询后操作');
       }
@@ -99,7 +90,7 @@ class MemoryRecordTool
         final query = (args['query'] as String).toLowerCase();
         final offset = args['offset'] as int;
         final matches =
-            memory.entries
+            (await memory.readableMemories())
                 .where(
                   (entry) =>
                       (entry['text'] as String).toLowerCase().contains(query),
@@ -114,17 +105,29 @@ class MemoryRecordTool
                     : order;
               });
         return result(call, ToolResultStatus.success, {
-          'memories': matches.skip(offset).take(20).map(memoryRecord).toList(),
+          'memories': matches
+              .skip(offset)
+              .take(20)
+              .map(memory.contextualRecord)
+              .toList(),
           'total': matches.length,
           'revision': memory.revision,
           'nextOffset': offset + 20 < matches.length ? offset + 20 : null,
         });
       }
-      if (operation == 'read')
+      if (operation == 'read') {
+        final rows = await memory.database.query(
+          'user_memories',
+          where: 'owner_id = ? AND id = ?',
+          whereArgs: [memory.ownerId, args['id']],
+          limit: 1,
+        );
+        if (rows.isEmpty) throw StateError('这条记忆已删除，请重新查询');
         return result(call, ToolResultStatus.success, {
-          'memory': memoryRecord(memory.entryById(args['id'] as String)),
+          'memory': memory.contextualRecord(rows.single),
           'revision': memory.revision,
         });
+      }
       final output = await memory.mutateRecord(
         operation,
         id: args['id'] as String?,

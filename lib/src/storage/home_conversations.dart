@@ -11,18 +11,12 @@ class HomeConversations {
   static const pageSize = 50;
 
   Future<List<Conversation>> recent({int offset = 0}) async {
-    final rows = await store.database.rawQuery(
-      '''
-      SELECT * FROM (
-        SELECT *, ROW_NUMBER() OVER (
-          PARTITION BY CASE WHEN kind = 'group' THEN id ELSE default_sender_id END
-          ORDER BY updated_at DESC, id DESC
-        ) AS recent_rank
-        FROM conversations WHERE archived = 0 AND $visibleConversation
-      ) WHERE recent_rank = 1
-      ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?
-    ''',
-      [pageSize, offset],
+    final rows = await store.database.query(
+      'conversations',
+      where: 'archived = 0 AND $visibleConversation AND $localUserConversation',
+      orderBy: 'pinned DESC, updated_at DESC, id DESC',
+      limit: pageSize,
+      offset: offset,
     );
     return _headers(rows);
   }
@@ -31,7 +25,7 @@ class HomeConversations {
     final rows = await store.database.query(
       'conversations',
       where:
-          "kind = 'direct' AND default_sender_id = ? AND archived = 0 AND $visibleConversation",
+          "kind = 'direct' AND default_sender_id = ? AND archived = 0 AND $visibleConversation AND $localUserConversation",
       whereArgs: [senderId],
       orderBy: 'pinned DESC, updated_at DESC, id DESC',
       limit: pageSize,
@@ -50,7 +44,7 @@ class HomeConversations {
         whereArgs: items.map((c) => 'seen_run:${c.id}').toList(),
         limit: pageSize,
       ),
-      loadGroupListPreviews(store.database, items),
+      loadConversationListPreviews(store.database, items),
       store.database.query(
         'attachments',
         columns: ['conversation_id', 'kind', 'display_name'],

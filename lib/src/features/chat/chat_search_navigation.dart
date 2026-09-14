@@ -5,7 +5,7 @@ extension _ChatSearchNavigation on _ChatPageState {
     final controller = widget.controller;
     final conversation = controller.activeConversation;
     final progress = ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('正在定位消息…'), duration: Duration(days: 1)),
+      SnackBar(content: Text('正在定位消息…'), duration: Duration(days: 1)),
     );
     try {
       if (!await controller.locateSearchMessage(messageId)) return;
@@ -13,10 +13,10 @@ extension _ChatSearchNavigation on _ChatPageState {
         return;
       _focusNode.unfocus();
       _positionSearchResult(messageId);
-    } on Object {
+    } on Object catch (caughtError) {
       if (mounted && identical(controller.activeConversation, conversation)) {
         _scrollToBottom();
-        _imageNotice('无法定位这条消息，请重新搜索');
+        _imageNotice('无法定位这条消息，请重新搜索：${errorMessage(caughtError)}');
       }
     } finally {
       progress.close();

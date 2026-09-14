@@ -14,13 +14,15 @@ class ConversationStatusDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final failed = conversation.runState == ChatRunState.failed;
+    final failed =
+        conversation.kind != ConversationKind.group &&
+        conversation.runState == ChatRunState.failed;
     final completed = hasUnreadCompletion(conversation);
     if (!failed && !completed) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(left: 8),
       child: Semantics(
-        label: failed ? '任务出错' : '任务已完成',
+        label: failed ? '任务出错' : '有新消息',
         child: failed
             ? const TaskFailureIcon()
             : Container(

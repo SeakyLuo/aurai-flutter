@@ -93,10 +93,18 @@ class AndroidAgentBridge(private val context: Context) {
                 startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                 result.success(null)
             }
+            "notifyGroupMessage" -> {
+                GroupMessageNotifications.show(
+                    context, call.argument<String>("conversationId")!!,
+                    call.argument<String>("title")!!, call.argument<String>("body")!!,
+                    call.argument<ByteArray>("avatar")!!,
+                )
+                result.success(null)
+            }
             "startAgentSession" -> {
                 sessionActive = true
                 AuraiAccessibilityService.instance?.startSession()
-                AgentSessionService.start(context, call.argument<String>("step")!!)
+                AgentSessionService.start(context, call.argument<String>("step")!!, call.argument<Boolean>("groupChat") == true, call.argument<ByteArray>("avatar"))
                 result.success(null)
             }
             "updateAttentionNotification" -> {
@@ -107,6 +115,7 @@ class AndroidAgentBridge(private val context: Context) {
                     call.argument<String>("title"),
                     call.argument<String>("body"),
                     call.argument<Int>("timeoutSeconds"),
+                    call.argument<ByteArray>("avatar"),
                 )
                 result.success(null)
             }
@@ -122,6 +131,7 @@ class AndroidAgentBridge(private val context: Context) {
                     call.argument<String>("conversationId")!!,
                     call.argument<String>("title")!!,
                     call.argument<String>("reply")!!,
+                    call.argument<ByteArray>("avatar")!!,
                 )
                 result.success(null)
             }

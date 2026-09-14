@@ -1,3 +1,4 @@
+import '../domain/error_message.dart';
 import 'package:flutter/services.dart';
 
 import '../domain/model_provider.dart';
@@ -56,8 +57,8 @@ class OpenModelTopUpTool implements AgentTool, RuntimeCapabilityAgentTool {
       );
     } on ModelProviderException catch (error) {
       return _error(call, error.message);
-    } on PlatformException {
-      return _error(call, '无法打开官方充值页，请在模型配置页手动打开');
+    } on PlatformException catch (error) {
+      return _error(call, '无法打开官方充值页，请在模型配置页手动打开：${errorMessage(error)}');
     }
   }
 

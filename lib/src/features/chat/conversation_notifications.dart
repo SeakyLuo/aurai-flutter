@@ -1,3 +1,5 @@
+import 'notification_avatar.dart';
+import '../../domain/error_message.dart';
 import 'app_page_navigation.dart';
 import 'home_navigation.dart';
 import 'package:flutter/material.dart';
@@ -89,11 +91,11 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
     try {
       await openHomeConversation(context, widget.controller, id);
       await widget.controller.markActiveConversationRead();
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('会话暂时无法打开，请稍后重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('会话暂时无法打开，请稍后重试：${errorMessage(error)}')),
+        );
       }
     }
   }
@@ -111,9 +113,13 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
     if (widget.controller.activeConversation.id == completion.conversationId)
       return;
     _hideCompletionToast();
+    final avatar = NotificationAvatar(
+      widget.controller.groupStore,
+    ).render(completion.conversationId);
     _completionToast = OverlayEntry(
       builder: (context) => ConversationNotificationToast(
         title: completion.title,
+        avatar: avatar,
         reply: completion.reply,
         onDismiss: _hideCompletionToast,
         onOpen: () {

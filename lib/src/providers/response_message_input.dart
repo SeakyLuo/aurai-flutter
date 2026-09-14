@@ -1,3 +1,4 @@
+import '../domain/error_message.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -36,13 +37,16 @@ Future<List<List<Map<String, Object?>>>> responseMessageInput(
         });
       } on FileSystemException catch (error) {
         if (error.osError?.errorCode == 2 && message.id != latestUserId) {
-          content.add({'type': 'input_text', 'text': '[历史图片文件已丢失，无法查看其内容。]'});
+          content.add({
+            'type': 'input_text',
+            'text': '[历史图片文件已丢失，无法查看其内容。]：${errorMessage(error)}',
+          });
           continue;
         }
         throw ModelProviderException(
           error.osError?.errorCode == 2
               ? '本次消息的图片文件已丢失，请重新添加图片后发送'
-              : '图片文件无法读取，请重新添加图片后发送',
+              : '图片文件无法读取，请重新添加图片后发送：${errorMessage(error)}',
         );
       }
     }

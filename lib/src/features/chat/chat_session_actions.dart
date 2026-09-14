@@ -4,9 +4,9 @@ extension _ChatSessionActions on _ChatPageState {
   Future<void> _openBatterySettings() async {
     await widget.controller.openBatterySettings();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请在“电池”或“后台耗电管理”中允许 Aurai 后台运行')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('请在“电池”或“后台耗电管理”中允许 Aurai 后台运行')));
     }
   }
 
@@ -30,8 +30,8 @@ extension _ChatSessionActions on _ChatPageState {
             conversation.runState != ChatRunState.idle)
           return;
         await widget.controller.markActiveConversationRead();
-      } on Object {
-        if (mounted) _imageNotice('已读状态保存失败，请重试');
+      } on Object catch (caughtError) {
+        if (mounted) _imageNotice('已读状态保存失败，请重试：${errorMessage(caughtError)}');
       } finally {
         _markReadScheduled = false;
       }

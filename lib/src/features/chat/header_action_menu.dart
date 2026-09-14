@@ -7,6 +7,7 @@ typedef HeaderMenuItem = ({String value, String label, Widget icon});
 Future<String?> showHeaderActionMenu(
   BuildContext context, {
   required List<HeaderMenuItem> items,
+  Set<String> destructiveValues = const {},
 }) {
   final button = context.findRenderObject()! as RenderBox;
   final overlay =
@@ -66,7 +67,17 @@ Future<String?> showHeaderActionMenu(
                                     Expanded(
                                       child: Text(
                                         item.label,
-                                        style: const TextStyle(fontSize: 15),
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          color:
+                                              destructiveValues.contains(
+                                                item.value,
+                                              )
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.error
+                                              : null,
+                                        ),
                                       ),
                                     ),
                                   ],

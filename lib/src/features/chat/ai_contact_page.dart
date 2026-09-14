@@ -1,7 +1,12 @@
+import '../../domain/error_message.dart';
 import '../../domain/message_sender.dart';
 import 'dialog_action_button.dart';
+import 'header_action_menu.dart';
+import 'conversation_menu_icon.dart';
 import 'tool_approvals_page.dart';
 import 'ai_contact_actions.dart';
+import 'ai_conversations_page.dart';
+import 'home_navigation.dart';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
 import '../../domain/avatar_style.dart';
@@ -45,9 +50,9 @@ class _AiContactPageState extends State<AiContactPage> {
     try {
       final ai = await widget.controller.groupStore.loadAi(widget.senderId);
       if (mounted) setState(() => _ai = ai);
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
-        _notice('朋友读取失败');
+        _notice('朋友读取失败：${errorMessage(error)}');
         Navigator.pop(context);
       }
     }
@@ -64,15 +69,15 @@ class _AiContactPageState extends State<AiContactPage> {
   Future<void> _message() async {
     if (_busy) return;
     setState(() => _busy = true);
-    await openAiChat(context, widget.controller, _ai!);
-    if (mounted && widget.groupId != null) {
-      try {
-        await widget.controller.selectConversation(widget.groupId!);
-      } on Object {
-        if (mounted) _notice('返回群聊失败，请重新打开群聊');
-      }
+    try {
+      final id = await widget.controller.openAiConversation(_ai!);
+      if (!mounted) return;
+      await openHomeConversation(context, widget.controller, id);
+    } on Object catch (error) {
+      if (mounted) _notice('无法打开私聊，请稍后重试：${errorMessage(error)}');
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-    if (mounted) setState(() => _busy = false);
   }
 
   Future<void> _memory() async {
@@ -99,15 +104,15 @@ class _AiContactPageState extends State<AiContactPage> {
                       title: group['title'] as String,
                     ),
                   );
-              } on Object {
-                if (mounted) _notice('记忆读取失败');
+              } on Object catch (error) {
+                if (mounted) _notice('记忆读取失败：${errorMessage(error)}');
               }
             },
           ),
         ),
       );
-    } on Object {
-      if (mounted) _notice('记忆读取失败');
+    } on Object catch (error) {
+      if (mounted) _notice('记忆读取失败：${errorMessage(error)}');
     }
   }
 
@@ -122,8 +127,8 @@ class _AiContactPageState extends State<AiContactPage> {
       await widget.controller.saveAi(_ai!.copyWith(isTemporary: false));
       await _reload();
       if (mounted) _notice('已添加到通讯录');
-    } catch (_) {
-      if (mounted) _notice('添加失败，请重试');
+    } catch (caughtError) {
+      if (mounted) _notice('添加失败，请重试：${errorMessage(caughtError)}');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -133,7 +138,42 @@ class _AiContactPageState extends State<AiContactPage> {
   Widget build(BuildContext context) {
     final ai = _ai;
     return Scaffold(
-      appBar: SettingsAppBar(title: '朋友', onBack: () => Navigator.pop(context)),
+      appBar: SettingsAppBar(
+        title: '朋友',
+        onBack: () => Navigator.pop(context),
+        actions: [
+          if (ai != null &&
+              !ai.sender.archived &&
+              !ai.isTemporary &&
+              ai.sender.id != MessageSender.aurai.id)
+            Builder(
+              builder: (buttonContext) => SettingsGlassAction(
+                label: '更多',
+                icon: Icons.more_horiz_rounded,
+                onPressed: _busy
+                    ? null
+                    : () async {
+                        final action = await showHeaderActionMenu(
+                          buttonContext,
+                          destructiveValues: const {'archive'},
+                          items: [
+                            (
+                              value: 'archive',
+                              label: '归档朋友',
+                              icon: ConversationMenuIcon(
+                                type: ConversationMenuIconType.archive,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                            ),
+                          ],
+                        );
+                        if (!mounted || action != 'archive') return;
+                        await _archive();
+                      },
+              ),
+            ),
+        ],
+      ),
       body: ai == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -190,8 +230,8 @@ class _AiContactPageState extends State<AiContactPage> {
                       widget.senderId,
                     );
                     if (mounted) await _page(SkillsPage(store: store));
-                  } on Object {
-                    if (mounted) _notice('技能读取失败，请重试');
+                  } on Object catch (error) {
+                    if (mounted) _notice('技能读取失败，请重试：${errorMessage(error)}');
                   }
                 }),
                 _row(
@@ -219,14 +259,20 @@ class _AiContactPageState extends State<AiContactPage> {
                       ? _addFriend
                       : _message,
                 ),
-                if (!ai.sender.archived &&
-                    !ai.isTemporary &&
-                    ai.sender.id != MessageSender.aurai.id) ...[
+                if (!ai.sender.archived && !ai.isTemporary) ...[
                   const SizedBox(height: 12),
                   DialogActionButton(
-                    text: '归档朋友',
+                    text: '会话列表',
                     role: DialogActionRole.secondary,
-                    onPressed: _busy ? null : _archive,
+                    onPressed: _busy
+                        ? null
+                        : () => _page(
+                            AiConversationsPage(
+                              controller: widget.controller,
+                              profile: ai,
+                              openEmptyConversation: false,
+                            ),
+                          ),
                   ),
                 ],
               ],

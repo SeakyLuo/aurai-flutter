@@ -121,7 +121,7 @@ class AuraiVpnService : VpnService() {
                     }
                 }
             } catch (error: Throwable) {
-                main.post { finishCapture(error.message ?: "网络记录启动失败") }
+                main.post { finishCapture(error.toString()) }
             }
         }
         return START_NOT_STICKY

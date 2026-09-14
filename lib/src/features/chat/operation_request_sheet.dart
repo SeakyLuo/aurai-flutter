@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import '../../domain/agent_models.dart';
 import '../../domain/ui_tool_actions.dart';
 import 'dart:async';
@@ -100,11 +101,11 @@ class _OperationRequestSheetState extends State<_OperationRequestSheet> {
               : toolTitle(widget.request.call.name),
           scope,
         );
-      } catch (_) {
+      } catch (caughtError) {
         if (mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('保存授权失败，请重试')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('保存授权失败，请重试：${errorMessage(caughtError)}')),
+          );
         return;
       } finally {
         _saving = false;

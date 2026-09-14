@@ -6,7 +6,7 @@ class AppControlTool implements AgentTool, RuntimeCapabilityAgentTool {
   final Future<Map<String, Object?>> Function(String, Map<String, Object?>) run;
   static const descriptions = {
     'createConversation':
-        'Create an empty private conversation with yourself, only when requested. Does not navigate or send. title is required.',
+        'Create or open a private conversation between yourself and a friend. Supply contactId from listFriends; addFriend first if needed. Omit contactId to create a new topic with the human user. Does not navigate or send. title is required.',
     'renameConversation':
         'Rename an accessible conversation. Discover conversationId with searchConversations or listGroupChats; title is required.',
     'setConversationPinned':
@@ -16,7 +16,7 @@ class AppControlTool implements AgentTool, RuntimeCapabilityAgentTool {
     'deleteConversation':
         'Permanently delete an accessible conversation and its attachments only on explicit user request. Running conversations cannot be deleted.',
     'sendConversationMessage':
-        'Send text as yourself to another accessible private conversation or group, only when the user requests delivery. Never impersonate the user. Does not navigate. text is required; supports Markdown reference images. Group members may respond; a private message is delivered without triggering another reply. Use sendGroupMessages for the current group.',
+        'Send text as yourself to a private conversation you participate in or an accessible group. Never impersonate the user. Does not navigate. text is required; supports Markdown reference images. AI recipients in private conversations may respond naturally; human recipients are not automatically answered on their behalf. Use sendGroupMessage for the current group.',
     'openAppPage':
         'Open an Aurai page only when the user asks. page is conversation, contact, skills, tasks or settings. conversationId is required for conversation, contactId for contact. App must be in foreground; opening does not modify data or send a message.',
   };
@@ -36,6 +36,7 @@ class AppControlTool implements AgentTool, RuntimeCapabilityAgentTool {
           'conversationId': {'type': 'string'},
         if (name == 'createConversation' || name == 'renameConversation')
           'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
+        if (name == 'createConversation') 'contactId': {'type': 'string'},
         if (name == 'setConversationPinned') 'pinned': {'type': 'boolean'},
         if (name == 'setConversationArchived') 'archived': {'type': 'boolean'},
         if (name == 'sendConversationMessage')

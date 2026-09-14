@@ -1,5 +1,15 @@
 import 'package:sqflite/sqflite.dart';
 import 'message_sender_schema.dart';
+import '../domain/message_sender.dart';
+
+Future<void> migrateAuraiDescription(Database db) async {
+  await db.update(
+    'ai_profiles',
+    {'description': '你的 AI 伙伴，陪你探索想法、解答问题，也帮你把日常事务付诸行动。'},
+    where: "sender_id = ? AND description = ''",
+    whereArgs: [MessageSender.aurai.id],
+  );
+}
 
 const groupChatTables = [
   '''CREATE TABLE ai_profiles (

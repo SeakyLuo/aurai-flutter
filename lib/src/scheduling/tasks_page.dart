@@ -1,3 +1,4 @@
+import '../domain/error_message.dart';
 import 'package:flutter/material.dart';
 
 import '../app/global_ui.dart';
@@ -50,8 +51,8 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
   Future<void> _load() async {
     try {
       await tasks.reload();
-    } on Object {
-      if (mounted) _notice('无法读取任务，请稍后重试');
+    } on Object catch (error) {
+      if (mounted) _notice('无法读取任务，请稍后重试：${errorMessage(error)}');
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -61,8 +62,8 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
   Future<void> _permission() async {
     try {
       await tasks.permission();
-    } on Object {
-      if (mounted) _notice('无法打开设置');
+    } on Object catch (error) {
+      if (mounted) _notice('无法打开设置：${errorMessage(error)}');
     }
   }
 
@@ -339,7 +340,11 @@ Future<void> openScheduledTasks(
     if (context.mounted)
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(error is StateError ? error.message : '无法创建任务，请在聊天中重试'),
+          content: Text(
+            error is StateError
+                ? error.message
+                : '无法创建任务，请在聊天中重试：${errorMessage(error)}',
+          ),
         ),
       );
   }

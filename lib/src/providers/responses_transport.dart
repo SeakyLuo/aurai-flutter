@@ -1,9 +1,11 @@
+import '../domain/error_message.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import '../domain/model_provider.dart';
 import 'responses_stream.dart';
+import 'chat_completions_codec.dart';
 
 /// One cancellable transport for both visible replies and context summaries.
 class ResponsesTransport {
@@ -79,12 +81,15 @@ class ResponsesTransport {
       final base = config.baseUrl.endsWith('/')
           ? config.baseUrl.substring(0, config.baseUrl.length - 1)
           : config.baseUrl;
-      final request = await client.postUrl(Uri.parse('$base/responses'));
+      final chat = config.service.usesChatCompletions;
+      final request = await client.postUrl(
+        Uri.parse('$base/${chat ? 'chat/completions' : 'responses'}'),
+      );
       checkCancelled();
       request.headers
         ..set(HttpHeaders.authorizationHeader, 'Bearer ${config.apiKey}')
         ..contentType = ContentType.json;
-      request.write(jsonEncode(body));
+      request.write(jsonEncode(chat ? chatCompletionsBody(body) : body));
       final response = await request.close().timeout(
         const Duration(seconds: 60),
       );
@@ -113,18 +118,19 @@ class ResponsesTransport {
         }
         throw error;
       }
-      final result = await readResponsesStream(
-        response,
-        onMessageStarted: onMessageStarted,
-        onProcessingStarted: () {
-          checkCancelled();
-          onProcessingStarted?.call();
-        },
-        onTextChanged: (text) {
-          checkCancelled();
-          onTextChanged?.call(text);
-        },
-      );
+      final result =
+          await (chat ? readChatCompletionsStream : readResponsesStream)(
+            response,
+            onMessageStarted: onMessageStarted,
+            onProcessingStarted: () {
+              checkCancelled();
+              onProcessingStarted?.call();
+            },
+            onTextChanged: (text) {
+              checkCancelled();
+              onTextChanged?.call(text);
+            },
+          );
       checkCancelled();
       return result;
     } on TimeoutException {
@@ -133,7 +139,10 @@ class ResponsesTransport {
     } on SocketException catch (error) {
       checkCancelled();
       throw _RetryableFailure(
-        ModelProviderException('无法连接模型服务，请检查网络', detail: '$error'),
+        ModelProviderException(
+          '无法连接模型服务，请检查网络：${errorMessage(error)}',
+          detail: '$error',
+        ),
       );
     } on HttpException catch (error) {
       checkCancelled();
@@ -146,7 +155,10 @@ class ResponsesTransport {
       rethrow;
     } on HandshakeException catch (error) {
       checkCancelled();
-      throw ModelProviderException('模型服务的安全连接失败', detail: '$error');
+      throw ModelProviderException(
+        '模型服务的安全连接失败：${errorMessage(error)}',
+        detail: '$error',
+      );
     } finally {
       client.close(force: true);
       if (identical(_client, client)) _client = null;

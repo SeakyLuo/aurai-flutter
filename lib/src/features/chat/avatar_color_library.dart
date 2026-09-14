@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'avatar_palette_store.dart';
@@ -42,9 +43,9 @@ class _AvatarColorLibraryState extends State<AvatarColorLibrary> {
           _solid = lists.solids;
           _gradients = lists.gradients;
         });
-    } catch (_) {
+    } catch (caughtError) {
       if (mounted) {
-        _notice('配色读取失败');
+        _notice('配色读取失败：${errorMessage(caughtError)}');
         Navigator.pop(context);
       }
     }
@@ -66,8 +67,8 @@ class _AvatarColorLibraryState extends State<AvatarColorLibrary> {
         }
       });
       return true;
-    } catch (_) {
-      if (mounted) _notice('配色保存失败，请重试');
+    } catch (caughtError) {
+      if (mounted) _notice('配色保存失败，请重试：${errorMessage(caughtError)}');
       return false;
     } finally {
       if (mounted) setState(() => _busy = false);

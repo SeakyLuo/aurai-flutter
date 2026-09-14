@@ -14,6 +14,8 @@ import android.os.IBinder
 import android.os.Looper
 
 class AgentSessionService : Service() {
+    private var groupChat = false
+    private var avatar: ByteArray? = null
     private val handler = Handler(Looper.getMainLooper())
     private val notificationBranding by lazy { NotificationBranding(resources) }
 
@@ -25,12 +27,16 @@ class AgentSessionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action ?: ACTION_START) {
             ACTION_SCHEDULED -> {
+                groupChat = false
+                avatar = null
                 running = true
                 startForeground(NOTIFICATION_ID, runningNotification("正在启动定时任务"))
                 ScheduledTasks.dispatch()
                 handler.postDelayed({ ScheduledTasks.startupTimedOut() }, 60_000)
             }
             ACTION_START -> {
+                groupChat = intent!!.getBooleanExtra("groupChat", false)
+                avatar = intent.getByteArrayExtra("avatar")
                 running = true
                 startForeground(NOTIFICATION_ID, runningNotification(intent!!.getStringExtra(EXTRA_STEP)!!))
             }
@@ -48,6 +54,7 @@ class AgentSessionService : Service() {
                 intent.getStringExtra("conversationId"),
                 intent.getStringExtra("title"),
                 intent.getStringExtra("reply"),
+                intent.getByteArrayExtra("avatar"),
             )
         }
         return START_NOT_STICKY
@@ -55,11 +62,12 @@ class AgentSessionService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun finish(outcome: String, conversationId: String? = null, title: String? = null, reply: String? = null) {
+    private fun finish(outcome: String, conversationId: String? = null, title: String? = null, reply: String? = null, completedAvatar: ByteArray? = avatar) {
+        avatar = completedAvatar
         handler.removeCallbacksAndMessages(null)
         running = false
         stopForeground(STOP_FOREGROUND_REMOVE)
-        if (outcome != "cancelled" && !MainActivity.isResumed &&
+        if (!groupChat && outcome != "cancelled" && !MainActivity.isResumed &&
             (outcome != "completed" || reply!!.isNotBlank())) {
             notificationManager().notify(
                 conversationId, FINISHED_NOTIFICATION_ID,
@@ -70,28 +78,37 @@ class AgentSessionService : Service() {
     }
 
     private fun runningNotification(step: String): Notification =
-        notificationBranding.applyTo(Notification.Builder(this, CHANNEL_ID))
-            .setContentTitle(step)
-            .setContentText("Aurai 正在执行任务")
+        notificationBranding.applyTo(
+            Notification.Builder(this, if (groupChat) GROUP_SERVICE_CHANNEL_ID else CHANNEL_ID),
+            showLargeIcon = !groupChat,
+            avatar = avatar,
+        )
+            .apply {
+                if (groupChat) {
+                    setShowWhen(false)
+                } else {
+                    setContentTitle(step)
+                }
+            }
             .setContentIntent(openAppIntent())
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .addAction(
+            .apply { if (!groupChat) addAction(
                 Notification.Action.Builder(
                     null,
                     "停止",
                     PendingIntent.getService(
-                        this,
+                        this@AgentSessionService,
                         2,
-                        Intent(this, AgentSessionService::class.java).setAction(ACTION_STOP),
+                        Intent(this@AgentSessionService, AgentSessionService::class.java).setAction(ACTION_STOP),
                         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                     ),
                 ).build(),
-            )
+            ) }
             .build()
 
     private fun finishedNotification(completed: Boolean, conversationId: String?, title: String?, reply: String?): Notification =
-        notificationBranding.applyTo(Notification.Builder(this, RESULT_CHANNEL_ID))
+        notificationBranding.applyTo(Notification.Builder(this, RESULT_CHANNEL_ID), avatar = avatar)
             .setContentTitle(if (completed) "${title!!} · 已完成回复" else "任务未完成")
             .setContentText(if (completed) reply!!.take(240) else "点按返回 Aurai 处理")
             .setStyle(Notification.BigTextStyle().bigText(if (completed) reply!!.take(4000) else "点按返回 Aurai 处理"))
@@ -115,6 +132,14 @@ class AgentSessionService : Service() {
 
     private fun createChannel() {
         notificationManager().createNotificationChannel(
+            NotificationChannel(GROUP_SERVICE_CHANNEL_ID, "后台连接", NotificationManager.IMPORTANCE_MIN).apply {
+                description = "维持后台消息连接，不作为群消息提醒"
+                setSound(null, null)
+                enableVibration(false)
+                setShowBadge(false)
+            },
+        )
+        notificationManager().createNotificationChannel(
             NotificationChannel(RESULT_CHANNEL_ID, "回复完成", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "会话在后台完成后的回复通知"
             },
@@ -135,6 +160,7 @@ class AgentSessionService : Service() {
     private fun notificationManager() = getSystemService(NotificationManager::class.java)
 
     companion object {
+        private const val GROUP_SERVICE_CHANNEL_ID = "aurai_group_connection"
         private const val RESULT_CHANNEL_ID = "aurai_reply_complete"
         private const val FINISHED_NOTIFICATION_ID = 1109
         private const val CHANNEL_ID = "aurai_agent_session"
@@ -154,8 +180,8 @@ class AgentSessionService : Service() {
             context.startForegroundService(Intent(context, AgentSessionService::class.java).setAction(ACTION_SCHEDULED))
         }
 
-        fun start(context: Context, step: String) {
-            val intent = Intent(context, AgentSessionService::class.java).setAction(ACTION_START).putExtra(EXTRA_STEP, step)
+        fun start(context: Context, step: String, groupChat: Boolean = false, avatar: ByteArray? = null) {
+            val intent = Intent(context, AgentSessionService::class.java).setAction(ACTION_START).putExtra(EXTRA_STEP, step).putExtra("groupChat", groupChat).putExtra("avatar", avatar)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
@@ -171,14 +197,15 @@ class AgentSessionService : Service() {
             )
         }
 
-        fun finish(context: Context, outcome: String, conversationId: String, title: String, reply: String) {
+        fun finish(context: Context, outcome: String, conversationId: String, title: String, reply: String, avatar: ByteArray? = null) {
             context.startService(
                 Intent(context, AgentSessionService::class.java)
                     .setAction(ACTION_FINISH)
                     .putExtra(EXTRA_OUTCOME, outcome)
                     .putExtra("conversationId", conversationId)
                     .putExtra("title", title)
-                    .putExtra("reply", reply.take(4000)),
+                    .putExtra("reply", reply.take(4000))
+                    .putExtra("avatar", avatar),
             )
         }
 

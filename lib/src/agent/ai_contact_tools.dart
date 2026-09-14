@@ -5,7 +5,13 @@ import '../domain/tool_models.dart';
 import '../storage/group_chat_store.dart';
 
 class AiContactTool implements AgentTool, RuntimeCapabilityAgentTool {
-  AiContactTool(this.store, this.operation, this.save, this.defaultModel);
+  AiContactTool(
+    this.store,
+    this.operation,
+    this.save,
+    this.defaultModel, {
+    this.ownerId = 'user:local',
+  });
   static const operations = [
     'list',
     'read',
@@ -14,6 +20,7 @@ class AiContactTool implements AgentTool, RuntimeCapabilityAgentTool {
     'delete',
     'restore',
   ];
+  final String ownerId;
   final GroupChatStore store;
   final String operation;
   final Future<void> Function(AiProfile profile, {bool create}) save;
@@ -101,6 +108,7 @@ class AiContactTool implements AgentTool, RuntimeCapabilityAgentTool {
           a['query'] as String,
           archived: a['archived'] as bool,
           offset: offset,
+          ownerId: ownerId,
         );
         output = {
           'contacts': items.map(_summary).toList(),

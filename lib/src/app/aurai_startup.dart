@@ -1,3 +1,4 @@
+import '../domain/error_message.dart';
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -42,7 +43,7 @@ class _AuraiStartupState extends State<AuraiStartup> {
       setState(() => _controller = controller);
     } on Object catch (error, stack) {
       developer.log(
-        '初始化失败',
+        '初始化失败：${errorMessage(error)}',
         name: 'aurai.startup',
         error: error,
         stackTrace: stack,
@@ -53,8 +54,8 @@ class _AuraiStartupState extends State<AuraiStartup> {
         if (!mounted) return;
         _messenger.currentState!.showSnackBar(
           SnackBar(
-            content: const Text('无法打开会话，请重试'),
-            duration: const Duration(days: 365),
+            content: Text('无法打开会话，请重试：${errorMessage(error)}'),
+            duration: Duration(days: 365),
             dismissDirection: DismissDirection.none,
             action: SnackBarAction(label: '重试', onPressed: _open),
           ),

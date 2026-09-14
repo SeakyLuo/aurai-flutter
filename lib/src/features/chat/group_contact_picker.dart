@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
 import '../../storage/group_chat_store.dart';
@@ -45,12 +46,12 @@ class _GroupContactPickerState extends State<GroupContactPicker> {
           _profiles.addAll(page);
           _more = page.length == GroupChatStore.pageSize;
         });
-    } catch (_) {
+    } catch (caughtError) {
       if (mounted) {
         setState(() => _failed = true);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('通讯录读取失败，请重试')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('通讯录读取失败，请重试：${errorMessage(caughtError)}')),
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);

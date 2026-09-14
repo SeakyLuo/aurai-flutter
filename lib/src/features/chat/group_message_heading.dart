@@ -8,6 +8,8 @@ class GroupMessageHeading extends StatelessWidget {
     required this.sender,
     required this.child,
     required this.onOpenProfile,
+    this.onMention,
+    this.showName = true,
   });
   static const leftInset = 12.0;
   static const rightInset = 18.0;
@@ -15,9 +17,11 @@ class GroupMessageHeading extends StatelessWidget {
   static const avatarGap = 8.0;
   static const contentInset = leftInset + avatarSize + avatarGap + rightInset;
 
+  final bool showName;
   final MessageSender sender;
   final Widget child;
   final VoidCallback onOpenProfile;
+  final VoidCallback? onMention;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -30,6 +34,7 @@ class GroupMessageHeading extends StatelessWidget {
           label: '查看${sender.name}的资料',
           child: InkWell(
             onTap: onOpenProfile,
+            onLongPress: onMention,
             borderRadius: BorderRadius.circular(18),
             child: MemberAvatar(sender: sender, size: avatarSize),
           ),
@@ -39,15 +44,16 @@ class GroupMessageHeading extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                sender.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+              if (showName)
+                Text(
+                  sender.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
               child,
             ],
           ),

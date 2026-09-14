@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'contact_relationships.dart';
 import '../domain/agent_models.dart';
 import 'group_system_notice.dart';
 import 'package:sqflite/sqflite.dart';
@@ -51,12 +52,13 @@ class GroupChatStore {
     String query, {
     required bool archived,
     int offset = 0,
+    String ownerId = 'user:local',
   }) async {
     final rows = await database.query(
       'ai_profiles',
       where:
-          'is_temporary = 0 AND sender_id IN (SELECT id FROM message_senders WHERE archived = ? AND instr(lower(name), ?) > 0)',
-      whereArgs: [archived ? 1 : 0, query.toLowerCase()],
+          'sender_id IN (SELECT friend_id FROM contact_friendships WHERE owner_id = ?) AND sender_id IN (SELECT id FROM message_senders WHERE archived = ? AND instr(lower(name), ?) > 0)',
+      whereArgs: [ownerId, archived ? 1 : 0, query.toLowerCase()],
       orderBy: 'created_at DESC, sender_id DESC',
       limit: pageSize,
       offset: offset,
@@ -80,7 +82,7 @@ class GroupChatStore {
     'conversations',
     columns: ['id', 'title'],
     where:
-        "kind = 'group' AND archived = 0 AND id ${joined ? 'IN' : 'NOT IN'} (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)",
+        "kind = 'group' AND archived = 0 AND id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = 'user:local' AND left_at IS NULL) AND id ${joined ? 'IN' : 'NOT IN'} (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)",
     whereArgs: [senderId],
     orderBy: 'updated_at DESC, id DESC',
     limit: pageSize,
@@ -132,53 +134,70 @@ class GroupChatStore {
       })
       .then((notice) => _notifySystem(conversationId, notice));
 
-  Future<void> inviteMembers(String conversationId, List<String> ids) =>
-      database
-          .transaction((txn) async {
-            await _validateMembers(txn, ids);
-            final current = await txn.query(
-              'conversation_members',
-              columns: ['sender_id', 'position'],
-              where: 'conversation_id = ? AND left_at IS NULL',
-              whereArgs: [conversationId],
-              limit: maxAiMembers + 1,
-            );
-            final activeIds = current
-                .map((row) => row['sender_id'] as String)
-                .toSet();
-            final added = ids.where((id) => !activeIds.contains(id)).toList();
-            if (activeIds.length - 1 + added.length > maxAiMembers) {
-              throw StateError('群聊最多可加入 32 位 AI');
-            }
-            final now = DateTime.now().microsecondsSinceEpoch;
-            final changed = await txn.update(
-              'conversations',
-              {'updated_at': now},
-              where: "id = ? AND kind = 'group'",
-              whereArgs: [conversationId],
-            );
-            if (changed != 1) throw StateError('群聊已不存在');
-            final position = current.fold<int>(
-              0,
-              (value, row) => (row['position'] as int) > value
-                  ? row['position'] as int
-                  : value,
-            );
-            final batch = txn.batch();
-            for (final (index, id) in added.indexed) {
-              batch.rawInsert(
-                '''INSERT INTO conversation_members
+  Future<void> inviteMembers(
+    String conversationId,
+    List<String> existingIds, {
+    List<AiProfile> newMembers = const [],
+  }) => database
+      .transaction((txn) async {
+        if (existingIds.isNotEmpty) await _validateMembers(txn, existingIds);
+        final ids = [...existingIds, ...newMembers.map((ai) => ai.sender.id)];
+        if (ids.isEmpty ||
+            ids.length > maxAiMembers ||
+            ids.toSet().length != ids.length) {
+          throw ArgumentError('请选择 1–32 位不同的 AI');
+        }
+        final profiles = txn.batch();
+        for (final ai in newMembers) {
+          profiles.insert('message_senders', _senderRow(ai.sender));
+          profiles.insert(
+            'ai_profiles',
+            _profileRow(ai.copyWith(isTemporary: true)),
+          );
+        }
+        await profiles.commit(noResult: true);
+        final current = await txn.query(
+          'conversation_members',
+          columns: ['sender_id', 'position'],
+          where: 'conversation_id = ? AND left_at IS NULL',
+          whereArgs: [conversationId],
+          limit: maxAiMembers + 1,
+        );
+        final activeIds = current
+            .map((row) => row['sender_id'] as String)
+            .toSet();
+        final added = ids.where((id) => !activeIds.contains(id)).toList();
+        if (activeIds.length - 1 + added.length > maxAiMembers) {
+          throw StateError('群聊最多可加入 32 位 AI');
+        }
+        final now = DateTime.now().microsecondsSinceEpoch;
+        final changed = await txn.update(
+          'conversations',
+          {'updated_at': now},
+          where: "id = ? AND kind = 'group'",
+          whereArgs: [conversationId],
+        );
+        if (changed != 1) throw StateError('群聊已不存在');
+        final position = current.fold<int>(
+          0,
+          (value, row) =>
+              (row['position'] as int) > value ? row['position'] as int : value,
+        );
+        final batch = txn.batch();
+        for (final (index, id) in added.indexed) {
+          batch.rawInsert(
+            '''INSERT INTO conversation_members
             (conversation_id, sender_id, position, joined_at, left_at)
             VALUES (?, ?, ?, ?, NULL)
             ON CONFLICT(conversation_id, sender_id) DO UPDATE SET
             position = excluded.position, joined_at = excluded.joined_at, left_at = NULL''',
-                [conversationId, id, position + index + 1, now],
-              );
-            }
-            await batch.commit(noResult: true);
-            return writeGroupMemberNotice(txn, conversationId, added, []);
-          })
-          .then((notice) => _notifySystem(conversationId, notice));
+            [conversationId, id, position + index + 1, now],
+          );
+        }
+        await batch.commit(noResult: true);
+        return writeGroupMemberNotice(txn, conversationId, added, []);
+      })
+      .then((notice) => _notifySystem(conversationId, notice));
 
   Future<List<AiProfile>> listAi({
     int offset = 0,
@@ -326,12 +345,15 @@ class GroupChatStore {
     );
   }
 
-  Future<void> createAi(AiProfile profile) => database.transaction((txn) async {
-    if (profile.sender.kind != MessageSenderKind.agent)
-      throw ArgumentError('AI 配置必须属于 AI 身份');
-    await txn.insert('message_senders', _senderRow(profile.sender));
-    await txn.insert('ai_profiles', _profileRow(profile));
-  });
+  Future<void> createAi(AiProfile profile, {String ownerId = 'user:local'}) =>
+      database.transaction((txn) async {
+        if (profile.sender.kind != MessageSenderKind.agent)
+          throw ArgumentError('AI 配置必须属于 AI 身份');
+        await txn.insert('message_senders', _senderRow(profile.sender));
+        await txn.insert('ai_profiles', _profileRow(profile));
+        if (!profile.isTemporary)
+          await ContactRelationships.befriend(txn, ownerId, profile.sender.id);
+      });
 
   Future<void> updateAi(AiProfile profile) => database.transaction((txn) async {
     if (profile.sender.id == MessageSender.aurai.id &&

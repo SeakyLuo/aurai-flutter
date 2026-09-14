@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'conversation_more.dart';
 import 'conversation_icon.dart';
 import 'conversation_status_dot.dart';
@@ -241,10 +242,10 @@ class HomeDrawer extends StatelessWidget {
                 controller,
                 item.id,
               );
-            } on Object {
+            } on Object catch (error) {
               if (messenger.mounted)
                 messenger.showSnackBar(
-                  const SnackBar(content: Text('无法打开会话，请重试')),
+                  SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
                 );
             }
           },

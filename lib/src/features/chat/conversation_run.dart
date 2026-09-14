@@ -13,7 +13,11 @@ extension ConversationRun on ChatController {
     final messages = runConversation.messages;
     final steps = runConversation.steps;
     final runConfig = reply.config;
-    final systemPrompt = reply.systemPrompt;
+    final diagnosticCalls = <String, Object?>{};
+    final systemPrompt = groupParent == null
+        ? reply.systemPrompt
+        : '${reply.systemPrompt}\n当前时间：${DateTime.now().toIso8601String()}。'
+              '${_groupDispatcher!.wokeFromSleep(reply.senderId) ? "这是你自己安排的睡眠到期，重新看看最新群聊；不代表用户发了新指令。" : "这是群消息触发的接话机会。"}';
     final memory = await aiMemory(
       reply.profile,
       scope: groupHistory == null ? '' : runConversation.id,
@@ -24,6 +28,10 @@ extension ConversationRun on ChatController {
     final customInstructions = reply.profile.preferences.customInstructions;
     final responsePreferences = reply.profile.preferences.responses;
     final memoryRevision = memory.revision;
+    final htmlEvents = await _pendingHtmlEvents(
+      runConversation,
+      reply.senderId,
+    );
     await _persistMember(runConversation, groupParent);
     final history =
         groupHistory ??
@@ -66,6 +74,7 @@ extension ConversationRun on ChatController {
     _notifyMember(runConversation, groupParent);
     var sessionStarted = groupHistory != null || alongsideGroup;
     var outcome = 'failed';
+    String? failureDiagnostic;
     final activities = <AgentTaskActivity>[];
     final runMessageIds = <String>[];
     final observed = List<AgentMessage>.of(history);
@@ -76,13 +85,16 @@ extension ConversationRun on ChatController {
       await _persistMember(runConversation, groupParent);
       await refreshCapabilities();
       if (runConversation.runState == ChatRunState.stopping)
-        throw const AgentCancelled();
+        throw AgentCancelled();
       final provider = switch (runConfig.service) {
         ModelService.openAi => OpenAiResponsesProvider(
           runConfig,
           systemPrompt: systemPrompt,
         ),
-        ModelService.deepSeek => DeepSeekResponsesProvider(
+        ModelService.deepSeek ||
+        ModelService.qwen ||
+        ModelService.kimi ||
+        ModelService.glm => DeepSeekResponsesProvider(
           runConfig,
           systemPrompt: systemPrompt,
         ),
@@ -111,7 +123,10 @@ extension ConversationRun on ChatController {
               body: question?.question,
             ),
           );
-          if (question != null && sessionStarted) {
+          if (question != null &&
+              sessionStarted &&
+              groupHistory == null &&
+              !alongsideGroup) {
             unawaited(
               _platform.updateAgentSessionStep(
                 question.isUserAction ? '等待你操作' : '等待你的回答',
@@ -122,10 +137,31 @@ extension ConversationRun on ChatController {
         }),
       );
       if (groupParent != null) {
-        tools.removeWhere((t) => t.definition.name == 'sendGroupMessages');
+        tools.removeWhere((t) => t.definition.name == 'sendGroupMessage');
+        Future<DateTime?> scheduleGroupSleep(Duration duration) async {
+          final dispatcher = _groupDispatcher!;
+          final until = duration.isNegative
+              ? null
+              : DateTime.now().add(duration);
+          if (until == null) {
+            await _groupSleeps.remove(groupParent.id, reply.senderId);
+          } else {
+            await _groupSleeps.save(groupParent.id, reply.senderId, until);
+          }
+          if (dispatcher.stopped ||
+              dispatcher.closed ||
+              dispatcher.paused.contains(reply.senderId) ||
+              _removedGroupMembers.contains(reply.senderId)) {
+            await _groupSleeps.remove(groupParent.id, reply.senderId);
+            throw AgentCancelled();
+          }
+          return dispatcher.sleepUntil(reply.senderId, until);
+        }
+
+        tools.add(GroupSleepTool(scheduleGroupSleep));
         tools.add(
           GroupMessageTool(
-            (arguments) => _deliverGroupMessages(
+            (arguments) => _deliverGroupMessage(
               arguments: arguments,
               member: runConversation,
               parent: groupParent,
@@ -136,33 +172,24 @@ extension ConversationRun on ChatController {
           ),
         );
       }
-      if (alongsideGroup) {
-        tools.retainWhere(
-          (tool) => {
-            ...AppControlTool.descriptions.keys,
-            'sendGroupMessages',
-            'readMyProfile',
-            'updateMyProfile',
-            'listGroupChats',
-            'readGroupChat',
-            'readAttachment',
-          }.contains(tool.definition.name),
-        );
-      }
       final registry = ToolRegistry(tools: tools, capabilities: capabilities);
       registry.load(
         await recentConversationTools(_store.database, runConversation.id),
       );
-      registry.load(['sendGroupMessages']);
+      registry.load([
+        'sendGroupMessage',
+        if (groupParent != null) 'sleepGroupChat',
+      ]);
       Future<bool> confirm(ToolCall call, ToolDefinition definition) =>
           _confirm(
             call,
             definition,
             runId: runId,
+            conversationId: runConversation.id,
             senderId: reply.senderId,
             screenAccess: reply.profile.preferences.screenAccess,
           );
-      final executor = groupParent == null
+      final executor = groupParent == null && !alongsideGroup
           ? ToolExecutor(registry: registry, confirm: confirm)
           : GroupToolExecutor(
               registry: registry,
@@ -172,7 +199,7 @@ extension ConversationRun on ChatController {
                 await pendingQuestion?.result.future;
               },
               cancelled: () =>
-                  groupParent.runState == ChatRunState.stopping ||
+                  groupParent?.runState == ChatRunState.stopping ||
                   runConversation.runState == ChatRunState.stopping,
             );
       final runtime = AgentRuntime(
@@ -186,31 +213,41 @@ extension ConversationRun on ChatController {
         _groupRuntimes[reply.senderId] = runtime;
       }
       if (scheduled) {
-        await _platform.startAgentSession('正在执行定时任务');
+        await _platform.startAgentSession(
+          '正在执行定时任务',
+          conversationId: runConversation.id,
+        );
         sessionStarted = true;
       }
       if (runConversation.runState == ChatRunState.stopping)
-        throw const AgentCancelled();
+        throw AgentCancelled();
       var turnOrdinal = 0;
       late String modelTurnId;
 
-      var silenceRequested = false;
       final stepActivityIndices = <int>[];
       String? turnMessageId;
       int? turnActivityIndex;
       int? outputMessageIndex;
       await runtime.run(
+        endsRun: groupParent == null
+            ? null
+            : (result) =>
+                  result.toolName == 'sleepGroupChat' &&
+                  result.status == ToolResultStatus.success,
         conversation: groupHistory == null
             ? List.unmodifiable(history.take(lastUser + 1))
-            : _groupHistory(history, reply.senderId),
+            : _groupHistory([
+                ...history,
+                if (htmlEvents.isNotEmpty) _htmlEventContext(htmlEvents),
+              ], reply.senderId),
         contextSummary: groupHistory == null
             ? runConversation.contextSummary
             : null,
-        personalContext: () => [
+        personalContext: () async => [
           responsePreferences.instructions,
           if (customInstructions.isNotEmpty) '用户自定义指令：\n$customInstructions',
-          memory.context,
-          if (alongsideGroup) '群聊正在后台进行。这里可以私聊以及调整自己的群聊接话状态；设备操作需等共享执行任务结束。',
+          await memory.sharedContext(),
+          if (alongsideGroup) '群聊正在后台进行；当前私聊仍可使用完整工具集。共享手机界面和用户交互由执行器互斥协调。',
           if (groupParent != null) '当前群成员：${jsonEncode((awaitedRoster))}',
         ].join('\n\n'),
         onContextSummary: (summary) async {
@@ -235,8 +272,12 @@ extension ConversationRun on ChatController {
           await _store.runs.finishTurn(modelTurnId, turn);
         },
         onToolStarted: (call) async {
+          diagnosticCalls[call.id] = ExecutionLog.argumentShape(call.arguments);
           if (!sessionStarted) {
-            await _platform.startAgentSession(toolTitle(call.name));
+            await _platform.startAgentSession(
+              toolTitle(call.name),
+              conversationId: runConversation.id,
+            );
             sessionStarted = true;
           }
           await _store.runs.startTool(
@@ -246,7 +287,24 @@ extension ConversationRun on ChatController {
             call,
           );
         },
-        onToolCompleted: (result) => _store.runs.finishTool(runId, result),
+        onToolCompleted: (result) async {
+          await _store.runs.finishTool(runId, result);
+          final shape = diagnosticCalls.remove(result.callId);
+          if (result.status == ToolResultStatus.error) {
+            await ExecutionLog.write({
+              'event': 'tool_error',
+              'conversationId': runConversation.id,
+              'senderId': reply.senderId,
+              'senderName': reply.sender.name,
+              'runId': runId,
+              'model': runConfig.model,
+              'callId': result.callId,
+              'tool': result.toolName,
+              'argumentShape': shape,
+              'result': result.output,
+            }, apiKey: runConfig.apiKey);
+          }
+        },
         onReconnect: (attempt) {
           if (runConversation.reconnectAttempt == attempt) return;
           runConversation.reconnectAttempt = attempt;
@@ -265,11 +323,7 @@ extension ConversationRun on ChatController {
           _notifyMember(runConversation, groupParent);
         },
         onTextChanged: (text) {
-          if (groupParent != null) {
-            silenceRequested = true;
-            return;
-          }
-          if (text.isEmpty) return;
+          if (groupParent != null || text.trim().isEmpty) return;
           if (turnMessageId == null) {
             turnMessageId = newMessageId();
             runMessageIds.add(turnMessageId!);
@@ -313,7 +367,7 @@ extension ConversationRun on ChatController {
         onStepsChanged: (newSteps) {
           if (groupParent != null) {
             newSteps = newSteps
-                .where((s) => s.toolName != 'sendGroupMessages')
+                .where((s) => s.toolName != 'sendGroupMessage')
                 .toList();
           }
           if (groupParent != null && newSteps.isNotEmpty) {
@@ -353,7 +407,7 @@ extension ConversationRun on ChatController {
           final runningStep = newSteps.where(
             (step) => step.status == AgentStepStatus.running,
           );
-          if (sessionStarted && !alongsideGroup)
+          if (sessionStarted && groupHistory == null && !alongsideGroup)
             unawaited(
               _platform.updateAgentSessionStep(
                 runningStep.isEmpty ? '正在分析结果' : runningStep.last.title,
@@ -362,12 +416,18 @@ extension ConversationRun on ChatController {
           _notifyMember(runConversation, groupParent);
         },
       );
+      for (final message in messages.where(
+        (m) => m.runId == runId && m.interactive != null,
+      )) {
+        if (!runMessageIds.contains(message.id)) runMessageIds.add(message.id);
+      }
       executionWatch.stop();
-      if (groupParent == null && runMessageIds.isEmpty && !silenceRequested)
-        throw StateError('模型未返回回复，请重试');
       if (runMessageIds.isNotEmpty && runConversation.hasExecutionProcess) {
-        final answer = messages.last;
-        messages[messages.length - 1] = AgentMessage(
+        final answerIndex = messages.lastIndexWhere(
+          (m) => runMessageIds.contains(m.id),
+        );
+        final answer = messages[answerIndex];
+        messages[answerIndex] = AgentMessage(
           id: answer.id,
           role: answer.role,
           isGroupMessage: answer.isGroupMessage,
@@ -378,17 +438,27 @@ extension ConversationRun on ChatController {
           text: answer.text,
           createdAt: answer.createdAt,
           images: answer.images,
+          interactive: answer.interactive,
+          htmlGame: answer.htmlGame,
           quote: answer.quote,
           taskSummary: AgentTaskSummary(
             elapsedMilliseconds: executionWatch.elapsedMilliseconds,
             intermediateMessageIds: List.unmodifiable(
               groupParent == null
-                  ? runMessageIds.take(runMessageIds.length - 1)
-                  : const <String>[],
+                  ? runMessageIds.where(
+                      (id) =>
+                          id != answer.id &&
+                          !messages.any(
+                            (m) => m.id == id && m.interactive != null,
+                          ),
+                    )
+                  : <String>[],
             ),
             activities: List.unmodifiable(
               groupParent != null
                   ? activities.where((a) => a.toolName != null)
+                  : answer.interactive != null
+                  ? activities
                   : activities.take(
                       activities.indexWhere(
                         (activity) => activity.messageId == answer.id,
@@ -403,7 +473,9 @@ extension ConversationRun on ChatController {
         runId,
         'completed',
         executionWatch.elapsedMilliseconds,
-        finalMessageId: runMessageIds.isEmpty ? null : messages.last.id,
+        finalMessageId: runMessageIds.isEmpty
+            ? null
+            : messages.lastWhere((m) => runMessageIds.contains(m.id)).id,
         isTask: runConversation.hasExecutionProcess,
       );
       runConversation.liveToolSteps.clear();
@@ -413,8 +485,24 @@ extension ConversationRun on ChatController {
       }
       outcome = 'completed';
     } on Object catch (error, stack) {
+      failureDiagnostic = '${error.runtimeType}: $error\n$stack';
+      if (runConfig.apiKey.isNotEmpty) {
+        failureDiagnostic = failureDiagnostic.replaceAll(
+          runConfig.apiKey,
+          '[redacted]',
+        );
+      }
+      await ExecutionLog.write({
+        'event': 'run_error',
+        'conversationId': runConversation.id,
+        'senderId': reply.senderId,
+        'senderName': reply.sender.name,
+        'runId': runId,
+        'model': runConfig.model,
+        'diagnostic': failureDiagnostic,
+      }, apiKey: runConfig.apiKey);
       developer.log(
-        '会话执行失败',
+        '会话执行失败：${errorMessage(error)}',
         name: 'aurai.execution',
         error: error,
         stackTrace: stack,
@@ -453,6 +541,8 @@ extension ConversationRun on ChatController {
             sender: last.sender,
             text: last.text,
             images: last.images,
+            interactive: last.interactive,
+            htmlGame: last.htmlGame,
             files: last.files,
             runId: last.runId,
             modelTurnId: last.modelTurnId,
@@ -487,13 +577,7 @@ extension ConversationRun on ChatController {
         await _persistMember(runConversation, groupParent);
       } else {
         runConversation.runState = ChatRunState.failed;
-        runConversation.errorDetail = switch (error) {
-          StateError() => error.message,
-          ModelProviderException() => error.displayMessage,
-          PlatformException() => error.message ?? '设备能力调用失败',
-          FileSystemException() => '文件读取失败，请检查附件是否存在或重新添加',
-          _ => '任务执行失败，请重试',
-        };
+        runConversation.errorDetail = errorMessage(error);
       }
       rethrow;
     } finally {
@@ -505,6 +589,7 @@ extension ConversationRun on ChatController {
             outcome,
             executionWatch.elapsedMilliseconds,
             error: runConversation.errorDetail,
+            diagnostic: failureDiagnostic,
             finalMessageId:
                 outcome == 'cancelled' && messages.last.runId == runId
                 ? messages.last.id
@@ -529,6 +614,19 @@ extension ConversationRun on ChatController {
         _setMemberStreaming(reply.senderId, null, groupParent);
         _notifyMember(runConversation, groupParent);
         await _persistMember(runConversation, groupParent);
+        if (htmlEvents.isNotEmpty) {
+          await htmlGames.finishEvents(
+            reply.senderId,
+            htmlEvents.map((e) => e['id'] as String).toList(),
+            success: outcome == 'completed',
+          );
+          for (final id
+              in htmlEvents
+                  .map((event) => event['message_id'] as String)
+                  .toSet()) {
+            HtmlGameSignals.changes.add(id);
+          }
+        }
         if (outcome == 'completed' &&
             (groupParent == null || runMessageIds.isNotEmpty)) {
           memory.learn(

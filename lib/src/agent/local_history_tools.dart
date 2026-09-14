@@ -26,7 +26,7 @@ class LocalHistoryTool implements AgentTool, RuntimeCapabilityAgentTool {
       'searchConversations' =>
         'Search saved conversation titles, drafts and message text with multiple literal keywords (case-insensitive OR). Empty keywords list recent conversations. Use for earlier conversations or past work. Returns only conversations accessible to this AI.',
       'searchMessages' =>
-        'Search original saved messages across conversations with multiple literal keywords (case-insensitive OR). Empty keywords list messages. Optionally restrict to a conversation. Use offsets to page only as needed and stop when evidence is sufficient. Results are restricted to this AI private conversations, or only the current group when in a group.',
+        'Search original saved messages across conversations with multiple literal keywords (case-insensitive OR). Empty keywords list messages. Use readMessage for full text and attachment references, then readMessageAttachment to read original images/files. Optionally restrict to a conversation. Use offsets to page only as needed and stop when evidence is sufficient. Results include conversations you participate in, including your private chats with AI friends and joined groups.',
       'inspectLocalDatabase' =>
         'Inspect the tables, columns and indexes of the local conversation database in read-only mode. Use queryLocalDatabase to read records. Results are paginated.',
       _ =>
@@ -155,16 +155,14 @@ class LocalHistoryTool implements AgentTool, RuntimeCapabilityAgentTool {
                 '(SELECT conversation_id FROM messages WHERE ${matches('text')}))';
       return (
         'SELECT id, title, preview, created_at, updated_at, message_count '
-            'FROM conversations WHERE ${groupId == null ? "kind = 'direct' AND default_sender_id = ?" : 'id = ?'} $where ORDER BY updated_at DESC, id DESC',
-        [groupId ?? senderId, ...parameters],
+            'FROM conversations WHERE id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL) $where ORDER BY updated_at DESC, id DESC',
+        [senderId, ...parameters],
       );
     }
     final filters = <String>[
-      groupId == null
-          ? "conversation_id IN (SELECT id FROM conversations WHERE kind = 'direct' AND default_sender_id = ?)"
-          : 'conversation_id = ?',
+      'conversation_id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)',
     ];
-    parameters.insert(0, groupId ?? senderId);
+    parameters.insert(0, senderId);
     if (keywords.isNotEmpty) filters.add('(${matches('text')})');
     final conversationId = arguments['conversationId'] as String?;
     if (conversationId != null) {

@@ -1,3 +1,4 @@
+import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 
 class PaginationListener extends StatefulWidget {
@@ -25,11 +26,11 @@ class _PaginationListenerState extends State<PaginationListener> {
     _loading = true;
     try {
       await widget.loadMore();
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('加载失败，请重试'),
+            content: Text('加载失败，请重试：${errorMessage(error)}'),
             action: SnackBarAction(label: '重试', onPressed: _load),
           ),
         );

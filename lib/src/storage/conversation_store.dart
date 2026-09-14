@@ -83,7 +83,7 @@ class ConversationStore {
       await database.delete(
         'conversations',
         where:
-            "kind = 'direct' AND message_count = 0 AND draft = '' AND pending_goal IS NULL AND NOT EXISTS (SELECT 1 FROM attachments WHERE conversation_id = conversations.id)",
+            "kind = 'direct' AND id NOT IN (SELECT conversation_id FROM direct_conversation_pairs) AND message_count = 0 AND draft = '' AND pending_goal IS NULL AND NOT EXISTS (SELECT 1 FROM attachments WHERE conversation_id = conversations.id)",
       );
       await database.delete(
         'app_state',
