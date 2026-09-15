@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 enum HtmlGameIconType { game, play, expand, close }
 
 class HtmlGameIcon extends StatelessWidget {
-  const HtmlGameIcon(this.type, {super.key});
+  const HtmlGameIcon(this.type, {super.key, this.color});
   final HtmlGameIconType type;
+  final Color? color;
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: const Size.square(24),
-    painter: _Painter(type, Theme.of(context).colorScheme.onSurfaceVariant),
+    painter: _Painter(
+      type,
+      color ?? Theme.of(context).colorScheme.onSurfaceVariant,
+    ),
   );
 }
 

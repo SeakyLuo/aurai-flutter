@@ -17,6 +17,18 @@ extension GlobalTools on ChatController {
     final conversationId = conversation.id;
     return <AgentTool>[
       ExecutionLogTool(),
+      for (final name in HtmlMessageUpdateTool.names)
+        HtmlMessageUpdateTool(name, (operation, args) async {
+          final result = await htmlGames.updateMessage(
+            operation,
+            conversation.id,
+            senderId,
+            args,
+          );
+          if (result['updated'] == true)
+            HtmlGameSignals.changes.add(args['messageId'] as String);
+          return result;
+        }),
       for (final name in FriendTool.names)
         FriendTool(
           ContactRelationships(_store.database),
@@ -72,8 +84,7 @@ extension GlobalTools on ChatController {
           (operation, args) =>
               _controlApp(operation, args, senderId, conversationId),
         ),
-      if (conversation.kind == ConversationKind.group)
-        RecallMessageTool((id) => _recallAiMessage(conversation, senderId, id)),
+      RecallMessageTool((id) => _recallAiMessage(conversation, senderId, id)),
       for (final update in [false, true])
         SelfProfileTool(
           store: groupStore,
@@ -88,7 +99,7 @@ extension GlobalTools on ChatController {
           },
         ),
       GroupMessageTool(
-        (arguments) => _changePrivateGroupParticipation(arguments, senderId),
+        (arguments) => _sendPrivateGroupMessage(arguments, senderId),
       ),
       for (final operation in GroupChatTool.operations)
         GroupChatTool(

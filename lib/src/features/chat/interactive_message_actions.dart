@@ -37,10 +37,12 @@ extension InteractiveMessageActions on ChatController {
       _publishInteractiveChange(source.id, message, source: source);
       return {'sent': true, 'messageId': message.id, 'revision': 0};
     }
+    source = await _messageConversation(id!, senderId, source);
     final rows = await _store.database.query(
       'messages',
       where: 'id = ? AND conversation_id = ?',
       whereArgs: [id, source.id],
+      limit: 1,
     );
     if (rows.isEmpty ||
         rows.single['interactive_json'] == null ||
@@ -81,7 +83,7 @@ extension InteractiveMessageActions on ChatController {
         '${actor.sender.name}更新了“${card.title}”',
       );
     });
-    _replaceInteractiveCard(source.id, id!, card, source: source);
+    _replaceInteractiveCard(source.id, id, card, source: source);
     _publishInteractiveChange(source.id, notice, source: source);
     return {'updated': true, 'revision': card.revision};
   }
@@ -171,6 +173,7 @@ extension InteractiveMessageActions on ChatController {
     _replaceInteractiveCard(conversation.id, messageId, result.card);
     if (result.notice != null)
       _publishInteractiveChange(conversation.id, result.notice!);
+    MessageCallbacks.changes.add(null);
     return result.url;
   }
 }

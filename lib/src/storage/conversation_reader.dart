@@ -322,7 +322,7 @@ class ConversationReader {
     final previews = gameIds.isEmpty || forModel
         ? <Map<String, Object?>>[]
         : await database.rawQuery(
-            'SELECT message_id, title, preview, display_mode, display_width, display_height, version, status, ${HtmlGameStore.retryColumn} FROM html_games WHERE message_id IN (${_slots(gameIds.length)})',
+            'SELECT message_id, title, preview, background_mode, display_mode, display_width, display_height, version, status, ${HtmlGameStore.retryColumn} FROM html_games WHERE message_id IN (${_slots(gameIds.length)})',
             gameIds,
           );
     final gameCards = {

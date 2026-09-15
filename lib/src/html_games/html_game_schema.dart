@@ -7,6 +7,7 @@ const htmlGameSchema = [
     html TEXT NOT NULL,
     stateful INTEGER NOT NULL DEFAULT 0,
     display_mode TEXT NOT NULL DEFAULT 'hybrid',
+    background_mode TEXT NOT NULL DEFAULT 'message' CHECK(background_mode IN ('message','transparent')),
     display_width INTEGER,
     display_height INTEGER NOT NULL,
     state_json TEXT NOT NULL,

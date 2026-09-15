@@ -1,3 +1,5 @@
+import 'html_game_display_cache.dart';
+import 'html_message_interaction.dart';
 import '../domain/error_message.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -43,6 +45,9 @@ class HtmlGameSession extends ChangeNotifier {
   final bool fullscreen;
   late final Timer _readyTimeout;
   Future<void> _localWrite = Future.value();
+  Timer? _captureTimer;
+  bool _capturing = false;
+  String? _lastLocalState;
   double? contentHeight;
   bool failed = false;
   HtmlGame game;
@@ -55,19 +60,35 @@ class HtmlGameSession extends ChangeNotifier {
   String? error;
   Uint8List? preview;
   int? previewVersion;
-  late final String document = htmlGameDocument(
-    game,
-    dark: dark,
-    localState: localState,
-    fullscreen: fullscreen,
-  );
+  late final String identity = '${HtmlGameDisplayCache.identity(game)}:$dark';
+  String? _document;
+  Future<String> _loadDocument() async {
+    final local = await loadLocal(game.messageId);
+    return _document ??= htmlGameDocument(
+      game,
+      dark: dark,
+      localState: local,
+      fullscreen: fullscreen,
+    );
+  }
 
   Future<void> bind(int id) async {
     final channel = MethodChannel('aurai/html_game/$id');
     _channel = channel;
     channel.setMethodCallHandler((call) async {
-      if (_closed || _closing) return jsonEncode({'error': '游戏已暂停'});
-      if (call.method == 'height') {
+      if (_closed || (_closing && call.method != 'localState'))
+        return jsonEncode({'error': '游戏已暂停'});
+      if (call.method == 'requestDocument') {
+        final document = await _loadDocument();
+        if (!_closed && !_closing)
+          await channel.invokeMethod<void>('loadDocument', document);
+      } else if (call.method == 'visualChanged') {
+        _captureTimer?.cancel();
+        _captureTimer = Timer(
+          const Duration(milliseconds: 500),
+          () => unawaited(capture()),
+        );
+      } else if (call.method == 'height') {
         final height = (call.arguments as num).toDouble();
         if (height.isFinite &&
             height > 0 &&
@@ -81,6 +102,8 @@ class HtmlGameSession extends ChangeNotifier {
         notifyListeners();
       } else if (call.method == 'localState') {
         final encoded = call.arguments as String;
+        if (encoded == _lastLocalState) return null;
+        _lastLocalState = encoded;
         _localWrite = _localWrite.then((_) async {
           try {
             await _preferences.setString(
@@ -88,6 +111,7 @@ class HtmlGameSession extends ChangeNotifier {
               encoded,
             );
           } on Object catch (caughtError) {
+            _lastLocalState = null;
             if (!_closed) {
               error = '输入内容保存失败，请勿关闭卡片：${errorMessage(caughtError)}';
               notifyListeners();
@@ -105,6 +129,19 @@ class HtmlGameSession extends ChangeNotifier {
         failed = true;
         error = '游戏运行中断，请关闭后重新打开';
         notifyListeners();
+      } else if (call.method == 'interaction') {
+        try {
+          return jsonEncode(
+            await store.submitInteraction(
+              game.conversationId,
+              game.messageId,
+              (jsonDecode(call.arguments as String) as Map)
+                  .cast<String, Object?>(),
+            ),
+          );
+        } on Object catch (failure) {
+          return jsonEncode({'error': errorMessage(failure)});
+        }
       } else if (call.method == 'event') {
         try {
           final args = (jsonDecode(call.arguments as String) as Map)
@@ -141,6 +178,12 @@ class HtmlGameSession extends ChangeNotifier {
         preview = null;
         previewVersion = null;
       }
+      if (next.html != game.html) {
+        failed = true;
+        error = null;
+        notifyListeners();
+        return;
+      }
       game = next;
       if (ready)
         await _channel?.invokeMethod<void>(
@@ -157,7 +200,8 @@ class HtmlGameSession extends ChangeNotifier {
   }
 
   Future<void> capture() async {
-    if (!ready || _closed) return;
+    if (!ready || _closed || _closing || _capturing) return;
+    _capturing = true;
     final version = game.version;
     try {
       final bytes = await _channel
@@ -172,6 +216,8 @@ class HtmlGameSession extends ChangeNotifier {
       }
     } on Object {
       // A preview is optional; canonical state is already committed per action.
+    } finally {
+      _capturing = false;
     }
   }
 
@@ -179,11 +225,9 @@ class HtmlGameSession extends ChangeNotifier {
     if (_closed) return;
     _closing = true;
     _readyTimeout.cancel();
+    _captureTimer?.cancel();
+    await _channel?.invokeMethod<void>('flushForm');
     await _localWrite;
-    await capture().timeout(
-      const Duration(milliseconds: 300),
-      onTimeout: () {},
-    );
     _closed = true;
     await _updates.cancel();
     try {

@@ -32,6 +32,9 @@ extension ConversationRun on ChatController {
       runConversation,
       reply.senderId,
     );
+    final callbackEvents = await MessageCallbacks(
+      _store.database,
+    ).pending(runConversation.id, reply.senderId);
     await _persistMember(runConversation, groupParent);
     final history =
         groupHistory ??
@@ -44,7 +47,9 @@ extension ConversationRun on ChatController {
     final lastUser = history.lastIndexWhere(
       (message) => message.role == AgentMessageRole.user,
     );
-    final userMessage = groupUser ?? history[lastUser];
+    final userMessage = callbackEvents.isNotEmpty
+        ? _callbackContext(callbackEvents)
+        : groupUser ?? history[lastUser];
     final executionWatch = Stopwatch()..start();
     runConversation.executionWatch = executionWatch;
     runConversation.restoredExecutionElapsed = Duration.zero;
@@ -234,12 +239,15 @@ extension ConversationRun on ChatController {
             : (result) =>
                   result.toolName == 'sleepGroupChat' &&
                   result.status == ToolResultStatus.success,
-        conversation: groupHistory == null
-            ? List.unmodifiable(history.take(lastUser + 1))
-            : _groupHistory([
-                ...history,
-                if (htmlEvents.isNotEmpty) _htmlEventContext(htmlEvents),
-              ], reply.senderId),
+        conversation: [
+          ...(groupHistory == null
+              ? List.unmodifiable(history.take(lastUser + 1))
+              : _groupHistory([
+                  ...history,
+                  if (htmlEvents.isNotEmpty) _htmlEventContext(htmlEvents),
+                ], reply.senderId)),
+          if (callbackEvents.isNotEmpty) _callbackContext(callbackEvents),
+        ],
         contextSummary: groupHistory == null
             ? runConversation.contextSummary
             : null,
@@ -614,6 +622,9 @@ extension ConversationRun on ChatController {
         _setMemberStreaming(reply.senderId, null, groupParent);
         _notifyMember(runConversation, groupParent);
         await _persistMember(runConversation, groupParent);
+        await MessageCallbacks(
+          _store.database,
+        ).finish(callbackEvents, outcome == 'completed');
         if (htmlEvents.isNotEmpty) {
           await htmlGames.finishEvents(
             reply.senderId,
@@ -627,7 +638,8 @@ extension ConversationRun on ChatController {
             HtmlGameSignals.changes.add(id);
           }
         }
-        if (outcome == 'completed' &&
+        if (callbackEvents.isEmpty &&
+            outcome == 'completed' &&
             (groupParent == null || runMessageIds.isNotEmpty)) {
           memory.learn(
             runConfig,

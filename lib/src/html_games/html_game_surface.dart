@@ -19,9 +19,8 @@ class HtmlGameSurface extends StatelessWidget {
           child: AndroidView(
             viewType: 'aurai/html_game',
             creationParams: {
-              'document': session.document,
               'messageId': session.game.messageId,
-              'identity': session.game.html + session.dark.toString(),
+              'identity': session.identity,
               'stateful': session.game.stateful,
               'fullscreen': session.fullscreen,
             },

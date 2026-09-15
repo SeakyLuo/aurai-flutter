@@ -13,7 +13,7 @@ class HtmlGameStore {
       "EXISTS (SELECT 1 FROM html_game_receipts WHERE processed_at IS NULL AND attempts >= 3 AND event_id IN (SELECT id FROM html_game_events WHERE message_id = html_games.message_id)) AS retry_available";
   Future<HtmlGameCard> card(String id) async {
     final rows = await database.rawQuery(
-      "SELECT title, preview, display_mode, display_width, display_height, version, status, $retryColumn FROM html_games WHERE message_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
+      "SELECT title, preview, background_mode, display_mode, display_width, display_height, version, status, $retryColumn FROM html_games WHERE message_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
       [id],
     );
     if (rows.isEmpty) throw StateError('游戏已被删除或撤回');
@@ -71,8 +71,12 @@ class HtmlGameStore {
     final title = (args['title'] as String).trim();
     final html = args['html'] as String;
     final width = args['width'] as int?;
-    final height = args['height'] as int;
+    final height = args['height'] as int? ?? 320;
     final displayMode = args['displayMode'] as String? ?? 'hybrid';
+    final backgroundMode = args['backgroundMode'] as String? ?? 'message';
+    if (!['message', 'transparent'].contains(backgroundMode)) {
+      throw ArgumentError('backgroundMode 必须为 message 或 transparent');
+    }
     if (height < 180 ||
         height > 640 ||
         (width != null && (width < 180 || width > 600)))
@@ -111,6 +115,7 @@ class HtmlGameStore {
         width: width,
         height: height,
         displayMode: displayMode,
+        backgroundMode: backgroundMode,
       ),
     );
     await txn.insert('messages', messageRow(conversationId, message));
@@ -121,6 +126,7 @@ class HtmlGameStore {
       'title': title,
       'html': html,
       'display_mode': displayMode,
+      'background_mode': backgroundMode,
       'stateful': args['stateful'] == true ? 1 : 0,
       'display_width': width,
       'display_height': height,

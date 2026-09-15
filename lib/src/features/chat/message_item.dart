@@ -321,14 +321,7 @@ class _MessageItemState extends State<MessageItem> {
               ],
             ),
             const SizedBox(height: 6),
-            Material(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xff2a292f)
-                  : const Color(0xffefeff3),
-              borderRadius: BorderRadius.circular(22),
-              clipBehavior: Clip.antiAlias,
-              child: widget.htmlGameView!,
-            ),
+            widget.htmlGameView!,
           ],
         ),
       );

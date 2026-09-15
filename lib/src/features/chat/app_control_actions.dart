@@ -88,7 +88,6 @@ extension AppControlActions on ChatController {
             return _sendPeerMessage(id, senderId, args['text'] as String);
           }
         }
-        if (id == sourceId) throw ArgumentError('请通过当前会话的正常回复入口发送');
         final text = (args['text'] as String).trim();
         if (text.isEmpty || text.length > 20000)
           throw ArgumentError('消息需为 1–20000 字');
@@ -99,7 +98,8 @@ extension AppControlActions on ChatController {
             : id == _privateConversation?.id
             ? _privateConversation!
             : await _store.load(id);
-        if (target.kind == ConversationKind.direct &&
+        if (id != sourceId &&
+            target.kind == ConversationKind.direct &&
             (id == _runningConversation?.id ||
                 id == _privateConversation?.id)) {
           throw StateError('目标私聊正在回复，请结束后再发送');

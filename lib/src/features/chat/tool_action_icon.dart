@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../html_games/html_game_icon.dart';
 
 import 'capability_icon.dart';
 import 'wrench_painter.dart';
@@ -17,6 +18,8 @@ class ToolActionIcon extends StatelessWidget {
     child: FittedBox(
       child: switch (toolName) {
         'sendHtmlMessage' ||
+        'readHtmlMessage' ||
+        'updateHtmlMessage' => const HtmlGameIcon(HtmlGameIconType.game),
         'sendInteractiveMessage' ||
         'findContacts' ||
         'listFriends' ||

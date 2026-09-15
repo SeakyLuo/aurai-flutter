@@ -1,6 +1,31 @@
 part of 'chat_controller.dart';
 
 extension MessageRecall on ChatController {
+  Future<Conversation> _messageConversation(
+    String messageId,
+    String senderId,
+    Conversation source,
+  ) async {
+    final rows = await _store.database.query(
+      'messages',
+      columns: ['conversation_id'],
+      where:
+          'id = ? AND conversation_id IN '
+          '(SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)',
+      whereArgs: [messageId, senderId],
+      limit: 1,
+    );
+    if (rows.isEmpty) throw StateError('消息不存在或你无权访问该会话');
+    final id = rows.single['conversation_id'] as String;
+    if (id == source.id) return source;
+    if (id == activeConversation.id) return activeConversation;
+    if (id == _runningConversation?.id) return _runningConversation!;
+    if (id == _privateConversation?.id) return _privateConversation!;
+    final peer = _peerSessions[id];
+    if (peer != null) return (await peer).conversation;
+    return _store.load(id);
+  }
+
   Future<void> recallMessage(AgentMessage message) async {
     final conversation = activeConversation;
     if (conversation.kind != ConversationKind.group ||
@@ -15,13 +40,18 @@ extension MessageRecall on ChatController {
     String senderId,
     String messageId,
   ) async {
+    conversation = await _messageConversation(
+      messageId,
+      senderId,
+      conversation,
+    );
     final found = await _store.reader.messages(
       conversation.id,
       throughMessageId: messageId,
       limit: 1,
     );
     if (found.isEmpty || found.single.id != messageId) {
-      throw StateError('当前会话中未找到这条消息');
+      throw StateError('目标会话中未找到这条消息');
     }
     final message = found.single;
     if (message.senderId != senderId ||
@@ -30,6 +60,21 @@ extension MessageRecall on ChatController {
       throw StateError('只能撤回自己发送的消息，不能撤回系统消息');
     }
     await _recallMessageIn(conversation, message, userInitiated: false);
+    final peer = _peerSessions[conversation.id];
+    if (peer != null) {
+      final session = await peer;
+      final notice = AgentMessage(
+        id: message.id,
+        role: message.role,
+        senderId: message.senderId,
+        sender: message.sender,
+        text: '${message.sender!.name}撤回了一条消息',
+        createdAt: message.createdAt,
+        isSystem: true,
+      );
+      _replaceRecalled(session.conversation.messages, messageId, notice);
+      _replaceRecalled(session.dispatcher.history, messageId, notice);
+    }
   }
 
   Future<void> _recallMessageIn(
@@ -94,7 +139,13 @@ extension MessageRecall on ChatController {
           if (activeConversation.id == conversation.id) activeConversation,
           if (_runningConversation?.id == conversation.id)
             _runningConversation!,
-          if (_runningConversation?.id == conversation.id) ..._groupRuns.values,
+          if (_privateConversation?.id == conversation.id)
+            _privateConversation!,
+          ..._conversations.where((c) => c.id == conversation.id),
+          ..._searchWindows.values.where((c) => c.id == conversation.id),
+          if (conversation.kind == ConversationKind.group &&
+              _runningConversation?.id == conversation.id)
+            ..._groupRuns.values,
         };
         for (final copy in copies) {
           _replaceRecalled(copy.messages, message.id, notice);

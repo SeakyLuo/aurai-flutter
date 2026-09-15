@@ -1,3 +1,4 @@
+import 'message_callbacks.dart';
 import 'contact_relationships.dart';
 import '../html_games/html_game_schema.dart';
 import 'ai_identity_schema.dart';
@@ -11,7 +12,7 @@ import '../memory/memory_controller.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 24,
+  version: 26,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -107,11 +108,26 @@ Future<Database> openConversationDatabase() async => openDatabase(
       }
     }
     if (oldVersion < 24) await migrateAuraiDescription(db);
+    if (oldVersion >= 20 && oldVersion < 26) {
+      // This device may already have the column from the requested live data update.
+      final columns = await db.rawQuery('PRAGMA table_info(html_games)');
+      if (!columns.any((column) => column['name'] == 'background_mode')) {
+        await db.execute(
+          "ALTER TABLE html_games ADD COLUMN background_mode TEXT NOT NULL DEFAULT 'message' CHECK(background_mode IN ('message','transparent'))",
+        );
+      }
+    }
+    if (oldVersion < 25) {
+      await db.execute(messageCallbackSchema);
+      await db.execute(messageCallbackIndex);
+    }
   },
   onCreate: (db, version) async {
     final batch = db.batch();
     for (final statement in [
       ..._schema,
+      messageCallbackSchema,
+      messageCallbackIndex,
       ...htmlGameSchema,
       ...groupChatTables,
       groupParticipationSchema,

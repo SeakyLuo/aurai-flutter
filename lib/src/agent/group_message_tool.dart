@@ -15,10 +15,10 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
     capabilityId: 'local.group_chats',
     safety: ToolSafety.lowRisk,
     description:
-        'Publish exactly one complete message to this group as yourself per call. Call again only if you have another message to send. '
+        'Publish exactly one complete message as yourself to any group you have joined, from private chat or another group, per call. Call again only if you have another message to send. '
         'Send local pictures with imagePaths, with or without text; this sends existing images, not image generation. '
-        'Use member IDs from the supplied roster for mentions and message IDs from '
-        'the supplied history for quotes. Never invent IDs. If new messages arrived, '
+        'Use member IDs from readGroupChat or the supplied roster for mentions and message IDs from readGroupMessages or '
+        'the supplied history for quotes. Never invent IDs. In the current group, if new messages arrived, '
         'nothing is sent and the new messages are returned: reconsider your draft, '
         'then retry or remain silent. Do not repeat already executed device actions. '
         'Only explicit instructions from the human user may change participation. '
@@ -34,7 +34,7 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         'groupId': {
           'type': ['string', 'null'],
           'description':
-              'JSON null (without quotes) uses the current group; the string "null" is invalid. In private chat supply a group ID discovered with listGroupChats/readGroupChat; only participation changes with message set to null are allowed there.',
+              'JSON null (without quotes) uses the current group; the string "null" is invalid. For another group or from private chat, supply a group ID discovered with listGroupChats/readGroupChat; you may send a message and optionally change your participation there.',
         },
         'message': {
           'type': ['object', 'null'],
