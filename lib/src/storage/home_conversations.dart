@@ -1,3 +1,4 @@
+import 'group_unread_messages.dart';
 import 'conversation_visibility.dart';
 import 'group_list_preview.dart';
 import '../domain/message_sender.dart';
@@ -53,6 +54,7 @@ class HomeConversations {
         whereArgs: items.map((c) => c.id).toList(),
         orderBy: 'position',
       ),
+      GroupUnreadMessages(store.database).load(items),
     ]);
     final attachments = <String, Set<String>>{};
     for (final row in results[2] as List<Map<String, Object?>>) {

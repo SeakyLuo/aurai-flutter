@@ -1,5 +1,4 @@
 import 'model_image_input.dart';
-import 'dart:convert';
 
 import '../agent/system_prompt.dart';
 import 'responses_context.dart';
@@ -101,13 +100,10 @@ class DeepSeekResponsesProvider implements ModelProvider {
       final item = rawItem.cast<String, Object?>();
       if (item['type'] == 'function_call' && json['status'] == 'completed') {
         calls.add(
-          ToolCall.fromModel(
+          ToolCall.fromJsonArguments(
             id: item['call_id']! as String,
             name: item['name']! as String,
-            arguments:
-                (jsonDecode(item['arguments']! as String)
-                        as Map<Object?, Object?>)
-                    .cast<String, Object?>(),
+            arguments: item['arguments']! as String,
           ),
         );
       }

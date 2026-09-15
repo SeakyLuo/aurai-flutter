@@ -23,7 +23,7 @@ extension ModelServiceDetails on ModelService {
 
   String get defaultModel => switch (this) {
     ModelService.openAi => 'gpt-5.4-mini',
-    ModelService.deepSeek => 'deepseek-v4-flash',
+    ModelService.deepSeek => 'deepseek-flash',
     ModelService.qwen => 'qwen-plus',
     ModelService.kimi => 'kimi-k2.6',
     ModelService.glm => 'glm-4.7',

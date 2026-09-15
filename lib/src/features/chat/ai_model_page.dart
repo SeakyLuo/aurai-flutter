@@ -8,6 +8,7 @@ import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'choice_sheet.dart';
 import 'model_balance_tile.dart';
+import 'model_settings_sheet.dart';
 import '../../scheduling/task_unsaved_dialog.dart';
 
 class AiModelPage extends StatefulWidget {
@@ -47,8 +48,8 @@ class _AiModelPageState extends State<AiModelPage> {
 
   Future<void> _save() async {
     if (_model.text.isEmpty) {
-      _notice('请选择模型名称');
-      return;
+      await _selectModel();
+      if (!mounted || _model.text.isEmpty) return;
     }
     setState(() => _saving = true);
     try {
@@ -109,7 +110,7 @@ class _AiModelPageState extends State<AiModelPage> {
             label: '保存',
             icon: Icons.check_rounded,
             iconWidget: const SettingsIcon(type: SettingsIconType.check),
-            onPressed: _saving ? null : _save,
+            onPressed: _saving || _loading ? null : _save,
           ),
         ],
       ),
@@ -168,15 +169,24 @@ class _AiModelPageState extends State<AiModelPage> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _selectModel() async {
-    final profile = widget.controller.modelSettings.profile(_service);
-    if (profile.apiKey.isEmpty) {
-      _notice('请先在设置中配置该供应商账号');
-      return;
-    }
+    if (_loading) return;
     setState(() => _loading = true);
     final catalog = ModelCatalog();
     _catalog = catalog;
     try {
+      var profile = widget.controller.modelSettings.profile(_service);
+      if (profile.apiKey.isEmpty) {
+        final saved = await ModelSettingsSheet.show(
+          context,
+          controller: widget.controller,
+          continueAfterSave: false,
+          accountOnly: true,
+          initialService: _service,
+        );
+        if (!mounted || !saved) return;
+        profile = widget.controller.modelSettings.profile(_service);
+        if (profile.apiKey.isEmpty) return;
+      }
       final models = await catalog.load(
         baseUrl: Uri.parse(profile.baseUrl),
         apiKey: profile.apiKey,

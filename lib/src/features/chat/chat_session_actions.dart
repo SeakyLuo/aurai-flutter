@@ -32,12 +32,18 @@ extension _ChatSessionActions on _ChatPageState {
 
   void _scheduleMarkRead() {
     final conversation = widget.controller.activeConversation;
-    if (_markReadScheduled ||
-        conversation.runState != ChatRunState.idle ||
+    if (_markReadScheduled) return;
+    if (conversation.kind == ConversationKind.group) {
+      if (_contentBelow ||
+          conversation.searchHasLater ||
+          !conversation.needsGroupReadCheckpoint)
+        return;
+    } else if (conversation.runState != ChatRunState.idle ||
         conversation.activeRunId == null ||
         conversation.pendingGoal != null ||
-        conversation.seenRunId == conversation.activeRunId)
+        conversation.seenRunId == conversation.activeRunId) {
       return;
+    }
     _markReadScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
@@ -47,7 +53,10 @@ extension _ChatSessionActions on _ChatPageState {
                 AppLifecycleState.resumed ||
             _scaffoldKey.currentState!.isDrawerOpen ||
             widget.controller.activeConversation != conversation ||
-            conversation.runState != ChatRunState.idle)
+            (conversation.kind == ConversationKind.group &&
+                (_contentBelow || conversation.searchHasLater)) ||
+            (conversation.kind != ConversationKind.group &&
+                conversation.runState != ChatRunState.idle))
           return;
         await widget.controller.markActiveConversationRead();
       } on Object catch (caughtError) {

@@ -47,9 +47,16 @@ class RecentChatsPageState extends State<RecentChatsPage> {
   }
 
   void _changed() {
-    _updates?.cancel();
     if (!ModalRoute.of(context)!.isCurrent) return;
+    if (_updates?.isActive == true) return;
     _updates = Timer(const Duration(milliseconds: 500), reload);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final current = ModalRoute.isCurrentOf(context);
+    if (_loaded && current == true) _changed();
   }
 
   @override
@@ -299,6 +306,9 @@ class RecentChatsPageState extends State<RecentChatsPage> {
           ],
         ),
         subtitle: ConversationPreviewText(
+          prefix: group && item.unreadMessageCount > 0
+              ? '[${item.unreadMessageCount}条] '
+              : '',
           showFailure: true,
           conversation: item,
           emptyText: '开始聊天',

@@ -1,3 +1,4 @@
+import 'group_unread_messages.dart';
 import 'dart:convert';
 
 import 'package:sqflite/sqflite.dart';
@@ -46,6 +47,7 @@ class ConversationStore {
         );
       }
       await clearLegacy();
+      await GroupUnreadMessages(database).initialize();
       await database.update('conversations', {
         'archived': 1,
       }, where: "mode != 'normal' AND archived = 0");
@@ -181,8 +183,12 @@ class ConversationStore {
       batch.delete('conversations', where: 'id = ?', whereArgs: [removed.id]);
       batch.delete(
         'app_state',
-        where: 'key IN (?, ?)',
-        whereArgs: ['context_summary:${removed.id}', 'seen_run:${removed.id}'],
+        where: 'key IN (?, ?, ?)',
+        whereArgs: [
+          'context_summary:${removed.id}',
+          'seen_run:${removed.id}',
+          'group_read:${removed.id}',
+        ],
       );
       if (replacement.messageCount > 0) {
         batch.insert('app_state', {

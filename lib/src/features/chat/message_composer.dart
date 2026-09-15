@@ -114,7 +114,8 @@ class MessageComposer extends StatelessWidget {
                                             ? TextAlignVertical.top
                                             : TextAlignVertical.center,
                                         minLines: 1,
-                                        maxLines: multiline ? 5 : 1,
+                                        maxLines: 5,
+                                        keyboardType: TextInputType.multiline,
                                         maxLength: maxLength,
                                         onChanged: onChanged,
                                         textInputAction:

@@ -153,6 +153,15 @@ extension ConversationActions on ChatController {
 
   Future<void> markActiveConversationRead() async {
     final conversation = activeConversation;
+    if (conversation.kind == ConversationKind.group) {
+      if (!conversation.needsGroupReadCheckpoint) return;
+      final latest = conversation.messages.last;
+      await _store.writer.flush();
+      await GroupUnreadMessages(_store.database).markRead(conversation, latest);
+      _updateConversationList();
+      _conversationChanged();
+      return;
+    }
     if (conversation.runState != ChatRunState.idle ||
         conversation.pendingGoal != null ||
         conversation.activeRunId == null ||
@@ -331,10 +340,11 @@ extension ConversationActions on ChatController {
         );
         await txn.delete(
           'app_state',
-          where: 'key IN (?, ?)',
+          where: 'key IN (?, ?, ?)',
           whereArgs: [
             'context_summary:${removed.id}',
             'seen_run:${removed.id}',
+            'group_read:${removed.id}',
           ],
         );
       });
