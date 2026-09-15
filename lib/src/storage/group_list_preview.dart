@@ -1,3 +1,4 @@
+import '../domain/message_summary.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../features/chat/conversation.dart';
@@ -13,7 +14,7 @@ Future<void> loadConversationListPreviews(
   };
   if (groups.isEmpty) return;
   final rows = await database.rawQuery(
-    '''SELECT id, conversation_id, sender_id, kind, text, created_at
+    '''SELECT id, conversation_id, sender_id, kind, text, interactive_json IS NOT NULL AS has_interactive, created_at
        FROM messages WHERE id IN (
          SELECT (SELECT id FROM messages
            WHERE conversation_id = conversations.id AND kind != 'commentary'
@@ -72,27 +73,27 @@ Future<void> loadConversationListPreviews(
     final text = row['id'] == 'group-created:${row['conversation_id']}'
         ? groups[row['conversation_id']]!.creationMessage!
         : row['text'] as String;
-    final labels = <String>{};
-    for (final attachment in attachments[row['id']] ?? const []) {
-      final mime = attachment['mime_type'] as String;
-      labels.add(
-        attachment['kind'] == 'image' || mime.startsWith('image/')
-            ? '[图片]'
-            : mime.startsWith('video/')
-            ? '[视频]'
-            : mime.startsWith('audio/')
-            ? '[音频]'
-            : '[文件] ${attachment['display_name']}',
-      );
-    }
-    final body = [...labels, if (text.isNotEmpty) text].join(' ');
+    final body = MessageSummary.content(
+      text: text,
+      htmlTitle: row['kind'] == 'html_game' ? text : null,
+      interactiveTitle: row['has_interactive'] == 1 ? text : null,
+      attachments: [
+        for (final attachment in attachments[row['id']] ?? const [])
+          MessageSummary.attachment(
+            kind: attachment['kind'] as String,
+            mimeType: attachment['mime_type'] as String,
+            name: attachment['display_name'] as String?,
+          ),
+      ],
+    );
     groups[row['conversation_id']]!.storedPreviewIsSystem =
         row['kind'] == 'system';
-    groups[row['conversation_id']]!.storedPreview =
-        row['kind'] == 'system' ||
-            row['sender_id'] == MessageSender.localUser.id
-        ? body
-        : '${names[row['sender_id']]}：$body';
+    groups[row['conversation_id']]!.storedPreview = MessageSummary.sender(
+      body,
+      senderId: row['sender_id'] as String,
+      senderName: names[row['sender_id']]!,
+      isSystem: row['kind'] == 'system',
+    );
   }
 }
 

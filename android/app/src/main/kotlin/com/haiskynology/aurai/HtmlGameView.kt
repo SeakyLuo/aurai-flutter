@@ -67,6 +67,7 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
     val canEvict: Boolean get() = !attached && !saving
     private var contentHeight: Double? = null
     private var lease = 0
+    private var visibilityRevision = 0
     var attached = false
         private set
     private var fullscreen = false
@@ -100,12 +101,18 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                 if (!disposed) { loaded = true; channel?.invokeMethod("ready", null); if (!attached) pause() }
             }
             override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
-                channel?.invokeMethod("failed", null)
+                channel?.invokeMethod("failed", if (detail.didCrash()) "WebView 渲染进程崩溃" else "WebView 渲染进程被系统终止（退出优先级：${detail.rendererPriorityAtExit()}）")
                 destroy()
                 return true
             }
         }
         web.addJavascriptInterface(object {
+            @JavascriptInterface fun editing(active: Boolean) {
+                web.post { if (!disposed) channel?.invokeMethod("editing", active) }
+            }
+            @JavascriptInterface fun reportError(message: String) {
+                web.post { if (!disposed) channel?.invokeMethod("scriptError", message) }
+            }
             @JavascriptInterface fun loadState(): String =
                 if (stateful) preferences.getString(messageId, "null")!! else "null"
             @JavascriptInterface fun saveStateAsync(requestId: Int, json: String) {
@@ -140,6 +147,9 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                 }
             }
             @JavascriptInterface fun visualChanged() { web.post { if (!disposed) channel?.invokeMethod("visualChanged", null) } }
+            @JavascriptInterface fun gestureRegions(json: String) {
+                web.post { if (!disposed) channel?.invokeMethod("gestureRegions", json) }
+            }
             @JavascriptInterface fun reopen() {
                 web.post { if (!disposed) channel?.invokeMethod("reopen", null) }
             }
@@ -163,7 +173,7 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                     }
                     channel?.invokeMethod("interaction", json, object : MethodChannel.Result {
                         override fun success(result: Any?) = reply(result as String)
-                        override fun error(code: String, message: String?, details: Any?) = reply("{\"error\":${JSONObject.quote(message ?: "操作未提交，请重试")}}")
+                        override fun error(code: String, message: String?, details: Any?) = reply("{\"error\":${JSONObject.quote(listOfNotNull(message, "错误码：$code", details?.toString()).joinToString("\n"))}}")
                         override fun notImplemented() = error("unavailable", null, null)
                     })
                 }
@@ -180,7 +190,7 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                         }
                         override fun error(code: String, message: String?, details: Any?) {
                             inFlight = false
-                            if (!disposed) web.evaluateJavascript("window.__auraiGameReply({error:${JSONObject.quote("游戏操作未完成，请重试")}})", null)
+                            if (!disposed) web.evaluateJavascript("window.__auraiGameReply({error:${JSONObject.quote(listOfNotNull(message, "错误码：$code", details?.toString()).joinToString("\n"))}})", null)
                         }
                         override fun notImplemented() = error("unavailable", null, null)
                     })
@@ -204,10 +214,15 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                     result.success(null)
                 }
                 "connect" -> {
+                    visibilityRevision++
                     if (loaded) channel?.invokeMethod("ready", null)
                     else channel?.invokeMethod("requestDocument", null)
                     web.onResume()
-                    web.evaluateJavascript("window.__auraiLifecycle?.(false); document.documentElement.dataset.auraiDisplay=" + JSONObject.quote(if (fullscreen) "fullscreen" else "inline") + "; document.dispatchEvent(new Event('aurai:displaychange')); window.dispatchEvent(new Event('resize')); window.__auraiMeasure?.();", null)
+                    web.evaluateJavascript("window.__auraiLifecycle?.(false); document.documentElement.dataset.auraiDisplay=" + JSONObject.quote(if (fullscreen) "fullscreen" else "inline") + "; document.dispatchEvent(new Event('aurai:displaychange')); window.dispatchEvent(new Event('resize')); window.__auraiMeasure?.(); AuraiGameBridge.editing(window.__auraiEditing?.()===true);", null)
+                    result.success(null)
+                }
+                "theme" -> {
+                    web.evaluateJavascript("document.getElementById('aurai-theme').textContent=" + JSONObject.quote(call.arguments as String) + "; window.dispatchEvent(new Event('resize'));", null)
                     result.success(null)
                 }
                 "state" -> {
@@ -242,6 +257,14 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                     }
                 }
                 "dispose" -> pause { result.success(null) }
+                "visibility" -> {
+                    if (call.arguments == true) {
+                        visibilityRevision++
+                        web.onResume()
+                        web.evaluateJavascript("window.__auraiLifecycle?.(false)", null)
+                        result.success(null)
+                    } else pause { result.success(null) }
+                }
                 else -> result.notImplemented()
             }
         }
@@ -251,8 +274,9 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
     fun pause(done: () -> Unit = {}) {
         if (disposed) { done(); return }
         val owner = lease
+        val visibility = ++visibilityRevision
         web.evaluateJavascript("window.__auraiLifecycle?.(true)") {
-            if (!disposed && owner == lease) web.onPause()
+            if (!disposed && owner == lease && visibility == visibilityRevision) web.onPause()
             stateWriter.execute { web.post { done() } }
         }
     }

@@ -5,7 +5,6 @@ extension MessageCallbackActions on ChatController {
     if (!_callbacksPending ||
         _callbacksDisposed ||
         _drainingCallbacks ||
-        hasRunningTask ||
         changingConversation)
       return;
     _drainingCallbacks = true;
@@ -21,40 +20,81 @@ extension MessageCallbackActions on ChatController {
   Future<bool> _deliverMessageCallback() async {
     try {
       final generation = _callbackGeneration;
+      final busyIds = {
+        ..._callbackConversations,
+        for (final entry in _executionStates.entries)
+          if (entry.value.runningConversation != null ||
+              entry.value.systemEventLoading ||
+              entry.value.submitting)
+            entry.key,
+      }.toList();
       final rows = await _store.database.query(
         'message_callbacks',
-        where: 'processed_at IS NULL AND attempts < 3',
+        where:
+            'processed_at IS NULL AND attempts < 3'
+            '${busyIds.isEmpty ? '' : ' AND conversation_id NOT IN (${List.filled(busyIds.length, '?').join(',')})'}',
+        whereArgs: busyIds,
         orderBy: 'created_at, id',
-        limit: 1,
+        limit: 32,
       );
       if (rows.isEmpty) {
         if (generation == _callbackGeneration) _callbacksPending = false;
-        return _callbacksPending;
+        return generation != _callbackGeneration;
       }
-      if (_callbacksDisposed || hasRunningTask || changingConversation)
-        return false;
-      final event = rows.single;
+      if (_callbacksDisposed || changingConversation) return false;
+      final events = <String, Map<String, Object?>>{};
+      for (final event in rows) {
+        events.putIfAbsent(event['conversation_id'] as String, () => event);
+      }
+      for (final entry in events.entries) {
+        _callbackConversations.add(entry.key);
+        unawaited(_runMessageCallback(entry.value));
+      }
+      return generation != _callbackGeneration;
+    } on Object catch (error, stack) {
+      developer.log(
+        'Message callback dispatch failed',
+        name: 'aurai.interaction',
+        error: error,
+        stackTrace: stack,
+      );
+      return false;
+    }
+  }
+
+  Future<void> _runMessageCallback(Map<String, Object?> event) async {
+    final id = event['conversation_id'] as String;
+    var more = false;
+    try {
+      more = await _executeMessageCallback(event);
+    } finally {
+      _callbackConversations.remove(id);
+      if (more) {
+        _callbacksPending = true;
+        _callbackGeneration++;
+        _drainMessageCallbacks();
+      }
+    }
+  }
+
+  Future<bool> _executeMessageCallback(Map<String, Object?> event) async {
+    try {
       final id = event['conversation_id'] as String;
       final senderId = event['sender_id'] as String;
-      final conversation = id == activeConversation.id
-          ? activeConversation
-          : await _store.load(id);
+      if (_liveConversation(id) != null) return false;
+      final conversation = await _forwardTarget(id);
       if (conversation.isArchived) {
         await MessageCallbacks(_store.database).finish([event], true);
         return true;
       }
-      if (hasRunningTask || changingConversation || _callbacksDisposed)
+      if (_liveConversation(id) != null ||
+          changingConversation ||
+          _callbacksDisposed)
         return false;
       if (conversation.kind == ConversationKind.group) {
         await _recoverGroupSleep(id, {senderId});
       } else {
-        _runningConversation = conversation;
-        try {
-          await _executeConversation(conversation);
-        } finally {
-          _runningConversation = null;
-          _conversationChanged();
-        }
+        await _executeConversation(conversation);
       }
       final remaining = await _store.database.query(
         'message_callbacks',

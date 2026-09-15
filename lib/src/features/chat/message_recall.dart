@@ -1,6 +1,73 @@
 part of 'chat_controller.dart';
 
 extension MessageRecall on ChatController {
+  Future<void> restoreRecalledDraft(AgentMessage message) async {
+    final conversation = activeConversation;
+    final saved =
+        (await RecalledMessageDrafts.instance.entries)[message.id]
+            as Map<String, dynamic>;
+    if (!identical(conversation, activeConversation) || !canEditDraft) return;
+    if (conversation.draft.isNotEmpty ||
+        draftImages.isNotEmpty ||
+        draftFiles.isNotEmpty ||
+        conversation.draftQuote != null) {
+      throw StateError('请先发送或清空当前草稿，再重新编辑');
+    }
+    final images = <MessageImage>[];
+    final files = <MessageFile>[];
+    final copied = <File>[];
+    try {
+      for (final value in saved['images'] as List) {
+        final source = File(value['path'] as String);
+        final copy = await source.copy(
+          '${source.parent.path}/${newMessageId()}_${source.uri.pathSegments.last}',
+        );
+        copied.add(copy);
+        images.add(
+          MessageImage(
+            path: copy.path,
+            mimeType: value['mimeType'] as String,
+            name: value['name'] as String?,
+          ),
+        );
+      }
+      for (final value in saved['files'] as List) {
+        final source = File(value['path'] as String);
+        final copy = await source.copy(
+          '${source.parent.path}/${newMessageId()}_${source.uri.pathSegments.last}',
+        );
+        copied.add(copy);
+        files.add(
+          MessageFile(
+            path: copy.path,
+            name: value['name'] as String,
+            mimeType: value['mimeType'] as String,
+            size: value['size'] as int,
+          ),
+        );
+      }
+      if (!identical(conversation, activeConversation) ||
+          !canEditDraft ||
+          conversation.draft.isNotEmpty ||
+          draftImages.isNotEmpty ||
+          draftFiles.isNotEmpty ||
+          conversation.draftQuote != null) {
+        throw StateError('草稿已变化，请先处理当前草稿');
+      }
+      conversation.draft = saved['text'] as String;
+      conversation.draftImages.addAll(images);
+      conversation.draftFiles.addAll(files);
+    } catch (_) {
+      for (final file in copied) {
+        await file.delete();
+      }
+      rethrow;
+    }
+    pendingComposerDraft = conversation.draft;
+    _conversationChanged();
+    await _store.writer.save(conversation, makeActive: false);
+  }
+
   Future<Conversation> _messageConversation(
     String messageId,
     String senderId,
@@ -19,8 +86,8 @@ extension MessageRecall on ChatController {
     final id = rows.single['conversation_id'] as String;
     if (id == source.id) return source;
     if (id == activeConversation.id) return activeConversation;
-    if (id == _runningConversation?.id) return _runningConversation!;
-    if (id == _privateConversation?.id) return _privateConversation!;
+    final live = _liveConversation(id);
+    if (live != null) return live;
     final peer = _peerSessions[id];
     if (peer != null) return (await peer).conversation;
     return _store.load(id);
@@ -32,6 +99,7 @@ extension MessageRecall on ChatController {
         message.senderId != MessageSender.localUser.id ||
         message.isSystem)
       return;
+    await RecalledMessageDrafts.instance.save(message);
     await _recallMessageIn(conversation, message, userInitiated: true);
   }
 
@@ -78,6 +146,19 @@ extension MessageRecall on ChatController {
   }
 
   Future<void> _recallMessageIn(
+    Conversation conversation,
+    AgentMessage message, {
+    required bool userInitiated,
+  }) => _inConversation(
+    conversation,
+    () => _recallMessageScoped(
+      conversation,
+      message,
+      userInitiated: userInitiated,
+    ),
+  );
+
+  Future<void> _recallMessageScoped(
     Conversation conversation,
     AgentMessage message, {
     required bool userInitiated,

@@ -200,6 +200,7 @@ class ExecutionProgress extends StatelessWidget {
     this.hideThinking = false,
     this.senderName,
     this.reconnectAttempt = 0,
+    this.compacting = false,
     required this.onContinue,
     required this.onRetry,
     required this.accessibilityRequestPending,
@@ -215,6 +216,7 @@ class ExecutionProgress extends StatelessWidget {
   final bool hideThinking;
   final String? senderName;
   final int reconnectAttempt;
+  final bool compacting;
   final VoidCallback onContinue;
   final VoidCallback onRetry;
   final bool accessibilityRequestPending;
@@ -243,6 +245,12 @@ class ExecutionProgress extends StatelessWidget {
       return TaskFailureCard(onRetry: onRetry, error: errorDetail ?? '任务执行失败');
     }
 
+    if (state == ChatRunState.running && compacting) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(18, 12, 18, 20),
+        child: ThinkingIndicator(label: '正在压缩上下文', singleLine: true),
+      );
+    }
     if (state == ChatRunState.running && reconnectAttempt > 0) {
       return ReconnectIndicator(attempt: reconnectAttempt);
     }

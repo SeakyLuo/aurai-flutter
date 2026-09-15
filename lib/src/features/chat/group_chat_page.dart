@@ -178,7 +178,11 @@ class _GroupChatPageState extends State<GroupChatPage> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
-                              leading: GroupAvatar(members: _avatars[item.id]!),
+                              leading: ConversationUnreadAvatar(
+                                controller: widget.controller,
+                                conversation: item,
+                                child: GroupAvatar(members: _avatars[item.id]!),
+                              ),
                               title: Text(
                                 item.title,
                                 maxLines: 1,
@@ -189,13 +193,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
                                 conversation: item,
                                 emptyText: '',
                               ),
-                              trailing:
-                                  item.runState == ChatRunState.failed ||
-                                      ConversationStatusDot.hasUnreadCompletion(
-                                        item,
-                                      )
-                                  ? ConversationStatusDot(conversation: item)
-                                  : null,
                               onTap: () => _open(item.id),
                             ),
                           ),

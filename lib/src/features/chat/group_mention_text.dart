@@ -55,11 +55,15 @@ class GroupMentionText extends StatefulWidget {
     required this.style,
     required this.members,
     this.onOpen,
+    this.maxLines,
+    this.overflow,
   });
   final String text;
   final TextStyle style;
   final Map<String, String> members;
   final ValueChanged<String>? onOpen;
+  final int? maxLines;
+  final TextOverflow? overflow;
   @override
   State<GroupMentionText> createState() => _GroupMentionTextState();
 }
@@ -115,6 +119,11 @@ class _GroupMentionTextState extends State<GroupMentionText> {
       cursor = match.end;
     }
     spans.add(TextSpan(text: widget.text.substring(cursor)));
-    return Text.rich(TextSpan(children: spans), style: widget.style);
+    return Text.rich(
+      TextSpan(children: spans),
+      style: widget.style,
+      maxLines: widget.maxLines,
+      overflow: widget.overflow,
+    );
   }
 }

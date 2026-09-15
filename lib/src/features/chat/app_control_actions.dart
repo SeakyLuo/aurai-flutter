@@ -91,19 +91,7 @@ extension AppControlActions on ChatController {
         final text = (args['text'] as String).trim();
         if (text.isEmpty || text.length > 20000)
           throw ArgumentError('消息需为 1–20000 字');
-        final target = id == activeConversation.id
-            ? activeConversation
-            : id == _runningConversation?.id
-            ? _runningConversation!
-            : id == _privateConversation?.id
-            ? _privateConversation!
-            : await _store.load(id);
-        if (id != sourceId &&
-            target.kind == ConversationKind.direct &&
-            (id == _runningConversation?.id ||
-                id == _privateConversation?.id)) {
-          throw StateError('目标私聊正在回复，请结束后再发送');
-        }
+        final target = await _forwardTarget(id);
         final profile = await groupStore.loadAi(senderId);
         final message = AgentMessage(
           id: newMessageId(),

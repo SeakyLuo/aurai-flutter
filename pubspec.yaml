@@ -66,6 +66,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
+    - assets/tokenizers/deepseek_v4.json.gz
     - assets/branding/app_logo.png
     - assets/branding/symbol_white.png
     - assets/branding/wordmark_white.png

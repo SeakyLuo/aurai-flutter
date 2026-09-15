@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 enum AttachmentActionIconType {
+  html,
   gallery,
   camera,
   file,
@@ -44,6 +45,27 @@ class _AttachmentActionPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case AttachmentActionIconType.html:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(2, 3, 20, 18),
+            const Radius.circular(4),
+          ),
+          pen,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(8.5, 9)
+            ..lineTo(5.5, 12)
+            ..lineTo(8.5, 15)
+            ..moveTo(15.5, 9)
+            ..lineTo(18.5, 12)
+            ..lineTo(15.5, 15)
+            ..moveTo(13, 8)
+            ..lineTo(11, 16),
+          pen,
+        );
+
       case AttachmentActionIconType.locate:
         canvas.drawCircle(const Offset(12, 12), 7, pen);
         canvas.drawCircle(const Offset(12, 12), 2.5, pen);

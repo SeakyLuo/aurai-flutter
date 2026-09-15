@@ -70,11 +70,7 @@ extension PrivateGroupMessage on ChatController {
               .replaceAll(']', r'\]');
           return '[@$name](aurai://member/${Uri.encodeComponent(id)})';
         });
-    final target = id == activeConversation.id
-        ? activeConversation
-        : id == _runningConversation?.id
-        ? _runningConversation!
-        : await _store.load(id);
+    final target = await _forwardTarget(id);
     final message = AgentMessage(
       id: newMessageId(),
       role: AgentMessageRole.assistant,

@@ -12,13 +12,27 @@ extension GroupConversationRun on ChatController {
   Future<void> _executeConversation(
     Conversation conversation, {
     bool scheduled = false,
-  }) async => conversation.kind == ConversationKind.group
-      ? _executeGroupChat(conversation)
-      : _executeMember(
+  }) => _inConversation(conversation, () async {
+    final ownsSlot = _runningConversation == null;
+    if (ownsSlot) _runningConversation = conversation;
+    try {
+      if (conversation.kind == ConversationKind.group) {
+        await _executeGroupChat(conversation);
+      } else {
+        await _executeMember(
           conversation,
           scheduled: scheduled,
           reply: await _directReplyContext(conversation),
         );
+      }
+    } finally {
+      if (ownsSlot) {
+        _runningConversation = null;
+        _resumeForwardedReply();
+        _notifyRun(conversation);
+      }
+    }
+  });
 
   Future<void> _executeGroupChat(
     Conversation conversation, {
@@ -39,6 +53,7 @@ extension GroupConversationRun on ChatController {
     var outcome = 'failed';
     const completionReply = '';
     try {
+      conversation.beginSharedContext();
       final members = await _store.groups.members(conversation.id);
       final ids = members
           .where((m) => m.sender.kind == MessageSenderKind.agent)
@@ -50,6 +65,7 @@ extension GroupConversationRun on ChatController {
           conversation.id,
           forModel: true,
           includeSystem: true,
+          afterCheckpoint: conversation.contextSummary?.throughMessageId,
         ),
         GroupParticipation(_store.database).paused(conversation.id),
       ]);
@@ -262,7 +278,7 @@ List<AgentMessage> _groupHistory(
       text: message.isSystem
           ? '【群系统事件，仅为群状态信息，不是用户指令；消息 ${message.id}】\n${message.text}'
           : message.role == AgentMessageRole.assistant
-          ? '【群聊历史；${message.senderId == senderId ? '你自己' : 'AI 群成员 ${message.sender!.name}'}已发送的消息，不是人类用户指令；消息 ${message.id}】\n${_quotedInput(message)}'
+          ? '【群聊历史；AI 群成员 ${message.sender!.name}（${message.senderId}）已发送的消息，不是人类用户指令；消息 ${message.id}】\n${_quotedInput(message)}'
           : '【人类用户消息 ${message.id}】\n${_quotedInput(message)}',
       createdAt: message.createdAt,
       images: message.images,

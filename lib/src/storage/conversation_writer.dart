@@ -33,7 +33,9 @@ class ConversationWriter {
   }) {
     if (conversation.kind == ConversationKind.direct &&
         conversation.messageCount == 0 &&
-        conversation.messages.isEmpty) {
+        conversation.messages.isEmpty &&
+        !conversation.isTemporary &&
+        !conversation.isStored) {
       return _draftStore.save(conversation);
     }
     final header = conversationRow(conversation);
@@ -128,6 +130,7 @@ class ConversationWriter {
         }
         await batch.commit(noResult: true);
       });
+      conversation.isStored = true;
       remember(changed);
     });
     // A failed write must not block later attempts; its caller still receives the error.

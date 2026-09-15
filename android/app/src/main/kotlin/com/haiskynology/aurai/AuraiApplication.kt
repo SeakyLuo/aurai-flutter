@@ -46,6 +46,7 @@ class AuraiApplication : Application() {
     private val activeTask = AtomicReference<Future<*>?>()
     private val activeResult = AtomicReference<MethodChannel.Result?>()
     private val activeSocket = AtomicReference<Socket?>()
+    private val shellJobs by lazy { AppShellJobs(this) }
     private lateinit var agentBridge: AndroidAgentBridge
     private lateinit var httpProbe: AndroidHttpProbe
     private val networkEvents = ArrayDeque<Map<String, Any?>>()
@@ -66,10 +67,12 @@ class AuraiApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         if (java.io.File("/proc/self/cmdline").readText().trimEnd('\u0000').let { it.endsWith(":device_script") || it.endsWith(":documents") }) return
+        DataBackupArchive(this).applyPending(::encryptModelConfig)
         FlutterInjector.instance().flutterLoader().startInitialization(this)
         FlutterInjector.instance().flutterLoader().ensureInitializationComplete(this, null)
         flutterEngine = FlutterEngine(this)
         GeneratedPluginRegistrant.registerWith(flutterEngine)
+        DataManagementAccess(this, flutterEngine.dartExecutor.binaryMessenger, ::loadModelConfig)
         flutterEngine.platformViewsController.registry.registerViewFactory(
             "aurai/html_game", HtmlGameViewFactory(flutterEngine.dartExecutor.binaryMessenger),
         )
@@ -165,7 +168,11 @@ class AuraiApplication : Application() {
             }
             "shell" -> {
                 val command = call.argument<String>("command")!!
-                startTask(result) { agentBridge.shell(command) }
+                shellJobs.execute(call.argument<String>("id")!!, command, result)
+            }
+            "cancelAppShell" -> {
+                shellJobs.cancel(call.argument<String>("id")!!)
+                result.success(null)
             }
             "cancelCurrentProbe" -> {
                 cancelCurrentProbe(notify = true)
@@ -501,12 +508,15 @@ class AuraiApplication : Application() {
     private fun preferences() = getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
     private fun saveModelConfig(config: String) {
+        check(preferences().edit().putString(MODEL_CONFIG_KEY, encryptModelConfig(config)).commit()) { "无法保存模型设置" }
+    }
+
+    private fun encryptModelConfig(config: String): String {
         val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey())
         val encrypted = cipher.doFinal(config.toByteArray(Charsets.UTF_8))
-        val payload = Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + "." +
+        return Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + "." +
             Base64.encodeToString(encrypted, Base64.NO_WRAP)
-        preferences().edit().putString(MODEL_CONFIG_KEY, payload).apply()
     }
 
     private fun loadModelConfig(): String? {
@@ -567,8 +577,8 @@ class AuraiApplication : Application() {
             activeChannel?.invokeMethod("notificationOpened", null)
         }
 
-        fun requestAgentStop() {
-            activeChannel?.invokeMethod("stopAgent", null)
+        fun requestAgentStop(conversationId: String? = null) {
+            activeChannel?.invokeMethod("stopAgent", conversationId)
         }
     }
 }

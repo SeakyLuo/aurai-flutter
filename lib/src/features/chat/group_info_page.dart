@@ -13,6 +13,7 @@ import 'chat_controller.dart';
 import 'conversation_rename_dialog.dart';
 import 'conversation_task_navigation.dart';
 import 'group_members_page.dart';
+import 'group_message_search_page.dart';
 import 'member_avatar.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -271,6 +272,18 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                             ),
                           ),
                           onTap: _rename,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _surface(
+                        _row(
+                          '查找聊天记录',
+                          () => _open(
+                            GroupMessageSearchPage(
+                              controller: widget.controller,
+                              conversationId: _conversation.id,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),

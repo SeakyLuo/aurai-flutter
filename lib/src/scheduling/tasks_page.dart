@@ -136,10 +136,6 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
               onPressed: !tasks.supported || _text.text.trim().isEmpty
                   ? null
                   : () {
-                      if (widget.controller.hasRunningTask) {
-                        _notice('请等待当前任务完成');
-                        return;
-                      }
                       if (widget.controller.needsConfiguration) {
                         _notice('请先在设置中配置模型，再创建任务');
                         return;
@@ -332,7 +328,6 @@ Future<void> openScheduledTasks(
   );
   if (!context.mounted || request == null) return;
   try {
-    if (controller.hasRunningTask) throw StateError('请等待当前任务完成');
     if (controller.needsConfiguration) throw StateError('请先在设置中配置模型，再创建任务');
     await controller.createConversation();
     await controller.submitGoal(request);

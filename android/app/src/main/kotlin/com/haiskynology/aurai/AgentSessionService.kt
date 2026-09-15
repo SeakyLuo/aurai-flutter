@@ -46,8 +46,11 @@ class AgentSessionService : Service() {
             )
             ACTION_STOP -> {
                 notificationManager().notify(NOTIFICATION_ID, runningNotification("正在停止"))
-                AuraiApplication.requestAgentStop()
-                handler.postDelayed({ finish("failed") }, STOP_TIMEOUT_MS)
+                val stoppingId = AndroidAgentBridge.activeConversationId
+                AuraiApplication.requestAgentStop(stoppingId)
+                handler.postDelayed({
+                    if (AndroidAgentBridge.activeConversationId == stoppingId && AndroidAgentBridge.sessionCount <= 1) finish("failed")
+                }, STOP_TIMEOUT_MS)
             }
             ACTION_FINISH -> finish(
                 intent!!.getStringExtra(EXTRA_OUTCOME)!!,
@@ -55,6 +58,8 @@ class AgentSessionService : Service() {
                 intent.getStringExtra("title"),
                 intent.getStringExtra("reply"),
                 intent.getByteArrayExtra("avatar"),
+                intent.getBooleanExtra("keepRunning", false),
+                intent.getBooleanExtra("completedGroupChat", groupChat),
             )
         }
         return START_NOT_STICKY
@@ -62,19 +67,23 @@ class AgentSessionService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun finish(outcome: String, conversationId: String? = null, title: String? = null, reply: String? = null, completedAvatar: ByteArray? = avatar) {
+    private fun finish(outcome: String, conversationId: String? = null, title: String? = null, reply: String? = null, completedAvatar: ByteArray? = avatar, keepRunning: Boolean = false, completedGroupChat: Boolean = groupChat) {
+        val previousAvatar = avatar
         avatar = completedAvatar
         handler.removeCallbacksAndMessages(null)
-        running = false
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        if (!groupChat && outcome != "cancelled" && !MainActivity.isResumed &&
+        if (!keepRunning) {
+            running = false
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        }
+        if (!completedGroupChat && outcome != "cancelled" && !MainActivity.isResumed &&
             (outcome != "completed" || reply!!.isNotBlank())) {
             notificationManager().notify(
                 conversationId, FINISHED_NOTIFICATION_ID,
                 finishedNotification(outcome == "completed", conversationId, title, reply),
             )
         }
-        stopSelf()
+        avatar = previousAvatar
+        if (!keepRunning) stopSelf()
     }
 
     private fun runningNotification(step: String): Notification =
@@ -197,7 +206,7 @@ class AgentSessionService : Service() {
             )
         }
 
-        fun finish(context: Context, outcome: String, conversationId: String, title: String, reply: String, avatar: ByteArray? = null) {
+        fun finish(context: Context, outcome: String, conversationId: String, title: String, reply: String, avatar: ByteArray? = null, keepRunning: Boolean = false, completedGroupChat: Boolean = false) {
             context.startService(
                 Intent(context, AgentSessionService::class.java)
                     .setAction(ACTION_FINISH)
@@ -205,7 +214,9 @@ class AgentSessionService : Service() {
                     .putExtra("conversationId", conversationId)
                     .putExtra("title", title)
                     .putExtra("reply", reply.take(4000))
-                    .putExtra("avatar", avatar),
+                    .putExtra("avatar", avatar)
+                    .putExtra("keepRunning", keepRunning)
+                    .putExtra("completedGroupChat", completedGroupChat),
             )
         }
 

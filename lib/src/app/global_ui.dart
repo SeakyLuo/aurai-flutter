@@ -3,6 +3,14 @@ import 'package:flutter/services.dart';
 
 /// 全局视觉配置：品牌色及 Material 组件样式统一在此维护。
 abstract final class GlobalUI {
+  static Color messageBackground(ThemeData theme) =>
+      theme.brightness == Brightness.dark
+      ? const Color(0xff2a292f)
+      : const Color(0xffefeff3);
+  static Color controlBackground(ThemeData theme) =>
+      theme.brightness == Brightness.dark
+      ? const Color(0xff262626)
+      : const Color(0xfff3f3f3);
   static const Color userMessageBackground = Color(0xffe8e0f5);
   static const Color pageBackground = Color(0xfffAfAfA);
   static const Color primary = Color(0xffafa9ee);

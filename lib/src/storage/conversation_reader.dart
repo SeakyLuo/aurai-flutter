@@ -558,7 +558,8 @@ class ConversationReader {
     if (query.isEmpty) {
       final rows = await database.query(
         'conversations',
-        where: '$visibleConversation AND $localUserConversation',
+        where:
+            "$visibleConversation AND $localUserConversation AND mode = 'normal'",
         orderBy: 'pinned DESC, updated_at DESC, id DESC',
         limit: pageSize,
         offset: offset,
@@ -575,13 +576,13 @@ class ConversationReader {
     }
     final hits = await database.rawQuery(
       '''SELECT id AS message_id, conversation_id, text, sender_id, created_at, id AS sort_id
-         FROM messages WHERE kind != 'system' AND conversation_id IN (SELECT id FROM conversations WHERE $localUserConversation) AND instr(lower(text), ?) > 0
+         FROM messages WHERE kind != 'system' AND conversation_id IN (SELECT id FROM conversations WHERE $localUserConversation AND mode = 'normal') AND instr(lower(text), ?) > 0
          UNION ALL
          SELECT NULL AS message_id, id AS conversation_id,
            CASE WHEN instr(lower(draft), ?) > 0 THEN draft ELSE '' END AS text,
            NULL AS sender_id, created_at, id AS sort_id
          FROM conversations
-         WHERE $visibleConversation AND $localUserConversation AND (instr(lower(title), ?) > 0 OR instr(lower(draft), ?) > 0)
+         WHERE $visibleConversation AND $localUserConversation AND mode = 'normal' AND (instr(lower(title), ?) > 0 OR instr(lower(draft), ?) > 0)
            AND id NOT IN (
              SELECT conversation_id FROM messages WHERE kind != 'system' AND instr(lower(text), ?) > 0
            )

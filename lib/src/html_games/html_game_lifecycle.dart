@@ -15,6 +15,7 @@ const htmlGameLifecycleScript = r'''
   };
   window.AuraiHTML=Object.freeze({
     get messageState(){return window.__auraiMessageState()},
+    requestResize(){document.dispatchEvent(new Event('aurai:resize'))},
     submitEvent({eventId,action,data=null,notifyAi=true}){
       if(!navigator.userActivation.isActive)return Promise.reject(new Error('Submit events from a user action, not on load or a timer'));
       if(pendingEvents.has(eventId))return Promise.reject(new Error('This event is already pending'));

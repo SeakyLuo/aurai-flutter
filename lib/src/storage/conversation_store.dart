@@ -46,6 +46,14 @@ class ConversationStore {
         );
       }
       await clearLegacy();
+      await database.update('conversations', {
+        'archived': 1,
+      }, where: "mode != 'normal' AND archived = 0");
+      await database.delete(
+        'app_state',
+        where:
+            "key = 'active_conversation' AND value IN (SELECT id FROM conversations WHERE mode != 'normal')",
+      );
       await database.transaction((txn) async {
         final batch = txn.batch();
         batch.update(

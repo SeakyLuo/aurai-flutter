@@ -29,6 +29,18 @@ class HtmlGameView extends StatefulWidget {
   final HtmlGameStore store;
   final bool fullscreen;
 
+  Future<HtmlGameCard> captureForwardPreview() async {
+    final view = _HtmlGameViewState._views
+        .where(
+          (view) =>
+              view.widget.messageId == messageId &&
+              view.widget.fullscreen == fullscreen,
+        )
+        .firstOrNull;
+    await view?._session?.capture();
+    return store.card(messageId);
+  }
+
   Future<void> openFullscreen(BuildContext context) =>
       Navigator.of(context).push<void>(
         MaterialPageRoute(
@@ -64,8 +76,10 @@ class _HtmlGameViewState extends State<HtmlGameView>
   double? _contentHeight;
   (String, double, bool)? _heightKey;
   bool _hasRendered = false;
+  bool _surfaceReady = false;
   bool _opening = false, _retrying = false;
   bool _failed = false, _foreground = true, _leaving = false;
+  bool _tabVisible = true;
   Future<void>? _closing;
 
   @override
@@ -95,14 +109,18 @@ class _HtmlGameViewState extends State<HtmlGameView>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _tabVisible = TickerMode.valuesOf(context).enabled;
     ModalRoute.isCurrentOf(context);
+    unawaited(_session?.updateTheme(Theme.of(context)));
     final scroll = widget.fullscreen || _card.displayMode == 'standalone'
         ? null
         : Scrollable.maybeOf(context)?.position;
     if (scroll != _scroll) {
       _scroll?.removeListener(_scheduleVisibility);
+      _scroll?.isScrollingNotifier.removeListener(_scheduleVisibility);
       _scroll = scroll;
       _scroll?.addListener(_scheduleVisibility);
+      _scroll?.isScrollingNotifier.addListener(_scheduleVisibility);
     }
     _scheduleVisibility();
   }
@@ -124,6 +142,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
         !mounted ||
         _leaving ||
         !_foreground ||
+        !_tabVisible ||
         !htmlRouteObserver.isVisible(ModalRoute.of(context)!))
       return false;
     if (widget.fullscreen) return true;
@@ -143,6 +162,15 @@ class _HtmlGameViewState extends State<HtmlGameView>
   }
 
   void _checkVisibility() {
+    if (!_tabVisible &&
+        _foreground &&
+        !_leaving &&
+        htmlRouteObserver.isVisible(ModalRoute.of(context)!)) {
+      _offscreenTimer?.cancel();
+      _offscreenTimer = null;
+      unawaited(_session?.setVisible(false));
+      return;
+    }
     if (!_visible) {
       if (!_foreground ||
           _leaving ||
@@ -160,10 +188,16 @@ class _HtmlGameViewState extends State<HtmlGameView>
     }
     _offscreenTimer?.cancel();
     _offscreenTimer = null;
-    if (_active == null &&
+    if (_session != null) {
+      unawaited(_session!.setVisible(true));
+      return;
+    }
+    // A fling uses snapshots; mount new platform views once scrolling settles.
+    if ((_active == null || !_active!._tabVisible) &&
         !_opening &&
         !_failed &&
         _closing == null &&
+        !(_scroll?.isScrollingNotifier.value ?? false) &&
         Platform.isAndroid) {
       unawaited(_open());
     }
@@ -225,9 +259,10 @@ class _HtmlGameViewState extends State<HtmlGameView>
         game,
         widget.store,
         fullscreen: widget.fullscreen,
-        dark: Theme.of(context).brightness == Brightness.dark,
+        theme: Theme.of(context),
       );
       setState(() {
+        _surfaceReady = false;
         _session = session..addListener(_sessionChanged);
       });
     } on Object catch (caughtError) {
@@ -244,11 +279,14 @@ class _HtmlGameViewState extends State<HtmlGameView>
 
   void _sessionChanged() {
     final session = _session!;
+    var changed = _surfaceReady != session.ready;
+    _surfaceReady = session.ready;
     if (session.ready) _hasRendered = true;
     if (session.contentHeight != null) {
       if (_contentHeight == null ||
           (session.contentHeight! - _contentHeight!).abs() >= 2) {
         _contentHeight = session.contentHeight;
+        changed = true;
       }
       if (_heightKey != null) {
         _heights.remove(_heightKey);
@@ -273,7 +311,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
         unawaited(_close());
       }
     }
-    if (mounted) setState(() {});
+    if (mounted && changed) setState(() {});
   }
 
   Future<void> _retry() async {
@@ -315,6 +353,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
     htmlRouteObserver.removeListener(_scheduleVisibility);
     _views.remove(this);
     _scroll?.removeListener(_scheduleVisibility);
+    _scroll?.isScrollingNotifier.removeListener(_scheduleVisibility);
     _changes.cancel();
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_close());
@@ -458,13 +497,17 @@ class _HtmlGameViewState extends State<HtmlGameView>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (_session != null)
-                    AnimatedSize(
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeOutCubic,
-                      alignment: Alignment.topCenter,
-                      child: SizedBox(
-                        height: height,
-                        child: HtmlGameSurface(session: _session!),
+                    // Resizing the native surface should not animate its clip.
+                    SizedBox(
+                      height: height,
+                      child: HtmlGameSurface(
+                        session: _session!,
+                        preview: _preview,
+                        loadingBackground: _card.backgroundMode == 'transparent'
+                            ? Colors.transparent
+                            : Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xff2a292f)
+                            : const Color(0xffefeff3),
                       ),
                     )
                   else if (_preview != null && !_failed)
@@ -474,6 +517,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
                         borderRadius: BorderRadius.circular(12),
                         child: Image.memory(
                           _preview!,
+                          gaplessPlayback: true,
                           height: height,
                           fit: BoxFit.fitWidth,
                           alignment: Alignment.topCenter,

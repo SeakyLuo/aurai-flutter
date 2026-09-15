@@ -1,7 +1,9 @@
+import 'model_image_input.dart';
 import 'dart:convert';
 
 import '../agent/system_prompt.dart';
 import 'responses_context.dart';
+import 'shared_responses_context.dart';
 import 'current_time_context.dart';
 import 'response_citations.dart';
 import 'model_context_limits.dart';
@@ -10,30 +12,47 @@ import '../domain/model_provider.dart';
 import '../domain/tool_models.dart';
 
 class OpenAiResponsesProvider implements ModelProvider {
-  OpenAiResponsesProvider(this.config, {required String? systemPrompt})
-    : _transport = ResponsesTransport(config),
-      _context = ResponsesContext(
-        ModelContextLimits.forModel(config.model),
-        systemPrompt: systemPrompt ?? agentSystemPrompt,
-      );
+  OpenAiResponsesProvider(
+    this.config, {
+    required String? systemPrompt,
+    ModelConfig? summaryConfig,
+    this.sharedContext,
+  }) : _transport = ResponsesTransport(config),
+       _summaryTransport = ResponsesTransport(summaryConfig ?? config),
+       _context = ResponsesContext(
+         ModelContextLimits.forModel(config.model),
+         summaryLimits: ModelContextLimits.forModel(
+           (summaryConfig ?? config).model,
+         ),
+         supportsImages: modelSupportsImageInput(config.model),
+         systemPrompt: systemPrompt ?? agentSystemPrompt,
+       );
 
   final ModelConfig config;
   final ResponsesTransport _transport;
   final ResponsesContext _context;
+  final ResponsesTransport _summaryTransport;
+  final SharedResponsesContext? sharedContext;
 
   @override
   Future<ModelTurn> respond(ModelRequest request) async {
     _transport.onReconnect = request.onReconnect;
     _transport.beginTurn();
-    final compacted = await _context.prepare(request, _transport.summarize);
+    _summaryTransport.beginTurn();
+    final compacted = await (sharedContext == null
+        ? _context.prepare(request, _summaryTransport.summarize)
+        : sharedContext!.prepare(
+            _context,
+            request,
+            _summaryTransport.summarize,
+          ));
     _transport.checkCancelled();
     final restart = request.continuationToken == null || compacted;
     final json = await _transport.send(
       {
         'model': config.model,
         'stream': true,
-        if (_context.limits case final limits?)
-          'max_output_tokens': limits.outputTokens,
+        'max_output_tokens': _context.limits.outputTokens,
         'instructions':
             '${_context.systemPrompt}\n${currentTimeContext()}\n${_capabilitySummary(request)}\n${request.personalContext}',
         'input': restart
@@ -127,5 +146,7 @@ class OpenAiResponsesProvider implements ModelProvider {
   }
 
   @override
-  Future<void> cancel() => _transport.cancel();
+  Future<void> cancel() async {
+    await Future.wait([_transport.cancel(), _summaryTransport.cancel()]);
+  }
 }

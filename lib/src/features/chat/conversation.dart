@@ -1,3 +1,5 @@
+import '../../providers/shared_responses_context.dart';
+import '../../domain/message_summary.dart';
 import '../../domain/draft_mention.dart';
 import '../../domain/message_quote.dart';
 import '../../domain/message_file.dart';
@@ -8,6 +10,8 @@ import '../../domain/message_image.dart';
 
 enum ConversationKind { direct, group }
 
+enum ConversationMode { normal, temporaryPersonalized, temporaryPlain }
+
 enum ChatRunState { idle, running, stopping, failed, cancelled, interrupted }
 
 class Conversation {
@@ -17,7 +21,12 @@ class Conversation {
       Conversation(id: newMessageId(), createdAt: DateTime.now());
 
   final String id;
+  bool isStored = false;
   ConversationKind kind = ConversationKind.direct;
+  ConversationMode mode = ConversationMode.normal;
+  bool get isTemporary => mode != ConversationMode.normal;
+  bool get usesPersonalization => mode != ConversationMode.temporaryPlain;
+  String get modeLabel => usesPersonalization ? '临时 · 个性化' : '临时 · 非个性化';
   String defaultSenderId = MessageSender.aurai.id;
   final DateTime createdAt;
   final List<AgentMessage> messages = [];
@@ -53,6 +62,10 @@ class Conversation {
   String? seenRunId;
   bool hasEarlierMessages = false;
   ContextSummary? contextSummary;
+  SharedResponsesContext? sharedContext;
+  void beginSharedContext() =>
+      sharedContext = SharedResponsesContext(contextSummary);
+  bool isCompacting = false;
   MessageQuote? draftQuote;
   String draft = '';
   final List<DraftMention> draftMentions = [];
@@ -99,25 +112,18 @@ class Conversation {
     return draftQuote == null ? null : '[引用] ${draftQuote!.text}';
   }
 
-  String? get preview => draft.isNotEmpty
-      ? draft
-      : draftFiles.isNotEmpty
-      ? '未发送的附件'
-      : draftImages.isNotEmpty
-      ? '未发送的图片'
-      : messages.isNotEmpty &&
-            messages.last.files.isNotEmpty &&
-            messages.last.text.isEmpty
-      ? '[附件] ${messages.last.files.first.name}'
-      : (kind == ConversationKind.group && messages.isNotEmpty) ||
-            messages.length > 1 ||
-            (messages.isNotEmpty && messages.last.images.isNotEmpty)
-      ? (messages.last.text.isEmpty ? '[图片]' : messages.last.text)
-      : storedPreview ?? creationMessage;
+  String? get preview {
+    if (draftPreview != null) return draftPreview;
+    final latest = messages.lastOrNull;
+    if (latest != null)
+      return MessageSummary.fromMessage(latest, withSender: true);
+    return storedPreview ?? creationMessage;
+  }
 
   Map<String, Object?> toJson() => {
     'id': id,
     'kind': kind.name,
+    'mode': mode.name,
     'creationMemberIds': creationMemberIds,
     'defaultSenderId': defaultSenderId,
     if (contextSummary != null) 'contextSummary': contextSummary!.toJson(),
@@ -157,6 +163,9 @@ class Conversation {
           );
     conversation.kind = ConversationKind.values.byName(
       json['kind'] as String? ?? 'direct',
+    );
+    conversation.mode = ConversationMode.values.byName(
+      json['mode'] as String? ?? 'normal',
     );
     conversation.defaultSenderId =
         json['defaultSenderId'] as String? ?? MessageSender.aurai.id;

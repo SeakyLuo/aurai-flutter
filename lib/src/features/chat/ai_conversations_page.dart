@@ -1,7 +1,7 @@
+import 'conversation_status_dot.dart';
 import '../../domain/error_message.dart';
 import 'conversation_preview_text.dart';
 import 'message_time.dart';
-import 'conversation_list_status.dart';
 import 'home_page.dart';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
@@ -196,7 +196,11 @@ class _AiConversationsPageState extends State<AiConversationsPage>
                           horizontal: 8,
                           vertical: 5,
                         ),
-                        leading: const ConversationIcon(),
+                        leading: ConversationUnreadAvatar(
+                          controller: widget.controller,
+                          conversation: item,
+                          child: const ConversationIcon(),
+                        ),
                         title: Row(
                           children: [
                             Expanded(
@@ -206,11 +210,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            ConversationListStatus(
-                              showUnread: false,
-                              controller: widget.controller,
-                              conversation: item,
-                            ),
+
                             if (item.lastMessageAt != null) ...[
                               const SizedBox(width: 8),
                               Text(
@@ -226,7 +226,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
                           ],
                         ),
                         subtitle: ConversationPreviewText(
-                          showUnread: true,
+                          showFailure: true,
                           conversation: item,
                           emptyText: '新会话',
                         ),

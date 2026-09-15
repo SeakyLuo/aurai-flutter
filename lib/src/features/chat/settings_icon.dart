@@ -3,6 +3,7 @@ import 'wrench_painter.dart';
 
 enum SettingsIconType {
   tools,
+  data,
   contacts,
   add,
   memory,
@@ -58,6 +59,18 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.data:
+        canvas.drawOval(const Rect.fromLTWH(4, 3, 16, 6), pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(4, 6)
+            ..lineTo(4, 18)
+            ..cubicTo(4, 22, 20, 22, 20, 18)
+            ..lineTo(20, 6)
+            ..moveTo(4, 12)
+            ..cubicTo(4, 16, 20, 16, 20, 12),
+          pen,
+        );
       case SettingsIconType.eye:
       case SettingsIconType.eyeOff:
         canvas.drawPath(

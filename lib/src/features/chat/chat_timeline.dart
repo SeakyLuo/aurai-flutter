@@ -1,3 +1,4 @@
+import 'recalled_message_notice.dart';
 import '../../html_games/html_game_view.dart';
 import '../../domain/tool_activity_groups.dart';
 import 'tool_activity_group.dart';
@@ -29,6 +30,7 @@ List<ChatTimelineEntry> buildChatTimeline(
   ValueChanged<MessageSender>? onMention,
   Future<void> Function(AgentMessage)? onRecall,
   ValueChanged<String>? onOpenQuote,
+  ValueChanged<AgentMessage>? onReeditRecalled,
 }) {
   final conversation = controller.activeConversation;
   final mentionSenders = {
@@ -226,9 +228,9 @@ List<ChatTimelineEntry> buildChatTimeline(
                 28,
                 conversation.kind == ConversationKind.group ? 0 : 12,
               ),
-              child: Text(
-                message.text,
-                textAlign: TextAlign.center,
+              child: RecalledMessageNotice(
+                message: message,
+                onEdit: onReeditRecalled,
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.6,

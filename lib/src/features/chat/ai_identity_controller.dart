@@ -87,12 +87,20 @@ extension AiIdentityController on ChatController {
   Future<String> openAiConversation(
     AiProfile ai, {
     bool newConversation = false,
+    ConversationMode mode = ConversationMode.normal,
   }) async {
+    if (mode != ConversationMode.normal) {
+      final conversation = Conversation.empty()
+        ..defaultSenderId = ai.sender.id
+        ..mode = mode;
+      _pendingAiConversation = conversation;
+      return conversation.id;
+    }
     final rows = await _store.database.query(
       'conversations',
       columns: ['id'],
       where:
-          "kind = 'direct' AND default_sender_id = ? AND archived = 0 AND $localUserConversation"
+          "kind = 'direct' AND mode = 'normal' AND default_sender_id = ? AND archived = 0 AND $localUserConversation"
           "${newConversation ? ' AND ($emptyDirectConversation)' : ''}",
       whereArgs: [ai.sender.id],
       orderBy: 'updated_at DESC, id DESC',

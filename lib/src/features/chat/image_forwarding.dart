@@ -42,21 +42,25 @@ extension ImageForwarding on ChatController {
     );
   }
 
-  Future<void> forwardImage(
+  Future<void> forwardImage(String? targetId, List<int> bytes, String text) =>
+      _inConversation(
+        activeConversation,
+        () => _forwardImage(targetId, bytes, text),
+      );
+
+  Future<void> _forwardImage(
     String? targetId,
     List<int> bytes,
     String text,
   ) async {
-    if (hasRunningTask) throw StateError('另一个会话正在运行，请等待完成后再发送');
+    if (_submitting) throw StateError('消息正在发送，请稍候');
     _submitting = true;
     MessageImage? image;
     var saved = false;
     try {
-      final target = targetId == null
+      var target = targetId == null
           ? Conversation.empty()
-          : targetId == activeConversation.id
-          ? activeConversation
-          : await _store.load(targetId);
+          : await _forwardTarget(targetId);
       if (target.kind == ConversationKind.direct &&
           !(await _directReplyContext(target)).config.isConfigured)
         throw StateError('请先配置目标 AI 的模型');
@@ -69,6 +73,9 @@ extension ImageForwarding on ChatController {
         images: [image],
         createdAt: DateTime.now(),
       );
+      target =
+          _liveConversation(target.id) ??
+          (target.id == _viewConversation.id ? _viewConversation : target);
       target.messages.add(message);
       target.messageCount++;
       try {
@@ -87,9 +94,8 @@ extension ImageForwarding on ChatController {
         rethrow;
       }
       saved = true;
-      _runningConversation = target;
       _updateConversationList(target);
-      unawaited(_runForwardedImage(target));
+      unawaited(_deliverForwardedMessage(target, message));
     } finally {
       _submitting = false;
       if (!saved && image != null) await _imageStore.remove([image]);
@@ -101,17 +107,24 @@ extension ImageForwarding on ChatController {
     String? targetId,
     AgentMessage source,
     String note,
+  ) => _inConversation(
+    activeConversation,
+    () => _forwardMessage(targetId, source, note),
+  );
+
+  Future<void> _forwardMessage(
+    String? targetId,
+    AgentMessage source,
+    String note,
   ) async {
-    if (hasRunningTask || _submitting) throw StateError('另一个会话正在运行，请等待完成后再发送');
+    if (_submitting) throw StateError('消息正在发送，请稍候');
     _submitting = true;
     final copies = <File>[];
     var saved = false;
     try {
-      final target = targetId == null
+      var target = targetId == null
           ? Conversation.empty()
-          : targetId == activeConversation.id
-          ? activeConversation
-          : await _store.load(targetId);
+          : await _forwardTarget(targetId);
       if (target.kind == ConversationKind.direct &&
           !(await _directReplyContext(target)).config.isConfigured) {
         throw StateError('请先配置目标 AI 的模型');
@@ -148,6 +161,30 @@ extension ImageForwarding on ChatController {
           ),
         );
       }
+      if (source.htmlGame != null) {
+        final rows = await _store.database.query(
+          'html_games',
+          columns: ['html', 'title'],
+          where:
+              'message_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = ?)',
+          whereArgs: [source.id, 'html_game'],
+          limit: 1,
+        );
+        if (rows.isEmpty) throw StateError('原 HTML 消息已删除或撤回，无法转发');
+        final document = rows.single;
+        final bytes = utf8.encode(document['html'] as String);
+        final file = File('${_imageStore.directory}/${newMessageId()}.html');
+        copies.add(file);
+        await file.writeAsBytes(bytes);
+        files.add(
+          MessageFile(
+            path: file.path,
+            name: '${document['title']}.html',
+            mimeType: 'text/html',
+            size: bytes.length,
+          ),
+        );
+      }
       final recipients = target.kind == ConversationKind.group
           ? (await groupStore.members(target.id))
                 .where((m) => m.sender.kind == MessageSenderKind.agent)
@@ -159,13 +196,16 @@ extension ImageForwarding on ChatController {
         role: AgentMessageRole.user,
         senderId: MessageSender.localUser.id,
         text: [
-          source.text,
+          if (source.htmlGame == null) source.text,
           if (note.isNotEmpty) note,
         ].where((part) => part.isNotEmpty).join('\n\n'),
         images: images,
         files: files,
         createdAt: DateTime.now(),
       );
+      target =
+          _liveConversation(target.id) ??
+          (target.id == _viewConversation.id ? _viewConversation : target);
       target.messages.add(message);
       target.messageCount++;
       try {
@@ -182,9 +222,8 @@ extension ImageForwarding on ChatController {
         rethrow;
       }
       saved = true;
-      _runningConversation = target;
       _updateConversationList(target);
-      unawaited(_runForwardedImage(target));
+      unawaited(_deliverForwardedMessage(target, message));
     } finally {
       _submitting = false;
       if (!saved) {
@@ -196,7 +235,49 @@ extension ImageForwarding on ChatController {
     }
   }
 
+  Future<Conversation> _forwardTarget(String id) async {
+    final live = _liveConversation(id);
+    if (live != null) return live;
+    if (id == _viewConversation.id) return _viewConversation;
+    final loaded = await _store.load(id);
+    return _liveConversation(id) ??
+        (id == _viewConversation.id ? _viewConversation : loaded);
+  }
+
+  Future<void> _deliverForwardedMessage(
+    Conversation target,
+    AgentMessage message,
+  ) => _inConversation(target, () async {
+    try {
+      if (target.kind == ConversationKind.group && _groupDispatcher != null) {
+        await _receiveGroupSystemNotice(target.id, message);
+        return;
+      }
+      // Only successive messages in the same conversation share a reply turn.
+      if (_runningConversation != null || _systemEventLoading) {
+        _execution.forwardedReplyPending = true;
+        return;
+      }
+      await _runForwardedImage(target);
+    } on Object catch (error, stack) {
+      developer.log(
+        'Forwarded message dispatch failed',
+        error: error,
+        stackTrace: stack,
+      );
+    }
+  });
+
+  void _resumeForwardedReply() {
+    if (!_execution.forwardedReplyPending || _callbacksDisposed) return;
+    _execution.forwardedReplyPending = false;
+    final target = _execution.conversation!;
+    unawaited(_inConversation(target, () => _runForwardedImage(target)));
+  }
+
   Future<void> _runForwardedImage(Conversation target) async {
+    _runningConversation = target;
+    _conversationChanged();
     try {
       await _executeConversation(target);
     } on Object catch (error) {
@@ -205,6 +286,7 @@ extension ImageForwarding on ChatController {
       await _persistRun(target);
     } finally {
       _runningConversation = null;
+      _resumeForwardedReply();
       _updateConversationList(target);
       _conversationChanged();
     }

@@ -2,13 +2,25 @@ import 'dart:async';
 import '../domain/ui_tool_actions.dart';
 import '../domain/tool_models.dart';
 import 'tool_executor.dart';
-import 'tool_registry.dart';
 
 class GroupToolQueue {
   Future<void> _tail = Future.value();
+  Object? _owner;
+  final _conversationQuestions = Expando<GroupToolQueue>();
 
-  Future<ToolResult> run(Future<ToolResult> Function() action) {
-    final next = _tail.then((_) => action());
+  GroupToolQueue questionsFor(Object owner) =>
+      _conversationQuestions[owner] ??= GroupToolQueue();
+  bool isOwnedBy(Object owner) => identical(_owner, owner);
+
+  Future<T> run<T>(Future<T> Function() action, {Object? owner}) {
+    final next = _tail.then((_) async {
+      _owner = owner;
+      try {
+        return await action();
+      } finally {
+        _owner = null;
+      }
+    });
     _tail = next.then<void>((_) {}, onError: (Object _, StackTrace __) {});
     return next;
   }
@@ -21,9 +33,10 @@ class GroupToolExecutor extends ToolExecutor {
     required this.queue,
     required this.cancelled,
     required this.waitForInteraction,
-  }) : _registry = registry;
-  final ToolRegistry _registry;
+    this.owner,
+  });
   final GroupToolQueue queue;
+  final Object? owner;
   final bool Function() cancelled;
   final Future<void> Function() waitForInteraction;
 
@@ -32,8 +45,6 @@ class GroupToolExecutor extends ToolExecutor {
     ToolCall call, {
     void Function(ToolResult)? onWaitingForUser,
   }) {
-    final tool = _registry.find(call.name);
-    final definition = tool?.definition;
     Future<ToolResult> perform() => cancelled()
         ? Future.value(
             ToolResult(
@@ -44,11 +55,34 @@ class GroupToolExecutor extends ToolExecutor {
             ),
           )
         : super.execute(call, onWaitingForUser: onWaitingForUser);
+    if (call.name == 'askUser' && call.userAction == null) {
+      return queue.questionsFor(owner ?? this).run(() async {
+        await waitForInteraction();
+        return perform();
+      });
+    }
+    return perform();
+  }
+
+  @override
+  Future<bool> confirmTool(ToolCall call, ToolDefinition definition) async {
+    await waitForInteraction();
+    return queue.run(
+      () => cancelled()
+          ? Future.value(false)
+          : super.confirmTool(call, definition),
+      owner: owner,
+    );
+  }
+
+  @override
+  Future<ToolResult> runAuthorizedTool(
+    ToolCall call,
+    ToolDefinition definition,
+    Future<ToolResult> Function() action,
+  ) {
     // Device mutations and user dialogs share one surface; read-only work can overlap.
-    final safety = definition?.safetyFor(call.arguments);
-    final confirmation = tool is ToolConfirmationPolicyAgentTool
-        ? (tool as ToolConfirmationPolicyAgentTool).requiresConfirmation(call)
-        : safety == ToolSafety.sensitive || safety == ToolSafety.destructive;
+    // Hold the shared surface only during device work and explicit handoff.
     final deviceSurface =
         isScreenTool(call.name) ||
         const {
@@ -60,20 +94,15 @@ class GroupToolExecutor extends ToolExecutor {
           'openAppPage',
           'executeAndroidScript',
           'executeShizuku',
-          'shell',
           'runSkill',
           'requestAccessibilityAccess',
         }.contains(call.name);
     final exclusive =
         call.userAction != null ||
-        definition?.waitsForUser == true ||
-        confirmation ||
+        definition.waitsForUser && call.name != 'askUser' ||
         deviceSurface;
     return exclusive
-        ? queue.run(() async {
-            await waitForInteraction();
-            return perform();
-          })
-        : perform();
+        ? waitForInteraction().then((_) => queue.run(action, owner: owner))
+        : action();
   }
 }

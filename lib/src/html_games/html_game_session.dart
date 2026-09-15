@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+import 'html_message_theme.dart';
 import 'html_game_display_cache.dart';
 import 'html_message_interaction.dart';
 import '../domain/error_message.dart';
@@ -20,7 +22,7 @@ class HtmlGameSession extends ChangeNotifier {
     this.game,
     this.store, {
     this.localState = const [],
-    this.dark = false,
+    required this.theme,
     this.fullscreen = false,
   }) {
     _readyTimeout = Timer(const Duration(seconds: 15), () {
@@ -41,7 +43,9 @@ class HtmlGameSession extends ChangeNotifier {
   }
 
   final List<Object?> localState;
-  final bool dark;
+  ThemeData theme;
+  bool _editing = false;
+  HtmlGame? _pendingUpdate;
   final bool fullscreen;
   late final Timer _readyTimeout;
   Future<void> _localWrite = Future.value();
@@ -49,6 +53,7 @@ class HtmlGameSession extends ChangeNotifier {
   bool _capturing = false;
   String? _lastLocalState;
   double? contentHeight;
+  List<Rect> gestureRegions = const [];
   bool failed = false;
   HtmlGame game;
   final HtmlGameStore store;
@@ -57,16 +62,19 @@ class HtmlGameSession extends ChangeNotifier {
   bool _closed = false;
   bool _closing = false;
   bool ready = false;
+  bool _visible = true;
+  bool _pageLoaded = false;
   String? error;
   Uint8List? preview;
   int? previewVersion;
-  late final String identity = '${HtmlGameDisplayCache.identity(game)}:$dark';
+  late final String identity =
+      '${HtmlGameDisplayCache.identity(game)}:fixed-height-v1';
   String? _document;
   Future<String> _loadDocument() async {
     final local = await loadLocal(game.messageId);
     return _document ??= htmlGameDocument(
       game,
-      dark: dark,
+      theme: theme,
       localState: local,
       fullscreen: fullscreen,
     );
@@ -82,6 +90,21 @@ class HtmlGameSession extends ChangeNotifier {
         final document = await _loadDocument();
         if (!_closed && !_closing)
           await channel.invokeMethod<void>('loadDocument', document);
+      } else if (call.method == 'editing') {
+        _editing = call.arguments as bool;
+        if (!_editing && _pendingUpdate != null) {
+          final next = _pendingUpdate!;
+          _pendingUpdate = null;
+          try {
+            await _applyUpdate(next);
+          } on Object catch (failure) {
+            error = '卡片更新失败：${errorMessage(failure)}';
+            notifyListeners();
+          }
+        }
+      } else if (call.method == 'scriptError') {
+        error = 'HTML 消息：${call.arguments}';
+        notifyListeners();
       } else if (call.method == 'visualChanged') {
         _captureTimer?.cancel();
         _captureTimer = Timer(
@@ -92,10 +115,21 @@ class HtmlGameSession extends ChangeNotifier {
         final height = (call.arguments as num).toDouble();
         if (height.isFinite &&
             height > 0 &&
-            (height - (contentHeight ?? 0)).abs() >= 1) {
+            (height - (contentHeight ?? 0)).abs() >= 2) {
           contentHeight = height;
           notifyListeners();
         }
+      } else if (call.method == 'gestureRegions') {
+        gestureRegions = (jsonDecode(call.arguments as String) as List)
+            .map(
+              (r) => Rect.fromLTWH(
+                (r[0] as num).toDouble(),
+                (r[1] as num).toDouble(),
+                (r[2] as num).toDouble(),
+                (r[3] as num).toDouble(),
+              ),
+            )
+            .toList();
       } else if (call.method == 'reopen') {
         failed = true;
         error = '操作尚未确认，请点击重试以读取最新状态';
@@ -120,14 +154,20 @@ class HtmlGameSession extends ChangeNotifier {
         });
         await _localWrite;
       } else if (call.method == 'ready') {
+        _pageLoaded = true;
+        // Android's state acknowledgement waits for a visual frame; only then
+        // may the view remove the previous preview covering the platform surface.
+        await channel.invokeMethod<void>('theme', htmlMessageTheme(theme));
+        await channel.invokeMethod<void>('state', jsonEncode(game.snapshot()));
+        if (_closed || _closing) return null;
         _readyTimeout.cancel();
         ready = true;
+        if (!_visible) await channel.invokeMethod<void>('visibility', false);
         notifyListeners();
-        await channel.invokeMethod<void>('state', jsonEncode(game.snapshot()));
         unawaited(capture());
       } else if (call.method == 'failed') {
         failed = true;
-        error = '游戏运行中断，请关闭后重新打开';
+        error = 'HTML 消息运行中断：${call.arguments}';
         notifyListeners();
       } else if (call.method == 'interaction') {
         try {
@@ -173,34 +213,62 @@ class HtmlGameSession extends ChangeNotifier {
   Future<void> _reload() async {
     try {
       final next = await store.load(game.conversationId, game.messageId);
-      if (_closed || next.version < game.version) return;
-      if (next.version != game.version) {
-        preview = null;
-        previewVersion = null;
-      }
-      if (next.html != game.html) {
-        failed = true;
-        error = null;
-        notifyListeners();
+      if (_closed || _closing || next.version <= game.version) return;
+      if (_editing) {
+        if (_pendingUpdate == null || next.version > _pendingUpdate!.version)
+          _pendingUpdate = next;
         return;
       }
-      game = next;
-      if (ready)
-        await _channel?.invokeMethod<void>(
-          'state',
-          jsonEncode(game.snapshot()),
-        );
-      if (!_closed) notifyListeners();
+      await _applyUpdate(next);
     } on Object catch (caughtError) {
       if (!_closed) {
-        error = '无法读取游戏，请关闭后重试：${errorMessage(caughtError)}';
+        error = '无法更新 HTML 消息：${errorMessage(caughtError)}';
         notifyListeners();
       }
     }
   }
 
+  Future<void> setVisible(bool value) async {
+    if (_visible == value || _closed || _closing) return;
+    _visible = value;
+    if (!value) _captureTimer?.cancel();
+    if (ready) await _channel?.invokeMethod<void>('visibility', value);
+  }
+
+  Future<void> updateTheme(ThemeData next, {bool force = false}) async {
+    if (!force && next == theme) return;
+    theme = next;
+    _document = null;
+    if (_pageLoaded && !_closed && !_closing) {
+      try {
+        await _channel?.invokeMethod<void>('theme', htmlMessageTheme(theme));
+      } on Object catch (failure) {
+        error = '主题更新失败：${errorMessage(failure)}';
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> _applyUpdate(HtmlGame next) async {
+    if (_closed || _closing || next.version <= game.version) return;
+    if (next.version != game.version) {
+      preview = null;
+      previewVersion = null;
+    }
+    if (next.html != game.html) {
+      failed = true;
+      error = null;
+      notifyListeners();
+      return;
+    }
+    game = next;
+    if (_pageLoaded)
+      await _channel?.invokeMethod<void>('state', jsonEncode(game.snapshot()));
+    if (!_closed) notifyListeners();
+  }
+
   Future<void> capture() async {
-    if (!ready || _closed || _closing || _capturing) return;
+    if (!ready || !_visible || _closed || _closing || _capturing) return;
     _capturing = true;
     final version = game.version;
     try {

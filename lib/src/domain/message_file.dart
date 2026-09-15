@@ -7,6 +7,9 @@ class MessageFile {
     required this.mimeType,
     required this.size,
   });
+  bool get isHtml =>
+      mimeType == 'text/html' || mimeType == 'application/xhtml+xml';
+
   final String path;
   final String name;
   final String mimeType;

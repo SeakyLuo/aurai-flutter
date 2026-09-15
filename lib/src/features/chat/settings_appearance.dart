@@ -1,12 +1,11 @@
+import '../../app/global_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 
 import 'glass_surface.dart';
 
 Color settingsFieldColor(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark
-    ? const Color(0xff262626)
-    : const Color(0xfff3f3f3);
+    GlobalUI.controlBackground(Theme.of(context));
 
 Color dialogControlColor(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark

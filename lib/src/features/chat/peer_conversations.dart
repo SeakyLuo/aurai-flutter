@@ -14,9 +14,15 @@ extension PeerConversations on ChatController {
   Future<_PeerSession> _loadPeerSession(String id) async {
     final conversation = await _store.load(id);
     final members = await groupStore.members(id);
+    conversation.beginSharedContext();
+    final history = await _store.reader.messages(
+      id,
+      forModel: true,
+      afterCheckpoint: conversation.contextSummary?.throughMessageId,
+    );
     final session = _PeerSession(conversation);
     session.dispatcher = GroupDispatcher(
-      history: conversation.messages,
+      history: history,
       members: members.map((m) => m.sender.id),
       paused: {},
       respond: (senderId, history) => _replyToPeer(session, senderId, history),
@@ -117,8 +123,15 @@ extension PeerConversations on ChatController {
       ModelService.openAi => OpenAiResponsesProvider(
         config,
         systemPrompt: prompt,
+        summaryConfig: modelSettings.activeConfig,
+        sharedContext: conversation.sharedContext,
       ),
-      _ => DeepSeekResponsesProvider(config, systemPrompt: prompt),
+      _ => DeepSeekResponsesProvider(
+        config,
+        systemPrompt: prompt,
+        summaryConfig: modelSettings.activeConfig,
+        sharedContext: conversation.sharedContext,
+      ),
     };
     final runId = await _store.runs.start(
       conversation.id,
@@ -189,12 +202,17 @@ extension PeerConversations on ChatController {
               senderId: message.senderId,
               sender: message.sender,
               text:
-                  '【私聊记录，${message.senderId == senderId ? '你自己' : message.sender!.name}；消息 ${message.id}】\n${message.text}',
+                  '【私聊记录，${message.sender!.name}（${message.senderId}）；消息 ${message.id}】\n${message.text}',
               createdAt: message.createdAt,
               images: message.images,
               files: message.files,
             ),
         ],
+        contextSummary: conversation.contextSummary,
+        onContextSummary: (summary) async {
+          conversation.contextSummary = summary;
+          await _persistRun(conversation);
+        },
         personalContext: () async => [
           profile.preferences.responses.instructions,
           profile.preferences.customInstructions,
