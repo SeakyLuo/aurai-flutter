@@ -12,9 +12,12 @@ extension GroupMessageDelivery on ChatController {
   }) async {
     final groupId = arguments['groupId'] as String?;
     if (groupId != null && groupId != parent.id) {
-      throw ArgumentError(
-        'sendGroupMessage 只能向当前群发送；请将 groupId 设为 JSON null（不是字符串）。如用户要求发送到其他会话，请使用 sendConversationMessage',
-      );
+      _checkGroupStopped(parent);
+      if (_removedGroupMembers.contains(reply.senderId) ||
+          member.runState == ChatRunState.stopping) {
+        throw const AgentCancelled();
+      }
+      return _sendPrivateGroupMessage(arguments, reply.senderId);
     }
     _checkGroupStopped(parent);
     if (_removedGroupMembers.contains(reply.senderId) ||
@@ -195,7 +198,7 @@ extension GroupMessageDelivery on ChatController {
     final groupId = arguments['groupId'] as String?;
     if (groupId == null) throw ArgumentError('请先确认要调整哪个群聊');
     if (arguments['message'] != null) {
-      throw ArgumentError('私聊中此工具仅调整接话状态，不能发送群消息');
+      throw ArgumentError('调整接话状态时 message 必须为 null');
     }
     final participation = arguments['participation'] as String;
     if (!['paused', 'active'].contains(participation)) {

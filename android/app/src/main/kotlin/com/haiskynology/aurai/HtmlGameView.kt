@@ -26,6 +26,7 @@ import io.flutter.plugin.platform.PlatformViewFactory
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.Executors
 
 class HtmlGameViewFactory(private val messenger: BinaryMessenger) : PlatformViewFactory(StandardMessageCodec.INSTANCE) {
     override fun create(context: Context, viewId: Int, args: Any?): PlatformView {
@@ -52,12 +53,18 @@ class HtmlGameView(context: Context, messenger: BinaryMessenger, id: Int, args: 
 
 @SuppressLint("SetJavaScriptEnabled")
 class HtmlGameRuntime(context: Context, val identity: String, private val messageId: String,
-                      private val stateful: Boolean, document: String) {
+                      private val stateful: Boolean) {
     private val webContext = MutableContextWrapper(context.applicationContext)
     val web = WebView(webContext)
     private var channel: MethodChannel? = null
     private var disposed = false
     private var loaded = false
+    private var snapshotRunning = false
+    private val saveLock = Any()
+    private var pendingSave: String? = null
+    private val saveRequests = mutableListOf<Int>()
+    @Volatile private var saving = false
+    val canEvict: Boolean get() = !attached && !saving
     private var contentHeight: Double? = null
     private var lease = 0
     var attached = false
@@ -101,10 +108,38 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
         web.addJavascriptInterface(object {
             @JavascriptInterface fun loadState(): String =
                 if (stateful) preferences.getString(messageId, "null")!! else "null"
-            @JavascriptInterface fun saveState(json: String): Boolean {
-                if (!stateful || json.toByteArray(Charsets.UTF_8).size > 65536) return false
-                return preferences.edit().putString(messageId, json).commit()
+            @JavascriptInterface fun saveStateAsync(requestId: Int, json: String) {
+                if (!stateful || json.toByteArray(Charsets.UTF_8).size > 65536) {
+                    web.post { if (!disposed) web.evaluateJavascript("window.__auraiSaved($requestId,false)", null) }
+                    return
+                }
+                synchronized(saveLock) {
+                    pendingSave = json
+                    saveRequests.add(requestId)
+                    if (saving) return
+                    saving = true
+                }
+                stateWriter.execute {
+                    while (true) {
+                        val batch = synchronized(saveLock) {
+                            val value = pendingSave
+                            if (value == null) { saving = false; null }
+                            else {
+                                pendingSave = null
+                                val requests = saveRequests.toList()
+                                saveRequests.clear()
+                                value to requests
+                            }
+                        } ?: break
+                        val success = preferences.edit().putString(messageId, batch.first).commit()
+                        web.post {
+                            if (!disposed) for (request in batch.second)
+                                web.evaluateJavascript("window.__auraiSaved($request,$success)", null)
+                        }
+                    }
+                }
             }
+            @JavascriptInterface fun visualChanged() { web.post { if (!disposed) channel?.invokeMethod("visualChanged", null) } }
             @JavascriptInterface fun reopen() {
                 web.post { if (!disposed) channel?.invokeMethod("reopen", null) }
             }
@@ -116,6 +151,21 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
             @JavascriptInterface fun localState(json: String) {
                 if (json.length <= 65536) web.post {
                     if (!disposed) channel?.invokeMethod("localState", json)
+                }
+            }
+            @JavascriptInterface fun postInteraction(eventId: String, json: String) {
+                web.post {
+                    if (disposed) return@post
+                    fun reply(value: String) { if (!disposed) web.evaluateJavascript("window.__auraiInteractionReply(${JSONObject.quote(eventId)},$value)", null) }
+                    if (json.toByteArray(Charsets.UTF_8).size > 16384 || channel == null) {
+                        reply("{\"error\":\"操作未提交，请重试\"}")
+                        return@post
+                    }
+                    channel?.invokeMethod("interaction", json, object : MethodChannel.Result {
+                        override fun success(result: Any?) = reply(result as String)
+                        override fun error(code: String, message: String?, details: Any?) = reply("{\"error\":${JSONObject.quote(message ?: "操作未提交，请重试")}}")
+                        override fun notImplemented() = error("unavailable", null, null)
+                    })
                 }
             }
             @JavascriptInterface fun postMessage(json: String) {
@@ -137,7 +187,6 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                 }
             }
         }, "AuraiGameBridge")
-        web.loadDataWithBaseURL("https://aurai-game.invalid/", document, "text/html", "UTF-8", null)
     }
 
 
@@ -150,11 +199,15 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
         lease++
         channel!!.setMethodCallHandler { call, result ->
             when (call.method) {
+                "loadDocument" -> {
+                    web.loadDataWithBaseURL("https://aurai-game.invalid/", call.arguments as String, "text/html", "UTF-8", null)
+                    result.success(null)
+                }
                 "connect" -> {
                     if (loaded) channel?.invokeMethod("ready", null)
-                    contentHeight?.let { channel?.invokeMethod("height", it) }
+                    else channel?.invokeMethod("requestDocument", null)
                     web.onResume()
-                    web.evaluateJavascript("window.__auraiLifecycle?.(false); document.documentElement.dataset.auraiDisplay=" + JSONObject.quote(if (fullscreen) "fullscreen" else "inline") + "; document.dispatchEvent(new Event('aurai:displaychange')); window.dispatchEvent(new Event('resize'));", null)
+                    web.evaluateJavascript("window.__auraiLifecycle?.(false); document.documentElement.dataset.auraiDisplay=" + JSONObject.quote(if (fullscreen) "fullscreen" else "inline") + "; document.dispatchEvent(new Event('aurai:displaychange')); window.dispatchEvent(new Event('resize')); window.__auraiMeasure?.();", null)
                     result.success(null)
                 }
                 "state" -> {
@@ -166,18 +219,26 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                         })
                     }
                 }
+                "flushForm" -> web.evaluateJavascript("window.__auraiFlushForm?.()") { result.success(null) }
                 "snapshot" -> {
-                    if (disposed || web.width == 0 || web.height == 0) result.success(null)
+                    if (disposed || snapshotRunning || web.width == 0 || web.height == 0) result.success(null)
                     else {
-                        val scale = minOf(1f, 480f / web.width)
+                        snapshotRunning = true
+                        val scale = minOf(1f, 480f / web.width, 960f / web.height)
                         val bitmap = Bitmap.createBitmap((web.width * scale).toInt(), (web.height * scale).toInt(), Bitmap.Config.ARGB_8888)
                         val canvas = Canvas(bitmap)
                         canvas.scale(scale, scale)
                         web.draw(canvas)
-                        val output = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.WEBP, 65, output)
-                        bitmap.recycle()
-                        result.success(output.toByteArray())
+                        snapshotEncoder.execute {
+                            try {
+                                val output = ByteArrayOutputStream()
+                                bitmap.compress(Bitmap.CompressFormat.WEBP, 65, output)
+                                val bytes = output.toByteArray()
+                                web.post { snapshotRunning = false; result.success(bytes) }
+                            } catch (error: Exception) {
+                                web.post { snapshotRunning = false; result.error("snapshot_failed", error.message, null) }
+                            } finally { bitmap.recycle() }
+                        }
                     }
                 }
                 "dispose" -> pause { result.success(null) }
@@ -192,7 +253,7 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
         val owner = lease
         web.evaluateJavascript("window.__auraiLifecycle?.(true)") {
             if (!disposed && owner == lease) web.onPause()
-            done()
+            stateWriter.execute { web.post { done() } }
         }
     }
 
@@ -201,9 +262,8 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
         attached = false
         channel?.setMethodCallHandler(null)
         channel = null
-        pause()
+        pause { HtmlGamePool.trim() }
         webContext.baseContext = webContext.applicationContext
-        HtmlGamePool.trim()
     }
 
     fun destroy() {
@@ -218,4 +278,8 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
         web.destroy()
     }
     val alive: Boolean get() = !disposed
+    companion object {
+        private val snapshotEncoder = Executors.newSingleThreadExecutor()
+        private val stateWriter = Executors.newSingleThreadExecutor()
+    }
 }

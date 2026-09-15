@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'settings_icon.dart';
+import '../../html_games/html_game_icon.dart';
 
 const avatarSymbols = <String, String>{
   'app_logo_white': 'App Logo',
@@ -12,6 +13,7 @@ const avatarSymbols = <String, String>{
   'smile': '笑脸',
   'cat': '猫咪',
   'robot': '机器人',
+  'game': '手柄',
   'flower': '花朵',
   'sun': '太阳',
   'moon': '月亮',
@@ -32,6 +34,8 @@ class AvatarSymbol extends StatelessWidget {
   final Color color;
   @override
   Widget build(BuildContext context) {
+    if (symbol == 'game')
+      return HtmlGameIcon(HtmlGameIconType.game, color: color);
     if (symbol == 'app_logo_white') {
       return Image.asset(
         'assets/branding/symbol_white.png',

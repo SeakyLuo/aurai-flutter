@@ -19,7 +19,7 @@ object HtmlGamePool : ComponentCallbacks2 {
         val previous = pages[id]
         if (previous != null && previous.alive && previous.identity == identity) return previous
         previous?.destroy()
-        val page = HtmlGameRuntime(context, identity, id, args["stateful"] as Boolean, args["document"] as String)
+        val page = HtmlGameRuntime(context, identity, id, args["stateful"] as Boolean)
         pages[id] = page
         return page
     }
@@ -28,7 +28,7 @@ object HtmlGamePool : ComponentCallbacks2 {
         val iterator = pages.entries.iterator()
         while (pages.size > 3 && iterator.hasNext()) {
             val page = iterator.next().value
-            if (!page.attached) {
+            if (page.canEvict) {
                 page.destroy()
                 iterator.remove()
             }
@@ -39,7 +39,7 @@ object HtmlGamePool : ComponentCallbacks2 {
         val iterator = pages.entries.iterator()
         while (iterator.hasNext()) {
             val page = iterator.next().value
-            if (!page.attached) {
+            if (page.canEvict) {
                 page.destroy()
                 iterator.remove()
             }

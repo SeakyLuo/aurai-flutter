@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../html_games/html_game_icon.dart';
 import '../features/chat/settings_icon.dart';
 import '../features/chat/conversation_menu_icon.dart';
 import '../features/chat/compose_icon.dart';
@@ -43,6 +44,7 @@ Widget? sharedSkillIcon(BuildContext context, String name) {
       ),
     );
   return switch (name) {
+    'game' => const HtmlGameIcon(HtmlGameIconType.game),
     'compose' => const ComposeIcon(),
     'question' => const QuestionIcon(type: QuestionIconType.question),
     'close' => const QuestionIcon(type: QuestionIconType.close),

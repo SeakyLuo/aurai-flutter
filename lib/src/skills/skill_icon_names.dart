@@ -31,6 +31,7 @@ const skillIcons = {
   'personalization': '个性化',
   'profile': '个人信息',
   'contacts': '通讯录',
+  'game': '手柄',
   'balance': '余额',
   'appearance': '夜间模式',
   'model': '模型',

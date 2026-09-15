@@ -6,13 +6,28 @@ const htmlGameLifecycleScript = r'''
   const timers=new Map(), frames=new Map();
   let serial=0, paused=false;
   let saved=JSON.parse(AuraiGameBridge.loadState());
+  const pendingEvents=new Map(),pendingSaves=new Map();
+  let saveSerial=0;
+  window.__auraiSaved=(id,ok)=>{const entry=pendingSaves.get(id);if(!entry)return;pendingSaves.delete(id);if(ok){saved=JSON.parse(entry.json);entry.resolve()}else entry.reject(new Error('State save failed'));};
+  window.__auraiInteractionReply=(id,value)=>{
+    const pending=pendingEvents.get(id);if(!pending)return;pendingEvents.delete(id);
+    value.error?pending.reject(new Error(value.error)):pending.resolve(value);
+  };
   window.AuraiHTML=Object.freeze({
+    get messageState(){return window.__auraiMessageState()},
+    submitEvent({eventId,action,data=null,notifyAi=true}){
+      if(!navigator.userActivation.isActive)return Promise.reject(new Error('Submit events from a user action, not on load or a timer'));
+      if(pendingEvents.has(eventId))return Promise.reject(new Error('This event is already pending'));
+      const json=JSON.stringify({eventId,action,data,notifyAi});
+      if(new TextEncoder().encode(json).length>16384)return Promise.reject(new Error('Event exceeds 16 KB'));
+      return new Promise((resolve,reject)=>{pendingEvents.set(eventId,{resolve,reject});AuraiGameBridge.postInteraction(eventId,json)});
+    },
     get state(){return structuredClone(saved)},
     async saveState(value){
       const json=JSON.stringify(value);
       if(json===undefined) throw new Error('State must be JSON-compatible');
-      if(!AuraiGameBridge.saveState(json)) throw new Error('State save failed: stateful must be enabled and state must fit within 64 KB');
-      saved=JSON.parse(json);
+      if(json===JSON.stringify(saved)&&pendingSaves.size===0)return;
+      await new Promise((resolve,reject)=>{const id=++saveSerial;pendingSaves.set(id,{json,resolve,reject});AuraiGameBridge.saveStateAsync(id,json)});
     }
   });
   const schedule=(id,t)=>{

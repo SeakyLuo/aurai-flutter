@@ -256,8 +256,11 @@ class _ConversationMoreState extends State<ConversationMore> {
                           children: [
                             if (!isGroup)
                               _GlassMenuItem(
-                                iconWidget: const SettingsIcon(
+                                iconWidget: SettingsIcon(
                                   type: SettingsIconType.personalInfo,
+                                  color: Theme.of(
+                                    menuContext,
+                                  ).colorScheme.onSurface,
                                 ),
                                 label: '查看资料',
                                 onTap: () => Navigator.pop(
@@ -267,8 +270,11 @@ class _ConversationMoreState extends State<ConversationMore> {
                               ),
                             if (isGroup)
                               _GlassMenuItem(
-                                iconWidget: const SidebarActionIcon(
+                                iconWidget: SidebarActionIcon(
                                   type: SidebarActionIconType.group,
+                                  color: Theme.of(
+                                    menuContext,
+                                  ).colorScheme.onSurface,
                                 ),
                                 label: '群成员',
                                 onTap: () => Navigator.pop(
@@ -278,8 +284,11 @@ class _ConversationMoreState extends State<ConversationMore> {
                               ),
                             if (hasTask)
                               _GlassMenuItem(
-                                iconWidget: const SettingsIcon(
+                                iconWidget: SettingsIcon(
                                   type: SettingsIconType.tasks,
+                                  color: Theme.of(
+                                    menuContext,
+                                  ).colorScheme.onSurface,
                                 ),
                                 label: '查看任务',
                                 onTap: () => Navigator.pop(

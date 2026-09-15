@@ -1,3 +1,4 @@
+import 'interactive_message_schema.dart';
 import '../domain/tool_models.dart';
 
 class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
@@ -17,13 +18,13 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         ? ToolSafety.readOnly
         : ToolSafety.lowRisk,
     description:
-        'Send, read or update an interactive message in the current conversation. '
+        'Send an interactive message in the current conversation, or read/update a message in any conversation you can access by messageId; no conversation switch is needed. '
         'It is a real message with vertically stacked buttons, not executable HTML. '
         'Only update messages you authored, after reading the latest revision. '
-        'update actions apply nextBody locally; acknowledge marks a one-time button completed; '
-        'openUrl opens HTTPS without changing the message. These buttons never execute tools, send messages, grant permissions or automatically wake AI. '
+        'update actions apply nextBody locally, or nextState to replace the title, body and whole button list using states; acknowledge marks a one-time button completed; '
+        'openUrl opens HTTPS without changing the message. Buttons with notifyAi:true queue the user action to the creator AI after applying their local action; default false. The AI can update the original card using updateInteractiveMessage, or leave it unchanged. This is not authorization for tools or external actions. '
         'Updating display state or recording a choice is not proof that an external task succeeded; never label a button as completing payments or external actions. '
-        'Use repeatable=false for a one-time choice. All buttons remain independent; do not present a vote requiring mutually exclusive choices. '
+        'Use repeatable=false for a one-time choice. For mutually exclusive choices, transition to a result state whose buttons replace the choices. Example: rock/paper/scissors buttons each nextState to a result with one Play again button; that button nextState returns to a start state containing the three choices. '
         'Actual updates append a system notice without waking other AIs. Do not repeat the card in ordinary text. '
         'messageId and button IDs are internal references; never ask users to enter them.',
     inputSchema: {
@@ -34,59 +35,22 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
           'revision': {'type': 'integer', 'minimum': 0},
         if (name != 'readInteractiveMessage') ...{
           'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
-          'body': {'type': 'string', 'maxLength': 10000},
-          'buttons': {
+          'body': interactiveBodySchema,
+          'buttons': interactiveButtonsSchema,
+          'states': {
             'type': 'array',
-            'minItems': 1,
-            'maxItems': 12,
+            'maxItems': 16,
+            'description':
+                'Named local card states. nextState buttons switch to a state and replace the entire card. States can link back to earlier states for replay; no nested card definitions or AI call needed.',
             'items': {
               'type': 'object',
               'properties': {
                 'id': {'type': 'string', 'minLength': 1},
-                'label': {'type': 'string', 'minLength': 1, 'maxLength': 80},
-                'action': {
-                  'type': 'string',
-                  'enum': ['update', 'acknowledge', 'openUrl'],
-                },
-                'style': {
-                  'type': 'string',
-                  'enum': [
-                    'normal',
-                    'primary',
-                    'info',
-                    'warning',
-                    'danger',
-                    'success',
-                  ],
-                  'description':
-                      'Optional visual emphasis: success is green, danger red, primary purple gradient with white text, info a separate light purple background with purple text; default normal. Prefer at most one primary action. Styling does not grant permissions or change what a button does.',
-                },
-                'icon': {
-                  'type': 'string',
-                  'enum': [
-                    'none',
-                    'info',
-                    'play',
-                    'reset',
-                    'delete',
-                    'check',
-                    'open',
-                    'settings',
-                  ],
-                  'description':
-                      'Optional leading outline icon. Omit to choose from action; none hides it.',
-                },
-                'showArrow': {
-                  'type': 'boolean',
-                  'description': 'Optional trailing arrow. Defaults to false.',
-                },
-                'repeatable': {'type': 'boolean'},
-                'disabled': {'type': 'boolean'},
-                'completedLabel': {'type': 'string', 'maxLength': 80},
-                'nextBody': {'type': 'string', 'maxLength': 10000},
-                'url': {'type': 'string'},
+                'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
+                'body': interactiveBodySchema,
+                'buttons': interactiveButtonsSchema,
               },
-              'required': ['id', 'label', 'action', 'repeatable'],
+              'required': ['id', 'title', 'body', 'buttons'],
               'additionalProperties': false,
             },
           },

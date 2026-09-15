@@ -1,3 +1,6 @@
+import '../../html_games/html_message_interaction.dart';
+import '../../storage/message_callbacks.dart';
+import '../../agent/html_message_update_tool.dart';
 import 'notification_avatar.dart';
 import '../../agent/friend_tools.dart';
 import '../../storage/contact_relationships.dart';
@@ -102,12 +105,14 @@ part 'group_reply_context.dart';
 part 'ai_identity_controller.dart';
 part 'group_conversation_run.dart';
 part 'group_message_delivery.dart';
+part 'private_group_message.dart';
 part 'group_private_conversation.dart';
 part 'group_system_events.dart';
 part 'conversation_actions.dart';
 part 'app_control_actions.dart';
 part 'peer_conversations.dart';
 part 'interactive_message_actions.dart';
+part 'message_callback_actions.dart';
 part 'html_game_actions.dart';
 part 'model_config_actions.dart';
 part 'image_forwarding.dart';
@@ -157,6 +162,11 @@ class ChatController extends ChangeNotifier {
   final completedReplies = ValueNotifier<ConversationCompletion?>(null);
   final _store = ConversationStore();
   HtmlGameEventPump? _htmlGameEvents;
+  StreamSubscription<void>? _callbackChanges;
+  bool _drainingCallbacks = false;
+  bool _callbacksDisposed = false;
+  bool _callbacksPending = true;
+  int _callbackGeneration = 0;
   MemoryController? _memory;
   MemoryController get memory => _memory!;
   final _newDraftStore = NewConversationDraft();
@@ -247,6 +257,9 @@ class ChatController extends ChangeNotifier {
     scheduledTasks.dispose();
     _groupSleeps.dispose();
     _htmlGameEvents?.dispose();
+    _callbacksDisposed = true;
+    _callbackChanges?.cancel();
+    removeListener(_drainMessageCallbacks);
     _memory?.dispose();
     _accessibilityTimer?.cancel();
     completedReplies.dispose();
@@ -329,6 +342,13 @@ class ChatController extends ChangeNotifier {
     await _reloadConversations();
     await scheduledTasks.initialize(_runScheduled);
     await _groupSleeps.initialize(_recoverGroupSleep);
+    _callbackChanges = MessageCallbacks.changes.stream.listen((_) {
+      _callbacksPending = true;
+      _callbackGeneration++;
+      _drainMessageCallbacks();
+    });
+    addListener(_drainMessageCallbacks);
+    _drainMessageCallbacks();
     if (HtmlGameFeature.enabled) {
       _htmlGameEvents = HtmlGameEventPump(
         htmlGames,

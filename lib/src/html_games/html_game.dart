@@ -16,8 +16,10 @@ class HtmlGameCard {
     this.status = 'active',
     this.canRetry = false,
     this.displayMode = 'hybrid',
+    this.backgroundMode = 'message',
   });
   final String displayMode;
+  final String backgroundMode;
   final String title;
   final Uint8List? preview;
   final int? width;
@@ -27,6 +29,7 @@ class HtmlGameCard {
   final bool canRetry;
   factory HtmlGameCard.fromRow(Map<String, Object?> row) => HtmlGameCard(
     displayMode: row['display_mode'] as String,
+    backgroundMode: row['background_mode'] as String,
     title: row['title'] as String,
     preview: row['preview'] as Uint8List?,
     width: row['display_width'] as int?,
@@ -54,8 +57,10 @@ class HtmlGame {
     required this.height,
     required this.canRetry,
     this.stateful = false,
+    this.backgroundMode = 'message',
   });
   final bool stateful;
+  final String backgroundMode;
   final int? width;
   final int height;
   final bool canRetry;
@@ -74,6 +79,7 @@ class HtmlGame {
   factory HtmlGame.fromRow(Map<String, Object?> row) => HtmlGame(
     messageId: row['message_id'] as String,
     stateful: row['stateful'] == 1,
+    backgroundMode: row['background_mode'] as String,
     width: row['display_width'] as int?,
     height: row['display_height'] as int,
     canRetry: row['retry_available'] == 1,
@@ -94,6 +100,7 @@ class HtmlGame {
 
   Map<String, Object?> snapshot() => {
     'messageId': messageId,
+    'backgroundMode': backgroundMode,
     'width': width,
     'height': height,
     'title': title,

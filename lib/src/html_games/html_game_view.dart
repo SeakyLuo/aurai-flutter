@@ -1,3 +1,4 @@
+import 'html_game_display_cache.dart';
 import '../domain/error_message.dart';
 import 'dart:async';
 import 'dart:io';
@@ -7,7 +8,6 @@ import 'package:flutter/material.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
 import 'html_game.dart';
-import 'html_game_icon.dart';
 import 'html_game_session.dart';
 import 'html_game_store.dart';
 import 'html_game_surface.dart';
@@ -49,7 +49,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
     with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   static _HtmlGameViewState? _active;
   static int _openRevision = 0;
-  static final _heights = <String, double>{};
+  static final _heights = <(String, double, bool), double>{};
   Timer? _offscreenTimer;
   @override
   bool get wantKeepAlive => _session != null || _opening || _closing != null;
@@ -62,7 +62,9 @@ class _HtmlGameViewState extends State<HtmlGameView>
   late HtmlGameCard _card;
   Uint8List? _preview;
   double? _contentHeight;
-  bool _opening = false, _expanded = false, _retrying = false;
+  (String, double, bool)? _heightKey;
+  bool _hasRendered = false;
+  bool _opening = false, _retrying = false;
   bool _failed = false, _foreground = true, _leaving = false;
   Future<void>? _closing;
 
@@ -71,7 +73,6 @@ class _HtmlGameViewState extends State<HtmlGameView>
     super.initState();
     _card = widget.card;
     _preview = _card.preview;
-    _contentHeight = _heights[widget.messageId];
     _changes = HtmlGameSignals.changes.stream
         .where((id) => id == widget.messageId)
         .listen((_) => unawaited(_refreshCard()));
@@ -131,12 +132,14 @@ class _HtmlGameViewState extends State<HtmlGameView>
     // Keyboard occlusion must not destroy a live form and dismiss its input.
     final rect = box.localToGlobal(Offset.zero) & box.size;
     final media = MediaQuery.of(context);
-    return rect.bottom > media.padding.top + 80 &&
+    final margin = _session == null ? 0.0 : 160.0;
+    return rect.bottom > media.padding.top + 80 - margin &&
         rect.top <
             media.size.height -
                 (_session == null ? media.viewInsets.bottom : 0) -
                 media.padding.bottom -
-                80;
+                80 +
+                margin;
   }
 
   void _checkVisibility() {
@@ -148,7 +151,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
         _offscreenTimer = null;
         if (_session != null) unawaited(_close());
       } else if (_session != null && _offscreenTimer == null) {
-        _offscreenTimer = Timer(const Duration(milliseconds: 350), () {
+        _offscreenTimer = Timer(const Duration(milliseconds: 700), () {
           _offscreenTimer = null;
           if (mounted && !_visible) unawaited(_close());
         });
@@ -212,16 +215,15 @@ class _HtmlGameViewState extends State<HtmlGameView>
     updateKeepAlive();
     try {
       await previous?._close();
-      final game = await widget.store.load(
+      final game = await HtmlGameDisplayCache.load(
+        widget.store,
         widget.conversationId,
         widget.messageId,
       );
-      final local = await HtmlGameSession.loadLocal(widget.messageId);
       if (!_visible || revision != _openRevision) return;
       final session = HtmlGameSession(
         game,
         widget.store,
-        localState: local,
         fullscreen: widget.fullscreen,
         dark: Theme.of(context).brightness == Brightness.dark,
       );
@@ -242,11 +244,26 @@ class _HtmlGameViewState extends State<HtmlGameView>
 
   void _sessionChanged() {
     final session = _session!;
+    if (session.ready) _hasRendered = true;
     if (session.contentHeight != null) {
-      _contentHeight = session.contentHeight;
-      _heights.remove(widget.messageId);
-      _heights[widget.messageId] = _contentHeight!;
+      if (_contentHeight == null ||
+          (session.contentHeight! - _contentHeight!).abs() >= 2) {
+        _contentHeight = session.contentHeight;
+      }
+      if (_heightKey != null) {
+        _heights.remove(_heightKey);
+        _heights[_heightKey!] = _contentHeight!;
+      }
       if (_heights.length > 128) _heights.remove(_heights.keys.first);
+    }
+    if (session.failed && session.error == null) {
+      unawaited(
+        _close().then((_) {
+          _failed = false;
+          _scheduleVisibility();
+        }),
+      );
+      return;
     }
     if (session.error != null) {
       _notice(session.error!);
@@ -357,11 +374,23 @@ class _HtmlGameViewState extends State<HtmlGameView>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return widget.fullscreen || _card.displayMode == 'standalone'
+    final content = widget.fullscreen
         ? _buildView(context)
+        : Material(
+            color: _card.backgroundMode == 'transparent'
+                ? Colors.transparent
+                : Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xff2a292f)
+                : const Color(0xffefeff3),
+            borderRadius: BorderRadius.circular(22),
+            clipBehavior: Clip.antiAlias,
+            child: _buildView(context),
+          );
+    return widget.fullscreen || _card.displayMode == 'standalone'
+        ? content
         : HtmlVisibilityObserver(
             onChanged: _scheduleVisibility,
-            child: _buildView(context),
+            child: content,
           );
   }
 
@@ -369,7 +398,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
       ? _fullscreen()
       : _card.displayMode == 'standalone'
       ? Material(
-          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(16),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -389,8 +418,6 @@ class _HtmlGameViewState extends State<HtmlGameView>
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      const HtmlGameIcon(HtmlGameIconType.game),
-                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           _card.title,
@@ -410,12 +437,16 @@ class _HtmlGameViewState extends State<HtmlGameView>
         )
       : LayoutBuilder(
           builder: (context, constraints) {
-            final limit = _expanded
-                ? 640.0
-                : math.min(_card.height.toDouble(), 420.0);
-            final height = math
-                .min(_contentHeight ?? 96, limit)
-                .clamp(64.0, 640.0);
+            final width = math.min(
+              _card.width?.toDouble() ?? constraints.maxWidth,
+              constraints.maxWidth,
+            );
+            final key = (widget.messageId, width, widget.fullscreen);
+            if (_heightKey != key) {
+              _heightKey = key;
+              _contentHeight = _heights[key];
+            }
+            final height = _contentHeight ?? 96.0;
             return SizedBox(
               key: _anchor,
               width: math.min(
@@ -427,9 +458,14 @@ class _HtmlGameViewState extends State<HtmlGameView>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (_session != null)
-                    SizedBox(
-                      height: height,
-                      child: HtmlGameSurface(session: _session!),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.topCenter,
+                      child: SizedBox(
+                        height: height,
+                        child: HtmlGameSurface(session: _session!),
+                      ),
                     )
                   else if (_preview != null && !_failed)
                     GestureDetector(
@@ -446,31 +482,32 @@ class _HtmlGameViewState extends State<HtmlGameView>
                     )
                   else
                     SizedBox(
-                      height: height,
+                      height: _hasRendered ? height : 88,
                       child: InkWell(
                         onTap: _opening ? null : _open,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(22),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Row(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const HtmlGameIcon(HtmlGameIconType.game),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _card.title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 15),
-                                ),
+                              Text(
+                                _card.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 15),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(height: 6),
                               Text(
                                 _opening
-                                    ? '加载中'
+                                    ? '正在加载…'
                                     : _failed
-                                    ? '重试'
-                                    : '点击交互',
+                                    ? '加载失败，点击重试'
+                                    : '点击查看内容',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Theme.of(
@@ -481,15 +518,6 @@ class _HtmlGameViewState extends State<HtmlGameView>
                             ],
                           ),
                         ),
-                      ),
-                    ),
-                  if ((_contentHeight ?? 0) >
-                      math.min(_card.height.toDouble(), 420.0))
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () => setState(() => _expanded = !_expanded),
-                        child: Text(_expanded ? '收起' : '展开'),
                       ),
                     ),
                   if (_card.canRetry)

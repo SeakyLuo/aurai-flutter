@@ -1,3 +1,4 @@
+import 'message_callbacks.dart';
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import '../domain/interactive_message.dart';
@@ -17,7 +18,7 @@ class InteractiveMessageStore {
   ) => database.transaction((txn) async {
     final rows = await txn.query(
       'messages',
-      columns: ['kind', 'interactive_json'],
+      columns: ['kind', 'interactive_json', 'sender_id'],
       where: 'id = ? AND conversation_id = ?',
       whereArgs: [messageId, conversationId],
     );
@@ -31,24 +32,51 @@ class InteractiveMessageStore {
     final button = card.buttons.firstWhere((b) => b['id'] == buttonId);
     if (button['disabled'] == true) throw StateError('这个选项已处理');
     final action = button['action'] as String;
+    if (button['notifyAi'] == true) {
+      await MessageCallbacks.enqueue(
+        txn,
+        id: newMessageId(),
+        messageId: messageId,
+        conversationId: conversationId,
+        senderId: rows.single['sender_id'] as String,
+        payload: {
+          'source': 'button',
+          'buttonId': buttonId,
+          'label': button['label'],
+          'revision': revision,
+        },
+      );
+    }
     if (action == 'openUrl')
       return (card: card, notice: null, url: button['url'] as String);
-    final body = action == 'update' ? button['nextBody'] as String : card.body;
+    final target = action == 'update' && button['nextState'] != null
+        ? card.states.firstWhere((state) => state['id'] == button['nextState'])
+        : null;
+    final body = target != null
+        ? target['body'] as String
+        : action == 'update'
+        ? button['nextBody'] as String
+        : card.body;
     final next = InteractiveMessage(
       revision: revision + 1,
-      title: card.title,
+      title: target == null ? card.title : target['title'] as String,
+      states: card.states,
       body: body,
-      buttons: [
-        for (final b in card.buttons)
-          if (b['id'] == buttonId && b['repeatable'] == false)
-            {
-              ...b,
-              'disabled': true,
-              'label': b['completedLabel'] ?? '${b['label']} ✓',
-            }
-          else
-            b,
-      ],
+      buttons: target != null
+          ? (target['buttons'] as List)
+                .map((b) => Map<String, Object?>.from(b as Map))
+                .toList()
+          : [
+              for (final b in card.buttons)
+                if (b['id'] == buttonId && b['repeatable'] == false)
+                  {
+                    ...b,
+                    'disabled': true,
+                    'label': b['completedLabel'] ?? '${b['label']} ✓',
+                  }
+                else
+                  b,
+            ],
     );
     final changed =
         jsonEncode(card.toJson()..remove('revision')) !=

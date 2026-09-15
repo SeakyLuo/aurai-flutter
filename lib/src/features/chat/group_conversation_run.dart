@@ -132,12 +132,9 @@ extension GroupConversationRun on ChatController {
       );
       _groupDispatcher = dispatcher;
       final sleeps = _groupSleeps.forGroup(conversation.id);
-      if (wakeMembers == null &&
-          user.role == AgentMessageRole.user &&
-          !user.isSystem) {
-        sleeps.removeWhere(
-          (id, _) => _isGroupMention(user.text, _groupSenders[id]!.name),
-        );
+      final mentioned = _groupNoticeMentions([user]);
+      if (wakeMembers == null && !user.isSystem) {
+        sleeps.removeWhere((id, _) => mentioned.contains(id));
       }
       dispatcher.restoreSleeps(sleeps);
       dispatcher.start([
@@ -146,15 +143,15 @@ extension GroupConversationRun on ChatController {
               (wakeMembers != null || id != user.senderId) &&
               (!paused.contains(id) ||
                   (wakeMembers == null &&
-                      user.role == AgentMessageRole.user &&
                       !user.isSystem &&
-                      _isGroupMention(user.text, _groupSenders[id]!.name))))
+                      mentioned.contains(id))))
             id,
       ]);
       final queued = _queuedSystemNotices.remove(conversation.id) ?? [];
       final known = dispatcher.history.map((m) => m.id).toSet();
       final fresh = queued.where((m) => !known.contains(m.id)).toList();
-      if (fresh.isNotEmpty) dispatcher.receive(fresh);
+      if (fresh.isNotEmpty)
+        dispatcher.receive(fresh, mentions: _groupNoticeMentions(fresh));
       await dispatcher.done;
       _checkGroupStopped(conversation);
       conversation.pendingGoal = null;

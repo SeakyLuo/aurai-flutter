@@ -1,6 +1,19 @@
 part of 'chat_controller.dart';
 
 extension GroupSystemEvents on ChatController {
+  Set<String> _groupNoticeMentions(Iterable<AgentMessage> messages) => {
+    for (final entry in _groupSenders.entries)
+      if (messages.any(
+        (message) =>
+            !message.isSystem &&
+            (message.text.contains(
+                  '](aurai://member/${Uri.encodeComponent(entry.key)})',
+                ) ||
+                _isGroupMention(message.text, entry.value.name)),
+      ))
+        entry.key,
+  };
+
   Future<void> _receiveGroupSystemNotice(
     String groupId,
     AgentMessage notice,
@@ -21,7 +34,9 @@ extension GroupSystemEvents on ChatController {
         _store.writer.remember([notice]);
         _notifyRun(running);
         if (!dispatcher.history.any((m) => m.id == notice.id)) {
-          dispatcher.receive([notice]);
+          dispatcher.receive([
+            notice,
+          ], mentions: _groupNoticeMentions([notice]));
         }
       } finally {
         dispatcher.release();
