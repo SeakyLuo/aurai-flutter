@@ -2,7 +2,12 @@ part of 'chat_controller.dart';
 
 extension GroupSleepRecovery on ChatController {
   Future<void> _recoverGroupSleep(String id, Set<String> members) async {
-    if (hasRunningTask || changingConversation) return;
+    final target = await _forwardTarget(id);
+    await _inConversation(target, () => _recoverGroupSleepIn(id, members));
+  }
+
+  Future<void> _recoverGroupSleepIn(String id, Set<String> members) async {
+    if (hasRunningTask) return;
     _systemEventLoading = true;
     try {
       final rows = await _store.database.query(
@@ -27,6 +32,7 @@ extension GroupSleepRecovery on ChatController {
     } finally {
       _systemEventLoading = false;
       _runningConversation = null;
+      _resumeForwardedReply();
       _conversationChanged();
       _drainGroupSystemNotices();
     }

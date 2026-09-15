@@ -1,5 +1,6 @@
 import '../../domain/error_message.dart';
 import 'archived_conversations_page.dart';
+import 'data_management_page.dart';
 import 'conversation_menu_icon.dart';
 import 'home_navigation.dart';
 import 'tools_page.dart';
@@ -244,6 +245,27 @@ class SettingsPage extends StatelessWidget {
                         type: SettingsIconType.chevron,
                       ),
                       onTap: () => _openNotifications(context),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Material(
+                    color: settingsFieldColor(context),
+                    borderRadius: BorderRadius.circular(26),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      leading: const SettingsIcon(type: SettingsIconType.data),
+                      title: const Text('数据管理'),
+                      subtitle: const Text('备份、恢复与缓存清理'),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              DataManagementPage(controller: controller),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),

@@ -1,16 +1,16 @@
+import 'conversation_status_dot.dart';
 import '../../domain/error_message.dart';
 import 'ai_contacts_page.dart';
+import 'temporary_conversation_dialog.dart';
 import 'message_time.dart';
 import 'conversation_icon.dart';
 import 'conversation_preview_text.dart';
 import 'header_action_menu.dart';
 import 'dart:async';
-import 'conversation_list_status.dart';
 import 'package:flutter/material.dart';
 import '../../domain/avatar_style.dart';
 import '../../domain/message_sender.dart';
 import '../../storage/home_conversations.dart';
-import '../../domain/ai_profile.dart';
 import 'conversation_more.dart';
 import 'chat_controller.dart';
 import 'group_create_page.dart';
@@ -102,25 +102,31 @@ class RecentChatsPageState extends State<RecentChatsPage> {
   }
 
   bool _opening = false;
-  Future<void> _newConversation() async {
+  Future<void> _temporaryConversation() async {
+    final mode = await showDialog<ConversationMode>(
+      context: context,
+      builder: (_) => const TemporaryConversationDialog(),
+    );
+    if (!mounted || mode == null) return;
+    await _newConversation(mode: mode);
+  }
+
+  Future<void> _newConversation({
+    ConversationMode mode = ConversationMode.normal,
+  }) async {
     if (_opening) return;
     _opening = true;
     try {
-      final ai = await Navigator.push<AiProfile>(
+      await Navigator.push<void>(
         context,
         MaterialPageRoute(
           builder: (_) => AiContactsPage(
             controller: widget.controller,
             selectForConversation: true,
+            conversationMode: mode,
           ),
         ),
       );
-      if (!mounted || ai == null) return;
-      final id = await widget.controller.openAiConversation(
-        ai,
-        newConversation: true,
-      );
-      if (mounted) await openHomeConversation(context, widget.controller, id);
     } on Object catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
@@ -171,6 +177,11 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                     icon: const ConversationIcon(),
                   ),
                   (
+                    value: 'temporary',
+                    label: '发起临时会话',
+                    icon: const ConversationIcon(),
+                  ),
+                  (
                     value: 'group',
                     label: '发起群聊',
                     icon: SidebarActionIcon(
@@ -185,6 +196,8 @@ class RecentChatsPageState extends State<RecentChatsPage> {
               if (!mounted) return;
               if (action == 'conversation') {
                 await _newConversation();
+              } else if (action == 'temporary') {
+                await _temporaryConversation();
               } else if (action == 'group') {
                 await _group();
               }
@@ -247,17 +260,21 @@ class RecentChatsPageState extends State<RecentChatsPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
         horizontalTitleGap: 12,
-        leading: group
-            ? GroupAvatar(members: _groups[item.id]!, size: 48)
-            : ProfileAvatar(
-                style: AvatarStyle(
-                  icon: sender!.avatarIcon,
-                  color: sender.avatarColor,
-                  path: sender.avatarPath,
+        leading: ConversationUnreadAvatar(
+          controller: widget.controller,
+          conversation: item,
+          child: group
+              ? GroupAvatar(members: _groups[item.id]!, size: 48)
+              : ProfileAvatar(
+                  style: AvatarStyle(
+                    icon: sender!.avatarIcon,
+                    color: sender.avatarColor,
+                    path: sender.avatarPath,
+                  ),
+                  name: sender.name,
+                  size: 48,
                 ),
-                name: sender.name,
-                size: 48,
-              ),
+        ),
         title: Row(
           children: [
             Expanded(
@@ -268,11 +285,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                 style: const TextStyle(fontSize: 16),
               ),
             ),
-            ConversationListStatus(
-              showUnread: false,
-              controller: widget.controller,
-              conversation: item,
-            ),
+
             if (item.lastMessageAt != null) ...[
               const SizedBox(width: 8),
               Text(
@@ -286,7 +299,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
           ],
         ),
         subtitle: ConversationPreviewText(
-          showUnread: true,
+          showFailure: true,
           conversation: item,
           emptyText: '开始聊天',
         ),

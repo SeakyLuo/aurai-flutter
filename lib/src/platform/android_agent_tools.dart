@@ -424,6 +424,7 @@ class OpenSettingsTool extends _PlatformTool {
 
 class AppShellTool extends _PlatformTool {
   AppShellTool(super.platform);
+  String? _callId;
   @override
   ToolDefinition get definition => const ToolDefinition(
     name: 'shell',
@@ -441,8 +442,24 @@ class AppShellTool extends _PlatformTool {
     capabilityId: 'android.shell.app_uid',
   );
   @override
-  Future<Map<String, Object?>> invoke(ToolCall call) =>
-      platform.runAppShell(call.arguments['command']! as String);
+  Future<Map<String, Object?>> invoke(ToolCall call) async {
+    final id = '${call.id}:${DateTime.now().microsecondsSinceEpoch}';
+    _callId = id;
+    try {
+      return await platform.runAppShell(
+        id,
+        call.arguments['command']! as String,
+      );
+    } finally {
+      _callId = null;
+    }
+  }
+
+  @override
+  Future<void> cancel() async {
+    final id = _callId;
+    if (id != null) await platform.cancelAppShell(id);
+  }
 }
 
 abstract class _PlatformTool implements AgentTool {

@@ -95,6 +95,8 @@ extension ConversationRun on ChatController {
         ModelService.openAi => OpenAiResponsesProvider(
           runConfig,
           systemPrompt: systemPrompt,
+          summaryConfig: modelSettings.activeConfig,
+          sharedContext: groupParent?.sharedContext,
         ),
         ModelService.deepSeek ||
         ModelService.qwen ||
@@ -102,6 +104,8 @@ extension ConversationRun on ChatController {
         ModelService.glm => DeepSeekResponsesProvider(
           runConfig,
           systemPrompt: systemPrompt,
+          summaryConfig: modelSettings.activeConfig,
+          sharedContext: groupParent?.sharedContext,
         ),
       };
       final webSources = WebSourceRegistry();
@@ -135,6 +139,7 @@ extension ConversationRun on ChatController {
             unawaited(
               _platform.updateAgentSessionStep(
                 question.isUserAction ? '等待你操作' : '等待你的回答',
+                conversationId: runConversation.id,
               ),
             );
           }
@@ -194,19 +199,18 @@ extension ConversationRun on ChatController {
             senderId: reply.senderId,
             screenAccess: reply.profile.preferences.screenAccess,
           );
-      final executor = groupParent == null && !alongsideGroup
-          ? ToolExecutor(registry: registry, confirm: confirm)
-          : GroupToolExecutor(
-              registry: registry,
-              confirm: confirm,
-              queue: _groupToolQueue,
-              waitForInteraction: () async {
-                await pendingQuestion?.result.future;
-              },
-              cancelled: () =>
-                  groupParent?.runState == ChatRunState.stopping ||
-                  runConversation.runState == ChatRunState.stopping,
-            );
+      final executor = GroupToolExecutor(
+        registry: registry,
+        confirm: confirm,
+        queue: _groupToolQueue,
+        owner: _execution,
+        waitForInteraction: () async {
+          await pendingQuestion?.result.future;
+        },
+        cancelled: () =>
+            groupParent?.runState == ChatRunState.stopping ||
+            runConversation.runState == ChatRunState.stopping,
+      );
       final runtime = AgentRuntime(
         provider: provider,
         registry: registry,
@@ -250,18 +254,24 @@ extension ConversationRun on ChatController {
         ],
         contextSummary: groupHistory == null
             ? runConversation.contextSummary
-            : null,
+            : groupParent!.contextSummary,
         personalContext: () async => [
           responsePreferences.instructions,
           if (customInstructions.isNotEmpty) '用户自定义指令：\n$customInstructions',
-          await memory.sharedContext(),
+          if (runConversation.usesPersonalization) await memory.sharedContext(),
+          if (runConversation.isTemporary) '当前为临时会话，不得将本次内容写入长期记忆。',
           if (alongsideGroup) '群聊正在后台进行；当前私聊仍可使用完整工具集。共享手机界面和用户交互由执行器互斥协调。',
           if (groupParent != null) '当前群成员：${jsonEncode((awaitedRoster))}',
         ].join('\n\n'),
         onContextSummary: (summary) async {
-          if (groupHistory != null) return;
-          runConversation.contextSummary = summary;
-          await _persistMember(runConversation, groupParent);
+          final owner = groupParent ?? runConversation;
+          owner.contextSummary = summary;
+          await _persistRun(owner);
+        },
+        onCompactionChanged: (active) {
+          if (groupParent != null) return;
+          runConversation.isCompacting = active;
+          _notifyMember(runConversation, groupParent);
         },
         onTurnStarted: () async {
           modelTurnId = await _store.runs.startTurn(
@@ -419,6 +429,7 @@ extension ConversationRun on ChatController {
             unawaited(
               _platform.updateAgentSessionStep(
                 runningStep.isEmpty ? '正在分析结果' : runningStep.last.title,
+                conversationId: runConversation.id,
               ),
             );
           _notifyMember(runConversation, groupParent);
@@ -521,7 +532,7 @@ extension ConversationRun on ChatController {
         outcome = 'cancelled';
         executionWatch.stop();
         final keepActivity =
-            groupParent == null ||
+            (groupParent == null && runConversation.hasExecutionProcess) ||
             messages.last.runId == runId ||
             activities.any((activity) => activity.toolName != null);
         if (keepActivity) {
@@ -589,6 +600,7 @@ extension ConversationRun on ChatController {
       }
       rethrow;
     } finally {
+      runConversation.isCompacting = false;
       executionWatch.stop();
       try {
         if (outcome != 'completed') {
@@ -641,12 +653,13 @@ extension ConversationRun on ChatController {
         if (callbackEvents.isEmpty &&
             outcome == 'completed' &&
             (groupParent == null || runMessageIds.isNotEmpty)) {
-          memory.learn(
-            runConfig,
-            runConversation.id,
-            userMessage,
-            memoryRevision,
-          );
+          if (!runConversation.isTemporary)
+            memory.learn(
+              runConfig,
+              runConversation.id,
+              userMessage,
+              memoryRevision,
+            );
           if (groupHistory == null)
             completedReplies.value = ConversationCompletion(
               conversationId: runConversation.id,

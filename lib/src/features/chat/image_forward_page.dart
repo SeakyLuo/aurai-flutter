@@ -9,7 +9,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../platform/preview_image_actions.dart';
 import 'chat_controller.dart';
-import 'markdown_preview_text.dart';
+import 'message_preview_text.dart';
 import '../../storage/group_list_preview.dart';
 import 'image_forward_dialog.dart';
 import 'attachment_action_icon.dart';
@@ -107,22 +107,43 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
     }
   }
 
-  Future<void> _select(String? id, String title) async {
-    final sent = await showDialog<bool>(
+  Future<void> _select(Conversation item) async {
+    FocusScope.of(context).unfocus();
+    final sent = await showModalBottomSheet<bool>(
       context: context,
-      barrierDismissible: false,
+      isScrollControlled: true,
+      useSafeArea: true,
+      isDismissible: false,
+      enableDrag: false,
+      showDragHandle: false,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
       builder: (_) => widget.message != null
           ? ImageForwardDialog.message(
               controller: widget.controller,
               message: widget.message!,
-              targetId: id,
-              title: title,
+              targetId: item.id,
+              kind: item.kind,
+              title: item.title,
+              recipientName: item.kind == ConversationKind.group
+                  ? '群聊'
+                  : _senders[item.defaultSenderId]!.name,
+              avatar: _avatar(item),
             )
           : ImageForwardDialog(
               controller: widget.controller,
               image: widget.image!,
-              targetId: id,
-              title: title,
+              targetId: item.id,
+              kind: item.kind,
+              title: item.title,
+              recipientName: item.kind == ConversationKind.group
+                  ? '群聊'
+                  : _senders[item.defaultSenderId]!.name,
+              avatar: _avatar(item),
             ),
     );
     if (sent == true && mounted) Navigator.pop(context, true);
@@ -191,7 +212,7 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
                 _row(
                   item.title,
                   _avatar(item),
-                  () => _select(item.id, item.title),
+                  () => _select(item),
                   preview: item.preview,
                 ),
               if (_loading)
@@ -253,10 +274,9 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
       ),
       subtitle: preview == null
           ? null
-          : Text(
-              markdownPreviewText(preview),
+          : MessagePreviewText(
+              text: preview,
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 13,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,

@@ -40,11 +40,14 @@ class MessageItem extends StatefulWidget {
     required this.message,
     required this.onEdit,
     this.streaming = false,
+    this.readOnly = false,
     this.groupBubble = false,
     this.onQuote,
     this.onRecall,
     this.onInteractiveClick,
     this.htmlGameView,
+    this.showHtmlType = true,
+    this.onLocate,
     this.onOpenQuote,
     this.onOpenMember,
     this.availableSources = const {},
@@ -61,8 +64,11 @@ class MessageItem extends StatefulWidget {
   final ValueChanged<String>? onOpenMember;
   final String? excludedActivityMessageId;
   final bool streaming;
+  final bool readOnly;
   final bool groupBubble;
   final Widget? htmlGameView;
+  final bool showHtmlType;
+  final VoidCallback? onLocate;
   final Map<String, SourceReference> availableSources;
   final Future<void> Function(AgentMessage)? onEdit;
 
@@ -95,6 +101,9 @@ class _MessageItemState extends State<MessageItem> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.message != message ||
         oldWidget.groupBubble != widget.groupBubble ||
+        oldWidget.showHtmlType != widget.showHtmlType ||
+        oldWidget.readOnly != widget.readOnly ||
+        oldWidget.onLocate != widget.onLocate ||
         !mapEquals(oldWidget.mentionMembers, widget.mentionMembers) ||
         !mapEquals(oldWidget.availableSources, widget.availableSources)) {
       _content = _buildContent(context);
@@ -120,7 +129,8 @@ class _MessageItemState extends State<MessageItem> {
               ),
             if (widget.groupBubble || message.taskSummary?.stopped != true)
               _selectableContent(),
-            if (!widget.groupBubble &&
+            if (!widget.readOnly &&
+                !widget.groupBubble &&
                 message.htmlGame == null &&
                 !widget.streaming &&
                 message.taskSummary?.stopped != true)
@@ -221,7 +231,8 @@ class _MessageItemState extends State<MessageItem> {
       allowForward:
           !widget.streaming &&
           !message.isFailure &&
-          (message.text.isNotEmpty ||
+          (message.htmlGame != null ||
+              message.text.isNotEmpty ||
               message.images.isNotEmpty ||
               message.files.isNotEmpty),
     );
@@ -230,6 +241,21 @@ class _MessageItemState extends State<MessageItem> {
       case MessageAction.fullscreen:
         await (widget.htmlGameView! as HtmlGameView).openFullscreen(context);
       case MessageAction.forward:
+        var htmlCard = snapshot.htmlGame;
+        if (htmlCard != null) {
+          try {
+            htmlCard = await (widget.htmlGameView! as HtmlGameView)
+                .captureForwardPreview();
+          } on Object catch (error) {
+            if (mounted) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+            }
+            return;
+          }
+          if (!mounted) return;
+        }
         final sent = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (_) => ImageForwardPage.message(
@@ -241,6 +267,8 @@ class _MessageItemState extends State<MessageItem> {
                 text: snapshot.text,
                 images: List.of(snapshot.images),
                 files: List.of(snapshot.files),
+                htmlGame: htmlCard,
+                interactive: snapshot.interactive,
                 createdAt: snapshot.createdAt,
               ),
             ),
@@ -284,7 +312,9 @@ class _MessageItemState extends State<MessageItem> {
               children: [
                 Expanded(
                   child: Text(
-                    message.sender!.name,
+                    widget.showHtmlType
+                        ? '${message.sender!.name} · 小程序'
+                        : message.sender!.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -293,35 +323,45 @@ class _MessageItemState extends State<MessageItem> {
                     ),
                   ),
                 ),
-                Builder(
-                  builder: (buttonContext) => Semantics(
-                    button: true,
-                    label: '消息菜单',
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () {
-                        final box =
-                            buttonContext.findRenderObject()! as RenderBox;
-                        _openActions(
-                          box.localToGlobal(box.size.center(Offset.zero)),
-                        );
-                      },
-                      child: SizedBox(
-                        width: 32,
-                        height: 18,
-                        child: Icon(
-                          Icons.more_horiz_rounded,
-                          size: 20,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                if (!widget.readOnly)
+                  Builder(
+                    builder: (buttonContext) => Semantics(
+                      button: true,
+                      label: '消息菜单',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () {
+                          final box =
+                              buttonContext.findRenderObject()! as RenderBox;
+                          _openActions(
+                            box.localToGlobal(box.size.center(Offset.zero)),
+                          );
+                        },
+                        child: SizedBox(
+                          width: 32,
+                          height: 18,
+                          child: Icon(
+                            Icons.more_horiz_rounded,
+                            size: 20,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
             const SizedBox(height: 6),
-            widget.htmlGameView!,
+            if (widget.onLocate case final locate?)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: locate,
+                child: IgnorePointer(child: widget.htmlGameView!),
+              )
+            else
+              widget.htmlGameView!,
           ],
         ),
       );
@@ -602,9 +642,7 @@ class _MessageItemState extends State<MessageItem> {
               ),
         child: Material(
           key: _bubbleKey,
-          color: Theme.of(context).brightness == Brightness.dark
-              ? const Color(0xff2a292f)
-              : const Color(0xffefeff3),
+          color: GlobalUI.messageBackground(Theme.of(context)),
           borderRadius: BorderRadius.circular(22),
           clipBehavior: Clip.antiAlias,
           child: InkWell(

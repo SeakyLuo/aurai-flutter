@@ -1,13 +1,16 @@
+import 'model_image_input.dart';
 import '../domain/error_message.dart';
 import 'dart:convert';
 import 'dart:io';
 
 import '../domain/agent_models.dart';
+import '../domain/message_image.dart';
 import '../domain/model_provider.dart';
 
 Future<List<List<Map<String, Object?>>>> responseMessageInput(
-  List<AgentMessage> messages,
-) async {
+  List<AgentMessage> messages, {
+  bool supportsImages = true,
+}) async {
   final latestUserId = messages
       .where((message) => message.role == AgentMessageRole.user)
       .lastOrNull
@@ -15,7 +18,7 @@ Future<List<List<Map<String, Object?>>>> responseMessageInput(
   final input = <List<Map<String, Object?>>>[];
   for (final message in messages) {
     if (message.responseInput case final items?) {
-      input.add(items);
+      input.add(supportsImages ? items : textOnlyModelInput(items));
       continue;
     }
     final fileContext = message.files.isEmpty
@@ -27,7 +30,13 @@ Future<List<List<Map<String, Object?>>>> responseMessageInput(
     final content = <Map<String, Object?>>[
       if (text.isNotEmpty) {'type': 'input_text', 'text': text},
     ];
-    for (final image in message.images) {
+    if (!supportsImages && message.images.isNotEmpty) {
+      content.addAll(
+        message.images.map((image) => imagePlaceholder(name: image.name)),
+      );
+    }
+    for (final image
+        in supportsImages ? message.images : const <MessageImage>[]) {
       try {
         final bytes = await File(image.path).readAsBytes();
         content.add({

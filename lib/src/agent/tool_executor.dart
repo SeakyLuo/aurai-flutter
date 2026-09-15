@@ -105,7 +105,7 @@ class ToolExecutor {
             },
           );
         }
-        final approved = await _confirm(call, tool.definition);
+        final approved = await confirmTool(call, tool.definition);
         if (!approved) {
           return ToolResult(
             callId: call.id,
@@ -122,6 +122,28 @@ class ToolExecutor {
         }
       }
     }
+    return runAuthorizedTool(
+      call,
+      tool.definition,
+      () => _executeAuthorized(tool, call, questions, onWaitingForUser),
+    );
+  }
+
+  Future<bool> confirmTool(ToolCall call, ToolDefinition definition) =>
+      _confirm(call, definition);
+
+  Future<ToolResult> runAuthorizedTool(
+    ToolCall call,
+    ToolDefinition definition,
+    Future<ToolResult> Function() action,
+  ) => action();
+
+  Future<ToolResult> _executeAuthorized(
+    AgentTool tool,
+    ToolCall call,
+    AskUserTool? questions,
+    void Function(ToolResult)? onWaitingForUser,
+  ) async {
     if (_cancelRequested) {
       return ToolResult(
         callId: call.id,

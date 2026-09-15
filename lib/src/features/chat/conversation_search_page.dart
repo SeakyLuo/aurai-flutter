@@ -1,3 +1,4 @@
+import 'message_preview_text.dart';
 import '../../domain/error_message.dart';
 import 'home_navigation.dart';
 import 'dart:async';
@@ -165,37 +166,11 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
     _focus.requestFocus();
   }
 
-  TextSpan _highlight(String text, {bool archived = false}) {
-    if (_query.isEmpty) return TextSpan(text: text);
-    final matches = RegExp(
-      RegExp.escape(_query),
-      caseSensitive: false,
-      unicode: true,
-    ).allMatches(text);
-    final spans = <TextSpan>[];
-    var start = 0;
-    for (final match in matches) {
-      if (match.start > start) {
-        spans.add(TextSpan(text: text.substring(start, match.start)));
-      }
-      spans.add(
-        TextSpan(
-          text: text.substring(match.start, match.end),
-          style: TextStyle(
-            color: archived
-                ? (Theme.of(context).brightness == Brightness.dark
-                      ? const Color(0xffbbbbbb)
-                      : const Color(0xff858585))
-                : Theme.of(context).colorScheme.onSurface,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      );
-      start = match.end;
-    }
-    if (start < text.length) spans.add(TextSpan(text: text.substring(start)));
-    return TextSpan(children: spans);
-  }
+  TextSpan _highlight(
+    String text, {
+    bool archived = false,
+    bool literal = true,
+  }) => MessagePreviewText.span(context, text, query: _query, literal: literal);
 
   Future<void> _loadHistory() async {
     try {
@@ -566,7 +541,10 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
                               return SearchFileResultTile(
                                 result: file,
                                 title: _highlight(file.fileName),
-                                subtitle: _highlight(file.messageExcerpt),
+                                subtitle: _highlight(
+                                  file.messageExcerpt,
+                                  literal: false,
+                                ),
                                 onTap: () => _openSearchConversation(
                                   file.conversationId,
                                   file.messageId,
@@ -594,6 +572,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
                                           ),
                                         _highlight(
                                           result.snippet,
+                                          literal: false,
                                           archived:
                                               result.conversation.isArchived,
                                         ),

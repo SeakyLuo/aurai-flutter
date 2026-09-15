@@ -33,10 +33,6 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
 
   Future<void> _remove() async {
     if (_saving || _selected.isEmpty) return;
-    if (widget.controller.runningConversationId == widget.conversationId) {
-      _notice('请先停止群聊回复，再移除成员');
-      return;
-    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => DeleteConfirmationDialog(
@@ -46,10 +42,6 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
       ),
     );
     if (!mounted || confirmed != true) return;
-    if (widget.controller.runningConversationId == widget.conversationId) {
-      _notice('请先停止群聊回复，再移除成员');
-      return;
-    }
     setState(() => _saving = true);
     try {
       await widget.controller.groupStore.removeMembers(

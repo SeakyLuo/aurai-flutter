@@ -10,11 +10,13 @@ class ConversationListStatus extends StatelessWidget {
     required this.controller,
     required this.conversation,
     this.showUnread = true,
+    this.showFailure = true,
   });
 
   final ChatController controller;
   final Conversation conversation;
   final bool showUnread;
+  final bool showFailure;
 
   static bool hasStatus(
     ChatController controller,
@@ -24,9 +26,9 @@ class ConversationListStatus extends StatelessWidget {
       (conversation.kind != ConversationKind.group &&
           conversation.runState == ChatRunState.failed) ||
       (showUnread && ConversationStatusDot.hasUnreadCompletion(conversation)) ||
-      _isScheduled(controller, conversation);
+      isScheduled(controller, conversation);
 
-  static bool _isScheduled(
+  static bool isScheduled(
     ChatController controller,
     Conversation conversation,
   ) =>
@@ -41,12 +43,13 @@ class ConversationListStatus extends StatelessWidget {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: controller.scheduledTasks,
     builder: (context, _) {
-      final scheduled = _isScheduled(controller, conversation);
+      final scheduled = isScheduled(controller, conversation);
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (scheduled &&
-              !ConversationStatusDot.hasUnreadCompletion(conversation))
+              (!showUnread ||
+                  !ConversationStatusDot.hasUnreadCompletion(conversation)))
             Semantics(
               label: '定时任务',
               child: SizedBox.square(
@@ -59,8 +62,9 @@ class ConversationListStatus extends StatelessWidget {
                 ),
               ),
             ),
-          if (showUnread ||
-              !ConversationStatusDot.hasUnreadCompletion(conversation))
+          if ((showUnread &&
+                  ConversationStatusDot.hasUnreadCompletion(conversation)) ||
+              (showFailure && conversation.runState == ChatRunState.failed))
             ConversationStatusDot(conversation: conversation),
         ],
       );

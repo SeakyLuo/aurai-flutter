@@ -152,8 +152,11 @@ class AuraiPlatform {
   Future<void> openBatterySettings() =>
       _channel.invokeMethod<void>('openBatterySettings');
 
-  Future<Map<String, Object?>> runAppShell(String command) =>
-      _invokeMap('shell', <String, Object?>{'command': command});
+  Future<Map<String, Object?>> runAppShell(String id, String command) =>
+      _invokeMap('shell', <String, Object?>{'id': id, 'command': command});
+
+  Future<void> cancelAppShell(String id) =>
+      _channel.invokeMethod<void>('cancelAppShell', {'id': id});
 
   Future<void> openAccessibilitySettings() =>
       _channel.invokeMethod<void>('openAccessibilitySettings');
@@ -164,6 +167,7 @@ class AuraiPlatform {
     bool groupChat = false,
   }) async => _channel.invokeMethod<void>('startAgentSession', {
     'step': step,
+    'conversationId': conversationId,
     'groupChat': groupChat,
     'avatar': groupChat ? null : await notificationAvatar(conversationId),
   });
@@ -179,10 +183,13 @@ class AuraiPlatform {
     'avatar': await notificationAvatar(conversationId),
   });
 
-  Future<void> updateAgentSessionStep(String step) =>
-      _channel.invokeMethod<void>('updateAgentSessionStep', <String, Object?>{
-        'step': step,
-      });
+  Future<void> updateAgentSessionStep(
+    String step, {
+    required String conversationId,
+  }) => _channel.invokeMethod<void>('updateAgentSessionStep', <String, Object?>{
+    'step': step,
+    'conversationId': conversationId,
+  });
 
   Future<void> updateAttentionNotification(
     String conversationId,
@@ -287,11 +294,11 @@ class AuraiPlatform {
   });
 
   void setStopHandler(
-    Future<void> Function() handler,
+    Future<void> Function(String?) handler,
     void Function() onNotification,
   ) {
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'stopAgent') await handler();
+      if (call.method == 'stopAgent') await handler(call.arguments as String?);
       if (call.method == 'notificationOpened') onNotification();
     });
   }

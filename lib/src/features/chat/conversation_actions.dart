@@ -1,6 +1,124 @@
 part of 'chat_controller.dart';
 
 extension ConversationActions on ChatController {
+  Future<List<AgentMessage>> previewConversationMessages(
+    String id, {
+    AgentMessage? before,
+  }) => _store.reader.messages(id, before: before, limit: 50);
+
+  Future<void> _switchConversation(String? id) async {
+    if (_submitting || addingImages || changingConversation)
+      throw StateError('请等待当前操作完成，再切换会话');
+    if (id == activeConversation.id && !hasSearchWindow) return;
+    cancelSearchNavigation();
+    changingConversation = true;
+    _conversationChanged();
+    try {
+      await archiveTemporaryConversation(activeConversation);
+      await _persist();
+      _loadedMessageCounts[activeConversation.id] = messages.length;
+      final conversation = id == null
+          ? _newConversation
+          : id == _pendingAiConversation?.id
+          ? _pendingAiConversation!
+          : _liveConversation(id) != null
+          ? _liveConversation(id)!
+          : await _store.load(
+              id,
+              messageLimit:
+                  (_loadedMessageCounts[id] ?? 0) <
+                      ConversationReader.messagePageSize
+                  ? ConversationReader.messagePageSize
+                  : _loadedMessageCounts[id]!,
+            );
+      if (id == null) {
+        await _store.selectNewConversation();
+      } else {
+        if (conversation.runState == ChatRunState.idle &&
+            conversation.pendingGoal == null) {
+          conversation.seenRunId = conversation.activeRunId;
+        }
+        if (conversation.kind == ConversationKind.direct &&
+            conversation.messageCount == 0 &&
+            !conversation.isTemporary &&
+            !conversation.isStored) {
+          await _newDraftStore.save(conversation);
+          await _store.selectNewConversation();
+        } else {
+          await _store.writer.save(conversation);
+        }
+      }
+      final previousIndex = _conversations.indexWhere(
+        (item) => item.id == activeConversation.id,
+      );
+      if (previousIndex >= 0 &&
+          activeConversation != _runningConversation &&
+          activeConversation != _privateConversation) {
+        _conversations[previousIndex] =
+            conversationFromRow(conversationRow(activeConversation))
+              ..seenRunId = activeConversation.seenRunId
+              ..draftFiles.addAll(activeConversation.draftFiles)
+              ..draftImages.addAll(activeConversation.draftImages);
+      }
+      _activeConversation = conversation;
+      _pendingAiConversation = null;
+      _activeAi = conversation.kind == ConversationKind.direct
+          ? await groupStore.loadAi(conversation.defaultSenderId)
+          : null;
+      _restoreSearchWindow(conversation);
+      _store.writer.retain([
+        ...conversation.messages,
+        for (final state in _executionStates.values)
+          if (state.runningConversation != null &&
+              state.conversation != conversation)
+            ...state.conversation!.messages,
+      ]);
+      _updateConversationList();
+    } finally {
+      changingConversation = false;
+      _drainGroupSystemNotices();
+      _conversationChanged();
+    }
+  }
+
+  Future<void> saveTemporaryConversation(String id) async {
+    final conversation = await _targetConversation(id);
+    final previousMode = conversation.mode;
+    final previouslyArchived = conversation.isArchived;
+    conversation.mode = ConversationMode.normal;
+    conversation.isArchived = false;
+    try {
+      await _store.writer.mutate(() async {
+        await _store.database.update(
+          'conversations',
+          {'mode': ConversationMode.normal.name, 'archived': 0},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      });
+    } on Object {
+      conversation.mode = previousMode;
+      conversation.isArchived = previouslyArchived;
+      rethrow;
+    }
+    _updateConversationList(conversation);
+    _conversationChanged();
+  }
+
+  Future<void> archiveTemporaryConversation(Conversation conversation) async {
+    if (!conversation.isTemporary) return;
+    final previouslyArchived = conversation.isArchived;
+    conversation.isArchived = true;
+    try {
+      await _store.writer.save(conversation, makeActive: false);
+    } on Object {
+      conversation.isArchived = previouslyArchived;
+      rethrow;
+    }
+    _updateConversationList(conversation);
+    _conversationChanged();
+  }
+
   void _updateConversationList([Conversation? value]) {
     final conversation = value ?? activeConversation;
     if (conversation.kind == ConversationKind.direct &&
@@ -24,8 +142,8 @@ extension ConversationActions on ChatController {
         page.map(
           (item) => item.id == activeConversation.id
               ? activeConversation
-              : item.id == _runningConversation?.id
-              ? _runningConversation!
+              : _liveConversation(item.id) != null
+              ? _liveConversation(item.id)!
               : item,
         ),
       );
@@ -54,8 +172,8 @@ extension ConversationActions on ChatController {
 
   Future<Conversation> _targetConversation(String? id) async {
     if (id == null || id == activeConversation.id) return activeConversation;
-    if (id == _runningConversation?.id) return _runningConversation!;
-    if (id == _privateConversation?.id) return _privateConversation!;
+    final live = _liveConversation(id);
+    if (live != null) return live;
     for (final conversation in _conversations) {
       if (conversation.id == id) return conversation;
     }
@@ -186,7 +304,7 @@ extension ConversationActions on ChatController {
   Future<void> deleteConversation([String? id]) async {
     final removed = await _targetConversation(id);
     final isActive = removed.id == activeConversation.id;
-    if (removed.id == runningConversationId ||
+    if (_liveConversation(removed.id) != null ||
         changingConversation ||
         (isActive && (isBusy || addingImages))) {
       throw StateError('请等待当前操作完成，再删除会话');

@@ -40,8 +40,9 @@ class AttachmentSearch {
       FROM attachments a
       INNER JOIN messages m ON m.id = a.message_id
       INNER JOIN conversations c ON c.id = a.conversation_id
-      ${query.isEmpty ? '' : '''WHERE instr(lower(coalesce(a.display_name, '')), ?) > 0
-        OR instr(lower(m.text), ?) > 0'''}
+      WHERE c.mode = 'normal'
+      ${query.isEmpty ? '' : '''AND (instr(lower(coalesce(a.display_name, '')), ?) > 0
+        OR instr(lower(m.text), ?) > 0)'''}
       ORDER BY m.created_at DESC, a.position, a.id
       LIMIT ? OFFSET ?
     ''',

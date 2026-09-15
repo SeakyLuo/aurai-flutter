@@ -1,4 +1,6 @@
+import 'model_image_input.dart';
 import 'dart:convert';
+import 'deepseek_token_counter.dart';
 
 import '../domain/agent_models.dart';
 import '../domain/context_summary.dart';
@@ -17,9 +19,18 @@ typedef _DialogueEntry = ({
 /// Budgets are conservative estimates, not model-specific tokenizer counts.
 /// Full messages and original images remain in the conversation store.
 class ResponsesContext {
-  ResponsesContext(this.limits, {required this.systemPrompt});
+  ResponsesContext(
+    this.limits, {
+    required this.systemPrompt,
+    this.supportsImages = true,
+    this.summaryLimits,
+  });
 
-  final ModelContextLimits? limits;
+  final bool supportsImages;
+  bool get initialized => _initialized;
+
+  final ModelContextLimits limits;
+  final ModelContextLimits? summaryLimits;
   final String systemPrompt;
   static const summaryReserve = 8192;
   final _dialogue = <_DialogueEntry>[];
@@ -39,17 +50,24 @@ class ResponsesContext {
   /// Returns true when the remote continuation chain must be restarted.
   Future<bool> prepare(
     ModelRequest request,
-    ContextSummarizer summarize,
-  ) async {
+    ContextSummarizer summarize, {
+    bool force = false,
+    ContextSummary? sharedSummary,
+    bool useSharedSummary = false,
+    Future<void> Function(ContextSummary)? saveSummary,
+  }) async {
     if (!_initialized) {
-      final saved = request.contextSummary;
+      final saved = useSharedSummary ? sharedSummary : request.contextSummary;
       final through = saved == null
           ? -1
           : request.messages.indexWhere((m) => m.id == saved.throughMessageId);
       // Storage may already have loaded only messages after the checkpoint.
       _dialogueMemory = saved?.text ?? '';
       final messages = request.messages.skip(through + 1).toList();
-      final items = await responseMessageInput(messages);
+      final items = await responseMessageInput(
+        messages,
+        supportsImages: supportsImages,
+      );
       for (var i = 0; i < messages.length; i++) {
         _dialogue.add((message: messages[i], input: items[i]));
       }
@@ -59,111 +77,120 @@ class ResponsesContext {
       // A complete model output and all its results are indivisible at compaction.
       _rounds.add([
         ..._pendingOutput,
-        ...request.toolResults.map(functionCallOutput),
+        ...request.toolResults.map((result) {
+          final output = functionCallOutput(result);
+          return supportsImages ? output : textOnlyModelInput([output]).single;
+        }),
         for (final update in request.userUpdates)
           {'role': 'user', 'content': update},
       ]);
       _pendingOutput = [];
     }
     final policy = limits;
-    // Unknown custom models keep their server-defined limits; do not guess a
-    // window or silently impose the capacity of one of the bundled models.
-    if (policy == null) return false;
+    // Every model has a budget, including the estimate for custom models.
     final budget = policy.compactThreshold;
     final target = policy.compactTarget;
     final overhead =
-        estimateTokens(systemPrompt) +
-        estimateTokens(request.personalContext) +
-        estimateTokens({
+        await estimateTokens(systemPrompt) +
+        await estimateTokens(request.personalContext) +
+        await estimateTokens({
           'tools': request.tools
               .map(
                 (tool) => {
                   'name': tool.name,
                   'description': tool.description,
-                  'parameters': tool.inputSchema,
+                  'parameters': tool.modelInputSchema,
                 },
               )
               .toList(),
           'capabilities': request.capabilities.map((c) => c.reason).toList(),
         });
-    var size = estimateTokens(input) + overhead;
-    if (size <= budget) return false;
-    var compacted = false;
+    var size = await estimateTokens(input) + overhead;
+    if (!force && size <= budget) return false;
+    request.onCompactionChanged?.call(true);
+    try {
+      var compacted = false;
 
-    final lastUser = _dialogue.lastIndexWhere(
-      (entry) => entry.message.role == AgentMessageRole.user,
-    );
-    if (estimateTokens(_dialogue[lastUser].input) + overhead >
-        policy.inputBudget) {
-      throw const ModelProviderException('当前消息或图片超出上下文预算，请分开发送');
-    }
-    var cut = 0;
-    size += summaryReserve;
-    // Keep four recent messages if they fit; never summarize the current request.
-    while (cut < lastUser &&
-        (size > budget || (size > target && _dialogue.length - cut > 4))) {
-      size -= estimateTokens(_dialogue[cut].input);
-      cut++;
-    }
-    if (cut > 0) {
-      final memory = await _summarize(
-        _dialogue.take(cut).expand((entry) => entry.input),
-        _dialogueMemory,
-        summarize,
+      final lastUser = _dialogue.lastIndexWhere(
+        (entry) => entry.message.role == AgentMessageRole.user,
       );
-      final checkpoint = ContextSummary(
-        text: memory,
-        throughMessageId: _dialogue[cut - 1].message.id,
-      );
-      await request.onContextSummary?.call(checkpoint);
-      _dialogueMemory = memory;
-      _dialogue.removeRange(0, cut);
-      compacted = true;
-    }
-    size = estimateTokens(input) + overhead;
-    if (size > budget && _rounds.isNotEmpty) {
-      var count = 0;
+      if (lastUser >= 0 &&
+          await estimateTokens(_dialogue[lastUser].input) + overhead >
+              policy.inputBudget) {
+        throw const ModelProviderException('当前消息或图片超出上下文预算，请分开发送');
+      }
+      var cut = 0;
       size += summaryReserve;
-      while (count < _rounds.length &&
-          (size > budget || (size > target && _rounds.length - count > 2))) {
-        size -= estimateTokens(_rounds[count]);
-        count++;
+      // Keep twenty recent messages if they fit; never summarize the current request.
+      while (cut < lastUser &&
+          ((force && _dialogue.length - cut > 20) ||
+              size > budget ||
+              (size > target && _dialogue.length - cut > 20))) {
+        size -= await estimateTokens(_dialogue[cut].input);
+        cut++;
       }
-      // If even the newest complete exchange is oversized, summarize its text
-      // but keep its screenshots for the next action, without orphaned call IDs.
-      final latestImages = count == _rounds.length
-          ? _summaryContent(
-              _rounds.last,
-            ).where((part) => part['type'] == 'input_image').toList()
-          : <Map<String, Object?>>[];
-      final memory = await _summarize(
-        _rounds.take(count).expand((round) => round),
-        _taskMemory,
-        summarize,
-      );
-      _taskMemory = memory;
-      _rounds.removeRange(0, count);
-      if (latestImages.isNotEmpty) {
-        _rounds.add([
-          {
-            'role': 'user',
-            'content': [
-              {
-                'type': 'input_text',
-                'text':
-                    'Historical screenshots from the most recent completed tool exchange. Re-observe before acting if the screen has changed.',
-              },
-              ...latestImages,
-            ],
-          },
-        ]);
+      if (cut > 0) {
+        final memory = await _summarize(
+          _dialogue.take(cut).expand((entry) => entry.input),
+          _dialogueMemory,
+          summarize,
+        );
+        final checkpoint = ContextSummary(
+          text: memory,
+          throughMessageId: _dialogue[cut - 1].message.id,
+        );
+        await (saveSummary ?? request.onContextSummary)?.call(checkpoint);
+        _dialogueMemory = memory;
+        _dialogue.removeRange(0, cut);
+        compacted = true;
       }
-      compacted = true;
+      size = await estimateTokens(input) + overhead;
+      if (size > budget && _rounds.isNotEmpty) {
+        var count = 0;
+        size += summaryReserve;
+        while (count < _rounds.length &&
+            (size > budget || (size > target && _rounds.length - count > 2))) {
+          size -= await estimateTokens(_rounds[count]);
+          count++;
+        }
+        // If even the newest complete exchange is oversized, summarize its text
+        // but keep its screenshots for the next action, without orphaned call IDs.
+        final latestImages = count == _rounds.length
+            ? _summaryContent(
+                _rounds.last,
+              ).where((part) => part['type'] == 'input_image').toList()
+            : <Map<String, Object?>>[];
+        final memory = await _summarize(
+          _rounds.take(count).expand((round) => round),
+          _taskMemory,
+          summarize,
+        );
+        _taskMemory = memory;
+        _rounds.removeRange(0, count);
+        if (latestImages.isNotEmpty) {
+          _rounds.add([
+            {
+              'role': 'user',
+              'content': [
+                {
+                  'type': 'input_text',
+                  'text':
+                      'Historical screenshots from the most recent completed tool exchange. Re-observe before acting if the screen has changed.',
+                },
+                ...latestImages,
+              ],
+            },
+          ]);
+        }
+        compacted = true;
+      }
+      if (await estimateTokens(input) + overhead > policy.inputBudget) {
+        throw const ModelProviderException('当前消息或图片超出上下文预算，请分开发送');
+      }
+      return compacted;
+    } finally {
+      request.onCompactionChanged?.call(false);
     }
-    if (estimateTokens(input) + overhead > policy.inputBudget) {
-      throw const ModelProviderException('当前消息或图片超出上下文预算，请分开发送');
-    }
-    return compacted;
   }
 
   void recordOutput(List<Map<String, Object?>> output) =>
@@ -174,12 +201,15 @@ class ResponsesContext {
     String previous,
     ContextSummarizer summarize,
   ) async {
+    final batchBudget = (summaryLimits ?? limits).summaryBatchBudget;
     var memory = previous;
     var batch = <Map<String, Object?>>[];
     var tokens = 0;
     for (final part in _summaryContent(items)) {
-      final cost = estimateTokens(part);
-      if (batch.isNotEmpty && tokens + cost > limits!.summaryBatchBudget) {
+      final cost = await estimateTokens(part);
+      if (batch.isNotEmpty &&
+          tokens + cost + await estimateTokens(memory) + summaryReserve >
+              batchBudget) {
         memory = await summarize([
           if (memory.isNotEmpty)
             {'type': 'input_text', 'text': 'Earlier memory:\n$memory'},
@@ -263,20 +293,7 @@ class ResponsesContext {
   };
 }
 
-int estimateTokens(Object? value) {
-  if (value is String) return (utf8.encode(value).length / 3).ceil();
-  if (value is List)
-    return value.fold(0, (sum, item) => sum + estimateTokens(item));
-  if (value is Map) {
-    if (value['type'] == 'input_image') return 4096;
-    return value.entries.fold(
-      8,
-      (sum, entry) =>
-          sum + estimateTokens(entry.key) + estimateTokens(entry.value),
-    );
-  }
-  return 1;
-}
+Future<int> estimateTokens(Object? value) => DeepSeekTokenCounter.count(value);
 
 Map<String, Object?> functionCallOutput(ToolResult result) => {
   'type': 'function_call_output',

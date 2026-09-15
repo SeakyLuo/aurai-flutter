@@ -85,19 +85,21 @@ extension GlobalTools on ChatController {
               _controlApp(operation, args, senderId, conversationId),
         ),
       RecallMessageTool((id) => _recallAiMessage(conversation, senderId, id)),
-      for (final update in [false, true])
-        SelfProfileTool(
-          store: groupStore,
-          senderId: senderId,
-          update: update,
-          save: saveAi,
-          icons: avatarSymbols,
-          colors: {
-            for (final entry in avatarColors.entries) entry.key: entry.value.$1,
-            for (final entry in avatarGradients.entries)
-              'gradient:${entry.key}': entry.value.$1,
-          },
-        ),
+      if (conversation.usesPersonalization)
+        for (final update in [false, true])
+          SelfProfileTool(
+            store: groupStore,
+            senderId: senderId,
+            update: update,
+            save: saveAi,
+            icons: avatarSymbols,
+            colors: {
+              for (final entry in avatarColors.entries)
+                entry.key: entry.value.$1,
+              for (final entry in avatarGradients.entries)
+                'gradient:${entry.key}': entry.value.$1,
+            },
+          ),
       GroupMessageTool(
         (arguments) => _sendPrivateGroupMessage(arguments, senderId),
       ),
@@ -148,11 +150,17 @@ extension GlobalTools on ChatController {
             operation,
             senderId: senderId,
           ),
-      ...MemoryTools(
-        memory,
-        conversationId: conversationId,
-        messageId: messageId,
-      ).tools,
+      if (conversation.usesPersonalization)
+        ...MemoryTools(
+          memory,
+          conversationId: conversationId,
+          messageId: messageId,
+        ).tools.where(
+          (tool) =>
+              !conversation.isTemporary ||
+              tool.definition.name == 'listMemories' ||
+              tool.definition.name == 'readMemory',
+        ),
       GetModelBalanceTool(modelSettings),
       OpenModelTopUpTool(modelSettings),
       questionTool,

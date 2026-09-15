@@ -1,3 +1,4 @@
+import '../../domain/message_summary.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -36,7 +37,9 @@ class FileAttachmentCard extends StatelessWidget {
     required this.file,
     this.onRemove,
     this.onOpen,
+    this.title,
   });
+  final InlineSpan? title;
   final VoidCallback? onOpen;
   final MessageFile file;
   final VoidCallback? onRemove;
@@ -68,22 +71,35 @@ class FileAttachmentCard extends StatelessWidget {
         padding: const EdgeInsets.only(left: 12, top: 10, bottom: 10, right: 6),
         child: Row(
           children: [
-            const AttachmentActionIcon(type: AttachmentActionIconType.file),
+            AttachmentActionIcon(
+              type: file.isHtml
+                  ? AttachmentActionIconType.html
+                  : AttachmentActionIconType.file,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    file.name,
+                  Text.rich(
+                    title ??
+                        TextSpan(
+                          text: file.isHtml
+                              ? MessageSummary.htmlFileTitle(file.name)
+                              : file.name,
+                        ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 14),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${file.name.contains('.') ? file.name.split('.').last.toUpperCase() : '文件'} · $_size',
+                    '${file.isHtml
+                        ? '小程序'
+                        : file.name.contains('.')
+                        ? file.name.split('.').last.toUpperCase()
+                        : '文件'} · $_size',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

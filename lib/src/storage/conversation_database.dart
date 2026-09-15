@@ -12,12 +12,17 @@ import '../memory/memory_controller.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 26,
+  version: 27,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion < 27) {
+      await db.execute(
+        "ALTER TABLE conversations ADD COLUMN mode TEXT NOT NULL DEFAULT 'normal'",
+      );
+    }
     if (oldVersion < 10) await migrateMessageSenders(db);
     if (oldVersion < 11) await migrateGroupChats(db);
     if (oldVersion < 12) await db.execute(temporaryAiColumn);
@@ -158,6 +163,7 @@ const _schema = [
     updated_at INTEGER NOT NULL,
     title TEXT NOT NULL,
     kind TEXT NOT NULL DEFAULT 'direct',
+    mode TEXT NOT NULL DEFAULT 'normal',
     default_sender_id TEXT NOT NULL DEFAULT 'agent:aurai' REFERENCES message_senders(id),
     preview TEXT,
     creation_member_ids TEXT,

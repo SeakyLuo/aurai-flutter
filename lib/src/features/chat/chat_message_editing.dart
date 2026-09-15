@@ -3,8 +3,7 @@ part of 'chat_page.dart';
 extension _ChatMessageEditing on _ChatPageState {
   Future<void> _beginMessageEdit(AgentMessage message) async {
     final controller = widget.controller;
-    if (controller.hasRunningTask ||
-        controller.isBusy ||
+    if (controller.isBusy ||
         controller.addingImages ||
         controller.changingConversation ||
         controller.loadingEarlierMessages ||
@@ -165,8 +164,7 @@ extension _ChatMessageEditing on _ChatPageState {
             session.images.isEmpty &&
             session.files.isEmpty))
       return;
-    if (controller.hasRunningTask ||
-        controller.isBusy ||
+    if (controller.isBusy ||
         controller.addingImages ||
         controller.changingConversation ||
         controller.loadingEarlierMessages ||

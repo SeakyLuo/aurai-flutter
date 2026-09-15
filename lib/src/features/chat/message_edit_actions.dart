@@ -18,8 +18,7 @@ extension MessageEditActions on ChatController {
     if (activeConversation.kind == ConversationKind.group) {
       throw StateError('群聊消息请撤回后重新发送');
     }
-    if (hasRunningTask ||
-        isBusy ||
+    if (isBusy ||
         addingImages ||
         changingConversation ||
         loadingEarlierMessages) {

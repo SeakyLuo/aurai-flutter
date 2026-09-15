@@ -1,3 +1,4 @@
+import '../../storage/recalled_message_drafts.dart';
 import '../../html_games/html_message_interaction.dart';
 import '../../storage/message_callbacks.dart';
 import '../../agent/html_message_update_tool.dart';
@@ -65,7 +66,6 @@ import '../../agent/ask_user_tool.dart';
 import '../../agent/model_balance_tool.dart';
 import '../../agent/memory_tools.dart';
 import '../../agent/model_top_up_tool.dart';
-import '../../agent/tool_executor.dart';
 import '../../agent/group_tool_executor.dart';
 import '../../agent/tool_registry.dart';
 import '../../agent/local_history_tools.dart';
@@ -122,6 +122,7 @@ part 'scheduled_execution.dart';
 part 'message_edit_actions.dart';
 part 'accessibility_request.dart';
 part 'pending_confirmation.dart';
+part 'conversation_execution_state.dart';
 part 'group_sleep_recovery.dart';
 
 class ChatController extends ChangeNotifier {
@@ -164,6 +165,7 @@ class ChatController extends ChangeNotifier {
   HtmlGameEventPump? _htmlGameEvents;
   StreamSubscription<void>? _callbackChanges;
   bool _drainingCallbacks = false;
+  final _callbackConversations = <String>{};
   bool _callbacksDisposed = false;
   bool _callbacksPending = true;
   int _callbackGeneration = 0;
@@ -172,8 +174,33 @@ class ChatController extends ChangeNotifier {
   final _newDraftStore = NewConversationDraft();
   late Conversation _newConversation;
   final List<Conversation> _conversations = [];
-  late Conversation _activeConversation;
-  Conversation get activeConversation => _activeConversation;
+  late Conversation _viewConversation;
+  final _executionStates = <String, _ConversationExecutionState>{};
+  final _uiZone = Zone.current;
+  var _viewExecution = _ConversationExecutionState();
+  Conversation get _activeConversation => _viewConversation;
+  set _activeConversation(Conversation value) {
+    _executionStates.removeWhere(
+      (id, state) =>
+          id != value.id &&
+          state.leases == 0 &&
+          state.runningConversation == null &&
+          !state.submitting,
+    );
+    _viewConversation = value;
+    _viewExecution = _executionStates.putIfAbsent(
+      value.id,
+      _ConversationExecutionState.new,
+    )..conversation = value;
+  }
+
+  Conversation get activeConversation =>
+      (Zone.current[_executionZoneKey] as _ConversationExecutionState?)
+          ?.conversation ??
+      _viewConversation;
+
+  @override
+  void notifyListeners() => _uiZone.run(super.notifyListeners);
   Conversation? _conversationCursor;
   bool hasMoreConversations = false;
   bool loadingConversations = false;
@@ -196,20 +223,9 @@ class ChatController extends ChangeNotifier {
   set pendingGoal(String? value) => activeConversation.pendingGoal = value;
   String? get errorDetail => activeConversation.errorDetail;
   set errorDetail(String? value) => activeConversation.errorDetail = value;
-  bool _submitting = false;
   final _recallingMessages = <String>{};
-  AgentRuntime? _runtime;
   final _queuedSystemNotices = <String, List<AgentMessage>>{};
   bool _systemEventDrainScheduled = false;
-  bool _systemEventLoading = false;
-  GroupDispatcher? _groupDispatcher;
-  final _groupReplies = <String, _ReplyContext>{};
-  final _groupSenders = <String, MessageSender>{};
-  final _groupRuns = <String, Conversation>{};
-  final _removedGroupMembers = <String>{};
-  String? _confirmingSenderId;
-  final _groupRuntimes = <String, AgentRuntime>{};
-  final _groupStreaming = <String, String>{};
   final _groupToolQueue = GroupToolQueue();
   final _peerSessions = <String, Future<_PeerSession>>{};
   Iterable<Conversation> get groupRuns =>
@@ -220,30 +236,18 @@ class ChatController extends ChangeNotifier {
       streamingMessageId == id || _groupStreaming.containsValue(id);
   bool get hasStreamingMessages =>
       streamingMessageId != null || _groupStreaming.isNotEmpty;
-  Conversation? _runningConversation;
-  Conversation? _privateConversation;
   bool get hasRunningTask =>
       _systemEventLoading ||
       _runningConversation != null ||
       _privateConversation != null ||
-      _submitting ||
-      _claimingSchedule;
+      _submitting;
   String? get runningConversationId => _runningConversation?.id;
-
-  String? streamingMessageId;
-  PendingConfirmation? pendingConfirmation;
-  UserQuestion? pendingQuestion;
-  Completer<Map<String, Object?>>? _accessibilityRequest;
-  bool accessibilityRequestPending = false;
-  Timer? _accessibilityTimer;
-  DateTime? accessibilityDeadline;
-  bool _accessibilitySettingsOpened = false;
 
   void _accessibilityChanged() => notifyListeners();
 
   @override
   void dispose() {
-    _groupDispatcher?.stop();
+    _disposeExecutions();
     _stopPeerSessions();
     _queuedSystemNotices.clear();
     groupStore.onSystemNotice = null;
@@ -267,9 +271,6 @@ class ChatController extends ChangeNotifier {
     super.dispose();
   }
 
-  final Set<String> _deniedConfirmations = <String>{};
-  bool _accessibilityDeclined = false;
-
   bool get isBusy =>
       _submitting ||
       identical(_runningConversation, activeConversation) ||
@@ -284,13 +285,15 @@ class ChatController extends ChangeNotifier {
       identical(_runningConversation, activeConversation) &&
       runState == ChatRunState.running;
 
-  bool get canEditDraft =>
-      !_submitting && !_claimingSchedule && !changingConversation;
+  bool get canEditDraft => !_submitting && !changingConversation;
 
   ModelConfig get config =>
       _activeAi == null ? modelSettings.activeConfig : aiConfig(_activeAi!);
 
   bool get needsConfiguration => !config.isConfigured;
+
+  bool get needsReplyConfiguration =>
+      activeConversation.kind == ConversationKind.direct && needsConfiguration;
 
   bool get hasCapabilityIssue => capabilities.any(
     (capability) =>
@@ -298,7 +301,10 @@ class ChatController extends ChangeNotifier {
   );
 
   Future<void> initialize() async {
-    _platform.setStopHandler(stop, () => notificationOpenRequests.value++);
+    _platform.setStopHandler(
+      _stopNotificationConversation,
+      () => notificationOpenRequests.value++,
+    );
     await _imageStore.initialize();
     await toolApprovals.initialize();
     modelSettings = await _platform.loadModelSettings();
@@ -352,19 +358,22 @@ class ChatController extends ChangeNotifier {
     if (HtmlGameFeature.enabled) {
       _htmlGameEvents = HtmlGameEventPump(
         htmlGames,
-        () => hasRunningTask || changingConversation,
+        () => changingConversation,
         _recoverGroupSleep,
       )..start();
     }
     notifyListeners();
   }
 
-  Future<void> continuePending() async {
+  Future<void> continuePending() =>
+      _inConversation(activeConversation, _continuePending);
+
+  Future<void> _continuePending() async {
     if (canStartPrivateDuringGroup) {
       await _runPrivateDuringGroup();
       return;
     }
-    if (hasRunningTask) throw StateError('另一个会话正在运行，请等待完成');
+    if (hasRunningTask) throw StateError('当前会话正在回复，请等待完成');
     if (pendingGoal == null) return;
     final conversation = activeConversation;
     _runningConversation = conversation;
@@ -373,42 +382,11 @@ class ChatController extends ChangeNotifier {
       await _executeConversation(conversation);
     } finally {
       _runningConversation = null;
+      _resumeForwardedReply();
       _drainGroupSystemNotices();
       _updateConversationList(conversation);
       notifyListeners();
     }
-  }
-
-  Future<void> stop() async {
-    if (identical(activeConversation, _privateConversation)) {
-      _privateConversation!.runState = ChatRunState.stopping;
-      await _runtime?.cancel();
-      return;
-    }
-    final conversation = _runningConversation;
-    if (conversation == null || conversation.runState != ChatRunState.running) {
-      return;
-    }
-    conversation.runState = ChatRunState.stopping;
-    _queuedSystemNotices.remove(conversation.id);
-    _groupDispatcher?.stop();
-    if (conversation.kind == ConversationKind.group)
-      await _groupSleeps.remove(conversation.id);
-    for (final member in _groupRuns.values) {
-      if (member.runState == ChatRunState.running)
-        member.runState = ChatRunState.stopping;
-    }
-
-    notifyListeners();
-    await _persistRun(conversation);
-    pendingConfirmation?.completer.complete(false);
-    pendingConfirmation = null;
-    _finishAccessibility({'granted': false, 'reason': 'User stopped the task'});
-    await _platform.cancelPendingInteraction();
-    await Future.wait([
-      if (_runtime != null && _privateConversation == null) _runtime!.cancel(),
-      for (final runtime in _groupRuntimes.values) runtime.cancel(),
-    ]);
   }
 
   Future<void> refreshCapabilities() async {
@@ -463,82 +441,6 @@ class ChatController extends ChangeNotifier {
   Conversation? _pendingAiConversation;
   final _searchWindows = <String, Conversation>{};
   int _searchNavigationGeneration = 0;
-
-  Future<void> _switchConversation(String? id) async {
-    if (_submitting || addingImages || changingConversation)
-      throw StateError('请等待当前操作完成，再切换会话');
-    if (id == activeConversation.id && !hasSearchWindow) return;
-    cancelSearchNavigation();
-    changingConversation = true;
-    notifyListeners();
-    try {
-      await _persist();
-      _loadedMessageCounts[activeConversation.id] = messages.length;
-      final conversation = id == null
-          ? _newConversation
-          : id == _pendingAiConversation?.id
-          ? _pendingAiConversation!
-          : id == _privateConversation?.id
-          ? _privateConversation!
-          : id == _runningConversation?.id
-          ? _runningConversation!
-          : await _store.load(
-              id,
-              messageLimit:
-                  (_loadedMessageCounts[id] ?? 0) <
-                      ConversationReader.messagePageSize
-                  ? ConversationReader.messagePageSize
-                  : _loadedMessageCounts[id]!,
-            );
-      if (id == null) {
-        await _store.selectNewConversation();
-      } else {
-        if (conversation.runState == ChatRunState.idle &&
-            conversation.pendingGoal == null) {
-          conversation.seenRunId = conversation.activeRunId;
-        }
-        if (conversation.kind == ConversationKind.direct &&
-            conversation.messageCount == 0) {
-          await _newDraftStore.save(conversation);
-          await _store.selectNewConversation();
-        } else {
-          await _store.writer.save(conversation);
-        }
-      }
-      final previousIndex = _conversations.indexWhere(
-        (item) => item.id == activeConversation.id,
-      );
-      if (previousIndex >= 0 &&
-          activeConversation != _runningConversation &&
-          activeConversation != _privateConversation) {
-        _conversations[previousIndex] =
-            conversationFromRow(conversationRow(activeConversation))
-              ..seenRunId = activeConversation.seenRunId
-              ..draftFiles.addAll(activeConversation.draftFiles)
-              ..draftImages.addAll(activeConversation.draftImages);
-      }
-      _activeConversation = conversation;
-      _pendingAiConversation = null;
-      _activeAi = conversation.kind == ConversationKind.direct
-          ? await groupStore.loadAi(conversation.defaultSenderId)
-          : null;
-      _restoreSearchWindow(conversation);
-      _store.writer.retain([
-        ...conversation.messages,
-        if (_privateConversation != null &&
-            _privateConversation != conversation)
-          ..._privateConversation!.messages,
-        if (_runningConversation != null &&
-            _runningConversation != conversation)
-          ..._runningConversation!.messages,
-      ]);
-      _updateConversationList();
-    } finally {
-      changingConversation = false;
-      _drainGroupSystemNotices();
-      notifyListeners();
-    }
-  }
 
   void _conversationChanged() => notifyListeners();
 
@@ -604,25 +506,31 @@ class ChatController extends ChangeNotifier {
   ).search(query, offset, limit: limit);
 
   Future<void> addImages([ImageSource? source]) async {
-    addingImages = true;
-    notifyListeners();
+    final picking = source != null;
+    var added = false;
+    if (picking) {
+      addingImages = true;
+      notifyListeners();
+    }
     try {
-      await _persist();
+      if (picking) await _persist();
       final remaining = MessageImageStore.maxImages - draftImages.length;
       final images = source == null
           ? await _imageStore.recover(remaining)
           : await _imageStore.pick(source, remaining);
+      if (images.isEmpty) return;
       draftImages.addAll(images);
       try {
         await _persist();
+        added = true;
       } on Object {
         draftImages.removeWhere(images.contains);
         await _imageStore.remove(images);
         rethrow;
       }
     } finally {
-      addingImages = false;
-      notifyListeners();
+      if (picking) addingImages = false;
+      if (picking || added) notifyListeners();
     }
   }
 
@@ -683,7 +591,9 @@ class ChatController extends ChangeNotifier {
 
   Future<void> _persist({Map<String, List<String>> recipients = const {}}) =>
       activeConversation.kind == ConversationKind.direct &&
-          activeConversation.messageCount == 0
+          activeConversation.messageCount == 0 &&
+          !activeConversation.isTemporary &&
+          !activeConversation.isStored
       ? _newDraftStore.save(activeConversation)
       : _store.writer.save(activeConversation, recipients: recipients);
 

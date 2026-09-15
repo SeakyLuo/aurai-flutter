@@ -1,6 +1,26 @@
 part of 'chat_page.dart';
 
 extension _ChatSessionActions on _ChatPageState {
+  Future<void> _exitTemporaryConversation() async {
+    if (_temporaryExitPending) return;
+    _temporaryExitPending = true;
+    try {
+      _draftTimer?.cancel();
+      await widget.controller.archiveTemporaryConversation(
+        widget.controller.activeConversation,
+      );
+      if (!mounted) return;
+      _updateEditing(() => _temporaryExitReady = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.pop(context);
+      });
+    } on Object catch (error) {
+      if (mounted) _imageNotice('临时会话归档失败，请重试：${errorMessage(error)}');
+    } finally {
+      _temporaryExitPending = false;
+    }
+  }
+
   Future<void> _openBatterySettings() async {
     await widget.controller.openBatterySettings();
     if (mounted) {
@@ -36,22 +56,6 @@ extension _ChatSessionActions on _ChatPageState {
         _markReadScheduled = false;
       }
     });
-  }
-
-  bool _otherConversationRunning() {
-    final controller = widget.controller;
-    if (!controller.hasRunningTask ||
-        controller.isBusy ||
-        controller.canStartPrivateDuringGroup)
-      return false;
-    _imageNotice(
-      '另一个会话正在回复，完成后可发送；你可以继续浏览或编辑草稿',
-      action: SnackBarAction(
-        label: '查看',
-        onPressed: () => _changeConversation(controller.runningConversationId),
-      ),
-    );
-    return true;
   }
 
   bool _beforeDeleteConversation() {

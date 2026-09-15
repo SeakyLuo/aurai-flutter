@@ -82,6 +82,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _preparingGoal = false;
   bool _accessibilitySheetShowing = false;
   bool _markReadScheduled = false;
+  bool _temporaryExitPending = false;
+  bool _temporaryExitReady = false;
   MessageEditSession? _editing;
 
   void _updateEditing(VoidCallback change) => setState(change);
@@ -97,9 +99,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.initialMessageId case final id?) {
         _locateSearchMessage(id);
-      } else if (widget.controller.activeConversation.kind !=
-          ConversationKind.group) {
-        _scrollToBottom();
       }
       _loadImages();
     });
@@ -141,6 +140,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       controller,
       onEdit: _beginMessageEdit,
       onRecall: _recallMessage,
+      onReeditRecalled: _reeditRecalledMessage,
       onQuote: _editing == null ? _quoteMessage : null,
       onMention: controller.canEditDraft && _editing == null
           ? _mentionMember
@@ -172,10 +172,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
     return PopScope(
-      canPop: _editing == null,
+      canPop: _editing == null && (!active.isTemporary || _temporaryExitReady),
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) unawaited(_saveDraft());
-        if (!didPop && _editing != null) _cancelMessageEdit();
+        if (!didPop && _editing != null) {
+          _cancelMessageEdit();
+        } else if (!didPop && active.isTemporary) {
+          unawaited(_exitTemporaryConversation());
+        }
       },
       child: AbsorbPointer(
         absorbing: controller.changingConversation,
@@ -502,12 +506,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         (_) => _showConfirmation(confirmation),
       );
     }
-    if (_followOutput) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_followOutput) return;
-        _viewportKey.currentState?.scrollToBottom();
-      });
-    }
   }
 
   Future<void> _showConfirmation(PendingConfirmation request) async {
@@ -581,46 +579,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _changeConversation([String? id]) async {
-    final controller = widget.controller;
-    if (id == controller.activeConversation.id) {
-      try {
-        await controller.markActiveConversationRead();
-      } on Object catch (error) {
-        if (mounted) _imageNotice('已读状态保存失败，请重试：${errorMessage(error)}');
-      }
-      return;
-    }
-    if (_imageOperationPending()) return;
-    if (_preparingGoal) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('正在准备任务，请稍候')));
-      return;
-    }
-    _draftTimer?.cancel();
-    try {
-      if (id == null) {
-        await controller.createConversation();
-      } else {
-        await controller.selectConversation(id);
-      }
-      if (!mounted) return;
-      if (id == null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _focusNode.requestFocus();
-        });
-      }
-      setState(() {});
-    } on Object catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('会话保存失败，请稍后重试：${errorMessage(error)}')),
-        );
-      }
-    }
-  }
-
   void _useExample(String example) {
     _textController.text = example;
     _textController.selection = TextSelection.collapsed(
@@ -630,7 +588,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _send() async {
-    if (_otherConversationRunning()) return;
     final conversationId = widget.controller.activeConversation.id;
     final goal = _textController.text.trim();
     if ((goal.isEmpty &&
@@ -672,10 +629,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Future<void> _continuePending() async {
-    if (_otherConversationRunning()) return;
     final conversationId = widget.controller.activeConversation.id;
     if (_preparingGoal || widget.controller.addingImages) return;
-    if (widget.controller.needsConfiguration) {
+    if (widget.controller.needsReplyConfiguration) {
       _preparingGoal = true;
       try {
         await _openSettings(continueAfterSave: true);

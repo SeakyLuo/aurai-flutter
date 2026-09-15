@@ -69,7 +69,11 @@ Future<MessageAction?> showMessageActionsMenu(
           '转发',
         ),
       if (message.text.isNotEmpty) ...[
-        (MessageAction.copy, const CopyIcon(), '复制'),
+        (
+          MessageAction.copy,
+          const CopyIcon(),
+          message.htmlGame != null ? '复制标题' : '复制',
+        ),
         (MessageAction.select, const TextSelectionIcon(), '选择文本'),
       ],
       if (allowEditing && message.role == AgentMessageRole.user)

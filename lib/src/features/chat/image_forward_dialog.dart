@@ -1,14 +1,16 @@
 import '../../domain/error_message.dart';
 import '../../domain/agent_models.dart';
 import 'message_forward_preview.dart';
+import 'forward_conversation_sheet.dart';
+import 'settings_icon.dart';
 import 'unavailable_image.dart';
 import '../../platform/message_image_store.dart';
 import 'package:flutter/material.dart';
 import '../../platform/preview_image_actions.dart';
 import 'chat_controller.dart';
 import 'dialog_action_button.dart';
-import 'glass_surface.dart';
 import 'settings_appearance.dart';
+import 'glass_surface.dart';
 
 class ImageForwardDialog extends StatefulWidget {
   const ImageForwardDialog({
@@ -16,7 +18,10 @@ class ImageForwardDialog extends StatefulWidget {
     required this.controller,
     required ImageProvider image,
     required this.targetId,
+    required this.kind,
     required this.title,
+    required this.recipientName,
+    required this.avatar,
   }) : image = image,
        message = null;
   const ImageForwardDialog.message({
@@ -24,14 +29,20 @@ class ImageForwardDialog extends StatefulWidget {
     required this.controller,
     required AgentMessage message,
     required this.targetId,
+    required this.kind,
     required this.title,
+    required this.recipientName,
+    required this.avatar,
   }) : message = message,
        image = null;
   final ChatController controller;
   final ImageProvider? image;
   final AgentMessage? message;
   final String? targetId;
+  final ConversationKind kind;
   final String title;
+  final String recipientName;
+  final Widget avatar;
   @override
   State<ImageForwardDialog> createState() => _ImageForwardDialogState();
 }
@@ -83,104 +94,189 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
     }
   }
 
+  Widget _content({required bool bounded}) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const Text(
+        '发送给',
+        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+      ),
+      const SizedBox(height: 16),
+      InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: _sending || widget.targetId == null
+            ? null
+            : () {
+                FocusScope.of(context).unfocus();
+                showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  useSafeArea: true,
+                  showDragHandle: false,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => ForwardConversationSheet(
+                    controller: widget.controller,
+                    conversationId: widget.targetId!,
+                    kind: widget.kind,
+                    title: widget.title,
+                  ),
+                );
+              },
+        child: Row(
+          children: [
+            widget.avatar,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.recipientName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (widget.targetId != null) ...[
+              const SizedBox(width: 12),
+              const SettingsIcon(type: SettingsIconType.chevron),
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 20),
+      if (bounded)
+        Flexible(
+          child: MessageForwardPreview(
+            message: widget.message!,
+            enabled: !_sending,
+            fitAvailableHeight: true,
+          ),
+        )
+      else if (widget.message != null)
+        MessageForwardPreview(message: widget.message!, enabled: !_sending)
+      else
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: dialogControlColor(context),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          alignment: Alignment.centerLeft,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image(
+              image: widget.image!,
+              width: 88,
+              height: 88,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => const SizedBox.square(
+                dimension: 88,
+                child: UnavailableImage(),
+              ),
+            ),
+          ),
+        ),
+      const SizedBox(height: 12),
+      TextField(
+        controller: _text,
+        enabled: !_sending,
+        minLines: 1,
+        maxLines: bounded ? 1 : 3,
+        style: const TextStyle(fontSize: 15),
+        decoration: InputDecoration(
+          hintText: '留言',
+          filled: true,
+          fillColor: dialogControlColor(context),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+      const SizedBox(height: 8),
+    ],
+  );
+
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: !_sending,
-    child: ScaffoldMessenger(
-      key: _messenger,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Dialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          insetPadding: const EdgeInsets.all(28),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: GlassSurface(
-              radius: 28,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      '发送给',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      widget.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 15),
-                    ),
-                    const SizedBox(height: 16),
-                    if (widget.message case final message?)
-                      MessageForwardPreview(message: message)
-                    else
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Image(
-                            image: widget.image!,
-                            width: 96,
-                            height: 96,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => const SizedBox.square(
-                              dimension: 96,
-                              child: UnavailableImage(),
-                            ),
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _text,
-                      enabled: !_sending,
-                      minLines: 1,
-                      maxLines: 4,
-                      style: const TextStyle(fontSize: 15),
-                      decoration: InputDecoration(
-                        hintText: '说点什么…',
-                        filled: true,
-                        fillColor: dialogControlColor(context),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: LayoutBuilder(
+      builder: (context, constraints) => SizedBox(
+        height: constraints.maxHeight.clamp(
+          0.0,
+          widget.message?.htmlGame != null ? 520.0 : 400.0,
+        ),
+        child: GlassSurface(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          child: PopScope(
+            canPop: !_sending,
+            child: ScaffoldMessenger(
+              key: _messenger,
+              child: Scaffold(
+                resizeToAvoidBottomInset: false,
+                backgroundColor: Colors.transparent,
+                body: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Expanded(
-                          child: DialogActionButton(
-                            text: '取消',
-                            role: DialogActionRole.secondary,
-                            onPressed: _sending
-                                ? null
-                                : () => Navigator.pop(context),
-                          ),
+                          child: widget.message?.htmlGame != null
+                              ? _content(bounded: true)
+                              : SingleChildScrollView(
+                                  child: _content(bounded: false),
+                                ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: DialogActionButton(
-                            text: _sending ? '发送中…' : '发送',
-                            onPressed: _sending ? null : _send,
-                          ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DialogActionButton(
+                                text: '取消',
+                                role: DialogActionRole.secondary,
+                                onPressed: _sending
+                                    ? null
+                                    : () => Navigator.pop(context),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: DialogActionButton(
+                                text: _sending ? '发送中…' : '发送',
+                                onPressed: _sending ? null : _send,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),

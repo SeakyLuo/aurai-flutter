@@ -181,6 +181,7 @@ class ModelRequest {
     this.contextSummary,
     this.personalContext = '',
     this.onContextSummary,
+    this.onCompactionChanged,
     this.onTextChanged,
     this.onProcessingStarted,
     this.onReconnect,
@@ -196,6 +197,7 @@ class ModelRequest {
   final ContextSummary? contextSummary;
   final String personalContext;
   final Future<void> Function(ContextSummary)? onContextSummary;
+  final void Function(bool)? onCompactionChanged;
   final List<ToolResult> toolResults;
   final List<String> userUpdates;
   final void Function(String text)? onTextChanged;

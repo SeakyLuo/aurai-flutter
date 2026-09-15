@@ -18,6 +18,14 @@ extension GroupSystemEvents on ChatController {
     String groupId,
     AgentMessage notice,
   ) async {
+    final target = await _forwardTarget(groupId);
+    await _inConversation(target, () => _receiveGroupNoticeIn(groupId, notice));
+  }
+
+  Future<void> _receiveGroupNoticeIn(
+    String groupId,
+    AgentMessage notice,
+  ) async {
     final running = _runningConversation;
     final dispatcher = _groupDispatcher;
     if (running?.id == groupId &&
@@ -62,7 +70,8 @@ extension GroupSystemEvents on ChatController {
     }
     if (removed.contains(_confirmingSenderId)) {
       if (pendingConfirmation != null) resolveConfirmation(false);
-      await _platform.cancelPendingInteraction();
+      if (_groupToolQueue.isOwnedBy(_execution))
+        await _platform.cancelPendingInteraction();
     }
     await Future.wait([
       for (final id in removed)
@@ -89,40 +98,50 @@ extension GroupSystemEvents on ChatController {
     _systemEventDrainScheduled = true;
     scheduleMicrotask(() async {
       _systemEventDrainScheduled = false;
-      if (hasRunningTask ||
-          changingConversation ||
-          _queuedSystemNotices.isEmpty)
-        return;
-      final id = _queuedSystemNotices.keys.first;
-      final notices = _queuedSystemNotices.remove(id)!;
-      try {
-        // Reserve the execution slot before loading the saved group.
-        _systemEventLoading = true;
-        final loaded = id == activeConversation.id
-            ? activeConversation
-            : await _store.load(id);
-        final conversation = id == activeConversation.id
-            ? activeConversation
-            : loaded;
-        for (final notice in notices) {
-          if (!conversation.messages.any((m) => m.id == notice.id)) {
-            conversation.messages.add(notice);
-            conversation.messageCount++;
-          }
-        }
-        _store.writer.remember(notices);
-        _runningConversation = conversation;
-        _systemEventLoading = false;
-        _notifyRun(conversation);
-        await _executeGroupChat(conversation);
-      } on Object catch (error, stack) {
-        debugPrint('Group system event failed: $error\n$stack');
-      } finally {
-        _systemEventLoading = false;
-        _runningConversation = null;
-        _conversationChanged();
-        _drainGroupSystemNotices();
+      if (_callbacksDisposed) return;
+      for (final id in _queuedSystemNotices.keys.toList()) {
+        final state = _executionStates[id];
+        if (state != null &&
+            (state.runningConversation != null ||
+                state.systemEventLoading ||
+                state.submitting))
+          continue;
+        final notices = _queuedSystemNotices.remove(id)!;
+        unawaited(_runGroupNotices(id, notices));
       }
     });
+  }
+
+  Future<void> _runGroupNotices(String id, List<AgentMessage> notices) async {
+    try {
+      final target = await _forwardTarget(id);
+      await _inConversation(target, () async {
+        if (_runningConversation != null) {
+          for (final notice in notices) {
+            await _receiveGroupNoticeIn(id, notice);
+          }
+          return;
+        }
+        _runningConversation = target;
+        try {
+          for (final notice in notices) {
+            if (!target.messages.any((m) => m.id == notice.id)) {
+              target.messages.add(notice);
+              target.messageCount++;
+            }
+          }
+          _store.writer.remember(notices);
+          _notifyRun(target);
+          await _executeGroupChat(target);
+        } finally {
+          _runningConversation = null;
+          _resumeForwardedReply();
+          _conversationChanged();
+          _drainGroupSystemNotices();
+        }
+      });
+    } on Object catch (error, stack) {
+      debugPrint('Group system event failed: $error\n$stack');
+    }
   }
 }

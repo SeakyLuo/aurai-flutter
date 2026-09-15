@@ -1,21 +1,29 @@
 part of 'chat_controller.dart';
 
 extension MessageSubmission on ChatController {
-  Future<bool> submitGoal(
-    String goal, {
+  Future<bool> submitGoal(String goal, {List<String>? mentionedRecipients}) =>
+      _inConversation(
+        activeConversation,
+        () => _submitGoal(goal, mentionedRecipients),
+      );
+
+  Future<bool> _submitGoal(
+    String goal,
     List<String>? mentionedRecipients,
-  }) async {
+  ) async {
     if (canSendToRunningGroup) {
       await _appendGroupMessage(goal, mentionedRecipients);
       return false;
     }
     if (hasRunningTask && !canStartPrivateDuringGroup)
-      throw StateError('另一个会话正在运行，请等待完成');
+      throw StateError('当前会话正在回复，请等待完成');
     cancelSearchNavigation();
     _submitting = true;
     final wasNew =
         activeConversation.kind == ConversationKind.direct &&
-        activeConversation.messageCount == 0;
+        activeConversation.messageCount == 0 &&
+        !activeConversation.isTemporary &&
+        !activeConversation.isStored;
     final previousQuote = activeConversation.draftQuote;
     final previousDraft = activeConversation.draft;
     final previousMentions = List.of(activeConversation.draftMentions);
@@ -89,7 +97,7 @@ extension MessageSubmission on ChatController {
         );
       }
       _updateConversationList();
-      if (needsConfiguration) {
+      if (needsReplyConfiguration) {
         return true;
       }
       _submitting = false;

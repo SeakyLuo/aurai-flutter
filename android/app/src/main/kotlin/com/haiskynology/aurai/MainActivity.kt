@@ -50,6 +50,11 @@ class MainActivity : FlutterActivity() {
         current = this
         isResumed = true
         AgentSessionService.clearFinishedNotification(this)
+        val backupStatus = java.io.File(applicationInfo.dataDir, "backup-status.txt")
+        if (backupStatus.exists()) {
+            android.widget.Toast.makeText(this, backupStatus.readText(), android.widget.Toast.LENGTH_LONG).show()
+            backupStatus.delete()
+        }
     }
 
     override fun onPause() {
@@ -71,6 +76,7 @@ class MainActivity : FlutterActivity() {
         if (requestCode == PreviewImageAccess.REQUEST) PreviewImageAccess.picker?.selected(if (resultCode == RESULT_OK) data?.data else null)
         if (requestCode == ChatFileAccess.REQUEST) ChatFileAccess.picker?.selected(if (resultCode == RESULT_OK) data else null)
         if (requestCode == DocumentAccess.REQUEST) DocumentAccess.picker?.selected(if (resultCode == RESULT_OK) data else null)
+        if (requestCode == DataManagementAccess.REQUEST) DataManagementAccess.picker?.selected(if (resultCode == RESULT_OK) data?.data else null)
         if (requestCode == 1402) NetworkCaptureAccess.consent(this, resultCode == RESULT_OK)
     }
 

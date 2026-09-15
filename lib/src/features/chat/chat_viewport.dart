@@ -95,10 +95,12 @@ class ChatViewportState extends State<ChatViewport> {
 
   void _measureEntry(String id, double height) {
     if (!mounted || _entryHeights[id] == height) return;
+    final previousHeight = _entryHeights[id];
     final previousFooter = _footerHeight;
     _entryHeights[id] = height;
     if (_footerHeight != previousFooter) setState(() {});
     if (_keepSentMessageAtTop) _scheduleSentSync();
+    if (_following && previousHeight != null) _scheduleBottomSync();
   }
 
   double _listAlignment(int index, double itemAlignment) {
@@ -185,7 +187,12 @@ class ChatViewportState extends State<ChatViewport> {
       _pinSentMessage();
       return;
     }
-    if (_following && widget.padding.bottom != oldWidget.padding.bottom) {
+    if (_following &&
+        (widget.padding.bottom != oldWidget.padding.bottom ||
+            widget.entries.length != oldWidget.entries.length ||
+            (widget.entries.isNotEmpty &&
+                oldWidget.entries.isNotEmpty &&
+                widget.entries.last.id != oldWidget.entries.last.id))) {
       _scheduleBottomSync();
     }
     if (anchor != null && !_following) {

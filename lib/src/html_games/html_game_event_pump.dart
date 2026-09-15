@@ -12,6 +12,7 @@ class HtmlGameEventPump {
   Timer? _timer;
   StreamSubscription<String>? _changes;
   bool _draining = false;
+  final _waking = <String>{};
   bool _disposed = false;
 
   void start() {
@@ -30,12 +31,17 @@ class HtmlGameEventPump {
     try {
       final pending = await store.pendingWake();
       if (pending.isEmpty || _disposed || busy()) return;
-      final id = pending.first['conversation_id'] as String;
-      final members = pending
-          .where((r) => r['conversation_id'] == id)
-          .map((r) => r['sender_id'] as String)
-          .toSet();
-      await wake(id, members);
+      final groups = <String, Set<String>>{};
+      for (final receipt in pending) {
+        groups
+            .putIfAbsent(receipt['conversation_id'] as String, () => {})
+            .add(receipt['sender_id'] as String);
+      }
+      for (final entry in groups.entries) {
+        if (_waking.add(entry.key)) {
+          unawaited(_wakeConversation(entry.key, entry.value));
+        }
+      }
     } on Object catch (error, stack) {
       developer.log(
         'HTML game event delivery failed',
@@ -45,6 +51,21 @@ class HtmlGameEventPump {
       );
     } finally {
       _draining = false;
+    }
+  }
+
+  Future<void> _wakeConversation(String id, Set<String> members) async {
+    try {
+      await wake(id, members);
+    } on Object catch (error, stack) {
+      developer.log(
+        'HTML game conversation wake failed',
+        name: 'aurai.html_game',
+        error: error,
+        stackTrace: stack,
+      );
+    } finally {
+      _waking.remove(id);
     }
   }
 

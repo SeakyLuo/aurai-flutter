@@ -50,6 +50,18 @@ class _ConversationMoreState extends State<ConversationMore> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _saveChat() async {
+    setState(() => _saving = true);
+    try {
+      await widget.controller.saveTemporaryConversation(_conversation.id);
+      _notice('已保存为正式会话');
+    } on Object catch (error) {
+      _notice('聊天保存失败，请重试：${errorMessage(error)}');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<void> _pin() async {
     setState(() => _saving = true);
     try {
@@ -211,7 +223,13 @@ class _ConversationMoreState extends State<ConversationMore> {
     final safe = MediaQuery.paddingOf(context);
     final menuWidth = 212.0;
     final menuHeight =
-        (_conversation.isArchived ? 202.0 : 264.0) + (hasTask ? 54 : 0) + 54;
+        (_conversation.isTemporary
+            ? 202.0
+            : _conversation.isArchived
+            ? 202.0
+            : 264.0) +
+        (hasTask ? 54 : 0) +
+        54;
     final anchor =
         position ??
         Offset(
@@ -282,6 +300,15 @@ class _ConversationMoreState extends State<ConversationMore> {
                                   _MoreAction.members,
                                 ),
                               ),
+                            if (_conversation.isTemporary)
+                              _GlassMenuItem(
+                                icon: ConversationMenuIconType.unarchive,
+                                label: '保存此聊天',
+                                onTap: () => Navigator.pop(
+                                  menuContext,
+                                  _MoreAction.save,
+                                ),
+                              ),
                             if (hasTask)
                               _GlassMenuItem(
                                 iconWidget: SettingsIcon(
@@ -296,7 +323,8 @@ class _ConversationMoreState extends State<ConversationMore> {
                                   _MoreAction.task,
                                 ),
                               ),
-                            if (!_conversation.isArchived)
+                            if (!_conversation.isArchived &&
+                                !_conversation.isTemporary)
                               _GlassMenuItem(
                                 icon: pinned
                                     ? ConversationMenuIconType.unpin
@@ -313,16 +341,17 @@ class _ConversationMoreState extends State<ConversationMore> {
                                 _MoreAction.rename,
                               ),
                             ),
-                            _GlassMenuItem(
-                              icon: _conversation.isArchived
-                                  ? ConversationMenuIconType.unarchive
-                                  : ConversationMenuIconType.archive,
-                              label: _conversation.isArchived ? '取消归档' : '归档',
-                              onTap: () => Navigator.pop(
-                                menuContext,
-                                _MoreAction.archive,
+                            if (!_conversation.isTemporary)
+                              _GlassMenuItem(
+                                icon: _conversation.isArchived
+                                    ? ConversationMenuIconType.unarchive
+                                    : ConversationMenuIconType.archive,
+                                label: _conversation.isArchived ? '取消归档' : '归档',
+                                onTap: () => Navigator.pop(
+                                  menuContext,
+                                  _MoreAction.archive,
+                                ),
                               ),
-                            ),
                             _GlassMenuItem(
                               icon: ConversationMenuIconType.delete,
                               label: '删除会话',
@@ -388,6 +417,8 @@ class _ConversationMoreState extends State<ConversationMore> {
             initialTitle: _conversation.title,
           ),
         );
+      case _MoreAction.save:
+        await _saveChat();
       case _MoreAction.archive:
         await _archive();
       case _MoreAction.delete:
@@ -416,7 +447,7 @@ class _ConversationMoreState extends State<ConversationMore> {
         );
 }
 
-enum _MoreAction { profile, task, members, pin, rename, archive, delete }
+enum _MoreAction { profile, task, members, pin, rename, archive, delete, save }
 
 class _GlassMenuItem extends StatelessWidget {
   const _GlassMenuItem({

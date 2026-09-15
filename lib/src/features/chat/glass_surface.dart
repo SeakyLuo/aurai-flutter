@@ -10,12 +10,14 @@ class GlassSurface extends StatelessWidget {
     super.key,
     required this.child,
     this.radius = 32,
+    this.borderRadius,
     this.dark = false,
     this.regular = false,
     this.tintOpacity = 1,
   });
   final Widget child;
   final double radius;
+  final BorderRadius? borderRadius;
   final bool dark;
   final bool regular;
   final double tintOpacity;
@@ -23,7 +25,7 @@ class GlassSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(radius),
+      borderRadius: borderRadius ?? BorderRadius.circular(radius),
       boxShadow: const [
         BoxShadow(
           color: Color(0x10000000),
@@ -38,12 +40,12 @@ class GlassSurface extends StatelessWidget {
       ],
     ),
     child: ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
+      borderRadius: borderRadius ?? BorderRadius.circular(radius),
       child: BackdropFilter.grouped(
         filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(radius),
+            borderRadius: borderRadius ?? BorderRadius.circular(radius),
             border: Border.all(
               color: (dark || Theme.of(context).brightness == Brightness.dark)
                   ? const Color(0x38ffffff)

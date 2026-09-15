@@ -33,6 +33,7 @@ class AgentRuntime {
     ContextSummary? contextSummary,
     FutureOr<String> Function()? personalContext,
     Future<void> Function(ContextSummary)? onContextSummary,
+    void Function(bool)? onCompactionChanged,
     FutureOr<void> Function()? onTurnStarted,
     Future<void> Function(ModelTurn)? onTurnCompleted,
     Future<void> Function(ToolCall)? onToolStarted,
@@ -73,6 +74,7 @@ class AgentRuntime {
             contextSummary: contextSummary,
             personalContext: await personalContext?.call() ?? '',
             onContextSummary: onContextSummary,
+            onCompactionChanged: onCompactionChanged,
             onMessageStarted: onMessageStarted,
             onReconnect: onReconnect,
             onProcessingStarted: () {

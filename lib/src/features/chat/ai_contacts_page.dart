@@ -1,6 +1,7 @@
 import '../../domain/error_message.dart';
 import '../../domain/message_sender.dart';
 import 'header_action_menu.dart';
+import 'home_navigation.dart';
 import 'ai_contact_actions.dart';
 import 'conversation_menu_icon.dart';
 import 'conversation_icon.dart';
@@ -24,11 +25,13 @@ class AiContactsPage extends StatefulWidget {
     this.archived = false,
     this.root = false,
     this.selectForConversation = false,
+    this.conversationMode = ConversationMode.normal,
   });
   final ChatController controller;
   final bool archived;
   final bool root;
   final bool selectForConversation;
+  final ConversationMode conversationMode;
   @override
   State<AiContactsPage> createState() => _AiContactsPageState();
 }
@@ -98,6 +101,35 @@ class _AiContactsPageState extends State<AiContactsPage> {
     if (mounted) _load(reset: true);
   }
 
+  bool _openingConversation = false;
+
+  Future<void> _startConversation(AiProfile ai) async {
+    if (_openingConversation) return;
+    _openingConversation = true;
+    try {
+      final id = await widget.controller.openAiConversation(
+        ai,
+        newConversation: true,
+        mode: widget.conversationMode,
+      );
+      if (!mounted) return;
+      await openHomeConversation(
+        context,
+        widget.controller,
+        id,
+        preservePreviousRoute: true,
+      );
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法新建会话，请重试：${errorMessage(error)}')),
+        );
+      }
+    } finally {
+      _openingConversation = false;
+    }
+  }
+
   Future<void> _create() async {
     final id = await Navigator.push<String>(
       context,
@@ -108,7 +140,8 @@ class _AiContactsPageState extends State<AiContactsPage> {
     if (!mounted) return;
     if (id != null && widget.selectForConversation) {
       final ai = await widget.controller.groupStore.loadAi(id);
-      if (mounted) Navigator.pop(context, ai);
+      if (mounted) await _startConversation(ai);
+      if (mounted) _load(reset: true);
       return;
     }
     if (id != null) await _open(id);
@@ -207,7 +240,11 @@ class _AiContactsPageState extends State<AiContactsPage> {
   Widget build(BuildContext context) => Scaffold(
     appBar: SettingsAppBar(
       title: widget.selectForConversation
-          ? '选择朋友'
+          ? switch (widget.conversationMode) {
+              ConversationMode.normal => '选择朋友',
+              ConversationMode.temporaryPersonalized => '临时个性化 · 选择朋友',
+              ConversationMode.temporaryPlain => '临时非个性化 · 选择朋友',
+            }
           : widget.archived
           ? '已归档朋友'
           : '通讯录',
@@ -340,7 +377,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                         onTap: () => widget.selectForConversation
-                            ? Navigator.pop(context, ai)
+                            ? _startConversation(ai)
                             : _open(ai.sender.id),
                         onLongPress: widget.selectForConversation
                             ? null

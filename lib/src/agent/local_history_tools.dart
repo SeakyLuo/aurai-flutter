@@ -155,11 +155,12 @@ class LocalHistoryTool implements AgentTool, RuntimeCapabilityAgentTool {
                 '(SELECT conversation_id FROM messages WHERE ${matches('text')}))';
       return (
         'SELECT id, title, preview, created_at, updated_at, message_count '
-            'FROM conversations WHERE id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL) $where ORDER BY updated_at DESC, id DESC',
+            'FROM conversations WHERE mode = \'normal\' AND id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL) $where ORDER BY updated_at DESC, id DESC',
         [senderId, ...parameters],
       );
     }
     final filters = <String>[
+      "conversation_id IN (SELECT id FROM conversations WHERE mode = 'normal')",
       'conversation_id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)',
     ];
     parameters.insert(0, senderId);

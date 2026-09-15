@@ -22,7 +22,6 @@ class AndroidAgentBridge(private val context: Context) {
     private val previewImages = PreviewImageAccess(context)
     private val documents = DocumentAccess(context)
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val appUidAdapter = AppUidExecutionAdapter(File(context.filesDir, "agent-shell"))
     private val shizuku = ShizukuAccess(context)
     private val adbAdapter = UnavailableExecutionAdapter(
         ExecutionIdentity.ADB,
@@ -102,9 +101,12 @@ class AndroidAgentBridge(private val context: Context) {
                 result.success(null)
             }
             "startAgentSession" -> {
-                sessionActive = true
-                AuraiAccessibilityService.instance?.startSession()
-                AgentSessionService.start(context, call.argument<String>("step")!!, call.argument<Boolean>("groupChat") == true, call.argument<ByteArray>("avatar"))
+                val id = call.argument<String>("conversationId")!!
+                val session = Session(call.argument<String>("step")!!, call.argument<Boolean>("groupChat") == true, call.argument<ByteArray>("avatar"))
+                if (sessions.isEmpty()) AuraiAccessibilityService.instance?.startSession()
+                sessions.remove(id)
+                sessions[id] = session
+                AgentSessionService.start(context, session.step, session.groupChat, session.avatar)
                 result.success(null)
             }
             "updateAttentionNotification" -> {
@@ -120,19 +122,29 @@ class AndroidAgentBridge(private val context: Context) {
                 result.success(null)
             }
             "updateAgentSessionStep" -> {
-                AgentSessionService.updateStep(context, call.argument<String>("step")!!)
+                val id = call.argument<String>("conversationId")!!
+                val session = sessions[id]
+                if (session != null) {
+                    session.step = call.argument<String>("step")!!
+                    if (id == activeConversationId) AgentSessionService.updateStep(context, session.step)
+                }
                 result.success(null)
             }
             "endAgentSession" -> {
-                sessionActive = false
-                AuraiAccessibilityService.instance?.endSession()
+                val completed = sessions.remove(call.argument<String>("conversationId")!!)
+                if (sessions.isEmpty()) AuraiAccessibilityService.instance?.endSession()
                 AgentSessionService.finish(
                     context, call.argument<String>("outcome")!!,
                     call.argument<String>("conversationId")!!,
                     call.argument<String>("title")!!,
                     call.argument<String>("reply")!!,
                     call.argument<ByteArray>("avatar")!!,
+                    keepRunning = sessions.isNotEmpty(),
+                    completedGroupChat = completed?.groupChat == true,
                 )
+                sessions.values.lastOrNull()?.let { remaining ->
+                    AgentSessionService.start(context, remaining.step, remaining.groupChat, remaining.avatar)
+                }
                 result.success(null)
             }
             "getScreenAccess" -> result.success(
@@ -146,17 +158,12 @@ class AndroidAgentBridge(private val context: Context) {
             "requestConfirmation" -> requestConfirmation(call, result)
             "cancelPendingInteraction" -> {
                 documents.cancelTasks()
-                appUidAdapter.cancel()
                 AuraiAccessibilityService.instance?.cancelInteraction()
                 result.success(null)
             }
             else -> return false
         }
         return true
-    }
-
-    fun shell(command: String): Map<String, Any?> {
-        return appUidAdapter.execute(command)
     }
 
     private fun backgroundRunReadiness() = mapOf(
@@ -403,7 +410,10 @@ class AndroidAgentBridge(private val context: Context) {
     private fun capability(id: String, name: String, availability: String, reason: String) =
         mapOf("id" to id, "name" to name, "availability" to availability, "reason" to reason)
     companion object {
-        var sessionActive = false
-            private set
+        private data class Session(var step: String, val groupChat: Boolean, val avatar: ByteArray?)
+        private val sessions = linkedMapOf<String, Session>()
+        val sessionActive: Boolean get() = sessions.isNotEmpty()
+        val activeConversationId: String? get() = sessions.keys.lastOrNull()
+        val sessionCount: Int get() = sessions.size
     }
 }

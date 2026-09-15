@@ -3,7 +3,6 @@ part of 'chat_controller.dart';
 extension ScheduledExecution on ChatController {
   Future<void> _runScheduled() async {
     if (_claimingSchedule) return;
-    final wasBusy = hasRunningTask;
     _claimingSchedule = true;
     Map<String, Object?>? task;
     Conversation? conversation;
@@ -11,7 +10,7 @@ extension ScheduledExecution on ChatController {
     var enteredRuntime = false;
     String? failure;
     try {
-      task = await scheduledTasks.take(wasBusy);
+      task = await scheduledTasks.take(false);
       if (task == null) return;
       conversation = Conversation.empty()
         ..defaultSenderId =
@@ -20,7 +19,6 @@ extension ScheduledExecution on ChatController {
         ..storedTitle = task['title'] as String;
       if (!(await _directReplyContext(conversation)).config.isConfigured)
         throw StateError('请先配置任务所属 AI 的模型');
-      _runningConversation = conversation;
       final instruction =
           '现在执行已安排的任务，不要重复创建计划。原计划：${task['scheduleLabel']}。任务内容：\n${task['prompt']}';
       conversation.messages.add(
@@ -36,6 +34,7 @@ extension ScheduledExecution on ChatController {
       await _store.writer.save(conversation, makeActive: false);
       _updateConversationList(conversation);
       _conversationChanged();
+      _claimingSchedule = false;
       enteredRuntime = true;
       await _executeConversation(conversation, scheduled: true);
       outcome = 'completed';
@@ -50,12 +49,14 @@ extension ScheduledExecution on ChatController {
         if (task != null) {
           // End the prestarted service even if execution failed before runtime startup.
           try {
-            await _platform.endAgentSession(
-              enteredRuntime ? 'cancelled' : 'failed',
-              conversationId: conversation?.id ?? '',
-              title: conversation?.title ?? '',
-              reply: '',
-            );
+            if (!enteredRuntime) {
+              await _platform.endAgentSession(
+                'failed',
+                conversationId: conversation?.id ?? '',
+                title: conversation?.title ?? '',
+                reply: '',
+              );
+            }
           } finally {
             await scheduledTasks.finish(
               task['id'] as String,
@@ -67,7 +68,6 @@ extension ScheduledExecution on ChatController {
         }
       } finally {
         if (task != null) {
-          _runningConversation = null;
           _drainGroupSystemNotices();
           if (conversation != null) _updateConversationList(conversation);
         }
