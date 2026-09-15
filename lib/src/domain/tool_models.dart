@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 enum ToolSafety { readOnly, lowRisk, sensitive, destructive }
 
 enum ToolResultStatus { success, error, denied, cancelled }
@@ -105,7 +107,31 @@ class ToolCall {
     required this.arguments,
     this.confirmationTimeoutSeconds,
     this.userAction,
+    this.argumentsError,
   });
+
+  factory ToolCall.fromJsonArguments({
+    required String id,
+    required String name,
+    required String arguments,
+  }) {
+    try {
+      final decoded = jsonDecode(arguments);
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException('工具参数必须是 JSON 对象');
+      }
+      return ToolCall.fromModel(id: id, name: name, arguments: decoded);
+    } on FormatException catch (error) {
+      return ToolCall(
+        id: id,
+        name: name,
+        arguments: {'invalidJson': arguments},
+        argumentsError:
+            '${error.message}'
+            '${error.offset == null ? '' : '（位置 ${error.offset}）'}',
+      );
+    }
+  }
 
   factory ToolCall.fromModel({
     required String id,
@@ -124,6 +150,7 @@ class ToolCall {
     );
   }
 
+  final String? argumentsError;
   final int? confirmationTimeoutSeconds;
   final String? userAction;
   final String id;

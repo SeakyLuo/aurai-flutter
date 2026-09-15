@@ -48,6 +48,7 @@ class AgentRuntime {
     final steps = <AgentStep>[];
     final stepIndices = <String, int>{};
     String? continuationToken;
+    var invalidArgumentTurns = 0;
     var toolResults = const <ToolResult>[];
 
     final questions = _registry.find('askUser') as AskUserTool?;
@@ -113,7 +114,12 @@ class AgentRuntime {
           final reason =
               (modelTurn.response['incomplete_details'] as Map?)?['reason'];
           throw ModelProviderException(switch (reason) {
-            'max_output_tokens' => '回复达到长度上限，已保留生成的内容，请继续或重试',
+            'max_output_tokens' =>
+              modelTurn.toolCalls.isNotEmpty
+                  ? '生成工具参数时达到输出上限，本轮工具尚未执行，请继续或重试'
+                  : modelTurn.text?.isNotEmpty == true
+                  ? '回复达到输出上限，已保留已生成的正文，请继续或重试'
+                  : '模型生成时达到输出上限，尚未生成回复，请重试',
             'content_filter' => '回复因内容限制未完成，已保留生成的内容',
             _ => '回复未完成，已保留生成的内容，请重试',
           }, detail: jsonEncode(modelTurn.response['incomplete_details']));
@@ -138,13 +144,23 @@ class AgentRuntime {
           );
         }
 
+        if (modelTurn.toolCalls.any((call) => call.argumentsError != null)) {
+          invalidArgumentTurns++;
+          if (invalidArgumentTurns > 2) {
+            throw const ModelProviderException(
+              '模型连续生成了无效工具参数，修正两次后仍失败，本轮工具未执行，请重试',
+            );
+          }
+        }
+
         final nextResults = <ToolResult>[];
         var userHandoffOccurred = false;
         for (final call in modelTurn.toolCalls) {
           _throwIfCancelled();
           onProcessingStarted?.call();
           final tool = _registry.find(call.name);
-          final toolArguments = tool is ToolHistoryAgentTool
+          final toolArguments =
+              call.argumentsError == null && tool is ToolHistoryAgentTool
               ? (tool as ToolHistoryAgentTool).historyArguments(call)
               : call.arguments;
           final historyArguments = {
@@ -173,6 +189,19 @@ class AgentRuntime {
                     'cancelled': true,
                     'performed': false,
                     'reason': '前一步已交给用户操作，此次预排动作未执行。请先根据用户反馈核实状态，再决定后续操作。',
+                  },
+                )
+              : call.argumentsError != null
+              ? ToolResult(
+                  callId: call.id,
+                  toolName: call.name,
+                  status: ToolResultStatus.error,
+                  output: {
+                    'performed': false,
+                    'error': 'invalid_tool_arguments',
+                    'detail': call.argumentsError,
+                    'instruction':
+                        r'该工具未执行。请重新生成符合工具 schema 的完整 JSON 对象；字符串中的换行必须写为 \n，制表符写为 \t，双引号和反斜杠必须正确转义。不要重发已经成功执行的其他工具。',
                   },
                 )
               : await _executor.execute(

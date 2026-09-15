@@ -63,6 +63,7 @@ class ModelCatalog {
 
 String modelDisplayName(String model) => switch (model) {
   'gpt-5.4-mini' => 'GPT 5.4 Mini',
+  'deepseek-flash' => 'DeepSeek Flash',
   'deepseek-v4-flash' => 'DeepSeek V4 Flash',
   'deepseek-v4-pro' => 'DeepSeek V4 Pro',
   'qwen-plus' => '千问 Plus',

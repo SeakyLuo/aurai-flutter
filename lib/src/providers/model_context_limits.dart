@@ -30,6 +30,7 @@ class ModelContextLimits {
       contextWindow: 400000,
       outputTokens: 128000,
     ),
+    'deepseek-flash' ||
     'deepseek-v4-flash' ||
     'deepseek-v4-pro' ||
     'deepseek-v4-flash-vision-exp' => const ModelContextLimits(

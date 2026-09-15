@@ -1,3 +1,4 @@
+import 'group_unread_messages.dart';
 import '../html_games/html_game_store.dart';
 import '../html_games/html_game.dart';
 import '../domain/interactive_message.dart';
@@ -68,6 +69,7 @@ class ConversationReader {
         _loadDraftQuotes(values),
         _loadListCreationMembers(values),
         loadConversationListPreviews(database, values),
+        GroupUnreadMessages(database).load(values),
       ]);
       final drafts = results[0] as List<Map<String, Object?>>;
       final byId = {for (final value in values) value.id: value};
@@ -163,6 +165,7 @@ class ConversationReader {
       _loadSeenRuns([conversation]),
       _loadDraftQuotes([conversation]),
       _loadCreationMembers(conversation),
+      GroupUnreadMessages(database).load([conversation]),
     ]);
     conversation.messages.addAll(results[0] as List<AgentMessage>);
     conversation.hasEarlierMessages =

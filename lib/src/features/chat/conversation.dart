@@ -60,6 +60,17 @@ class Conversation {
   bool hasExecutionProcess = false;
   String? executionUserMessageId;
   String? seenRunId;
+  int unreadMessageCount = 0;
+  int groupReadAt = 0;
+  String groupReadId = '';
+  bool get needsGroupReadCheckpoint {
+    final latest = messages.lastOrNull;
+    if (latest == null) return false;
+    final at = latest.createdAt.microsecondsSinceEpoch;
+    return at > groupReadAt ||
+        (at == groupReadAt && latest.id.compareTo(groupReadId) > 0);
+  }
+
   bool hasEarlierMessages = false;
   ContextSummary? contextSummary;
   SharedResponsesContext? sharedContext;

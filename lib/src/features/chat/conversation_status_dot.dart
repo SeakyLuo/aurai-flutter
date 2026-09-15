@@ -8,10 +8,12 @@ class ConversationStatusDot extends StatelessWidget {
   final Conversation conversation;
 
   static bool hasUnreadCompletion(Conversation conversation) =>
-      conversation.runState == ChatRunState.idle &&
-      conversation.activeRunId != null &&
-      conversation.seenRunId != conversation.activeRunId &&
-      conversation.pendingGoal == null;
+      conversation.kind == ConversationKind.group
+      ? conversation.unreadMessageCount > 0
+      : conversation.runState == ChatRunState.idle &&
+            conversation.activeRunId != null &&
+            conversation.seenRunId != conversation.activeRunId &&
+            conversation.pendingGoal == null;
 
   @override
   Widget build(BuildContext context) {
