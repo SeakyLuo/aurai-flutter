@@ -130,7 +130,7 @@ class SharedInteraction {
     'closed': closed,
     'completed': phase == 'completed',
     'submitted': submissions.containsKey(actorId),
-    'submittedCount': submissions.length,
+    if (revealed && summaryVisible) 'submittedCount': submissions.length,
     'self': submissions[actorId],
     'revealed': revealed,
     'summaryVisible': summaryVisible,

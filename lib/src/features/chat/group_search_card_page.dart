@@ -59,6 +59,7 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
         jsonDecode(rows.single['interactive_json'] as String)
             as Map<String, dynamic>,
       );
+      card.requireViewer('user:local');
       if (mounted) setState(() => _card = card);
     } on Object catch (error) {
       if (mounted && !_closing) {

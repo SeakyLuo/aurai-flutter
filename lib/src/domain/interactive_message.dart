@@ -19,6 +19,23 @@ class InteractiveMessage {
   final Map<String, Object?> interaction;
   final Map<String, Object?> session;
   final Map<String, Object?>? snapshotView;
+  bool canView(String actor) =>
+      participation['audience'] == null ||
+      (participation['audience'] as List).contains(actor);
+  void requireViewer(String actor) {
+    if (!canView(actor)) throw StateError('你无权查看这条交互消息');
+  }
+
+  void validateTransport({required bool html}) {
+    final allButtons = [
+      ...buttons,
+      for (final state in states) ...(state['buttons'] as List).cast<Map>(),
+    ];
+    if (!html && allButtons.any((b) => b['input'] != null))
+      throw ArgumentError('原生交互消息使用固定按钮，输入端点仅用于 HTML');
+  }
+
+  bool get systemPresentation => participation['presentation'] == 'system';
   bool get shared => interaction.isNotEmpty;
   bool get hasInteraction => snapshotView != null || shared || singleChoice;
   Map<String, Object?> get interactionDefinition => shared
@@ -53,13 +70,14 @@ class InteractiveMessage {
   int get sessionVersion => shared ? engine.version : 0;
   Map<String, Map<String, Object?>> get choices =>
       shared ? engine.submissions : participants;
-  Map<String, Object?> interactionView(String actor) {
+  Map<String, Object?> interactionView(String actor, {String? viewer}) {
+    requireViewer(viewer ?? actor);
     if (snapshotView != null) return snapshotView!;
     final ctx = engine.project(
       actor,
       closed: closed,
-      choicesVisible: visible('visibility'),
-      summaryVisible: visible('summaryVisibility'),
+      choicesVisible: visible('visibility', actor: viewer ?? actor),
+      summaryVisible: visible('summaryVisibility', actor: viewer ?? actor),
       distribution: summary,
     );
     final components = <Map<String, Object?>>[];
@@ -90,7 +108,10 @@ class InteractiveMessage {
   final Map<String, Map<String, Object?>> participants;
   bool get closed => participation['closed'] == true;
   bool get singleChoice => participation['selectionMode'] == 'singleChoice';
-  bool visible(String field) {
+  bool visible(String field, {String actor = 'user:local'}) {
+    if (!canView(actor)) return false;
+    final allowed = participation['${field}Actors'] as List?;
+    if (allowed != null && !allowed.contains(actor)) return false;
     if (shared && !engine.revealed) return false;
     return switch (participation[field] ?? 'public') {
       'public' => true,
@@ -103,6 +124,7 @@ class InteractiveMessage {
       participants[actor]?['revision'] as int? ?? 0;
 
   InteractiveMessage viewFor(String actor) {
+    requireViewer(actor);
     final state = participants[actor];
     final current = state?.containsKey('buttons') == true ? state : null;
     return InteractiveMessage(
@@ -146,13 +168,26 @@ class InteractiveMessage {
     );
   }
 
+  /// The web page receives only the authenticated participant's projected data.
+  Map<String, Object?> webViewFor(String actor) => {
+    'revision': revision,
+    'sessionVersion': sessionVersion,
+    'participantRevision': participantRevision(actor),
+    'callbackVersion':
+        (participants[actor]?['callback'] as Map?)?['updatedAt'] ?? 0,
+    if (participants[actor]?['callback'] case final callback?)
+      'callback': callback,
+    'buttons': viewFor(actor).buttons,
+    'interactionView': interactionView(actor),
+  };
+
   Map<String, Object?> readFor(String actor) => {
     ...viewFor(actor).toJson(),
     'definition': toJson(),
     'participantRevision': participantRevision(actor),
     if (hasInteraction) 'interactionView': interactionView(actor),
     if (participants[actor] != null) 'ownParticipation': participants[actor],
-    if (visible('visibility'))
+    if (visible('visibility', actor: actor))
       'participants': {
         for (final entry in choices.entries)
           entry.key: {
@@ -162,7 +197,7 @@ class InteractiveMessage {
             'updatedAt': entry.value['updatedAt'],
           },
       },
-    if (visible('summaryVisibility')) 'summary': summary,
+    if (visible('summaryVisibility', actor: actor)) 'summary': summary,
   };
 
   List<Map<String, Object?>> get summary {
@@ -258,6 +293,17 @@ class InteractiveMessage {
           stateButtons.length > 12)
         throw ArgumentError('每个状态需要标题、最多 10000 字正文和 1–12 个按钮');
       _validateButtons(stateButtons, stateIds);
+    }
+    final participation = json['participation'] as Map? ?? const {};
+    for (final key in [
+      'audience',
+      'visibilityActors',
+      'summaryVisibilityActors',
+    ]) {
+      if (participation[key] case final value?) {
+        if (value is! List || value.any((id) => id is! String || id.isEmpty))
+          throw ArgumentError('$key 必须为参与者标识列表');
+      }
     }
     final interaction = Map<String, Object?>.from(
       json['interaction'] as Map? ?? const {},

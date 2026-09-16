@@ -1,3 +1,4 @@
+import '../domain/interactive_message.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:sqflite/sqflite.dart';
@@ -53,14 +54,30 @@ class HtmlGameStore {
   Future<HtmlGame> _load(
     DatabaseExecutor db,
     String conversationId,
-    String id,
-  ) async {
+    String id, {
+    String viewer = 'user:local',
+  }) async {
     final rows = await db.rawQuery(
       "SELECT *, $retryColumn FROM html_games WHERE message_id = ? AND conversation_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = ?)",
       [id, conversationId, 'html_game'],
     );
     if (rows.isEmpty) throw StateError('游戏已被删除或撤回');
-    return HtmlGame.fromRow(rows.single);
+    final messages = await db.query(
+      'messages',
+      columns: ['interactive_json'],
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    final raw = messages.single['interactive_json'];
+    final card = raw == null
+        ? null
+        : InteractiveMessage.fromJson(
+            (jsonDecode(raw as String) as Map).cast<String, Object?>(),
+          );
+    return HtmlGame.fromRow({
+      ...rows.single,
+      'interaction_projection': card?.webViewFor(viewer),
+    });
   }
 
   static void checkJson(Object? value, int limit, String label) {
@@ -122,12 +139,24 @@ class HtmlGameStore {
             participants.any((id) => !members.contains(id)) ||
             (turn != null && !participants.contains(turn))))
       throw ArgumentError('请选择包含你和用户的 2–8 位当前群成员，并指定有效的下一位玩家');
+    final interactive = args['interaction'] == null
+        ? null
+        : InteractiveMessage.fromJson({
+            'title': title,
+            'body': '',
+            'revision': 0,
+            'buttons': args['buttons'],
+            'interaction': args['interaction'],
+            'participation': args['participation'] ?? <String, Object?>{},
+          });
+    interactive?.validateTransport(html: true);
     final message = AgentMessage(
+      interactive: interactive,
       id: newMessageId(),
       role: AgentMessageRole.assistant,
       senderId: creator.id,
       sender: creator,
-      text: title,
+      text: interactive?.participation['audience'] == null ? title : '私密交互消息',
       createdAt: DateTime.now(),
       isGroupMessage: groupMessage,
       htmlGame: HtmlGameCard(
@@ -159,10 +188,15 @@ class HtmlGameStore {
     });
     await txn.rawUpdate(
       'UPDATE conversations SET message_count = message_count + 1, preview = ?, updated_at = ? WHERE id = ?',
-      [title, message.createdAt.microsecondsSinceEpoch, conversationId],
+      [message.text, message.createdAt.microsecondsSinceEpoch, conversationId],
     );
     final initialEventId = '${message.id}:created';
-    final snapshot = (await _load(txn, conversationId, message.id)).snapshot();
+    final snapshot = (await _load(
+      txn,
+      conversationId,
+      message.id,
+      viewer: creator.id,
+    )).snapshot();
     await txn.insert('html_game_events', {
       'id': initialEventId,
       'message_id': message.id,

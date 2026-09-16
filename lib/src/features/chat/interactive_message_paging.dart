@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'chat_scroll_anchor.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../domain/error_message.dart';
@@ -37,6 +38,7 @@ class _InteractiveMessagePagingState extends State<InteractiveMessagePaging> {
     if (_loading) return;
     final page = ((_page ?? _count - 1) + 1) % _count;
     if (page == _count - 1) {
+      ChatScrollAnchor.beforeResize(context);
       setState(() {
         _page = null;
         _sequence = null;
@@ -60,12 +62,14 @@ class _InteractiveMessagePagingState extends State<InteractiveMessagePaging> {
             as Map<String, dynamic>,
         MessageSender.localUser.id,
       );
-      if (mounted)
+      if (mounted) {
+        ChatScrollAnchor.beforeResize(context);
         setState(() {
           _page = page;
           _sequence = rows.single['sequence'] as int;
           _snapshot = snapshot;
         });
+      }
     } on Object catch (error) {
       if (mounted)
         ScaffoldMessenger.of(

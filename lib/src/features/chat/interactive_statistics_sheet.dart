@@ -1,3 +1,5 @@
+import 'interactive_message_paging.dart';
+import 'interactive_snapshot_statistics.dart';
 import 'interactive_statistics_overview.dart';
 import 'message_time.dart';
 import 'question_icon.dart';
@@ -19,23 +21,32 @@ Future<void> showInteractiveStatistics(
   BuildContext context, {
   required Database database,
   required String messageId,
-}) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  showDragHandle: false,
-  builder: (_) => _StatisticsSheet(database: database, messageId: messageId),
-);
+}) {
+  final snapshot = InteractivePageScope.of(context)?.snapshot;
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: false,
+    builder: (_) => _StatisticsSheet(
+      database: database,
+      messageId: messageId,
+      snapshot: snapshot,
+    ),
+  );
+}
 
 class _StatisticsSheet extends StatefulWidget {
   const _StatisticsSheet({
     required this.database,
     required this.messageId,
     this.actor,
+    this.snapshot,
   });
   final Database database;
   final String messageId;
   final String? actor;
+  final InteractiveMessage? snapshot;
   @override
   State<_StatisticsSheet> createState() => _StatisticsSheetState();
 }
@@ -91,6 +102,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
         jsonDecode(rows.single['interactive_json'] as String)
             as Map<String, dynamic>,
       );
+      card.requireViewer('user:local');
       final ids = card.visible('visibility')
           ? card.participants.keys.toList()
           : [MessageSender.localUser.id];
@@ -278,6 +290,8 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
                       ? const Center(
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
+                      : widget.snapshot != null
+                      ? InteractiveSnapshotStatistics(card: widget.snapshot!)
                       : actor != null
                       ? _participant(card, actor)
                       : _option != null

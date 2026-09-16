@@ -65,7 +65,7 @@ class GroupMessageSearch {
     final rows = await database.query(
       'messages',
       where:
-          '''conversation_id = ? AND role IN ('user', 'assistant')
+          '''conversation_id = ? AND (interactive_json IS NULL OR json_extract(interactive_json, '\$.participation.audience') IS NULL OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = 'user:local')) AND role IN ('user', 'assistant')
         AND kind IN ('user', 'group_message', 'html_game')
         AND ($filter)
         ${query.isEmpty ? '' : '''AND (instr(lower(text), ?) > 0

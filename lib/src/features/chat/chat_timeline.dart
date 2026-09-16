@@ -145,8 +145,10 @@ List<ChatTimelineEntry> buildChatTimeline(
   final visibleMessages = controller.visibleMessages
       .where(
         (message) =>
-            !hiddenIds.contains(message.id) ||
-            message.id == conversation.searchMessageId,
+            (message.interactive?.canView(MessageSender.localUser.id) ??
+                true) &&
+            (!hiddenIds.contains(message.id) ||
+                message.id == conversation.searchMessageId),
       )
       .toList();
   final end = beforeMessageId == null
@@ -302,7 +304,8 @@ List<ChatTimelineEntry> buildChatTimeline(
           final messageBody =
               conversation.kind == ConversationKind.group &&
                   message.role == AgentMessageRole.assistant &&
-                  message.sender != null
+                  message.sender != null &&
+                  message.interactive?.systemPresentation != true
               ? GroupMessageHeading(
                   showName: message.htmlGame == null,
                   sender: message.sender!,
@@ -322,14 +325,36 @@ List<ChatTimelineEntry> buildChatTimeline(
                   child: content,
                 )
               : content;
-          final pagedBody = message.interactive == null
-              ? messageBody
+          final systemBody =
+              message.interactive?.systemPresentation == true &&
+                  message.htmlGame == null
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        '系统',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      messageBody,
+                    ],
+                  ),
+                )
+              : messageBody;
+          final pagedBody =
+              message.interactive == null || message.htmlGame != null
+              ? systemBody
               : InteractiveMessagePaging(
                   key: ValueKey('pages:${message.id}'),
                   messageId: message.id,
                   card: message.interactive!,
                   database: controller.groupStore.database,
-                  child: messageBody,
+                  child: systemBody,
                 );
           final item = conversation.kind == ConversationKind.group
               ? Padding(

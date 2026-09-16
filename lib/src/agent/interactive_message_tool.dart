@@ -54,6 +54,10 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
                 'For callback completion: eventId received in the callback context. Updates only the triggering participant title/body/buttons and atomically completes that event; do not send interaction/participation/states. Retrying an already committed result does not apply it twice.',
           },
         if (name == 'clickInteractiveMessage') ...{
+          'value': {
+            'description':
+                'HTML input-enabled submit endpoint only: text or JSON value (max 16 KB). Omit for native fixed buttons.',
+          },
           'buttonId': {'type': 'string'},
           'participantRevision': {'type': 'integer', 'minimum': 0},
         },

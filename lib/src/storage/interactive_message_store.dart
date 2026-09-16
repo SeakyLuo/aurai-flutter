@@ -19,6 +19,7 @@ class InteractiveMessageStore {
     int revision, {
     required MessageSender actor,
     required int participantRevision,
+    Object? inputValue,
   }) => database.transaction((txn) async {
     final rows = await txn.query(
       'messages',
@@ -34,6 +35,7 @@ class InteractiveMessageStore {
       jsonDecode(rows.single['interactive_json'] as String)
           as Map<String, dynamic>,
     );
+    card.validateTransport(html: rows.single['kind'] == 'html_game');
     if (card.revision != revision ||
         card.participantRevision(actor.id) != participantRevision)
       throw InteractiveMessageChanged(card);
@@ -45,9 +47,25 @@ class InteractiveMessageStore {
     final button = view.buttons.firstWhere((b) => b['id'] == buttonId);
     if (button['disabled'] == true) throw StateError('这个选项已处理');
     final action = button['action'] as String;
+    if (inputValue != null) {
+      if (rows.single['kind'] != 'html_game' ||
+          action != 'submit' ||
+          !['text', 'json'].contains(button['input']))
+        throw ArgumentError('这个按钮不接受页面输入');
+      if (button['input'] == 'text' &&
+          (inputValue is! String || inputValue.trim().isEmpty))
+        throw ArgumentError('请填写文本内容');
+      if (utf8.encode(jsonEncode(inputValue)).length > 16384)
+        throw ArgumentError('提交数据不能超过 16 KB');
+    } else if (button['input'] != null) {
+      throw ArgumentError('请提供页面输入数据');
+    }
     final nextSession = card.shared
         ? switch (action) {
-            'submit' => card.engine.submit(actor.id, actor.name, button),
+            'submit' => card.engine.submit(actor.id, actor.name, {
+              ...button,
+              if (inputValue != null) 'value': inputValue,
+            }),
             'nextRound' => card.engine.nextRound(actor.id),
             _ => card.engine,
           }
@@ -165,9 +183,10 @@ class InteractiveMessageStore {
         whereArgs: [messageId],
       );
     }
+    final encoded = jsonEncode(next.toJson(includeParticipants: true));
     await txn.update(
       'messages',
-      {'interactive_json': jsonEncode(next.toJson(includeParticipants: true))},
+      {'interactive_json': encoded},
       where: 'id = ?',
       whereArgs: [messageId],
     );
@@ -182,7 +201,10 @@ class InteractiveMessageStore {
         senderId: rows.single['sender_id'] as String,
         payload: {
           'source': 'button',
-          if (card.visible('visibility') ||
+          if (card.visible(
+                'visibility',
+                actor: rows.single['sender_id'] as String,
+              ) ||
               rows.single['sender_id'] == actor.id) ...{
             'actorId': actor.id,
             'actorName': actor.name,
@@ -197,7 +219,12 @@ class InteractiveMessageStore {
     final notice = await writeNotice(
       txn,
       conversationId,
-      '${actor.name}参与了“${card.title}”',
+      card.participation['audience'] != null
+          ? '私密交互消息已更新'
+          : !card.visible('visibility') ||
+                card.participation['visibilityActors'] != null
+          ? '“${card.title}”有新的提交'
+          : '${actor.name}在“${card.title}”中选择了“${button['label']}”',
     );
     return (
       card: next,

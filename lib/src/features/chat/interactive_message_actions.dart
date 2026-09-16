@@ -1,6 +1,57 @@
 part of 'chat_controller.dart';
 
 extension InteractiveMessageActions on ChatController {
+  /// Program-created activities retain normal message semantics and do not wake an AI.
+  Future<String> sendSystemInteractiveMessage(
+    Map<String, Object?> definition, {
+    String? callbackSenderId,
+  }) async {
+    await _store.writer.flush();
+    final conversation = activeConversation;
+    final card = InteractiveMessage.fromJson({
+      ...definition,
+      'revision': 0,
+      'participation': {
+        ...?definition['participation'] as Map<String, Object?>?,
+        'presentation': 'system',
+      },
+    });
+    card.validateTransport(html: false);
+    final callbacks = [
+      ...card.buttons,
+      for (final state in card.states)
+        ...(state['buttons'] as List).cast<Map>(),
+    ].any((b) => b['notifyAi'] == true);
+    if (callbacks && callbackSenderId == null)
+      throw ArgumentError('配置了 AI 通知时，请指定接收回调的 AI');
+    final sender = callbackSenderId == null
+        ? MessageSender.localUser
+        : (await groupStore.loadAi(callbackSenderId)).sender;
+    final message = AgentMessage(
+      id: newMessageId(),
+      role: AgentMessageRole.assistant,
+      senderId: sender.id,
+      sender: sender,
+      text: card.participation['audience'] == null ? card.title : '私密交互消息',
+      interactive: card,
+      createdAt: DateTime.now(),
+      isGroupMessage: conversation.kind == ConversationKind.group,
+    );
+    await _store.database.transaction((txn) async {
+      await txn.insert('messages', messageRow(conversation.id, message));
+      await txn.rawUpdate(
+        'UPDATE conversations SET message_count = message_count + 1, preview = ?, updated_at = ? WHERE id = ?',
+        [
+          message.text,
+          message.createdAt.microsecondsSinceEpoch,
+          conversation.id,
+        ],
+      );
+    });
+    _publishInteractiveChange(conversation.id, message, source: conversation);
+    return message.id;
+  }
+
   Future<Map<String, Object?>> _interactiveMessage(
     String operation,
     Map<String, Object?> args,
@@ -11,13 +62,16 @@ extension InteractiveMessageActions on ChatController {
     final id = args['messageId'] as String?;
     if (operation == 'sendInteractiveMessage') {
       final card = InteractiveMessage.fromJson({...args, 'revision': 0});
+      card.validateTransport(html: false);
       final profile = await groupStore.loadAi(senderId);
       final message = AgentMessage(
         id: newMessageId(),
         role: AgentMessageRole.assistant,
         senderId: senderId,
         sender: profile.sender,
-        text: '${card.title}\n${card.body}',
+        text: card.participation['audience'] == null
+            ? '${card.title}\n${card.body}'
+            : '私密交互消息',
         createdAt: DateTime.now(),
         interactive: card,
         runId: source.activeRunId,
@@ -38,7 +92,7 @@ extension InteractiveMessageActions on ChatController {
         source.id,
         message,
         source: source,
-        notifyParticipants: true,
+        notifyParticipants: !card.systemPresentation,
       );
       return {'sent': true, 'messageId': message.id, 'revision': 0};
     }
@@ -58,17 +112,25 @@ extension InteractiveMessageActions on ChatController {
     final old = InteractiveMessage.fromJson(
       jsonDecode(row['interactive_json'] as String) as Map<String, dynamic>,
     );
+    old.requireViewer(senderId);
     if (operation == 'readInteractiveMessage') {
       final perspective = args['participantId'] as String? ?? senderId;
-      if (perspective != senderId && !old.visible('visibility'))
+      if (perspective != senderId &&
+          !old.visible('visibility', actor: senderId))
         throw StateError('这条消息尚未公开其他参与者的选择');
+      if (perspective != senderId &&
+          !old.visible('summaryVisibility', actor: senderId))
+        throw StateError('当前权限不允许查看其他参与者的历史快照');
       return {
         'messageId': id,
         ...old.readFor(senderId),
         'perspective': {
           ...old.viewFor(perspective).toJson(),
           if (old.hasInteraction)
-            'interactionView': old.interactionView(perspective),
+            'interactionView': old.interactionView(
+              perspective,
+              viewer: senderId,
+            ),
         },
         'history': await readInteractiveHistory(
           _store.database,
@@ -110,6 +172,7 @@ extension InteractiveMessageActions on ChatController {
         args['revision'] as int,
         actor: actor.sender,
         participantRevision: args['participantRevision'] as int,
+        inputValue: args['value'],
       );
       _replaceInteractiveCard(source.id, id, result.card, source: source);
       if (result.notice != null)
@@ -163,6 +226,7 @@ extension InteractiveMessageActions on ChatController {
         'session': settled.runtime,
       });
     }
+    card.validateTransport(html: row['kind'] == 'html_game');
     if (jsonEncode(old.toJson()..remove('revision')) ==
         jsonEncode(card.toJson()..remove('revision'))) {
       return {'updated': false, 'revision': old.revision};
@@ -175,7 +239,9 @@ extension InteractiveMessageActions on ChatController {
           'interactive_json': jsonEncode(
             card.toJson(includeParticipants: true),
           ),
-          'text': '${card.title}\n${card.body}',
+          'text': card.participation['audience'] == null
+              ? '${card.title}\n${card.body}'
+              : '私密交互消息',
         },
         where: 'id = ? AND interactive_json = ?',
         whereArgs: [id, row['interactive_json']],
@@ -196,7 +262,9 @@ extension InteractiveMessageActions on ChatController {
       return InteractiveMessageStore.writeNotice(
         txn,
         source.id,
-        '${actor.sender.name}更新了“${card.title}”',
+        card.participation['audience'] == null
+            ? '${actor.sender.name}更新了“${card.title}”'
+            : '私密交互消息已更新',
       );
     });
     _replaceInteractiveCard(source.id, id, card, source: source);
