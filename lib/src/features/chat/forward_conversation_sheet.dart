@@ -173,11 +173,11 @@ class _ForwardConversationSheetState extends State<ForwardConversationSheet> {
                           children: [
                             if (showTime)
                               Padding(
-                                padding: EdgeInsets.fromLTRB(
+                                padding: const EdgeInsets.fromLTRB(
+                                  18,
+                                  24,
                                   18,
                                   12,
-                                  18,
-                                  group ? 0 : 12,
                                 ),
                                 child: Text(
                                   messageTime(message.createdAt),

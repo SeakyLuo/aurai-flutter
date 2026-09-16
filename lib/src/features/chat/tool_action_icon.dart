@@ -38,6 +38,7 @@ class ToolActionIcon extends StatelessWidget {
               'addFriend' ||
               'readExecutionLogs' ||
               'clickInteractiveMessage' ||
+              'retryInteractiveCallback' ||
               'readInteractiveMessage' ||
               'updateInteractiveMessage' ||
               'createConversation' ||

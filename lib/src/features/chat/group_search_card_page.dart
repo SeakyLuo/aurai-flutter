@@ -104,6 +104,8 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
                 ),
                 child: InteractiveMessageView(
                   card: _card!,
+                  onRetry: (eventId) => widget.controller
+                      .retryInteractiveCallback(widget.result.id, eventId),
                   onClick: (button, revision, participantRevision) async {
                     final result = await widget.controller
                         .clickInteractiveMessage(

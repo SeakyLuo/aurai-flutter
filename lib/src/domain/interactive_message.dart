@@ -13,7 +13,9 @@ class InteractiveMessage {
     this.interaction = const {},
     this.session = const {},
     this.snapshotView,
+    this.showStatistics = true,
   });
+  final bool showStatistics;
   final Map<String, Object?> interaction;
   final Map<String, Object?> session;
   final Map<String, Object?>? snapshotView;
@@ -105,6 +107,7 @@ class InteractiveMessage {
     final current = state?.containsKey('buttons') == true ? state : null;
     return InteractiveMessage(
       revision: revision,
+      showStatistics: current?['showStatistics'] as bool? ?? showStatistics,
       title: current?['title'] as String? ?? title,
       body: current?['body'] as String? ?? body,
       buttons: current == null
@@ -124,6 +127,7 @@ class InteractiveMessage {
     final view = viewFor(actor);
     return InteractiveMessage(
       revision: 1,
+      showStatistics: view.showStatistics,
       title: view.title,
       body: view.body,
       buttons: [
@@ -193,6 +197,7 @@ class InteractiveMessage {
     Map<String, dynamic> json,
     String actorId,
   ) => InteractiveMessage(
+    showStatistics: json['showStatistics'] as bool? ?? true,
     revision: json['revision'] as int,
     snapshotView: json['interactionView'] == null
         ? null
@@ -205,7 +210,10 @@ class InteractiveMessage {
     participation: Map<String, Object?>.from(json['participation'] as Map),
     participants: {
       if (json['selectedLabel'] != null)
-        actorId: {'label': json['selectedLabel']},
+        actorId: {
+          'label': json['selectedLabel'],
+          if (json['callback'] != null) 'callback': json['callback'],
+        },
     },
   );
 
@@ -236,6 +244,8 @@ class InteractiveMessage {
     }
     _validateButtons(buttons, stateIds);
     for (final state in states) {
+      if (state['showStatistics'] != null && state['showStatistics'] is! bool)
+        throw ArgumentError('showStatistics 必须是布尔值');
       final stateTitle = state['title'] as String;
       final stateBody = state['body'] as String;
       final stateButtons = (state['buttons'] as List)
@@ -253,6 +263,7 @@ class InteractiveMessage {
       json['interaction'] as Map? ?? const {},
     );
     return InteractiveMessage(
+      showStatistics: json['showStatistics'] as bool? ?? true,
       snapshotView: json['snapshotView'] == null
           ? null
           : Map<String, Object?>.from(json['snapshotView'] as Map),
@@ -352,6 +363,7 @@ class InteractiveMessage {
 
   Map<String, Object?> toJson({bool includeParticipants = false}) => {
     'revision': revision,
+    'showStatistics': showStatistics,
     if (snapshotView != null) 'snapshotView': snapshotView,
     'participation': participation,
     if (interaction.isNotEmpty) 'interaction': interaction,

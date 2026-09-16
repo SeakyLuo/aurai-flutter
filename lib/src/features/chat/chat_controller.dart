@@ -1,3 +1,5 @@
+import '../../storage/interactive_callback_result.dart';
+import '../../storage/interactive_callback_state.dart';
 import '../../storage/conversation_navigation_state.dart';
 import '../../domain/tool_customization.dart';
 import '../../storage/interactive_action_history.dart';
@@ -181,6 +183,7 @@ class ChatController extends ChangeNotifier {
   final _store = ConversationStore();
   HtmlGameEventPump? _htmlGameEvents;
   StreamSubscription<void>? _callbackChanges;
+  StreamSubscription<List<CallbackCardUpdate>>? _callbackCardChanges;
   bool _drainingCallbacks = false;
   final _callbackConversations = <String>{};
   bool _callbacksDisposed = false;
@@ -280,6 +283,7 @@ class ChatController extends ChangeNotifier {
     _htmlGameEvents?.dispose();
     _callbacksDisposed = true;
     _callbackChanges?.cancel();
+    _callbackCardChanges?.cancel();
     removeListener(_drainMessageCallbacks);
     _memory?.dispose();
     _accessibilityTimer?.cancel();
@@ -365,6 +369,18 @@ class ChatController extends ChangeNotifier {
         ? await groupStore.loadAi(activeConversation.defaultSenderId)
         : null;
     await _reloadConversations();
+    _callbackCardChanges = MessageCallbacks.cardChanges.stream.listen((
+      updates,
+    ) {
+      for (final update in updates) {
+        _replaceInteractiveCard(
+          update.conversationId,
+          update.messageId,
+          update.card,
+        );
+      }
+    });
+    await MessageCallbacks(_store.database).recoverInterrupted();
     await scheduledTasks.initialize(_runScheduled);
     await _groupSleeps.initialize(_recoverGroupSleep);
     _callbackChanges = MessageCallbacks.changes.stream.listen((_) {

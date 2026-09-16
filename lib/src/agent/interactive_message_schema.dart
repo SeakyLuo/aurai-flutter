@@ -1,3 +1,9 @@
+const interactiveStatisticsSchema = {
+  'type': 'boolean',
+  'description':
+      'Show the View statistics message-menu entry. Defaults to true. Set false to hide it during an activity, and set true in a final named state to reveal it locally on nextState. A state that omits this field inherits the current value. Updates may change this flag. This controls the entry only, not collection or participation visibility.',
+};
+
 const interactiveBodySchema = {
   'type': 'string',
   'maxLength': 10000,
@@ -47,7 +53,7 @@ const interactiveButtonsSchema = {
         'type': 'boolean',
         'default': false,
         'description':
-            'Queue a callback to the creator after this user action. Omit/false for local-only changes.',
+            'Queue an AI callback after this action. The participant waits until the creator commits title/body/buttons with updateInteractiveMessage + callbackEventId. Failures can retry the same event without repeating this action. Omit/false for local-only changes.',
       },
       'repeatable': {'type': 'boolean'},
       'value': {

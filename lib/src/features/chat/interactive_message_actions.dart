@@ -78,6 +78,29 @@ extension InteractiveMessageActions on ChatController {
         ),
       };
     }
+    if (operation == 'retryInteractiveCallback') {
+      final card = await MessageCallbacks(
+        _store.database,
+      ).retry(id, args['callbackEventId'] as String, senderId);
+      _replaceInteractiveCard(source.id, id, card, source: source);
+      return {'messageId': id, ...card.readFor(senderId)};
+    }
+    if (operation == 'updateInteractiveMessage' &&
+        args['callbackEventId'] != null) {
+      final result = await completeInteractiveCallback(
+        _store.database,
+        messageId: id,
+        senderId: senderId,
+        eventId: args['callbackEventId'] as String,
+        result: args,
+      );
+      _replaceInteractiveCard(source.id, id, result.card, source: source);
+      return {
+        'updated': result.applied,
+        'callbackStatus': result.status,
+        'revision': result.card.revision,
+      };
+    }
     if (operation == 'clickInteractiveMessage') {
       final actor = await groupStore.loadAi(senderId);
       final result = await InteractiveMessageStore(_store.database).click(
@@ -101,7 +124,14 @@ extension InteractiveMessageActions on ChatController {
     if (row['sender_id'] != senderId) throw StateError('只能更新自己发送的交互消息');
     if (args['revision'] != old.revision) throw StateError('消息已更新，请先重新读取');
     final definitionChanged =
-        ['title', 'body', 'buttons', 'states', 'interaction'].any(
+        [
+          'title',
+          'body',
+          'buttons',
+          'states',
+          'interaction',
+          'showStatistics',
+        ].any(
           (key) =>
               jsonEncode(old.toJson()[key]) !=
               jsonEncode(args[key] ?? old.toJson()[key]),
@@ -119,7 +149,9 @@ extension InteractiveMessageActions on ChatController {
               ? (Map<String, Object?>.of(entry.value)
                   ..remove('title')
                   ..remove('body')
-                  ..remove('buttons'))
+                  ..remove('buttons')
+                  ..remove('showStatistics')
+                  ..remove('callback'))
               : entry.value,
       },
       'revision': old.revision + 1,
@@ -149,6 +181,18 @@ extension InteractiveMessageActions on ChatController {
         whereArgs: [id, row['interactive_json']],
       );
       if (changed != 1) throw StateError('消息已更新，请先重新读取');
+      if (definitionChanged) {
+        await txn.update(
+          'message_callbacks',
+          {
+            'status': 'expired',
+            'processed_at': DateTime.now().microsecondsSinceEpoch,
+          },
+          where:
+              'message_id = ? AND actor_id IS NOT NULL AND processed_at IS NULL',
+          whereArgs: [id],
+        );
+      }
       return InteractiveMessageStore.writeNotice(
         txn,
         source.id,
@@ -249,6 +293,17 @@ extension InteractiveMessageActions on ChatController {
       );
     }
     _conversationChanged();
+  }
+
+  Future<InteractiveMessage> retryInteractiveCallback(
+    String messageId,
+    String eventId,
+  ) async {
+    await _store.writer.flush();
+    final card = await MessageCallbacks(
+      _store.database,
+    ).retry(messageId, eventId, MessageSender.localUser.id);
+    return card;
   }
 
   Future<InteractiveClickResult> clickInteractiveMessage(

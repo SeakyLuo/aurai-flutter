@@ -37,6 +37,9 @@ class InteractiveMessageStore {
     if (card.revision != revision ||
         card.participantRevision(actor.id) != participantRevision)
       throw InteractiveMessageChanged(card);
+    final pending = card.participants[actor.id]?['callback'] as Map?;
+    if (['queued', 'processing'].contains(pending?['status']))
+      throw StateError('AI 正在处理这次操作，请等待结果');
     if (card.closed) throw StateError('这条交互消息已结束');
     final view = card.viewFor(actor.id);
     final button = view.buttons.firstWhere((b) => b['id'] == buttonId);
@@ -49,6 +52,8 @@ class InteractiveMessageStore {
             _ => card.engine,
           }
         : null;
+    final newRound =
+        nextSession != null && nextSession.round != card.engine.round;
     final target = action == 'update' && button['nextState'] != null
         ? card.states.firstWhere((state) => state['id'] == button['nextState'])
         : null;
@@ -81,16 +86,21 @@ class InteractiveMessageStore {
                 ),
               )!;
     final now = DateTime.now().microsecondsSinceEpoch;
+    final callbackId = button['notifyAi'] == true ? newMessageId() : null;
     final state = <String, Object?>{
+      if (callbackId != null)
+        'callback': {'id': callbackId, 'status': 'queued', 'updatedAt': now},
       'name': actor.name,
       'revision': participantRevision + 1,
       'snapshotCount': snapshotCount + 1,
       'definitionRevision': revision,
-      'title': target?['title'] ?? view.title,
-      'body':
-          target?['body'] ??
-          (action == 'update' ? button['nextBody'] : view.body),
-      'buttons': nextButtons,
+      'showStatistics': target?['showStatistics'] ?? view.showStatistics,
+      'title': newRound ? card.title : target?['title'] ?? view.title,
+      'body': newRound
+          ? card.body
+          : target?['body'] ??
+                (action == 'update' ? button['nextBody'] : view.body),
+      'buttons': newRound ? card.buttons : nextButtons,
       'buttonId': buttonId,
       'label': button['label'],
       'updatedAt': now,
@@ -102,6 +112,7 @@ class InteractiveMessageStore {
                   nextSession.phase != card.engine.phase)
           ? card.revision + 1
           : card.revision,
+      showStatistics: card.showStatistics,
       interaction: card.interaction,
       session: nextSession?.runtime ?? card.session,
       title: card.title,
@@ -109,7 +120,17 @@ class InteractiveMessageStore {
       buttons: card.buttons,
       states: card.states,
       participation: card.participation,
-      participants: {...card.participants, actor.id: state},
+      participants: {
+        for (final entry in card.participants.entries)
+          entry.key: newRound
+              ? (Map<String, Object?>.from(entry.value)
+                  ..remove('title')
+                  ..remove('body')
+                  ..remove('buttons')
+                  ..remove('callback'))
+              : entry.value,
+        actor.id: state,
+      },
     );
     await txn.insert('interactive_actions', {
       'message_id': messageId,
@@ -121,10 +142,13 @@ class InteractiveMessageStore {
       'participant_revision': participantRevision + 1,
       'before_json': jsonEncode({
         'revision': view.revision,
+        'showStatistics': view.showStatistics,
         'title': view.title,
         'body': view.body,
         'buttons': view.buttons,
         'participation': view.participation,
+        if (card.participants[actor.id]?['callback'] != null)
+          'callback': card.participants[actor.id]!['callback'],
         if (card.hasInteraction)
           'interactionView': card.interactionView(actor.id),
         if (card.choices[actor.id] case final previous?)
@@ -132,16 +156,27 @@ class InteractiveMessageStore {
       }),
       'created_at': now,
     });
+    if (newRound) {
+      await txn.update(
+        'message_callbacks',
+        {'status': 'expired', 'processed_at': now},
+        where:
+            'message_id = ? AND actor_id IS NOT NULL AND processed_at IS NULL',
+        whereArgs: [messageId],
+      );
+    }
     await txn.update(
       'messages',
       {'interactive_json': jsonEncode(next.toJson(includeParticipants: true))},
       where: 'id = ?',
       whereArgs: [messageId],
     );
-    if (button['notifyAi'] == true) {
+    if (callbackId != null) {
       await MessageCallbacks.enqueue(
         txn,
-        id: newMessageId(),
+        id: callbackId,
+        actorId: actor.id,
+        participantRevision: participantRevision + 1,
         messageId: messageId,
         conversationId: conversationId,
         senderId: rows.single['sender_id'] as String,
