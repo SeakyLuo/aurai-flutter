@@ -1,3 +1,4 @@
+import 'tool_customization.dart';
 import '../html_games/html_game.dart';
 import 'interactive_message.dart';
 import 'message_quote.dart';
@@ -263,7 +264,10 @@ typedef AgentStepListener = void Function(List<AgentStep> steps);
 String newMessageId() =>
     DateTime.now().microsecondsSinceEpoch.toRadixString(36);
 
-String toolTitle(String name) => switch (name) {
+String toolTitle(String name) =>
+    ToolCustomizations.values[name]?.title ?? _defaultToolTitle(name);
+
+String _defaultToolTitle(String name) => switch (name) {
   'readMyProfile' => '读取自己的资料',
   'updateMyProfile' => '更新自己的资料',
   'sendHtmlMessage' => '发送 HTML 消息',
@@ -284,6 +288,10 @@ String toolTitle(String name) => switch (name) {
   'deleteConversation' => '删除会话',
   'sendConversationMessage' => '发送私聊消息',
   'openAppPage' => '打开应用页面',
+  'locateMessage' => '定位原消息',
+  'forwardMessage' => '转发消息',
+  'getModelConfiguration' => '检查模型配置',
+  'openModelConfiguration' => '打开模型设置',
   'sendGroupMessage' => '发送群消息',
   'sleepGroupChat' => '稍后查看群聊',
   'recallMessage' => '撤回消息',
@@ -342,6 +350,9 @@ String toolTitle(String name) => switch (name) {
   'deleteSkill' => '删除技能',
   'installSkill' => '安装技能',
   'uninstallSkill' => '卸载技能',
+  'enableSkill' => '启用技能',
+  'disableSkill' => '停用技能',
+  'searchSkills' => '搜索技能库',
   'runSkill' => '运行技能',
   'scheduledTask' => '管理定时任务',
   'createScheduledTask' => '创建定时任务',

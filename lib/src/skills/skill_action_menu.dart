@@ -12,8 +12,10 @@ Future<String?> showSkillActionMenu(
   bool showEdit = false,
   bool installed = true,
   bool canDelete = true,
+  bool canInstall = false,
 }) => _showSkillMenu(context, position, [
   if (showEdit) ('edit', '编辑'),
+  if (canInstall) ('install', '安装'),
   if (installed) ('uninstall', '卸载'),
   if (installed) (enabled ? 'pause' : 'resume', enabled ? '停用' : '启用'),
   if (canDelete) ('delete', '删除'),
@@ -94,7 +96,7 @@ Future<String?> _showSkillMenu(
                                   children: [
                                     if (entry.$1 == 'sort')
                                       const SettingsIcon(
-                                        type: SettingsIconType.filter,
+                                        type: SettingsIconType.sort,
                                       )
                                     else if (entry.$1 == 'uninstall')
                                       ConversationMenuIcon(

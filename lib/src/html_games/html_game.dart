@@ -12,12 +12,18 @@ class HtmlGameCard {
     this.preview,
     this.width,
     this.height = 320,
+    this.measuredWidth,
+    this.measuredHeight,
+    this.measuredScale,
+    this.measuredVersion,
     this.version = 0,
     this.status = 'active',
     this.canRetry = false,
     this.displayMode = 'hybrid',
     this.backgroundMode = 'message',
   });
+  final double? measuredWidth, measuredHeight, measuredScale;
+  final int? measuredVersion;
   final String displayMode;
   final String backgroundMode;
   final String title;
@@ -32,6 +38,10 @@ class HtmlGameCard {
     backgroundMode: row['background_mode'] as String,
     title: row['title'] as String,
     preview: row['preview'] as Uint8List?,
+    measuredWidth: (row['measured_width'] as num?)?.toDouble(),
+    measuredHeight: (row['measured_height'] as num?)?.toDouble(),
+    measuredScale: (row['measured_scale'] as num?)?.toDouble(),
+    measuredVersion: row['measured_version'] as int?,
     width: row['display_width'] as int?,
     height: row['display_height'] as int,
     version: row['version'] as int,

@@ -25,7 +25,7 @@ class InteractiveStatisticsOverview extends StatelessWidget {
     final peopleVisible = card.visible('visibility');
     final groups = <InteractiveOptionKey, List<String>>{};
     if (peopleVisible) {
-      for (final entry in card.participants.entries) {
+      for (final entry in card.choices.entries) {
         final key = (
           entry.value['buttonId'] as String,
           entry.value['label'] as String,
@@ -34,8 +34,8 @@ class InteractiveStatisticsOverview extends StatelessWidget {
       }
     }
     final people = peopleVisible
-        ? card.participants.keys.toList()
-        : card.participants.keys
+        ? card.choices.keys.toList()
+        : card.choices.keys
               .where((id) => id == MessageSender.localUser.id)
               .toList();
     return ListView(
@@ -43,9 +43,18 @@ class InteractiveStatisticsOverview extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
       children: [
         Text(
+          card.title,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
           [
             card.closed ? '已结束' : '进行中',
-            if (summaryVisible) '${card.participants.length} 人参与',
+            if (summaryVisible) '${card.choices.length} 人参与',
           ].join(' · '),
           style: TextStyle(
             fontSize: 13,
@@ -55,12 +64,12 @@ class InteractiveStatisticsOverview extends StatelessWidget {
         const SizedBox(height: 24),
         if (summaryVisible) ...[
           Text(
-            card.singleChoice ? '选择分布' : '最近操作',
+            card.hasInteraction ? '选择分布' : '最近操作',
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
           Text(
-            card.singleChoice ? '每人按最近一次选择计票' : '按每人最近一次操作汇总',
+            card.hasInteraction ? '每人按最近一次选择计票' : '按每人最近一次操作汇总',
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -77,7 +86,7 @@ class InteractiveStatisticsOverview extends StatelessWidget {
                   )] ??
                   const [],
             ),
-          if (card.participants.isEmpty)
+          if (card.choices.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Text('还没有人参与'),
@@ -132,9 +141,7 @@ class InteractiveStatisticsOverview extends StatelessWidget {
   ) {
     final colors = Theme.of(context).colorScheme;
     final count = option['count'] as int;
-    final ratio = card.participants.isEmpty
-        ? 0.0
-        : count / card.participants.length;
+    final ratio = card.choices.isEmpty ? 0.0 : count / card.choices.length;
     final key = (option['buttonId'] as String, option['label'] as String);
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
@@ -152,12 +159,12 @@ class InteractiveStatisticsOverview extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Text(
-                '$count 人${card.singleChoice ? ' · ${(ratio * 100).round()}%' : ''}',
+                '$count 人${card.hasInteraction ? ' · ${(ratio * 100).round()}%' : ''}',
                 style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
               ),
             ],
           ),
-          if (card.singleChoice) ...[
+          if (card.hasInteraction) ...[
             const SizedBox(height: 10),
             LinearProgressIndicator(
               value: ratio,
@@ -240,7 +247,11 @@ class InteractiveParticipantTile extends StatelessWidget {
     contentPadding: EdgeInsets.zero,
     leading: MemberAvatar(sender: sender),
     title: Text(statisticsName(card, actor)),
-    subtitle: Text(card.participants[actor]!['label'] as String),
+    subtitle: Text(
+      card.shared
+          ? (card.choices[actor]?['label'] as String? ?? '本轮尚未提交')
+          : card.participants[actor]!['label'] as String,
+    ),
     trailing: const SettingsIcon(type: SettingsIconType.chevron),
     onTap: onTap,
   );

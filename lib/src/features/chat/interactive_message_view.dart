@@ -1,3 +1,4 @@
+import 'interaction_content.dart';
 import '../../domain/error_message.dart';
 import 'interactive_message_button.dart';
 import 'package:flutter/material.dart';
@@ -12,10 +13,12 @@ class InteractiveMessageView extends StatefulWidget {
     this.actorId = 'user:local',
     this.readOnly = false,
     this.titleTrailing,
+    this.historical = false,
   });
   final InteractiveMessage card;
   final String actorId;
   final bool readOnly;
+  final bool historical;
   final Widget? titleTrailing;
   final Future<InteractiveClickResult?> Function(
     String buttonId,
@@ -30,6 +33,7 @@ class InteractiveMessageView extends StatefulWidget {
 
 class _InteractiveMessageViewState extends State<InteractiveMessageView> {
   String? _busy;
+  bool _editing = false;
   late InteractiveMessage _card = widget.card;
 
   @override
@@ -37,6 +41,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
     super.didUpdateWidget(oldWidget);
     if (widget.actorId != oldWidget.actorId) {
       _card = widget.card;
+      _editing = false;
     } else {
       _acceptCard(widget.card);
     }
@@ -46,7 +51,13 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
     if (next.revision > _card.revision ||
         (next.revision == _card.revision &&
             next.participantRevision(widget.actorId) >=
-                _card.participantRevision(widget.actorId))) {
+                _card.participantRevision(widget.actorId) &&
+            next.sessionVersion >= _card.sessionVersion)) {
+      if (next.shared &&
+          (next.engine.phase != 'collecting' ||
+              (_card.shared && next.engine.round != _card.engine.round))) {
+        _editing = false;
+      }
       _card = next;
     }
   }
@@ -61,7 +72,10 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         _card.participantRevision(widget.actorId),
       );
       if (result != null && mounted) {
-        setState(() => _acceptCard(result.card));
+        setState(() {
+          _acceptCard(result.card);
+          _editing = false;
+        });
         if (result.url != null) await widget.onOpenLink(result.url!);
       }
     } on Object catch (error) {
@@ -87,6 +101,11 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
     final colors = Theme.of(context).colorScheme;
     final card = _card.viewFor(widget.actorId);
     final selected = _card.participants[widget.actorId];
+    final sharedView = widget.historical
+        ? _card.snapshotView
+        : _card.hasInteraction
+        ? _card.interactionView(widget.actorId)
+        : null;
     return SizedBox(
       width: double.infinity,
       child: Column(
@@ -96,7 +115,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Flexible(
+              Expanded(
                 child: Text(
                   card.title,
                   style: TextStyle(
@@ -120,7 +139,8 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               ),
             ),
           ],
-          if (card.closed || (card.singleChoice && selected != null)) ...[
+          if (sharedView == null &&
+              (card.closed || (card.singleChoice && selected != null))) ...[
             const SizedBox(height: 12),
             Text(
               [
@@ -132,15 +152,37 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
             ),
           ],
           const SizedBox(height: 16),
-          for (final (index, button) in card.buttons.indexed) ...[
-            if (index > 0) const SizedBox(height: 8),
-            InteractiveMessageButton(
-              button: button,
-              busy: _busy == button['id'],
-              locked: _busy != null || widget.readOnly || card.closed,
-              onPressed: () => _click(button),
-            ),
-          ],
+          if (sharedView != null)
+            InteractionContent(
+              view: sharedView,
+              shared: _card.shared,
+              buttons: card.buttons,
+              readOnly:
+                  widget.readOnly ||
+                  widget.historical ||
+                  _card.snapshotView != null,
+              allowChange: _card.hasInteraction && _card.engine.allowChange,
+              eligible:
+                  !_card.shared ||
+                  _card.interaction['actors'] == null ||
+                  (_card.interaction['actors'] as List).contains(
+                    widget.actorId,
+                  ),
+              editing: _editing,
+              busy: _busy,
+              onEditing: (value) => setState(() => _editing = value),
+              onClick: _click,
+            )
+          else
+            for (final (index, button) in card.buttons.indexed) ...[
+              if (index > 0) const SizedBox(height: 8),
+              InteractiveMessageButton(
+                button: button,
+                busy: _busy == button['id'],
+                locked: _busy != null || widget.readOnly || card.closed,
+                onPressed: () => _click(button),
+              ),
+            ],
         ],
       ),
     );

@@ -1,3 +1,6 @@
+import 'interaction_expression.dart';
+import 'shared_interaction.dart';
+
 class InteractiveMessage {
   const InteractiveMessage({
     required this.revision,
@@ -7,16 +10,93 @@ class InteractiveMessage {
     this.states = const [],
     this.participation = const {},
     this.participants = const {},
+    this.interaction = const {},
+    this.session = const {},
+    this.snapshotView,
   });
+  final Map<String, Object?> interaction;
+  final Map<String, Object?> session;
+  final Map<String, Object?>? snapshotView;
+  bool get shared => interaction.isNotEmpty;
+  bool get hasInteraction => snapshotView != null || shared || singleChoice;
+  Map<String, Object?> get interactionDefinition => shared
+      ? interaction
+      : {
+          'allowChange': true,
+          'views': [
+            {
+              'type': 'distribution',
+              'when': {
+                'op': 'or',
+                'args': [
+                  {'ref': 'submitted'},
+                  {'ref': 'closed'},
+                ],
+              },
+            },
+          ],
+        };
+  SharedInteraction get engine => SharedInteraction(
+    interactionDefinition,
+    shared
+        ? session
+        : {
+            'round': 1,
+            'version': 0,
+            'phase': closed ? 'closed' : 'collecting',
+            'state': <String, Object?>{},
+            'submissions': participants,
+          },
+  );
+  int get sessionVersion => shared ? engine.version : 0;
+  Map<String, Map<String, Object?>> get choices =>
+      shared ? engine.submissions : participants;
+  Map<String, Object?> interactionView(String actor) {
+    if (snapshotView != null) return snapshotView!;
+    final ctx = engine.project(
+      actor,
+      closed: closed,
+      choicesVisible: visible('visibility'),
+      summaryVisible: visible('summaryVisibility'),
+      distribution: summary,
+    );
+    final components = <Map<String, Object?>>[];
+    for (final raw in interactionDefinition['views'] as List? ?? const []) {
+      final view = Map<String, Object?>.from(raw as Map);
+      if (evaluateInteraction(view['when'] ?? true, ctx) != true) continue;
+      if (view['type'] == 'distribution') {
+        if (ctx['summaryVisible'] == true && ctx['revealed'] == true)
+          components.add({
+            'type': 'distribution',
+            'items': summary,
+            'total': choices.length,
+            'selected': choices[actor],
+            'unit': view['unit'] ?? (singleChoice ? '票' : '人'),
+          });
+      } else {
+        components.add({
+          'type': view['type'],
+          'label': view['label'],
+          'value': evaluateInteraction(view['value'], ctx),
+        });
+      }
+    }
+    return {...ctx, 'components': components};
+  }
+
   final Map<String, Object?> participation;
   final Map<String, Map<String, Object?>> participants;
   bool get closed => participation['closed'] == true;
   bool get singleChoice => participation['selectionMode'] == 'singleChoice';
-  bool visible(String field) => switch (participation[field] ?? 'public') {
-    'public' => true,
-    'afterClose' => closed,
-    _ => false,
-  };
+  bool visible(String field) {
+    if (shared && !engine.revealed) return false;
+    return switch (participation[field] ?? 'public') {
+      'public' => true,
+      'afterClose' => closed || (shared && engine.phase == 'completed'),
+      _ => false,
+    };
+  }
+
   int participantRevision(String actor) =>
       participants[actor]?['revision'] as int? ?? 0;
 
@@ -34,6 +114,31 @@ class InteractiveMessage {
                 .toList(),
       states: states,
       participation: participation,
+      interaction: interaction,
+      session: session,
+      snapshotView: snapshotView,
+    );
+  }
+
+  InteractiveMessage forwardedFor(String actor) {
+    final view = viewFor(actor);
+    return InteractiveMessage(
+      revision: 1,
+      title: view.title,
+      body: view.body,
+      buttons: [
+        for (final button in view.buttons)
+          {
+            'id': button['id'],
+            'label': button['label'],
+            'action': 'acknowledge',
+            'repeatable': false,
+            'disabled': true,
+            if (button['style'] != null) 'style': button['style'],
+          },
+      ],
+      participation: const {'closed': true},
+      snapshotView: hasInteraction ? interactionView(actor) : null,
     );
   }
 
@@ -41,10 +146,11 @@ class InteractiveMessage {
     ...viewFor(actor).toJson(),
     'definition': toJson(),
     'participantRevision': participantRevision(actor),
+    if (hasInteraction) 'interactionView': interactionView(actor),
     if (participants[actor] != null) 'ownParticipation': participants[actor],
     if (visible('visibility'))
       'participants': {
-        for (final entry in participants.entries)
+        for (final entry in choices.entries)
           entry.key: {
             'name': entry.value['name'],
             'buttonId': entry.value['buttonId'],
@@ -57,14 +163,16 @@ class InteractiveMessage {
 
   List<Map<String, Object?>> get summary {
     final counts = <(String, String), Map<String, Object?>>{
-      for (final button in buttons)
+      for (final button in buttons.where(
+        (b) => !shared || b['action'] == 'submit',
+      ))
         (button['id'] as String, button['label'] as String): {
           'buttonId': button['id'],
           'label': button['label'],
           'count': 0,
         },
     };
-    for (final state in participants.values) {
+    for (final state in choices.values) {
       final id = state['buttonId'] as String;
       final entry = counts.putIfAbsent((
         id,
@@ -86,6 +194,9 @@ class InteractiveMessage {
     String actorId,
   ) => InteractiveMessage(
     revision: json['revision'] as int,
+    snapshotView: json['interactionView'] == null
+        ? null
+        : Map<String, Object?>.from(json['interactionView'] as Map),
     title: json['title'] as String,
     body: json['body'] as String,
     buttons: (json['buttons'] as List)
@@ -107,7 +218,9 @@ class InteractiveMessage {
     if (title.trim().isEmpty ||
         title.length > 100 ||
         body.length > 10000 ||
-        buttons.isEmpty ||
+        (buttons.isEmpty &&
+            json['snapshotView'] == null &&
+            (json['participation'] as Map?)?['closed'] != true) ||
         buttons.length > 12) {
       throw ArgumentError('请提供标题、最多 10000 字正文和 1–12 个按钮');
     }
@@ -136,7 +249,19 @@ class InteractiveMessage {
         throw ArgumentError('每个状态需要标题、最多 10000 字正文和 1–12 个按钮');
       _validateButtons(stateButtons, stateIds);
     }
+    final interaction = Map<String, Object?>.from(
+      json['interaction'] as Map? ?? const {},
+    );
     return InteractiveMessage(
+      snapshotView: json['snapshotView'] == null
+          ? null
+          : Map<String, Object?>.from(json['snapshotView'] as Map),
+      interaction: interaction,
+      session: interaction.isEmpty
+          ? const {}
+          : Map<String, Object?>.from(
+              json['session'] as Map? ?? SharedInteraction.initial(interaction),
+            ),
       revision: json['revision'] as int,
       title: title,
       body: body,
@@ -162,7 +287,13 @@ class InteractiveMessage {
           (b['id'] as String).isEmpty ||
           (b['label'] as String).trim().isEmpty ||
           (b['label'] as String).length > 80 ||
-          !['update', 'acknowledge', 'openUrl'].contains(b['action']) ||
+          ![
+            'update',
+            'acknowledge',
+            'openUrl',
+            'submit',
+            'nextRound',
+          ].contains(b['action']) ||
           b['repeatable'] is! bool) {
         throw ArgumentError('按钮标识需唯一，文字不能为空，动作需有效');
       }
@@ -221,7 +352,10 @@ class InteractiveMessage {
 
   Map<String, Object?> toJson({bool includeParticipants = false}) => {
     'revision': revision,
+    if (snapshotView != null) 'snapshotView': snapshotView,
     'participation': participation,
+    if (interaction.isNotEmpty) 'interaction': interaction,
+    if (includeParticipants && session.isNotEmpty) 'session': session,
     if (includeParticipants && participants.isNotEmpty)
       'participants': participants,
     'title': title,

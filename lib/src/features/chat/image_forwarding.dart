@@ -103,7 +103,7 @@ extension ImageForwarding on ChatController {
     }
   }
 
-  Future<void> forwardMessage(
+  Future<String> forwardMessage(
     String? targetId,
     AgentMessage source,
     String note,
@@ -112,7 +112,7 @@ extension ImageForwarding on ChatController {
     () => _forwardMessage(targetId, source, note),
   );
 
-  Future<void> _forwardMessage(
+  Future<String> _forwardMessage(
     String? targetId,
     AgentMessage source,
     String note,
@@ -196,11 +196,16 @@ extension ImageForwarding on ChatController {
         role: AgentMessageRole.user,
         senderId: MessageSender.localUser.id,
         text: [
-          if (source.htmlGame == null) source.text,
+          '转发自 ${source.sender?.name ?? MessageSender.localUser.name}',
+          if (source.htmlGame == null && source.interactive == null)
+            source.text,
           if (note.isNotEmpty) note,
         ].where((part) => part.isNotEmpty).join('\n\n'),
         images: images,
         files: files,
+        interactive: source.interactive?.forwardedFor(
+          MessageSender.localUser.id,
+        ),
         createdAt: DateTime.now(),
       );
       target =
@@ -224,6 +229,7 @@ extension ImageForwarding on ChatController {
       saved = true;
       _updateConversationList(target);
       unawaited(_deliverForwardedMessage(target, message));
+      return message.id;
     } finally {
       _submitting = false;
       if (!saved) {

@@ -1,3 +1,4 @@
+import 'shared_interaction_schema.dart';
 import 'interactive_message_schema.dart';
 import '../domain/tool_models.dart';
 
@@ -18,24 +19,27 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
     safety: name == 'readInteractiveMessage'
         ? ToolSafety.readOnly
         : ToolSafety.lowRisk,
-    description:
-        'Send, read, update or participate in a native interactive message. '
-        'Read/click works in any conversation you can access without switching conversations. '
-        'Each human or AI has independent state and choices; clicks never overwrite another participant. '
-        'readInteractiveMessage returns your current card, participantRevision, permitted statistics and up to 50 history events. '
-        'To participate, call clickInteractiveMessage with messageId, buttonId, revision and participantRevision from a fresh read. '
-        'Your identity comes from the current AI runtime; participantId only selects a read-only perspective in readInteractiveMessage. '
-        'Use beforeEvent to read older history using the last sequence. '
-        'Only the author updates the shared definition; use its revision and definition fields from readInteractiveMessage. Omitted participation settings are preserved on update. '
-        'update actions apply nextBody or nextState to your own card. acknowledge records a choice; repeatable=false completes that button for you. '
-        'openUrl returns the HTTPS URL for an AI and opens it for a human. '
-        'notifyAi queues a callback to the creator, respecting choice visibility. '
-        'participation.visibility controls individual choices; summaryVisibility independently controls aggregate counts: public, private or afterClose. '
-        'Defaults are public. closed=true ends participation and reveals afterClose results. '
-        'selectionMode=singleChoice makes the latest choice each participant’s vote, allows changing it, and counts each participant once; use acknowledge buttons for a poll. '
-        'Default actions mode supports games, branching states and repeated actions with full history. '
-        'Author updates preserve all history, and everyone starts from the revised definition on their next action. '
-        'Message and button IDs are internal; do not ask users to enter them. Do not repeat the card in ordinary text.',
+    description: switch (name) {
+      'sendInteractiveMessage' =>
+        'Create a native interactive card in the current conversation. Use for persistent choices, shared participation and replayable rounds; ordinary one-off questions can use askUser. '
+            'For shared interactions define interaction (state, completion rules, reveal timing and views) and submit buttons with JSON value. Each actor contributes one current-round submission. '
+            'The app settles rules atomically; distribution/text/metric views render visible state. A poll and simultaneous-choice game use this same mechanism. nextRound keeps shared state and resets submissions plus roundInitial fields. '
+            'update/nextState buttons change only the acting participant’s presentation. openUrl opens/returns HTTPS; notifyAi requests a creator callback. Every button requires id,label,action,repeatable. '
+            'Default visibility is public. reveal=onComplete hides other choices, aggregates and runtime state until completed or closed. Keep completion reachable and gate result views on available context. '
+            'For complete examples, discover the public skill 共享交互消息 with listSkills/readSkill. Keep message/button IDs internal and do not repeat the full card as ordinary text.',
+      'readInteractiveMessage' =>
+        'Read an accessible interactive message without switching conversations. Returns your current card, revision, participantRevision, definition, visible interactionView and up to 50 of your action-history events. '
+            'Read before clicking; interactionView contains phase, round, submitted, self and permitted results. Hidden opponents’ choices and runtime state are not available before reveal. '
+            'participantId changes only the read-only perspective; perspective.interactionView belongs to that participant, while top-level revisions and ownParticipation remain yours. Use the last history sequence as beforeEvent for earlier events.',
+      'clickInteractiveMessage' =>
+        'Perform one existing button action as the current AI, just like a human tap. Pass messageId, buttonId, revision and participantRevision from a fresh readInteractiveMessage. '
+            'submit records or replaces only your current-round choice. nextRound works after completion; it preserves shared state and clears round submissions. No participant impersonation parameter is needed. '
+            'On a stale-state error, read again and decide against the new phase; do not blindly replay an old choice into a new round. Success returns your visible updated state; openUrl also returns its URL.',
+      _ =>
+        'Update a card you authored, using the current revision and definition from readInteractiveMessage. Supply title,body,buttons; omitted interaction/states/participation fields remain in place, and supplied participation fields merge. '
+            'Preserves participants, shared runtime and action history. initial initializes only creation; roundInitial applies on the next round. Rules may change but a completed round is not settled again. '
+            'participation.closed=true stops collecting and reveals onComplete submissions. Completion rules run only if their expression is true; reference closed explicitly when settlement should occur at closure. Do not replace the card merely to count votes: submit already stores choices and distribution renders them.',
+    },
     inputSchema: {
       'type': 'object',
       'properties': {
@@ -58,6 +62,7 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         if (name == 'sendInteractiveMessage' ||
             name == 'updateInteractiveMessage') ...{
           'participation': interactiveParticipationSchema,
+          'interaction': sharedInteractionSchema,
           'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
           'body': interactiveBodySchema,
           'buttons': interactiveButtonsSchema,

@@ -8,13 +8,16 @@ List<Route<dynamic>> initialHomeRoutes(ChatController controller, Widget root) {
   final restore =
       !controller.startsWithoutConversations &&
       controller.hasRestoredConversation &&
+      controller.navigationState.detailVisible &&
       (conversation.kind == ConversationKind.group || !conversation.isEmpty);
   return [
     MaterialPageRoute<void>(
       settings: const RouteSettings(name: '/'),
       builder: (_) => root,
     ),
-    if (restore || controller.startsWithoutConversations)
+    if (restore ||
+        (controller.startsWithoutConversations &&
+            controller.navigationState.detailVisible))
       MaterialPageRoute<void>(
         builder: (_) => ChatPage(controller: controller, stacked: true),
       ),

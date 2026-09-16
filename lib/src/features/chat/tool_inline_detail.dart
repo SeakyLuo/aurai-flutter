@@ -23,6 +23,7 @@ String? toolInlineDetail(
     'searchWeb' ||
     'searchImages' ||
     'searchTools' ||
+    'searchSkills' ||
     'findApps' ||
     'searchConversations' ||
     'searchMessages' => request['query'],
@@ -35,6 +36,8 @@ String? toolInlineDetail(
     'updateSkill' ||
     'deleteSkill' ||
     'installSkill' ||
+    'enableSkill' ||
+    'disableSkill' ||
     'uninstallSkill' => request['name'],
     'executeAndroidScript' => request['purpose'],
     'createScheduledTask' || 'updateScheduledTask' => request['title'],

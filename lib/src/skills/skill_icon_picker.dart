@@ -3,7 +3,11 @@ import '../features/chat/settings_appearance.dart';
 import '../features/chat/question_icon.dart';
 import 'skill_icon.dart';
 
-Future<String?> showSkillIconPicker(BuildContext context, String selected) {
+Future<String?> showSkillIconPicker(
+  BuildContext context,
+  String selected, {
+  String title = '选择技能图标',
+}) {
   final media = MediaQuery.of(context);
   final height = media.size.height - media.viewPadding.top;
   return showModalBottomSheet<String>(
@@ -36,9 +40,9 @@ Future<String?> showSkillIconPicker(BuildContext context, String selected) {
                     ),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      '选择技能图标',
+                      title,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 17,

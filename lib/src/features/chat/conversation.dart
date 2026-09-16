@@ -94,8 +94,12 @@ class Conversation {
       draftImages.isEmpty &&
       draftFiles.isEmpty &&
       pendingGoal == null;
-  DateTime get updatedAt =>
-      messages.isEmpty ? storedUpdatedAt ?? createdAt : messages.last.createdAt;
+  DateTime get updatedAt {
+    final latest = messages.isEmpty ? createdAt : messages.last.createdAt;
+    final stored = storedUpdatedAt;
+    return stored != null && stored.isAfter(latest) ? stored : latest;
+  }
+
   String get title => storedTitle != null
       ? storedTitle!
       : messages.isEmpty

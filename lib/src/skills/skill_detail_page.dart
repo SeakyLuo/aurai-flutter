@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../features/chat/chat_controller.dart';
+import '../features/chat/ai_contact_page.dart';
+import '../domain/message_sender.dart';
+import '../features/chat/member_avatar.dart';
 import '../domain/error_message.dart';
 import '../features/chat/delete_confirmation_dialog.dart';
 import '../features/chat/dialog_action_button.dart';
@@ -16,9 +20,11 @@ class SkillDetailPage extends StatefulWidget {
   const SkillDetailPage({
     super.key,
     required this.store,
+    required this.controller,
     required this.skillId,
   });
   final SkillStore store;
+  final ChatController controller;
   final String skillId;
   @override
   State<SkillDetailPage> createState() => _SkillDetailPageState();
@@ -123,6 +129,9 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
         );
       }
       final installed = widget.store.isInstalled(skill.id);
+      final creator = widget.store.members
+          .where((member) => member.id == skill.ownerId)
+          .firstOrNull;
       return Scaffold(
         appBar: SettingsAppBar(
           title: '技能详情',
@@ -163,11 +172,49 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
                   const SizedBox(height: 12),
                   Text(skill.description),
                   const SizedBox(height: 12),
-                  Text(
-                    '${widget.store.ownerName(skill)} · ${skillVisibilityLabel(skill.visibility)}',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  Row(
+                    children: [
+                      if (creator != null) ...[
+                        Material(
+                          color: Colors.transparent,
+                          shape: const CircleBorder(),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: creator.kind != MessageSenderKind.agent
+                                ? null
+                                : () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => AiContactPage(
+                                        controller: widget.controller,
+                                        senderId: creator.id,
+                                      ),
+                                    ),
+                                  ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(3),
+                              child: MemberAvatar(sender: creator, size: 32),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                      ],
+                      Expanded(
+                        child: Text(
+                          widget.store.ownerName(skill),
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        skillVisibilityLabel(skill.visibility),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
                   if (widget.store.usesInstallations && !installed)
@@ -247,7 +294,11 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute<void>(
-          builder: (_) => SkillDetailPage(store: widget.store, skillId: id),
+          builder: (_) => SkillDetailPage(
+            store: widget.store,
+            controller: widget.controller,
+            skillId: id,
+          ),
         ),
       ),
     );

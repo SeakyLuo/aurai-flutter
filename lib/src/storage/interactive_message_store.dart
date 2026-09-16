@@ -42,6 +42,13 @@ class InteractiveMessageStore {
     final button = view.buttons.firstWhere((b) => b['id'] == buttonId);
     if (button['disabled'] == true) throw StateError('这个选项已处理');
     final action = button['action'] as String;
+    final nextSession = card.shared
+        ? switch (action) {
+            'submit' => card.engine.submit(actor.id, actor.name, button),
+            'nextRound' => card.engine.nextRound(actor.id),
+            _ => card.engine,
+          }
+        : null;
     final target = action == 'update' && button['nextState'] != null
         ? card.states.firstWhere((state) => state['id'] == button['nextState'])
         : null;
@@ -53,7 +60,8 @@ class InteractiveMessageStore {
             for (final b in view.buttons)
               if (b['id'] == buttonId &&
                   b['repeatable'] == false &&
-                  !card.singleChoice)
+                  !card.singleChoice &&
+                  !card.shared)
                 {
                   ...b,
                   'disabled': true,
@@ -88,7 +96,14 @@ class InteractiveMessageStore {
       'updatedAt': now,
     };
     final next = InteractiveMessage(
-      revision: card.revision,
+      revision:
+          nextSession != null &&
+              (nextSession.round != card.engine.round ||
+                  nextSession.phase != card.engine.phase)
+          ? card.revision + 1
+          : card.revision,
+      interaction: card.interaction,
+      session: nextSession?.runtime ?? card.session,
       title: card.title,
       body: card.body,
       buttons: card.buttons,
@@ -110,7 +125,9 @@ class InteractiveMessageStore {
         'body': view.body,
         'buttons': view.buttons,
         'participation': view.participation,
-        if (card.participants[actor.id] case final previous?)
+        if (card.hasInteraction)
+          'interactionView': card.interactionView(actor.id),
+        if (card.choices[actor.id] case final previous?)
           'selectedLabel': previous['label'],
       }),
       'created_at': now,

@@ -1,6 +1,7 @@
+import 'header_action_menu.dart';
+import '../../scheduling/task_filter_menu.dart';
 import '../../domain/error_message.dart';
 import '../../domain/message_sender.dart';
-import 'header_action_menu.dart';
 import 'home_navigation.dart';
 import 'ai_contact_actions.dart';
 import 'conversation_menu_icon.dart';
@@ -16,7 +17,6 @@ import 'profile_avatar.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'pagination_listener.dart';
-import 'glass_surface.dart';
 
 class AiContactsPage extends StatefulWidget {
   const AiContactsPage({
@@ -42,9 +42,11 @@ class _AiContactsPageState extends State<AiContactsPage> {
   Timer? _debounce;
   int _generation = 0;
   bool _loading = false, _more = true;
+  late bool _archived;
   @override
   void initState() {
     super.initState();
+    _archived = widget.archived;
     _load(reset: true);
   }
 
@@ -65,7 +67,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
     try {
       final page = await widget.controller.groupStore.contacts(
         _search.text.trim(),
-        archived: widget.archived,
+        archived: _archived,
         offset: _items.length,
       );
       if (!mounted || generation != _generation) return;
@@ -144,72 +146,53 @@ class _AiContactsPageState extends State<AiContactsPage> {
       if (mounted) _load(reset: true);
       return;
     }
-    if (id != null) await _open(id);
+    if (id != null) {
+      setState(() => _archived = false);
+      await _open(id);
+    }
     if (mounted) _load(reset: true);
   }
 
-  Future<void> _menu(AiProfile ai) async {
-    final action = await showDialog<String>(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: GlassSurface(
-          radius: 26,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final item in [
-                  ('open', '查看资料', SettingsIconType.personalInfo),
-                  if (!ai.sender.archived)
-                    ('message', '发消息', SettingsIconType.personalization),
-                  ('edit', '编辑', SettingsIconType.filter),
-                  if (ai.sender.id != MessageSender.aurai.id ||
-                      ai.sender.archived)
-                    (
-                      'archive',
-                      ai.sender.archived ? '恢复朋友' : '归档朋友',
-                      SettingsIconType.filter,
-                    ),
-                ])
-                  ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    leading: item.$1 == 'message'
-                        ? const ConversationIcon()
-                        : item.$1 == 'edit'
-                        ? ConversationMenuIcon(
-                            type: ConversationMenuIconType.rename,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          )
-                        : item.$1 == 'archive'
-                        ? ConversationMenuIcon(
-                            type: ai.sender.archived
-                                ? ConversationMenuIconType.unarchive
-                                : ConversationMenuIconType.archive,
-                            color: ai.sender.archived
-                                ? Theme.of(context).colorScheme.onSurface
-                                : Theme.of(context).colorScheme.error,
-                          )
-                        : SettingsIcon(type: item.$3),
-                    title: Text(
-                      item.$2,
-                      style: TextStyle(
-                        color: item.$1 == 'archive' && !ai.sender.archived
-                            ? Theme.of(context).colorScheme.error
-                            : null,
-                      ),
-                    ),
-                    onTap: () => Navigator.pop(context, item.$1),
+  Future<void> _menu(AiProfile ai, BuildContext anchorContext) async {
+    final color = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : Colors.black;
+    final action = await showHeaderActionMenu(
+      anchorContext,
+      destructiveValues: ai.sender.archived ? const {} : const {'archive'},
+      items: [
+        for (final item in [
+          ('open', '查看资料'),
+          if (!ai.sender.archived) ('message', '发消息'),
+          ('edit', '编辑'),
+          if (ai.sender.id != MessageSender.aurai.id || ai.sender.archived)
+            ('archive', ai.sender.archived ? '恢复朋友' : '归档朋友'),
+        ])
+          (
+            value: item.$1,
+            label: item.$2,
+            icon: item.$1 == 'message'
+                ? ColorFiltered(
+                    colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                    child: const ConversationIcon(),
+                  )
+                : item.$1 == 'open'
+                ? SettingsIcon(
+                    type: SettingsIconType.personalInfo,
+                    color: color,
+                  )
+                : ConversationMenuIcon(
+                    type: item.$1 == 'edit'
+                        ? ConversationMenuIconType.rename
+                        : ai.sender.archived
+                        ? ConversationMenuIconType.unarchive
+                        : ConversationMenuIconType.archive,
+                    color: item.$1 == 'archive' && !ai.sender.archived
+                        ? Theme.of(context).colorScheme.error
+                        : color,
                   ),
-              ],
-            ),
           ),
-        ),
-      ),
+      ],
     );
     if (!mounted || action == null) return;
     if (action == 'message') {
@@ -245,61 +228,70 @@ class _AiContactsPageState extends State<AiContactsPage> {
               ConversationMode.temporaryPersonalized => '临时个性化 · 选择朋友',
               ConversationMode.temporaryPlain => '临时非个性化 · 选择朋友',
             }
-          : widget.archived
+          : _archived
           ? '已归档朋友'
           : '通讯录',
       root: widget.root,
       onBack: () => Navigator.pop(context),
-      actions: [
-        if (widget.selectForConversation)
-          SettingsGlassAction(
-            label: '添加 AI',
-            icon: Icons.add_rounded,
-            iconWidget: const SettingsIcon(type: SettingsIconType.add),
-            onPressed: _create,
-          ),
-        if (!widget.archived && !widget.selectForConversation)
-          Builder(
-            builder: (buttonContext) => SettingsGlassAction(
-              label: '更多',
-              icon: Icons.more_horiz_rounded,
-              onPressed: () async {
-                final action = await showHeaderActionMenu(
-                  buttonContext,
-                  items: [
-                    const (
-                      value: 'create',
-                      label: '添加朋友',
-                      icon: SettingsIcon(type: SettingsIconType.add),
-                    ),
-                    (
-                      value: 'archive',
-                      label: '已归档朋友',
-                      icon: ConversationMenuIcon(
-                        type: ConversationMenuIconType.archive,
-                        color: Theme.of(context).colorScheme.onSurface,
+      titleWidget: widget.selectForConversation
+          ? null
+          : Builder(
+              builder: (anchor) => InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () async {
+                  final box = anchor.findRenderObject()! as RenderBox;
+                  final selected = await showTaskChoiceMenu(
+                    context,
+                    anchor: box.localToGlobal(Offset.zero) & box.size,
+                    selected: _archived ? 'archived' : 'active',
+                    label: '通讯录',
+                    centerOnAnchor: true,
+                    choices: const [
+                      (value: 'active', label: '通讯录'),
+                      (value: 'archived', label: '已归档朋友'),
+                    ],
+                  );
+                  if (!mounted || selected == null) return;
+                  final archived = selected == 'archived';
+                  if (archived == _archived) return;
+                  _debounce?.cancel();
+                  setState(() => _archived = archived);
+                  _load(reset: true);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          _archived ? '已归档朋友' : '通讯录',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ],
-                );
-                if (!mounted || action == null) return;
-                if (action == 'create') {
-                  await _create();
-                  return;
-                }
-                await Navigator.push<void>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => AiContactsPage(
-                      controller: widget.controller,
-                      archived: true,
-                    ),
+                      const SizedBox(width: 6),
+                      const RotatedBox(
+                        quarterTurns: 1,
+                        child: SizedBox.square(
+                          dimension: 18,
+                          child: FittedBox(
+                            child: SettingsIcon(type: SettingsIconType.chevron),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                );
-                if (mounted) _load(reset: true);
-              },
+                ),
+              ),
             ),
-          ),
+      actions: [
+        SettingsGlassAction(
+          label: '添加朋友',
+          icon: Icons.add_rounded,
+          iconWidget: const SettingsIcon(type: SettingsIconType.add),
+          onPressed: _create,
+        ),
       ],
     ),
     body: Column(
@@ -335,7 +327,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
                       : Text(
                           _search.text.isNotEmpty
                               ? '没有找到朋友'
-                              : widget.archived
+                              : _archived
                               ? '没有已归档朋友'
                               : '点击右上角，创建你的第一个 AI',
                         ),
@@ -348,40 +340,43 @@ class _AiContactsPageState extends State<AiContactsPage> {
                     itemCount: _items.length,
                     itemBuilder: (context, index) {
                       final ai = _items[index];
-                      return ListTile(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(22),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        leading: ProfileAvatar(
-                          style: AvatarStyle(
-                            icon: ai.sender.avatarIcon,
-                            color: ai.sender.avatarColor,
-                            path: ai.sender.avatarPath,
+                      return Builder(
+                        builder: (anchorContext) => ListTile(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(22),
                           ),
-                          name: ai.sender.name,
-                          size: 44,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 0,
+                          ),
+                          horizontalTitleGap: 12,
+                          leading: ProfileAvatar(
+                            style: AvatarStyle(
+                              icon: ai.sender.avatarIcon,
+                              color: ai.sender.avatarColor,
+                              path: ai.sender.avatarPath,
+                            ),
+                            name: ai.sender.name,
+                            size: 44,
+                          ),
+                          title: Text(
+                            ai.sender.name,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          subtitle: ai.description.isEmpty
+                              ? null
+                              : Text(
+                                  ai.description,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                          onTap: () => widget.selectForConversation
+                              ? _startConversation(ai)
+                              : _open(ai.sender.id),
+                          onLongPress: widget.selectForConversation
+                              ? null
+                              : () => _menu(ai, anchorContext),
                         ),
-                        title: Text(
-                          ai.sender.name,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                        subtitle: ai.description.isEmpty
-                            ? null
-                            : Text(
-                                ai.description,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                        onTap: () => widget.selectForConversation
-                            ? _startConversation(ai)
-                            : _open(ai.sender.id),
-                        onLongPress: widget.selectForConversation
-                            ? null
-                            : () => _menu(ai),
                       );
                     },
                   ),

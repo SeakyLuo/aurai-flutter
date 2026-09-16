@@ -5,6 +5,9 @@ import 'ai_contact_page.dart';
 import 'chat_controller.dart';
 import 'home_navigation.dart';
 import 'settings_page.dart';
+import 'ai_model_page.dart';
+import 'model_settings_sheet.dart';
+import '../../domain/model_provider.dart';
 
 Future<void> navigateAppPage(
   BuildContext context,
@@ -19,6 +22,32 @@ Future<void> navigateAppPage(
       context,
       controller,
       args['conversationId'] as String,
+      messageId: args['messageId'] as String?,
+    );
+    return;
+  }
+  if (args['page'] == 'providerConfiguration') {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ModelSettingsSheet(
+          controller: controller,
+          continueAfterSave: false,
+          accountOnly: true,
+          initialService: ModelService.values.byName(args['service'] as String),
+        ),
+      ),
+    );
+    return;
+  }
+  if (args['page'] == 'modelConfiguration') {
+    final profile = await controller.groupStore.loadAi(
+      args['senderId'] as String,
+    );
+    if (!context.mounted) throw StateError('页面已关闭');
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => AiModelPage(controller: controller, profile: profile),
+      ),
     );
     return;
   }
@@ -28,6 +57,7 @@ Future<void> navigateAppPage(
       senderId: args['contactId'] as String,
     ),
     'skills' => SkillsPage(
+      controller: controller,
       store: await controller.aiSkills(args['senderId'] as String),
     ),
     'tasks' => TasksPage(controller: controller),

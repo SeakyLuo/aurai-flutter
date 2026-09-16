@@ -9,9 +9,16 @@ import 'tool_action_icon.dart';
 import 'tool_detail_page.dart';
 import 'tool_approvals_page.dart';
 
-class ToolsPage extends StatelessWidget {
+class ToolsPage extends StatefulWidget {
   const ToolsPage({super.key, required this.controller});
   final ChatController controller;
+
+  @override
+  State<ToolsPage> createState() => _ToolsPageState();
+}
+
+class _ToolsPageState extends State<ToolsPage> {
+  ChatController get controller => widget.controller;
 
   @override
   Widget build(BuildContext context) {
@@ -81,12 +88,15 @@ class ToolsPage extends StatelessWidget {
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,
                       ),
-                      onTap: () => Navigator.push<void>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ToolDetailPage(tool: tool),
-                        ),
-                      ),
+                      onTap: () async {
+                        await Navigator.push<void>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ToolDetailPage(tool: tool),
+                          ),
+                        );
+                        if (mounted) setState(() {});
+                      },
                     ),
                 ],
               ),

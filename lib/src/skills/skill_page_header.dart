@@ -5,51 +5,25 @@ import '../scheduling/task_filter_menu.dart';
 class SkillPageHeader extends StatelessWidget {
   const SkillPageHeader({
     super.key,
-    required this.library,
     required this.scope,
-    required this.status,
     required this.onScope,
-    required this.onStatus,
   });
-  final bool library;
-  final String scope, status;
-  final ValueChanged<String> onScope, onStatus;
+  final String scope;
+  final ValueChanged<String> onScope;
   @override
   Widget build(BuildContext context) => Column(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Text(library ? '技能库' : '技能'),
-      Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _choice(
-            context,
-            scope,
-            library
-                ? const [
-                    (value: 'library', label: '全部技能'),
-                    (value: 'created', label: '我创建的'),
-                  ]
-                : const [
-                    (value: 'installed', label: '已安装'),
-                    (value: 'created', label: '我创建的'),
-                  ],
-            '技能分类',
-            onScope,
-          ),
-          if (scope == 'installed')
-            _choice(
-              context,
-              status,
-              const [
-                (value: 'all', label: '全部状态'),
-                (value: 'enabled', label: '已启用'),
-                (value: 'disabled', label: '已停用'),
-              ],
-              '启停状态',
-              onStatus,
-            ),
+      const Text('技能'),
+      _choice(
+        context,
+        scope,
+        const [
+          (value: 'installed', label: '已安装'),
+          (value: 'created', label: '我创建的'),
         ],
+        '筛选技能',
+        onScope,
       ),
     ],
   );

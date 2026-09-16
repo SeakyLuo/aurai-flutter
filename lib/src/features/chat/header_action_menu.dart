@@ -33,10 +33,14 @@ Future<String?> showHeaderActionMenu(
       final curve = animation.drive(CurveTween(curve: Curves.easeOutCubic));
       return Stack(
         children: [
-          Positioned(
-            left: left,
-            top: origin.dy + button.size.height + 8,
-            width: width,
+          CustomSingleChildLayout(
+            delegate: _MenuPosition(
+              left: left,
+              anchor: origin & button.size,
+              width: width,
+              topInset: media.padding.top + 8,
+              bottomInset: media.padding.bottom + 8,
+            ),
             child: FadeTransition(
               opacity: curve,
               child: ScaleTransition(
@@ -97,4 +101,47 @@ Future<String?> showHeaderActionMenu(
     },
     transitionBuilder: (_, _, _, child) => child,
   );
+}
+
+class _MenuPosition extends SingleChildLayoutDelegate {
+  const _MenuPosition({
+    required this.left,
+    required this.anchor,
+    required this.width,
+    required this.topInset,
+    required this.bottomInset,
+  });
+  final double left, width, topInset, bottomInset;
+  final Rect anchor;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) =>
+      BoxConstraints(
+        minWidth: width,
+        maxWidth: width,
+        maxHeight: math.max(0, constraints.maxHeight - topInset - bottomInset),
+      );
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    final below = anchor.bottom + 8;
+    final top = below + childSize.height <= size.height - bottomInset
+        ? below
+        : anchor.top - childSize.height - 8;
+    return Offset(
+      left,
+      top.clamp(
+        topInset,
+        math.max(topInset, size.height - bottomInset - childSize.height),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRelayout(_MenuPosition oldDelegate) =>
+      left != oldDelegate.left ||
+      anchor != oldDelegate.anchor ||
+      width != oldDelegate.width ||
+      topInset != oldDelegate.topInset ||
+      bottomInset != oldDelegate.bottomInset;
 }

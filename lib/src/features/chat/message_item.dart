@@ -1,3 +1,4 @@
+import 'forwarded_interactive_message.dart';
 import '../../storage/interactive_action_history.dart';
 import 'interactive_message_paging.dart';
 import '../../domain/message_sender.dart';
@@ -462,6 +463,8 @@ class _MessageItemState extends State<MessageItem> {
                         ),
                     ],
                   ),
+                if (message.interactive case final card?)
+                  ForwardedInteractiveMessage(card: card),
                 if (message.images.isNotEmpty && message.text.isNotEmpty)
                   const SizedBox(height: 8),
                 if (message.text.isNotEmpty)
@@ -552,13 +555,17 @@ class _MessageItemState extends State<MessageItem> {
         if (message.htmlGame != null)
           widget.htmlGameView!
         else if (message.interactive != null)
-          InteractiveMessageView(
-            key: ValueKey(page?.sequence),
-            card: page?.snapshot ?? message.interactive!,
-            titleTrailing: widget.groupBubble ? null : page?.control,
-            readOnly: widget.readOnly || page?.snapshot != null,
-            onClick: widget.onInteractiveClick!,
-            onOpenLink: (url) => _openLink(context, url),
+          IgnorePointer(
+            ignoring: widget.readOnly && widget.onLocate != null,
+            child: InteractiveMessageView(
+              key: ValueKey(page?.sequence),
+              card: page?.snapshot ?? message.interactive!,
+              titleTrailing: widget.groupBubble ? null : page?.control,
+              historical: page?.snapshot != null,
+              readOnly: widget.readOnly || page?.snapshot != null,
+              onClick: widget.onInteractiveClick!,
+              onOpenLink: (url) => _openLink(context, url),
+            ),
           )
         else
           MediaQuery.removePadding(
@@ -694,6 +701,7 @@ class _MessageItemState extends State<MessageItem> {
           borderRadius: BorderRadius.circular(22),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
+            onTap: message.interactive != null ? widget.onLocate : null,
             onLongPress: () {
               final box =
                   _bubbleKey.currentContext!.findRenderObject()! as RenderBox;

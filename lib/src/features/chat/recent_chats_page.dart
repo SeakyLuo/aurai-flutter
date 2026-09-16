@@ -157,8 +157,10 @@ class RecentChatsPageState extends State<RecentChatsPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
       title: '会话',
+      gradientBackground: true,
       onBack: null,
       root: true,
       leadingAction: SettingsGlassAction(
@@ -186,7 +188,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                   (
                     value: 'temporary',
                     label: '发起临时会话',
-                    icon: const ConversationIcon(),
+                    icon: const ConversationIcon(temporary: true),
                   ),
                   (
                     value: 'group',
@@ -223,7 +225,12 @@ class RecentChatsPageState extends State<RecentChatsPage> {
             hasMore: _more,
             loadMore: _load,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+              padding: EdgeInsets.fromLTRB(
+                12,
+                MediaQuery.paddingOf(context).top + 76 + 8,
+                12,
+                24,
+              ),
               children: [
                 if (_loaded && _items.isEmpty)
                   _roundedTile(
@@ -232,8 +239,8 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 7,
+                        horizontal: 6,
+                        vertical: 0,
                       ),
                       horizontalTitleGap: 12,
                       leading: const ProfileAvatar(
@@ -265,7 +272,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
     return _roundedTile(
       ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
         horizontalTitleGap: 12,
         leading: ConversationUnreadAvatar(
           controller: widget.controller,
@@ -325,11 +332,14 @@ class RecentChatsPageState extends State<RecentChatsPage> {
           if (mounted) reload();
         },
       ),
+      pinned: item.isPinned,
     );
   }
 
-  Widget _roundedTile(Widget child) => Material(
-    color: Colors.transparent,
+  Widget _roundedTile(Widget child, {bool pinned = false}) => Material(
+    color: pinned
+        ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.035)
+        : Colors.transparent,
     borderRadius: BorderRadius.circular(16),
     clipBehavior: Clip.antiAlias,
     child: child,

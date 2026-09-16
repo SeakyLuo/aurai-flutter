@@ -16,7 +16,7 @@ const interactiveButtonsSchema = {
       'label': {'type': 'string', 'minLength': 1, 'maxLength': 80},
       'action': {
         'type': 'string',
-        'enum': ['update', 'acknowledge', 'openUrl'],
+        'enum': ['update', 'acknowledge', 'openUrl', 'submit', 'nextRound'],
       },
       'style': {
         'type': 'string',
@@ -50,6 +50,10 @@ const interactiveButtonsSchema = {
             'Queue a callback to the creator after this user action. Omit/false for local-only changes.',
       },
       'repeatable': {'type': 'boolean'},
+      'value': {
+        'description':
+            'For submit: any JSON value to record for this participant in the current shared round. Defaults to button id.',
+      },
       'disabled': {'type': 'boolean'},
       'completedLabel': {'type': 'string', 'maxLength': 80},
       'nextState': {

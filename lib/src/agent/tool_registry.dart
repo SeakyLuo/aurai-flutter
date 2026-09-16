@@ -1,3 +1,4 @@
+import '../domain/tool_customization.dart';
 import 'tool_search.dart';
 import '../domain/capability.dart';
 import '../domain/tool_models.dart';
@@ -30,7 +31,7 @@ class ToolRegistry {
               availableIds.contains(tool.definition.capabilityId) ||
               tool is RuntimeCapabilityAgentTool,
         )
-        .map((tool) => tool.definition)
+        .map((tool) => ToolCustomizations.apply(tool.definition))
         .toList(growable: false);
   }
 

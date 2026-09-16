@@ -13,11 +13,31 @@ class HtmlGameStore {
       "EXISTS (SELECT 1 FROM html_game_receipts WHERE processed_at IS NULL AND attempts >= 3 AND event_id IN (SELECT id FROM html_game_events WHERE message_id = html_games.message_id)) AS retry_available";
   Future<HtmlGameCard> card(String id) async {
     final rows = await database.rawQuery(
-      "SELECT title, preview, background_mode, display_mode, display_width, display_height, version, status, $retryColumn FROM html_games WHERE message_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
+      "SELECT title, preview, background_mode, display_mode, display_width, display_height, measured_width, measured_height, measured_scale, measured_version, version, status, $retryColumn FROM html_games WHERE message_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
       [id],
     );
     if (rows.isEmpty) throw StateError('游戏已被删除或撤回');
     return HtmlGameCard.fromRow(rows.single);
+  }
+
+  Future<void> saveMeasuredSize(
+    String id,
+    double width,
+    double height,
+    double scale,
+    int version,
+  ) async {
+    await database.update(
+      'html_games',
+      {
+        'measured_width': width,
+        'measured_height': height,
+        'measured_scale': scale,
+        'measured_version': version,
+      },
+      where: 'message_id = ? AND version = ?',
+      whereArgs: [id, version],
+    );
   }
 
   Future<void> retryNotifications(String id) async {

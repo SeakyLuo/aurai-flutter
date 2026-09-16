@@ -61,7 +61,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
     with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   static _HtmlGameViewState? _active;
   int _openRevision = 0;
-  static final _heights = <(String, double, bool), double>{};
+  static final _heights = <(String, double, bool, double, int), double>{};
   Timer? _offscreenTimer;
   @override
   bool get wantKeepAlive => _session != null || _opening || _closing != null;
@@ -74,7 +74,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
   late HtmlGameCard _card;
   Uint8List? _preview;
   double? _contentHeight;
-  (String, double, bool)? _heightKey;
+  (String, double, bool, double, int)? _heightKey;
   bool _surfaceReady = false;
   bool _opening = false, _retrying = false;
   bool _failed = false, _foreground = true, _leaving = false;
@@ -307,6 +307,21 @@ class _HtmlGameViewState extends State<HtmlGameView>
           (session.contentHeight! - _contentHeight!).abs() >= 2) {
         _contentHeight = session.contentHeight;
         changed = true;
+        if (!widget.fullscreen && _heightKey != null) {
+          unawaited(
+            widget.store
+                .saveMeasuredSize(
+                  widget.messageId,
+                  _heightKey!.$2,
+                  _contentHeight!,
+                  MediaQuery.textScalerOf(context).scale(1),
+                  session.game.version,
+                )
+                .catchError((Object error) {
+                  if (mounted) _notice('尺寸保存失败：${errorMessage(error)}');
+                }),
+          );
+        }
       }
       if (_heightKey != null) {
         _heights.remove(_heightKey);
@@ -500,10 +515,24 @@ class _HtmlGameViewState extends State<HtmlGameView>
               _card.width?.toDouble() ?? constraints.maxWidth,
               constraints.maxWidth,
             );
-            final key = (widget.messageId, width, widget.fullscreen);
+            final key = (
+              widget.messageId,
+              width,
+              widget.fullscreen,
+              MediaQuery.textScalerOf(context).scale(1),
+              _card.version,
+            );
             if (_heightKey != key) {
               _heightKey = key;
               _contentHeight = _heights[key];
+              if (_contentHeight == null &&
+                  !widget.fullscreen &&
+                  _card.measuredWidth == width &&
+                  _card.measuredScale ==
+                      MediaQuery.textScalerOf(context).scale(1) &&
+                  _card.measuredVersion == _card.version) {
+                _contentHeight = _card.measuredHeight;
+              }
             }
             final height = _contentHeight ?? 96.0;
             return SizedBox(
