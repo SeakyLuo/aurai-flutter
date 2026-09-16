@@ -195,8 +195,11 @@ class SettingsPage extends StatelessWidget {
                         await Navigator.push(
                           context,
                           MaterialPageRoute<void>(
-                            builder: (_) =>
-                                SkillsPage(store: store, library: true),
+                            builder: (_) => SkillsPage(
+                              store: store,
+                              controller: controller,
+                              library: true,
+                            ),
                           ),
                         );
                       },

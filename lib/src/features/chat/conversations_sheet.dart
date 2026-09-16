@@ -167,8 +167,9 @@ class ConversationsDrawer extends StatelessWidget {
                                 itemBuilder: (context, index) {
                                   final conversation = conversations[index];
                                   final selected =
+                                      controller.isConversationDetailVisible &&
                                       conversation.id ==
-                                      controller.activeConversation.id;
+                                          controller.activeConversation.id;
                                   return ConversationMore(
                                     key: ValueKey(conversation.id),
                                     controller: controller,

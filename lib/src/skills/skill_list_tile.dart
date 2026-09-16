@@ -10,13 +10,13 @@ class SkillListTile extends StatelessWidget {
     required this.skill,
     required this.onTap,
     this.titleTrailing,
-    this.subtitlePrefix,
+    this.footer,
     this.onLongPressStart,
     this.showDisabled = false,
   });
 
   final SavedSkill skill;
-  final String? subtitlePrefix;
+  final Widget? footer;
   final VoidCallback onTap;
   final Widget? titleTrailing;
   final GestureLongPressStartCallback? onLongPressStart;
@@ -47,12 +47,18 @@ class SkillListTile extends StatelessWidget {
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 6),
-          child: Text(
-            showDisabled && !skill.enabled
-                ? '已停用 · ${skill.description}'
-                : '${subtitlePrefix == null ? '' : '$subtitlePrefix\n'}${skill.description}',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                showDisabled && !skill.enabled
+                    ? '已停用 · ${skill.description}'
+                    : skill.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (footer != null) ...[const SizedBox(height: 12), footer!],
+            ],
           ),
         ),
         onTap: onTap,

@@ -1,3 +1,5 @@
+import '../../storage/conversation_navigation_state.dart';
+import '../../domain/tool_customization.dart';
 import '../../storage/interactive_action_history.dart';
 import '../../storage/group_unread_messages.dart';
 import '../../storage/recalled_message_drafts.dart';
@@ -25,6 +27,7 @@ import '../../agent/group_history_tool.dart';
 import 'markdown_preview_text.dart';
 import 'dart:developer' as developer;
 import '../../agent/app_control_tool.dart';
+import '../../agent/app_assistance_tool.dart';
 import '../../agent/recall_message_tool.dart';
 import '../../agent/self_profile_tool.dart';
 import 'avatar_symbol.dart';
@@ -112,6 +115,7 @@ part 'group_private_conversation.dart';
 part 'group_system_events.dart';
 part 'conversation_actions.dart';
 part 'app_control_actions.dart';
+part 'app_assistance_actions.dart';
 part 'peer_conversations.dart';
 part 'interactive_message_actions.dart';
 part 'message_callback_actions.dart';
@@ -131,6 +135,17 @@ class ChatController extends ChangeNotifier {
   AiProfile? _activeAi;
   AiProfile? get activeAi => _activeAi;
   bool hasRestoredConversation = false;
+  final navigationState = ConversationNavigationState();
+  bool isConversationDetailVisible = false;
+  Future<void> setConversationDetailVisible(bool visible) async {
+    if (isConversationDetailVisible == visible &&
+        navigationState.detailVisible == visible)
+      return;
+    isConversationDetailVisible = visible;
+    _conversationChanged();
+    await navigationState.setDetailVisible(visible);
+  }
+
   bool startsWithoutConversations = false;
   final Map<String, MemoryController> _aiMemories = {};
   final Map<String, SkillStore> _aiSkills = {};
@@ -309,6 +324,8 @@ class ChatController extends ChangeNotifier {
     );
     await _imageStore.initialize();
     await toolApprovals.initialize();
+    await navigationState.initialize();
+    await ToolCustomizations.initialize();
     modelSettings = await _platform.loadModelSettings();
     await refreshCapabilities();
     final activeId = await _store.initialize(
@@ -589,7 +606,17 @@ class ChatController extends ChangeNotifier {
     await MessageFileStore.remove([file]);
   }
 
-  Future<void> saveDraft() => _persist();
+  void updateDraft(String text) {
+    final conversation = activeConversation;
+    if (conversation.draft == text) return;
+    conversation.draft = text;
+    if (text.trim().isNotEmpty) conversation.storedUpdatedAt = DateTime.now();
+  }
+
+  Future<void> saveDraft() async {
+    await _persist();
+    _conversationChanged();
+  }
 
   Future<void> _persist({Map<String, List<String>> recipients = const {}}) =>
       activeConversation.kind == ConversationKind.direct &&

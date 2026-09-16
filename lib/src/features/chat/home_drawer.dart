@@ -206,7 +206,9 @@ class HomeDrawer extends StatelessWidget {
   );
 
   Widget _conversation(BuildContext context, Conversation item) {
-    final selected = item.id == controller.activeConversation.id;
+    final selected =
+        controller.isConversationDetailVisible &&
+        item.id == controller.activeConversation.id;
     return ConversationMore(
       key: ValueKey(item.id),
       controller: controller,
@@ -223,7 +225,10 @@ class HomeDrawer extends StatelessWidget {
           minTileHeight: 48,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           leading: item.kind == ConversationKind.group
-              ? const SidebarActionIcon(type: SidebarActionIconType.group)
+              ? SidebarActionIcon(
+                  type: SidebarActionIconType.group,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                )
               : const ConversationIcon(),
           title: Text(
             item.title,

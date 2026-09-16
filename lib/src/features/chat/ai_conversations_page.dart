@@ -183,7 +183,11 @@ class _AiConversationsPageState extends State<AiConversationsPage>
                   conversation: item,
                   onChanged: () => _load(reset: true),
                   child: Material(
-                    color: Colors.transparent,
+                    color: item.isPinned
+                        ? Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.035)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
                     clipBehavior: Clip.antiAlias,
                     child: ListenableBuilder(

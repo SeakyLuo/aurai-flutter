@@ -65,7 +65,11 @@ extension InteractiveMessageActions on ChatController {
       return {
         'messageId': id,
         ...old.readFor(senderId),
-        'perspective': old.viewFor(perspective).toJson(),
+        'perspective': {
+          ...old.viewFor(perspective).toJson(),
+          if (old.hasInteraction)
+            'interactionView': old.interactionView(perspective),
+        },
         'history': await readInteractiveHistory(
           _store.database,
           id,
@@ -96,13 +100,14 @@ extension InteractiveMessageActions on ChatController {
     }
     if (row['sender_id'] != senderId) throw StateError('只能更新自己发送的交互消息');
     if (args['revision'] != old.revision) throw StateError('消息已更新，请先重新读取');
-    final definitionChanged = ['title', 'body', 'buttons', 'states'].any(
-      (key) =>
-          jsonEncode(old.toJson()[key]) !=
-          jsonEncode(args[key] ?? old.toJson()[key]),
-    );
-    final card = InteractiveMessage.fromJson({
-      ...old.toJson(),
+    final definitionChanged =
+        ['title', 'body', 'buttons', 'states', 'interaction'].any(
+          (key) =>
+              jsonEncode(old.toJson()[key]) !=
+              jsonEncode(args[key] ?? old.toJson()[key]),
+        );
+    var card = InteractiveMessage.fromJson({
+      ...old.toJson(includeParticipants: true),
       ...args,
       'participation': {
         ...old.participation,
@@ -119,6 +124,13 @@ extension InteractiveMessageActions on ChatController {
       },
       'revision': old.revision + 1,
     });
+    if (card.shared) {
+      final settled = card.engine.settle(closed: card.closed);
+      card = InteractiveMessage.fromJson({
+        ...card.toJson(includeParticipants: true),
+        'session': settled.runtime,
+      });
+    }
     if (jsonEncode(old.toJson()..remove('revision')) ==
         jsonEncode(card.toJson()..remove('revision'))) {
       return {'updated': false, 'revision': old.revision};

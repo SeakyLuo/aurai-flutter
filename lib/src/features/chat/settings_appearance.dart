@@ -1,3 +1,4 @@
+import 'chat_header_background.dart';
 import '../../app/global_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -55,10 +56,12 @@ class SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.titleWidget,
     this.leadingAction,
     this.root = false,
+    this.gradientBackground = false,
   });
 
   final String title;
   final bool root;
+  final bool gradientBackground;
   final Widget? titleWidget;
   final Widget? leadingAction;
   final VoidCallback? onBack;
@@ -69,6 +72,13 @@ class SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) => AppBar(
+    backgroundColor: gradientBackground ? Colors.transparent : null,
+    surfaceTintColor: gradientBackground ? Colors.transparent : null,
+    shadowColor: gradientBackground ? Colors.transparent : null,
+    elevation: gradientBackground ? 0 : null,
+    scrolledUnderElevation: gradientBackground ? 0 : null,
+    forceMaterialTransparency: gradientBackground,
+    flexibleSpace: gradientBackground ? const ChatHeaderBackground() : null,
     centerTitle: true,
     toolbarHeight: 76,
     leadingWidth: 64,
@@ -77,7 +87,7 @@ class SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
     leading: leadingAction != null
         ? Padding(
             padding: const EdgeInsets.only(left: 16),
-            child: Align(alignment: Alignment.centerLeft, child: leadingAction),
+            child: Center(child: leadingAction),
           )
         : root
         ? null

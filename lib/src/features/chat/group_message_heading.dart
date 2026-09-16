@@ -48,7 +48,7 @@ class GroupMessageHeading extends StatelessWidget {
               if (showName)
                 Row(
                   children: [
-                    Flexible(
+                    Expanded(
                       child: Text(
                         sender.name,
                         maxLines: 1,

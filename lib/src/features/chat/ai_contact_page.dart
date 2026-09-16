@@ -142,10 +142,7 @@ class _AiContactPageState extends State<AiContactPage> {
         title: '朋友',
         onBack: () => Navigator.pop(context),
         actions: [
-          if (ai != null &&
-              !ai.sender.archived &&
-              !ai.isTemporary &&
-              ai.sender.id != MessageSender.aurai.id)
+          if (ai != null)
             Builder(
               builder: (buttonContext) => SettingsGlassAction(
                 label: '更多',
@@ -158,17 +155,37 @@ class _AiContactPageState extends State<AiContactPage> {
                           destructiveValues: const {'archive'},
                           items: [
                             (
-                              value: 'archive',
-                              label: '归档朋友',
+                              value: 'edit',
+                              label: '编辑',
                               icon: ConversationMenuIcon(
-                                type: ConversationMenuIconType.archive,
-                                color: Theme.of(context).colorScheme.error,
+                                type: ConversationMenuIconType.rename,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
+                            if (!ai.sender.archived &&
+                                !ai.isTemporary &&
+                                ai.sender.id != MessageSender.aurai.id)
+                              (
+                                value: 'archive',
+                                label: '归档朋友',
+                                icon: ConversationMenuIcon(
+                                  type: ConversationMenuIconType.archive,
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              ),
                           ],
                         );
-                        if (!mounted || action != 'archive') return;
-                        await _archive();
+                        if (!mounted) return;
+                        if (action == 'edit') {
+                          await _page(
+                            AiContactEditor(
+                              controller: widget.controller,
+                              profile: ai,
+                            ),
+                          );
+                        } else if (action == 'archive') {
+                          await _archive();
+                        }
                       },
               ),
             ),
@@ -229,7 +246,10 @@ class _AiContactPageState extends State<AiContactPage> {
                     final store = await widget.controller.aiSkills(
                       widget.senderId,
                     );
-                    if (mounted) await _page(SkillsPage(store: store));
+                    if (mounted)
+                      await _page(
+                        SkillsPage(store: store, controller: widget.controller),
+                      );
                   } on Object catch (error) {
                     if (mounted) _notice('技能读取失败，请重试：${errorMessage(error)}');
                   }

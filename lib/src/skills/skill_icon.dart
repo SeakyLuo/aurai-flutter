@@ -24,6 +24,7 @@ class SkillIcon extends StatelessWidget {
               ),
             )
           : ToolActionIcon(
+              iconName: '',
               toolName: switch (name) {
                 'news' => 'readFile',
                 'search' => 'searchWeb',

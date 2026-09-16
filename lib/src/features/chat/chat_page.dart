@@ -1,3 +1,4 @@
+import 'home_page.dart';
 import '../../domain/message_sender.dart';
 import '../../domain/error_message.dart';
 import '../../domain/draft_mention.dart';
@@ -59,7 +60,9 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
+class _ChatPageState extends State<ChatPage>
+    with WidgetsBindingObserver, RouteAware {
+  static final _chatPages = <_ChatPageState>{};
   List<DraftMention> get _mentions =>
       widget.controller.activeConversation.draftMentions;
   late String _mentionText = widget.controller.activeConversation.draft;
@@ -105,7 +108,50 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _chatPages.add(this);
+    homeRouteObserver.subscribe(
+      this,
+      ModalRoute.of(context)! as PageRoute<dynamic>,
+    );
+  }
+
+  void _recordPagePosition() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final visible = _chatPages.any(
+        (page) =>
+            page.mounted &&
+            identical(page.widget.controller, widget.controller) &&
+            ModalRoute.of(page.context)!.isCurrent,
+      );
+      unawaited(
+        widget.controller.setConversationDetailVisible(visible).catchError((
+          Object error,
+        ) {
+          if (mounted)
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+        }),
+      );
+    });
+  }
+
+  @override
+  void didPush() => _recordPagePosition();
+  @override
+  void didPopNext() => _recordPagePosition();
+  @override
+  void didPushNext() => _recordPagePosition();
+  @override
+  void didPop() => _recordPagePosition();
+
+  @override
   void dispose() {
+    homeRouteObserver.unsubscribe(this);
+    _chatPages.remove(this);
+    _recordPagePosition();
     if (_editing != null) unawaited(_discardEditImages(_editing!));
     _draftTimer?.cancel();
     widget.controller.removeListener(_onControllerChanged);
@@ -558,7 +604,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       if (_canSend != canSend) setState(() => _canSend = canSend);
       return;
     }
-    widget.controller.activeConversation.draft = _textController.text;
+    widget.controller.updateDraft(_textController.text);
     _draftTimer?.cancel();
     _draftTimer = Timer(const Duration(milliseconds: 500), _saveDraft);
     final canSend = _textController.text.trim().isNotEmpty;

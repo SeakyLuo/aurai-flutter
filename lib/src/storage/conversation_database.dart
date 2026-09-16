@@ -14,7 +14,7 @@ import '../memory/memory_controller.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 30,
+  version: 31,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -118,6 +118,16 @@ Future<Database> openConversationDatabase() async => openDatabase(
       await db.execute(
         'ALTER TABLE html_games ADD COLUMN stateful INTEGER NOT NULL DEFAULT 0',
       );
+    }
+    if (oldVersion >= 20 && oldVersion < 31) {
+      for (final column in [
+        'measured_width REAL',
+        'measured_height REAL',
+        'measured_scale REAL',
+        'measured_version INTEGER',
+      ]) {
+        await db.execute('ALTER TABLE html_games ADD COLUMN $column');
+      }
     }
     if (oldVersion < 21) {
       for (final statement in contactRelationshipSchema) {

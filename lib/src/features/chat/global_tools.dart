@@ -84,6 +84,11 @@ extension GlobalTools on ChatController {
           (operation, args) =>
               _controlApp(operation, args, senderId, conversationId),
         ),
+      for (final name in AppAssistanceTool.descriptions.keys)
+        AppAssistanceTool(
+          name,
+          (operation, args) => _assistApp(operation, args, senderId),
+        ),
       RecallMessageTool((id) => _recallAiMessage(conversation, senderId, id)),
       if (conversation.usesPersonalization)
         for (final update in [false, true])
@@ -227,9 +232,6 @@ extension GlobalTools on ChatController {
       questionTool: AskUserTool(conversation.id, (_) {}),
       webSources: WebSourceRegistry(),
     );
-    return ToolRegistry(
-      tools: tools,
-      capabilities: capabilities,
-    ).tools.map((tool) => tool.definition).toList();
+    return ToolRegistry(tools: tools, capabilities: capabilities).catalog;
   }
 }

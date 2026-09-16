@@ -156,6 +156,7 @@ class _SkillEditorState extends State<SkillEditor> {
     TextEditingController controller,
     int limit, {
     bool multiline = false,
+    Widget? prefixIcon,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: Column(
@@ -187,6 +188,11 @@ class _SkillEditorState extends State<SkillEditor> {
           onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           style: const TextStyle(fontSize: 16),
           decoration: InputDecoration(
+            prefixIcon: prefixIcon,
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 60,
+              minHeight: 48,
+            ),
             filled: true,
             fillColor: settingsFieldColor(context),
             contentPadding: const EdgeInsets.symmetric(
@@ -241,10 +247,53 @@ class _SkillEditorState extends State<SkillEditor> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               children: [
+                _field(
+                  '名称',
+                  _name,
+                  60,
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 6, right: 4),
+                    child: Tooltip(
+                      message: '选择技能图标',
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(24),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(24),
+                          onTap: _busy
+                              ? null
+                              : () async {
+                                  FocusManager.instance.primaryFocus?.unfocus();
+                                  final icon = await showSkillIconPicker(
+                                    context,
+                                    _icon,
+                                  );
+                                  if (mounted && icon != null)
+                                    setState(() => _icon = icon);
+                                },
+                          child: SizedBox.square(
+                            dimension: 48,
+                            child: Center(
+                              child: ColorFiltered(
+                                colorFilter: ColorFilter.mode(
+                                  Theme.of(context).colorScheme.onSurface,
+                                  BlendMode.srcIn,
+                                ),
+                                child: SkillIcon(_icon),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                _field('简介', _description, 300, multiline: true),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
                   child: Text(
-                    '图标',
+                    '可见范围',
                     style: TextStyle(
                       fontSize: 15,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -262,15 +311,13 @@ class _SkillEditorState extends State<SkillEditor> {
                         horizontal: 18,
                         vertical: 8,
                       ),
-                      leading: ColorFiltered(
-                        colorFilter: ColorFilter.mode(
-                          Theme.of(context).colorScheme.onSurface,
-                          BlendMode.srcIn,
-                        ),
-                        child: SkillIcon(_icon),
+                      leading: SettingsIcon(
+                        type: _visibility == 'private'
+                            ? SettingsIconType.eyeOff
+                            : SettingsIconType.eye,
                       ),
                       title: Text(
-                        skillIcons[_icon]!,
+                        skillVisibilityLabel(_visibility),
                         style: TextStyle(
                           fontSize: 16,
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -279,50 +326,32 @@ class _SkillEditorState extends State<SkillEditor> {
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,
                       ),
-                      onTap: _busy
+                      onTap:
+                          _busy ||
+                              (_saved.id.isNotEmpty &&
+                                  !widget.store.canManageVisibility(_saved))
                           ? null
                           : () async {
-                              FocusManager.instance.primaryFocus?.unfocus();
-                              final icon = await showSkillIconPicker(
-                                context,
-                                _icon,
-                              );
-                              if (mounted && icon != null)
-                                setState(() => _icon = icon);
+                              final value =
+                                  await Navigator.push<(String, Set<String>)>(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => SkillVisibilityPicker(
+                                        store: widget.store,
+                                        visibility: _visibility,
+                                        selected: _visibleTo,
+                                      ),
+                                    ),
+                                  );
+                              if (mounted && value != null)
+                                setState(() {
+                                  _visibility = value.$1;
+                                  _visibleTo = value.$2;
+                                });
                             },
                     ),
                   ),
                 ),
-                ListTile(
-                  title: const Text('可见范围'),
-                  subtitle: Text(skillVisibilityLabel(_visibility)),
-                  trailing: const SettingsIcon(type: SettingsIconType.chevron),
-                  onTap:
-                      _busy ||
-                          (_saved.id.isNotEmpty &&
-                              !widget.store.canManageVisibility(_saved))
-                      ? null
-                      : () async {
-                          final value =
-                              await Navigator.push<(String, Set<String>)>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => SkillVisibilityPicker(
-                                    store: widget.store,
-                                    visibility: _visibility,
-                                    selected: _visibleTo,
-                                  ),
-                                ),
-                              );
-                          if (mounted && value != null)
-                            setState(() {
-                              _visibility = value.$1;
-                              _visibleTo = value.$2;
-                            });
-                        },
-                ),
-                _field('名称', _name, 60),
-                _field('简介', _description, 300, multiline: true),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
                   child: Text(

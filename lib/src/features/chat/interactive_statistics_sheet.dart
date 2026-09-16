@@ -11,7 +11,6 @@ import '../../domain/interactive_message.dart';
 import '../../domain/message_sender.dart';
 import '../../storage/interactive_action_history.dart';
 import '../../storage/interactive_message_store.dart';
-import 'interactive_message_view.dart';
 import 'member_avatar.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -29,9 +28,14 @@ Future<void> showInteractiveStatistics(
 );
 
 class _StatisticsSheet extends StatefulWidget {
-  const _StatisticsSheet({required this.database, required this.messageId});
+  const _StatisticsSheet({
+    required this.database,
+    required this.messageId,
+    this.actor,
+  });
   final Database database;
   final String messageId;
+  final String? actor;
   @override
   State<_StatisticsSheet> createState() => _StatisticsSheetState();
 }
@@ -41,7 +45,6 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
   Map<String, MessageSender> _senders = {};
   String? _perspective;
   InteractiveOptionKey? _option;
-  bool _showCurrent = false;
   final _pageStorage = PageStorageBucket();
   List<Map<String, Object?>> _history = [];
   bool _historyLoading = false;
@@ -54,6 +57,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
   @override
   void initState() {
     super.initState();
+    _perspective = widget.actor;
     _changes = InteractiveMessageStore.changes.stream.listen((id) {
       if (id == widget.messageId) _load();
     });
@@ -99,10 +103,18 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
             );
       if (!mounted || generation != _loadGeneration) return;
       final actor = _perspective;
+      if (actor != null &&
+          (!card.participants.containsKey(actor) ||
+              (actor != MessageSender.localUser.id &&
+                  !card.visible('visibility')))) {
+        throw StateError('该参与者的记录已不可查看');
+      }
       final refreshHistory =
           actor != null &&
           card.participants.containsKey(actor) &&
-          card.participantRevision(actor) != _card!.participantRevision(actor);
+          (_card == null ||
+              card.participantRevision(actor) !=
+                  _card!.participantRevision(actor));
       setState(() {
         _card = card;
         _senders = {
@@ -115,7 +127,6 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
             (_perspective != null &&
                 !card.participants.containsKey(_perspective))) {
           _perspective = null;
-          _showCurrent = false;
           _historyGeneration++;
           _historyLoading = false;
           _history = [];
@@ -182,22 +193,23 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
     }
   }
 
-  void _openParticipant(String id) {
-    setState(() {
-      _perspective = id;
-      _history = [];
-      _hasMore = false;
-    });
-    _loadHistory(reset: true);
-  }
+  Future<void> _openParticipant(String id) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: false,
+    builder: (_) => _StatisticsSheet(
+      database: widget.database,
+      messageId: widget.messageId,
+      actor: id,
+    ),
+  );
 
   bool get _atOverview => _perspective == null && _option == null;
 
   void _back() {
     setState(() {
-      if (_showCurrent) {
-        _showCurrent = false;
-      } else if (_perspective != null) {
+      if (_perspective != null) {
         _perspective = null;
         _historyGeneration++;
         _historyLoading = false;
@@ -211,15 +223,13 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
   Widget build(BuildContext context) {
     final card = _card;
     final actor = _perspective;
-    final title = _showCurrent
-        ? '当前页面'
-        : actor != null
-        ? statisticsName(card!, actor)
+    final title = actor != null
+        ? '参与详情'
         : _option != null
         ? '参与者'
-        : card?.title ?? '参与情况';
+        : '参与情况';
     return PopScope(
-      canPop: _atOverview,
+      canPop: _atOverview || actor != null,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) _back();
       },
@@ -234,22 +244,22 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
                 child: Row(
                   children: [
                     SettingsGlassAction(
-                      label: _atOverview ? '关闭' : '返回',
-                      icon: _atOverview
+                      label: _atOverview || actor != null ? '关闭' : '返回',
+                      icon: _atOverview || actor != null
                           ? Icons.close_rounded
                           : Icons.arrow_back_rounded,
-                      iconWidget: _atOverview
+                      iconWidget: _atOverview || actor != null
                           ? const QuestionIcon(type: QuestionIconType.close)
                           : const SettingsIcon(type: SettingsIconType.back),
-                      onPressed: _atOverview
+                      onPressed: _atOverview || actor != null
                           ? () => Navigator.pop(context)
                           : _back,
                     ),
-                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         title,
-                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 17,
@@ -257,17 +267,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
                         ),
                       ),
                     ),
-                    if (!_atOverview) ...[
-                      const SizedBox(width: 12),
-                      SettingsGlassAction(
-                        label: '关闭',
-                        icon: Icons.close_rounded,
-                        iconWidget: const QuestionIcon(
-                          type: QuestionIconType.close,
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
+                    const SizedBox(width: 40),
                   ],
                 ),
               ),
@@ -278,8 +278,6 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
                       ? const Center(
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : _showCurrent
-                      ? _current(card, actor!)
                       : actor != null
                       ? _participant(card, actor)
                       : _option != null
@@ -337,20 +335,6 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
     );
   }
 
-  Widget _current(InteractiveMessage card, String actor) => ListView(
-    key: PageStorageKey(('current', actor)),
-    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-    children: [
-      InteractiveMessageView(
-        card: card,
-        actorId: actor,
-        readOnly: true,
-        onClick: (_, _, _) async => null,
-        onOpenLink: (_) async {},
-      ),
-    ],
-  );
-
   Widget _participant(InteractiveMessage card, String actor) {
     final state = card.participants[actor]!;
     final updatedAt = DateTime.fromMicrosecondsSinceEpoch(
@@ -360,34 +344,26 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
       key: PageStorageKey(('participant', actor)),
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
       children: [
+        const SizedBox(height: 12),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             MemberAvatar(
               sender: statisticsSender(card, _senders, actor),
-              size: 44,
+              size: 40,
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    card.singleChoice ? '当前选择' : '最近操作',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    state['label'] as String,
+                    statisticsName(card, actor),
                     style: const TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     messageTime(updatedAt),
                     style: TextStyle(
@@ -400,12 +376,22 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('查看当前页面'),
-          trailing: const SettingsIcon(type: SettingsIconType.chevron),
-          onTap: () => setState(() => _showCurrent = true),
+        const SizedBox(height: 24),
+        Text(
+          card.singleChoice ? '当前选择' : '最近操作',
+          style: TextStyle(
+            fontSize: 13,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          state['label'] as String,
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w500,
+            height: 1.5,
+          ),
         ),
         const Divider(height: 32),
         const Text(

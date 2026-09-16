@@ -20,6 +20,7 @@ enum SettingsIconType {
   check,
   tasks,
   filter,
+  sort,
   eye,
   eyeOff,
 }
@@ -164,6 +165,24 @@ class _SettingsIconPainter extends CustomPainter {
             ..lineTo(8.5, 15.5),
           pen,
         );
+      case SettingsIconType.sort:
+        canvas.drawLine(const Offset(7, 4), const Offset(7, 20), pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(4, 7)
+            ..lineTo(7, 4)
+            ..lineTo(10, 7),
+          pen,
+        );
+        canvas.drawLine(const Offset(17, 4), const Offset(17, 20), pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(14, 17)
+            ..lineTo(17, 20)
+            ..lineTo(20, 17),
+          pen,
+        );
+        break;
       case SettingsIconType.filter:
         canvas.drawPath(
           Path()
