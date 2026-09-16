@@ -34,7 +34,12 @@ extension InteractiveMessageActions on ChatController {
           [message.text, message.createdAt.microsecondsSinceEpoch, source.id],
         );
       });
-      _publishInteractiveChange(source.id, message, source: source);
+      _publishInteractiveChange(
+        source.id,
+        message,
+        source: source,
+        notifyParticipants: true,
+      );
       return {'sent': true, 'messageId': message.id, 'revision': 0};
     }
     source = await _messageConversation(id!, senderId, source);
@@ -53,12 +58,65 @@ extension InteractiveMessageActions on ChatController {
     final old = InteractiveMessage.fromJson(
       jsonDecode(row['interactive_json'] as String) as Map<String, dynamic>,
     );
-    if (operation == 'readInteractiveMessage')
-      return {'messageId': id, ...old.toJson()};
+    if (operation == 'readInteractiveMessage') {
+      final perspective = args['participantId'] as String? ?? senderId;
+      if (perspective != senderId && !old.visible('visibility'))
+        throw StateError('这条消息尚未公开其他参与者的选择');
+      return {
+        'messageId': id,
+        ...old.readFor(senderId),
+        'perspective': old.viewFor(perspective).toJson(),
+        'history': await readInteractiveHistory(
+          _store.database,
+          id,
+          perspective,
+          before: args['beforeEvent'] as int?,
+        ),
+      };
+    }
+    if (operation == 'clickInteractiveMessage') {
+      final actor = await groupStore.loadAi(senderId);
+      final result = await InteractiveMessageStore(_store.database).click(
+        source.id,
+        id,
+        args['buttonId'] as String,
+        args['revision'] as int,
+        actor: actor.sender,
+        participantRevision: args['participantRevision'] as int,
+      );
+      _replaceInteractiveCard(source.id, id, result.card, source: source);
+      if (result.notice != null)
+        _publishInteractiveChange(source.id, result.notice!, source: source);
+      MessageCallbacks.changes.add(null);
+      return {
+        'messageId': id,
+        ...result.card.readFor(senderId),
+        if (result.url != null) 'url': result.url,
+      };
+    }
     if (row['sender_id'] != senderId) throw StateError('只能更新自己发送的交互消息');
     if (args['revision'] != old.revision) throw StateError('消息已更新，请先重新读取');
+    final definitionChanged = ['title', 'body', 'buttons', 'states'].any(
+      (key) =>
+          jsonEncode(old.toJson()[key]) !=
+          jsonEncode(args[key] ?? old.toJson()[key]),
+    );
     final card = InteractiveMessage.fromJson({
+      ...old.toJson(),
       ...args,
+      'participation': {
+        ...old.participation,
+        ...?args['participation'] as Map<String, Object?>?,
+      },
+      'participants': {
+        for (final entry in old.participants.entries)
+          entry.key: definitionChanged
+              ? (Map<String, Object?>.of(entry.value)
+                  ..remove('title')
+                  ..remove('body')
+                  ..remove('buttons'))
+              : entry.value,
+      },
       'revision': old.revision + 1,
     });
     if (jsonEncode(old.toJson()..remove('revision')) ==
@@ -70,7 +128,9 @@ extension InteractiveMessageActions on ChatController {
       final changed = await txn.update(
         'messages',
         {
-          'interactive_json': jsonEncode(card.toJson()),
+          'interactive_json': jsonEncode(
+            card.toJson(includeParticipants: true),
+          ),
           'text': '${card.title}\n${card.body}',
         },
         where: 'id = ? AND interactive_json = ?',
@@ -94,9 +154,14 @@ extension InteractiveMessageActions on ChatController {
   ) => {
     if (source != null) source,
     activeConversation,
+    _viewConversation,
     if (_runningConversation != null) _runningConversation!,
     if (_privateConversation != null) _privateConversation!,
     ..._groupRuns.values,
+    if (_executionStates[id]?.conversation case final target?) target,
+    if (_executionStates[id]?.runningConversation case final running?) running,
+    if (_executionStates[id]?.privateConversation case final private?) private,
+    ...?_executionStates[id]?.groupRuns.values,
     ..._conversations,
     ..._searchWindows.values,
   }.where((c) => c.id == id);
@@ -107,6 +172,7 @@ extension InteractiveMessageActions on ChatController {
     InteractiveMessage card, {
     Conversation? source,
   }) {
+    InteractiveMessageStore.changes.add(id);
     for (final conversation in _interactiveConversations(
       conversationId,
       source,
@@ -125,8 +191,8 @@ extension InteractiveMessageActions on ChatController {
         }
       }
     }
-    final dispatcher = _groupDispatcher;
-    if (_runningConversation?.id == conversationId && dispatcher != null) {
+    final dispatcher = _executionStates[conversationId]?.groupDispatcher;
+    if (dispatcher != null) {
       final index = dispatcher.history.indexWhere((m) => m.id == id);
       if (index >= 0)
         dispatcher.history[index] = dispatcher.history[index].withSender(
@@ -141,6 +207,7 @@ extension InteractiveMessageActions on ChatController {
     String conversationId,
     AgentMessage message, {
     Conversation? source,
+    bool notifyParticipants = false,
   }) {
     for (final conversation in _interactiveConversations(
       conversationId,
@@ -152,28 +219,51 @@ extension InteractiveMessageActions on ChatController {
       }
     }
     _store.writer.remember([message]);
-    if (_runningConversation?.id == conversationId &&
-        _groupDispatcher != null &&
-        !_groupDispatcher!.history.any((m) => m.id == message.id)) {
-      _groupDispatcher!.history.add(message);
+    final dispatcher = _executionStates[conversationId]?.groupDispatcher;
+    if (dispatcher != null &&
+        !dispatcher.history.any((m) => m.id == message.id)) {
+      if (notifyParticipants && !dispatcher.closed && !dispatcher.stopped) {
+        dispatcher.receive([message]);
+      } else {
+        dispatcher.history.add(message);
+      }
+    } else if (notifyParticipants && source?.kind == ConversationKind.group) {
+      unawaited(
+        _receiveGroupSystemNotice(conversationId, message).catchError((
+          Object error,
+        ) {
+          developer.log('Interactive message dispatch failed', error: error);
+        }),
+      );
     }
     _conversationChanged();
   }
 
-  Future<String?> clickInteractiveMessage(
+  Future<InteractiveClickResult> clickInteractiveMessage(
     String messageId,
     String buttonId,
     int revision,
+    int participantRevision,
   ) async {
     final conversation = activeConversation;
     await _store.writer.flush();
-    final result = await InteractiveMessageStore(
-      _store.database,
-    ).click(conversation.id, messageId, buttonId, revision);
-    _replaceInteractiveCard(conversation.id, messageId, result.card);
-    if (result.notice != null)
-      _publishInteractiveChange(conversation.id, result.notice!);
-    MessageCallbacks.changes.add(null);
-    return result.url;
+    try {
+      final result = await InteractiveMessageStore(_store.database).click(
+        conversation.id,
+        messageId,
+        buttonId,
+        revision,
+        actor: MessageSender.localUser,
+        participantRevision: participantRevision,
+      );
+      _replaceInteractiveCard(conversation.id, messageId, result.card);
+      if (result.notice != null)
+        _publishInteractiveChange(conversation.id, result.notice!);
+      MessageCallbacks.changes.add(null);
+      return (card: result.card, url: result.url);
+    } on InteractiveMessageChanged catch (error) {
+      _replaceInteractiveCard(conversation.id, messageId, error.card);
+      rethrow;
+    }
   }
 }

@@ -64,3 +64,23 @@ const interactiveButtonsSchema = {
     'additionalProperties': false,
   },
 };
+
+const interactiveParticipationSchema = {
+  'type': 'object',
+  'properties': {
+    'visibility': {
+      'type': 'string',
+      'enum': ['public', 'private', 'afterClose'],
+    },
+    'summaryVisibility': {
+      'type': 'string',
+      'enum': ['public', 'private', 'afterClose'],
+    },
+    'selectionMode': {
+      'type': 'string',
+      'enum': ['actions', 'singleChoice'],
+    },
+    'closed': {'type': 'boolean'},
+  },
+  'additionalProperties': false,
+};

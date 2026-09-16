@@ -25,6 +25,7 @@ class ToolActionIcon extends StatelessWidget {
         'listFriends' ||
         'addFriend' ||
         'readExecutionLogs' ||
+        'clickInteractiveMessage' ||
         'readInteractiveMessage' ||
         'updateInteractiveMessage' ||
         'createConversation' ||
@@ -71,6 +72,8 @@ class ToolActionIcon extends StatelessWidget {
         'createSkill' ||
         'updateSkill' ||
         'deleteSkill' ||
+        'installSkill' ||
+        'uninstallSkill' ||
         'manageSkill' ||
         'runSkill' => SettingsIcon(
           color: Theme.of(context).colorScheme.onSurfaceVariant,

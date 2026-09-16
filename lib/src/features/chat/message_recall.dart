@@ -243,6 +243,8 @@ extension MessageRecall on ChatController {
       });
       await _store.writer.save(conversation, makeActive: false);
       HtmlGameSignals.changes.add(message.id);
+      if (message.interactive != null)
+        InteractiveMessageStore.changes.add(message.id);
       _conversationChanged();
       if (userInitiated && live) {
         dispatcher.start(

@@ -1,20 +1,16 @@
 import '../domain/error_message.dart';
+import 'skill_visibility_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'skill_dependency_picker.dart';
 import 'skill_icon.dart';
 import 'skill_icon_picker.dart';
 import 'package:flutter/material.dart';
-import '../features/chat/delete_confirmation_dialog.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/glass_surface.dart';
 import '../features/chat/settings_icon.dart';
 import '../scheduling/task_unsaved_dialog.dart';
 import 'skill_store.dart';
 import 'skill_statistics_view.dart';
-import 'skill_permission.dart';
-import 'skill_permission_picker.dart';
-import 'skill_action_menu.dart';
-import '../scheduling/task_action_menu.dart';
 
 class SkillEditor extends StatefulWidget {
   const SkillEditor({super.key, required this.store, required this.skill});
@@ -26,25 +22,26 @@ class SkillEditor extends StatefulWidget {
 
 class _SkillEditorState extends State<SkillEditor> {
   late SavedSkill _saved = widget.skill;
+  late String _visibility = _saved.visibility;
+  late Set<String> _visibleTo = _saved.visibleTo.toSet();
   late final _name = TextEditingController(text: _saved.name);
   late final _description = TextEditingController(text: _saved.description);
   late final _instructions = TextEditingController(text: _saved.instructions);
   late final _script = TextEditingController(text: _saved.script);
   late String _icon = _saved.icon;
   late bool _enabled = _saved.enabled;
-  late SkillPermission? _permission = widget.store.permissionOverrideFor(
-    _saved.id,
-  );
   late Set<String> _dependencies = _saved.dependencyIds.toSet();
   bool _busy = false, _leaving = false;
   bool get _dirty =>
+      _saved.id.isEmpty ||
+      _visibility != _saved.visibility ||
+      !setEquals(_visibleTo, _saved.visibleTo.toSet()) ||
       _name.text != _saved.name ||
       _description.text != _saved.description ||
       _instructions.text != _saved.instructions ||
       _script.text != _saved.script ||
       _enabled != _saved.enabled ||
       _icon != _saved.icon ||
-      _permission != widget.store.permissionOverrideFor(_saved.id) ||
       !setEquals(_dependencies, _saved.dependencyIds.toSet());
   @override
   void dispose() {
@@ -63,6 +60,9 @@ class _SkillEditorState extends State<SkillEditor> {
     try {
       await widget.store.save(
         SavedSkill(
+          id: _saved.id,
+          visibility: _visibility,
+          visibleTo: _visibleTo.toList(),
           dependencyIds: _dependencies.toList(),
           name: _name.text,
           description: _description.text,
@@ -72,13 +72,20 @@ class _SkillEditorState extends State<SkillEditor> {
           revision: _saved.revision,
           icon: _icon,
         ),
-        previousName: _saved.name,
-        permission: _permission,
-        updatePermission: true,
+        previousName: _saved.id.isEmpty ? null : _saved.id,
       );
       if (!mounted) return true;
       setState(() {
-        _saved = widget.store.read(_name.text.trim());
+        _saved = widget.store.library.singleWhere(
+          (s) =>
+              s.name == _name.text.trim() &&
+              s.ownerId ==
+                  (widget.skill.ownerId.isEmpty
+                      ? widget.store.ownerId
+                      : widget.skill.ownerId),
+        );
+        _visibleTo = _saved.visibleTo.toSet();
+        _enabled = _saved.enabled;
         _name.text = _saved.name;
         _description.text = _saved.description;
         _instructions.text = _saved.instructions;
@@ -115,77 +122,6 @@ class _SkillEditorState extends State<SkillEditor> {
     if (mounted) _leave();
   }
 
-  Future<void> _menu(BuildContext buttonContext) async {
-    FocusManager.instance.primaryFocus?.unfocus();
-    final box = buttonContext.findRenderObject()! as RenderBox;
-    final action = await showSkillActionMenu(
-      context,
-      box.localToGlobal(Offset(0, box.size.height)),
-      _saved.enabled,
-    );
-    if (!mounted || action == null) return;
-    if (action == 'delete') {
-      await _delete();
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      await widget.store.save(
-        SavedSkill(
-          dependencyIds: _saved.dependencyIds,
-          name: _saved.name,
-          description: _saved.description,
-          instructions: _saved.instructions,
-          script: _saved.script,
-          enabled: !_saved.enabled,
-          revision: _saved.revision,
-          icon: _saved.icon,
-        ),
-        previousName: _saved.name,
-      );
-      if (!mounted) return;
-      setState(() {
-        _saved = widget.store.read(_saved.name);
-        _enabled = _saved.enabled;
-      });
-      _notice(_enabled ? '技能已启用' : '技能已停用');
-    } on Object catch (e) {
-      if (mounted)
-        _notice(e is StateError ? e.message : '操作失败，请重试：${errorMessage(e)}');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _delete() async {
-    final yes = await showDialog<bool>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: .24),
-      builder: (_) => const DeleteConfirmationDialog(
-        title: '删除技能？',
-        description: '删除后，Aurai 将无法再查找和调用这个技能。',
-      ),
-    );
-    if (!mounted || yes != true) return;
-    setState(() => _busy = true);
-    try {
-      await widget.store.delete(_saved.name);
-      if (mounted) {
-        _notice('技能已删除');
-        _leave();
-      }
-    } on Object catch (error) {
-      if (mounted)
-        _notice(
-          error is StateError
-              ? error.message
-              : '删除失败，请重试：${errorMessage(error)}',
-        );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   Future<void> _chooseDependencies() async {
     final selected = await Navigator.push<Set<String>>(
       context,
@@ -201,12 +137,18 @@ class _SkillEditorState extends State<SkillEditor> {
   }
 
   String _dependencyLabel() {
-    final items = widget.store.skills
+    final items = widget.store.library
         .where((s) => _dependencies.contains(s.id))
         .toList();
     if (_dependencies.isEmpty) return '无';
     if (items.length != _dependencies.length) return '部分依赖已删除，请重新选择';
-    return '${items.take(2).map((s) => "${s.name}${s.enabled ? '' : '（已停用）'}").join('、')}${items.length > 2 ? ' +${items.length - 2}' : ''}';
+    return '${items.take(2).map((s) => "${s.name}${!widget.store.usesInstallations
+        ? ''
+        : !widget.store.isInstalled(s.id)
+        ? '（未安装）'
+        : s.enabled
+        ? ''
+        : '（已停用）'}").join('、')}${items.length > 2 ? ' +${items.length - 2}' : ''}';
   }
 
   Widget _field(
@@ -268,7 +210,7 @@ class _SkillEditorState extends State<SkillEditor> {
     },
     child: Scaffold(
       appBar: SettingsAppBar(
-        title: '技能详情',
+        title: _saved.id.isEmpty ? '新建技能' : '编辑技能',
         onBack: _close,
         actions: [
           GlassSurface(
@@ -284,14 +226,6 @@ class _SkillEditorState extends State<SkillEditor> {
                     child: const SettingsIcon(type: SettingsIconType.check),
                   ),
                   onPressed: _dirty && !_busy ? () => _save() : null,
-                ),
-                Builder(
-                  builder: (buttonContext) => RoundAction(
-                    label: '更多',
-                    icon: Icons.more_vert,
-                    iconWidget: const TaskActionIcon('more'),
-                    onPressed: _busy ? null : () => _menu(buttonContext),
-                  ),
                 ),
               ],
             ),
@@ -359,59 +293,36 @@ class _SkillEditorState extends State<SkillEditor> {
                     ),
                   ),
                 ),
+                ListTile(
+                  title: const Text('可见范围'),
+                  subtitle: Text(skillVisibilityLabel(_visibility)),
+                  trailing: const SettingsIcon(type: SettingsIconType.chevron),
+                  onTap:
+                      _busy ||
+                          (_saved.id.isNotEmpty &&
+                              !widget.store.canManageVisibility(_saved))
+                      ? null
+                      : () async {
+                          final value =
+                              await Navigator.push<(String, Set<String>)>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => SkillVisibilityPicker(
+                                    store: widget.store,
+                                    visibility: _visibility,
+                                    selected: _visibleTo,
+                                  ),
+                                ),
+                              );
+                          if (mounted && value != null)
+                            setState(() {
+                              _visibility = value.$1;
+                              _visibleTo = value.$2;
+                            });
+                        },
+                ),
                 _field('名称', _name, 60),
                 _field('简介', _description, 300, multiline: true),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
-                  child: Text(
-                    '权限',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 8,
-                      ),
-                      title: Text(
-                        _permission?.label ??
-                            '默认 · ${widget.store.defaultPermission.label}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: _busy
-                          ? null
-                          : () async {
-                              FocusManager.instance.primaryFocus?.unfocus();
-                              final permission =
-                                  await showSkillPermissionPicker(
-                                    context,
-                                    _permission ??
-                                        widget.store.defaultPermission,
-                                  );
-                              if (permission != null && mounted)
-                                setState(
-                                  () => _permission = permission.permission,
-                                );
-                            },
-                    ),
-                  ),
-                ),
-
                 Padding(
                   padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
                   child: Text(

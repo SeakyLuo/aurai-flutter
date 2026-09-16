@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'html_message_theme.dart';
+import 'html_message_components.dart';
 import 'dart:convert';
 import 'html_game.dart';
 import 'html_game_lifecycle.dart';
@@ -23,6 +24,7 @@ html[data-aurai-paused="true"] *{animation-play-state:paused!important}
 #aurai-content{display:flow-root;width:100%;overflow-wrap:anywhere}
 :where(input,textarea,select){font:inherit;color:var(--aurai-text);background:var(--aurai-field);border:1px solid var(--aurai-border);border-radius:var(--aurai-field-radius);padding:10px;max-width:100%}
 :where(button){font:inherit;border:0;border-radius:var(--aurai-button-radius);padding:10px 14px;background:var(--aurai-accent);color:var(--aurai-on-accent)}
+$htmlMessageComponentStyles
 </style>
 <script>
 (()=>{
@@ -61,6 +63,7 @@ $htmlGameLifecycleScript
 </script></head><body><div id="aurai-content">${game.html}</div>
 <style>html,body,#aurai-content{background:transparent!important}</style>
 <script>
+$htmlMessageComponentScript
 (()=>{
  const root=document.getElementById('aurai-content');
  const saved=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('$local'),c=>c.charCodeAt(0))));

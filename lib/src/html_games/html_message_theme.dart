@@ -10,6 +10,7 @@ String htmlMessageTheme(ThemeData theme) {
       '--aurai-message-background:${css(GlobalUI.messageBackground(theme))};'
       '--aurai-text:${css(colors.onSurface)};--aurai-muted:${css(colors.onSurfaceVariant)};'
       '--aurai-field:${css(GlobalUI.controlBackground(theme))};--aurai-border:${css(colors.outlineVariant)};'
+      '--aurai-error:${css(colors.error)};'
       '--aurai-accent:${css(colors.primary)};--aurai-on-accent:${css(colors.onPrimary)};'
       '--aurai-font-size:${theme.textTheme.bodyMedium!.fontSize}px;'
       '--aurai-field-radius:${(theme.inputDecorationTheme.border as OutlineInputBorder).borderRadius.topLeft.x}px;--aurai-button-radius:24px;}';

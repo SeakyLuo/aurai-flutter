@@ -113,15 +113,20 @@ class AgentRuntime {
         if (modelTurn.response['status'] == 'incomplete') {
           final reason =
               (modelTurn.response['incomplete_details'] as Map?)?['reason'];
+          final hasText = modelTurn.text?.isNotEmpty == true;
+          final hasToolOutput = (modelTurn.response['output'] as List)
+              .cast<Map>()
+              .any((item) => item['type'] == 'function_call');
           throw ModelProviderException(switch (reason) {
-            'max_output_tokens' =>
-              modelTurn.toolCalls.isNotEmpty
+            'max_output_tokens' || 'length' =>
+              hasToolOutput
                   ? '生成工具参数时达到输出上限，本轮工具尚未执行，请继续或重试'
-                  : modelTurn.text?.isNotEmpty == true
+                  : hasText
                   ? '回复达到输出上限，已保留已生成的正文，请继续或重试'
                   : '模型生成时达到输出上限，尚未生成回复，请重试',
-            'content_filter' => '回复因内容限制未完成，已保留生成的内容',
-            _ => '回复未完成，已保留生成的内容，请重试',
+            'content_filter' =>
+              hasText ? '回复因内容限制未完成，已保留已生成的正文' : '回复因内容限制未完成，尚未生成正文',
+            _ => hasText ? '回复未完成，已保留已生成的正文，请重试' : '回复未完成，尚未生成正文，请重试',
           }, detail: jsonEncode(modelTurn.response['incomplete_details']));
         }
         if (modelTurn.toolCalls.isEmpty) {

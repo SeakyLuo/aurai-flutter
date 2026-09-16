@@ -5,12 +5,98 @@ class InteractiveMessage {
     required this.body,
     required this.buttons,
     this.states = const [],
+    this.participation = const {},
+    this.participants = const {},
   });
+  final Map<String, Object?> participation;
+  final Map<String, Map<String, Object?>> participants;
+  bool get closed => participation['closed'] == true;
+  bool get singleChoice => participation['selectionMode'] == 'singleChoice';
+  bool visible(String field) => switch (participation[field] ?? 'public') {
+    'public' => true,
+    'afterClose' => closed,
+    _ => false,
+  };
+  int participantRevision(String actor) =>
+      participants[actor]?['revision'] as int? ?? 0;
+
+  InteractiveMessage viewFor(String actor) {
+    final state = participants[actor];
+    final current = state?.containsKey('buttons') == true ? state : null;
+    return InteractiveMessage(
+      revision: revision,
+      title: current?['title'] as String? ?? title,
+      body: current?['body'] as String? ?? body,
+      buttons: current == null
+          ? buttons
+          : (current['buttons'] as List)
+                .map((b) => Map<String, Object?>.from(b as Map))
+                .toList(),
+      states: states,
+      participation: participation,
+    );
+  }
+
+  Map<String, Object?> readFor(String actor) => {
+    ...viewFor(actor).toJson(),
+    'definition': toJson(),
+    'participantRevision': participantRevision(actor),
+    if (participants[actor] != null) 'ownParticipation': participants[actor],
+    if (visible('visibility'))
+      'participants': {
+        for (final entry in participants.entries)
+          entry.key: {
+            'name': entry.value['name'],
+            'buttonId': entry.value['buttonId'],
+            'label': entry.value['label'],
+            'updatedAt': entry.value['updatedAt'],
+          },
+      },
+    if (visible('summaryVisibility')) 'summary': summary,
+  };
+
+  List<Map<String, Object?>> get summary {
+    final counts = <(String, String), Map<String, Object?>>{
+      for (final button in buttons)
+        (button['id'] as String, button['label'] as String): {
+          'buttonId': button['id'],
+          'label': button['label'],
+          'count': 0,
+        },
+    };
+    for (final state in participants.values) {
+      final id = state['buttonId'] as String;
+      final entry = counts.putIfAbsent((
+        id,
+        state['label'] as String,
+      ), () => {'buttonId': id, 'label': state['label'], 'count': 0});
+      entry['count'] = (entry['count'] as int) + 1;
+    }
+    return counts.values.toList();
+  }
+
   final int revision;
   final List<Map<String, Object?>> states;
   final String title;
   final String body;
   final List<Map<String, Object?>> buttons;
+
+  factory InteractiveMessage.fromSnapshot(
+    Map<String, dynamic> json,
+    String actorId,
+  ) => InteractiveMessage(
+    revision: json['revision'] as int,
+    title: json['title'] as String,
+    body: json['body'] as String,
+    buttons: (json['buttons'] as List)
+        .map((b) => Map<String, Object?>.from(b as Map))
+        .toList(),
+    participation: Map<String, Object?>.from(json['participation'] as Map),
+    participants: {
+      if (json['selectedLabel'] != null)
+        actorId: {'label': json['selectedLabel']},
+    },
+  );
 
   factory InteractiveMessage.fromJson(Map<String, Object?> json) {
     final title = json['title'] as String;
@@ -56,6 +142,13 @@ class InteractiveMessage {
       body: body,
       buttons: buttons,
       states: states,
+      participation: Map<String, Object?>.from(
+        json['participation'] as Map? ?? const {},
+      ),
+      participants: {
+        for (final entry in (json['participants'] as Map? ?? const {}).entries)
+          entry.key as String: Map<String, Object?>.from(entry.value as Map),
+      },
     );
   }
 
@@ -126,11 +219,21 @@ class InteractiveMessage {
     }
   }
 
-  Map<String, Object?> toJson() => {
+  Map<String, Object?> toJson({bool includeParticipants = false}) => {
     'revision': revision,
+    'participation': participation,
+    if (includeParticipants && participants.isNotEmpty)
+      'participants': participants,
     'title': title,
     'body': body,
     'buttons': buttons,
     if (states.isNotEmpty) 'states': states,
   };
+}
+
+typedef InteractiveClickResult = ({InteractiveMessage card, String? url});
+
+class InteractiveMessageChanged extends StateError {
+  InteractiveMessageChanged(this.card) : super('已同步到最新进度，请按当前卡片继续');
+  final InteractiveMessage card;
 }

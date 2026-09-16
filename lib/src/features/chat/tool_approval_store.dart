@@ -11,11 +11,15 @@ class ToolApprovalStore {
     _preferences = await SharedPreferences.getInstance();
     final saved = _preferences.getString('tool_approvals');
     if (saved != null)
-      persistent.addAll(Map<String, String>.from(jsonDecode(saved) as Map));
+      persistent.addAll(
+        _sharedKeys(Map<String, String>.from(jsonDecode(saved) as Map)),
+      );
     final savedSessions = _preferences.getString('session_tool_approvals');
     if (savedSessions != null) {
       (jsonDecode(savedSessions) as Map).forEach((key, value) {
-        sessions[key as String] = Map<String, String>.from(value as Map);
+        sessions[key as String] = _sharedKeys(
+          Map<String, String>.from(value as Map),
+        );
       });
     }
   }
@@ -28,32 +32,28 @@ class ToolApprovalStore {
         ])
       : call.name;
 
-  String _identityKey(String senderId, ToolCall call) =>
-      senderId == 'agent:aurai' ? key(call) : '$senderId:${key(call)}';
+  Map<String, String> _sharedKeys(Map<String, String> entries) => {
+    for (final entry in entries.entries)
+      entry.key.startsWith('agent:')
+              ? entry.key.substring(entry.key.indexOf(':', 6) + 1)
+              : entry.key:
+          entry.value,
+  };
 
-  bool allows(
-    String conversation,
-    ToolCall call, {
-    String senderId = 'agent:aurai',
-  }) =>
-      persistent.containsKey(_identityKey(senderId, call)) ||
-      (sessions[conversation]?.containsKey(_identityKey(senderId, call)) ??
-          false);
+  bool allows(String conversation, ToolCall call) =>
+      persistent.containsKey(key(call)) ||
+      (sessions[conversation]?.containsKey(key(call)) ?? false);
 
   Future<void> grant(
     String conversation,
     ToolCall call,
     String label,
-    String scope, {
-    String senderId = 'agent:aurai',
-  }) async {
+    String scope,
+  ) async {
     if (scope == 'session') {
       final updated = {
         ...sessions,
-        conversation: {
-          ...?sessions[conversation],
-          _identityKey(senderId, call): label,
-        },
+        conversation: {...?sessions[conversation], key(call): label},
       };
       if (!await _preferences.setString(
         'session_tool_approvals',
@@ -63,7 +63,7 @@ class ToolApprovalStore {
       }
       sessions[conversation] = updated[conversation]!;
     } else if (scope == 'always') {
-      final updated = {...persistent, _identityKey(senderId, call): label};
+      final updated = {...persistent, key(call): label};
       if (!await _preferences.setString(
         'tool_approvals',
         jsonEncode(updated),

@@ -1,3 +1,4 @@
+import 'interactive_message_paging.dart';
 import 'recalled_message_notice.dart';
 import '../../html_games/html_game_view.dart';
 import '../../domain/tool_activity_groups.dart';
@@ -252,12 +253,16 @@ List<ChatTimelineEntry> buildChatTimeline(
                     conversationId: conversation.id,
                     store: controller.htmlGames,
                   ),
-            onInteractiveClick: (button, revision) => controller
-                .clickInteractiveMessage(message.id, button, revision),
+            onInteractiveClick: (button, revision, participantRevision) =>
+                controller.clickInteractiveMessage(
+                  message.id,
+                  button,
+                  revision,
+                  participantRevision,
+                ),
             groupBubble: conversation.kind == ConversationKind.group,
             onQuote:
                 conversation.kind == ConversationKind.group &&
-                    !message.isFailure &&
                     !controller.isStreamingMessage(message.id) &&
                     (message.text.isNotEmpty ||
                         message.images.isNotEmpty ||
@@ -320,12 +325,21 @@ List<ChatTimelineEntry> buildChatTimeline(
                   child: content,
                 )
               : content;
+          final pagedBody = message.interactive == null
+              ? messageBody
+              : InteractiveMessagePaging(
+                  key: ValueKey('pages:${message.id}'),
+                  messageId: message.id,
+                  card: message.interactive!,
+                  database: controller.groupStore.database,
+                  child: messageBody,
+                );
           final item = conversation.kind == ConversationKind.group
               ? Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child: messageBody,
+                  child: pagedBody,
                 )
-              : messageBody;
+              : pagedBody;
           if (message.id != conversation.searchMessageId) return item;
           return TweenAnimationBuilder<double>(
             tween: Tween(begin: .28, end: 0),

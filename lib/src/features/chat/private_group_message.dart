@@ -63,7 +63,13 @@ extension PrivateGroupMessage on ChatController {
       r'\]\(aurai://member/([^)]+)\)',
     ).allMatches(text).map((match) => match.group(1)!).toSet();
     final prefixes = mentions
-        .where((id) => !inlineMentions.contains(Uri.encodeComponent(id)))
+        .where(
+          (id) =>
+              !inlineMentions.contains(Uri.encodeComponent(id)) &&
+              !RegExp(
+                '@${RegExp.escape(senders[id]!.name)}(?![a-zA-Z0-9_])',
+              ).hasMatch(text),
+        )
         .map((id) {
           final name = senders[id]!.name
               .replaceAll('[', r'\[')

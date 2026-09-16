@@ -86,7 +86,11 @@ extension GroupMessageDelivery on ChatController {
         r'\]\(aurai://member/([^)]+)\)',
       ).allMatches(text).map((match) => match.group(1)!).toSet();
       final missingMentions = ids.toSet().where(
-        (id) => !inlineMentions.contains(Uri.encodeComponent(id)),
+        (id) =>
+            !inlineMentions.contains(Uri.encodeComponent(id)) &&
+            !RegExp(
+              '@${RegExp.escape(senders[id]!.name)}(?![a-zA-Z0-9_])',
+            ).hasMatch(text),
       );
       output.add(
         AgentMessage(

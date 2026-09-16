@@ -60,7 +60,7 @@ class HtmlGameView extends StatefulWidget {
 class _HtmlGameViewState extends State<HtmlGameView>
     with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   static _HtmlGameViewState? _active;
-  static int _openRevision = 0;
+  int _openRevision = 0;
   static final _heights = <(String, double, bool), double>{};
   Timer? _offscreenTimer;
   @override
@@ -75,7 +75,6 @@ class _HtmlGameViewState extends State<HtmlGameView>
   Uint8List? _preview;
   double? _contentHeight;
   (String, double, bool)? _heightKey;
-  bool _hasRendered = false;
   bool _surfaceReady = false;
   bool _opening = false, _retrying = false;
   bool _failed = false, _foreground = true, _leaving = false;
@@ -96,6 +95,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
     _scheduleVisibility();
   }
 
+  // A stored preview is optional; the live document supplies its height.
   void _scheduleVisibility() {
     if (!mounted || _checkScheduled) return;
     _checkScheduled = true;
@@ -193,7 +193,8 @@ class _HtmlGameViewState extends State<HtmlGameView>
       return;
     }
     // A fling uses snapshots; mount new platform views once scrolling settles.
-    if ((_active == null || !_active!._tabVisible) &&
+    if (_views.where((view) => view._session != null || view._opening).length <
+            3 &&
         !_opening &&
         !_failed &&
         _closing == null &&
@@ -240,7 +241,21 @@ class _HtmlGameViewState extends State<HtmlGameView>
       return;
     }
     final revision = ++_openRevision;
-    final previous = _active;
+    final previous =
+        _views
+            .where(
+              (view) =>
+                  !identical(view, this) &&
+                  view.widget.messageId == widget.messageId &&
+                  (view._session != null || view._opening),
+            )
+            .firstOrNull ??
+        (_views
+                    .where((view) => view._session != null || view._opening)
+                    .length >=
+                3
+            ? _active
+            : null);
     _active = this;
     setState(() {
       _opening = true;
@@ -248,7 +263,10 @@ class _HtmlGameViewState extends State<HtmlGameView>
     });
     updateKeepAlive();
     try {
-      await previous?._close();
+      if (previous != null) {
+        previous._openRevision++;
+        await previous._close();
+      }
       final game = await HtmlGameDisplayCache.load(
         widget.store,
         widget.conversationId,
@@ -274,6 +292,9 @@ class _HtmlGameViewState extends State<HtmlGameView>
         setState(() => _opening = false);
         updateKeepAlive();
       }
+      for (final view in _views) {
+        if (!identical(view, this)) view._scheduleVisibility();
+      }
     }
   }
 
@@ -281,7 +302,6 @@ class _HtmlGameViewState extends State<HtmlGameView>
     final session = _session!;
     var changed = _surfaceReady != session.ready;
     _surfaceReady = session.ready;
-    if (session.ready) _hasRendered = true;
     if (session.contentHeight != null) {
       if (_contentHeight == null ||
           (session.contentHeight! - _contentHeight!).abs() >= 2) {
@@ -510,7 +530,9 @@ class _HtmlGameViewState extends State<HtmlGameView>
                             : const Color(0xffefeff3),
                       ),
                     )
-                  else if (_preview != null && !_failed)
+                  else if (_preview != null &&
+                      _contentHeight != null &&
+                      !_failed)
                     GestureDetector(
                       onTap: _open,
                       child: ClipRRect(
@@ -518,7 +540,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
                         child: Image.memory(
                           _preview!,
                           gaplessPlayback: true,
-                          height: height,
+                          height: _contentHeight,
                           fit: BoxFit.fitWidth,
                           alignment: Alignment.topCenter,
                         ),
@@ -526,7 +548,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
                     )
                   else
                     SizedBox(
-                      height: _hasRendered ? height : 88,
+                      height: height,
                       child: InkWell(
                         onTap: _opening ? null : _open,
                         borderRadius: BorderRadius.circular(22),

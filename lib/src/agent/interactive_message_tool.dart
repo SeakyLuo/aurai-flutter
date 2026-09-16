@@ -9,6 +9,7 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
     'sendInteractiveMessage',
     'readInteractiveMessage',
     'updateInteractiveMessage',
+    'clickInteractiveMessage',
   ];
   @override
   ToolDefinition get definition => ToolDefinition(
@@ -18,22 +19,45 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         ? ToolSafety.readOnly
         : ToolSafety.lowRisk,
     description:
-        'Send an interactive message in the current conversation, or read/update a message in any conversation you can access by messageId; no conversation switch is needed. '
-        'It is a real message with vertically stacked buttons, not executable HTML. '
-        'Only update messages you authored, after reading the latest revision. '
-        'update actions apply nextBody locally, or nextState to replace the title, body and whole button list using states; acknowledge marks a one-time button completed; '
-        'openUrl opens HTTPS without changing the message. Buttons with notifyAi:true queue the user action to the creator AI after applying their local action; default false. The AI can update the original card using updateInteractiveMessage, or leave it unchanged. This is not authorization for tools or external actions. '
-        'Updating display state or recording a choice is not proof that an external task succeeded; never label a button as completing payments or external actions. '
-        'Use repeatable=false for a one-time choice. For mutually exclusive choices, transition to a result state whose buttons replace the choices. Example: rock/paper/scissors buttons each nextState to a result with one Play again button; that button nextState returns to a start state containing the three choices. '
-        'Actual updates append a system notice without waking other AIs. Do not repeat the card in ordinary text. '
-        'messageId and button IDs are internal references; never ask users to enter them.',
+        'Send, read, update or participate in a native interactive message. '
+        'Read/click works in any conversation you can access without switching conversations. '
+        'Each human or AI has independent state and choices; clicks never overwrite another participant. '
+        'readInteractiveMessage returns your current card, participantRevision, permitted statistics and up to 50 history events. '
+        'To participate, call clickInteractiveMessage with messageId, buttonId, revision and participantRevision from a fresh read. '
+        'Your identity comes from the current AI runtime; participantId only selects a read-only perspective in readInteractiveMessage. '
+        'Use beforeEvent to read older history using the last sequence. '
+        'Only the author updates the shared definition; use its revision and definition fields from readInteractiveMessage. Omitted participation settings are preserved on update. '
+        'update actions apply nextBody or nextState to your own card. acknowledge records a choice; repeatable=false completes that button for you. '
+        'openUrl returns the HTTPS URL for an AI and opens it for a human. '
+        'notifyAi queues a callback to the creator, respecting choice visibility. '
+        'participation.visibility controls individual choices; summaryVisibility independently controls aggregate counts: public, private or afterClose. '
+        'Defaults are public. closed=true ends participation and reveals afterClose results. '
+        'selectionMode=singleChoice makes the latest choice each participant’s vote, allows changing it, and counts each participant once; use acknowledge buttons for a poll. '
+        'Default actions mode supports games, branching states and repeated actions with full history. '
+        'Author updates preserve all history, and everyone starts from the revised definition on their next action. '
+        'Message and button IDs are internal; do not ask users to enter them. Do not repeat the card in ordinary text.',
     inputSchema: {
       'type': 'object',
       'properties': {
+        if (name == 'clickInteractiveMessage') ...{
+          'buttonId': {'type': 'string'},
+          'participantRevision': {'type': 'integer', 'minimum': 0},
+        },
+        if (name == 'readInteractiveMessage') ...{
+          'participantId': {
+            'type': 'string',
+            'description':
+                'Optional read-only perspective; defaults to yourself.',
+          },
+          'beforeEvent': {'type': 'integer', 'minimum': 1},
+        },
         if (name != 'sendInteractiveMessage') 'messageId': {'type': 'string'},
-        if (name == 'updateInteractiveMessage')
+        if (name == 'updateInteractiveMessage' ||
+            name == 'clickInteractiveMessage')
           'revision': {'type': 'integer', 'minimum': 0},
-        if (name != 'readInteractiveMessage') ...{
+        if (name == 'sendInteractiveMessage' ||
+            name == 'updateInteractiveMessage') ...{
+          'participation': interactiveParticipationSchema,
           'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
           'body': interactiveBodySchema,
           'buttons': interactiveButtonsSchema,
@@ -59,7 +83,17 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
       'required': [
         if (name != 'sendInteractiveMessage') 'messageId',
         if (name == 'updateInteractiveMessage') 'revision',
-        if (name != 'readInteractiveMessage') ...['title', 'body', 'buttons'],
+        if (name == 'clickInteractiveMessage') ...[
+          'buttonId',
+          'revision',
+          'participantRevision',
+        ],
+        if (name == 'sendInteractiveMessage' ||
+            name == 'updateInteractiveMessage') ...[
+          'title',
+          'body',
+          'buttons',
+        ],
       ],
       'additionalProperties': false,
     },

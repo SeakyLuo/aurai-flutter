@@ -1,29 +1,48 @@
-import '../domain/error_message.dart';
-import 'skill_list_tile.dart';
 import 'package:flutter/material.dart';
+import '../domain/error_message.dart';
 import '../features/chat/settings_appearance.dart';
-import '../features/chat/settings_icon.dart';
 import '../features/chat/sidebar_action_icon.dart';
-import '../features/chat/question_icon.dart';
-import '../scheduling/task_filter_menu.dart';
+import 'skill_detail_page.dart';
+import 'skill_page_header.dart';
 import 'skill_editor.dart';
+import 'skill_list_tile.dart';
 import 'skill_store.dart';
-import 'skill_action_menu.dart';
-import 'skill_permission_picker.dart';
 import 'skill_sort_picker.dart';
+import 'skill_permission_picker.dart';
+import 'skill_action_menu.dart';
 import '../scheduling/task_action_menu.dart';
-import '../features/chat/delete_confirmation_dialog.dart';
 
 class SkillsPage extends StatefulWidget {
-  const SkillsPage({super.key, required this.store});
+  const SkillsPage({super.key, required this.store, this.library = false});
   final SkillStore store;
+  final bool library;
   @override
   State<SkillsPage> createState() => _SkillsPageState();
 }
 
 class _SkillsPageState extends State<SkillsPage> {
-  final _titleKey = GlobalKey();
   final _search = TextEditingController();
+  String _status = 'all';
+  late String _filter = widget.library ? 'library' : 'installed';
+  bool _loading = true;
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      await widget.store.reload();
+    } on Object catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -31,49 +50,60 @@ class _SkillsPageState extends State<SkillsPage> {
     super.dispose();
   }
 
-  String _filter = 'enabled';
-  bool _menuOpen = false;
-  String get _title => _filter == 'enabled' ? '已启用技能' : '已停用技能';
-
-  Future<void> _chooseFilter() async {
-    final box = _titleKey.currentContext!.findRenderObject()! as RenderBox;
-    setState(() => _menuOpen = true);
-    final selected = await showTaskChoiceMenu(
-      context,
-      anchor: box.localToGlobal(Offset.zero) & box.size,
-      selected: _filter,
-      label: '技能筛选',
-      centerOnAnchor: true,
-      choices: const [
-        (value: 'enabled', label: '已启用'),
-        (value: 'disabled', label: '已停用'),
-      ],
-    );
-    if (!mounted) return;
-    setState(() {
-      _menuOpen = false;
-      if (selected != null) _filter = selected;
-    });
+  Future<void> _create() => Navigator.push(
+    context,
+    MaterialPageRoute<void>(
+      builder: (_) => SkillEditor(
+        store: widget.store,
+        skill: const SavedSkill(
+          name: '',
+          description: '',
+          instructions: '',
+          script: '',
+          enabled: true,
+          revision: 0,
+        ),
+      ),
+    ),
+  );
+  Future<void> _install() => Navigator.push(
+    context,
+    MaterialPageRoute<void>(
+      builder: (_) => SkillsPage(store: widget.store, library: true),
+    ),
+  );
+  Future<void> _sort() async {
+    final value = await showSkillSortPicker(context, widget.store.sort);
+    if (value == null || !mounted) return;
+    try {
+      await widget.store.saveSort(value);
+    } on Object catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorMessage(e))));
+    }
   }
 
-  void _notice(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-
-  Future<void> _preferences(BuildContext buttonContext) async {
-    final box = buttonContext.findRenderObject()! as RenderBox;
+  Future<void> _preferences(BuildContext anchor) async {
+    final box = anchor.findRenderObject()! as RenderBox;
     final action = await showSkillPreferencesMenu(
       context,
       box.localToGlobal(Offset(0, box.size.height)),
+      library: widget.library,
+      showPermissions: widget.store.usesInstallations,
     );
     if (!mounted || action == null) return;
+    if (action == 'create') {
+      await _create();
+      return;
+    }
+    if (action == 'install') {
+      await _install();
+      return;
+    }
     if (action == 'sort') {
-      final selected = await showSkillSortPicker(context, widget.store.sort);
-      if (!mounted || selected == null) return;
-      try {
-        await widget.store.saveSort(selected);
-      } on Object catch (error) {
-        if (mounted) _notice('保存排序失败，请重试：${errorMessage(error)}');
-      }
+      await _sort();
       return;
     }
     final selection = await showSkillPermissionPicker(
@@ -84,133 +114,36 @@ class _SkillsPageState extends State<SkillsPage> {
     if (!mounted || selection == null) return;
     try {
       await widget.store.saveDefaultPermission(selection.permission!);
-      if (mounted) _notice('偏好权限已保存');
-    } on Object catch (error) {
-      if (mounted) _notice('保存失败，请重试：${errorMessage(error)}');
-    }
-  }
-
-  Future<void> _skillMenu(SavedSkill skill, Offset position) async {
-    final action = await showSkillActionMenu(
-      context,
-      position,
-      skill.enabled,
-      showEdit: true,
-    );
-    if (!mounted || action == null) return;
-    if (action == 'edit') {
-      await Navigator.push(
-        context,
-        MaterialPageRoute<void>(
-          builder: (_) => SkillEditor(store: widget.store, skill: skill),
-        ),
-      );
-      return;
-    }
-    if (action == 'delete') {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        barrierColor: Colors.black.withValues(alpha: .24),
-        builder: (_) => const DeleteConfirmationDialog(
-          title: '删除技能？',
-          description: '删除后，Aurai 将无法再查找和调用这个技能。',
-        ),
-      );
-      if (!mounted || confirmed != true) return;
-    }
-    try {
-      if (action == 'delete') {
-        await widget.store.delete(skill.name);
-      } else {
-        await widget.store.save(
-          SavedSkill.fromJson({
-            ...skill.toJson(),
-            'enabled': action == 'resume',
-          }),
-          previousName: skill.name,
-        );
-      }
+    } on Object catch (e) {
       if (mounted)
-        _notice(
-          action == 'delete'
-              ? '技能已删除'
-              : action == 'resume'
-              ? '技能已启用'
-              : '技能已停用',
-        );
-    } on Object catch (error) {
-      if (mounted)
-        _notice(
-          error is StateError
-              ? error.message
-              : '操作失败，请重试：${errorMessage(error)}',
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorMessage(e))));
     }
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: SettingsAppBar(
-      title: '技能',
+      title: widget.library ? '技能库' : '技能',
+      titleWidget: SkillPageHeader(
+        library: widget.library,
+        scope: _filter,
+        status: _status,
+        onScope: (value) => setState(() => _filter = value),
+        onStatus: (value) => setState(() => _status = value),
+      ),
       onBack: () => Navigator.pop(context),
       actions: [
         Builder(
-          builder: (buttonContext) => SettingsGlassAction(
+          builder: (anchor) => SettingsGlassAction(
             label: '更多',
             icon: Icons.more_vert,
             iconWidget: const TaskActionIcon('more'),
-            onPressed: () => _preferences(buttonContext),
+            onPressed: () => _preferences(anchor),
           ),
         ),
       ],
-      titleWidget: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('技能'),
-          Semantics(
-            button: true,
-            label: '$_title，筛选技能',
-            child: GestureDetector(
-              key: _titleKey,
-              behavior: HitTestBehavior.opaque,
-              onTap: _chooseFilter,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 3, 12, 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _filter == 'enabled' ? '已启用' : '已停用',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    AnimatedRotation(
-                      turns: _menuOpen ? -.25 : .25,
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeInOutCubic,
-                      child: SizedBox.square(
-                        dimension: 14,
-                        child: FittedBox(
-                          child: SettingsIcon(
-                            type: SettingsIconType.chevron,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     ),
     body: SafeArea(
       top: false,
@@ -220,22 +153,16 @@ class _SkillsPageState extends State<SkillsPage> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 child: TextField(
                   controller: _search,
                   onChanged: (_) => setState(() {}),
                   onTapOutside: (_) =>
                       FocusManager.instance.primaryFocus?.unfocus(),
-                  textInputAction: TextInputAction.search,
-                  style: const TextStyle(fontSize: 16),
                   decoration: InputDecoration(
                     hintText: '搜索技能',
                     filled: true,
                     fillColor: settingsFieldColor(context),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 14,
-                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(26),
                       borderSide: BorderSide.none,
@@ -246,15 +173,6 @@ class _SkillsPageState extends State<SkillsPage> {
                         type: SidebarActionIconType.search,
                       ),
                     ),
-                    suffixIcon: _search.text.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: '清除搜索',
-                            onPressed: () => setState(_search.clear),
-                            icon: const QuestionIcon(
-                              type: QuestionIconType.close,
-                            ),
-                          ),
                   ),
                 ),
               ),
@@ -262,56 +180,90 @@ class _SkillsPageState extends State<SkillsPage> {
                 child: ListenableBuilder(
                   listenable: widget.store,
                   builder: (context, _) {
+                    if (_loading)
+                      return const Center(child: CircularProgressIndicator());
                     final query = _search.text.trim().toLowerCase();
-                    final skills =
-                        widget.store.skills
+                    final items =
+                        widget.store.library
                             .where(
-                              (skill) =>
-                                  skill.enabled == (_filter == 'enabled'),
-                            )
-                            .where(
-                              (skill) =>
-                                  query.isEmpty ||
-                                  skill.name.toLowerCase().contains(query) ||
-                                  skill.description.toLowerCase().contains(
-                                    query,
-                                  ),
+                              (s) =>
+                                  (_filter != 'installed' ||
+                                      widget.store.isInstalled(s.id)) &&
+                                  (_filter != 'installed' ||
+                                      _status == 'all' ||
+                                      s.enabled == (_status == 'enabled')) &&
+                                  (_filter != 'created' ||
+                                      s.ownerId == widget.store.ownerId) &&
+                                  (s.name.toLowerCase().contains(query) ||
+                                      s.description.toLowerCase().contains(
+                                        query,
+                                      )),
                             )
                             .toList()
                           ..sort(widget.store.compareSkills);
-                    if (skills.isEmpty) {
+                    if (items.isEmpty)
                       return Center(
-                        child: Text(
-                          query.isEmpty ? '暂无$_title' : '没有匹配的技能',
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              query.isNotEmpty
+                                  ? '没有匹配的技能'
+                                  : _filter == 'installed'
+                                  ? (_status == 'all'
+                                        ? '还没有安装技能'
+                                        : _status == 'enabled'
+                                        ? '暂无已启用技能'
+                                        : '暂无已停用技能')
+                                  : '暂无技能',
+                            ),
+                            if (query.isEmpty && _filter == 'installed') ...[
+                              const SizedBox(height: 8),
+                              TextButton(
+                                onPressed: _status == 'all'
+                                    ? _install
+                                    : () => setState(() => _status = 'all'),
+                                child: Text(
+                                  _status == 'all' ? '去安装' : '查看全部已安装技能',
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       );
-                    }
                     return ListView.separated(
+                      padding: const EdgeInsets.all(16),
                       keyboardDismissBehavior:
                           ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding: const EdgeInsets.all(16),
-                      itemCount: skills.length,
+                      itemCount: items.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
-                        final skill = skills[index];
+                        final skill = items[index];
                         return SkillListTile(
                           skill: skill,
-                          onLongPressStart: (details) =>
-                              _skillMenu(skill, details.globalPosition),
+                          subtitlePrefix: widget.store.ownerName(skill),
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute<void>(
-                              builder: (_) => SkillEditor(
+                              builder: (_) => SkillDetailPage(
                                 store: widget.store,
-                                skill: skill,
+                                skillId: skill.id,
                               ),
                             ),
                           ),
+                          titleTrailing: !widget.store.usesInstallations
+                              ? null
+                              : Text(
+                                  widget.store.isInstalled(skill.id)
+                                      ? (skill.enabled ? '已启用' : '已停用')
+                                      : '未安装',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
                         );
                       },
                     );

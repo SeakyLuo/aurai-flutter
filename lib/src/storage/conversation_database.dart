@@ -1,3 +1,4 @@
+import 'interactive_action_history.dart';
 import 'message_callbacks.dart';
 import 'contact_relationships.dart';
 import '../html_games/html_game_schema.dart';
@@ -5,6 +6,7 @@ import 'ai_identity_schema.dart';
 import 'group_participation.dart';
 import 'group_creation_migration.dart';
 import '../skills/skill_schema.dart';
+import '../skills/skill_library_schema.dart';
 import 'message_sender_schema.dart';
 import 'group_chat_schema.dart';
 import 'package:sqflite/sqflite.dart';
@@ -12,12 +14,22 @@ import '../memory/memory_controller.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 27,
+  version: 30,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion >= 28 && oldVersion < 30) {
+      await db.execute(
+        'ALTER TABLE interactive_actions ADD COLUMN before_json TEXT',
+      );
+    }
+    if (oldVersion < 28) {
+      for (final statement in interactiveActionSchema) {
+        await db.execute(statement);
+      }
+    }
     if (oldVersion < 27) {
       await db.execute(
         "ALTER TABLE conversations ADD COLUMN mode TEXT NOT NULL DEFAULT 'normal'",
@@ -126,11 +138,13 @@ Future<Database> openConversationDatabase() async => openDatabase(
       await db.execute(messageCallbackSchema);
       await db.execute(messageCallbackIndex);
     }
+    if (oldVersion < 29) await migrateSkillLibrary(db);
   },
   onCreate: (db, version) async {
     final batch = db.batch();
     for (final statement in [
       ..._schema,
+      ...interactiveActionSchema,
       messageCallbackSchema,
       messageCallbackIndex,
       ...htmlGameSchema,
@@ -145,6 +159,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
     }
     await batch.commit(noResult: true);
     await migrateAiIdentities(db);
+    await migrateSkillLibrary(db);
     await migrateAuraiAvatar(db);
     await migrateAuraiDescription(db);
   },

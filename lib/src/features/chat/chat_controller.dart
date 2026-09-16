@@ -1,3 +1,4 @@
+import '../../storage/interactive_action_history.dart';
 import '../../storage/group_unread_messages.dart';
 import '../../storage/recalled_message_drafts.dart';
 import '../../html_games/html_message_interaction.dart';
@@ -632,7 +633,7 @@ class ChatController extends ChangeNotifier {
     conversationId ??= _runningConversation!.id;
     final existing =
         (screenAccess && isScreenTool(call.name)) ||
-        toolApprovals.allows(conversationId, call, senderId: senderId);
+        toolApprovals.allows(conversationId, call);
     if (!existing)
       await _platform.updateAttentionNotification(
         conversationId,
@@ -656,7 +657,7 @@ class ChatController extends ChangeNotifier {
             )
           : existing
           ? 'once'
-          : await _confirmInApp(call, definition);
+          : await _confirmInApp(call, definition, conversationId);
       approved = scope != 'deny';
       if (approved) {
         await toolApprovals.grant(
@@ -666,7 +667,6 @@ class ChatController extends ChangeNotifier {
               ? '技能：${call.arguments['name']}（版本 ${call.arguments['revision']}）'
               : toolTitle(call.name),
           scope,
-          senderId: senderId,
         );
       }
     } finally {
@@ -678,12 +678,12 @@ class ChatController extends ChangeNotifier {
     return approved;
   }
 
-  Future<String> _confirmInApp(ToolCall call, ToolDefinition definition) async {
-    final request = PendingConfirmation(
-      call,
-      definition,
-      _runningConversation!.id,
-    );
+  Future<String> _confirmInApp(
+    ToolCall call,
+    ToolDefinition definition,
+    String conversationId,
+  ) async {
+    final request = PendingConfirmation(call, definition, conversationId);
     pendingConfirmation = request;
     notifyListeners();
     final timer = call.confirmationTimeoutSeconds == null

@@ -1,3 +1,4 @@
+import 'interactive_message_paging.dart';
 import 'package:flutter/material.dart';
 import '../../domain/message_sender.dart';
 import 'member_avatar.dart';
@@ -45,14 +46,23 @@ class GroupMessageHeading extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (showName)
-                Text(
-                  sender.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        sender.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    if (InteractivePageScope.of(context)?.control
+                        case final control?)
+                      control,
+                  ],
                 ),
               child,
             ],
