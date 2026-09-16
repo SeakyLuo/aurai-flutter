@@ -56,6 +56,12 @@ const interactiveButtonsSchema = {
             'Queue an AI callback after this action. The participant waits until the creator commits title/body/buttons with updateInteractiveMessage + callbackEventId. Failures can retry the same event without repeating this action. Omit/false for local-only changes.',
       },
       'repeatable': {'type': 'boolean'},
+      'input': {
+        'type': 'string',
+        'enum': ['text', 'json'],
+        'description':
+            'HTML messages only: this submit endpoint accepts page-provided text or JSON, max 16 KB. Native cards use fixed button values instead. The host binds the authenticated participant.',
+      },
       'value': {
         'description':
             'For submit: any JSON value to record for this participant in the current shared round. Defaults to button id.',
@@ -78,6 +84,30 @@ const interactiveButtonsSchema = {
 const interactiveParticipationSchema = {
   'type': 'object',
   'properties': {
+    'audience': {
+      'type': 'array',
+      'items': {'type': 'string'},
+      'description':
+          'Only these known participants may view the card. Omit for everyone. Include the creator if they must read/administer it. Voting eligibility is separately interaction.actors.',
+    },
+    'visibilityActors': {
+      'type': 'array',
+      'items': {'type': 'string'},
+      'description':
+          'Additional allowlist for other participants choices; still follows visibility and reveal timing.',
+    },
+    'summaryVisibilityActors': {
+      'type': 'array',
+      'items': {'type': 'string'},
+      'description':
+          'Additional allowlist for totals/results; still follows summaryVisibility and reveal timing.',
+    },
+    'presentation': {
+      'type': 'string',
+      'enum': ['author', 'system'],
+      'description':
+          'system displays a system activity card without an AI avatar. Presentation only: it does not grant system authority or change the real author. Use notifyAi:false for program-settled cards.',
+    },
     'visibility': {
       'type': 'string',
       'enum': ['public', 'private', 'afterClose'],

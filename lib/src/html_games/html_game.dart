@@ -52,6 +52,7 @@ class HtmlGameCard {
 
 class HtmlGame {
   const HtmlGame({
+    this.interactionProjection,
     required this.messageId,
     required this.conversationId,
     required this.creatorId,
@@ -69,6 +70,7 @@ class HtmlGame {
     this.stateful = false,
     this.backgroundMode = 'message',
   });
+  final Map<String, Object?>? interactionProjection;
   final bool stateful;
   final String backgroundMode;
   final int? width;
@@ -87,6 +89,8 @@ class HtmlGame {
   final Uint8List? preview;
 
   factory HtmlGame.fromRow(Map<String, Object?> row) => HtmlGame(
+    interactionProjection:
+        row['interaction_projection'] as Map<String, Object?>?,
     messageId: row['message_id'] as String,
     stateful: row['stateful'] == 1,
     backgroundMode: row['background_mode'] as String,
@@ -109,6 +113,7 @@ class HtmlGame {
   );
 
   Map<String, Object?> snapshot() => {
+    if (interactionProjection != null) 'interaction': interactionProjection,
     'messageId': messageId,
     'backgroundMode': backgroundMode,
     'width': width,

@@ -15,6 +15,23 @@ const htmlGameLifecycleScript = r'''
   };
   window.AuraiHTML=Object.freeze({
     get messageState(){return window.__auraiMessageState()},
+    get interaction(){return window.__auraiInteractionState()},
+    async submitInteraction({buttonId,value}){
+      const current=this.interaction;
+      if(!current)throw new Error('This message has no shared interaction');
+      const result=await this.submitEvent({eventId:crypto.randomUUID(),action:'aurai:clickButton',notifyAi:false,
+        data:{buttonId,value,revision:current.revision,participantRevision:current.participantRevision}});
+      window.__auraiApplyInteraction(result);
+      return result;
+    },
+    async clickButton(buttonId){
+      const current=this.interaction;
+      if(!current)throw new Error('This message has no shared interaction');
+      const result=await this.submitEvent({eventId:crypto.randomUUID(),action:'aurai:clickButton',notifyAi:false,
+        data:{buttonId,revision:current.revision,participantRevision:current.participantRevision}});
+      window.__auraiApplyInteraction(result);
+      return result;
+    },
     requestResize(){document.dispatchEvent(new Event('aurai:resize'))},
     submitEvent({eventId,action,data=null,notifyAi=true}){
       if(!navigator.userActivation.isActive)return Promise.reject(new Error('Submit events from a user action, not on load or a timer'));

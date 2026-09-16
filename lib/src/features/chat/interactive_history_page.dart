@@ -123,8 +123,10 @@ class InteractiveHistoryTile extends StatelessWidget {
         jsonDecode(rows.single['interactive_json'] as String)
             as Map<String, dynamic>,
       );
+      current.requireViewer(MessageSender.localUser.id);
       if (actorId != MessageSender.localUser.id &&
-          !current.visible('visibility'))
+          (!current.visible('visibility') ||
+              !current.visible('summaryVisibility')))
         throw StateError('这条消息尚未公开其他参与者的记录');
       final snapshots = await database.query(
         'interactive_actions',

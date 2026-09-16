@@ -62,8 +62,8 @@ class ReadGroupMessagesTool implements AgentTool, RuntimeCapabilityAgentTool {
         'messages',
         columns: ['id', 'sender_id', 'role', 'kind', 'text', 'created_at'],
         where:
-            'conversation_id = ?${query.isEmpty ? '' : ' AND instr(lower(text), ?) > 0'}',
-        whereArgs: [groupId, if (query.isNotEmpty) query],
+            "conversation_id = ? AND (interactive_json IS NULL OR json_extract(interactive_json, '\$.participation.audience') IS NULL OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = ?))${query.isEmpty ? '' : ' AND instr(lower(text), ?) > 0'}",
+        whereArgs: [groupId, senderId, if (query.isNotEmpty) query],
         orderBy: 'created_at DESC, id DESC',
         limit: limit + 1,
         offset: offset,

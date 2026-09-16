@@ -53,7 +53,10 @@ $htmlGameLifecycleScript
    }
  });
  window.__auraiMessageState=()=>structuredClone(snapshot.state);
- window.__auraiGameState=value=>{if(value.version>snapshot.version){publish(value);document.dispatchEvent(new Event('aurai:messageupdate'))}};
+ const newerInteraction=(a,b)=>{if(!a)return false;if(!b)return true;for(const k of ['revision','sessionVersion','participantRevision','callbackVersion']){if(a[k]!==b[k])return a[k]>b[k]}return false};
+ window.__auraiInteractionState=()=>structuredClone(snapshot.interaction??null);
+ window.__auraiApplyInteraction=value=>{if(newerInteraction(value,snapshot.interaction)){publish({...snapshot,interaction:value});document.dispatchEvent(new Event('aurai:messageupdate'))}};
+ window.__auraiGameState=value=>{if(value.version>snapshot.version||(value.version===snapshot.version&&newerInteraction(value.interaction,snapshot.interaction))){publish(value);document.dispatchEvent(new Event('aurai:messageupdate'))}};
  window.__auraiGameReply=value=>{
    if(value.version!==undefined && value.version>snapshot.version)publish(value);
    const current=pending;pending=null;if(!current)return;clearTimeout(current.timer);

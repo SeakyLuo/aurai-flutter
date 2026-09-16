@@ -1,3 +1,4 @@
+import '../storage/interactive_message_store.dart';
 import 'package:flutter/material.dart';
 import 'html_message_theme.dart';
 import 'html_game_display_cache.dart';
@@ -32,6 +33,9 @@ class HtmlGameSession extends ChangeNotifier {
         notifyListeners();
       }
     });
+    _interactiveUpdates = InteractiveMessageStore.changes.stream
+        .where((id) => id == game.messageId)
+        .listen((_) => unawaited(_reload()));
     _updates = HtmlGameSignals.changes.stream
         .where((id) => id == game.messageId)
         .listen((_) => unawaited(_reload()));
@@ -58,6 +62,7 @@ class HtmlGameSession extends ChangeNotifier {
   HtmlGame game;
   final HtmlGameStore store;
   late final StreamSubscription<String> _updates;
+  late final StreamSubscription<String> _interactiveUpdates;
   MethodChannel? _channel;
   bool _closed = false;
   bool _closing = false;
@@ -210,11 +215,29 @@ class HtmlGameSession extends ChangeNotifier {
     await channel.invokeMethod<void>('connect');
   }
 
+  bool _isNewer(HtmlGame next) {
+    if (next.version != game.version) return next.version > game.version;
+    final incoming = next.interactionProjection;
+    final current = game.interactionProjection;
+    if (incoming == null) return false;
+    if (current == null) return true;
+    for (final key in [
+      'revision',
+      'sessionVersion',
+      'participantRevision',
+      'callbackVersion',
+    ]) {
+      if (incoming[key] != current[key])
+        return (incoming[key] as int) > (current[key] as int);
+    }
+    return false;
+  }
+
   Future<void> _reload() async {
     try {
       final next = await store.load(game.conversationId, game.messageId);
-      if (_closed || _closing || next.version <= game.version) return;
-      if (_editing) {
+      if (_closed || _closing || !_isNewer(next)) return;
+      if (_editing && next.html != game.html) {
         if (_pendingUpdate == null || next.version > _pendingUpdate!.version)
           _pendingUpdate = next;
         return;
@@ -250,7 +273,7 @@ class HtmlGameSession extends ChangeNotifier {
   }
 
   Future<void> _applyUpdate(HtmlGame next) async {
-    if (_closed || _closing || next.version <= game.version) return;
+    if (_closed || _closing || !_isNewer(next)) return;
     if (next.version != game.version) {
       preview = null;
       previewVersion = null;
@@ -298,6 +321,7 @@ class HtmlGameSession extends ChangeNotifier {
     await _localWrite;
     _closed = true;
     await _updates.cancel();
+    await _interactiveUpdates.cancel();
     try {
       await _channel
           ?.invokeMethod<void>('dispose')

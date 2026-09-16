@@ -93,7 +93,9 @@ class InteractiveStatisticsOverview extends StatelessWidget {
             ),
         ] else ...[
           Text(
-            card.participation['summaryVisibility'] == 'afterClose'
+            card.shared && !card.engine.revealed
+                ? '本轮尚未揭晓统计'
+                : card.participation['summaryVisibility'] == 'afterClose'
                 ? '结束后公开汇总'
                 : '汇总不公开',
           ),
@@ -107,7 +109,9 @@ class InteractiveStatisticsOverview extends StatelessWidget {
           if (!peopleVisible) ...[
             const SizedBox(height: 8),
             Text(
-              card.participation['visibility'] == 'afterClose'
+              card.shared && !card.engine.revealed
+                  ? '本轮尚未公开参与者选择'
+                  : card.participation['visibility'] == 'afterClose'
                   ? '结束后公开参与者记录'
                   : '其他人的记录不公开',
               style: TextStyle(

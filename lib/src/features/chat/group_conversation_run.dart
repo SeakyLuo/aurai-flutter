@@ -267,7 +267,9 @@ List<AgentMessage> _groupHistory(
   List<AgentMessage> history,
   String senderId,
 ) => [
-  for (final message in history.where((m) => !m.isFailure))
+  for (final message in history.where(
+    (m) => !m.isFailure && (m.interactive?.canView(senderId) ?? true),
+  ))
     AgentMessage(
       id: message.id,
       // Published group messages are transcript data, not provider output from

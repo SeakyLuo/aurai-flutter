@@ -20,14 +20,11 @@ import 'reply_image_gallery.dart';
 import 'markdown_link_underlines.dart';
 import 'cjk_strong_syntax.dart';
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-
 import '../../app/global_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-
 import '../../domain/agent_models.dart';
 import '../../domain/source_reference.dart';
 import '../../domain/web_sources.dart';
@@ -122,7 +119,9 @@ class _MessageItemState extends State<MessageItem> {
 
   @override
   Widget build(BuildContext context) =>
-      ImageMessageScope(messageId: message.id, child: _buildMessage(context));
+      message.interactive?.canView('user:local') == false
+      ? const SizedBox.shrink()
+      : ImageMessageScope(messageId: message.id, child: _buildMessage(context));
 
   Widget _buildMessage(BuildContext context) =>
       message.role == AgentMessageRole.user
@@ -364,7 +363,9 @@ class _MessageItemState extends State<MessageItem> {
               children: [
                 Expanded(
                   child: Text(
-                    message.sender!.name,
+                    message.interactive?.systemPresentation == true
+                        ? '系统'
+                        : message.sender!.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -468,8 +469,8 @@ class _MessageItemState extends State<MessageItem> {
                         ),
                     ],
                   ),
-                if (message.interactive case final card?)
-                  ForwardedInteractiveMessage(card: card),
+                if (message.htmlGame == null && message.interactive != null)
+                  ForwardedInteractiveMessage(card: message.interactive!),
                 if (message.images.isNotEmpty && message.text.isNotEmpty)
                   const SizedBox(height: 8),
                 if (message.text.isNotEmpty)
@@ -565,8 +566,8 @@ class _MessageItemState extends State<MessageItem> {
             child: InteractiveMessageView(
               key: ValueKey(page?.sequence),
               card: page?.snapshot ?? message.interactive!,
-              titleTrailing: widget.groupBubble ? null : page?.control,
               historical: page?.snapshot != null,
+              titleTrailing: widget.groupBubble ? null : page?.control,
               readOnly: widget.readOnly || page?.snapshot != null,
               onClick: widget.onInteractiveClick!,
               onRetry: widget.onInteractiveRetry,

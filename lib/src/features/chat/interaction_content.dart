@@ -30,17 +30,22 @@ class InteractionContent extends StatelessWidget {
     final collecting = view['phase'] == 'collecting' && view['closed'] != true;
     final choosing = collecting && (!submitted || editing);
     final self = view['self'] as Map?;
+    final selectedButton = collecting && submitted && !editing
+        ? buttons
+              .where(
+                (button) =>
+                    button['id'] == self!['buttonId'] &&
+                    button['label'] == self['label'] &&
+                    (button['action'] == 'submit' || !shared),
+              )
+              .firstOrNull
+        : null;
+    final showSubmitted = selectedButton != null;
     final status = view['closed'] == true || view['phase'] == 'closed'
         ? '已结束'
-        : view['completed'] == true
-        ? '本轮已完成'
-        : submitted
-        ? (view['revealed'] == true
-              ? '已提交：${self!['label']}'
-              : '已提交：${self!['label']}，等待其他参与者')
-        : eligible
-        ? null
-        : '等待本轮参与者提交';
+        : !submitted && !eligible && view['completed'] != true
+        ? '等待本轮参与者提交'
+        : null;
     final actions = buttons
         .where(
           (button) => button['action'] == 'nextRound'
@@ -84,10 +89,24 @@ class InteractionContent extends StatelessWidget {
             '统计尚未公开',
             style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
           ),
-        if (actions.isNotEmpty &&
+        if ((actions.isNotEmpty || showSubmitted) &&
             (status != null ||
                 (view['revealed'] == true && view['summaryVisible'] != true)))
           const SizedBox(height: 12),
+        if (selectedButton != null) ...[
+          InteractiveMessageButton(
+            button: {
+              ...selectedButton,
+              'label':
+                  selectedButton['completedLabel'] ?? selectedButton['label'],
+              'disabled': true,
+            },
+            busy: false,
+            locked: true,
+            onPressed: () {},
+          ),
+          if (actions.isNotEmpty) const SizedBox(height: 8),
+        ],
         for (final (index, button) in actions.indexed) ...[
           if (index > 0) const SizedBox(height: 8),
           InteractiveMessageButton(

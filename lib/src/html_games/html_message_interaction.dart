@@ -1,3 +1,6 @@
+import '../domain/interactive_message.dart';
+import '../storage/interactive_message_store.dart';
+import '../domain/message_sender.dart';
 import 'dart:convert';
 import '../storage/message_callbacks.dart';
 import 'html_game_store.dart';
@@ -18,6 +21,33 @@ extension HtmlMessageInteraction on HtmlGameStore {
         action.length > 1000 ||
         args['notifyAi'] is! bool)
       throw ArgumentError('操作需要 eventId、action 和 notifyAi');
+    if (action == 'aurai:clickButton') {
+      final bound = await database.query(
+        'html_games',
+        columns: ['message_id'],
+        where:
+            "message_id = ? AND conversation_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
+        whereArgs: [messageId, conversationId],
+        limit: 1,
+      );
+      if (bound.isEmpty) throw StateError('消息已撤回或删除');
+      final data = (args['data'] as Map).cast<String, Object?>();
+      final result = await InteractiveMessageStore(database).click(
+        conversationId,
+        messageId,
+        data['buttonId'] as String,
+        data['revision'] as int,
+        participantRevision: data['participantRevision'] as int,
+        actor: MessageSender.localUser,
+        inputValue: data['value'],
+      );
+      InteractiveMessageStore.changes.add(messageId);
+      return {
+        'accepted': true,
+        'eventId': eventId,
+        ...result.card.webViewFor(MessageSender.localUser.id),
+      };
+    }
     final result = await database.transaction((txn) async {
       final rows = await txn.query(
         'html_games',
@@ -62,8 +92,21 @@ extension HtmlMessageInteraction on HtmlGameStore {
     final row = rows.single;
     if (row['creator_id'] != senderId) throw StateError('只能读取或更新自己创建的 HTML 消息');
     final state = jsonDecode(row['state_json'] as String);
-    if (operation == 'readHtmlMessage')
+    if (operation == 'readHtmlMessage') {
+      final messages = await txn.query(
+        'messages',
+        columns: ['interactive_json'],
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      final raw = messages.single['interactive_json'];
+      final interactive = raw == null
+          ? null
+          : InteractiveMessage.fromJson(
+              (jsonDecode(raw as String) as Map).cast<String, Object?>(),
+            );
       return {
+        if (interactive != null) 'interaction': interactive.readFor(senderId),
         'messageId': id,
         'version': row['version'],
         'title': row['title'],
@@ -71,6 +114,7 @@ extension HtmlMessageInteraction on HtmlGameStore {
         'backgroundMode': row['background_mode'],
         'state': state,
       };
+    }
     if (args['expectedVersion'] != row['version'])
       throw StateError('消息已更新，请重新读取版本');
     final html = args['html'] as String?;
