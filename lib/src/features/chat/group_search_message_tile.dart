@@ -15,14 +15,14 @@ class GroupSearchMessageTile extends StatelessWidget {
     required this.htmlGames,
     required this.time,
     required this.onLocate,
-    required this.showHtmlType,
+    required this.onOpenProfile,
   });
 
   final GroupMessageSearchResult result;
   final String conversationId, time;
   final HtmlGameStore htmlGames;
   final VoidCallback onLocate;
-  final bool showHtmlType;
+  final VoidCallback onOpenProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -43,10 +43,9 @@ class GroupSearchMessageTile extends StatelessWidget {
       message: message,
       onEdit: null,
       readOnly: result.html == null,
-      showHtmlType: showHtmlType,
       onLocate: onLocate,
       groupBubble: true,
-      onInteractiveClick: (_, _) async {
+      onInteractiveClick: (_, _, _) async {
         onLocate();
         return null;
       },
@@ -69,33 +68,36 @@ class GroupSearchMessageTile extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           excludeFromSemantics: true,
           onTap: onLocate,
-          child: IgnorePointer(
-            ignoring: result.html == null,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    time,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  time,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                if (result.role == AgentMessageRole.assistant)
-                  GroupMessageHeading(
-                    sender: result.sender,
-                    showName: result.html == null,
-                    onOpenProfile: onLocate,
+              ),
+              if (result.role == AgentMessageRole.assistant)
+                GroupMessageHeading(
+                  sender: result.sender,
+                  showName: result.html == null,
+                  onOpenProfile: onOpenProfile,
+                  child: IgnorePointer(
+                    ignoring: result.html == null && result.interactive == null,
                     child: content,
-                  )
-                else
-                  content,
-              ],
-            ),
+                  ),
+                )
+              else
+                IgnorePointer(
+                  ignoring: result.html == null && result.interactive == null,
+                  child: content,
+                ),
+            ],
           ),
         ),
       ),

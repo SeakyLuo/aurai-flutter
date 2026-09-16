@@ -14,13 +14,25 @@ import 'conversation_menu_icon.dart';
 import 'text_selection_icon.dart';
 import 'settings_appearance.dart';
 
-enum MessageAction { copy, select, edit, quote, recall, forward, fullscreen }
+enum MessageAction {
+  copy,
+  select,
+  edit,
+  quote,
+  recall,
+  forward,
+  fullscreen,
+  statistics,
+  history,
+}
 
 Future<MessageAction?> showMessageActionsMenu(
   BuildContext context, {
   required AgentMessage message,
   required Offset position,
   bool allowEditing = true,
+  bool allowStatistics = false,
+  bool allowHistory = false,
   bool allowQuote = false,
   bool allowRecall = false,
   bool allowForward = false,
@@ -43,6 +55,24 @@ Future<MessageAction?> showMessageActionsMenu(
         math.max(media.padding.bottom, media.viewInsets.bottom) -
         16;
     final actions = [
+      if (allowHistory)
+        (
+          MessageAction.history,
+          SettingsIcon(
+            type: SettingsIconType.tasks,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          '查看历史',
+        ),
+      if (allowStatistics)
+        (
+          MessageAction.statistics,
+          SettingsIcon(
+            type: SettingsIconType.data,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          '查看统计',
+        ),
       if (message.htmlGame != null && message.htmlGame!.displayMode != 'inline')
         (
           MessageAction.fullscreen,

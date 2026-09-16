@@ -57,7 +57,8 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
               'type': 'array',
               'items': {'type': 'string'},
               'uniqueItems': true,
-              'description': 'Optional; omit when not mentioning anyone.',
+              'description':
+                  'Optional; omit when not mentioning anyone. Mentioned members are automatically added to the message; do not repeat the same @names in text.',
             },
             'quoteMessageId': {
               'type': ['string', 'null'],

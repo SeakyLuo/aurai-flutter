@@ -18,6 +18,7 @@ class GroupSearchResults extends StatelessWidget {
     required this.scroll,
     required this.loading,
     required this.onLocate,
+    required this.onOpenProfile,
     required this.conversationId,
     required this.htmlGames,
   });
@@ -29,6 +30,17 @@ class GroupSearchResults extends StatelessWidget {
   final ScrollController scroll;
   final bool loading;
   final ValueChanged<GroupMessageSearchResult> onLocate;
+  final ValueChanged<GroupMessageSearchResult> onOpenProfile;
+
+  Widget _avatar(GroupMessageSearchResult result, double size) => Semantics(
+    button: true,
+    label: '查看${result.sender.name}的资料',
+    child: InkWell(
+      onTap: () => onOpenProfile(result),
+      borderRadius: BorderRadius.circular(size / 2),
+      child: MemberAvatar(sender: result.sender, size: size),
+    ),
+  );
 
   String _month(DateTime date) => '${date.year}年${date.month}月';
   String _date(DateTime date) =>
@@ -66,7 +78,7 @@ class GroupSearchResults extends StatelessWidget {
     bool action = false,
   }) => Row(
     children: [
-      MemberAvatar(sender: result.sender, size: 24),
+      _avatar(result, 24),
       const SizedBox(width: 8),
       Expanded(
         child: Text(
@@ -160,8 +172,8 @@ class GroupSearchResults extends StatelessWidget {
                   conversationId: conversationId,
                   htmlGames: htmlGames,
                   time: _date(r.createdAt),
-                  showHtmlType: type != GroupSearchType.html,
                   onLocate: () => onLocate(r),
+                  onOpenProfile: () => onOpenProfile(r),
                 );
               return Material(
                 color: Colors.transparent,
@@ -176,7 +188,7 @@ class GroupSearchResults extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        MemberAvatar(sender: r.sender, size: 40),
+                        _avatar(r, 40),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(

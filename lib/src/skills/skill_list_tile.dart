@@ -10,11 +10,13 @@ class SkillListTile extends StatelessWidget {
     required this.skill,
     required this.onTap,
     this.titleTrailing,
+    this.subtitlePrefix,
     this.onLongPressStart,
     this.showDisabled = false,
   });
 
   final SavedSkill skill;
+  final String? subtitlePrefix;
   final VoidCallback onTap;
   final Widget? titleTrailing;
   final GestureLongPressStartCallback? onLongPressStart;
@@ -48,7 +50,7 @@ class SkillListTile extends StatelessWidget {
           child: Text(
             showDisabled && !skill.enabled
                 ? '已停用 · ${skill.description}'
-                : skill.description,
+                : '${subtitlePrefix == null ? '' : '$subtitlePrefix\n'}${skill.description}',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),

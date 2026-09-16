@@ -4,9 +4,8 @@ import 'chat_controller.dart';
 import 'settings_appearance.dart';
 
 class ToolApprovalsPage extends StatefulWidget {
-  const ToolApprovalsPage({super.key, required this.controller, this.senderId});
+  const ToolApprovalsPage({super.key, required this.controller});
   final ChatController controller;
-  final String? senderId;
   @override
   State<ToolApprovalsPage> createState() => _ToolApprovalsPageState();
 }
@@ -36,14 +35,7 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
   Widget build(BuildContext context) {
     final store = widget.controller.toolApprovals;
     final conversation = widget.controller.activeConversation.id;
-    bool included(String key) =>
-        widget.senderId == null ||
-        (widget.senderId == 'agent:aurai'
-            ? !key.startsWith('agent:')
-            : key.startsWith('${widget.senderId}:'));
-    Map<String, String> only(Map<String, String> entries) =>
-        Map.fromEntries(entries.entries.where((entry) => included(entry.key)));
-    final current = only(store.sessions[conversation] ?? {});
+    final current = store.sessions[conversation] ?? {};
     Widget section(String title, Map<String, String> entries, String? scope) =>
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -74,13 +66,8 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 18),
         children: [
-          section('始终允许', only(store.persistent), null),
-          if (widget.senderId == null)
-            section('当前会话允许', current, conversation)
-          else
-            for (final entry in store.sessions.entries)
-              if (only(entry.value).isNotEmpty)
-                section('会话授权', only(entry.value), entry.key),
+          section('始终允许', store.persistent, null),
+          section('当前会话允许', current, conversation),
         ],
       ),
     );

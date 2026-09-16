@@ -1,3 +1,6 @@
+import 'dart:async';
+import '../../storage/interactive_message_store.dart';
+import 'interactive_statistics_sheet.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../platform/aurai_platform.dart';
@@ -26,10 +29,21 @@ class GroupSearchCardPage extends StatefulWidget {
 class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
   InteractiveMessage? _card;
   bool _loading = true;
+  bool _closing = false;
+  late final StreamSubscription<String> _changes;
   @override
   void initState() {
     super.initState();
+    _changes = InteractiveMessageStore.changes.stream.listen((id) {
+      if (id == widget.result.id) _reload();
+    });
     _reload();
+  }
+
+  @override
+  void dispose() {
+    _changes.cancel();
+    super.dispose();
   }
 
   Future<void> _reload() async {
@@ -47,10 +61,20 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
       );
       if (mounted) setState(() => _card = card);
     } on Object catch (error) {
-      if (mounted)
+      if (mounted && !_closing) {
+        _closing = true;
+        _changes.cancel();
+        _card = null;
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+        final route = ModalRoute.of(context)!;
+        if (route.isCurrent) {
+          Navigator.pop(context);
+        } else {
+          Navigator.of(context).removeRoute(route);
+        }
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -59,12 +83,8 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: SettingsAppBar(title: '交互消息', onBack: () => Navigator.pop(context)),
-    body: _loading
+    body: _loading || _card == null
         ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-        : _card == null
-        ? Center(
-            child: TextButton(onPressed: _reload, child: const Text('重新打开')),
-          )
         : ListView(
             padding: const EdgeInsets.all(20),
             children: [
@@ -76,30 +96,38 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              InteractiveMessageView(
-                card: _card!,
-                onClick: (button, revision) async {
-                  final url = await widget.controller.clickInteractiveMessage(
-                    widget.result.id,
-                    button,
-                    revision,
-                  );
-                  await _reload();
-                  return url;
-                },
-                onOpenLink: (url) async {
-                  try {
-                    await AuraiPlatform.instance.startIntent({
-                      'action': 'android.intent.action.VIEW',
-                      'data': url,
-                    });
-                  } on Object catch (error) {
-                    if (context.mounted)
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(errorMessage(error))),
-                      );
-                  }
-                },
+              GestureDetector(
+                onLongPress: () => showInteractiveStatistics(
+                  context,
+                  database: widget.controller.groupStore.database,
+                  messageId: widget.result.id,
+                ),
+                child: InteractiveMessageView(
+                  card: _card!,
+                  onClick: (button, revision, participantRevision) async {
+                    final result = await widget.controller
+                        .clickInteractiveMessage(
+                          widget.result.id,
+                          button,
+                          revision,
+                          participantRevision,
+                        );
+                    return result;
+                  },
+                  onOpenLink: (url) async {
+                    try {
+                      await AuraiPlatform.instance.startIntent({
+                        'action': 'android.intent.action.VIEW',
+                        'data': url,
+                      });
+                    } on Object catch (error) {
+                      if (context.mounted)
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(errorMessage(error))),
+                        );
+                    }
+                  },
+                ),
               ),
               const SizedBox(height: 24),
               TextButton.icon(

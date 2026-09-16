@@ -237,12 +237,7 @@ class _AiContactPageState extends State<AiContactPage> {
                 _row(
                   '工具授权',
                   SettingsIconType.tools,
-                  () => _page(
-                    ToolApprovalsPage(
-                      controller: widget.controller,
-                      senderId: widget.senderId,
-                    ),
-                  ),
+                  () => _page(ToolApprovalsPage(controller: widget.controller)),
                 ),
                 const SizedBox(height: 24),
                 WidgetUtils.primaryButton(

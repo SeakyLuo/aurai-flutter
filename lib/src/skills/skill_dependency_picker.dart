@@ -80,7 +80,7 @@ class _SkillDependencyPickerState extends State<SkillDependencyPicker> {
                   listenable: widget.store,
                   builder: (context, _) {
                     final query = _search.text.toLowerCase();
-                    final items = widget.store.skills
+                    final items = widget.store.library
                         .where(
                           (s) =>
                               s.id != widget.skillId &&

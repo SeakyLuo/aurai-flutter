@@ -1,3 +1,9 @@
+import '../../storage/interactive_action_history.dart';
+import 'interactive_message_paging.dart';
+import '../../domain/message_sender.dart';
+import 'interactive_history_page.dart';
+import '../../domain/interactive_message.dart';
+import 'interactive_statistics_sheet.dart';
 import '../../html_games/html_game_view.dart';
 import '../../domain/error_message.dart';
 import 'image_forward_page.dart';
@@ -46,7 +52,6 @@ class MessageItem extends StatefulWidget {
     this.onRecall,
     this.onInteractiveClick,
     this.htmlGameView,
-    this.showHtmlType = true,
     this.onLocate,
     this.onOpenQuote,
     this.onOpenMember,
@@ -56,7 +61,11 @@ class MessageItem extends StatefulWidget {
   });
   final AgentMessage message;
   final Map<String, String> mentionMembers;
-  final Future<String?> Function(String buttonId, int revision)?
+  final Future<InteractiveClickResult?> Function(
+    String buttonId,
+    int revision,
+    int participantRevision,
+  )?
   onInteractiveClick;
   final ValueChanged<AgentMessage>? onQuote;
   final Future<void> Function(AgentMessage)? onRecall;
@@ -67,7 +76,6 @@ class MessageItem extends StatefulWidget {
   final bool readOnly;
   final bool groupBubble;
   final Widget? htmlGameView;
-  final bool showHtmlType;
   final VoidCallback? onLocate;
   final Map<String, SourceReference> availableSources;
   final Future<void> Function(AgentMessage)? onEdit;
@@ -101,7 +109,6 @@ class _MessageItemState extends State<MessageItem> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.message != message ||
         oldWidget.groupBubble != widget.groupBubble ||
-        oldWidget.showHtmlType != widget.showHtmlType ||
         oldWidget.readOnly != widget.readOnly ||
         oldWidget.onLocate != widget.onLocate ||
         !mapEquals(oldWidget.mentionMembers, widget.mentionMembers) ||
@@ -191,6 +198,8 @@ class _MessageItemState extends State<MessageItem> {
         );
 
   Widget _selectableContent() {
+    if (message.interactive != null && !widget.groupBubble)
+      return _withActions(_content);
     if (widget.groupBubble || message.htmlGame != null) return _content;
     final content = SelectionArea(
       contextMenuBuilder: (context, selection) =>
@@ -221,16 +230,37 @@ class _MessageItemState extends State<MessageItem> {
 
   Future<void> _openActions(Offset position) async {
     final snapshot = message;
+    var hasHistory = false;
+    if (snapshot.interactive != null &&
+        (!widget.readOnly || widget.onLocate != null)) {
+      try {
+        hasHistory = await hasInteractiveHistory(
+          ImageActionScope.of(context).groupStore.database,
+          snapshot.id,
+          MessageSender.localUser.id,
+        );
+      } on Object catch (error) {
+        if (mounted)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+        return;
+      }
+      if (!mounted) return;
+    }
     final action = await showMessageActionsMenu(
       context,
       message: snapshot,
       position: position,
       allowEditing: widget.onEdit != null,
+      allowStatistics:
+          snapshot.interactive != null &&
+          (!widget.readOnly || widget.onLocate != null),
+      allowHistory: hasHistory,
       allowQuote: widget.onQuote != null,
       allowRecall: widget.onRecall != null,
       allowForward:
           !widget.streaming &&
-          !message.isFailure &&
           (message.htmlGame != null ||
               message.text.isNotEmpty ||
               message.images.isNotEmpty ||
@@ -238,6 +268,22 @@ class _MessageItemState extends State<MessageItem> {
     );
     if (!mounted) return;
     switch (action) {
+      case MessageAction.history:
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => InteractiveHistoryPage(
+              database: ImageActionScope.of(context).groupStore.database,
+              messageId: snapshot.id,
+            ),
+          ),
+        );
+      case MessageAction.statistics:
+        await showInteractiveStatistics(
+          context,
+          database: ImageActionScope.of(context).groupStore.database,
+          messageId: snapshot.id,
+        );
       case MessageAction.fullscreen:
         await (widget.htmlGameView! as HtmlGameView).openFullscreen(context);
       case MessageAction.forward:
@@ -312,9 +358,7 @@ class _MessageItemState extends State<MessageItem> {
               children: [
                 Expanded(
                   child: Text(
-                    widget.showHtmlType
-                        ? '${message.sender!.name} · 小程序'
-                        : message.sender!.name,
+                    message.sender!.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -466,6 +510,7 @@ class _MessageItemState extends State<MessageItem> {
         ),
       );
     }
+    final page = InteractivePageScope.of(context);
     final body = TextStyle(
       color: Theme.of(context).colorScheme.onSurface,
       fontSize: widget.groupBubble ? 15 : 16,
@@ -508,7 +553,10 @@ class _MessageItemState extends State<MessageItem> {
           widget.htmlGameView!
         else if (message.interactive != null)
           InteractiveMessageView(
-            card: message.interactive!,
+            key: ValueKey(page?.sequence),
+            card: page?.snapshot ?? message.interactive!,
+            titleTrailing: widget.groupBubble ? null : page?.control,
+            readOnly: widget.readOnly || page?.snapshot != null,
             onClick: widget.onInteractiveClick!,
             onOpenLink: (url) => _openLink(context, url),
           )

@@ -185,16 +185,21 @@ class SettingsPage extends StatelessWidget {
                       leading: const SettingsIcon(
                         type: SettingsIconType.skills,
                       ),
-                      title: const Text('技能'),
+                      title: const Text('技能库'),
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,
                       ),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => SkillsPage(store: controller.skills),
-                        ),
-                      ),
+                      onTap: () async {
+                        final store = await controller.aiSkills('user:local');
+                        if (!context.mounted) return;
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                SkillsPage(store: store, library: true),
+                          ),
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(height: 12),

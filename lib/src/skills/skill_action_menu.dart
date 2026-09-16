@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../features/chat/glass_surface.dart';
 import '../features/chat/settings_icon.dart';
+import '../features/chat/conversation_menu_icon.dart';
 import '../scheduling/task_action_menu.dart';
 
 Future<String?> showSkillActionMenu(
@@ -9,17 +10,24 @@ Future<String?> showSkillActionMenu(
   Offset position,
   bool enabled, {
   bool showEdit = false,
+  bool installed = true,
+  bool canDelete = true,
 }) => _showSkillMenu(context, position, [
   if (showEdit) ('edit', '编辑'),
-  (enabled ? 'pause' : 'resume', enabled ? '停用' : '启用'),
-  ('delete', '删除'),
+  if (installed) ('uninstall', '卸载'),
+  if (installed) (enabled ? 'pause' : 'resume', enabled ? '停用' : '启用'),
+  if (canDelete) ('delete', '删除'),
 ]);
 
 Future<String?> showSkillPreferencesMenu(
   BuildContext context,
-  Offset position,
-) => _showSkillMenu(context, position, [
-  ('permissions', '偏好权限'),
+  Offset position, {
+  bool library = false,
+  bool showPermissions = true,
+}) => _showSkillMenu(context, position, [
+  ('create', '新建'),
+  if (!library) ('install', '去安装'),
+  if (showPermissions) ('permissions', '偏好权限'),
   ('sort', '排序'),
 ]);
 
@@ -87,6 +95,21 @@ Future<String?> _showSkillMenu(
                                     if (entry.$1 == 'sort')
                                       const SettingsIcon(
                                         type: SettingsIconType.filter,
+                                      )
+                                    else if (entry.$1 == 'uninstall')
+                                      ConversationMenuIcon(
+                                        type: ConversationMenuIconType.archive,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
+                                      )
+                                    else if (entry.$1 == 'create')
+                                      const SettingsIcon(
+                                        type: SettingsIconType.add,
+                                      )
+                                    else if (entry.$1 == 'install')
+                                      const SettingsIcon(
+                                        type: SettingsIconType.skills,
                                       )
                                     else if (entry.$1 == 'permissions')
                                       const SettingsIcon(

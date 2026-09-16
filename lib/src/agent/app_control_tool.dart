@@ -16,7 +16,7 @@ class AppControlTool implements AgentTool, RuntimeCapabilityAgentTool {
     'deleteConversation':
         'Permanently delete an accessible conversation and its attachments only on explicit user request. Running conversations cannot be deleted.',
     'sendConversationMessage':
-        'Send text as yourself to the current conversation or another private conversation/group you participate in. Never impersonate the user. Does not navigate. text is required; supports Markdown reference images. AI recipients in private conversations may respond naturally; human recipients are not automatically answered on their behalf. Use sendGroupMessage for group messages with images, mentions or quotes. Do not repeat successfully sent text in your ordinary reply.',
+        'Send text as yourself only to a private conversation you participate in. Group targets are rejected; use sendGroupMessage for every group message, including when sending from private chat. Never impersonate the user. Does not navigate. text is required; supports Markdown reference images. AI recipients in private conversations may respond naturally; human recipients are not automatically answered on their behalf. Do not repeat successfully sent text in your ordinary reply.',
     'openAppPage':
         'Open an Aurai page only when the user asks. page is conversation, contact, skills, tasks or settings. conversationId is required for conversation, contactId for contact. App must be in foreground; opening does not modify data or send a message.',
   };

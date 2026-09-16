@@ -33,7 +33,9 @@ String? toolInlineDetail(
     'runSkill' ||
     'createSkill' ||
     'updateSkill' ||
-    'deleteSkill' => request['name'],
+    'deleteSkill' ||
+    'installSkill' ||
+    'uninstallSkill' => request['name'],
     'executeAndroidScript' => request['purpose'],
     'createScheduledTask' || 'updateScheduledTask' => request['title'],
     'inputUiText' => request['text'],

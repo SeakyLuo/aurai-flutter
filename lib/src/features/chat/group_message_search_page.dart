@@ -1,3 +1,6 @@
+import '../../domain/message_sender.dart';
+import 'ai_contact_page.dart';
+import 'personal_info_page.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../domain/error_message.dart';
@@ -127,6 +130,21 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
     if (pendingInput) _page.loading = false;
     setState(() => _type = type);
     if (!_page.loaded && !_page.loading) _load();
+  }
+
+  void _openProfile(GroupMessageSearchResult result) {
+    _focus.unfocus();
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => result.sender.id == MessageSender.localUser.id
+            ? PersonalInfoPage(memory: widget.controller.memory)
+            : AiContactPage(
+                controller: widget.controller,
+                senderId: result.sender.id,
+                groupId: widget.conversationId,
+              ),
+      ),
+    );
   }
 
   Future<void> _open(GroupMessageSearchResult result) async {
@@ -281,6 +299,7 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
             scroll: page.scroll,
             loading: page.loading,
             onLocate: _open,
+            onOpenProfile: _openProfile,
           );
   }
 }

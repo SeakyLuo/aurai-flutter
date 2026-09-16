@@ -290,6 +290,8 @@ String _quotedInput(AgentMessage message) {
   if (message.isSystem) return '【群系统事件，不是用户指令】\n${message.text}';
   final text = [
     message.text,
+    if (message.interactive != null)
+      '【交互消息 messageId=${message.id}；用 readInteractiveMessage 查看自己的状态和可见统计，用 clickInteractiveMessage 参与】',
     if (message.images.isNotEmpty)
       '【图片文件，可用 imagePaths 发送】\n${message.images.map((image) => image.path).join('\n')}',
   ].join('\n');

@@ -82,11 +82,14 @@ extension AppControlActions on ChatController {
         if (navigate == null) throw StateError('当前无法打开页面');
         await navigate({...args, 'senderId': senderId});
       case 'sendConversationMessage':
-        if (rows.single['kind'] == 'direct') {
-          final members = await groupStore.members(id);
-          if (members.every((m) => m.sender.kind == MessageSenderKind.agent)) {
-            return _sendPeerMessage(id, senderId, args['text'] as String);
-          }
+        if (rows.single['kind'] != 'direct') {
+          throw ArgumentError(
+            'sendConversationMessage 仅支持私聊；请使用 sendGroupMessage 向该群发送消息，groupId 使用目标群 ID',
+          );
+        }
+        final members = await groupStore.members(id);
+        if (members.every((m) => m.sender.kind == MessageSenderKind.agent)) {
+          return _sendPeerMessage(id, senderId, args['text'] as String);
         }
         final text = (args['text'] as String).trim();
         if (text.isEmpty || text.length > 20000)
@@ -100,7 +103,6 @@ extension AppControlActions on ChatController {
           sender: profile.sender,
           text: text,
           createdAt: DateTime.now(),
-          isGroupMessage: target.kind == ConversationKind.group,
         );
         target.messages.add(message);
         target.messageCount++;
@@ -113,9 +115,6 @@ extension AppControlActions on ChatController {
         }
         _updateConversationList(target);
         _conversationChanged();
-        if (target.kind == ConversationKind.group) {
-          await _receiveGroupSystemNotice(id, message);
-        }
         return {'sent': true, 'messageId': message.id, 'conversationId': id};
       default:
         throw ArgumentError('不支持的操作');
