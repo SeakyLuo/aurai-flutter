@@ -30,6 +30,17 @@ class InteractionContent extends StatelessWidget {
     final collecting = view['phase'] == 'collecting' && view['closed'] != true;
     final choosing = collecting && (!submitted || editing);
     final self = view['self'] as Map?;
+    final status = view['closed'] == true || view['phase'] == 'closed'
+        ? '已结束'
+        : view['completed'] == true
+        ? '本轮已完成'
+        : submitted
+        ? (view['revealed'] == true
+              ? '已提交：${self!['label']}'
+              : '已提交：${self!['label']}，等待其他参与者')
+        : eligible
+        ? null
+        : '等待本轮参与者提交';
     final actions = buttons
         .where(
           (button) => button['action'] == 'nextRound'
@@ -63,26 +74,20 @@ class InteractionContent extends StatelessWidget {
                 ),
               },
             ),
-        Text(
-          view['closed'] == true || view['phase'] == 'closed'
-              ? '已结束'
-              : view['completed'] == true
-              ? '本轮已完成'
-              : submitted
-              ? (view['revealed'] == true
-                    ? '已提交：${self!['label']}'
-                    : '已提交：${self!['label']}，等待其他参与者')
-              : eligible
-              ? '请选择'
-              : '等待本轮参与者提交',
-          style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
-        ),
+        if (status != null)
+          Text(
+            status,
+            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+          ),
         if (view['revealed'] == true && view['summaryVisible'] != true)
           Text(
             '统计尚未公开',
             style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
           ),
-        if (actions.isNotEmpty) const SizedBox(height: 12),
+        if (actions.isNotEmpty &&
+            (status != null ||
+                (view['revealed'] == true && view['summaryVisible'] != true)))
+          const SizedBox(height: 12),
         for (final (index, button) in actions.indexed) ...[
           if (index > 0) const SizedBox(height: 8),
           InteractiveMessageButton(

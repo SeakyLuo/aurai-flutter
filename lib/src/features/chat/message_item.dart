@@ -52,6 +52,7 @@ class MessageItem extends StatefulWidget {
     this.onQuote,
     this.onRecall,
     this.onInteractiveClick,
+    this.onInteractiveRetry,
     this.htmlGameView,
     this.onLocate,
     this.onOpenQuote,
@@ -68,6 +69,7 @@ class MessageItem extends StatefulWidget {
     int participantRevision,
   )?
   onInteractiveClick;
+  final Future<InteractiveMessage> Function(String)? onInteractiveRetry;
   final ValueChanged<AgentMessage>? onQuote;
   final Future<void> Function(AgentMessage)? onRecall;
   final ValueChanged<String>? onOpenQuote;
@@ -255,7 +257,10 @@ class _MessageItemState extends State<MessageItem> {
       position: position,
       allowEditing: widget.onEdit != null,
       allowStatistics:
-          snapshot.interactive != null &&
+          snapshot.interactive
+                  ?.viewFor(MessageSender.localUser.id)
+                  .showStatistics ==
+              true &&
           (!widget.readOnly || widget.onLocate != null),
       allowHistory: hasHistory,
       allowQuote: widget.onQuote != null,
@@ -564,6 +569,7 @@ class _MessageItemState extends State<MessageItem> {
               historical: page?.snapshot != null,
               readOnly: widget.readOnly || page?.snapshot != null,
               onClick: widget.onInteractiveClick!,
+              onRetry: widget.onInteractiveRetry,
               onOpenLink: (url) => _openLink(context, url),
             ),
           )

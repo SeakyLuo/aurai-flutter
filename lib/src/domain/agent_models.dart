@@ -280,6 +280,7 @@ String _defaultToolTitle(String name) => switch (name) {
   'readExecutionLogs' => '读取执行日志',
   'clickInteractiveMessage' => '参与交互消息',
   'readInteractiveMessage' => '读取交互消息',
+  'retryInteractiveCallback' => '重试交互处理',
   'updateInteractiveMessage' => '更新交互消息',
   'createConversation' => '新建会话',
   'renameConversation' => '重命名会话',

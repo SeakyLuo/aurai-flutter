@@ -160,7 +160,7 @@ List<ChatTimelineEntry> buildChatTimeline(
       ChatTimelineEntry(
         'creation:${conversation.id}',
         (context) => Padding(
-          padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
+          padding: const EdgeInsets.fromLTRB(28, 24, 28, 12),
           child: Column(
             children: [
               Text(
@@ -176,7 +176,7 @@ List<ChatTimelineEntry> buildChatTimeline(
                   !visibleMessages.any(
                     (m) => m.id == 'group-created:${conversation.id}',
                   )) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 24),
                 Text(
                   conversation.creationMessage!,
                   textAlign: TextAlign.center,
@@ -201,12 +201,7 @@ List<ChatTimelineEntry> buildChatTimeline(
         ChatTimelineEntry(
           'time:${message.id}',
           (context) => Padding(
-            padding: EdgeInsets.fromLTRB(
-              18,
-              12,
-              18,
-              conversation.kind == ConversationKind.group ? 0 : 12,
-            ),
+            padding: const EdgeInsets.fromLTRB(18, 24, 18, 12),
             child: Center(
               child: Text(
                 messageTime(message.createdAt),
@@ -253,6 +248,8 @@ List<ChatTimelineEntry> buildChatTimeline(
                     conversationId: conversation.id,
                     store: controller.htmlGames,
                   ),
+            onInteractiveRetry: (eventId) =>
+                controller.retryInteractiveCallback(message.id, eventId),
             onInteractiveClick: (button, revision, participantRevision) =>
                 controller.clickInteractiveMessage(
                   message.id,

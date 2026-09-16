@@ -14,12 +14,25 @@ import '../memory/memory_controller.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 31,
+  version: 32,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion >= 25 && oldVersion < 32) {
+      await db.execute(
+        'ALTER TABLE message_callbacks ADD COLUMN actor_id TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE message_callbacks ADD COLUMN participant_revision INTEGER',
+      );
+      await db.execute(
+        "ALTER TABLE message_callbacks ADD COLUMN status TEXT NOT NULL DEFAULT 'legacy'",
+      );
+      await db.execute('DROP INDEX message_callbacks_pending');
+      await db.execute(messageCallbackIndex);
+    }
     if (oldVersion >= 28 && oldVersion < 30) {
       await db.execute(
         'ALTER TABLE interactive_actions ADD COLUMN before_json TEXT',

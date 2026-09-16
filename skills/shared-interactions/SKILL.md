@@ -288,3 +288,14 @@ participation.visibility 控制个人选择；summaryVisibility 控制汇总，�
 给玩法扩展计分时，把稳定的参与者 ID 对应分数放在 initial，结算时更新，别放进 roundInitial。多人猜拳需先定义三种出招同时出现时如何处理，不能把两人规则直接当成多人规则。报名容量、自动定时结束和自由文本输入也不能只靠文案宣称已实现。
 
 固定轮数自动结束目前没有内建保证：例如“三轮猜拳”，第三轮结算后 nextRound 仍可点击；作者需要随后更新 closed，不能只改文案就承诺自动止于三轮。reveal=onComplete 在收集阶段会隐藏整个共享 state，所以示例保留累计轮数，但只在结算后展示。
+
+
+## 点击后由 AI 处理
+
+按钮设置 notifyAi=true 后，应用先保存这次操作，再向创建者派发回调。触发者看到等待状态，自己的卡片按钮暂时锁定；其他参与者仍能操作。纯本地规则和固定结果不必开启回调。
+
+收到 requiresResult=true 的事件后，处理结果用 updateInteractiveMessage 返回：提供 messageId、当前 revision、callbackEventId=eventId，以及 title/body/buttons。结果仅替换触发者在原卡片上的呈现；此调用不带 interaction/participation/states。即使内容无需变化，也要提交该呈现以确认完成，单独发一句聊天文字不能结束等待。
+
+回调完成和结果写回在同一事务中保存；同一事件重复完成不会再次覆盖。失败后用 retryInteractiveCallback(messageId, callbackEventId) 重试自己的事件，或由用户点击卡片重试；不要再次调用原按钮来重试。下一轮或共享定义已更新时，旧回调会失效，读取最新状态继续。
+
+重试复用同一事件，不重复按钮的本地计票或状态变化。AI 执行的外部工具不因此自动获得幂等性：若之前已取得随机结果或完成外部操作，复用已有结果，不要重新抽取或重复执行。模型结束但没有提交卡片结果，仍视为未完成。

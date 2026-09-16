@@ -14,11 +14,13 @@ class InteractiveMessageView extends StatefulWidget {
     this.readOnly = false,
     this.titleTrailing,
     this.historical = false,
+    this.onRetry,
   });
   final InteractiveMessage card;
   final String actorId;
   final bool readOnly;
   final bool historical;
+  final Future<InteractiveMessage> Function(String eventId)? onRetry;
   final Widget? titleTrailing;
   final Future<InteractiveClickResult?> Function(
     String buttonId,
@@ -52,7 +54,17 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         (next.revision == _card.revision &&
             next.participantRevision(widget.actorId) >=
                 _card.participantRevision(widget.actorId) &&
-            next.sessionVersion >= _card.sessionVersion)) {
+            next.sessionVersion >= _card.sessionVersion &&
+            (next.participantRevision(widget.actorId) >
+                    _card.participantRevision(widget.actorId) ||
+                ((next.participants[widget.actorId]?['callback']
+                                as Map?)?['updatedAt']
+                            as int? ??
+                        0) >=
+                    ((_card.participants[widget.actorId]?['callback']
+                                as Map?)?['updatedAt']
+                            as int? ??
+                        0)))) {
       if (next.shared &&
           (next.engine.phase != 'collecting' ||
               (_card.shared && next.engine.round != _card.engine.round))) {
@@ -96,11 +108,39 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
     }
   }
 
+  Future<void> _retry(String eventId) async {
+    if (_busy != null) return;
+    setState(() => _busy = eventId);
+    try {
+      final card = await widget.onRetry!(eventId);
+      if (mounted)
+        setState(() {
+          _acceptCard(card);
+          _editing = false;
+        });
+    } on Object catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final card = _card.viewFor(widget.actorId);
     final selected = _card.participants[widget.actorId];
+    final callback = selected?['callback'] as Map?;
+    final callbackStatus = callback?['status'];
+    final callbackLocked = ['queued', 'processing'].contains(callbackStatus);
+    final canRetry =
+        !widget.readOnly &&
+        !widget.historical &&
+        _card.snapshotView == null &&
+        widget.onRetry != null;
     final sharedView = widget.historical
         ? _card.snapshotView
         : _card.hasInteraction
@@ -151,6 +191,49 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
             ),
           ],
+          if (callbackLocked || callbackStatus == 'failed') ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (callbackLocked && !widget.historical) ...[
+                  const SizedBox.square(
+                    dimension: 12,
+                    child: CircularProgressIndicator(strokeWidth: 1.5),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: GestureDetector(
+                    onTap: callbackStatus == 'failed'
+                        ? () => ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(callback!['error'] as String),
+                            ),
+                          )
+                        : null,
+                    child: Text(
+                      callbackStatus == 'queued'
+                          ? '等待 AI 处理'
+                          : callbackStatus == 'processing'
+                          ? 'AI 正在处理'
+                          : '处理未完成',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+                if (callbackStatus == 'failed' && canRetry)
+                  TextButton(
+                    onPressed: _busy == null
+                        ? () => _retry(callback!['id'] as String)
+                        : null,
+                    child: const Text('重试'),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
           if (sharedView != null)
             InteractionContent(
@@ -159,6 +242,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               buttons: card.buttons,
               readOnly:
                   widget.readOnly ||
+                  callbackLocked ||
                   widget.historical ||
                   _card.snapshotView != null,
               allowChange: _card.hasInteraction && _card.engine.allowChange,
@@ -179,7 +263,11 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               InteractiveMessageButton(
                 button: button,
                 busy: _busy == button['id'],
-                locked: _busy != null || widget.readOnly || card.closed,
+                locked:
+                    _busy != null ||
+                    widget.readOnly ||
+                    card.closed ||
+                    callbackLocked,
                 onPressed: () => _click(button),
               ),
             ],
