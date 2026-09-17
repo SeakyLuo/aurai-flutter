@@ -1,6 +1,35 @@
 part of 'chat_controller.dart';
 
 extension ModelConfigActions on ChatController {
+  Future<void> saveDefaultModel(
+    ModelPurpose purpose,
+    DefaultModelSelection selection,
+  ) async {
+    final next = ModelSettings(
+      activeService: purpose == ModelPurpose.text
+          ? selection.service
+          : modelSettings.activeService,
+      profiles: modelSettings.profiles,
+      systemPrompt: modelSettings.systemPrompt,
+      customInstructions: modelSettings.customInstructions,
+      responsePreferences: modelSettings.responsePreferences,
+      modelDefaults: {...modelSettings.modelDefaults, purpose: selection},
+    );
+    final encrypted = await _platform.encryptModelSettings(next);
+    await _store.database.rawInsert(
+      'INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+      ['encrypted_model_config', encrypted],
+    );
+    modelSettings = next;
+    final config = next.activeConfig;
+    groupStore.defaultSelection = AiModelSelection(
+      provider: config.service,
+      model: config.model,
+      baseUrl: config.baseUrl,
+    );
+    _conversationChanged();
+  }
+
   Future<void> saveConfig(
     ModelConfig newConfig, {
     String? senderId,
@@ -17,6 +46,7 @@ extension ModelConfigActions on ChatController {
       systemPrompt: modelSettings.systemPrompt,
       customInstructions: modelSettings.customInstructions,
       responsePreferences: modelSettings.responsePreferences,
+      modelDefaults: modelSettings.modelDefaults,
     );
     final encrypted = await _platform.encryptModelSettings(nextSettings);
     final updatedAi = await _store.database.transaction((txn) async {
@@ -33,17 +63,17 @@ extension ModelConfigActions on ChatController {
           where: 'id = ?',
           whereArgs: [senderId],
         );
-        updated =
-            AiProfile.fromRows(
-              MessageSender.fromRow(senders.single),
-              profiles.single,
-            ).copyWith(
-              modelSelection: AiModelSelection(
-                provider: newConfig.service,
-                model: newConfig.model,
-                baseUrl: newConfig.baseUrl,
-              ),
-            );
+        final old = AiProfile.fromRows(
+          MessageSender.fromRow(senders.single),
+          profiles.single,
+        );
+        updated = old.copyWith(
+          modelSelection: AiModelSelection(
+            provider: newConfig.service,
+            model: newConfig.model,
+            baseUrl: newConfig.baseUrl,
+          ),
+        );
         await txn.update(
           'ai_profiles',
           {
@@ -70,6 +100,7 @@ extension ModelConfigActions on ChatController {
       baseUrl: defaultConfig.baseUrl,
     );
     if (updatedAi != null) _applySavedAi(updatedAi);
+    _refreshGroupModelConfigs();
     _conversationChanged();
   }
 }

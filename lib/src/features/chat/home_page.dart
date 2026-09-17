@@ -1,10 +1,9 @@
-import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import 'chat_controller.dart';
 import 'recent_chats_page.dart';
-import 'home_drawer.dart';
-import 'drawer_drag_region.dart';
+import 'ai_contacts_page.dart';
 import 'settings_page.dart';
+import 'home_tab_bar.dart';
 
 final homeRouteObserver = RouteObserver<PageRoute<dynamic>>();
 
@@ -17,7 +16,9 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with RouteAware {
   final _recentKey = GlobalKey<RecentChatsPageState>();
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
+  int _tab = 0;
+  final _pages = PageController();
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -28,56 +29,86 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   @override
-  void didPopNext() {
-    _recentKey.currentState?.reload();
-  }
+  void didPopNext() => _recentKey.currentState?.reload();
 
   @override
   void dispose() {
+    _pages.dispose();
     homeRouteObserver.unsubscribe(this);
     super.dispose();
   }
 
+  void _select(int tab) {
+    if (_tab == tab) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    _pages.animateToPage(
+      tab,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeInOutCubic,
+    );
+  }
+
+  void _pageChanged(int tab) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _tab = tab);
+    if (tab == 0) _recentKey.currentState?.reload();
+  }
+
   @override
   Widget build(BuildContext context) => PopScope(
-    canPop: false,
+    canPop: _tab == 0,
     onPopInvokedWithResult: (didPop, result) {
-      if (didPop) return;
-      if (_scaffoldKey.currentState!.isDrawerOpen) {
-        _scaffoldKey.currentState!.closeDrawer();
-        return;
-      }
-      Navigator.of(context).push<void>(
-        MaterialPageRoute(
-          builder: (_) => SettingsPage(
-            controller: widget.controller,
-            preparingGoal: () => false,
-          ),
-        ),
-      );
+      if (!didPop && _tab != 0) _select(0);
     },
     child: Scaffold(
-      key: _scaffoldKey,
-      drawer: HomeDrawer(controller: widget.controller),
-      onDrawerChanged: (opened) async {
-        if (!opened) return;
-        try {
-          await widget.controller.refreshConversations();
-        } on Object catch (error) {
-          if (mounted)
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('会话加载失败，请重试：${errorMessage(error)}')),
-            );
-        }
-      },
-      body: DrawerDragRegion(
-        onOpen: () => _scaffoldKey.currentState!.openDrawer(),
-        builder: (_) => RecentChatsPage(
-          key: _recentKey,
-          controller: widget.controller,
-          onOpenMenu: () => _scaffoldKey.currentState!.openDrawer(),
-        ),
+      extendBody: true,
+      body: PageView(
+        controller: _pages,
+        onPageChanged: _pageChanged,
+        children: [
+          _HomeTabPage(
+            child: RecentChatsPage(
+              key: _recentKey,
+              controller: widget.controller,
+            ),
+          ),
+          _HomeTabPage(
+            child: AiContactsPage(controller: widget.controller, root: true),
+          ),
+          _HomeTabPage(
+            child: SettingsPage(
+              controller: widget.controller,
+              preparingGoal: () => false,
+              root: true,
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: HomeTabBar(
+        selected: _tab,
+        pages: _pages,
+        onSelected: _select,
       ),
     ),
   );
+}
+
+class _HomeTabPage extends StatefulWidget {
+  const _HomeTabPage({required this.child});
+  final Widget child;
+
+  @override
+  State<_HomeTabPage> createState() => _HomeTabPageState();
+}
+
+class _HomeTabPageState extends State<_HomeTabPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
 }

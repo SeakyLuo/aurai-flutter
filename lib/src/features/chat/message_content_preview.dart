@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import 'html_message_preview.dart';
-import 'dart:io';
+import '../../platform/svg_image.dart';
 import 'package:flutter/material.dart';
 import '../../domain/message_image.dart';
 import '../../domain/message_file.dart';
@@ -80,13 +80,14 @@ class MessageContentPreview extends StatelessWidget {
                   else
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.file(
-                        File(image.path),
+                      child: Image(
+                        image: ResizeImage.resizeIfNeeded(
+                          (64 * MediaQuery.devicePixelRatioOf(context)).round(),
+                          null,
+                          localImageProvider(image.path),
+                        ),
                         width: 64,
                         height: 64,
-                        cacheWidth:
-                            (64 * MediaQuery.devicePixelRatioOf(context))
-                                .round(),
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) => const SizedBox.square(
                           dimension: 64,

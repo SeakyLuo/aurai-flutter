@@ -1,3 +1,4 @@
+import 'chat_header_background.dart';
 import '../../domain/error_message.dart';
 import 'conversation_more.dart';
 import 'conversation_icon.dart';
@@ -17,9 +18,29 @@ import 'settings_icon.dart';
 import 'settings_page.dart';
 import 'sidebar_action_icon.dart';
 
-class HomeDrawer extends StatelessWidget {
+class HomeDrawer extends StatefulWidget {
   const HomeDrawer({super.key, required this.controller});
   final ChatController controller;
+
+  @override
+  State<HomeDrawer> createState() => _HomeDrawerState();
+}
+
+class _HomeDrawerState extends State<HomeDrawer> {
+  final _scroll = ScrollController();
+  ChatController get controller => widget.controller;
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _scrollToTop() => _scroll.animateTo(
+    0,
+    duration: const Duration(milliseconds: 300),
+    curve: Curves.easeOutCubic,
+  );
 
   void _open(BuildContext context, Widget page) {
     final navigator = Navigator.of(context);
@@ -44,14 +65,23 @@ class HomeDrawer extends StatelessWidget {
                 Expanded(
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: Image.asset(
-                      'assets/branding/wordmark_white.png',
-                      width: 144,
-                      height: 48,
-                      fit: BoxFit.contain,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      colorBlendMode: BlendMode.srcIn,
-                      semanticLabel: 'Aurai',
+                    child: Semantics(
+                      button: true,
+                      label: 'Aurai，回到顶部',
+                      excludeSemantics: true,
+                      child: InkWell(
+                        onTap: _scrollToTop,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.asset(
+                          'assets/branding/wordmark_white.png',
+                          width: 144,
+                          height: 48,
+                          fit: BoxFit.contain,
+                          color: Theme.of(context).colorScheme.onSurface,
+                          colorBlendMode: BlendMode.srcIn,
+                          semanticLabel: 'Aurai',
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -73,128 +103,165 @@ class HomeDrawer extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: ListenableBuilder(
-              listenable: controller,
-              builder: (context, _) {
-                final conversations = controller.conversations
-                    .where(
-                      (item) =>
-                          item.kind == ConversationKind.group || !item.isEmpty,
-                    )
-                    .toList();
-                return PaginationListener(
-                  hasMore: controller.hasMoreConversations,
-                  loadMore: controller.loadMoreConversations,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    itemCount: conversations.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == 0)
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _entry(
-                              '通讯录',
-                              const SettingsIcon(
-                                type: SettingsIconType.contacts,
-                              ),
-                              () => _open(
-                                context,
-                                AiContactsPage(controller: controller),
-                              ),
-                            ),
-                            _entry(
-                              '定时任务',
-                              const SettingsIcon(type: SettingsIconType.tasks),
-                              () {
-                                Scaffold.of(context).closeDrawer();
-                                openScheduledTasks(context, controller);
-                              },
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                              child: Text(
-                                '会话列表',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                            if (conversations.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.all(12),
-                                child: Text('暂无会话'),
-                              ),
-                          ],
-                        );
-                      return _conversation(context, conversations[index - 1]);
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-            child: Row(
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Expanded(
-                  child: ListenableBuilder(
-                    listenable: controller.memory,
-                    builder: (context, _) => InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () => _open(
-                        context,
-                        PersonalInfoPage(memory: controller.memory),
+                ListenableBuilder(
+                  listenable: controller,
+                  builder: (context, _) {
+                    final conversations = controller.conversations
+                        .where(
+                          (item) =>
+                              item.kind == ConversationKind.group ||
+                              !item.isEmpty,
+                        )
+                        .toList();
+                    return PaginationListener(
+                      hasMore: controller.hasMoreConversations,
+                      loadMore: controller.loadMoreConversations,
+                      child: ListView.builder(
+                        controller: _scroll,
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 72),
+                        itemCount: conversations.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == 0)
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _entry(
+                                  '通讯录',
+                                  const SettingsIcon(
+                                    type: SettingsIconType.contacts,
+                                  ),
+                                  () => _open(
+                                    context,
+                                    AiContactsPage(controller: controller),
+                                  ),
+                                ),
+                                _entry(
+                                  '定时任务',
+                                  const SettingsIcon(
+                                    type: SettingsIconType.tasks,
+                                  ),
+                                  () {
+                                    Scaffold.of(context).closeDrawer();
+                                    openScheduledTasks(context, controller);
+                                  },
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    12,
+                                    12,
+                                    12,
+                                    8,
+                                  ),
+                                  child: Text(
+                                    '会话列表',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                                if (conversations.isEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: Text('暂无会话'),
+                                  ),
+                              ],
+                            );
+                          return _conversation(
+                            context,
+                            conversations[index - 1],
+                          );
+                        },
                       ),
-                      child: Padding(
+                    );
+                  },
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Stack(
+                    children: [
+                      const Positioned.fill(
+                        child: IgnorePointer(
+                          child: RotatedBox(
+                            quarterTurns: 2,
+                            child: ChatHeaderBackground(surfaceOpacity: .8),
+                          ),
+                        ),
+                      ),
+                      Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 10,
+                          horizontal: 16,
+                          vertical: 4,
                         ),
                         child: Row(
                           children: [
-                            ProfileAvatar(
-                              style: controller.memory.avatar,
-                              name: controller.memory.nickname,
-                              size: 36,
+                            Expanded(
+                              child: ListenableBuilder(
+                                listenable: controller.memory,
+                                builder: (context, _) => InkWell(
+                                  borderRadius: BorderRadius.circular(16),
+                                  onTap: () => _open(
+                                    context,
+                                    PersonalInfoPage(memory: controller.memory),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 10,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        ProfileAvatar(
+                                          style: controller.memory.avatar,
+                                          name: controller.memory.nickname,
+                                          size: 36,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            controller.memory.nickname.isEmpty
+                                                ? '个人信息'
+                                                : controller.memory.nickname,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                controller.memory.nickname.isEmpty
-                                    ? '个人信息'
-                                    : controller.memory.nickname,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
+                            SettingsGlassAction(
+                              label: '设置',
+                              icon: Icons.settings_outlined,
+                              iconWidget: const SidebarActionIcon(
+                                type: SidebarActionIconType.settings,
+                              ),
+                              onPressed: () => _open(
+                                context,
+                                SettingsPage(
+                                  controller: controller,
+                                  preparingGoal: () => false,
                                 ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SettingsGlassAction(
-                  label: '设置',
-                  icon: Icons.settings_outlined,
-                  iconWidget: const SidebarActionIcon(
-                    type: SidebarActionIconType.settings,
-                  ),
-                  onPressed: () => _open(
-                    context,
-                    SettingsPage(
-                      controller: controller,
-                      preparingGoal: () => false,
-                    ),
+                    ],
                   ),
                 ),
               ],

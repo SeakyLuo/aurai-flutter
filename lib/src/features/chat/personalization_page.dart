@@ -76,6 +76,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
           customInstructions: _instructions.text,
           responses: _preferences,
           screenAccess: _profile.preferences.screenAccess,
+          reasoning: _profile.preferences.reasoning,
         ),
       );
       await widget.controller.saveAi(next);

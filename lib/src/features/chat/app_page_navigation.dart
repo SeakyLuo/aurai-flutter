@@ -1,3 +1,4 @@
+import 'image_generation_settings_page.dart';
 import 'package:flutter/material.dart';
 import '../../skills/skills_page.dart';
 import '../../scheduling/tasks_page.dart';
@@ -52,6 +53,7 @@ Future<void> navigateAppPage(
     return;
   }
   final page = switch (args['page']) {
+    'imageGeneration' => ImageGenerationSettingsPage(controller: controller),
     'contact' => AiContactPage(
       controller: controller,
       senderId: args['contactId'] as String,

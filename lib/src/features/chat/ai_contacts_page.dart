@@ -236,8 +236,8 @@ class _AiContactsPageState extends State<AiContactsPage> {
       titleWidget: widget.selectForConversation
           ? null
           : Builder(
-              builder: (anchor) => InkWell(
-                borderRadius: BorderRadius.circular(16),
+              builder: (anchor) => GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () async {
                   final box = anchor.findRenderObject()! as RenderBox;
                   final selected = await showTaskChoiceMenu(
@@ -336,7 +336,12 @@ class _AiContactsPageState extends State<AiContactsPage> {
                   hasMore: _more,
                   loadMore: _load,
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: EdgeInsets.fromLTRB(
+                      12,
+                      0,
+                      12,
+                      MediaQuery.paddingOf(context).bottom + 16,
+                    ),
                     itemCount: _items.length,
                     itemBuilder: (context, index) {
                       final ai = _items[index];

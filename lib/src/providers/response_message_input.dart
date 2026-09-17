@@ -1,3 +1,4 @@
+import '../platform/svg_image.dart';
 import 'model_image_input.dart';
 import '../domain/error_message.dart';
 import 'dart:convert';
@@ -47,10 +48,11 @@ Future<List<List<Map<String, Object?>>>> responseMessageInput(
     for (final image
         in supportsImages ? message.images : const <MessageImage>[]) {
       try {
-        final bytes = await File(image.path).readAsBytes();
+        final vision = await readVisionImage(File(image.path), image.mimeType);
         content.add({
           'type': 'input_image',
-          'image_url': 'data:${image.mimeType};base64,${base64Encode(bytes)}',
+          'image_url':
+              'data:${vision.mimeType};base64,${base64Encode(vision.bytes)}',
           'detail': 'auto',
         });
       } on FileSystemException catch (error) {

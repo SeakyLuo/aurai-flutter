@@ -3,7 +3,11 @@ import 'dart:convert';
 import '../domain/model_provider.dart';
 
 /// Adapt the shared conversation representation to Chat Completions.
-Map<String, Object?> chatCompletionsBody(Map<String, Object?> body) {
+Map<String, Object?> chatCompletionsBody(
+  Map<String, Object?> body, {
+  bool supportsTools = true,
+  bool openRouter = false,
+}) {
   final messages = <Map<String, Object?>>[
     if (body['instructions'] case final String instructions)
       {'role': 'system', 'content': instructions},
@@ -28,6 +32,7 @@ Map<String, Object?> chatCompletionsBody(Map<String, Object?> body) {
         // Responses-only reasoning items are not Chat Completions messages.
         continue;
       case 'function_call':
+        if (!supportsTools) continue;
         flushImages();
         if (messages.isEmpty || messages.last['role'] != 'assistant') {
           messages.add({'role': 'assistant', 'content': ''});
@@ -59,8 +64,8 @@ Map<String, Object?> chatCompletionsBody(Map<String, Object?> body) {
           );
         }
         messages.add({
-          'role': 'tool',
-          'tool_call_id': item['call_id'],
+          'role': supportsTools ? 'tool' : 'user',
+          if (supportsTools) 'tool_call_id': item['call_id'],
           'content': text,
         });
       default:
@@ -92,7 +97,9 @@ Map<String, Object?> chatCompletionsBody(Map<String, Object?> body) {
                             : part['text'],
                       },
                 ],
-          if (item['reasoning_content'] != null)
+          if (openRouter && item['reasoning_details'] != null)
+            'reasoning_details': item['reasoning_details'],
+          if (!openRouter && item['reasoning_content'] != null)
             'reasoning_content': item['reasoning_content'],
         });
     }
@@ -103,9 +110,11 @@ Map<String, Object?> chatCompletionsBody(Map<String, Object?> body) {
     'model': body['model'],
     'stream': true,
     'messages': messages,
+    for (final key in ['reasoning', 'thinking', 'enable_thinking'])
+      if (body.containsKey(key)) key: body[key],
     if (body['max_output_tokens'] != null)
       'max_tokens': body['max_output_tokens'],
-    if (tools.isNotEmpty) ...{
+    if (supportsTools && tools.isNotEmpty) ...{
       'tools': [
         for (final tool in tools)
           {
@@ -136,6 +145,7 @@ Future<Map<String, Object?>> readChatCompletionsStream(
 }) async {
   final text = StringBuffer(), reasoning = StringBuffer();
   final calls = <int, Map<String, Object?>>{};
+  final reasoningDetails = <Map<String, Object?>>[];
   String? id, finish;
   Map? usage;
   var started = false, processing = false;
@@ -162,7 +172,13 @@ Future<Map<String, Object?>> readChatCompletionsStream(
         processing = true;
         onProcessingStarted?.call();
       }
-      final reasoningChunk = delta['reasoning_content'] as String? ?? '';
+      final reasoningChunk =
+          delta['reasoning_content'] as String? ??
+          delta['reasoning'] as String? ??
+          '';
+      for (final detail in (delta['reasoning_details'] as List? ?? const [])) {
+        reasoningDetails.add(Map<String, Object?>.from(detail as Map));
+      }
       if (reasoningChunk.isNotEmpty) {
         reasoning.write(reasoningChunk);
         onReasoningChanged?.call(reasoning.toString());
@@ -237,11 +253,15 @@ Future<Map<String, Object?>> readChatCompletionsStream(
         'total_tokens': usage!['total_tokens'],
       },
     'output': [
-      if (text.isNotEmpty || reasoning.isNotEmpty)
+      if (text.isNotEmpty ||
+          reasoning.isNotEmpty ||
+          reasoningDetails.isNotEmpty)
         {
           'type': 'message',
           'role': 'assistant',
           if (reasoning.isNotEmpty) 'reasoning_content': reasoning.toString(),
+          if (reasoningDetails.isNotEmpty)
+            'reasoning_details': reasoningDetails,
           'content': [
             if (text.isNotEmpty)
               {'type': 'output_text', 'text': text.toString()},

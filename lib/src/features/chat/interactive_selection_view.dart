@@ -10,13 +10,13 @@ class InteractiveSelectionView extends StatefulWidget {
     required this.self,
     required this.locked,
     required this.submitted,
-    required this.editing,
+    required this.allowChange,
     required this.busy,
     required this.onSubmit,
   });
   final Map<String, Object?> button;
   final Map? self;
-  final bool locked, submitted, editing, busy;
+  final bool locked, submitted, allowChange, busy;
   final ValueChanged<Object> onSubmit;
 
   @override
@@ -40,8 +40,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
     super.didUpdateWidget(oldWidget);
     if (jsonEncode(oldWidget.button['selection']) !=
             jsonEncode(widget.button['selection']) ||
-        jsonEncode(oldWidget.self) != jsonEncode(widget.self) ||
-        oldWidget.editing != widget.editing) {
+        jsonEncode(oldWidget.self) != jsonEncode(widget.self)) {
       _selected = _saved;
     }
   }
@@ -54,7 +53,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
         widget.locked ||
         widget.button['disabled'] == true ||
         widget.busy ||
-        widget.submitted && !widget.editing;
+        widget.submitted && !widget.allowChange;
     final valid =
         _selected.length >= config.minimum &&
         _selected.length <= config.maximum;
@@ -95,9 +94,9 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
                 inMutuallyExclusiveGroup: !config.multiple,
                 enabled: enabled,
                 label: option['label'] as String,
-                child: InkWell(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: enabled ? toggle : null,
-                  borderRadius: BorderRadius.circular(10),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Row(
@@ -111,7 +110,11 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
                               multiple: config.multiple,
                               selected: selected,
                               color: selected
-                                  ? colors.primary
+                                  ? Color.lerp(
+                                      colors.primary,
+                                      colors.onSurface,
+                                      .35,
+                                    )!
                                   : colors.onSurfaceVariant,
                             ),
                           ),
@@ -122,6 +125,9 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
                             option['label'] as String,
                             style: TextStyle(
                               fontSize: 15,
+                              fontWeight: selected
+                                  ? FontWeight.w500
+                                  : FontWeight.w400,
                               height: 1.5,
                               color: enabled || selected
                                   ? colors.onSurface
@@ -141,7 +147,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
           button: {
             ...widget.button,
             if (!valid && !widget.submitted) 'label': '请选择后提交',
-            if (widget.submitted && !widget.editing)
+            if (widget.submitted && !widget.allowChange)
               'label':
                   widget.button['completedLabel'] ?? widget.button['label'],
           },
@@ -196,7 +202,7 @@ class _ChoicePainter extends CustomPainter {
     } else {
       canvas.drawCircle(const Offset(11, 11), 9, pen);
       if (selected)
-        canvas.drawCircle(const Offset(11, 11), 4.5, Paint()..color = color);
+        canvas.drawCircle(const Offset(11, 11), 5.5, Paint()..color = color);
     }
   }
 

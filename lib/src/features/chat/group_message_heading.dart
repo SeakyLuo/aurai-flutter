@@ -1,3 +1,4 @@
+import 'task_failure_icon.dart';
 import 'interactive_message_paging.dart';
 import 'package:flutter/material.dart';
 import '../../domain/message_sender.dart';
@@ -11,6 +12,7 @@ class GroupMessageHeading extends StatelessWidget {
     required this.onOpenProfile,
     this.onMention,
     this.showName = true,
+    this.isFailure = false,
   });
   static const leftInset = 12.0;
   static const rightInset = 18.0;
@@ -19,6 +21,7 @@ class GroupMessageHeading extends StatelessWidget {
   static const contentInset = leftInset + avatarSize + avatarGap + rightInset;
 
   final bool showName;
+  final bool isFailure;
   final MessageSender sender;
   final Widget child;
   final VoidCallback onOpenProfile;
@@ -59,6 +62,10 @@ class GroupMessageHeading extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (isFailure) ...[
+                      const SizedBox(width: 8),
+                      const TaskFailureIcon(size: 14),
+                    ],
                     if (InteractivePageScope.of(context)?.control
                         case final control?)
                       control,

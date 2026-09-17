@@ -1,3 +1,6 @@
+import '../../scheduling/tasks_page.dart';
+import 'settings_icon.dart';
+import 'conversation_search_page.dart';
 import 'conversation_status_dot.dart';
 import '../../domain/error_message.dart';
 import 'ai_contacts_page.dart';
@@ -22,13 +25,8 @@ import 'settings_appearance.dart';
 import 'sidebar_action_icon.dart';
 
 class RecentChatsPage extends StatefulWidget {
-  const RecentChatsPage({
-    super.key,
-    required this.controller,
-    required this.onOpenMenu,
-  });
+  const RecentChatsPage({super.key, required this.controller});
   final ChatController controller;
-  final VoidCallback onOpenMenu;
   @override
   State<RecentChatsPage> createState() => RecentChatsPageState();
 }
@@ -164,9 +162,18 @@ class RecentChatsPageState extends State<RecentChatsPage> {
       onBack: null,
       root: true,
       leadingAction: SettingsGlassAction(
-        label: '打开侧边栏',
-        icon: Icons.menu_rounded,
-        onPressed: widget.onOpenMenu,
+        label: '搜索会话',
+        icon: Icons.search_rounded,
+        iconWidget: const SidebarActionIcon(type: SidebarActionIconType.search),
+        onPressed: () => Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ConversationSearchPage(
+              controller: widget.controller,
+              preparingGoal: () => false,
+            ),
+          ),
+        ),
       ),
       actions: [
         Builder(
@@ -177,27 +184,37 @@ class RecentChatsPageState extends State<RecentChatsPage> {
               type: SidebarActionIconType.add,
             ),
             onPressed: () async {
+              final iconColor =
+                  Theme.of(buttonContext).brightness == Brightness.dark
+                  ? Theme.of(buttonContext).colorScheme.onSurfaceVariant
+                  : const Color(0xff222222);
               final action = await showHeaderActionMenu(
                 buttonContext,
                 items: [
                   (
                     value: 'conversation',
                     label: '发起会话',
-                    icon: const ConversationIcon(),
+                    icon: ConversationIcon(color: iconColor),
                   ),
                   (
                     value: 'temporary',
                     label: '发起临时会话',
-                    icon: const ConversationIcon(temporary: true),
+                    icon: ConversationIcon(temporary: true, color: iconColor),
                   ),
                   (
                     value: 'group',
                     label: '发起群聊',
                     icon: SidebarActionIcon(
                       type: SidebarActionIconType.group,
-                      color: Theme.of(
-                        buttonContext,
-                      ).colorScheme.onSurfaceVariant,
+                      color: iconColor,
+                    ),
+                  ),
+                  (
+                    value: 'tasks',
+                    label: '定时任务',
+                    icon: SettingsIcon(
+                      type: SettingsIconType.tasks,
+                      color: iconColor,
                     ),
                   ),
                 ],
@@ -209,6 +226,8 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                 await _temporaryConversation();
               } else if (action == 'group') {
                 await _group();
+              } else if (action == 'tasks') {
+                await openScheduledTasks(context, widget.controller);
               }
             },
           ),
@@ -229,7 +248,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                 12,
                 MediaQuery.paddingOf(context).top + 76 + 8,
                 12,
-                24,
+                MediaQuery.paddingOf(context).bottom + 24,
               ),
               children: [
                 if (_loaded && _items.isEmpty)

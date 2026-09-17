@@ -19,11 +19,9 @@ class OpenAiResponsesProvider implements ModelProvider {
   }) : _transport = ResponsesTransport(config),
        _summaryTransport = ResponsesTransport(summaryConfig ?? config),
        _context = ResponsesContext(
-         ModelContextLimits.forModel(config.model),
-         summaryLimits: ModelContextLimits.forModel(
-           (summaryConfig ?? config).model,
-         ),
-         supportsImages: modelSupportsImageInput(config.model),
+         ModelContextLimits.forConfig(config),
+         summaryLimits: ModelContextLimits.forConfig(summaryConfig ?? config),
+         supportsImages: configSupportsImageInput(config),
          systemPrompt: systemPrompt ?? agentSystemPrompt,
        );
 

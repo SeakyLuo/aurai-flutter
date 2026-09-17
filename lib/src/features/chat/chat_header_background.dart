@@ -2,7 +2,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 class ChatHeaderBackground extends StatelessWidget {
-  const ChatHeaderBackground({super.key});
+  const ChatHeaderBackground({super.key, this.surfaceOpacity = .65});
+
+  final double surfaceOpacity;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -31,7 +33,9 @@ class ChatHeaderBackground extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Theme.of(context).colorScheme.surface.withValues(alpha: .65),
+                Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: surfaceOpacity),
                 Theme.of(context).colorScheme.surface.withValues(alpha: 0),
               ],
             ),

@@ -130,7 +130,7 @@ class ToolActionIcon extends StatelessWidget {
                 type: SidebarActionIconType.search,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-              'searchImages' => const ToolSemanticIcon(
+              'searchImages' || 'generateImage' => const ToolSemanticIcon(
                 type: ToolSemanticIconType.imageSearch,
               ),
               'findApps' => const ToolSemanticIcon(

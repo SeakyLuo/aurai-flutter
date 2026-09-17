@@ -58,6 +58,7 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
               controller: widget.controller,
               service: service,
               accountOnly: widget.accountOnly,
+              credentialsOnly: widget.accountOnly,
             ),
           ),
         ) ??
@@ -88,7 +89,10 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
             if (!didPop) _leave();
           },
           child: Scaffold(
-            appBar: SettingsAppBar(title: '模型设置', onBack: _leave),
+            appBar: SettingsAppBar(
+              title: widget.accountOnly ? '模型供应商' : '选择模型',
+              onBack: _leave,
+            ),
             body: SafeArea(
               top: false,
               child: Center(
@@ -98,7 +102,9 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                     listenable: widget.controller,
                     builder: (context, _) => ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                      itemCount: ModelService.values.length,
+                      itemCount:
+                          ModelService.values.length +
+                          (widget.accountOnly ? 0 : 1),
                       separatorBuilder: (_, index) =>
                           const SizedBox(height: 10),
                       itemBuilder: (context, index) {
@@ -118,7 +124,9 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                             title: Text(service.label),
                             subtitle: Text(
                               profile.isConfigured
-                                  ? modelDisplayName(profile.model)
+                                  ? (widget.accountOnly
+                                        ? '已配置'
+                                        : modelDisplayName(profile.model))
                                   : '未配置',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -126,7 +134,8 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (settings.activeService == service) ...[
+                                if (!widget.accountOnly &&
+                                    settings.activeService == service) ...[
                                   Text(
                                     '默认',
                                     style: TextStyle(

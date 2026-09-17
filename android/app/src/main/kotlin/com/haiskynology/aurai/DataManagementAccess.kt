@@ -105,7 +105,14 @@ class DataManagementAccess(private val context: Context, messenger: BinaryMessen
                     try { DocumentsContract.deleteDocument(context.contentResolver, uri) } catch (cleanup: Exception) { error.addSuppressed(cleanup) }
                     throw error
                 }.also {
-                    check(context.getSharedPreferences("data_management", 0).edit().putLong("last_export_at", System.currentTimeMillis()).commit()) { "备份文件已保存，但无法记录导出时间" }
+                    // The exported file is the success boundary; this timestamp is metadata.
+                    try {
+                        if (!context.getSharedPreferences("data_management", 0).edit().putLong("last_export_at", System.currentTimeMillis()).commit()) {
+                            android.util.Log.w("AuraiBackup", "Backup exported; timestamp could not be saved")
+                        }
+                    } catch (error: Exception) {
+                        android.util.Log.w("AuraiBackup", "Backup exported; timestamp could not be saved", error)
+                    }
                 }
             } else {
                 inspected = false

@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:image_picker/image_picker.dart';
-import 'package:mime/mime.dart';
+import 'svg_image.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../domain/message_image.dart';
@@ -68,15 +68,20 @@ class MessageImageStore {
           throw const ImageInputException('图片过大，请选择小于 10 MB 的图片');
         }
         final bytes = await file.readAsBytes();
-        final mimeType = lookupMimeType('', headerBytes: bytes);
+        final mimeType = imageBytesMime(bytes);
         final extension = switch (mimeType) {
           'image/jpeg' => 'jpg',
           'image/png' => 'png',
           'image/webp' => 'webp',
-          _ => throw const ImageInputException('请选择 JPG、PNG 或 WebP 图片'),
+          'image/svg+xml' => 'svg',
+          _ => throw const ImageInputException('请选择 JPG、PNG、WebP 或 SVG 图片'),
         };
-        final codec = await ui.instantiateImageCodec(bytes, targetWidth: 1);
-        codec.dispose();
+        if (mimeType == 'image/svg+xml') {
+          await validateSvg(bytes);
+        } else {
+          final codec = await ui.instantiateImageCodec(bytes, targetWidth: 1);
+          codec.dispose();
+        }
         final path =
             '$directory/${DateTime.now().microsecondsSinceEpoch}.$extension';
         await File(path).writeAsBytes(bytes, flush: true);

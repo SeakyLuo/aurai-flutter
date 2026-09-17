@@ -1,3 +1,4 @@
+import '../../providers/openrouter_models.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import '../../domain/model_provider.dart';
@@ -8,6 +9,7 @@ import 'delete_confirmation_dialog.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'model_balance_tile.dart';
+import 'model_reasoning_field.dart';
 
 class ModelProviderDetail extends StatefulWidget {
   const ModelProviderDetail({
@@ -15,10 +17,12 @@ class ModelProviderDetail extends StatefulWidget {
     required this.controller,
     required this.service,
     required this.accountOnly,
+    this.credentialsOnly = false,
   });
   final ChatController controller;
   final ModelService service;
   final bool accountOnly;
+  final bool credentialsOnly;
   @override
   State<ModelProviderDetail> createState() => _ModelProviderDetailState();
 }
@@ -31,6 +35,8 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
       widget.controller.modelSettings.activeService;
   late ModelService _defaultService = _originalDefault;
   late String _model;
+  late ModelReasoning _reasoning;
+  late ModelReasoning _initialReasoning;
   var _obscure = true;
   var _saving = false;
   var _loading = false;
@@ -41,7 +47,8 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
   bool get _currentDirty =>
       _apiKey != _saved.apiKey ||
       _address.text != _saved.baseUrl ||
-      _model != _saved.model;
+      _model != _saved.model ||
+      _reasoning != _initialReasoning;
   bool get _dirty => _currentDirty || _defaultService != _originalDefault;
 
   @override
@@ -52,6 +59,8 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     _key.text = _saved.apiKey;
     final useConversation = !widget.accountOnly && config.service == _service;
     _model = useConversation ? config.model : _saved.model;
+    _reasoning = _saved.reasoning;
+    _initialReasoning = _reasoning;
     _address.text = useConversation ? config.baseUrl : _saved.baseUrl;
     _key.addListener(_changed);
     _address.addListener(_changed);
@@ -152,33 +161,30 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
                   style: const TextStyle(fontSize: 16),
                   decoration: _fieldDecoration(hint: _service.defaultBaseUrl),
                 ),
-                const SizedBox(height: 32),
-                const _Label('使用的模型'),
-                _ModelChoice(
-                  label: modelDisplayName(_model),
-                  loading: _loading,
-                  onTap: _locked ? null : _selectModel,
-                ),
-                const SizedBox(height: 12),
-                Material(
-                  color: settingsFieldColor(context),
-                  borderRadius: BorderRadius.circular(26),
-                  clipBehavior: Clip.antiAlias,
-                  child: SwitchListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 18),
-                    title: const Text('设为默认', style: TextStyle(fontSize: 16)),
-                    value: _defaultService == _service,
-                    onChanged:
-                        _locked ||
-                            (_service == _originalDefault &&
-                                _defaultService == _originalDefault)
-                        ? null
-                        : (value) => setState(() {
-                            _defaultService = value
-                                ? _service
-                                : _originalDefault;
-                          }),
+                if (!widget.accountOnly && !widget.credentialsOnly) ...[
+                  const SizedBox(height: 32),
+                  const _Label('使用的模型'),
+                  _ModelChoice(
+                    label: _service == ModelService.openRouter
+                        ? OpenRouterModels.lookup(
+                                _address.text.trim(),
+                                _model,
+                              )?.name ??
+                              _model
+                        : modelDisplayName(_model),
+                    loading: _loading,
+                    onTap: _locked ? null : _selectModel,
                   ),
+                ],
+                ModelReasoningField(
+                  service: _service,
+                  model: _model,
+                  baseUrl: _address.text.trim(),
+                  value: _reasoning,
+                  providerDefault: true,
+                  onChanged: _locked
+                      ? null
+                      : (value) => setState(() => _reasoning = value),
                 ),
                 if (_saved.isConfigured) ...[
                   const SizedBox(height: 32),
@@ -232,11 +238,18 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
       selected: _model,
       choices: [
         for (final model in models)
-          (value: model, label: modelDisplayName(model)),
+          (
+            value: model,
+            label: _service == ModelService.openRouter
+                ? OpenRouterModels.lookup(_address.text.trim(), model)!.name
+                : modelDisplayName(model),
+          ),
       ],
     );
     if (!mounted || model == null || model == _model) return;
-    setState(() => _model = model);
+    setState(() {
+      _model = model;
+    });
   }
 
   Future<bool> _discardChanges() async =>
@@ -278,7 +291,11 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     final catalog = ModelCatalog();
     _catalog = catalog;
     try {
-      final models = await catalog.load(baseUrl: uri, apiKey: _apiKey);
+      final models = await catalog.load(
+        baseUrl: uri,
+        apiKey: _apiKey,
+        openRouter: _service == ModelService.openRouter,
+      );
       if (!mounted) return null;
       if (models.isEmpty) {
         _notice('服务没有返回模型，已保留当前选择');
@@ -300,22 +317,33 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
   Future<void> _save() async {
     final uri = _validatedAddress();
     if (uri == null) return;
+    if (!widget.accountOnly && _service == ModelService.openRouter) {
+      final models = await _fetchModels();
+      if (!mounted || models == null) return;
+      if (!models.contains(_model)) {
+        _notice('该模型当前不可用，请重新选择模型');
+        return;
+      }
+    }
     setState(() => _saving = true);
     try {
       await widget.controller.saveConfig(
         ModelConfig(
           service: _service,
           apiKey: _apiKey,
-          model: _model,
+          model: widget.credentialsOnly ? _saved.model : _model,
           baseUrl: uri.toString(),
+          reasoning: _reasoning,
         ),
-        defaultService: _defaultService,
-        senderId: widget.accountOnly
+        defaultService: widget.credentialsOnly
+            ? widget.controller.modelSettings.activeService
+            : _defaultService,
+        senderId: widget.accountOnly || widget.credentialsOnly
             ? null
             : widget.controller.activeConversation.defaultSenderId,
       );
       if (!mounted) return;
-      _notice('模型配置已保存');
+      _notice(widget.credentialsOnly ? '服务商配置已保存' : '模型配置已保存');
       setState(() => _allowPop = true);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) Navigator.pop(context, true);

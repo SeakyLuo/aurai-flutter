@@ -1,3 +1,7 @@
+import 'model_defaults.dart';
+export 'model_defaults.dart';
+import 'model_reasoning.dart';
+export 'model_reasoning.dart';
 import 'dart:convert';
 import 'response_preferences.dart';
 export 'response_preferences.dart';
@@ -6,10 +10,11 @@ import 'context_summary.dart';
 import 'capability.dart';
 import 'tool_models.dart';
 
-enum ModelService { openAi, deepSeek, qwen, kimi, glm }
+enum ModelService { openAi, deepSeek, qwen, kimi, glm, openRouter }
 
 extension ModelServiceDetails on ModelService {
   bool get usesChatCompletions =>
+      this == ModelService.openRouter ||
       this == ModelService.qwen ||
       this == ModelService.kimi ||
       this == ModelService.glm;
@@ -19,6 +24,7 @@ extension ModelServiceDetails on ModelService {
     ModelService.qwen => '千问',
     ModelService.kimi => 'Kimi',
     ModelService.glm => 'GLM',
+    ModelService.openRouter => 'OpenRouter',
   };
 
   String get defaultModel => switch (this) {
@@ -27,6 +33,7 @@ extension ModelServiceDetails on ModelService {
     ModelService.qwen => 'qwen-plus',
     ModelService.kimi => 'kimi-k2.6',
     ModelService.glm => 'glm-4.7',
+    ModelService.openRouter => 'openai/gpt-5.6-sol',
   };
 
   String get defaultBaseUrl => switch (this) {
@@ -35,6 +42,7 @@ extension ModelServiceDetails on ModelService {
     ModelService.qwen => 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     ModelService.kimi => 'https://api.moonshot.cn/v1',
     ModelService.glm => 'https://open.bigmodel.cn/api/paas/v4',
+    ModelService.openRouter => 'https://openrouter.ai/api/v1',
   };
 }
 
@@ -44,6 +52,7 @@ class ModelConfig {
     this.service = ModelService.openAi,
     required this.model,
     required this.baseUrl,
+    this.reasoning = ModelReasoning.automatic,
   });
 
   factory ModelConfig.defaults(ModelService service, {String apiKey = ''}) =>
@@ -58,6 +67,7 @@ class ModelConfig {
   final String apiKey;
   final String model;
   final String baseUrl;
+  final ModelReasoning reasoning;
 
   bool get isConfigured => apiKey.isNotEmpty;
 
@@ -66,6 +76,7 @@ class ModelConfig {
     'apiKey': apiKey,
     'model': model,
     'baseUrl': baseUrl,
+    'reasoning': reasoning.name,
   };
 
   factory ModelConfig.fromJson(Map<String, Object?> json) => ModelConfig(
@@ -73,6 +84,9 @@ class ModelConfig {
     apiKey: json['apiKey']! as String,
     model: json['model']! as String,
     baseUrl: json['baseUrl']! as String,
+    reasoning: ModelReasoning.values.byName(
+      json['reasoning'] as String? ?? 'automatic',
+    ),
   );
 }
 
@@ -83,6 +97,7 @@ class ModelSettings {
     this.systemPrompt,
     this.customInstructions = '',
     this.responsePreferences = const ResponsePreferences(),
+    this.modelDefaults = const {},
   });
 
   factory ModelSettings.defaults({String openAiApiKey = ''}) => ModelSettings(
@@ -99,13 +114,28 @@ class ModelSettings {
     },
   );
 
+  final Map<ModelPurpose, DefaultModelSelection> modelDefaults;
   final ModelService activeService;
   final Map<ModelService, ModelConfig> profiles;
   final String? systemPrompt;
   final String customInstructions;
   final ResponsePreferences responsePreferences;
 
-  ModelConfig get activeConfig => profiles[activeService]!;
+  ModelConfig get activeConfig =>
+      configFor(ModelPurpose.text) ?? profiles[activeService]!;
+
+  ModelConfig? configFor(ModelPurpose purpose) {
+    final selection = modelDefaults[purpose];
+    if (selection == null) return null;
+    final account = profile(selection.service);
+    return ModelConfig(
+      service: selection.service,
+      apiKey: account.apiKey,
+      model: selection.model,
+      baseUrl: account.baseUrl,
+      reasoning: account.reasoning,
+    );
+  }
 
   ModelConfig profile(ModelService service) => profiles[service]!;
 
@@ -119,10 +149,15 @@ class ModelSettings {
         systemPrompt: systemPrompt,
         customInstructions: customInstructions,
         responsePreferences: responsePreferences,
+        modelDefaults: modelDefaults,
       );
 
   Map<String, Object?> toJson() => <String, Object?>{
     'activeService': activeService.name,
+    'modelDefaults': {
+      for (final entry in modelDefaults.entries)
+        entry.key.name: entry.value.toJson(),
+    },
     'systemPrompt': systemPrompt,
     'customInstructions': customInstructions,
     'responsePreferences': responsePreferences.toJson(),
@@ -140,6 +175,14 @@ class ModelSettings {
     final rawProfiles = (json['profiles']! as Map<Object?, Object?>)
         .cast<String, Object?>();
     return ModelSettings(
+      modelDefaults: {
+        for (final entry in (json['modelDefaults'] as Map? ?? const {}).entries)
+          ModelPurpose.values.byName(
+            entry.key as String,
+          ): DefaultModelSelection.fromJson(
+            Map<String, dynamic>.from(entry.value as Map),
+          ),
+      },
       systemPrompt: json['systemPrompt'] as String?,
       customInstructions: json['customInstructions'] as String? ?? '',
       responsePreferences: json['responsePreferences'] == null
@@ -169,6 +212,7 @@ ModelService _serviceFromStored(String value) => switch (value) {
   'qwen' => ModelService.qwen,
   'kimi' => ModelService.kimi,
   'glm' => ModelService.glm,
+  'openRouter' => ModelService.openRouter,
   _ => throw FormatException('Unknown model service: $value'),
 };
 

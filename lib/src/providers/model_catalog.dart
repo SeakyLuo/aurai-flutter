@@ -1,3 +1,4 @@
+import 'openrouter_models.dart';
 import '../domain/error_message.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -11,9 +12,16 @@ class ModelCatalog {
   Future<List<String>> load({
     required Uri baseUrl,
     required String apiKey,
+    bool openRouter = false,
+    bool textOnly = true,
   }) async {
     try {
-      return await _load(baseUrl, apiKey).timeout(const Duration(seconds: 20));
+      return await _load(
+        baseUrl,
+        apiKey,
+        openRouter,
+        textOnly,
+      ).timeout(const Duration(seconds: 20));
     } on TimeoutException catch (error) {
       throw ModelProviderException('获取模型超时，请检查网络后重试', detail: error.toString());
     } on SocketException catch (error) {
@@ -31,7 +39,12 @@ class ModelCatalog {
     }
   }
 
-  Future<List<String>> _load(Uri baseUrl, String apiKey) async {
+  Future<List<String>> _load(
+    Uri baseUrl,
+    String apiKey,
+    bool openRouter,
+    bool textOnly,
+  ) async {
     final path = baseUrl.path.endsWith('/')
         ? '${baseUrl.path}models'
         : '${baseUrl.path}/models';
@@ -49,9 +62,19 @@ class ModelCatalog {
     }
     final body = await utf8.decoder.bind(response).join();
     final json = jsonDecode(body) as Map<String, dynamic>;
+    final entries = (json['data'] as List)
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+    if (openRouter) await OpenRouterModels.save(baseUrl.toString(), entries);
     final models =
-        (json['data'] as List<dynamic>)
-            .map((item) => (item as Map<String, dynamic>)['id'] as String)
+        entries
+            .where(
+              (entry) =>
+                  !openRouter ||
+                  !textOnly ||
+                  OpenRouterModelInfo(entry).supportsText,
+            )
+            .map((entry) => entry['id'] as String)
             .toSet()
             .toList()
           ..sort();

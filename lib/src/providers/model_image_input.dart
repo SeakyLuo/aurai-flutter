@@ -1,3 +1,5 @@
+import '../domain/model_provider.dart';
+import 'openrouter_models.dart';
 import 'dart:convert';
 
 /// GLM text variants are distinct from the GLM-*V vision models.
@@ -41,3 +43,7 @@ List<Object?> _textOnlyParts(List parts) => [
   for (final part in parts)
     if ((part as Map)['type'] == 'input_image') imagePlaceholder() else part,
 ];
+
+bool configSupportsImageInput(ModelConfig config) =>
+    OpenRouterModels.forConfig(config)?.supportsImages ??
+    modelSupportsImageInput(config.model);

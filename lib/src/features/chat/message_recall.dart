@@ -220,6 +220,7 @@ extension MessageRecall on ChatController {
             whereArgs: ['context_summary:${conversation.id}'],
           );
         });
+        _store.writer.invalidateHistory(conversation.id);
         final copies = <Conversation>{
           conversation,
           if (activeConversation.id == conversation.id) activeConversation,
@@ -242,6 +243,7 @@ extension MessageRecall on ChatController {
             copy.draftQuote = _recalledQuote(copy.draftQuote!);
           }
           copy.contextSummary = null;
+          copy.sharedContext = null;
         }
         if (live) _replaceRecalled(dispatcher.history, message.id, notice);
         _store.writer.remember([notice]);

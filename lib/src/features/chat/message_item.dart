@@ -14,7 +14,6 @@ import 'image_forward_page.dart';
 import 'group_mention_text.dart';
 import 'interactive_message_view.dart';
 import 'group_message_heading.dart';
-import 'task_failure_icon.dart';
 import 'message_quote_view.dart';
 import 'image_action_scope.dart';
 import 'file_attachments.dart';
@@ -587,23 +586,7 @@ class _MessageItemState extends State<MessageItem> {
             onLongPress: _openActions,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: message.isFailure
-                  ? Text.rich(
-                      TextSpan(
-                        children: [
-                          const WidgetSpan(
-                            alignment: PlaceholderAlignment.middle,
-                            child: Padding(
-                              padding: EdgeInsets.only(right: 6),
-                              child: TaskFailureIcon(size: 14),
-                            ),
-                          ),
-                          TextSpan(text: message.text),
-                        ],
-                      ),
-                      style: body,
-                    )
-                  : content,
+              child: content,
             ),
           ),
         ),

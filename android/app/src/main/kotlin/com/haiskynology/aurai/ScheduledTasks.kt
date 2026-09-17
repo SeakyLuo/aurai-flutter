@@ -59,16 +59,15 @@ object ScheduledTasks {
                         val task = pendingId?.let(tasks::get)
                         if (task != null && task.getString("state") == "starting") {
                             if (args["busy"] == true) {
-                                task.put("state", "scheduled")
-                                arm(task, System.currentTimeMillis() + 60_000)
-                                pendingId = null
+                                val deferred = JSONObject(task.toString()).put("state", "scheduled")
+                                commitTask(deferred, null)
+                                syncAlarm(deferred, System.currentTimeMillis() + 60_000)
                                 AgentSessionService.finish(context, "cancelled", "", "", "")
-                                persist()
                                 null
                             } else {
-                                task.put("state", "running")
-                                persist()
-                                map(task)
+                                val running = JSONObject(task.toString()).put("state", "running")
+                                commitTask(running)
+                                map(running)
                             }
                         } else null
                     }
@@ -86,10 +85,60 @@ object ScheduledTasks {
     private fun map(task: JSONObject): Map<String, Any?> = task.keys().asSequence().associateWith {
         if (task.isNull(it)) null else task.get(it)
     }
+    private fun changed() {
+        try { channel.invokeMethod("changed", null) }
+        catch (error: Exception) { android.util.Log.w("AuraiSchedule", "Task committed; UI notification failed", error) }
+    }
+
+    private fun commitTasks(next: Map<String, JSONObject>, pending: String? = pendingId) {
+        check(context.getSharedPreferences("scheduled_tasks", 0).edit()
+            .putString("tasks", JSONArray(next.values.toList()).toString()).commit()) { "无法保存任务" }
+        tasks.clear()
+        tasks.putAll(next)
+        pendingId = pending
+        changed()
+    }
+
+    private fun commitTask(task: JSONObject, pending: String? = pendingId) {
+        val next = LinkedHashMap(tasks).apply { put(task.getString("id"), task) }
+        commitTasks(next, pending)
+    }
+
+    private fun cancelAlarm(id: String) {
+        alarmRetries.remove(id)?.let(alarmHandler::removeCallbacks)
+        try { alarms().cancel(intent(id)) }
+        catch (error: Exception) {
+            // A stale broadcast is harmless: due() rechecks the committed state.
+            android.util.Log.w("AuraiSchedule", "Task disabled; old alarm could not be cancelled", error)
+        }
+    }
+
+    private val alarmHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val alarmRetries = mutableMapOf<String, Runnable>()
+
+    // Persisted scheduled state is the intent. Restart recovery and this retry
+    // converge the system alarm without replaying the task that just completed.
+    private fun syncAlarm(task: JSONObject, at: Long = task.getLong("runAt")) {
+        val id = task.getString("id")
+        alarmRetries.remove(id)?.let(alarmHandler::removeCallbacks)
+        try { arm(task, at) }
+        catch (error: Exception) {
+            android.util.Log.w("AuraiSchedule", "Task saved; alarm synchronization will retry", error)
+            val retry = Runnable {
+                alarmRetries.remove(id)
+                if (tasks[id] === task && task.getString("state") == "scheduled") {
+                    syncAlarm(task, maxOf(at, System.currentTimeMillis() + 1000))
+                }
+            }
+            alarmRetries[id] = retry
+            alarmHandler.postDelayed(retry, 60_000)
+        }
+    }
+
     private fun persist() {
         val data = JSONArray(tasks.values.toList()).toString()
         check(context.getSharedPreferences("scheduled_tasks", 0).edit().putString("tasks", data).commit()) { "无法保存任务" }
-        channel.invokeMethod("changed", null)
+        changed()
     }
     private fun intent(id: String) = PendingIntent.getBroadcast(context, 0,
         Intent(context, ScheduledTaskReceiver::class.java).setAction("aurai.SCHEDULED_TASK")
@@ -97,6 +146,7 @@ object ScheduledTasks {
     private fun arm(task: JSONObject, at: Long = task.getLong("runAt")) {
         check(allowed()) { "请先开启准时执行权限" }
         alarms().setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, intent(task.getString("id")))
+        alarmRetries.remove(task.getString("id"))?.let(alarmHandler::removeCallbacks)
     }
     private fun next(task: JSONObject): Boolean {
         val rule = task.getString("rrule")
@@ -121,8 +171,8 @@ object ScheduledTasks {
         if (args["scheduleChanged"] == false) {
             check(old != null) { "任务已不存在" }
             val edited = JSONObject(old.toString()).put("title", title).put("prompt", prompt)
-            tasks[id] = edited
-            try { persist() } catch (error: Exception) { tasks[id] = old; throw error }
+            commitTask(edited)
+            if (edited.getString("state") == "scheduled") syncAlarm(edited)
             return map(edited)
         }
         check(allowed()) { "请先开启准时执行权限" }
@@ -144,95 +194,92 @@ object ScheduledTasks {
         if (key != null) task.put("requestKey", key)
         if (args["sourceConversationId"] != null) task.put("sourceConversationId", args["sourceConversationId"])
         if (args["aiSenderId"] != null) task.put("aiSenderId", args["aiSenderId"])
-        if (task.getString("state") == "scheduled") arm(task)
-        tasks[id] = task
-        try { persist() }
-        catch (error: Exception) {
-            alarms().cancel(intent(id))
-            if (old == null) tasks.remove(id) else {
-                tasks[id] = old
-                if (old.getString("state") == "scheduled") arm(old)
-            }
-            throw error
-        }
+        commitTask(task)
+        if (task.getString("state") == "scheduled") syncAlarm(task) else cancelAlarm(id)
         return map(task)
     }
     private fun manage(args: Map<String, Any?>): Any? {
         val id = args["id"] as String
-        val task = tasks[id] ?: error("任务已不存在")
-        val previous = JSONObject(task.toString())
+        val current = tasks[id] ?: error("任务已不存在")
+        val task = JSONObject(current.toString())
         if (args["action"] == "stop") {
             check(task.getString("state") in activeStates) { "任务当前没有运行" }
             if (task.getString("state") == "starting") {
-                task.put("state", "cancelled").put("lastOutcome", "cancelled")
-                pendingId = null
+                commitTask(JSONObject(task.toString()).put("state", "cancelled").put("lastOutcome", "cancelled"), null)
                 AgentSessionService.finish(context, "cancelled", "", "", "")
-                persist()
             } else AuraiApplication.requestAgentStop()
             return null
         }
         check(task.getString("state") !in activeStates) { "请先停止正在执行的任务" }
         when (args["action"]) {
-            "delete" -> { alarms().cancel(intent(id)); tasks.remove(id) }
-            "pause" -> { alarms().cancel(intent(id)); task.put("state", "paused") }
+            "delete" -> {
+                commitTasks(LinkedHashMap(tasks).apply { remove(id) })
+                cancelAlarm(id)
+            }
+            "pause" -> {
+                task.put("state", "paused")
+                commitTask(task)
+                cancelAlarm(id)
+            }
             "resume" -> {
                 if (task.getLong("runAt") <= System.currentTimeMillis()) {
                     check(next(task)) { "请先修改为未来的执行时间" }
                 }
-                arm(task)
                 task.put("state", "scheduled")
+                commitTask(task)
+                syncAlarm(task)
             }
             else -> error("未知任务操作")
-        }
-        try { persist() }
-        catch (error: Exception) {
-            alarms().cancel(intent(id))
-            tasks[id] = previous
-            if (previous.getString("state") == "scheduled") arm(previous)
-            throw error
         }
         return null
     }
     fun restore() {
+        persist()
         for (task in tasks.values) {
             if (task.getString("state") != "scheduled") continue
-            if (allowed()) arm(task, maxOf(task.getLong("runAt"), System.currentTimeMillis() + 1000))
+            if (allowed()) syncAlarm(task, maxOf(task.getLong("runAt"), System.currentTimeMillis() + 1000))
         }
-        persist()
     }
     fun due(id: String) {
         val task = tasks[id] ?: return
         if (task.getString("state") != "scheduled") return
-        if (AgentSessionService.isRunning || pendingId != null) { arm(task, System.currentTimeMillis() + 60_000); return }
-        task.put("state", "starting")
-        pendingId = id
-        persist()
+        if (task.getLong("runAt") > System.currentTimeMillis()) { syncAlarm(task); return }
+        if (AgentSessionService.isRunning || pendingId != null) { syncAlarm(task, System.currentTimeMillis() + 60_000); return }
+        val starting = JSONObject(task.toString()).put("state", "starting")
+        try { commitTask(starting, id) }
+        catch (error: Exception) {
+            android.util.Log.w("AuraiSchedule", "Task start could not be committed; retrying later", error)
+            syncAlarm(task, System.currentTimeMillis() + 60_000)
+            return
+        }
         try { AgentSessionService.startScheduled(context) }
-        catch (error: Exception) { task.put("state", "failed").put("lastOutcome", "failed"); pendingId = null; persist() }
+        catch (error: Exception) {
+            commitTask(JSONObject(starting.toString()).put("state", "failed").put("lastOutcome", "failed"), null)
+        }
     }
     fun dispatch() { channel.invokeMethod("due", null) }
     fun startupTimedOut() {
         val task = pendingId?.let(tasks::get) ?: return
         if (task.getString("state") == "starting") {
-            task.put("state", "failed").put("lastOutcome", "failed")
-            pendingId = null
-            persist()
+            commitTask(JSONObject(task.toString()).put("state", "failed").put("lastOutcome", "failed"), null)
             AgentSessionService.finish(context, "failed", "", "", "")
         }
     }
     private fun complete(args: Map<String, Any?>) {
-        val task = tasks[args["id"] as String] ?: return
-        if (task.getString("state") !in activeStates) return
+        val previous = tasks[args["id"] as String] ?: return
+        if (previous.getString("state") !in activeStates) return
+        val task = JSONObject(previous.toString())
         val outcome = args["outcome"] as String
         task.put("lastOutcome", outcome).put("lastRunAt", System.currentTimeMillis())
         task.put("conversationId", args["conversationId"])
         task.put("lastError", args["error"])
-        pendingId = null
         if (outcome == "completed" && allowed() && next(task)) {
-            arm(task); task.put("state", "scheduled")
+            task.put("state", "scheduled")
         } else task.put("state", if (task.getString("rrule").isEmpty() || outcome == "completed") outcome else "paused")
-        persist()
+        commitTask(task, null)
+        if (task.getString("state") == "scheduled") syncAlarm(task)
     }
+
 }
 
 class ScheduledTaskReceiver : BroadcastReceiver() {

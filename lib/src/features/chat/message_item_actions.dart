@@ -45,7 +45,6 @@ extension _MessageItemActions on _MessageItemState {
           widget.onQuickReply != null &&
           !widget.streaming &&
           !snapshot.isSystem &&
-          !snapshot.isFailure &&
           !snapshot.isReasoning &&
           snapshot.role == AgentMessageRole.assistant,
       sentQuickReplyKey: snapshot.quickReplies
@@ -97,6 +96,60 @@ extension _MessageItemActions on _MessageItemState {
       case MessageAction.quickWiltedFlower:
       case MessageAction.quickSleep:
       case MessageAction.quickDog:
+      case MessageAction.quickSob:
+      case MessageAction.quickTouched:
+      case MessageAction.quickEyeRoll:
+      case MessageAction.quickMindBlown:
+      case MessageAction.quickSalute:
+      case MessageAction.quickHandshake:
+      case MessageAction.quickPanda:
+      case MessageAction.quickFox:
+      case MessageAction.quickPopcorn:
+      case MessageAction.quickBrain:
+      case MessageAction.quickTrophy:
+      case MessageAction.quickHeartHands:
+      case MessageAction.quickSkull:
+      case MessageAction.quickAlien:
+      case MessageAction.quickSeeNoEvil:
+      case MessageAction.quickShush:
+      case MessageAction.quickZipMouth:
+      case MessageAction.quickYawn:
+      case MessageAction.quickSick:
+      case MessageAction.quickMelting:
+      case MessageAction.quickUpsideDown:
+      case MessageAction.quickWink:
+      case MessageAction.quickWave:
+      case MessageAction.quickFistBump:
+      case MessageAction.quickVictory:
+      case MessageAction.quickPointUp:
+      case MessageAction.quickWriting:
+      case MessageAction.quickFrog:
+      case MessageAction.quickRabbit:
+      case MessageAction.quickBear:
+      case MessageAction.quickTiger:
+      case MessageAction.quickDragon:
+      case MessageAction.quickButterfly:
+      case MessageAction.quickSnail:
+      case MessageAction.quickTurtle:
+      case MessageAction.quickShark:
+      case MessageAction.quickPizza:
+      case MessageAction.quickCake:
+      case MessageAction.quickMilkTea:
+      case MessageAction.quickCheers:
+      case MessageAction.quickSparkles:
+      case MessageAction.quickBomb:
+      case MessageAction.quickGrin:
+      case MessageAction.quickBeaming:
+      case MessageAction.quickRollingLaugh:
+      case MessageAction.quickKiss:
+      case MessageAction.quickPleading:
+      case MessageAction.quickSleepy:
+      case MessageAction.quickProud:
+      case MessageAction.quickScared:
+      case MessageAction.quickNauseated:
+      case MessageAction.quickDrooling:
+      case MessageAction.quickSneezing:
+      case MessageAction.quickPartyFace:
       case MessageAction.quickLike:
       case MessageAction.quickPlusOne:
       case MessageAction.quickDone:

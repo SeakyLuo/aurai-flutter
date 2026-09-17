@@ -56,7 +56,11 @@ class MemoryEditorState extends State<MemoryEditor> {
   Future<void> _commit() async {
     setState(() => busy = true);
     try {
-      await widget.memory.saveEntry(widget.entry?['id'] as String?, text.text);
+      await widget.memory.saveEntry(
+        widget.entry?['id'] as String?,
+        text.text,
+        original: widget.entry,
+      );
       if (!mounted) return;
       memoryToast(context, '记忆已保存');
       _close();

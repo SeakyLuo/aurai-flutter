@@ -143,12 +143,16 @@ ${jsonEncode({'nickname': nickname, 'occupation': occupation, 'about': about, 'm
     notifyListeners();
   }
 
-  Future<void> saveEntry(String? id, String text) async {
+  Future<void> saveEntry(
+    String? id,
+    String text, {
+    required Map<String, Object?>? original,
+  }) async {
     if (text.trim().isEmpty || text.length > 300)
       throw StateError('请填写不超过300字的记忆');
     _invalidate();
     final now = DateTime.now().millisecondsSinceEpoch;
-    await database.transaction((txn) async {
+    await _commitRecords((txn) async {
       if (id == null) {
         await txn.insert('user_memories', {
           'id': newMessageId(),
@@ -163,33 +167,48 @@ ${jsonEncode({'nickname': nickname, 'occupation': occupation, 'about': about, 'm
         final changed = await txn.update(
           'user_memories',
           {'text': text.trim(), 'manual': 1, 'updated_at': now},
-          where: 'id = ? AND $_scopeWhere',
-          whereArgs: [id, ..._scopeArgs],
+          where: 'id = ? AND $_scopeWhere AND updated_at = ? AND text = ?',
+          whereArgs: [
+            id,
+            ..._scopeArgs,
+            original!['updated_at'],
+            original['text'],
+          ],
         );
-        if (changed == 0) throw StateError('这条记忆已删除，请重新添加');
+        if (changed == 0) throw StateError('这条记忆已被修改或删除，请重新打开后编辑');
       }
     });
-    await _reload();
   }
 
   Future<void> deleteEntry(String? id) async {
     _invalidate();
-    await database.delete(
-      'user_memories',
-      where: id == null ? _scopeWhere : 'id = ? AND $_scopeWhere',
-      whereArgs: id == null ? _scopeArgs : [id, ..._scopeArgs],
-    );
-    await _reload();
+    await _commitRecords((txn) async {
+      await txn.delete(
+        'user_memories',
+        where: id == null ? _scopeWhere : 'id = ? AND $_scopeWhere',
+        whereArgs: id == null ? _scopeArgs : [id, ..._scopeArgs],
+      );
+    });
   }
 
-  Future<void> _reload() async {
-    entries = await database.query(
-      'user_memories',
-      where: _scopeWhere,
-      whereArgs: _scopeArgs,
-      orderBy: 'created_at, id',
-    );
+  Future<List<Map<String, Object?>>> _readRecords(DatabaseExecutor db) =>
+      db.query(
+        'user_memories',
+        where: _scopeWhere,
+        whereArgs: _scopeArgs,
+        orderBy: 'created_at, id',
+      );
+
+  Future<List<Map<String, Object?>>> _commitRecords(
+    Future<void> Function(Transaction txn) write,
+  ) async {
+    final next = await database.transaction((txn) async {
+      await write(txn);
+      return _readRecords(txn);
+    });
+    entries = next;
     if (!_disposed) notifyListeners();
+    return next;
   }
 
   void learn(

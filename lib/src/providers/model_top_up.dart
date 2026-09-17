@@ -12,6 +12,7 @@ abstract final class ModelTopUp {
     ModelService.qwen =>
       'https://bailian.console.aliyun.com/cn-beijing/costing-balance/overview',
     ModelService.kimi => 'https://platform.kimi.com',
+    ModelService.openRouter => 'https://openrouter.ai/settings/credits',
     ModelService.glm => 'https://open.bigmodel.cn/finance/overview',
   };
 

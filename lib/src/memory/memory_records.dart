@@ -4,14 +4,18 @@ Map<String, Object?> memoryRecord(Map<String, Object?> entry) => {
   'id': entry['id'],
   'text': entry['text'],
   'manual': entry['manual'] == 1,
-  'createdAt': localIsoTime(DateTime.fromMillisecondsSinceEpoch(
-    entry['created_at'] as int,
-    isUtc: true,
-  )),
-  'updatedAt': localIsoTime(DateTime.fromMillisecondsSinceEpoch(
-    entry['updated_at'] as int,
-    isUtc: true,
-  )),
+  'createdAt': localIsoTime(
+    DateTime.fromMillisecondsSinceEpoch(
+      entry['created_at'] as int,
+      isUtc: true,
+    ),
+  ),
+  'updatedAt': localIsoTime(
+    DateTime.fromMillisecondsSinceEpoch(
+      entry['updated_at'] as int,
+      isUtc: true,
+    ),
+  ),
   'sourceConversationId': entry['source_conversation_id'],
   'sourceMessageId': entry['source_message_id'],
 };
@@ -35,19 +39,25 @@ extension MemoryRecords on MemoryController {
     if (operation != 'delete' && (text!.trim().isEmpty || text.length > 300)) {
       throw StateError('请填写不超过300字的记忆');
     }
-    if (id != null) entryById(id);
+    final original = id == null ? null : entryById(id);
     _invalidate();
     final epoch = revision;
     final recordId = id ?? newMessageId();
     final now = DateTime.now().millisecondsSinceEpoch;
-    await database.transaction((txn) async {
+    final records = await _commitRecords((txn) async {
       if (epoch != revision) throw StateError('记忆已变化，请重新查询后操作');
       if (operation == 'delete') {
-        await txn.delete(
+        final changed = await txn.delete(
           'user_memories',
-          where: 'id = ? AND $_scopeWhere',
-          whereArgs: [recordId, ..._scopeArgs],
+          where: 'id = ? AND $_scopeWhere AND updated_at = ? AND text = ?',
+          whereArgs: [
+            recordId,
+            ..._scopeArgs,
+            original!['updated_at'],
+            original['text'],
+          ],
         );
+        if (changed != 1) throw StateError('记忆已变化，请重新查询后操作');
       } else if (operation == 'create') {
         await txn.insert('user_memories', {
           'id': recordId,
@@ -61,17 +71,27 @@ extension MemoryRecords on MemoryController {
           'updated_at': now,
         });
       } else {
-        await txn.update(
+        final changed = await txn.update(
           'user_memories',
           {'text': text!.trim(), 'manual': 1, 'updated_at': now},
-          where: 'id = ? AND $_scopeWhere',
-          whereArgs: [recordId, ..._scopeArgs],
+          where: 'id = ? AND $_scopeWhere AND updated_at = ? AND text = ?',
+          whereArgs: [
+            recordId,
+            ..._scopeArgs,
+            original!['updated_at'],
+            original['text'],
+          ],
         );
+        if (changed != 1) throw StateError('记忆已变化，请重新查询后操作');
       }
     });
-    await _reload();
     return operation == 'delete'
         ? {'deleted': true}
-        : {'saved': true, 'memory': memoryRecord(entryById(recordId))};
+        : {
+            'saved': true,
+            'memory': memoryRecord(
+              records.singleWhere((row) => row['id'] == recordId),
+            ),
+          };
   }
 }

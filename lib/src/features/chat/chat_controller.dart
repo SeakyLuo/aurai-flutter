@@ -1,3 +1,9 @@
+import '../../platform/svg_image.dart';
+import '../../domain/image_generation_config.dart';
+import '../../providers/image_generation_client.dart';
+import '../../agent/image_generation_tool.dart';
+import '../../providers/openrouter_models.dart';
+import '../../storage/draft_attachment_cleanup.dart';
 import '../../storage/quick_reply_recents.dart';
 import '../../agent/quick_reply_tool.dart';
 import '../../agent/html_app_data_tool.dart';
@@ -117,6 +123,7 @@ part 'global_tools.dart';
 part 'group_reply_context.dart';
 part 'ai_identity_controller.dart';
 part 'group_conversation_run.dart';
+part 'group_member_activity.dart';
 part 'group_message_delivery.dart';
 part 'private_group_message.dart';
 part 'group_private_conversation.dart';
@@ -129,6 +136,7 @@ part 'interactive_message_actions.dart';
 part 'message_callback_actions.dart';
 part 'html_game_actions.dart';
 part 'model_config_actions.dart';
+part 'image_generation_actions.dart';
 part 'image_forwarding.dart';
 part 'draft_attachment_actions.dart';
 part 'conversation_search_navigation.dart';
@@ -245,6 +253,7 @@ class ChatController extends ChangeNotifier {
   List<AgentStep> get steps => activeConversation.steps;
   final List<Capability> capabilities = <Capability>[];
   ModelSettings modelSettings = ModelSettings.defaults();
+  ImageGenerationConfig? imageGeneration;
   ChatRunState get runState => activeConversation.runState;
   set runState(ChatRunState value) => activeConversation.runState = value;
   String? get pendingGoal => activeConversation.pendingGoal;
@@ -338,6 +347,7 @@ class ChatController extends ChangeNotifier {
     await toolApprovals.initialize();
     await navigationState.initialize();
     await ToolCustomizations.initialize();
+    await OpenRouterModels.initialize();
     modelSettings = await _platform.loadModelSettings();
     await refreshCapabilities();
     final activeId = await _store.initialize(
@@ -345,6 +355,7 @@ class ChatController extends ChangeNotifier {
       _platform.loadLegacyAppState,
       _platform.clearLegacyAppState,
     );
+    await _loadImageGeneration();
     groupStore.onSystemNotice = _receiveGroupSystemNotice;
     _platform.notificationAvatar = NotificationAvatar(groupStore).render;
     _memory = MemoryController(_store.database, () => config);
@@ -377,6 +388,7 @@ class ChatController extends ChangeNotifier {
         ? await groupStore.loadAi(activeConversation.defaultSenderId)
         : null;
     await _reloadConversations();
+    await DraftAttachmentCleanup(_store.database, _imageStore.directory).recover();
     _callbackCardChanges = MessageCallbacks.cardChanges.stream.listen((
       updates,
     ) {
@@ -623,6 +635,7 @@ class ChatController extends ChangeNotifier {
         timeoutSeconds: call.confirmationTimeoutSeconds,
       );
     _confirmingSenderId = senderId;
+    notifyListeners();
     final bool approved;
     try {
       final scope = accessibilityAvailable && !definition.singleUseConfirmation
@@ -651,6 +664,7 @@ class ChatController extends ChangeNotifier {
       }
     } finally {
       _confirmingSenderId = null;
+      notifyListeners();
       await _platform.updateAttentionNotification(conversationId, 'approval');
     }
     await _store.runs.resolveApproval(approvalId, approved);

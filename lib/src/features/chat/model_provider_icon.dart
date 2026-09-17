@@ -13,6 +13,7 @@ class ModelProviderIcon extends StatelessWidget {
       ModelService.qwen => 'qwen-color',
       ModelService.kimi => 'kimi-color',
       ModelService.glm => 'zhipu-color',
+      ModelService.openRouter => null,
     };
     return Container(
       width: 44,
@@ -24,10 +25,21 @@ class ModelProviderIcon extends StatelessWidget {
             : Colors.white,
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Image.asset(
-        'assets/providers/$asset.png',
-        excludeFromSemantics: true,
-      ),
+      child: asset == null
+          ? const Center(
+              child: Text(
+                'OR',
+                style: TextStyle(
+                  color: Color(0xff222222),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
+            )
+          : Image.asset(
+              'assets/providers/$asset.png',
+              excludeFromSemantics: true,
+            ),
     );
   }
 }

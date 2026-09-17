@@ -106,9 +106,9 @@ Future<MessageAction?> showMessageActionsMenu(
         if (allowRecall)
           (
             MessageAction.recall,
-            SettingsIcon(
-              type: SettingsIconType.back,
-              color: Theme.of(context).colorScheme.error,
+            ConversationMenuIcon(
+              type: ConversationMenuIconType.recall,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             '撤回',
           ),
