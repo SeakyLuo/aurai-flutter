@@ -121,6 +121,7 @@ part 'message_submission.dart';
 part 'message_quick_replies.dart';
 part 'global_tools.dart';
 part 'group_reply_context.dart';
+part 'group_reply_draft.dart';
 part 'ai_identity_controller.dart';
 part 'group_conversation_run.dart';
 part 'group_member_activity.dart';
@@ -264,6 +265,7 @@ class ChatController extends ChangeNotifier {
   final _queuedSystemNotices = <String, List<AgentMessage>>{};
   bool _systemEventDrainScheduled = false;
   final _groupToolQueue = GroupToolQueue();
+  final groupActivityChanges = ValueNotifier<int>(0);
   final _peerSessions = <String, Future<_PeerSession>>{};
   Iterable<Conversation> get groupRuns =>
       activeConversation.id == runningConversationId
@@ -306,6 +308,7 @@ class ChatController extends ChangeNotifier {
     _accessibilityTimer?.cancel();
     completedReplies.dispose();
     notificationOpenRequests.dispose();
+    groupActivityChanges.dispose();
     super.dispose();
   }
 
@@ -548,8 +551,9 @@ class ChatController extends ChangeNotifier {
 
   Future<List<ConversationSearchResult>> searchConversations(
     String query,
-    int offset,
-  ) => _store.reader.search(query, offset);
+    int offset, {
+    bool includeReasoning = false,
+  }) => _store.reader.search(query, offset, includeReasoning: includeReasoning);
 
   Future<List<AttachmentSearchResult>> searchAttachments(
     String query,

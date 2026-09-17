@@ -51,10 +51,7 @@ class GroupDispatcher {
     }
   }
 
-  void receiveTargeted(
-    List<AgentMessage> messages,
-    Set<String> recipients,
-  ) {
+  void receiveTargeted(List<AgentMessage> messages, Set<String> recipients) {
     history.addAll(messages);
     for (final id in recipients) {
       final mailbox = _members[id];
@@ -86,6 +83,17 @@ class GroupDispatcher {
       mailbox.pending = false;
       mailbox.sleepUntil = null;
     }
+    _finishIfIdle();
+  }
+
+  /// Clear this turn's follow-up work; future messages may wake the member again.
+  void interrupt(String id) {
+    final mailbox = _members[id];
+    if (mailbox == null) return;
+    mailbox.timer?.cancel();
+    mailbox.timer = null;
+    mailbox.pending = false;
+    mailbox.sleepUntil = null;
     _finishIfIdle();
   }
 
@@ -127,6 +135,8 @@ class GroupDispatcher {
   }
 
   bool wokeFromSleep(String id) => _members[id]!.wokeFromSleep;
+
+  bool hasPending(String id) => _members[id]?.pending == true;
 
   void _markPending(_Mailbox mailbox) {
     mailbox.pending = true;

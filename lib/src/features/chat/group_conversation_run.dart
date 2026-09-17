@@ -94,12 +94,16 @@ extension GroupConversationRun on ChatController {
       );
       sessionStarted = true;
       _groupRuns.clear();
+      _execution.groupThoughts.clear();
+      _execution.groupReplyDrafts.clear();
       final dispatcher = GroupDispatcher(
         history: history,
         members: ids,
         paused: paused,
         failed: (id, error) async {
-          if (error is AgentCancelled || _removedGroupMembers.contains(id))
+          if (error is AgentCancelled ||
+              _groupRuns[id]?.runState == ChatRunState.cancelled ||
+              _removedGroupMembers.contains(id))
             return;
           final detail = _groupRuns[id]?.errorDetail ?? errorMessage(error);
           final failure = AgentMessage(
@@ -137,13 +141,23 @@ extension GroupConversationRun on ChatController {
                 ..messageCount = conversation.messageCount
                 ..messages.addAll(conversation.messages);
           _groupRuns[id] = member;
-          await _executeMember(
-            member,
-            reply: reply,
-            groupHistory: snapshot,
-            groupUser: snapshot.last,
-            groupParent: conversation,
-          );
+          try {
+            await _executeMember(
+              member,
+              reply: reply,
+              groupHistory: snapshot,
+              groupUser: snapshot.last,
+              groupParent: conversation,
+            );
+          } finally {
+            // Only hand unfinished text to a turn already queued by new messages.
+            if (_groupDispatcher?.hasPending(id) != true ||
+                member.runState == ChatRunState.cancelled ||
+                member.runState == ChatRunState.stopping ||
+                _removedGroupMembers.contains(id)) {
+              _execution.groupReplyDrafts.remove(id);
+            }
+          }
         },
       );
       _groupDispatcher = dispatcher;
@@ -202,6 +216,8 @@ extension GroupConversationRun on ChatController {
         _groupReplies.clear();
         _groupSenders.clear();
         _groupRuns.clear();
+        _execution.groupThoughts.clear();
+        _execution.groupReplyDrafts.clear();
         _groupRuntimes.clear();
         _groupStreaming.clear();
         await _persistRun(conversation);

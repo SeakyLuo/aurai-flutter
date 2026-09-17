@@ -20,6 +20,7 @@ import 'file_attachments.dart';
 import 'reply_image_syntax.dart';
 import 'reply_image_gallery.dart';
 import 'markdown_link_underlines.dart';
+import 'markdown_code_block.dart';
 import 'cjk_strong_syntax.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -459,6 +460,7 @@ class _MessageItemState extends State<MessageItem> {
                     MemberMentionSyntax(widget.mentionMembers),
                 ],
                 builders: {
+                  'pre': MarkdownCodeBlockBuilder(compact: widget.groupBubble),
                   'member-mention': MemberMentionBuilder(widget.onOpenMember),
                   'reference-gallery': ReplyImageGalleryBuilder(
                     (url) => _openLink(context, url),

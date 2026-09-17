@@ -1,6 +1,6 @@
 enum ModelReasoning {
   inherit('跟随供应商'),
-  automatic('模型默认'),
+  automatic('由模型决定'),
   none('关闭'),
   enabled('开启'),
   minimal('极低'),

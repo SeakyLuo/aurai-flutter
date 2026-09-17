@@ -1,3 +1,5 @@
+import 'mention_tap_region.dart';
+import 'mention_text_controller.dart';
 import 'package:flutter/material.dart';
 
 import 'glass_surface.dart';
@@ -27,6 +29,13 @@ class MessageComposer extends StatelessWidget {
   final Widget? attachments;
   final int? maxLength;
   final ValueChanged<String>? onChanged;
+
+  Widget _mentionTaps(Widget child) => controller is MentionTextController
+      ? MentionTapRegion(
+          controller: controller as MentionTextController,
+          child: child,
+        )
+      : child;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -96,53 +105,64 @@ class MessageComposer extends StatelessWidget {
                               painter.dispose();
                               return Stack(
                                 children: [
-                                  ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      minHeight: 48,
-                                    ),
-                                    child: Align(
-                                      alignment: multiline
-                                          ? Alignment.topCenter
-                                          : Alignment.center,
-                                      heightFactor: 1,
-                                      child: TextField(
-                                        controller: controller,
-                                        focusNode: focusNode,
-                                        enabled: enabled,
-                                        style: style,
-                                        textAlignVertical: multiline
-                                            ? TextAlignVertical.top
-                                            : TextAlignVertical.center,
-                                        minLines: 1,
-                                        maxLines: 5,
-                                        keyboardType: TextInputType.multiline,
-                                        maxLength: maxLength,
-                                        onChanged: onChanged,
-                                        textInputAction:
-                                            TextInputAction.newline,
-                                        decoration: InputDecoration(
-                                          hintText: hintText,
-                                          isDense: true,
-                                          isCollapsed: !multiline,
-                                          hintStyle: style.copyWith(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.onSurfaceVariant,
+                                  AnimatedSize(
+                                    duration:
+                                        MediaQuery.disableAnimationsOf(context)
+                                        ? Duration.zero
+                                        : const Duration(milliseconds: 220),
+                                    curve: Curves.easeInOutCubic,
+                                    alignment: Alignment.topCenter,
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        minHeight: 48,
+                                      ),
+                                      child: Align(
+                                        alignment: multiline
+                                            ? Alignment.topCenter
+                                            : Alignment.center,
+                                        heightFactor: 1,
+                                        child: _mentionTaps(
+                                          TextField(
+                                            controller: controller,
+                                            focusNode: focusNode,
+                                            enabled: enabled,
+                                            style: style,
+                                            textAlignVertical: multiline
+                                                ? TextAlignVertical.top
+                                                : TextAlignVertical.center,
+                                            minLines: 1,
+                                            maxLines: 5,
+                                            keyboardType:
+                                                TextInputType.multiline,
+                                            maxLength: maxLength,
+                                            onChanged: onChanged,
+                                            textInputAction:
+                                                TextInputAction.newline,
+                                            decoration: InputDecoration(
+                                              hintText: hintText,
+                                              isDense: true,
+                                              isCollapsed: !multiline,
+                                              hintStyle: style.copyWith(
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurfaceVariant,
+                                              ),
+                                              counterText: '',
+                                              filled: false,
+                                              border: InputBorder.none,
+                                              enabledBorder: InputBorder.none,
+                                              focusedBorder: InputBorder.none,
+                                              disabledBorder: InputBorder.none,
+                                              contentPadding: multiline
+                                                  ? const EdgeInsets.fromLTRB(
+                                                      16,
+                                                      14,
+                                                      16,
+                                                      56,
+                                                    )
+                                                  : singleLinePadding,
+                                            ),
                                           ),
-                                          counterText: '',
-                                          filled: false,
-                                          border: InputBorder.none,
-                                          enabledBorder: InputBorder.none,
-                                          focusedBorder: InputBorder.none,
-                                          disabledBorder: InputBorder.none,
-                                          contentPadding: multiline
-                                              ? const EdgeInsets.fromLTRB(
-                                                  16,
-                                                  14,
-                                                  16,
-                                                  56,
-                                                )
-                                              : singleLinePadding,
                                         ),
                                       ),
                                     ),

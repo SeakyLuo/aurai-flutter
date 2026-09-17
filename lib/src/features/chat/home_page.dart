@@ -19,6 +19,22 @@ class _HomePageState extends State<HomePage> with RouteAware {
   int _tab = 0;
   final _pages = PageController();
 
+  late final List<Widget> _tabPages = [
+    _HomeTabPage(
+      child: RecentChatsPage(key: _recentKey, controller: widget.controller),
+    ),
+    _HomeTabPage(
+      child: AiContactsPage(controller: widget.controller, root: true),
+    ),
+    _HomeTabPage(
+      child: SettingsPage(
+        controller: widget.controller,
+        preparingGoal: () => false,
+        root: true,
+      ),
+    ),
+  ];
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -51,7 +67,6 @@ class _HomePageState extends State<HomePage> with RouteAware {
   void _pageChanged(int tab) {
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _tab = tab);
-    if (tab == 0) _recentKey.currentState?.reload();
   }
 
   @override
@@ -65,24 +80,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
       body: PageView(
         controller: _pages,
         onPageChanged: _pageChanged,
-        children: [
-          _HomeTabPage(
-            child: RecentChatsPage(
-              key: _recentKey,
-              controller: widget.controller,
-            ),
-          ),
-          _HomeTabPage(
-            child: AiContactsPage(controller: widget.controller, root: true),
-          ),
-          _HomeTabPage(
-            child: SettingsPage(
-              controller: widget.controller,
-              preparingGoal: () => false,
-              root: true,
-            ),
-          ),
-        ],
+        children: _tabPages,
       ),
       bottomNavigationBar: HomeTabBar(
         selected: _tab,
@@ -109,6 +107,6 @@ class _HomeTabPageState extends State<_HomeTabPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return widget.child;
+    return RepaintBoundary(child: widget.child);
   }
 }

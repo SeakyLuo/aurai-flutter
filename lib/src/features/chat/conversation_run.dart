@@ -157,27 +157,16 @@ extension ConversationRun on ChatController {
       );
       if (groupParent != null) {
         tools.removeWhere((t) => t.definition.name == 'sendGroupMessage');
-        Future<DateTime?> scheduleGroupSleep(Duration duration) async {
-          final dispatcher = _groupDispatcher!;
-          final until = duration.isNegative
-              ? null
-              : DateTime.now().add(duration);
-          if (until == null) {
-            await _groupSleeps.remove(groupParent.id, reply.senderId);
-          } else {
-            await _groupSleeps.save(groupParent.id, reply.senderId, until);
-          }
-          if (dispatcher.stopped ||
-              dispatcher.closed ||
-              dispatcher.paused.contains(reply.senderId) ||
-              _removedGroupMembers.contains(reply.senderId)) {
-            await _groupSleeps.remove(groupParent.id, reply.senderId);
-            throw AgentCancelled();
-          }
-          return dispatcher.sleepUntil(reply.senderId, until);
-        }
-
-        tools.add(GroupSleepTool(scheduleGroupSleep));
+        tools.add(
+          GroupSleepTool(
+            (duration) => _scheduleMemberSleep(
+              groupParent,
+              runConversation,
+              reply.senderId,
+              duration,
+            ),
+          ),
+        );
         tools.add(
           GroupMessageTool(
             (arguments) => _deliverGroupMessage(
@@ -262,6 +251,8 @@ extension ConversationRun on ChatController {
                   if (htmlEvents.isNotEmpty) _htmlEventContext(htmlEvents),
                 ], reply.senderId)),
           if (callbackEvents.isNotEmpty) _callbackContext(callbackEvents),
+          if (groupParent != null)
+            if (_takeGroupReplyDraft(reply.senderId) case final draft?) draft,
         ],
         contextSummary: groupHistory == null
             ? runConversation.contextSummary
@@ -360,7 +351,11 @@ extension ConversationRun on ChatController {
           _notifyMember(runConversation, groupParent);
         },
         onReasoningChanged: (text) {
-          if (groupParent != null || text.trim().isEmpty) return;
+          if (text.trim().isEmpty) return;
+          if (groupParent != null) {
+            _recordGroupThought(reply.senderId, runId, turnOrdinal, text);
+            return;
+          }
           if (reasoningMessageId == null) {
             reasoningMessageId = newMessageId();
             runMessageIds.add(reasoningMessageId!);
@@ -412,7 +407,14 @@ extension ConversationRun on ChatController {
           _notifyMember(runConversation, groupParent);
         },
         onTextChanged: (text) {
-          if (groupParent != null || text.trim().isEmpty) return;
+          if (_cacheGroupReplyText(
+            groupParent,
+            runConversation,
+            reply.senderId,
+            text,
+          ))
+            return;
+          if (text.trim().isEmpty) return;
           if (turnMessageId == null) {
             turnMessageId = newMessageId();
             runMessageIds.add(turnMessageId!);

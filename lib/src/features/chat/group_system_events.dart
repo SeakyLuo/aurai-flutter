@@ -64,6 +64,7 @@ extension GroupSystemEvents on ChatController {
         .toList();
     _removedGroupMembers.addAll(removed);
     for (final id in removed) {
+      _execution.groupReplyDrafts.remove(id);
       _groupDispatcher?.remove(id);
       final member = _groupRuns[id];
       if (member != null) member.runState = ChatRunState.stopping;

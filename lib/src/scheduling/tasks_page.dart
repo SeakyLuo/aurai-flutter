@@ -118,6 +118,7 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
       final colors = Theme.of(context).colorScheme;
       final filtered = tasks.tasks.where(_matches).toList();
       return Scaffold(
+        extendBodyBehindAppBar: true,
         extendBody: true,
         resizeToAvoidBottomInset: false,
         bottomNavigationBar: KeyboardInset(
@@ -149,6 +150,7 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
           ),
         ),
         appBar: SettingsAppBar(
+          gradientBackground: true,
           title: '任务',
           onBack: () => Navigator.pop(context),
           actions: [
@@ -171,7 +173,12 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
                 children: [
                   if (!tasks.allowed && tasks.supported)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        MediaQuery.paddingOf(context).top + 76,
+                        16,
+                        8,
+                      ),
                       child: Row(
                         children: [
                           Expanded(
@@ -206,7 +213,9 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
                         : ListView.builder(
                             padding: EdgeInsets.fromLTRB(
                               16,
-                              12,
+                              (!tasks.allowed && tasks.supported)
+                                  ? 12
+                                  : MediaQuery.paddingOf(context).top + 76 + 12,
                               16,
                               MediaQuery.paddingOf(context).bottom + 20,
                             ),

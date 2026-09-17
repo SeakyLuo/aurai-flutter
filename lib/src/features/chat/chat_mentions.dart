@@ -1,6 +1,21 @@
 part of 'chat_page.dart';
 
 extension _ChatMentions on _ChatPageState {
+  void _openDraftMention(String senderId) {
+    _focusNode.unfocus();
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => senderId == MessageSender.localUser.id
+            ? PersonalInfoPage(memory: widget.controller.memory)
+            : AiContactPage(
+                controller: widget.controller,
+                senderId: senderId,
+                groupId: widget.controller.activeConversation.id,
+              ),
+      ),
+    );
+  }
+
   void _trackMentions() {
     final value = _textController.value;
     final current = value.text;

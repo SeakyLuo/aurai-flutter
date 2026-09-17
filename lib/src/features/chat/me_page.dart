@@ -36,7 +36,13 @@ class MePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: const SettingsAppBar(title: '我', onBack: null, root: true),
+    extendBodyBehindAppBar: true,
+    appBar: const SettingsAppBar(
+      gradientBackground: true,
+      title: '我',
+      onBack: null,
+      root: true,
+    ),
     body: ListenableBuilder(
       listenable: controller.memory,
       builder: (context, _) {
@@ -45,7 +51,15 @@ class MePage extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
             child: ListView(
-              padding: const EdgeInsets.only(top: 12, bottom: 24),
+              padding: EdgeInsets.fromLTRB(
+                0,
+                View.of(context).padding.top /
+                        View.of(context).devicePixelRatio +
+                    76 +
+                    12,
+                0,
+                24,
+              ),
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),

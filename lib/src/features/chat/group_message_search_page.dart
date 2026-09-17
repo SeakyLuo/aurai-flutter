@@ -155,7 +155,7 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
         widget.controller,
         widget.conversationId,
         messageId: result.id,
-        preservePreviousRoute: true,
+        waitForClose: true,
       );
     } on Object catch (error) {
       if (mounted)

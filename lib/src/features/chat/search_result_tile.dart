@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 
 import 'conversation.dart';
-import 'conversation_icon.dart';
-import 'conversation_menu_icon.dart';
 import 'glass_surface.dart';
 
 class SearchResultTile extends StatelessWidget {
   const SearchResultTile({
     super.key,
     required this.conversation,
+    required this.avatar,
     required this.title,
     required this.subtitle,
     required this.onTap,
     this.plain = false,
   });
   final Conversation conversation;
+  final Widget avatar;
   final InlineSpan title;
   final InlineSpan? subtitle;
   final VoidCallback onTap;
@@ -40,7 +40,6 @@ class SearchResultTile extends StatelessWidget {
   Widget build(BuildContext context) {
     if (plain) return _plainResult(context);
     final colors = Theme.of(context).colorScheme;
-    final dark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: DecoratedBox(
@@ -69,35 +68,7 @@ class SearchResultTile extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            colors.primary.withValues(alpha: .22),
-                            colors.primary.withValues(alpha: .08),
-                          ],
-                        ),
-                      ),
-                      child: Center(
-                        child: SizedBox.square(
-                          dimension: 20,
-                          child: ColorFiltered(
-                            colorFilter: ColorFilter.mode(
-                              dark
-                                  ? const Color(0xffc4b5fd)
-                                  : const Color(0xff7959df),
-                              BlendMode.srcIn,
-                            ),
-                            child: const FittedBox(child: ConversationIcon()),
-                          ),
-                        ),
-                      ),
-                    ),
+                    avatar,
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -173,35 +144,10 @@ class SearchResultTile extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 76),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
               child: Row(
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(11),
-                      border: Border.all(
-                        color: dark
-                            ? const Color(0xff414141)
-                            : const Color(0xffe5e5e5),
-                      ),
-                    ),
-                    child: Center(
-                      child: conversation.isArchived
-                          ? ConversationMenuIcon(
-                              type: ConversationMenuIconType.archive,
-                              color: foreground,
-                            )
-                          : ColorFiltered(
-                              colorFilter: ColorFilter.mode(
-                                foreground,
-                                BlendMode.srcIn,
-                              ),
-                              child: const ConversationIcon(),
-                            ),
-                    ),
-                  ),
+                  avatar,
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(

@@ -70,7 +70,9 @@ class _CapabilityPageState extends State<CapabilityPage>
   Widget build(BuildContext context) => ScaffoldMessenger(
     key: _messenger,
     child: Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
+        gradientBackground: true,
         title: '设备能力',
         onBack: () => Navigator.maybePop(context),
       ),
@@ -80,7 +82,12 @@ class _CapabilityPageState extends State<CapabilityPage>
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                MediaQuery.paddingOf(context).top + 76 + 16,
+                16,
+                24,
+              ),
               children: [
                 const SizedBox(height: 8),
                 for (final capability in widget.controller.capabilities)

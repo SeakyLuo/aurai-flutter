@@ -194,7 +194,9 @@ class _DataManagementPageState extends State<DataManagementPage> {
     return PopScope(
       canPop: _busy == null,
       child: Scaffold(
+        extendBodyBehindAppBar: true,
         appBar: SettingsAppBar(
+          gradientBackground: true,
           title: '数据管理',
           onBack: _busy == null ? () => Navigator.maybePop(context) : null,
         ),
@@ -204,7 +206,15 @@ class _DataManagementPageState extends State<DataManagementPage> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 640),
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  View.of(context).padding.top /
+                          View.of(context).devicePixelRatio +
+                      76 +
+                      16,
+                  16,
+                  16,
+                ),
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(8, 4, 8, 24),

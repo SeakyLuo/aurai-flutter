@@ -629,8 +629,9 @@ class ConversationReader {
 
   Future<List<ConversationSearchResult>> search(
     String query,
-    int offset,
-  ) async {
+    int offset, {
+    bool includeReasoning = false,
+  }) async {
     if (query.isEmpty) {
       final rows = await database.query(
         'conversations',
@@ -650,9 +651,12 @@ class ConversationReader {
           ),
       ];
     }
+    final messageFilter = includeReasoning
+        ? "kind NOT IN ('system', 'quick_reply')"
+        : "kind NOT IN ('system', 'quick_reply', 'reasoning')";
     final hits = await database.rawQuery(
       '''SELECT id AS message_id, conversation_id, text, sender_id, created_at, id AS sort_id
-         FROM messages WHERE kind NOT IN ('system', 'quick_reply') AND conversation_id IN (SELECT id FROM conversations WHERE $localUserConversation AND mode = 'normal') AND instr(lower(text), ?) > 0
+         FROM messages WHERE $messageFilter AND conversation_id IN (SELECT id FROM conversations WHERE $localUserConversation AND mode = 'normal') AND instr(lower(text), ?) > 0
          UNION ALL
          SELECT NULL AS message_id, id AS conversation_id,
            CASE WHEN instr(lower(draft), ?) > 0 THEN draft ELSE '' END AS text,
@@ -660,7 +664,7 @@ class ConversationReader {
          FROM conversations
          WHERE $visibleConversation AND $localUserConversation AND mode = 'normal' AND (instr(lower(title), ?) > 0 OR instr(lower(draft), ?) > 0)
            AND id NOT IN (
-             SELECT conversation_id FROM messages WHERE kind NOT IN ('system', 'quick_reply') AND instr(lower(text), ?) > 0
+             SELECT conversation_id FROM messages WHERE $messageFilter AND instr(lower(text), ?) > 0
            )
          ORDER BY created_at DESC, sort_id DESC
          LIMIT ? OFFSET ?''',

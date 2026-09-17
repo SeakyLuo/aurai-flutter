@@ -8,6 +8,7 @@ class ThinkingIndicator extends StatefulWidget {
     this.detail,
     this.leading,
     this.singleLine = false,
+    this.fontSize = 15,
   });
 
   final String label;
@@ -15,6 +16,7 @@ class ThinkingIndicator extends StatefulWidget {
   final String? detail;
   final Widget? leading;
   final bool singleLine;
+  final double fontSize;
 
   @override
   State<ThinkingIndicator> createState() => _ThinkingIndicatorState();
@@ -89,7 +91,7 @@ class _ThinkingIndicatorState extends State<ThinkingIndicator>
                 overflow: widget.singleLine ? TextOverflow.ellipsis : null,
                 style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                   inherit: false,
-                  fontSize: 15,
+                  fontSize: widget.fontSize,
                   height: 1.5,
                   fontWeight: FontWeight.w500,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,

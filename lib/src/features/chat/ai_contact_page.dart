@@ -72,7 +72,12 @@ class _AiContactPageState extends State<AiContactPage> {
     try {
       final id = await widget.controller.openAiConversation(_ai!);
       if (!mounted) return;
-      await openHomeConversation(context, widget.controller, id);
+      await openHomeConversation(
+        context,
+        widget.controller,
+        id,
+        waitForClose: true,
+      );
     } on Object catch (error) {
       if (mounted) _notice('无法打开私聊，请稍后重试：${errorMessage(error)}');
     } finally {
@@ -266,13 +271,13 @@ class _AiContactPageState extends State<AiContactPage> {
                       : ai.isTemporary
                       ? '添加朋友'
                       : '发消息',
-                  onPressed: _busy
+                  onPressed: !ai.sender.archived && !ai.isTemporary
+                      ? _message
+                      : _busy
                       ? null
                       : ai.sender.archived
                       ? _archive
-                      : ai.isTemporary
-                      ? _addFriend
-                      : _message,
+                      : _addFriend,
                 ),
                 if (!ai.sender.archived && !ai.isTemporary) ...[
                   const SizedBox(height: 12),

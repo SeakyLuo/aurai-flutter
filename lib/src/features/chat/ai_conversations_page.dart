@@ -80,7 +80,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
           _items.isEmpty &&
           ModalRoute.of(context)!.isCurrent;
       _firstLoad = false;
-      if (openEmpty) await _open(null, true);
+      if (openEmpty) await _open();
     } on Object catch (error) {
       if (mounted) setState(() => _failed = true);
       if (mounted)
@@ -98,7 +98,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
     }
   }
 
-  Future<void> _open([String? id, bool replace = false]) async {
+  Future<void> _open([String? id]) async {
     if (_opening) return;
     setState(() => _opening = true);
     try {
@@ -113,10 +113,6 @@ class _AiConversationsPageState extends State<AiConversationsPage>
       final route = MaterialPageRoute<void>(
         builder: (_) => ChatPage(controller: widget.controller, stacked: true),
       );
-      if (replace) {
-        Navigator.of(context).pushReplacement<void, void>(route);
-        return;
-      }
       await Navigator.push<void>(context, route);
       if (mounted) await _load(reset: true);
     } on Object catch (error) {
@@ -131,7 +127,9 @@ class _AiConversationsPageState extends State<AiConversationsPage>
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
+      gradientBackground: true,
       title: widget.profile.sender.name,
       onBack: () => Navigator.pop(context),
       titleWidget: InkWell(
@@ -174,7 +172,15 @@ class _AiConversationsPageState extends State<AiConversationsPage>
             hasMore: _more,
             loadMore: _load,
             child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                View.of(context).padding.top /
+                        View.of(context).devicePixelRatio +
+                    76 +
+                    8,
+                16,
+                24,
+              ),
               itemCount: _items.length,
               itemBuilder: (context, index) {
                 final item = _items[index];
