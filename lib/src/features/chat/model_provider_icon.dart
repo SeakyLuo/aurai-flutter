@@ -7,6 +7,8 @@ class ModelProviderIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
     final asset = switch (service) {
       ModelService.openAi => 'openai',
       ModelService.deepSeek => 'deepseek-color',
@@ -22,15 +24,17 @@ class ModelProviderIcon extends StatelessWidget {
       decoration: BoxDecoration(
         color: service == ModelService.kimi
             ? const Color(0xFF16191E)
+            : dark
+            ? theme.colorScheme.surfaceContainerHigh
             : Colors.white,
         borderRadius: BorderRadius.circular(14),
       ),
       child: asset == null
-          ? const Center(
+          ? Center(
               child: Text(
                 'OR',
                 style: TextStyle(
-                  color: Color(0xff222222),
+                  color: theme.colorScheme.onSurface,
                   fontWeight: FontWeight.w700,
                   fontSize: 16,
                 ),
@@ -39,6 +43,10 @@ class ModelProviderIcon extends StatelessWidget {
           : Image.asset(
               'assets/providers/$asset.png',
               excludeFromSemantics: true,
+              color: service == ModelService.openAi
+                  ? theme.colorScheme.onSurface
+                  : null,
+              colorBlendMode: BlendMode.srcIn,
             ),
     );
   }

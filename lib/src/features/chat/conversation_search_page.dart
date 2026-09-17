@@ -1,3 +1,11 @@
+import 'search_filter_menu.dart';
+import 'settings_appearance.dart';
+import 'settings_icon.dart';
+import '../../storage/home_conversations.dart';
+import '../../domain/message_sender.dart';
+import '../../domain/avatar_style.dart';
+import 'group_avatar.dart';
+import 'profile_avatar.dart';
 import 'message_preview_text.dart';
 import '../../domain/error_message.dart';
 import 'home_navigation.dart';
@@ -40,11 +48,14 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
   final _focus = FocusNode();
   final _scroll = ScrollController();
   bool _searchFailed = false;
+  final _senders = <String, MessageSender>{};
+  final _groups = <String, List<MessageSender>>{};
   final _results = <ConversationSearchResult>[];
   final _files = <AttachmentSearchResult>[];
   final _historyStore = SearchHistoryStore();
   List<String> _history = [];
   bool _filesTab = false;
+  bool _includeReasoning = false;
   bool _filesMore = false;
   Timer? _debounce;
   int _generation = 0;
@@ -102,6 +113,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
           widget.controller.searchConversations(
             query,
             reset ? 0 : _results.length,
+            includeReasoning: _includeReasoning,
           )
         else
           Future.value(<ConversationSearchResult>[]),
@@ -117,11 +129,26 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
       if (!mounted || generation != _generation) return;
       final page = pages[0] as List<ConversationSearchResult>;
       final files = pages[1] as List<AttachmentSearchResult>;
+      final conversations = page.map((result) => result.conversation).toList();
+      final avatars = await Future.wait<Object>([
+        HomeConversations(widget.controller.groupStore).senders(conversations),
+        widget.controller.groupStore.avatarMembers(
+          conversations
+              .where((item) => item.kind == ConversationKind.group)
+              .map((item) => item.id)
+              .toList(),
+        ),
+      ]);
+      if (!mounted || generation != _generation) return;
       setState(() {
         if (reset) {
+          _senders.clear();
+          _groups.clear();
           _results.clear();
           _files.clear();
         }
+        _senders.addAll(avatars[0] as Map<String, MessageSender>);
+        _groups.addAll(avatars[1] as Map<String, List<MessageSender>>);
         _results.addAll(page);
         _files.addAll(files);
         _query = query;
@@ -149,6 +176,22 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
       if (mounted && generation == _generation)
         setState(() => _loading = false);
     }
+  }
+
+  Widget _avatar(Conversation conversation) {
+    if (conversation.kind == ConversationKind.group) {
+      return GroupAvatar(members: _groups[conversation.id]!, size: 40);
+    }
+    final sender = _senders[conversation.defaultSenderId]!;
+    return ProfileAvatar(
+      style: AvatarStyle(
+        icon: sender.avatarIcon,
+        color: sender.avatarColor,
+        path: sender.avatarPath,
+      ),
+      name: sender.name,
+      size: 40,
+    );
   }
 
   @override
@@ -313,7 +356,39 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
         ),
         centerTitle: true,
         titleSpacing: 0,
-        actions: const [SizedBox(width: 74)],
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Builder(
+              builder: (anchor) => SettingsGlassAction(
+                label: '搜索筛选',
+                icon: Icons.filter_list_rounded,
+                iconWidget: SettingsIcon(
+                  type: SettingsIconType.filter,
+                  color: _includeReasoning
+                      ? colors.primary
+                      : colors.onSurfaceVariant,
+                ),
+                onPressed: () async {
+                  final box = anchor.findRenderObject()! as RenderBox;
+                  await showSearchFilterMenu(
+                    context,
+                    anchor: box.localToGlobal(Offset.zero) & box.size,
+                    includeReasoning: _includeReasoning,
+                    onChanged: (include) {
+                      _debounce?.cancel();
+                      _generation++;
+                      setState(() => _includeReasoning = include);
+                      if (_search.text.trim().isNotEmpty) {
+                        unawaited(_load(reset: true));
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
         title: query.isEmpty
             ? null
             : SearchTypeSegment(
@@ -478,9 +553,9 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
                           keyboardDismissBehavior:
                               ScrollViewKeyboardDismissBehavior.onDrag,
                           padding: EdgeInsets.fromLTRB(
-                            16,
+                            _filesTab || query.isEmpty ? 16 : 8,
                             4,
-                            16,
+                            _filesTab || query.isEmpty ? 16 : 8,
                             media.viewInsets.bottom +
                                 media.viewPadding.bottom +
                                 104,
@@ -555,6 +630,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
                             final result = results[index];
                             return SearchResultTile(
                               plain: true,
+                              avatar: _avatar(result.conversation),
                               conversation: result.conversation,
                               title: _highlight(
                                 result.conversation.title,

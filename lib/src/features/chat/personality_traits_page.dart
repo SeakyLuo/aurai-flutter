@@ -24,14 +24,26 @@ class _PersonalityTraitsPageState extends State<PersonalityTraitsPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: SettingsAppBar(title: '特征', onBack: () => Navigator.pop(context)),
+    extendBodyBehindAppBar: true,
+    appBar: SettingsAppBar(
+      gradientBackground: true,
+      title: '特征',
+      onBack: () => Navigator.pop(context),
+    ),
     body: SafeArea(
       top: false,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              View.of(context).padding.top / View.of(context).devicePixelRatio +
+                  76 +
+                  8,
+              16,
+              32,
+            ),
             children: [
               for (final trait in ResponseTrait.values) ...[
                 PersonalizationChoiceRow(

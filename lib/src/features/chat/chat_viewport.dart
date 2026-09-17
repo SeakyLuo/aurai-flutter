@@ -241,8 +241,13 @@ class ChatViewportState extends State<ChatViewport> {
     final contentBelow =
         last == null ||
         last.itemTrailingEdge > 1 - widget.padding.bottom / _height + 0.01;
-    if (_contentBelow != contentBelow) {
-      _contentBelow = contentBelow;
+    final jumpThreshold = _contentBelow ? 120.0 : 160.0;
+    final showJumpToBottom =
+        last == null ||
+        last.itemTrailingEdge * _height - (_height - widget.padding.bottom) >
+            jumpThreshold;
+    if (_contentBelow != showJumpToBottom) {
+      _contentBelow = showJumpToBottom;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) widget.onContentBelowChanged(_contentBelow);
       });

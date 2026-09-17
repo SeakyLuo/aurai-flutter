@@ -102,8 +102,10 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
       title: '设置',
+      gradientBackground: true,
       root: root,
       onBack: () => Navigator.maybePop(context),
     ),
@@ -140,7 +142,10 @@ class SettingsPage extends StatelessWidget {
               child: ListView(
                 padding: EdgeInsets.fromLTRB(
                   16,
-                  16,
+                  View.of(context).padding.top /
+                          View.of(context).devicePixelRatio +
+                      76 +
+                      16,
                   16,
                   MediaQuery.paddingOf(context).bottom + 16,
                 ),

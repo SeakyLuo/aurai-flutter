@@ -19,6 +19,7 @@ class ToolExecutor {
   final ToolRegistry _registry;
   final ToolConfirmation _confirm;
   AgentTool? _activeTool;
+  String? get activeToolName => _activeTool?.definition.name;
   bool _cancelRequested = false;
 
   Future<ToolResult> execute(

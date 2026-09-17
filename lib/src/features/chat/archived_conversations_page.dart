@@ -61,7 +61,9 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
+        gradientBackground: true,
         title: '已归档会话',
         onBack: () => Navigator.pop(context),
       ),
@@ -76,7 +78,12 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
                     style: TextStyle(color: colors.onSurfaceVariant),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      MediaQuery.paddingOf(context).top + 76 + 16,
+                      16,
+                      16,
+                    ),
                     itemCount: _items.length + 1,
                     itemBuilder: (context, index) {
                       if (index == _items.length) {

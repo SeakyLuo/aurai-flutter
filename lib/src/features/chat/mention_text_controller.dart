@@ -3,7 +3,8 @@ import 'group_mention_text.dart';
 import '../../domain/draft_mention.dart';
 
 class MentionTextController extends TextEditingController {
-  MentionTextController(this.mentions);
+  MentionTextController(this.mentions, {this.onOpenMention});
+  final ValueChanged<String>? onOpenMention;
   final List<DraftMention> Function() mentions;
 
   @override
@@ -24,12 +25,13 @@ class MentionTextController extends TextEditingController {
         end--;
         nextEnd--;
       }
-      if (end > start) {
+      {
         var from = start;
         var to = end;
         for (final mention in mentions()) {
           final limit = mention.start + mention.text.length;
-          if (mention.start < end && limit > start) {
+          if ((mention.start < end && limit > start) ||
+              (start == end && start > mention.start && start < limit)) {
             if (mention.start < from) from = mention.start;
             if (limit > to) to = limit;
           }
@@ -54,6 +56,38 @@ class MentionTextController extends TextEditingController {
             ),
           );
         }
+      }
+    }
+    if (next.text == previous.text && next.selection.isValid) {
+      final selection = next.selection;
+      var start = selection.start;
+      var end = selection.end;
+      for (final mention in mentions()) {
+        final limit = mention.start + mention.text.length;
+        if (selection.isCollapsed) {
+          if (start > mention.start && start < limit) {
+            final boundary = start - mention.start < limit - start
+                ? mention.start
+                : limit;
+            start = boundary;
+            end = boundary;
+          }
+        } else if (start < limit && end > mention.start) {
+          if (start > mention.start) start = mention.start;
+          if (end < limit) end = limit;
+        }
+      }
+      if (start != selection.start || end != selection.end) {
+        next = next.copyWith(
+          selection: selection.copyWith(
+            baseOffset: selection.baseOffset <= selection.extentOffset
+                ? start
+                : end,
+            extentOffset: selection.baseOffset <= selection.extentOffset
+                ? end
+                : start,
+          ),
+        );
       }
     }
     super.value = next;

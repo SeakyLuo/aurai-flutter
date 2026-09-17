@@ -161,14 +161,26 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: SettingsAppBar(title: '模型设置', onBack: () => Navigator.pop(context)),
+    extendBodyBehindAppBar: true,
+    appBar: SettingsAppBar(
+      gradientBackground: true,
+      title: '模型设置',
+      onBack: () => Navigator.pop(context),
+    ),
     body: SafeArea(
       top: false,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              View.of(context).padding.top / View.of(context).devicePixelRatio +
+                  76 +
+                  16,
+              16,
+              16,
+            ),
             children: [
               for (final purpose in ModelPurpose.values) ...[
                 Material(

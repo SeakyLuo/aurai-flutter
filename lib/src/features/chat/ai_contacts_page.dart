@@ -119,7 +119,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
         context,
         widget.controller,
         id,
-        preservePreviousRoute: true,
+        waitForClose: true,
       );
     } on Object catch (error) {
       if (mounted) {

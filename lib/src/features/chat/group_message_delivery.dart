@@ -17,7 +17,9 @@ extension GroupMessageDelivery on ChatController {
           member.runState == ChatRunState.stopping) {
         throw const AgentCancelled();
       }
-      return _sendPrivateGroupMessage(arguments, reply.senderId);
+      final result = await _sendPrivateGroupMessage(arguments, reply.senderId);
+      _execution.groupReplyDrafts.remove(reply.senderId);
+      return result;
     }
     _checkGroupStopped(parent);
     if (_removedGroupMembers.contains(reply.senderId) ||
@@ -25,6 +27,8 @@ extension GroupMessageDelivery on ChatController {
       throw const AgentCancelled();
     }
     final dispatcher = _groupDispatcher!;
+    final item = arguments['message'] as Map<String, Object?>?;
+    _cacheGroupMessageDraft(reply.senderId, item);
     final seen = {for (final m in observed) m.id: m};
     final fresh = dispatcher.history
         .where(
@@ -58,7 +62,6 @@ extension GroupMessageDelivery on ChatController {
     final byId = {for (final m in dispatcher.history) m.id: m};
     final mentions = <String>{};
     final output = <AgentMessage>[];
-    final item = arguments['message'] as Map<String, Object?>?;
     if (item != null) {
       final text = (item['text'] as String).trim();
       final images = item['_images'] as List<MessageImage>;
@@ -165,6 +168,7 @@ extension GroupMessageDelivery on ChatController {
       rethrow;
     }
     publishedIds.addAll(output.map((m) => m.id));
+    _execution.groupReplyDrafts.remove(reply.senderId);
     observed.addAll(output);
     if (output.isNotEmpty) dispatcher.receive(output, mentions: mentions);
     _notifyMember(member, parent);

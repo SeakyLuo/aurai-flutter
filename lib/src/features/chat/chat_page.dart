@@ -1,10 +1,13 @@
+import 'ai_contact_page.dart';
+import 'personal_info_page.dart';
 import 'home_page.dart';
 import '../../domain/message_sender.dart';
 import '../../domain/error_message.dart';
 import '../../domain/draft_mention.dart';
 import 'mention_text_controller.dart';
 import 'group_mention_sheet.dart';
-import 'group_activity_composer.dart';
+import 'group_activity_avatars.dart';
+import 'group_activity_sheet.dart';
 import '../../platform/message_file_store.dart';
 import 'keyboard_inset.dart';
 import 'operation_request_sheet.dart';
@@ -70,7 +73,10 @@ class _ChatPageState extends State<ChatPage>
   late String _mentionConversationId = widget.controller.activeConversation.id;
   bool _mentionOpen = false;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
-  late final _textController = MentionTextController(() => _mentions);
+  late final _textController = MentionTextController(
+    () => _mentions,
+    onOpenMention: _openDraftMention,
+  );
   final _focusNode = FocusNode();
   var _viewportKey = GlobalKey<ChatViewportState>();
   final _scrollBookmarks = <String, ChatScrollBookmark>{};
@@ -259,88 +265,79 @@ class _ChatPageState extends State<ChatPage>
                 systemNavigationBarContrastEnforced: false,
               ),
               child: KeyboardInset(
-                child: GroupActivityComposer(
-                  conversationId: isGroup ? active.id : null,
-                  activities: controller.groupMemberActivities,
-                  child:
-                      controller.pendingQuestion?.conversationId ==
-                          _conversationId
-                      ? UserQuestionCard(
-                          key: ObjectKey(controller.pendingQuestion),
-                          question: controller.pendingQuestion!,
-                        )
-                      : ChatComposer(
-                          controller: _textController,
-                          hintText: _editing != null
-                              ? '编辑消息'
-                              : isGroup
-                              ? ''
-                              : '回复 ${controller.activeAi!.sender.name}',
-                          quote: _editing != null
-                              ? _editing!.message.quote
-                              : controller.activeConversation.draftQuote,
-                          onCancelQuote: _editing == null
-                              ? () => _quoteMessage(null)
-                              : null,
-                          focusNode: _focusNode,
-                          savingEdit: _editing?.saving == true,
-                          draftEnabled: _editing != null
-                              ? !_editing!.saving
-                              : controller.canEditDraft && !_preparingGoal,
-                          enabled: isGroup
-                              ? true
-                              : _editing != null
-                              ? !_editing!.saving
-                              : !controller.isBusy ||
-                                    _canSend ||
-                                    controller.draftImages.isNotEmpty ||
-                                    controller.draftFiles.isNotEmpty,
-                          canSend:
-                              _canSend ||
-                              (_editing?.images ?? controller.draftImages)
-                                  .isNotEmpty ||
-                              (_editing?.files ?? controller.draftFiles)
-                                  .isNotEmpty,
-                          images: _editing?.images ?? controller.draftImages,
-                          files: _editing?.files ?? controller.draftFiles,
-                          onRemoveFile: (file) async {
-                            if (_editing != null) {
-                              _updateEditing(
-                                () => _editing!.files.remove(file),
-                              );
-                              return;
-                            }
-                            try {
-                              await controller.removeDraftFile(file);
-                            } on Object catch (error) {
-                              if (mounted)
-                                _imageNotice(
-                                  '附件移除失败，请重试：${errorMessage(error)}',
-                                );
-                            }
-                          },
-                          addingImages:
-                              controller.addingImages ||
-                              _editing?.picking == true,
-                          onAddImages: _editing != null
-                              ? _addEditImages
-                              : _addImages,
-                          onRemoveImage: _editing != null
-                              ? _removeEditImage
-                              : _removeImage,
-                          stopping:
-                              controller.runState == ChatRunState.stopping,
-                          onSend: _editing != null ? _submitMessageEdit : _send,
-                          canResume:
-                              !isGroup &&
-                              _editing == null &&
-                              (controller.runState == ChatRunState.cancelled ||
-                                  controller.runState == ChatRunState.idle) &&
-                              controller.pendingGoal != null,
-                          onResume: _continuePending,
-                          onStop: _stop,
-                        ),
-                ),
+                child:
+                    controller.pendingQuestion?.conversationId ==
+                        _conversationId
+                    ? UserQuestionCard(
+                        key: ObjectKey(controller.pendingQuestion),
+                        question: controller.pendingQuestion!,
+                      )
+                    : ChatComposer(
+                        controller: _textController,
+                        hintText: _editing != null
+                            ? '编辑消息'
+                            : isGroup
+                            ? ''
+                            : '回复 ${controller.activeAi!.sender.name}',
+                        quote: _editing != null
+                            ? _editing!.message.quote
+                            : controller.activeConversation.draftQuote,
+                        onCancelQuote: _editing == null
+                            ? () => _quoteMessage(null)
+                            : null,
+                        focusNode: _focusNode,
+                        savingEdit: _editing?.saving == true,
+                        draftEnabled: _editing != null
+                            ? !_editing!.saving
+                            : controller.canEditDraft && !_preparingGoal,
+                        enabled: isGroup
+                            ? true
+                            : _editing != null
+                            ? !_editing!.saving
+                            : !controller.isBusy ||
+                                  _canSend ||
+                                  controller.draftImages.isNotEmpty ||
+                                  controller.draftFiles.isNotEmpty,
+                        canSend:
+                            _canSend ||
+                            (_editing?.images ?? controller.draftImages)
+                                .isNotEmpty ||
+                            (_editing?.files ?? controller.draftFiles)
+                                .isNotEmpty,
+                        images: _editing?.images ?? controller.draftImages,
+                        files: _editing?.files ?? controller.draftFiles,
+                        onRemoveFile: (file) async {
+                          if (_editing != null) {
+                            _updateEditing(() => _editing!.files.remove(file));
+                            return;
+                          }
+                          try {
+                            await controller.removeDraftFile(file);
+                          } on Object catch (error) {
+                            if (mounted)
+                              _imageNotice('附件移除失败，请重试：${errorMessage(error)}');
+                          }
+                        },
+                        addingImages:
+                            controller.addingImages ||
+                            _editing?.picking == true,
+                        onAddImages: _editing != null
+                            ? _addEditImages
+                            : _addImages,
+                        onRemoveImage: _editing != null
+                            ? _removeEditImage
+                            : _removeImage,
+                        stopping: controller.runState == ChatRunState.stopping,
+                        onSend: _editing != null ? _submitMessageEdit : _send,
+                        canResume:
+                            !isGroup &&
+                            _editing == null &&
+                            (controller.runState == ChatRunState.cancelled ||
+                                controller.runState == ChatRunState.idle) &&
+                            controller.pendingGoal != null,
+                        onResume: _continuePending,
+                        onStop: _stop,
+                      ),
               ),
             ),
             body: Builder(
@@ -471,6 +468,24 @@ class _ChatPageState extends State<ChatPage>
                         ),
                       ),
                     ),
+                    if (isGroup)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: bottom,
+                        child: GroupActivityAvatars(
+                          key: ValueKey(active.id),
+                          activities: controller.groupMemberActivities,
+                          onPressed: () {
+                            _focusNode.unfocus();
+                            showGroupActivitySheet(
+                              context,
+                              controller: controller,
+                              conversationId: active.id,
+                            );
+                          },
+                        ),
+                      ),
                   ],
                 );
               },

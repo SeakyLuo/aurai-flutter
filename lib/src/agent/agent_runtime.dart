@@ -25,6 +25,7 @@ class AgentRuntime {
   final ModelProvider _provider;
   final ToolRegistry _registry;
   final ToolExecutor _executor;
+  String? get activeToolName => _executor.activeToolName;
   bool _cancelRequested = false;
 
   Future<AgentRunResult> run({

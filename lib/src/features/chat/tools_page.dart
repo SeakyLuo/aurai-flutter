@@ -42,9 +42,19 @@ class _ToolsPageState extends State<ToolsPage> {
       groups.putIfAbsent(name, () => []).add(tool);
     }
     return Scaffold(
-      appBar: SettingsAppBar(title: '工具', onBack: () => Navigator.pop(context)),
+      extendBodyBehindAppBar: true,
+      appBar: SettingsAppBar(
+        title: '工具',
+        gradientBackground: true,
+        onBack: () => Navigator.pop(context),
+      ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 32),
+        padding: EdgeInsets.fromLTRB(
+          18,
+          MediaQuery.paddingOf(context).top + 76 + 12,
+          18,
+          MediaQuery.paddingOf(context).bottom + 32,
+        ),
         children: [
           Material(
             color: settingsFieldColor(context),

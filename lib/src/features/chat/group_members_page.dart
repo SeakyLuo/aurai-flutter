@@ -55,7 +55,9 @@ class _GroupMembersPageState extends State<GroupMembersPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
+      gradientBackground: true,
       title: _members.isEmpty ? '群成员' : '群成员（${_members.length}）',
       onBack: () => Navigator.pop(context),
     ),
@@ -71,7 +73,15 @@ class _GroupMembersPageState extends State<GroupMembersPage> {
                   child: TextButton(onPressed: _load, child: const Text('重试')),
                 )
               : GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    View.of(context).padding.top /
+                            View.of(context).devicePixelRatio +
+                        76 +
+                        12,
+                    16,
+                    24,
+                  ),
                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                     maxCrossAxisExtent: 100,
                     mainAxisExtent: 96,

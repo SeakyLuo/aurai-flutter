@@ -30,17 +30,14 @@ class HomeTabBar extends StatelessWidget {
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: AnimatedBuilder(
-                    animation: pages,
-                    builder: (context, _) {
-                      final page = pages.hasClients
-                          ? (pages.page ?? pages.initialPage.toDouble())
-                          : pages.initialPage.toDouble();
-                      return Align(
-                        alignment: Alignment(page.clamp(0.0, 2.0) - 1, 0),
-                        child: FractionallySizedBox(
-                          widthFactor: 1 / 3,
-                          heightFactor: 1,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => AnimatedBuilder(
+                      animation: pages,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: SizedBox(
+                          width: constraints.maxWidth / 3,
+                          height: constraints.maxHeight,
                           child: DecoratedBox(
                             decoration: BoxDecoration(
                               color: Theme.of(
@@ -50,8 +47,20 @@ class HomeTabBar extends StatelessWidget {
                             ),
                           ),
                         ),
-                      );
-                    },
+                      ),
+                      builder: (context, child) {
+                        final page = pages.hasClients
+                            ? (pages.page ?? pages.initialPage.toDouble())
+                            : pages.initialPage.toDouble();
+                        return Transform.translate(
+                          offset: Offset(
+                            page.clamp(0.0, 2.0) * constraints.maxWidth / 3,
+                            0,
+                          ),
+                          child: child,
+                        );
+                      },
+                    ),
                   ),
                 ),
                 Row(

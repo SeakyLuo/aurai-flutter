@@ -68,7 +68,9 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
   Widget build(BuildContext context) => PopScope(
     canPop: !_saving,
     child: Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
+        gradientBackground: true,
         title: '移除成员',
         onBack: _saving ? null : () => Navigator.pop(context),
         actions: [
@@ -88,7 +90,14 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
       body: SafeArea(
         top: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            View.of(context).padding.top / View.of(context).devicePixelRatio +
+                76 +
+                8,
+            16,
+            24,
+          ),
           children: [
             Padding(
               padding: const EdgeInsets.only(bottom: 12),

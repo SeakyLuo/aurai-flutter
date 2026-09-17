@@ -29,12 +29,11 @@ Future<void> openHomeConversation(
   ChatController controller,
   String id, {
   String? messageId,
-  bool preservePreviousRoute = false,
+  bool waitForClose = false,
 }) async {
   await controller.selectConversation(id);
   if (!context.mounted) return;
   final navigator = Navigator.of(context);
-  if (!preservePreviousRoute) navigator.popUntil((route) => route.isFirst);
   final route = navigator.push<void>(
     MaterialPageRoute(
       builder: (_) => ChatPage(
@@ -44,5 +43,5 @@ Future<void> openHomeConversation(
       ),
     ),
   );
-  if (preservePreviousRoute) await route;
+  if (waitForClose) await route;
 }

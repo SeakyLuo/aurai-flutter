@@ -89,7 +89,9 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
             if (!didPop) _leave();
           },
           child: Scaffold(
+            extendBodyBehindAppBar: true,
             appBar: SettingsAppBar(
+              gradientBackground: true,
               title: widget.accountOnly ? '模型供应商' : '选择模型',
               onBack: _leave,
             ),
@@ -101,7 +103,15 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                   child: ListenableBuilder(
                     listenable: widget.controller,
                     builder: (context, _) => ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        View.of(context).padding.top /
+                                View.of(context).devicePixelRatio +
+                            76 +
+                            16,
+                        16,
+                        32,
+                      ),
                       itemCount:
                           ModelService.values.length +
                           (widget.accountOnly ? 0 : 1),

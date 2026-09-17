@@ -12,11 +12,13 @@ class AiGroupList extends StatefulWidget {
     required this.controller,
     required this.senderId,
     this.joined = true,
+    this.padding = const EdgeInsets.all(16),
     required this.onSelected,
   });
   final ChatController controller;
   final String senderId;
   final bool joined;
+  final EdgeInsets padding;
   final ValueChanged<Map<String, Object?>> onSelected;
   @override
   State<AiGroupList> createState() => _AiGroupListState();
@@ -63,7 +65,7 @@ class _AiGroupListState extends State<AiGroupList> {
     hasMore: _more,
     loadMore: _load,
     child: ListView(
-      padding: const EdgeInsets.all(16),
+      padding: widget.padding,
       children: [
         if (!widget.joined)
           ListTile(
@@ -120,11 +122,19 @@ class AiGroupPicker extends StatelessWidget {
   final bool joined;
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
+      gradientBackground: true,
       title: joined ? '选择群聊记忆' : '加入群聊',
       onBack: () => Navigator.pop(context),
     ),
     body: AiGroupList(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        MediaQuery.paddingOf(context).top + 76 + 16,
+        16,
+        MediaQuery.paddingOf(context).bottom + 16,
+      ),
       controller: controller,
       senderId: senderId,
       joined: joined,

@@ -132,7 +132,9 @@ class _DocumentFoldersPageState extends State<DocumentFoldersPage>
     return ScaffoldMessenger(
       key: _messenger,
       child: Scaffold(
+        extendBodyBehindAppBar: true,
         appBar: SettingsAppBar(
+          gradientBackground: true,
           title: '授权文件夹',
           onBack: () => Navigator.maybePop(context),
           actions: [
@@ -185,7 +187,15 @@ class _DocumentFoldersPageState extends State<DocumentFoldersPage>
                       ),
                     )
                   : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        View.of(context).padding.top /
+                                View.of(context).devicePixelRatio +
+                            76 +
+                            16,
+                        16,
+                        24,
+                      ),
                       itemCount: folders.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {

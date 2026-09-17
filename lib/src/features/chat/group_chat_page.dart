@@ -94,7 +94,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
+        gradientBackground: true,
         title: '群聊',
         onBack: () => Navigator.pop(context),
         actions: [
@@ -145,7 +147,15 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     hasMore: _hasMore && !_failed,
                     loadMore: _load,
                     child: ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        View.of(context).padding.top /
+                                View.of(context).devicePixelRatio +
+                            76 +
+                            12,
+                        16,
+                        24,
+                      ),
                       itemCount: _items.length + (_loading || _failed ? 1 : 0),
                       itemBuilder: (context, index) {
                         if (index == _items.length && _failed) {

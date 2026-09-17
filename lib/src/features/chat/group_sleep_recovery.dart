@@ -1,6 +1,31 @@
 part of 'chat_controller.dart';
 
 extension GroupSleepRecovery on ChatController {
+  Future<DateTime?> _scheduleMemberSleep(
+    Conversation parent,
+    Conversation member,
+    String senderId,
+    Duration duration,
+  ) async {
+    final dispatcher = _groupDispatcher!;
+    final until = duration.isNegative ? null : DateTime.now().add(duration);
+    if (until == null) {
+      await _groupSleeps.remove(parent.id, senderId);
+    } else {
+      await _groupSleeps.save(parent.id, senderId, until);
+    }
+    if (dispatcher.stopped ||
+        dispatcher.closed ||
+        member.runState == ChatRunState.stopping ||
+        dispatcher.paused.contains(senderId) ||
+        _removedGroupMembers.contains(senderId)) {
+      await _groupSleeps.remove(parent.id, senderId);
+      throw AgentCancelled();
+    }
+    _execution.groupReplyDrafts.remove(senderId);
+    return dispatcher.sleepUntil(senderId, until);
+  }
+
   Future<void> _recoverGroupSleep(String id, Set<String> members) async {
     final target = await _forwardTarget(id);
     await _inConversation(target, () => _recoverGroupSleepIn(id, members));

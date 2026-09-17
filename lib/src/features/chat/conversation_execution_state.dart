@@ -17,6 +17,8 @@ class _ConversationExecutionState {
   Map<String, _ReplyContext> groupReplies = {};
   Map<String, MessageSender> groupSenders = {};
   Map<String, Conversation> groupRuns = {};
+  Map<String, _GroupMemberThoughts> groupThoughts = {};
+  Map<String, String> groupReplyDrafts = {};
   Set<String> removedGroupMembers = {};
   String? confirmingSenderId;
   Map<String, AgentRuntime> groupRuntimes = {};
@@ -110,6 +112,7 @@ extension ConversationExecutionState on ChatController {
       return;
     }
     conversation.runState = ChatRunState.stopping;
+    _execution.groupReplyDrafts.clear();
     _execution.forwardedReplyPending = false;
     _queuedSystemNotices.remove(conversation.id);
     _groupDispatcher?.stop();
