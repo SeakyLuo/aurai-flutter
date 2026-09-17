@@ -68,7 +68,11 @@ class RollContactIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: const Size.square(24),
-    painter: _DicePainter(Theme.of(context).colorScheme.onSurfaceVariant),
+    painter: _DicePainter(
+      Theme.of(context).brightness == Brightness.dark
+          ? Theme.of(context).colorScheme.onSurfaceVariant
+          : const Color(0xff222222),
+    ),
   );
 }
 

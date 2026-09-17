@@ -1,3 +1,4 @@
+import 'html_app_store.dart';
 import '../domain/interactive_message.dart';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -14,7 +15,7 @@ class HtmlGameStore {
       "EXISTS (SELECT 1 FROM html_game_receipts WHERE processed_at IS NULL AND attempts >= 3 AND event_id IN (SELECT id FROM html_game_events WHERE message_id = html_games.message_id)) AS retry_available";
   Future<HtmlGameCard> card(String id) async {
     final rows = await database.rawQuery(
-      "SELECT title, preview, background_mode, display_mode, display_width, display_height, measured_width, measured_height, measured_scale, measured_version, version, status, $retryColumn FROM html_games WHERE message_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
+      "SELECT app_id, title, preview, background_mode, display_mode, display_width, display_height, measured_width, measured_height, measured_scale, measured_version, version, status, $retryColumn FROM html_games WHERE message_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
       [id],
     );
     if (rows.isEmpty) throw StateError('游戏已被删除或撤回');
@@ -74,8 +75,12 @@ class HtmlGameStore {
         : InteractiveMessage.fromJson(
             (jsonDecode(raw as String) as Map).cast<String, Object?>(),
           );
+    final app = await HtmlAppStore.load(db, rows.single['app_id'] as String);
     return HtmlGame.fromRow({
       ...rows.single,
+      'html': await HtmlAppStore.code(app),
+      'state_json': app['state_json'],
+      'stateful': app['stateful'],
       'interaction_projection': card?.webViewFor(viewer),
     });
   }
@@ -107,7 +112,12 @@ class HtmlGameStore {
     bool groupMessage = true,
   }) => database.transaction((txn) async {
     final title = (args['title'] as String).trim();
-    final html = args['html'] as String;
+    final existingId = args['appId'] as String?;
+    final existing = existingId == null ? null : await HtmlAppStore.load(txn, existingId);
+    if (existing != null && existing['creator_id'] != creator.id) {
+      throw StateError('只能重新发送自己创建的小应用入口');
+    }
+    final html = existing == null ? args['html'] as String : await HtmlAppStore.code(existing);
     final width = args['width'] as int?;
     final height = args['height'] as int? ?? 320;
     final displayMode = args['displayMode'] as String? ?? 'hybrid';
@@ -119,7 +129,9 @@ class HtmlGameStore {
         height > 640 ||
         (width != null && (width < 180 || width > 600)))
       throw ArgumentError('卡片高度需在 180–640 之间，宽度可自适应或设为 180–600');
-    final state = (args['state'] as Map).cast<String, Object?>();
+    final state = existing == null
+        ? (args['state'] as Map).cast<String, Object?>()
+        : (jsonDecode(existing['state_json'] as String) as Map).cast<String, Object?>();
     final participants = List<String>.from(args['participants'] as List);
     final turn = args['turnSenderId'] as String?;
     if (title.isEmpty ||
@@ -151,6 +163,7 @@ class HtmlGameStore {
             'participation': args['participation'] ?? <String, Object?>{},
           });
     interactive?.validateTransport(html: true);
+    final appId = existingId ?? newMessageId();
     final message = AgentMessage(
       interactive: interactive,
       id: newMessageId(),
@@ -162,6 +175,8 @@ class HtmlGameStore {
       isGroupMessage: groupMessage,
       runId: runId,
       htmlGame: HtmlGameCard(
+        appId: appId,
+        version: existing?['version'] as int? ?? 0,
         title: title,
         width: width,
         height: height,
@@ -169,20 +184,35 @@ class HtmlGameStore {
         backgroundMode: backgroundMode,
       ),
     );
+    final appVersion = existing?['version'] as int? ?? 0;
+    if (existing == null) {
+      final path = await HtmlAppStore.publish(appId, html);
+      await txn.insert('html_apps', {
+        'id': appId,
+        'creator_id': creator.id,
+        'title': title,
+        'source_path': path,
+        'state_json': jsonEncode(state),
+        'stateful': args['stateful'] == true ? 1 : 0,
+        'version': 0,
+        'updated_at': message.createdAt.microsecondsSinceEpoch,
+      });
+    }
     await txn.insert('messages', messageRow(conversationId, message));
     await txn.insert('html_games', {
       'message_id': message.id,
+      'app_id': appId,
       'conversation_id': conversationId,
       'creator_id': creator.id,
       'title': title,
-      'html': html,
+      'html': '',
       'display_mode': displayMode,
       'background_mode': backgroundMode,
-      'stateful': args['stateful'] == true ? 1 : 0,
+      'stateful': existing?['stateful'] ?? (args['stateful'] == true ? 1 : 0),
       'display_width': width,
       'display_height': height,
-      'state_json': jsonEncode(state),
-      'version': 0,
+      'state_json': '{}',
+      'version': appVersion,
       'participants_json': jsonEncode(participants),
       'status': 'active',
       'turn_sender_id': turn,
@@ -203,7 +233,7 @@ class HtmlGameStore {
       'id': initialEventId,
       'message_id': message.id,
       'actor_id': creator.id,
-      'version': 0,
+      'version': appVersion,
       'request_json': jsonEncode({'action': '游戏已创建'}),
       'snapshot_json': jsonEncode(snapshot),
       'created_at': message.createdAt.microsecondsSinceEpoch,
@@ -295,18 +325,22 @@ class HtmlGameStore {
       'status': status,
     };
     final now = DateTime.now().microsecondsSinceEpoch;
+    await txn.update('html_apps', {
+      'state_json': jsonEncode(nextState),
+      'version': expected + 1,
+      'updated_at': now,
+    }, where: 'id = ?', whereArgs: [game.appId]);
     await txn.update(
       'html_games',
       {
-        'state_json': jsonEncode(nextState),
         'version': expected + 1,
         'status': status,
         'turn_sender_id': turn,
         'preview': null,
         'updated_at': now,
       },
-      where: 'message_id = ? AND version = ?',
-      whereArgs: [messageId, expected],
+      where: 'app_id = ?',
+      whereArgs: [game.appId],
     );
     await txn.insert('html_game_events', {
       'id': eventId,

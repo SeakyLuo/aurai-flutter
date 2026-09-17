@@ -177,7 +177,9 @@ class ChatViewportState extends State<ChatViewport> {
   @override
   void didUpdateWidget(ChatViewport oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _following = widget.followOutput;
+    if (widget.followOutput != oldWidget.followOutput) {
+      _following = widget.followOutput;
+    }
     final anchor = _anchor;
     final previousIndex = anchor == null ? null : _indices[anchor.messageId];
     if (!identical(widget.entries, oldWidget.entries)) _indexEntries();
@@ -394,13 +396,29 @@ class ChatViewportState extends State<ChatViewport> {
                 if (notification.depth == 0) {
                   if (notification is ScrollStartNotification &&
                       notification.dragDetails != null) {
+                    _scrollRevision++;
+                    _restoring = false;
                     _keepSentMessageAtTop = false;
+                    _following = false;
+                    widget.onFollowOutputChanged(false);
                     _userScrolling = true;
                     FocusManager.instance.primaryFocus?.unfocus();
                   }
-                  if (notification is ScrollEndNotification) {
+                  if (notification is ScrollEndNotification && _userScrolling) {
                     _rememberPosition();
                     _userScrolling = false;
+                    final anchor = _anchor;
+                    if (!_following && anchor != null) {
+                      final revision = _scrollRevision;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted ||
+                            _userScrolling ||
+                            _following ||
+                            revision != _scrollRevision)
+                          return;
+                        _preserveEntry(anchor.messageId);
+                      });
+                    }
                   }
                 }
                 return false;

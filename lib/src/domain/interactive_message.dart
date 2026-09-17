@@ -1,3 +1,4 @@
+import 'interactive_selection.dart';
 import 'interaction_expression.dart';
 import 'shared_interaction.dart';
 
@@ -14,8 +15,10 @@ class InteractiveMessage {
     this.session = const {},
     this.snapshotView,
     this.showStatistics = true,
+    this.buttonColumns = 1,
   });
   final bool showStatistics;
+  final int buttonColumns;
   final Map<String, Object?> interaction;
   final Map<String, Object?> session;
   final Map<String, Object?>? snapshotView;
@@ -31,6 +34,8 @@ class InteractiveMessage {
       ...buttons,
       for (final state in states) ...(state['buttons'] as List).cast<Map>(),
     ];
+    if (!shared && allButtons.any((b) => b['selection'] != null))
+      throw ArgumentError('选择列表需要 interaction 配置以保存参与者选择');
     if (!html && allButtons.any((b) => b['input'] != null))
       throw ArgumentError('原生交互消息使用固定按钮，输入端点仅用于 HTML');
   }
@@ -130,6 +135,7 @@ class InteractiveMessage {
     return InteractiveMessage(
       revision: revision,
       showStatistics: current?['showStatistics'] as bool? ?? showStatistics,
+      buttonColumns: current?['buttonColumns'] as int? ?? buttonColumns,
       title: current?['title'] as String? ?? title,
       body: current?['body'] as String? ?? body,
       buttons: current == null
@@ -150,6 +156,7 @@ class InteractiveMessage {
     return InteractiveMessage(
       revision: 1,
       showStatistics: view.showStatistics,
+      buttonColumns: view.buttonColumns,
       title: view.title,
       body: view.body,
       buttons: [
@@ -200,27 +207,10 @@ class InteractiveMessage {
     if (visible('summaryVisibility', actor: actor)) 'summary': summary,
   };
 
-  List<Map<String, Object?>> get summary {
-    final counts = <(String, String), Map<String, Object?>>{
-      for (final button in buttons.where(
-        (b) => !shared || b['action'] == 'submit',
-      ))
-        (button['id'] as String, button['label'] as String): {
-          'buttonId': button['id'],
-          'label': button['label'],
-          'count': 0,
-        },
-    };
-    for (final state in choices.values) {
-      final id = state['buttonId'] as String;
-      final entry = counts.putIfAbsent((
-        id,
-        state['label'] as String,
-      ), () => {'buttonId': id, 'label': state['label'], 'count': 0});
-      entry['count'] = (entry['count'] as int) + 1;
-    }
-    return counts.values.toList();
-  }
+  List<Map<String, Object?>> get summary => interactionSummary(
+    buttons.where((b) => !shared || b['action'] == 'submit').toList(),
+    choices.values,
+  );
 
   final int revision;
   final List<Map<String, Object?>> states;
@@ -233,6 +223,7 @@ class InteractiveMessage {
     String actorId,
   ) => InteractiveMessage(
     showStatistics: json['showStatistics'] as bool? ?? true,
+    buttonColumns: json['buttonColumns'] as int? ?? 1,
     revision: json['revision'] as int,
     snapshotView: json['interactionView'] == null
         ? null
@@ -253,6 +244,7 @@ class InteractiveMessage {
   );
 
   factory InteractiveMessage.fromJson(Map<String, Object?> json) {
+    _validateButtonColumns(json['buttonColumns']);
     final title = json['title'] as String;
     final body = json['body'] as String;
     final buttons = (json['buttons'] as List)
@@ -279,6 +271,7 @@ class InteractiveMessage {
     }
     _validateButtons(buttons, stateIds);
     for (final state in states) {
+      _validateButtonColumns(state['buttonColumns']);
       if (state['showStatistics'] != null && state['showStatistics'] is! bool)
         throw ArgumentError('showStatistics 必须是布尔值');
       final stateTitle = state['title'] as String;
@@ -310,6 +303,7 @@ class InteractiveMessage {
     );
     return InteractiveMessage(
       showStatistics: json['showStatistics'] as bool? ?? true,
+      buttonColumns: json['buttonColumns'] as int? ?? 1,
       snapshotView: json['snapshotView'] == null
           ? null
           : Map<String, Object?>.from(json['snapshotView'] as Map),
@@ -334,6 +328,12 @@ class InteractiveMessage {
     );
   }
 
+  static void _validateButtonColumns(Object? value) {
+    if (value != null && (value is! int || (value != 1 && value != 2))) {
+      throw ArgumentError('按钮列数只支持 1 或 2');
+    }
+  }
+
   static void _validateButtons(
     List<Map<String, Object?>> buttons,
     Set<String> stateIds,
@@ -353,6 +353,11 @@ class InteractiveMessage {
           ].contains(b['action']) ||
           b['repeatable'] is! bool) {
         throw ArgumentError('按钮标识需唯一，文字不能为空，动作需有效');
+      }
+      if (b['selection'] case final Map config) {
+        if (b['action'] != 'submit' || b['input'] != null)
+          throw ArgumentError('选择列表使用 submit，不能同时配置页面输入');
+        InteractiveSelection(Map<String, Object?>.from(config)).validate();
       }
       if (b['completedLabel'] != null &&
           (b['completedLabel'] is! String ||
@@ -410,6 +415,7 @@ class InteractiveMessage {
   Map<String, Object?> toJson({bool includeParticipants = false}) => {
     'revision': revision,
     'showStatistics': showStatistics,
+    'buttonColumns': buttonColumns,
     if (snapshotView != null) 'snapshotView': snapshotView,
     'participation': participation,
     if (interaction.isNotEmpty) 'interaction': interaction,

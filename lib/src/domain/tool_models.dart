@@ -21,6 +21,7 @@ class ToolDefinition {
     this.confirmationDescriptionBuilder,
     this.taskScopedConfirmation = false,
     this.confirmationMayBeRequired = false,
+    this.singleUseConfirmation = false,
     this.waitsForUser = false,
   });
 
@@ -36,6 +37,7 @@ class ToolDefinition {
   final ToolConfirmationDescriptionBuilder? confirmationDescriptionBuilder;
   final bool taskScopedConfirmation;
   final bool confirmationMayBeRequired;
+  final bool singleUseConfirmation;
   final bool waitsForUser;
 
   Map<String, Object?> get modelInputSchema {

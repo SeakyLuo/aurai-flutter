@@ -4,7 +4,8 @@ extension ConversationSearchNavigation on ChatController {
   List<AgentMessage> get visibleMessages {
     final conversation = activeConversation;
     final window = conversation.searchMessages;
-    if (window == null) return messages;
+    if (window == null)
+      return messages.where((message) => message.quickReplyToId == null).toList();
     if (conversation.searchHasLater) return window;
     final combined = {
       for (final message in window) message.id: message,
@@ -16,7 +17,9 @@ extension ConversationSearchNavigation on ChatController {
       final order = a.createdAt.compareTo(b.createdAt);
       return order == 0 ? a.id.compareTo(b.id) : order;
     });
-    return combined;
+    return combined
+        .where((message) => message.quickReplyToId == null)
+        .toList();
   }
 
   bool get hasSearchWindow => activeConversation.searchMessages != null;

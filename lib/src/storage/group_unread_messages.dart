@@ -39,11 +39,18 @@ class GroupUnreadMessages {
       '''
       SELECT conversation_id, COUNT(*) AS unread FROM messages
       WHERE sender_id != ? AND role = 'assistant'
-        AND kind NOT IN ('commentary', 'system') AND (
+        AND kind NOT IN ('commentary', 'system')
+        AND (interactive_json IS NULL
+          OR json_extract(interactive_json, '\$.participation.audience') IS NULL
+          OR EXISTS (
+            SELECT 1 FROM json_each(interactive_json, '\$.participation.audience')
+            WHERE value = ?
+          )) AND (
           ${groups.map((_) => '(conversation_id = ? AND (created_at > ? OR (created_at = ? AND id > ?)))').join(' OR ')}
         ) GROUP BY conversation_id
     ''',
       [
+        MessageSender.localUser.id,
         MessageSender.localUser.id,
         for (final c in groups) ...[
           c.id,

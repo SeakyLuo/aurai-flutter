@@ -1,6 +1,7 @@
 const htmlGameSchema = [
   '''CREATE TABLE html_games (
     message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+    app_id TEXT REFERENCES html_apps(id),
     conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     creator_id TEXT NOT NULL REFERENCES message_senders(id),
     title TEXT NOT NULL,

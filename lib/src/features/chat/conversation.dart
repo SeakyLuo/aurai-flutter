@@ -44,6 +44,7 @@ class Conversation {
   String? storedTitle;
   List<String> creationMemberIds = [];
   List<MessageSender> creationMembers = [];
+  String creationUserName = MessageSender.localUser.name;
   String? storedPreview;
   bool storedPreviewIsSystem = false;
   AgentMessage? get _previewMessage => messages.reversed
@@ -121,7 +122,7 @@ class Conversation {
             : messages.first.text);
   String? get creationMessage => creationMembers.isEmpty
       ? null
-      : '你邀请了 ${creationMembers.map((sender) => sender.name).join('、')} 加入群聊';
+      : '${creationUserName}邀请了 ${creationMembers.map((sender) => sender.name).join('、')} 加入群聊';
 
   String? storedDraftAttachmentPreview;
   String? get draftPreview {

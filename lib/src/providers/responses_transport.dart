@@ -27,6 +27,7 @@ class ResponsesTransport {
   Future<Map<String, Object?>> send(
     Map<String, Object?> body, {
     void Function(String)? onTextChanged,
+    void Function(String)? onReasoningChanged,
     void Function()? onProcessingStarted,
     void Function(int index)? onMessageStarted,
   }) async {
@@ -42,6 +43,7 @@ class ResponsesTransport {
               onReconnect?.call(0);
               onTextChanged?.call(text);
             },
+            onReasoningChanged: onReasoningChanged,
             onProcessingStarted: () {
               onReconnect?.call(0);
               onProcessingStarted?.call();
@@ -71,6 +73,7 @@ class ResponsesTransport {
   Future<Map<String, Object?>> _sendOnce(
     Map<String, Object?> body, {
     void Function(String)? onTextChanged,
+    void Function(String)? onReasoningChanged,
     void Function()? onProcessingStarted,
     void Function(int index)? onMessageStarted,
   }) async {
@@ -123,6 +126,7 @@ class ResponsesTransport {
           await (chat ? readChatCompletionsStream : readResponsesStream)(
             response,
             onMessageStarted: onMessageStarted,
+            onReasoningChanged: onReasoningChanged,
             onProcessingStarted: () {
               checkCancelled();
               onProcessingStarted?.call();

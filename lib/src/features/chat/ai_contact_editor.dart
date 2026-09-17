@@ -191,7 +191,7 @@ class _AiContactEditorState extends State<AiContactEditor> {
           archived: old?.sender.archived ?? false,
         ),
         description: _description.text.trim(),
-        instructions: '',
+        instructions: old?.instructions ?? '',
         preferences: AiPreferences(
           systemPrompt:
               (old?.preferences ?? const AiPreferences()).systemPrompt,
@@ -209,6 +209,7 @@ class _AiContactEditorState extends State<AiContactEditor> {
         isTemporary: old?.isTemporary ?? false,
         createdAt: old?.createdAt ?? now,
         updatedAt: now,
+        previousUpdatedAt: old?.updatedAt,
       );
       if (widget.onSaveDraft != null) {
         await widget.onSaveDraft!(ai);

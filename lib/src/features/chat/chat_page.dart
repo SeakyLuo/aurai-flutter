@@ -192,6 +192,7 @@ class _ChatPageState extends State<ChatPage>
           ? _mentionMember
           : null,
       onOpenQuote: _openQuotedMessage,
+      onQuickReply: _sendQuickReply,
       beforeMessageId: _editing?.message.id,
       allowEditing: _editing == null,
     );
@@ -287,8 +288,9 @@ class _ChatPageState extends State<ChatPage>
                             : _editing != null
                             ? !_editing!.saving
                             : !controller.isBusy ||
-                                  (controller.canSendToRunningGroup &&
-                                      _canSend),
+                                  _canSend ||
+                                  controller.draftImages.isNotEmpty ||
+                                  controller.draftFiles.isNotEmpty,
                         canSend:
                             _canSend ||
                             (_editing?.images ?? controller.draftImages)
@@ -323,7 +325,8 @@ class _ChatPageState extends State<ChatPage>
                         canResume:
                             !isGroup &&
                             _editing == null &&
-                            controller.runState == ChatRunState.cancelled &&
+                            (controller.runState == ChatRunState.cancelled ||
+                                controller.runState == ChatRunState.idle) &&
                             controller.pendingGoal != null,
                         onResume: _continuePending,
                         onStop: _stop,
@@ -639,8 +642,6 @@ class _ChatPageState extends State<ChatPage>
     if ((goal.isEmpty &&
             widget.controller.draftImages.isEmpty &&
             widget.controller.draftFiles.isEmpty) ||
-        (widget.controller.isBusy &&
-            !widget.controller.canSendToRunningGroup) ||
         widget.controller.addingImages ||
         _preparingGoal) {
       return;
@@ -671,6 +672,31 @@ class _ChatPageState extends State<ChatPage>
     } finally {
       _preparingGoal = false;
       _positionSentMessage = false;
+    }
+  }
+
+  Future<void> _sendQuickReply(
+    AgentMessage message,
+    String key,
+    String text,
+  ) async {
+    final conversationId = widget.controller.activeConversation.id;
+    try {
+      final needsSettings = await widget.controller.submitQuickReply(
+        message,
+        key,
+        text,
+      );
+      if (needsSettings && mounted) {
+        _preparingGoal = true;
+        await _openSettings(continueAfterSave: true);
+      }
+    } on Object catch (error) {
+      if (widget.controller.activeConversation.id == conversationId) {
+        _showRunNotice(error);
+      }
+    } finally {
+      _preparingGoal = false;
     }
   }
 

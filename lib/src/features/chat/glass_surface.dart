@@ -14,6 +14,7 @@ class GlassSurface extends StatelessWidget {
     this.dark = false,
     this.regular = false,
     this.tintOpacity = 1,
+    this.shadowOpacity = 1,
   });
   final Widget child;
   final double radius;
@@ -21,21 +22,26 @@ class GlassSurface extends StatelessWidget {
   final bool dark;
   final bool regular;
   final double tintOpacity;
+  final double shadowOpacity;
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
       borderRadius: borderRadius ?? BorderRadius.circular(radius),
-      boxShadow: const [
+      boxShadow: [
         BoxShadow(
-          color: Color(0x10000000),
+          color: const Color(
+            0x10000000,
+          ).withValues(alpha: 16 / 255 * shadowOpacity),
           blurRadius: 6,
-          offset: Offset(0, 1),
+          offset: const Offset(0, 1),
         ),
         BoxShadow(
-          color: Color(0x04000000),
+          color: const Color(
+            0x04000000,
+          ).withValues(alpha: 4 / 255 * shadowOpacity),
           blurRadius: 3,
-          offset: Offset(0, 1),
+          offset: const Offset(0, 1),
         ),
       ],
     ),

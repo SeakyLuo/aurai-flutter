@@ -213,16 +213,33 @@ extension GroupMessageDelivery on ChatController {
       throw ArgumentError('你不是这个群的成员');
     }
     final paused = participation == 'paused';
-    if (paused) await _groupSleeps.remove(groupId, senderId);
     await GroupParticipation(_store.database).set(groupId, senderId, paused);
-    if (_runningConversation?.id == groupId) {
-      if (paused) {
-        _groupDispatcher?.pause(senderId);
-        await _groupRuntimes[senderId]?.cancel();
-      } else {
-        _groupDispatcher?.paused.remove(senderId);
-      }
-    }
+    await _applyPrivateGroupParticipation(groupId, senderId, paused);
     return {'participation': participation, 'groupId': groupId};
+  }
+
+  Future<void> _applyPrivateGroupParticipation(
+    String groupId,
+    String senderId,
+    bool paused,
+  ) async {
+    try {
+      final state = _executionStates[groupId];
+      if (state != null) {
+        if (paused) {
+          state.groupDispatcher?.pause(senderId);
+          await state.groupRuntimes[senderId]?.cancel();
+        } else {
+          state.groupDispatcher?.paused.remove(senderId);
+        }
+      }
+      await _groupSleeps.reload();
+    } on Object catch (error, stack) {
+      developer.log(
+        'Committed participation runtime update failed',
+        error: error,
+        stackTrace: stack,
+      );
+    }
   }
 }

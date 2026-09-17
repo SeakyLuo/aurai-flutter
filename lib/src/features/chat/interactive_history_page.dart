@@ -166,7 +166,7 @@ class InteractiveHistoryTile extends StatelessWidget {
                     actorId: actorId,
                     readOnly: true,
                     historical: true,
-                    onClick: (_, _, _) async => null,
+                    onClick: (_, _, _, {value}) async => null,
                     onOpenLink: (_) async {},
                   ),
                 ],

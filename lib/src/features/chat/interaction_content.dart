@@ -1,3 +1,6 @@
+import 'interactive_button_layout.dart';
+import 'interactive_selection_view.dart';
+import '../../domain/interactive_selection.dart';
 import 'package:flutter/material.dart';
 import 'interactive_message_button.dart';
 
@@ -8,20 +11,24 @@ class InteractionContent extends StatelessWidget {
     required this.view,
     required this.shared,
     required this.buttons,
+    required this.buttonColumns,
     required this.readOnly,
     required this.allowChange,
     required this.eligible,
     required this.editing,
     required this.busy,
+    this.pendingButtonId,
     required this.onEditing,
     required this.onClick,
   });
   final Map<String, Object?> view;
+  final int buttonColumns;
   final List<Map<String, Object?>> buttons;
   final bool readOnly, allowChange, eligible, editing, shared;
   final String? busy;
+  final String? pendingButtonId;
   final ValueChanged<bool> onEditing;
-  final ValueChanged<Map<String, Object?>> onClick;
+  final void Function(Map<String, Object?> button, {Object? value}) onClick;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +41,7 @@ class InteractionContent extends StatelessWidget {
         ? buttons
               .where(
                 (button) =>
+                    button['selection'] == null &&
                     button['id'] == self!['buttonId'] &&
                     button['label'] == self['label'] &&
                     (button['action'] == 'submit' || !shared),
@@ -43,10 +51,9 @@ class InteractionContent extends StatelessWidget {
     final showSubmitted = selectedButton != null;
     final status = view['closed'] == true || view['phase'] == 'closed'
         ? '已结束'
-        : !submitted && !eligible && view['completed'] != true
-        ? '等待本轮参与者提交'
         : null;
     final actions = buttons
+        .where((button) => button['selection'] == null)
         .where(
           (button) => button['action'] == 'nextRound'
               ? view['completed'] == true && view['closed'] != true
@@ -93,6 +100,27 @@ class InteractionContent extends StatelessWidget {
             (status != null ||
                 (view['revealed'] == true && view['summaryVisible'] != true)))
           const SizedBox(height: 12),
+        for (final button in buttons.where(
+          (button) => button['selection'] != null,
+        ))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: InteractiveSelectionView(
+              key: ValueKey((button['id'], view['round'])),
+              button: button,
+              self: self,
+              locked:
+                  readOnly ||
+                  !eligible ||
+                  !collecting ||
+                  busy != null ||
+                  pendingButtonId == button['id'],
+              submitted: submitted,
+              editing: editing,
+              busy: busy == button['id'],
+              onSubmit: (value) => onClick(button, value: value),
+            ),
+          ),
         if (selectedButton != null) ...[
           InteractiveMessageButton(
             button: {
@@ -107,19 +135,23 @@ class InteractionContent extends StatelessWidget {
           ),
           if (actions.isNotEmpty) const SizedBox(height: 8),
         ],
-        for (final (index, button) in actions.indexed) ...[
-          if (index > 0) const SizedBox(height: 8),
-          InteractiveMessageButton(
-            button: button,
-            busy: busy == button['id'],
-            locked:
-                readOnly ||
-                busy != null ||
-                (!eligible &&
-                    ['submit', 'nextRound'].contains(button['action'])),
-            onPressed: () => onClick(button),
-          ),
-        ],
+        InteractiveButtonLayout(
+          columns: buttonColumns,
+          children: [
+            for (final button in actions)
+              InteractiveMessageButton(
+                button: button,
+                busy: busy == button['id'],
+                locked:
+                    readOnly ||
+                    busy != null ||
+                    pendingButtonId == button['id'] ||
+                    (!eligible &&
+                        ['submit', 'nextRound'].contains(button['action'])),
+                onPressed: () => onClick(button),
+              ),
+          ],
+        ),
         if (collecting && submitted && allowChange && eligible && !readOnly)
           Align(
             alignment: Alignment.centerRight,
@@ -153,8 +185,12 @@ class InteractionDistribution extends StatelessWidget {
                 final count = option['count'] as int;
                 final ratio = total == 0 ? 0.0 : count / total;
                 final mine =
-                    selected?['buttonId'] == option['buttonId'] &&
-                    selected?['label'] == option['label'];
+                    selected != null &&
+                    selectionEntries(Map<String, Object?>.from(selected)).any(
+                      (choice) =>
+                          choice['buttonId'] == option['buttonId'] &&
+                          choice['label'] == option['label'],
+                    );
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [

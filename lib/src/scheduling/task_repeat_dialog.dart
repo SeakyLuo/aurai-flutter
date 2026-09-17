@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import '../features/chat/glass_surface.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
-import '../utils/widget_utils.dart';
+import '../features/chat/dialog_action_button.dart';
 import 'task_filter_menu.dart';
 import 'task_repeat.dart';
 
@@ -293,26 +293,16 @@ class _RepeatDialogState extends State<_RepeatDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: TextButton(
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(0, 46),
-                        foregroundColor: Theme.of(
-                          context,
-                        ).colorScheme.onSurface,
-                        backgroundColor: dialogControlColor(context),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(23),
-                        ),
-                      ),
+                    child: DialogActionButton(
+                      text: '取消',
+                      role: DialogActionRole.secondary,
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('取消'),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: WidgetUtils.primaryButton(
+                    child: DialogActionButton(
                       text: '完成',
-                      height: 46,
                       onPressed: _done,
                     ),
                   ),

@@ -100,6 +100,7 @@ class GroupMessageSearch {
       database.query(
         'html_games',
         columns: [
+          'app_id',
           'message_id',
           'title',
           'preview',

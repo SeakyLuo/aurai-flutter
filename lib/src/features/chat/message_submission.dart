@@ -15,8 +15,7 @@ extension MessageSubmission on ChatController {
       await _appendGroupMessage(goal, mentionedRecipients);
       return false;
     }
-    if (hasRunningTask && !canStartPrivateDuringGroup)
-      throw StateError('当前会话正在回复，请等待完成');
+    final queueReply = hasRunningTask && !canStartPrivateDuringGroup;
     cancelSearchNavigation();
     _submitting = true;
     final wasNew =
@@ -24,6 +23,9 @@ extension MessageSubmission on ChatController {
         activeConversation.messageCount == 0 &&
         !activeConversation.isTemporary &&
         !activeConversation.isStored;
+    final previousPending = activeConversation.pendingGoal;
+    final previousQueued = _execution.queuedUserMessageId;
+    final messageId = newMessageId();
     final previousQuote = activeConversation.draftQuote;
     final previousDraft = activeConversation.draft;
     final previousMentions = List.of(activeConversation.draftMentions);
@@ -49,7 +51,7 @@ extension MessageSubmission on ChatController {
       }
       messages.add(
         AgentMessage(
-          id: newMessageId(),
+          id: messageId,
           role: AgentMessageRole.user,
           senderId: MessageSender.localUser.id,
           text: goal,
@@ -63,19 +65,26 @@ extension MessageSubmission on ChatController {
       draftImages.clear();
       draftFiles.clear();
       pendingGoal = goal;
-      steps.clear();
-      activeConversation.liveToolSteps.clear();
-      errorDetail = null;
-      runState = ChatRunState.idle;
+      if (queueReply && activeConversation.kind == ConversationKind.direct)
+        _execution.queuedUserMessageId = messageId;
+      if (!queueReply) {
+        steps.clear();
+        activeConversation.liveToolSteps.clear();
+        errorDetail = null;
+        runState = ChatRunState.idle;
+      }
       _notifyRun(activeConversation);
       try {
         await _persist(
+          saveRuntime: true,
+          saveMessages: true,
           recipients: activeConversation.kind == ConversationKind.group
-              ? {messages.last.id: recipients}
+              ? {messageId: recipients}
               : const {},
         );
       } on Object {
-        final unsent = messages.removeLast();
+        final index = messages.indexWhere((message) => message.id == messageId);
+        final unsent = messages.removeAt(index);
         activeConversation.messageCount--;
         activeConversation.draft = previousDraft;
         activeConversation.draftMentions
@@ -85,7 +94,9 @@ extension MessageSubmission on ChatController {
         activeConversation.storedTitle = previousTitle;
         draftImages.addAll(unsent.images);
         draftFiles.addAll(unsent.files);
-        pendingGoal = null;
+        pendingGoal = previousPending;
+        if (_execution.queuedUserMessageId == messageId)
+          _execution.queuedUserMessageId = previousQueued;
         rethrow;
       }
       if (wasNew) {
@@ -97,6 +108,13 @@ extension MessageSubmission on ChatController {
         );
       }
       _updateConversationList();
+      if (queueReply) {
+        await _queueSubmittedReply(
+          activeConversation,
+          messages.firstWhere((message) => message.id == messageId),
+        );
+        return false;
+      }
       if (needsReplyConfiguration) {
         return true;
       }
@@ -105,8 +123,24 @@ extension MessageSubmission on ChatController {
       return false;
     } finally {
       _submitting = false;
+      _resumeForwardedReply();
       _drainGroupSystemNotices();
       _notifyRun(activeConversation);
+    }
+  }
+
+  Future<void> _queueSubmittedReply(
+    Conversation conversation,
+    AgentMessage message,
+  ) async {
+    if (conversation.kind == ConversationKind.group) {
+      if (_groupDispatcher?.stopped == true) {
+        _queuedSystemNotices
+            .putIfAbsent(conversation.id, () => [])
+            .add(message);
+      } else {
+        await _receiveGroupSystemNotice(conversation.id, message);
+      }
     }
   }
 
@@ -138,6 +172,7 @@ extension MessageSubmission on ChatController {
       await _store.writer.save(
         conversation,
         makeActive: false,
+        saveDraft: true,
         recipients: {message.id: mentions ?? _groupReplies.keys.toList()},
       );
       dispatcher.receive(

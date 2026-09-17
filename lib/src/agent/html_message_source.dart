@@ -11,13 +11,19 @@ abstract final class HtmlMessageSource {
     'description':
         'UTF-8 .html/.htm file in the shell tool working directory (agent-shell). '
         'Use a relative path such as miniapps/game.html. Supply either html or '
-        'sourcePath, never both. The file is copied into the message, not linked.',
+        'sourcePath, never both. The code is published as an independent application file; the message holds an application reference.',
   };
 
   static Future<Map<String, Object?>> resolve(
     Map<String, Object?> args, {
     required bool creating,
   }) async {
+    if (args['appId'] != null) {
+      if (args['html'] != null || args['sourcePath'] != null) {
+        throw ArgumentError('重新打开小应用时不要同时提供源码');
+      }
+      return args;
+    }
     final html = args['html'];
     final source = args['sourcePath'];
     if (html != null && source != null) {

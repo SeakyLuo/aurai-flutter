@@ -158,6 +158,7 @@ extension GroupConversationRun on ChatController {
           if ((wakeMembers == null || wakeMembers.contains(id)) &&
               (wakeMembers != null || id != user.senderId) &&
               (!paused.contains(id) ||
+                  wakeMembers != null ||
                   (wakeMembers == null &&
                       !user.isSystem &&
                       mentioned.contains(id))))

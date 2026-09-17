@@ -20,6 +20,7 @@ extension GroupPrivateConversation on ChatController {
       );
     } finally {
       _privateConversation = null;
+      _resumeForwardedReply();
       _drainGroupSystemNotices();
       _notifyRun(conversation);
     }

@@ -6,6 +6,7 @@ import '../features/chat/compose_icon.dart';
 import '../features/chat/question_icon.dart';
 import '../features/chat/attachment_action_icon.dart';
 import '../features/chat/file_tool_icon.dart';
+import '../features/chat/sidebar_action_icon.dart';
 
 Widget? sharedSkillIcon(BuildContext context, String name) {
   const settings = {
@@ -52,6 +53,7 @@ Widget? sharedSkillIcon(BuildContext context, String name) {
       type: AttachmentActionIconType.gallery,
     ),
     'document' => const FileToolIcon(type: FileToolIconType.read),
+    'group' => const SidebarActionIcon(type: SidebarActionIconType.group),
     _ => null,
   };
 }

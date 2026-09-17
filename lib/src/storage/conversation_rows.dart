@@ -80,6 +80,8 @@ Map<String, Object?> messageRow(String conversationId, AgentMessage value) => {
   'sender_id': value.senderId,
   'kind': value.isFailure
       ? 'message_failure'
+      : value.quickReplyToId != null
+      ? 'quick_reply'
       : value.isSystem
       ? 'system'
       : value.htmlGame != null
@@ -88,6 +90,8 @@ Map<String, Object?> messageRow(String conversationId, AgentMessage value) => {
       ? 'user'
       : value.isGroupMessage
       ? 'group_message'
+      : value.isReasoning
+      ? 'reasoning'
       : value.taskSummary != null
       ? 'final'
       : 'assistant',

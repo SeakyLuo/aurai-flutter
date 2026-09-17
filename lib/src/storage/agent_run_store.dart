@@ -202,6 +202,7 @@ class AgentRunStore {
     String? error,
     String? diagnostic,
     bool isTask = false,
+    bool keepPendingGoal = false,
   }) async {
     await database.transaction((txn) async {
       final batch = txn.batch();
@@ -223,7 +224,7 @@ class AgentRunStore {
         {
           'run_state': status == 'completed' ? 'idle' : status,
           'error_detail': error,
-          if (status == 'completed') 'pending_goal': null,
+          if (status == 'completed' && !keepPendingGoal) 'pending_goal': null,
         },
         where: "active_run_id = ? AND kind != 'group'",
         whereArgs: [runId],
@@ -233,13 +234,14 @@ class AgentRunStore {
           'messages',
           {'kind': 'commentary'},
           where:
-              "run_id = ? AND id != ? AND kind NOT IN ('group_message', 'html_game') AND interactive_json IS NULL",
+              "run_id = ? AND id != ? AND kind NOT IN ('group_message', 'html_game', 'reasoning', 'system') AND interactive_json IS NULL",
           whereArgs: [runId, finalMessageId],
         );
         batch.update(
           'messages',
           {'kind': 'final'},
-          where: "id = ? AND kind NOT IN ('group_message', 'html_game')",
+          where:
+              "id = ? AND kind NOT IN ('group_message', 'html_game', 'reasoning', 'system')",
           whereArgs: [finalMessageId],
         );
       }

@@ -1,3 +1,5 @@
+import '../storage/html_callback_state.dart';
+import 'html_app_store.dart';
 import '../domain/interactive_message.dart';
 import '../storage/interactive_message_store.dart';
 import '../domain/message_sender.dart';
@@ -67,11 +69,17 @@ extension HtmlMessageInteraction on HtmlGameStore {
           conversationId: conversationId,
           senderId: row['creator_id'] as String,
           payload: {'action': action, 'data': args['data'], 'source': 'html'},
+          html: true,
         );
       }
-      return {'accepted': true, 'eventId': eventId};
+      return {'accepted': true, 'eventId': eventId,
+        if (args['notifyAi'] == true)
+          ...((await HtmlCallbackState.read(txn, messageId, eventId: eventId)).single)};
     });
-    if (args['notifyAi'] == true) MessageCallbacks.changes.add(null);
+    if (args['notifyAi'] == true) {
+      HtmlCallbackState.changes.add(messageId);
+      MessageCallbacks.changes.add(null);
+    }
     return result;
   }
 
@@ -91,8 +99,11 @@ extension HtmlMessageInteraction on HtmlGameStore {
     );
     if (rows.isEmpty) throw StateError('HTML 消息不存在或已撤回');
     final row = rows.single;
-    if (row['creator_id'] != senderId) throw StateError('只能读取或更新自己创建的 HTML 消息');
-    final state = jsonDecode(row['state_json'] as String);
+    final authored = row['creator_id'] == senderId;
+    if (operation != 'readHtmlMessage' && !authored)
+      throw StateError('只能更新自己创建的 HTML 消息');
+    final app = await HtmlAppStore.load(txn, row['app_id'] as String);
+    final state = jsonDecode(app['state_json'] as String);
     if (operation == 'readHtmlMessage') {
       final messages = await txn.query(
         'messages',
@@ -106,20 +117,53 @@ extension HtmlMessageInteraction on HtmlGameStore {
           : InteractiveMessage.fromJson(
               (jsonDecode(raw as String) as Map).cast<String, Object?>(),
             );
+      interactive?.requireViewer(senderId);
       return {
-        if (interactive != null) 'interaction': interactive.readFor(senderId),
+        if (interactive != null) 'interaction': interactive.webViewFor(senderId),
+        if (interactive != null) 'presentation': interactive.viewFor(senderId).toJson(),
+        if (authored) 'events': await HtmlCallbackState.read(txn, id),
         'messageId': id,
         'version': row['version'],
         'title': row['title'],
-        'html': row['html'],
+        if (authored || args['includePrivate'] == true) ...{
+          'html': await HtmlAppStore.code(app),
+          ...await HtmlAppStore.reference(app),
+        },
         'backgroundMode': row['background_mode'],
-        'state': state,
+        'displayMode': row['display_mode'],
+        'width': row['display_width'],
+        'conversationId': conversationId,
+        if (authored || args['includePrivate'] == true) 'state': state,
+        'privateContentIncluded': authored || args['includePrivate'] == true,
       };
+    }
+    final callbackId = args['callbackEventId'] as String?;
+    if (callbackId != null) {
+      final event = await HtmlCallbackState.requireEvent(txn, id, callbackId, senderId);
+      if (event['status'] == 'completed') {
+        return {'updated': false, 'version': row['version'], 'callbackCompleted': true};
+      }
+      if (event['status'] != 'processing') throw StateError('操作未在处理中，请先重试');
     }
     if (args['expectedVersion'] != row['version'])
       throw StateError('消息已更新，请重新读取版本');
     final html = args['html'] as String?;
     final background = args['backgroundMode'] as String?;
+    final title = (args['title'] as String?)?.trim();
+    final displayMode = args['displayMode'] as String?;
+    final width = args['width'] as int?;
+    if (title != null && (title.isEmpty || title.length > 100))
+      throw ArgumentError('标题需为 1–100 字');
+    if (displayMode != null && !['inline', 'hybrid', 'standalone'].contains(displayMode))
+      throw ArgumentError('displayMode 必须为 inline、hybrid 或 standalone');
+    if (width != null && (width < 180 || width > 600))
+      throw ArgumentError('宽度需为 180–600，或使用 null 自适应');
+    final presentation = <String, Object?>{
+      if (title != null) 'title': title,
+      if (displayMode != null) 'display_mode': displayMode,
+      if (args.containsKey('width')) 'display_width': width,
+    };
+    final presentationChanged = presentation.entries.any((e) => row[e.key] != e.value);
     if (background != null &&
         !['message', 'transparent'].contains(background)) {
       throw ArgumentError('backgroundMode 必须为 message 或 transparent');
@@ -128,27 +172,60 @@ extension HtmlMessageInteraction on HtmlGameStore {
         (html.trim().isEmpty || utf8.encode(html).length > 256 * 1024))
       throw ArgumentError('HTML 不能为空且最多 256 KB');
     final nextState = args['state'] == null
-        ? row['state_json'] as String
+        ? app['state_json'] as String
         : jsonEncode(args['state']);
     if (utf8.encode(nextState).length > 65536)
       throw ArgumentError('状态最多 64 KB');
-    if (nextState == row['state_json'] &&
-        (html == null || html == row['html']) &&
-        (background == null || background == row['background_mode']))
-      return {'updated': false, 'version': row['version']};
+    if (!presentationChanged && nextState == app['state_json'] &&
+        html == null &&
+        (background == null || background == row['background_mode'])) {
+        if (callbackId != null) await HtmlCallbackState.complete(txn, callbackId);
+        return {'updated': false, 'version': row['version'],
+          if (callbackId != null) 'callbackCompleted': true};
+    }
     final version = (row['version'] as int) + 1;
+    final sourcePath = html == null ? app['source_path'] as String : await HtmlAppStore.publish(app['id'] as String, html);
+    await txn.update('html_apps', {
+      'source_path': sourcePath,
+      'state_json': nextState,
+      'version': version,
+      if (title != null) 'title': title,
+      'updated_at': DateTime.now().microsecondsSinceEpoch,
+    }, where: 'id = ?', whereArgs: [app['id']]);
     await txn.update(
       'html_games',
-      {
-        'state_json': nextState,
-        if (html != null) 'html': html,
-        if (background != null) 'background_mode': background,
-        'version': version,
-        'preview': null,
-      },
-      where: 'message_id = ?',
-      whereArgs: [id],
+      {'version': version, 'preview': null},
+      where: 'app_id = ?',
+      whereArgs: [app['id']],
     );
-    return {'updated': true, 'version': version};
+    if (presentation.isNotEmpty || background != null) {
+      await txn.update('html_games', {
+        ...presentation,
+        if (background != null) 'background_mode': background,
+      }, where: 'message_id = ?', whereArgs: [id]);
+    }
+    if (title != null && title != row['title']) {
+      final messages = await txn.query('messages', columns: ['interactive_json'],
+        where: 'id = ?', whereArgs: [id], limit: 1);
+      final raw = messages.single['interactive_json'] as String?;
+      final card = raw == null ? null : (jsonDecode(raw) as Map).cast<String, Object?>();
+      if (card != null) {
+        card['title'] = title;
+        card['revision'] = (card['revision'] as int) + 1;
+      }
+      final private = card != null && (card['participation'] as Map?)?['audience'] != null;
+      final text = private ? '私密交互消息' : title;
+      await txn.update('messages', {
+        'text': text,
+        if (card != null) 'interactive_json': jsonEncode(card),
+      }, where: 'id = ?', whereArgs: [id]);
+      await txn.update('conversations', {'preview': text},
+        where: 'id = ? AND ? = (SELECT id FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, id DESC LIMIT 1)',
+        whereArgs: [conversationId, id, conversationId]);
+    }
+    if (callbackId != null) await HtmlCallbackState.complete(txn, callbackId);
+    return {'updated': true, 'version': version,
+      if (callbackId != null) 'callbackCompleted': true,
+      ...await HtmlAppStore.reference({...app, 'source_path': sourcePath})};
   });
 }

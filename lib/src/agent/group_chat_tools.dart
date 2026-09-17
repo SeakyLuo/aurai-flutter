@@ -1,15 +1,16 @@
 import '../domain/tool_models.dart';
 import '../storage/group_chat_store.dart';
 
-class GroupChatTool implements AgentTool, RuntimeCapabilityAgentTool {
+class GroupChatTool implements AgentTool, RuntimeCapabilityAgentTool, PreflightAgentTool {
   GroupChatTool(
     this.store,
     this.operation,
     this.currentConversationId,
     this.rename,
     this.updateMembers,
-    this.changed,
-  );
+    this.changed, {
+    required this.senderId,
+  });
   static const operations = [
     'list',
     'read',
@@ -18,11 +19,24 @@ class GroupChatTool implements AgentTool, RuntimeCapabilityAgentTool {
     'updateMembers',
   ];
   final GroupChatStore store;
+  final String senderId;
   final String operation;
   final String currentConversationId;
   final Future<void> Function(String id, String title) rename;
   final Future<void> Function(String id, List<String> members) updateMembers;
   final void Function() changed;
+  String _groupTitle = '';
+  @override
+  Future<ToolResult?> preflight(ToolCall call) async {
+    if (operation == 'list' || operation == 'create') return null;
+    final rows = await store.database.query('conversations', columns: ['title'],
+      where: "id = ? AND kind = 'group' AND id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)",
+      whereArgs: [call.arguments['id'] ?? currentConversationId, senderId], limit: 1);
+    if (rows.isEmpty) return ToolResult(callId: call.id, toolName: call.name,
+      status: ToolResultStatus.error, output: {'message': '群聊不存在或你不是当前成员'});
+    _groupTitle = rows.single['title'] as String;
+    return null;
+  }
 
   @override
   ToolDefinition get definition => ToolDefinition(
@@ -32,7 +46,9 @@ class GroupChatTool implements AgentTool, RuntimeCapabilityAgentTool {
     capabilityId: 'local.group_chats',
     safety: ['list', 'read'].contains(operation)
         ? ToolSafety.readOnly
-        : ToolSafety.lowRisk,
+        : operation == 'updateMembers' ? ToolSafety.sensitive : ToolSafety.lowRisk,
+    singleUseConfirmation: operation == 'updateMembers',
+    confirmationDescriptionBuilder: (_) => '是否允许调整“$_groupTitle”的成员？移除成员会停止其当前任务，新成员可以参与群聊。',
     description: switch (operation) {
       'list' =>
         'Search saved Aurai group chats by title with offset pagination, at most 50. Returns internal IDs; never ask the user to enter IDs. Does not search messages; use readGroupMessages for group message contents.',
@@ -90,8 +106,8 @@ class GroupChatTool implements AgentTool, RuntimeCapabilityAgentTool {
         final rows = await store.database.query(
           'conversations',
           columns: ['id', 'title', 'updated_at'],
-          where: "kind = 'group' AND instr(lower(title), ?) > 0",
-          whereArgs: [(a['query'] as String).toLowerCase()],
+          where: "kind = 'group' AND instr(lower(title), ?) > 0 AND id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)",
+          whereArgs: [(a['query'] as String).toLowerCase(), senderId],
           orderBy: 'updated_at DESC, id',
           limit: 51,
           offset: offset,
@@ -120,8 +136,8 @@ class GroupChatTool implements AgentTool, RuntimeCapabilityAgentTool {
         final rows = await store.database.query(
           'conversations',
           columns: ['id', 'title'],
-          where: "id = ? AND kind = 'group'",
-          whereArgs: [id],
+          where: "id = ? AND kind = 'group' AND id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)",
+          whereArgs: [id, senderId],
         );
         if (rows.isEmpty) throw StateError('未找到群聊，请先查询群聊列表');
         if (operation == 'read') {

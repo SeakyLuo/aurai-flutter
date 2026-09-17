@@ -18,6 +18,11 @@ extension MessageQuoteActions on ChatController {
     }
     conversation.draftQuote = quote;
     _conversationChanged();
-    await _store.writer.save(conversation, makeActive: false);
+    await _store.writer.save(
+      conversation,
+      makeActive: false,
+      saveDraft: true,
+      saveMessages: false,
+    );
   }
 }

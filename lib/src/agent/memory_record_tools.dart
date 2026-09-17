@@ -46,7 +46,7 @@ class MemoryRecordTool
       name: operation == 'list' ? 'listMemories' : '${operation}Memory',
       description: switch (operation) {
         'list' =>
-          'Search or list this AI own memories across private chat and all groups, newest updated first, 20 per page. Returns IDs, UTC creation/update timestamps, source references and revision. Use nextOffset for more. IDs are internal, do not display them to users.',
+          'Search or list this AI own memories across private chat and all groups, newest updated first, 20 per page. Returns IDs, device-local creation/update timestamps with explicit UTC offset, source references and revision. Use nextOffset for more. IDs are internal, do not display them to users.',
         'read' =>
           'Read one of this AI own memories from any scene, including creation/update times, source references and revision.',
         'create' =>

@@ -65,6 +65,15 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
   String get _duration =>
       taskDuration(Duration(milliseconds: widget.summary.elapsedMilliseconds));
 
+  String get _heading {
+    if (!widget.summary.isTask) {
+      return widget.summary.stopped ? '思考已停止' : '思考过程';
+    }
+    return widget.summary.stopped
+        ? '用时 $_duration · 已停止'
+        : '用时 $_duration';
+  }
+
   @override
   Widget build(BuildContext context) {
     final sources = _expanded && _activityWidgets == null
@@ -119,9 +128,13 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
                             tableScrollbarThumbVisibility: true,
                             tablePadding: const EdgeInsets.only(bottom: 12),
                             p: TextStyle(
-                              fontSize: 16,
+                              fontSize: activity.isReasoning ? 15 : 16,
                               height: 1.65,
-                              color: Theme.of(context).colorScheme.onSurface,
+                              color: activity.isReasoning
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant
+                                  : Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                     ),
@@ -166,9 +179,7 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
                   children: [
                     Flexible(
                       child: Text(
-                        widget.summary.stopped
-                            ? '用时 $_duration · 已停止'
-                            : '用时 $_duration',
+                        _heading,
                         style: TextStyle(
                           fontSize: 14,
                           color: Theme.of(context).colorScheme.onSurfaceVariant,

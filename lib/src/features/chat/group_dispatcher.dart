@@ -51,6 +51,22 @@ class GroupDispatcher {
     }
   }
 
+  void receiveTargeted(
+    List<AgentMessage> messages,
+    Set<String> recipients,
+  ) {
+    history.addAll(messages);
+    for (final id in recipients) {
+      final mailbox = _members[id];
+      if (mailbox == null) continue;
+      mailbox.timer?.cancel();
+      mailbox.timer = null;
+      mailbox.sleepUntil = null;
+      _markPending(mailbox);
+      _schedule(id, mailbox);
+    }
+  }
+
   void start(Iterable<String> recipients) {
     for (final id in recipients) {
       final mailbox = _members[id];

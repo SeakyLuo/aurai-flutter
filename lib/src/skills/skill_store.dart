@@ -75,6 +75,7 @@ class SkillStore extends ChangeNotifier {
   final _installations = <String, Map<String, Object?>>{};
   final _statistics = <String, Map<String, int>>{};
   final _timestamps = <String, Map<String, int>>{};
+  final _lastEditors = <String, String>{};
   final _members = <MessageSender>[];
   SkillSort sort = SkillSort.createdDescending;
   SkillPermission defaultPermission = SkillPermission.lowRisk;
@@ -87,7 +88,12 @@ class SkillStore extends ChangeNotifier {
   bool canManageVisibility(SavedSkill skill) =>
       ownerId == MessageSender.localUser.id || skill.ownerId == ownerId;
   bool canEdit(SavedSkill skill) =>
-      canManageVisibility(skill) || skill.visibility == 'public';
+      canManageVisibility(skill) ||
+      (skill.visibility == 'public' &&
+          (skill.ownerId.isEmpty || _lastEditors[skill.id] == ownerId));
+  bool requiresEditApproval(SavedSkill skill) =>
+      skill.visibility == 'public' && !canEdit(skill);
+  String? lastEditorId(String id) => _lastEditors[id];
   String ownerName(SavedSkill skill) =>
       _members.where((m) => m.id == skill.ownerId).firstOrNull?.name ??
       '已移除的联系人';
@@ -183,22 +189,28 @@ class SkillStore extends ChangeNotifier {
     _stores.add(this);
   }
 
-  Future<List<List<Map<String, Object?>>>> _snapshot() => Future.wait([
-    _database.query('skills'),
-    _database.query('skill_dependencies'),
-    _database.query('skill_installations'),
-    _database.query('skill_visibility_members'),
-    _database.query('message_senders', where: 'archived = 0'),
-    _database.query(
-      'app_state',
-      where: 'key LIKE ? OR key LIKE ? OR key LIKE ?',
-      whereArgs: [
-        '%skill_sort',
-        '%skill_statistics',
-        '%skill_default_permission',
-      ],
-    ),
-  ]);
+  Future<List<List<Map<String, Object?>>>> _snapshot([
+    DatabaseExecutor? executor,
+  ]) {
+    final db = executor ?? _database;
+    return Future.wait([
+      db.query('skills'),
+      db.query('skill_dependencies'),
+      db.query('skill_installations'),
+      db.query('skill_visibility_members'),
+      db.query('message_senders', where: 'archived = 0'),
+      db.query(
+        'app_state',
+        where: 'key LIKE ? OR key LIKE ? OR key LIKE ?',
+        whereArgs: [
+          '%skill_sort',
+          '%skill_statistics',
+          '%skill_default_permission',
+        ],
+      ),
+    ]);
+  }
+
   Future<void> reload() => _enqueue(() async {
     await _reload();
     notifyListeners();
@@ -246,6 +258,7 @@ class SkillStore extends ChangeNotifier {
       ..addAll(rows[4].map(MessageSender.fromRow));
     _statistics.clear();
     _timestamps.clear();
+    _lastEditors.clear();
     for (final row in rows[5]) {
       if (row['key'] == _key('skill_sort'))
         sort = SkillSort.values.byName(row['value'] as String);
@@ -267,6 +280,12 @@ class SkillStore extends ChangeNotifier {
             times['created'] = min(times['created'] ?? created, created);
           }
           if (entry.value['updated'] case final updated?) {
+            if (updated > (times['updated'] ?? -1)) {
+              final key = row['key'] as String;
+              _lastEditors[entry.key] = key == 'skill_statistics'
+                  ? 'agent:aurai'
+                  : key.substring(0, key.length - ':skill_statistics'.length);
+            }
             times['updated'] = max(times['updated'] ?? updated, updated);
           }
         }
@@ -274,8 +293,11 @@ class SkillStore extends ChangeNotifier {
     }
   }
 
-  Future<void> _publish() async {
-    final snapshot = await _snapshot();
+  Future<void> _commit(Future<void> Function(Transaction txn) write) async {
+    final snapshot = await _database.transaction((txn) async {
+      await write(txn);
+      return _snapshot(txn);
+    });
     for (final store
         in _stores.where((s) => identical(s._database, _database)).toList()) {
       store._applySnapshot(snapshot);

@@ -6,6 +6,7 @@ class ExtraSkillIcon extends StatelessWidget {
   static const names = {
     'phone',
     'browser',
+    'window',
     'camera',
     'clipboard',
     'calculator',
@@ -13,6 +14,8 @@ class ExtraSkillIcon extends StatelessWidget {
     'battery',
     'download',
     'checklist',
+    'news',
+    'calendar',
     'food',
     'shopping',
     'location',
@@ -54,6 +57,34 @@ class _ExtraPainter extends CustomPainter {
       pen,
     );
     switch (name) {
+      case 'news':
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(3, 4, 18, 16),
+            const Radius.circular(2.5),
+          ),
+          pen,
+        );
+        box(const Rect.fromLTWH(6, 7, 5, 5), 1);
+        line(14, 7, 18, 7);
+        line(14, 10, 18, 10);
+        line(6, 15, 18, 15);
+        line(6, 18, 15, 18);
+      case 'calendar':
+        box(const Rect.fromLTWH(3, 4.5, 18, 17), 3);
+        line(3, 9, 21, 9);
+        line(8, 2.5, 8, 6.5);
+        line(16, 2.5, 16, 6.5);
+        for (final point in const [
+          Offset(8, 13),
+          Offset(12, 13),
+          Offset(16, 13),
+          Offset(8, 17),
+          Offset(12, 17),
+          Offset(16, 17),
+        ]) {
+          canvas.drawCircle(point, .55, Paint()..color = color);
+        }
       case 'food':
         canvas.drawPath(
           Path()
@@ -181,6 +212,17 @@ class _ExtraPainter extends CustomPainter {
         line(10, 5, 14, 5);
         line(11, 19, 13, 19);
       case 'browser':
+        canvas.drawCircle(const Offset(12, 12), 9, pen);
+        canvas.drawOval(const Rect.fromLTRB(8, 3, 16, 21), pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(4.2, 8)
+            ..quadraticBezierTo(12, 10.5, 19.8, 8)
+            ..moveTo(4.2, 16)
+            ..quadraticBezierTo(12, 13.5, 19.8, 16),
+          pen,
+        );
+      case 'window':
         box(const Rect.fromLTWH(2, 3, 20, 18), 3);
         line(2, 8, 22, 8);
         line(5, 5.5, 5.5, 5.5);

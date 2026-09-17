@@ -16,7 +16,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 
-class DataManagementAccess(private val context: Context, messenger: BinaryMessenger, private val loadModel: () -> String?) {
+class DataManagementAccess(private val context: Context, messenger: BinaryMessenger, private val loadModel: () -> String?, private val decryptModel: (String) -> String) {
     private val archive = DataBackupArchive(context)
     private val worker = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -99,7 +99,7 @@ class DataManagementAccess(private val context: Context, messenger: BinaryMessen
                         throw IllegalStateException("无法读取当前模型密钥：${error.message ?: error.javaClass.simpleName}", error)
                     }
                     val output = context.contentResolver.openOutputStream(uri, "wt") ?: error("无法写入所选文件")
-                    val details = output.use { archive.export(it, model) }
+                    val details = output.use { archive.export(it, model, decryptModel) }
                     details
                 } catch (error: Exception) {
                     try { DocumentsContract.deleteDocument(context.contentResolver, uri) } catch (cleanup: Exception) { error.addSuppressed(cleanup) }

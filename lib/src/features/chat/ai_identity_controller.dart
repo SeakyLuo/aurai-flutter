@@ -127,13 +127,12 @@ extension AiIdentityController on ChatController {
     if (create) {
       await groupStore.createAi(ai);
     } else {
-      await groupStore.updateAi(ai);
+      await groupStore.updateAi(ai, addToMyContacts: addToMyContacts);
     }
-    if (addToMyContacts && !ai.isTemporary && !ai.sender.archived) {
-      await ContactRelationships(
-        _store.database,
-      ).add(MessageSender.localUser.id, ai.sender.id);
-    }
+    _applySavedAi(ai);
+  }
+
+  void _applySavedAi(AiProfile ai) {
     if (_activeAi?.sender.id == ai.sender.id) _activeAi = ai;
     if (_groupReplies.containsKey(ai.sender.id)) {
       _groupReplies[ai.sender.id] = _groupReplyContext(ai);

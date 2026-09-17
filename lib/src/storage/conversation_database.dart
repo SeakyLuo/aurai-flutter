@@ -1,3 +1,4 @@
+import '../html_games/html_app_store.dart';
 import 'interactive_action_history.dart';
 import 'message_callbacks.dart';
 import 'contact_relationships.dart';
@@ -11,15 +12,25 @@ import 'message_sender_schema.dart';
 import 'group_chat_schema.dart';
 import 'package:sqflite/sqflite.dart';
 import '../memory/memory_controller.dart';
+import 'message_quick_reply_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 32,
+  version: 34,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion < 34) {
+      await db.execute(htmlAppSchema);
+      await db.execute(htmlAppIndex);
+    }
+    if (oldVersion < 33) {
+      for (final statement in messageQuickReplySchema) {
+        await db.execute(statement);
+      }
+    }
     if (oldVersion >= 25 && oldVersion < 32) {
       await db.execute(
         'ALTER TABLE message_callbacks ADD COLUMN actor_id TEXT',
@@ -162,6 +173,16 @@ Future<Database> openConversationDatabase() async => openDatabase(
       await db.execute(messageCallbackIndex);
     }
     if (oldVersion < 29) await migrateSkillLibrary(db);
+    if (oldVersion < 34) {
+      if (oldVersion >= 20) {
+        await db.execute('ALTER TABLE html_games ADD COLUMN app_id TEXT REFERENCES html_apps(id)');
+      }
+      await db.execute('CREATE INDEX html_games_app ON html_games(app_id)');
+      await db.execute('''INSERT INTO html_apps
+        (id, creator_id, title, legacy_html, state_json, stateful, version, updated_at)
+        SELECT message_id, creator_id, title, html, state_json, stateful, version, updated_at FROM html_games''');
+      await db.execute("UPDATE html_games SET app_id = message_id, html = '', state_json = '{}'");
+    }
   },
   onCreate: (db, version) async {
     final batch = db.batch();
@@ -170,13 +191,17 @@ Future<Database> openConversationDatabase() async => openDatabase(
       ...interactiveActionSchema,
       messageCallbackSchema,
       messageCallbackIndex,
+      htmlAppSchema,
+      htmlAppIndex,
       ...htmlGameSchema,
+      'CREATE INDEX html_games_app ON html_games(app_id)',
       ...groupChatTables,
       groupParticipationSchema,
       temporaryAiColumn,
       ...contactRelationshipSchema,
       ...skillSchema,
       ...memorySchema,
+      ...messageQuickReplySchema,
     ]) {
       batch.execute(statement);
     }

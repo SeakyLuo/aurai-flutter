@@ -14,7 +14,7 @@ Future<void> loadConversationListPreviews(
   };
   if (groups.isEmpty) return;
   final rows = await database.rawQuery(
-    '''SELECT id, conversation_id, sender_id, kind, text, json_extract(interactive_json, '\$.title') AS interactive_title, created_at
+    '''SELECT id, conversation_id, sender_id, kind, text, json_extract(interactive_json, '\$.title') AS interactive_title, json_extract(interactive_json, '\$.body') AS interactive_body, created_at
        FROM messages WHERE id IN (
          SELECT (SELECT id FROM messages
            WHERE conversation_id = conversations.id AND kind != 'commentary'
@@ -28,10 +28,10 @@ Future<void> loadConversationListPreviews(
     groups.keys.toList(),
   );
   final senderIds = {
+    MessageSender.localUser.id,
     for (final row in rows) row['sender_id'] as String,
     for (final group in groups.values) ...group.creationMemberIds,
   };
-  if (senderIds.isEmpty) return;
   final results = await Future.wait([
     database.query(
       'message_senders',
@@ -56,6 +56,7 @@ Future<void> loadConversationListPreviews(
   for (final group in groups.values.where(
     (c) => c.kind == ConversationKind.group,
   )) {
+    group.creationUserName = senders[MessageSender.localUser.id]!.name;
     group.creationMembers = [
       for (final id in group.creationMemberIds) senders[id]!,
     ];
@@ -76,7 +77,9 @@ Future<void> loadConversationListPreviews(
         DateTime.fromMicrosecondsSinceEpoch(row['created_at'] as int);
     final text = row['id'] == 'group-created:${row['conversation_id']}'
         ? groups[row['conversation_id']]!.creationMessage!
-        : row['interactive_title'] as String? ?? row['text'] as String;
+        : row['interactive_title'] != null
+        ? '${row['interactive_title']}\n${row['interactive_body']}'
+        : row['text'] as String;
     final body = MessageSummary.content(
       text: text,
       htmlTitle: row['kind'] == 'html_game' ? text : null,

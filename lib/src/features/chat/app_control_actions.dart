@@ -82,40 +82,11 @@ extension AppControlActions on ChatController {
         if (navigate == null) throw StateError('当前无法打开页面');
         await navigate({...args, 'senderId': senderId});
       case 'sendConversationMessage':
-        if (rows.single['kind'] != 'direct') {
-          throw ArgumentError(
-            'sendConversationMessage 仅支持私聊；请使用 sendGroupMessage 向该群发送消息，groupId 使用目标群 ID',
-          );
-        }
-        final members = await groupStore.members(id);
-        if (members.every((m) => m.sender.kind == MessageSenderKind.agent)) {
-          return _sendPeerMessage(id, senderId, args['text'] as String);
-        }
-        final text = (args['text'] as String).trim();
-        if (text.isEmpty || text.length > 20000)
-          throw ArgumentError('消息需为 1–20000 字');
-        final target = await _forwardTarget(id);
-        final profile = await groupStore.loadAi(senderId);
-        final message = AgentMessage(
-          id: newMessageId(),
-          role: AgentMessageRole.assistant,
-          senderId: senderId,
-          sender: profile.sender,
-          text: text,
-          createdAt: DateTime.now(),
-        );
-        target.messages.add(message);
-        target.messageCount++;
-        try {
-          await _store.writer.save(target, makeActive: false);
-        } on Object {
-          target.messages.remove(message);
-          target.messageCount--;
-          rethrow;
-        }
-        _updateConversationList(target);
-        _conversationChanged();
-        return {'sent': true, 'messageId': message.id, 'conversationId': id};
+        return _sendPrivateGroupMessage({
+          'groupId': id,
+          'message': args['message'],
+          'participation': 'unchanged',
+        }, senderId, requireGroup: false);
       default:
         throw ArgumentError('不支持的操作');
     }

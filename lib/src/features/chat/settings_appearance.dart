@@ -30,6 +30,7 @@ class SettingsGlassAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) => GlassSurface(
     radius: 28,
+    shadowOpacity: .65,
     child: RoundAction(
       label: label,
       icon: icon,

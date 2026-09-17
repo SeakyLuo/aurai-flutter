@@ -71,6 +71,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
   ScrollPosition? _scroll;
   bool _checkScheduled = false;
   late final StreamSubscription<String> _changes;
+  late final StreamSubscription<String> _appChanges;
   late HtmlGameCard _card;
   Uint8List? _preview;
   double? _contentHeight;
@@ -86,6 +87,9 @@ class _HtmlGameViewState extends State<HtmlGameView>
     super.initState();
     _card = widget.card;
     _preview = _card.preview;
+    _appChanges = HtmlGameSignals.appChanges.stream
+        .where((id) => id == _card.appId)
+        .listen((_) => unawaited(_refreshCard()));
     _changes = HtmlGameSignals.changes.stream
         .where((id) => id == widget.messageId)
         .listen((_) => unawaited(_refreshCard()));
@@ -390,6 +394,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
     _scroll?.removeListener(_scheduleVisibility);
     _scroll?.isScrollingNotifier.removeListener(_scheduleVisibility);
     _changes.cancel();
+    _appChanges.cancel();
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_close());
     super.dispose();

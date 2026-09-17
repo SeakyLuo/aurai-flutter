@@ -23,6 +23,7 @@ class AiProfile {
     required this.instructions,
     required this.createdAt,
     required this.updatedAt,
+    this.previousUpdatedAt,
     this.modelSelection,
     this.isTemporary = false,
     this.preferences = const AiPreferences(),
@@ -36,6 +37,7 @@ class AiProfile {
   final AiModelSelection? modelSelection;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DateTime? previousUpdatedAt;
 
   AiProfile copyWith({
     MessageSender? sender,
@@ -53,6 +55,7 @@ class AiProfile {
     isTemporary: isTemporary ?? this.isTemporary,
     createdAt: createdAt,
     updatedAt: DateTime.now(),
+    previousUpdatedAt: updatedAt,
   );
 
   factory AiProfile.fromRows(

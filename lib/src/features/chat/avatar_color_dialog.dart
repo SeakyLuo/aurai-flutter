@@ -1,3 +1,4 @@
+import 'app_dialog.dart';
 import 'package:flutter/material.dart';
 import '../../domain/avatar_style.dart';
 import 'avatar_background.dart';
@@ -34,8 +35,8 @@ class _AvatarColorDialogState extends State<AvatarColorDialog> {
     widget.gradient ? _angle : 0,
   );
   @override
-  Widget build(BuildContext context) => Dialog(
-    insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+  Widget build(BuildContext context) => AppDialog(
+    maxWidth: 400,
     child: ConstrainedBox(
       constraints: BoxConstraints(
         maxWidth: 400,

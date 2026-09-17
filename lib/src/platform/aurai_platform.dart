@@ -379,6 +379,11 @@ class AuraiPlatform {
     );
   }
 
+  Future<String> encryptModelSettings(ModelSettings settings) async =>
+      (await _channel.invokeMethod<String>('encryptModelConfig', {
+        'config': jsonEncode(settings.toJson()),
+      }))!;
+
   Future<void> saveModelSettings(ModelSettings settings) async {
     if (!Platform.isAndroid) {
       throw PlatformException(code: 'unsupported', message: '当前平台尚未实现安全配置存储');

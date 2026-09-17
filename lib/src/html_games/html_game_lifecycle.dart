@@ -7,13 +7,34 @@ const htmlGameLifecycleScript = r'''
   let serial=0, paused=false;
   let saved=JSON.parse(AuraiGameBridge.loadState());
   const pendingEvents=new Map(),pendingSaves=new Map();
-  let saveSerial=0;
+  let saveSerial=0,dataSerial=0;
+  const pendingData=new Map();
+  let events=[];
+  window.__auraiCallbacks=value=>{events=value;document.dispatchEvent(new CustomEvent('aurai:eventupdate',{detail:structuredClone(events)}))};
+  window.__auraiDataReply=(id,value)=>{
+    const pending=pendingData.get(id);if(!pending)return;pendingData.delete(id);nativeClear(pending.timer);
+    value.error?pending.reject(new Error(value.error)):pending.resolve(value);
+  };
+  const appData=args=>new Promise((resolve,reject)=>{
+    const id=++dataSerial;
+    const timer=nativeTimeout(()=>{pendingData.delete(id);reject(new Error('Operation acknowledgement timed out; read the latest state before retrying'))},15000);
+    pendingData.set(id,{resolve,reject,timer});
+    AuraiGameBridge.appData(id,JSON.stringify(args));
+  });
   window.__auraiSaved=(id,ok)=>{const entry=pendingSaves.get(id);if(!entry)return;pendingSaves.delete(id);if(ok){saved=JSON.parse(entry.json);entry.resolve()}else entry.reject(new Error('State save failed'));};
   window.__auraiInteractionReply=(id,value)=>{
-    const pending=pendingEvents.get(id);if(!pending)return;pendingEvents.delete(id);
+    const pending=pendingEvents.get(id);if(!pending)return;pendingEvents.delete(id);nativeClear(pending.timer);
     value.error?pending.reject(new Error(value.error)):pending.resolve(value);
   };
   window.AuraiHTML=Object.freeze({
+    get events(){return structuredClone(events)},
+    async readEvent(eventId){const result=await appData({operation:'events',eventId});return result.events[0]??null},
+    async retryEvent(eventId){
+      if(!navigator.userActivation.isActive)throw new Error('Retry from a user action');
+      const result=await appData({operation:'retryEvent',eventId});return result.events[0];
+    },
+    readData(name){return appData({operation:'read',name})},
+    writeData(name,value,expectedRevision){return appData({operation:'write',name,value,expectedRevision})},
     get messageState(){return window.__auraiMessageState()},
     get interaction(){return window.__auraiInteractionState()},
     async submitInteraction({buttonId,value}){
@@ -38,7 +59,10 @@ const htmlGameLifecycleScript = r'''
       if(pendingEvents.has(eventId))return Promise.reject(new Error('This event is already pending'));
       const json=JSON.stringify({eventId,action,data,notifyAi});
       if(new TextEncoder().encode(json).length>16384)return Promise.reject(new Error('Event exceeds 16 KB'));
-      return new Promise((resolve,reject)=>{pendingEvents.set(eventId,{resolve,reject});AuraiGameBridge.postInteraction(eventId,json)});
+      return new Promise((resolve,reject)=>{
+        const timer=nativeTimeout(()=>{pendingEvents.delete(eventId);reject(new Error('Submission acknowledgement timed out; use readEvent with the same eventId before retrying'))},15000);
+        pendingEvents.set(eventId,{resolve,reject,timer});AuraiGameBridge.postInteraction(eventId,json);
+      });
     },
     get state(){return structuredClone(saved)},
     async saveState(value){

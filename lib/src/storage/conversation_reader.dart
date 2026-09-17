@@ -13,6 +13,7 @@ import 'package:sqflite/sqflite.dart';
 import '../domain/agent_models.dart';
 import '../domain/message_sender.dart';
 import '../domain/message_image.dart';
+import '../domain/message_quick_reply.dart';
 import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
 import 'protocol_history.dart';
@@ -96,6 +97,7 @@ class ConversationReader {
         .toSet()
         .toList();
     if (ids.isEmpty) return;
+    ids.add(MessageSender.localUser.id);
     final rows = await database.query(
       'message_senders',
       where: 'id IN (${_slots(ids.length)})',
@@ -105,6 +107,7 @@ class ConversationReader {
       for (final row in rows) row['id'] as String: MessageSender.fromRow(row),
     };
     for (final conversation in conversations) {
+      conversation.creationUserName = senders[MessageSender.localUser.id]!.name;
       conversation.creationMembers = [
         for (final id in conversation.creationMemberIds) senders[id]!,
       ];
@@ -131,8 +134,9 @@ class ConversationReader {
   }
 
   Future<void> _loadCreationMembers(Conversation conversation) async {
-    final ids = conversation.creationMemberIds;
+    final ids = [...conversation.creationMemberIds];
     if (ids.isEmpty) return;
+    ids.add(MessageSender.localUser.id);
     final rows = await database.query(
       'message_senders',
       where: 'id IN (${List.filled(ids.length, '?').join(',')})',
@@ -141,7 +145,10 @@ class ConversationReader {
     final senders = {
       for (final row in rows) row['id'] as String: MessageSender.fromRow(row),
     };
-    conversation.creationMembers = [for (final id in ids) senders[id]!];
+    conversation.creationUserName = senders[MessageSender.localUser.id]!.name;
+    conversation.creationMembers = [
+      for (final id in conversation.creationMemberIds) senders[id]!,
+    ];
   }
 
   Future<Conversation> load(
@@ -278,10 +285,10 @@ class ConversationReader {
         "run_id IN (SELECT run_id FROM messages WHERE conversation_id = ? AND run_id IS NOT NULL AND (interactive_json IS NOT NULL OR kind = 'html_game'))";
     final selectionWhere =
         'conversation_id = ?${forModel
-            ? "${includeSystem ? '' : " AND kind != 'system'"} AND kind != 'message_failure' AND NOT (role = 'assistant' AND text = '')"
+            ? "${includeSystem ? '' : " AND kind != 'system'"} AND kind NOT IN ('message_failure', 'reasoning') AND NOT (role = 'assistant' AND text = '')"
             : includeMessageId == null
-            ? " AND (kind != 'commentary' OR $richReply)"
-            : " AND (kind != 'commentary' OR $richReply OR id = ?)"}${afterCheckpoint == null ? '' : ' AND created_at >= (SELECT created_at FROM messages WHERE id = ?)'}${before == null ? '' : ' AND (created_at < ? OR (created_at = ? AND id < ?))'}${after == null ? '' : ' AND (created_at > ? OR (created_at = ? AND id > ?))'}${throughMessageId == null ? '' : ' AND (created_at, id) <= (SELECT created_at, id FROM messages WHERE id = ?)'}';
+            ? " AND kind != 'quick_reply' AND (kind != 'commentary' OR $richReply)"
+            : " AND kind != 'quick_reply' AND (kind != 'commentary' OR $richReply OR id = ?)"}${afterCheckpoint == null ? '' : ' AND created_at >= (SELECT created_at FROM messages WHERE id = ?)'}${before == null ? '' : ' AND (created_at < ? OR (created_at = ? AND id < ?))'}${after == null ? '' : ' AND (created_at > ? OR (created_at = ? AND id > ?))'}${throughMessageId == null ? '' : ' AND (created_at, id) <= (SELECT created_at, id FROM messages WHERE id = ?)'}';
     final selectionArgs = <Object?>[
       conversationId,
       if (!forModel) conversationId,
@@ -328,7 +335,7 @@ class ConversationReader {
     final previews = gameIds.isEmpty || forModel
         ? <Map<String, Object?>>[]
         : await database.rawQuery(
-            'SELECT message_id, title, preview, background_mode, display_mode, display_width, display_height, measured_width, measured_height, measured_scale, measured_version, version, status, ${HtmlGameStore.retryColumn} FROM html_games WHERE message_id IN (${_slots(gameIds.length)})',
+            'SELECT message_id, app_id, title, preview, background_mode, display_mode, display_width, display_height, measured_width, measured_height, measured_scale, measured_version, version, status, ${HtmlGameStore.retryColumn} FROM html_games WHERE message_id IN (${_slots(gameIds.length)})',
             gameIds,
           );
     final gameCards = {
@@ -369,6 +376,24 @@ class ConversationReader {
         )
       else
         Future.value(<Map<String, Object?>>[]),
+      if (!forModel)
+        database.query(
+          'message_quick_replies',
+          where: 'parent_message_id IN ($selectedMessages)',
+          whereArgs: selectedArgs,
+        )
+      else
+        Future.value(<Map<String, Object?>>[]),
+      if (!forModel)
+        database.query(
+          'messages',
+          where:
+              'id IN (SELECT message_id FROM message_quick_replies WHERE parent_message_id IN ($selectedMessages))',
+          whereArgs: selectedArgs,
+          orderBy: 'created_at, id',
+        )
+      else
+        Future.value(<Map<String, Object?>>[]),
     ]);
     final richRuns = attachmentsAndSenders[2]
         .map((row) => row['run_id'])
@@ -378,6 +403,27 @@ class ConversationReader {
       for (final row in attachmentsAndSenders[1])
         row['id'] as String: MessageSender.fromRow(row),
     };
+    final quickReplyRelations = {
+      for (final row in attachmentsAndSenders[3])
+        row['message_id'] as String: row,
+    };
+    final quickReplies = <String, List<MessageQuickReply>>{};
+    for (final row in attachmentsAndSenders[4]) {
+      final relation = quickReplyRelations[row['id']]!;
+      quickReplies
+          .putIfAbsent(relation['parent_message_id'] as String, () => [])
+          .add(
+            MessageQuickReply(
+              id: row['id'] as String,
+              senderId: relation['actor_id'] as String,
+              key: relation['reply_key'] as String,
+              text: row['text'] as String,
+              createdAt: DateTime.fromMicrosecondsSinceEpoch(
+                row['created_at'] as int,
+              ),
+            ),
+          );
+    }
     for (final quote in quotes.values) {
       quote.senderName = senders[quote.senderId]!.name;
     }
@@ -438,9 +484,11 @@ class ConversationReader {
             files: fileMap[row['id']] ?? const [],
             runId: row['run_id'] as String?,
             isRichReply: richRuns.contains(row['run_id']),
+            isReasoning: row['kind'] == 'reasoning',
             modelTurnId: row['model_turn_id'] as String?,
             taskSummary: summaries[row['id']],
             responseInput: protocol[row['id']],
+            quickReplies: quickReplies[row['id']] ?? const [],
           ),
         )
         .toList();
@@ -451,7 +499,7 @@ class ConversationReader {
     List<Object?> selectedArgs,
   ) async {
     final runWhere =
-        "final_message_id IN ($selectedMessages) AND elapsed_ms IS NOT NULL AND is_task = 1 AND conversation_id IN (SELECT id FROM conversations WHERE kind = 'direct')";
+        "final_message_id IN ($selectedMessages) AND elapsed_ms IS NOT NULL AND (is_task = 1 OR id IN (SELECT run_id FROM messages WHERE kind = 'reasoning')) AND conversation_id IN (SELECT id FROM conversations WHERE kind = 'direct')";
     final runs = await database.query(
       'agent_runs',
       where: runWhere,
@@ -479,6 +527,7 @@ class ConversationReader {
       for (final run in runs)
         run['final_message_id']! as String: AgentTaskSummary(
           elapsedMilliseconds: run['elapsed_ms']! as int,
+          isTask: run['is_task'] == 1,
           stopped: run['status'] == 'cancelled',
           intermediateMessageIds: [
             for (final event
@@ -522,6 +571,7 @@ class ConversationReader {
       return AgentTaskActivity(
         messageId: event['message_id'] as String,
         text: messages[event['message_id']]!['text']! as String,
+        isReasoning: messages[event['message_id']]!['kind'] == 'reasoning',
       );
     }
     if (event['kind'] == 'tool') {
@@ -602,7 +652,7 @@ class ConversationReader {
     }
     final hits = await database.rawQuery(
       '''SELECT id AS message_id, conversation_id, text, sender_id, created_at, id AS sort_id
-         FROM messages WHERE kind != 'system' AND conversation_id IN (SELECT id FROM conversations WHERE $localUserConversation AND mode = 'normal') AND instr(lower(text), ?) > 0
+         FROM messages WHERE kind NOT IN ('system', 'quick_reply') AND conversation_id IN (SELECT id FROM conversations WHERE $localUserConversation AND mode = 'normal') AND instr(lower(text), ?) > 0
          UNION ALL
          SELECT NULL AS message_id, id AS conversation_id,
            CASE WHEN instr(lower(draft), ?) > 0 THEN draft ELSE '' END AS text,
@@ -610,7 +660,7 @@ class ConversationReader {
          FROM conversations
          WHERE $visibleConversation AND $localUserConversation AND mode = 'normal' AND (instr(lower(title), ?) > 0 OR instr(lower(draft), ?) > 0)
            AND id NOT IN (
-             SELECT conversation_id FROM messages WHERE kind != 'system' AND instr(lower(text), ?) > 0
+             SELECT conversation_id FROM messages WHERE kind NOT IN ('system', 'quick_reply') AND instr(lower(text), ?) > 0
            )
          ORDER BY created_at DESC, sort_id DESC
          LIMIT ? OFFSET ?''',

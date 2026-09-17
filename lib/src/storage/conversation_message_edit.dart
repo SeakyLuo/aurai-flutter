@@ -72,14 +72,37 @@ extension ConversationMessageEdit on ConversationStore {
         [replacement.id],
       );
       replacement.messageCount = count.single['count']! as int;
-      if (replacement.messageCount == 1 && replacement.title == original.text) {
+      final currentRows = await txn.query(
+        'conversations',
+        where: 'id = ?',
+        whereArgs: [replacement.id],
+      );
+      final current = conversationFromRow(currentRows.single);
+      replacement
+        ..storedTitle = current.storedTitle
+        ..isPinned = current.isPinned
+        ..isArchived = current.isArchived
+        ..mode = current.mode
+        ..isScheduledTask = current.isScheduledTask
+        ..storedUpdatedAt = current.storedUpdatedAt;
+      final renameAutomaticTitle =
+          replacement.messageCount == 1 && current.title == original.text;
+      if (renameAutomaticTitle) {
         replacement.storedTitle = replacement.messages.last.text.isEmpty
             ? (editedFiles.isEmpty ? '图片对话' : editedFiles.first.name)
             : replacement.messages.last.text;
       }
       await txn.update(
         'conversations',
-        conversationRow(replacement),
+        {
+          'message_count': replacement.messageCount,
+          'preview': replacement.messages.last.text,
+          'pending_goal': replacement.pendingGoal,
+          'run_state': replacement.runState.name,
+          'error_detail': replacement.errorDetail,
+          'active_run_id': replacement.activeRunId,
+          if (renameAutomaticTitle) 'title': replacement.storedTitle,
+        },
         where: 'id = ?',
         whereArgs: [replacement.id],
       );

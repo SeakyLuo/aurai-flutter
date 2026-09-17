@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import 'group_sleep_store.dart';
 
 const groupParticipationSchema = '''
 CREATE TABLE group_participation (
@@ -23,8 +24,25 @@ class GroupParticipation {
     return rows.map((row) => row['sender_id'] as String).toSet();
   }
 
-  Future<void> set(String groupId, String senderId, bool paused) async {
-    await database.insert('group_participation', {
+  Future<void> set(String groupId, String senderId, bool paused) =>
+      database.transaction((txn) => setIn(txn, groupId, senderId, paused));
+
+  static Future<void> setIn(
+    DatabaseExecutor txn,
+    String groupId,
+    String senderId,
+    bool paused,
+  ) async {
+    final members = await txn.query(
+      'conversation_members',
+      columns: ['sender_id'],
+      where: 'conversation_id = ? AND sender_id = ? AND left_at IS NULL',
+      whereArgs: [groupId, senderId],
+      limit: 1,
+    );
+    if (members.isEmpty) throw StateError('你已不在这个群聊中');
+    if (paused) await GroupSleepStore.removeIn(txn, groupId, senderId);
+    await txn.insert('group_participation', {
       'conversation_id': groupId,
       'sender_id': senderId,
       'paused': paused ? 1 : 0,

@@ -5,48 +5,56 @@ extension SkillLibraryOperations on SkillStore {
       _enqueue(() async {
         final skill = readId(id);
         if (!isInstalled(id)) throw StateError('请先安装此技能');
-        await _database.update(
-          'skill_installations',
-          {'permission': permission?.name, 'approved_revision': skill.revision},
-          where: 'skill_id = ? AND owner_id = ?',
-          whereArgs: [id, ownerId],
-        );
-        await _publish();
+        await _commit((txn) async {
+          await txn.update(
+            'skill_installations',
+            {
+              'permission': permission?.name,
+              'approved_revision': skill.revision,
+            },
+            where: 'skill_id = ? AND owner_id = ?',
+            whereArgs: [id, ownerId],
+          );
+        });
       });
   Future<void> install(String id) => _enqueue(() async {
     final skill = readId(id);
-    await _database.insert('skill_installations', {
-      'skill_id': id,
-      'owner_id': ownerId,
-      'enabled': 1,
-      'approved_revision': skill.revision,
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
-    await _publish();
+    await _commit((txn) async {
+      await txn.insert('skill_installations', {
+        'skill_id': id,
+        'owner_id': ownerId,
+        'enabled': 1,
+        'approved_revision': skill.revision,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    });
   });
   Future<void> uninstall(String id) => _enqueue(() async {
-    await _database.delete(
-      'skill_installations',
-      where: 'skill_id = ? AND owner_id = ?',
-      whereArgs: [id, ownerId],
-    );
-    await _publish();
+    await _commit((txn) async {
+      await txn.delete(
+        'skill_installations',
+        where: 'skill_id = ? AND owner_id = ?',
+        whereArgs: [id, ownerId],
+      );
+    });
   });
   Future<void> setEnabled(String id, bool enabled) => _enqueue(() async {
     readId(id);
     if (!isInstalled(id)) throw StateError('请先安装此技能');
-    await _database.update(
-      'skill_installations',
-      {'enabled': enabled ? 1 : 0},
-      where: 'skill_id = ? AND owner_id = ?',
-      whereArgs: [id, ownerId],
-    );
-    await _publish();
+    await _commit((txn) async {
+      await txn.update(
+        'skill_installations',
+        {'enabled': enabled ? 1 : 0},
+        where: 'skill_id = ? AND owner_id = ?',
+        whereArgs: [id, ownerId],
+      );
+    });
   });
   Future<void> save(
     SavedSkill value, {
     String? previousName,
     SkillPermission? permission,
     bool updatePermission = false,
+    int? approvedRevision,
   }) => _enqueue(() async {
     final name = value.name.trim();
     if (!skillIcons.containsKey(value.icon)) throw StateError('请选择有效的技能图标');
@@ -62,7 +70,10 @@ extension SkillLibraryOperations on SkillStore {
     final old = previousName == null
         ? null
         : read(value.id.isEmpty ? previousName : value.id);
-    if (old != null && !canEdit(old)) throw StateError('仅创建者可以修改此技能');
+    if (old != null &&
+        !canEdit(old) &&
+        !(requiresEditApproval(old) && approvedRevision == old.revision))
+      throw StateError('修改此技能需要用户审批');
     if (old != null && old.revision != value.revision)
       throw StateError('技能已被修改，请返回后重新打开');
     if (!['private', 'public', 'selected'].contains(value.visibility))
@@ -130,7 +141,7 @@ extension SkillLibraryOperations on SkillStore {
         'updated': now,
       },
     };
-    await _database.transaction((txn) async {
+    await _commit((txn) async {
       if (old == null) {
         await txn.insert('skills', {..._row(saved), 'owner_id': creator});
         if (usesInstallations)
@@ -195,11 +206,18 @@ extension SkillLibraryOperations on SkillStore {
         );
       }
     });
-    await _publish();
   });
-  Future<void> delete(String name) => _enqueue(() async {
+  Future<void> delete(
+    String name, {
+    int? approvedRevision,
+    int? expectedRevision,
+  }) => _enqueue(() async {
     final skill = read(name);
-    if (!canEdit(skill)) throw StateError('仅创建者可以删除此技能');
+    if (expectedRevision != null && expectedRevision != skill.revision)
+      throw StateError('技能已被修改，请重新确认删除');
+    if (!canEdit(skill) &&
+        !(requiresEditApproval(skill) && approvedRevision == skill.revision))
+      throw StateError('删除此技能需要用户审批');
     final references = await _database.query(
       'skill_dependencies',
       columns: ['skill_id'],
@@ -208,7 +226,8 @@ extension SkillLibraryOperations on SkillStore {
       limit: 1,
     );
     if (references.isNotEmpty) throw StateError('其他技能仍依赖此技能，请先移除依赖');
-    await _database.delete('skills', where: 'id = ?', whereArgs: [skill.id]);
-    await _publish();
+    await _commit((txn) async {
+      await txn.delete('skills', where: 'id = ?', whereArgs: [skill.id]);
+    });
   });
 }

@@ -1,3 +1,4 @@
+import 'html_callback_state.dart';
 import 'interactive_callback_state.dart';
 import '../domain/interactive_message.dart';
 import 'dart:async';
@@ -37,6 +38,7 @@ class MessageCallbacks {
     required Map<String, Object?> payload,
     String? actorId,
     int? participantRevision,
+    bool html = false,
   }) async {
     final encoded = jsonEncode(payload);
     if (utf8.encode(encoded).length > 16384)
@@ -52,6 +54,12 @@ class MessageCallbacks {
           existing.single['payload_json'] != encoded) {
         throw StateError('操作编号已用于其他操作');
       }
+      if (html && existing.single['status'] == 'legacy') {
+        // Older HTML callbacks had no receipt. Do not replay an uncertain result.
+        await db.update('message_callbacks', {
+          'status': existing.single['processed_at'] == null ? 'failed' : 'completed',
+        }, where: 'id = ?', whereArgs: [id]);
+      }
       return;
     }
     final destinations = await db.rawQuery(
@@ -65,6 +73,7 @@ class MessageCallbacks {
       'conversation_id': conversationId,
       'sender_id': senderId,
       'payload_json': encoded,
+      if (html) 'status': 'queued',
       if (actorId != null) ...{
         'actor_id': actorId,
         'participant_revision': participantRevision,
@@ -89,6 +98,7 @@ class MessageCallbacks {
         orderBy: 'created_at, id',
         limit: 20,
       );
+      await HtmlCallbackState.transition(txn, events, 'processing');
       final updates = await transitionInteractiveCallbacks(
         txn,
         events,
@@ -106,6 +116,7 @@ class MessageCallbacks {
       );
     });
     cardChanges.add(result.updates);
+    HtmlCallbackState.notify(result.events);
     return result.events;
   }
 
@@ -125,7 +136,7 @@ class MessageCallbacks {
         whereArgs: ids,
       );
       final legacy = remaining
-          .where((e) => e['actor_id'] == null)
+          .where((e) => e['actor_id'] == null && e['status'] == 'legacy')
           .map((e) => e['id'])
           .toList();
       if (legacy.isNotEmpty) {
@@ -137,6 +148,7 @@ class MessageCallbacks {
           [if (success) DateTime.now().microsecondsSinceEpoch, ...legacy],
         );
       }
+      await HtmlCallbackState.transition(txn, remaining, 'failed');
       return transitionInteractiveCallbacks(
         txn,
         remaining,
@@ -145,6 +157,7 @@ class MessageCallbacks {
       );
     });
     cardChanges.add(updates);
+    HtmlCallbackState.notify(events);
   }
 
   Future<void> recoverInterrupted() async {
@@ -153,6 +166,7 @@ class MessageCallbacks {
         'message_callbacks',
         where: "status = 'processing' AND processed_at IS NULL",
       );
+      await HtmlCallbackState.transition(txn, events, 'failed');
       return transitionInteractiveCallbacks(
         txn,
         events,

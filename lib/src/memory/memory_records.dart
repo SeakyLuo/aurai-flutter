@@ -4,14 +4,14 @@ Map<String, Object?> memoryRecord(Map<String, Object?> entry) => {
   'id': entry['id'],
   'text': entry['text'],
   'manual': entry['manual'] == 1,
-  'createdAt': DateTime.fromMillisecondsSinceEpoch(
+  'createdAt': localIsoTime(DateTime.fromMillisecondsSinceEpoch(
     entry['created_at'] as int,
     isUtc: true,
-  ).toIso8601String(),
-  'updatedAt': DateTime.fromMillisecondsSinceEpoch(
+  )),
+  'updatedAt': localIsoTime(DateTime.fromMillisecondsSinceEpoch(
     entry['updated_at'] as int,
     isUtc: true,
-  ).toIso8601String(),
+  )),
   'sourceConversationId': entry['source_conversation_id'],
   'sourceMessageId': entry['source_message_id'],
 };

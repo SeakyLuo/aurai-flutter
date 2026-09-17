@@ -84,7 +84,7 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
       'local.diagnostics' =>
         '日志 报错 错误 执行失败 排查 诊断 log logs error failure diagnostics',
       'local.messages' =>
-        '消息 私聊 群聊 小程序 HTML 交互 卡片 图表 可视化 message private group html interactive card visualization',
+        '快捷回复 点赞 附议 收到 在看 疑问 quick reply reaction 消息 私聊 群聊 小程序 HTML 交互 卡片 图表 可视化 message private group html interactive card visualization',
       'local.group_chats' =>
         '群聊 群组 发群消息 发送群消息 私聊发群 跨群发送 创建建群 拉群 成员 添加 移除 退群 改名 重命名 group chat send message private cross-group members roster create rename',
       'local.ai_contacts' =>

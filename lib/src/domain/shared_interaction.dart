@@ -63,7 +63,8 @@ class SharedInteraction {
           'name': name,
           'buttonId': button['id'],
           'label': button['label'],
-          'value': button['value'] ?? button['id'],
+          'value': button.containsKey('value') ? button['value'] : button['id'],
+          if (button['selections'] != null) 'selections': button['selections'],
         },
       },
     }).settle(closed: false);

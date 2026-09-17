@@ -62,6 +62,8 @@ completeInteractiveCallback(
     'title': result['title'],
     'body': result['body'],
     'buttons': result['buttons'],
+    'buttonColumns':
+        result['buttonColumns'] ?? card.viewFor(actor).buttonColumns,
   });
   final next = InteractiveMessage.fromJson({
     ...card.toJson(includeParticipants: true),
@@ -73,7 +75,13 @@ completeInteractiveCallback(
         'title': presentation.title,
         'body': presentation.body,
         'buttons': presentation.buttons,
-        'callback': {'id': eventId, 'status': 'completed', 'updatedAt': now},
+        'buttonColumns': presentation.buttonColumns,
+        'callback': {
+          'id': eventId,
+          'buttonId': callback?['buttonId'] ?? participant['buttonId'],
+          'status': 'completed',
+          'updatedAt': now,
+        },
       },
     },
   });

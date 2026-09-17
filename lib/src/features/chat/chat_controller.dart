@@ -1,3 +1,7 @@
+import '../../storage/quick_reply_recents.dart';
+import '../../agent/quick_reply_tool.dart';
+import '../../agent/html_app_data_tool.dart';
+import '../../html_games/html_app_store.dart';
 import '../../storage/interactive_callback_result.dart';
 import '../../storage/interactive_callback_state.dart';
 import '../../storage/conversation_navigation_state.dart';
@@ -80,6 +84,7 @@ import '../../agent/web_tools.dart';
 import '../../agent/source_dates_tool.dart';
 import '../../domain/agent_models.dart';
 import '../../domain/message_sender.dart';
+import '../../domain/message_quick_reply.dart';
 import '../../domain/ai_profile.dart';
 import '../../domain/conversation_completion.dart';
 import '../../domain/capability.dart';
@@ -107,6 +112,7 @@ export 'conversation.dart';
 part 'message_quote_actions.dart';
 part 'message_recall.dart';
 part 'message_submission.dart';
+part 'message_quick_replies.dart';
 part 'global_tools.dart';
 part 'group_reply_context.dart';
 part 'ai_identity_controller.dart';
@@ -124,6 +130,7 @@ part 'message_callback_actions.dart';
 part 'html_game_actions.dart';
 part 'model_config_actions.dart';
 part 'image_forwarding.dart';
+part 'draft_attachment_actions.dart';
 part 'conversation_search_navigation.dart';
 part 'conversation_run.dart';
 part 'scheduled_execution.dart';
@@ -172,7 +179,8 @@ class ChatController extends ChangeNotifier {
 
   bool _claimingSchedule = false;
   final _imageStore = MessageImageStore();
-  bool addingImages = false;
+  bool get addingImages => _execution.attachmentJobs > 0;
+  Future<void> _forwardingTail = Future<void>.value();
   List<MessageImage> get draftImages => activeConversation.draftImages;
   List<MessageFile> get draftFiles => activeConversation.draftFiles;
   Future<void> Function(Map<String, Object?>)? openAppPage;
@@ -382,7 +390,7 @@ class ChatController extends ChangeNotifier {
     });
     await MessageCallbacks(_store.database).recoverInterrupted();
     await scheduledTasks.initialize(_runScheduled);
-    await _groupSleeps.initialize(_recoverGroupSleep);
+    await _groupSleeps.initialize(_store.database, _recoverGroupSleep);
     _callbackChanges = MessageCallbacks.changes.stream.listen((_) {
       _callbacksPending = true;
       _callbackGeneration++;
@@ -408,7 +416,7 @@ class ChatController extends ChangeNotifier {
       await _runPrivateDuringGroup();
       return;
     }
-    if (hasRunningTask) throw StateError('当前会话正在回复，请等待完成');
+    if (hasRunningTask) return;
     if (pendingGoal == null) return;
     final conversation = activeConversation;
     _runningConversation = conversation;
@@ -540,88 +548,6 @@ class ChatController extends ChangeNotifier {
     _imageStore.directory,
   ).search(query, offset, limit: limit);
 
-  Future<void> addImages([ImageSource? source]) async {
-    final picking = source != null;
-    var added = false;
-    if (picking) {
-      addingImages = true;
-      notifyListeners();
-    }
-    try {
-      if (picking) await _persist();
-      final remaining = MessageImageStore.maxImages - draftImages.length;
-      final images = source == null
-          ? await _imageStore.recover(remaining)
-          : await _imageStore.pick(source, remaining);
-      if (images.isEmpty) return;
-      draftImages.addAll(images);
-      try {
-        await _persist();
-        added = true;
-      } on Object {
-        draftImages.removeWhere(images.contains);
-        await _imageStore.remove(images);
-        rethrow;
-      }
-    } finally {
-      if (picking) addingImages = false;
-      if (picking || added) notifyListeners();
-    }
-  }
-
-  Future<void> removeDraftImage(MessageImage image) async {
-    final index = draftImages.indexOf(image);
-    draftImages.removeAt(index);
-    notifyListeners();
-    try {
-      await _persist();
-    } on Object {
-      draftImages.insert(index, image);
-      notifyListeners();
-      rethrow;
-    }
-    await _imageStore.remove([image]);
-  }
-
-  Future<List<MessageFile>> pickFiles(int remaining) =>
-      MessageFileStore.pick(_imageStore.directory, remaining);
-
-  Future<void> addFiles() async {
-    addingImages = true;
-    notifyListeners();
-    try {
-      await _persist();
-      final files = await pickFiles(
-        MessageFileStore.maxFiles - draftFiles.length,
-      );
-      draftFiles.addAll(files);
-      try {
-        await _persist();
-      } on Object {
-        draftFiles.removeWhere(files.contains);
-        await MessageFileStore.remove(files);
-        rethrow;
-      }
-    } finally {
-      addingImages = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> removeDraftFile(MessageFile file) async {
-    final index = draftFiles.indexOf(file);
-    draftFiles.removeAt(index);
-    notifyListeners();
-    try {
-      await _persist();
-    } on Object {
-      draftFiles.insert(index, file);
-      notifyListeners();
-      rethrow;
-    }
-    await MessageFileStore.remove([file]);
-  }
-
   void updateDraft(String text) {
     final conversation = activeConversation;
     if (conversation.draft == text) return;
@@ -634,13 +560,23 @@ class ChatController extends ChangeNotifier {
     _conversationChanged();
   }
 
-  Future<void> _persist({Map<String, List<String>> recipients = const {}}) =>
+  Future<void> _persist({
+    Map<String, List<String>> recipients = const {},
+    bool saveRuntime = false,
+    bool saveMessages = false,
+  }) =>
       activeConversation.kind == ConversationKind.direct &&
           activeConversation.messageCount == 0 &&
           !activeConversation.isTemporary &&
           !activeConversation.isStored
       ? _newDraftStore.save(activeConversation)
-      : _store.writer.save(activeConversation, recipients: recipients);
+      : _store.writer.save(
+          activeConversation,
+          recipients: recipients,
+          saveDraft: true,
+          saveRuntime: saveRuntime,
+          saveMessages: saveMessages,
+        );
 
   Future<bool> getScreenAccess(String senderId) async =>
       (await groupStore.loadAi(senderId)).preferences.screenAccess;
@@ -675,8 +611,9 @@ class ChatController extends ChangeNotifier {
     );
     conversationId ??= _runningConversation!.id;
     final existing =
-        (screenAccess && isScreenTool(call.name)) ||
-        toolApprovals.allows(conversationId, call);
+        !definition.singleUseConfirmation &&
+        ((screenAccess && isScreenTool(call.name)) ||
+            toolApprovals.allows(conversationId, call));
     if (!existing)
       await _platform.updateAttentionNotification(
         conversationId,
@@ -688,7 +625,7 @@ class ChatController extends ChangeNotifier {
     _confirmingSenderId = senderId;
     final bool approved;
     try {
-      final scope = accessibilityAvailable
+      final scope = accessibilityAvailable && !definition.singleUseConfirmation
           ? await _platform.requestConfirmation(
               call.id,
               call.name,
@@ -702,7 +639,7 @@ class ChatController extends ChangeNotifier {
           ? 'once'
           : await _confirmInApp(call, definition, conversationId);
       approved = scope != 'deny';
-      if (approved) {
+      if (approved && !definition.singleUseConfirmation) {
         await toolApprovals.grant(
           conversationId,
           call,

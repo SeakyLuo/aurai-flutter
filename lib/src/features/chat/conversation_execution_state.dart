@@ -6,7 +6,10 @@ final _executionZoneKey = Object();
 class _ConversationExecutionState {
   Conversation? conversation;
   int leases = 0;
+  int attachmentJobs = 0;
+  bool forwardingMessage = false;
   bool forwardedReplyPending = false;
+  String? queuedUserMessageId;
   bool submitting = false;
   AgentRuntime? runtime;
   bool systemEventLoading = false;
@@ -65,6 +68,8 @@ extension ConversationExecutionState on ChatController {
     return state != null &&
             (state.runningConversation != null ||
                 state.submitting ||
+                state.attachmentJobs > 0 ||
+                state.forwardingMessage ||
                 state.systemEventLoading)
         ? state.conversation
         : null;
@@ -94,6 +99,7 @@ extension ConversationExecutionState on ChatController {
   Future<void> stop() => _inConversation(activeConversation, _stopConversation);
 
   Future<void> _stopConversation() async {
+    _execution.queuedUserMessageId = null;
     if (identical(activeConversation, _privateConversation)) {
       _privateConversation!.runState = ChatRunState.stopping;
       await _runtime?.cancel();

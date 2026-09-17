@@ -22,10 +22,10 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         : ToolSafety.lowRisk,
     description: switch (name) {
       'sendInteractiveMessage' =>
-        'Create a native interactive card in the current conversation. In private chat it is inserted into your current streamed reply at this point; continue ordinary text afterwards only when useful. Do not describe it as a separate message or repeat its contents. In group chat it is a separate group message. Use for persistent choices, shared participation and replayable rounds; ordinary one-off questions can use askUser. '
-            'For shared interactions define interaction (state, completion rules, reveal timing and views) and submit buttons with JSON value. Each actor contributes one current-round submission. '
+        'Create a native interactive card in the current conversation or an accessible conversation specified by conversationId, without switching conversations. Omit conversationId to use the current conversation. In the current private chat it is inserted into your current streamed reply at this point; continue ordinary text afterwards only when useful. Do not describe an inline card as a separate message or repeat its contents. In another conversation or group chat it is a separate message sent as you. Use for persistent choices, shared participation and replayable rounds; ordinary one-off questions can use askUser. '
+            'Set buttonColumns=2 for compact short-option polls or quizzes; omit for a single column. For shared interactions define interaction (state, completion rules, reveal timing and views) and submit buttons with JSON value. Each actor contributes one current-round submission. For radio/checkbox choices, put selection:{mode:single|multiple,options:[{id,label,value?}]} on one submit button. Its label is the confirmation action. Set interaction (for example allowChange:true) to store choices; do not create one submit button per option. A single selection records its option value, multiple records an array; selections retains option IDs and labels. Distribution counts each chosen option separately, with participant count as denominator. '
             'The app settles rules atomically; distribution/text/metric views render visible state. A poll and simultaneous-choice game use this same mechanism. nextRound keeps shared state and resets submissions plus roundInitial fields. '
-            'notifyAi=true keeps the triggering participant waiting for a callback result. Complete it with updateInteractiveMessage plus callbackEventId; a plain chat reply is not a card result. update/nextState buttons change only the acting participant’s presentation. openUrl opens/returns HTTPS; notifyAi requests a creator callback. Every button requires id,label,action,repeatable. '
+            'notifyAi=true locks only the triggering button until its callback result. A later state-changing action supersedes the previous callback. Complete it with updateInteractiveMessage plus callbackEventId; a plain chat reply is not a card result. update/nextState buttons change only the acting participant’s presentation. openUrl opens/returns HTTPS; notifyAi requests a creator callback. Every button requires id,label,action,repeatable. '
             'Default visibility is public. reveal=onComplete hides other choices, aggregates and runtime state until completed or closed. Keep completion reachable and gate result views on available context. '
             'For complete examples, discover the public skill 共享交互消息 with listSkills/readSkill. Keep message/button IDs internal and do not repeat the full card as ordinary text.',
       'readInteractiveMessage' =>
@@ -46,6 +46,12 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
     inputSchema: {
       'type': 'object',
       'properties': {
+        if (name == 'sendInteractiveMessage')
+          'conversationId': {
+            'type': 'string',
+            'description':
+                'Optional destination from searchConversations/listGroupChats. You must be a current member. Omit for the current conversation; never ask the user to enter IDs.',
+          },
         if (name == 'retryInteractiveCallback' ||
             name == 'updateInteractiveMessage')
           'callbackEventId': {
@@ -56,7 +62,7 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         if (name == 'clickInteractiveMessage') ...{
           'value': {
             'description':
-                'HTML input-enabled submit endpoint only: text or JSON value (max 16 KB). Omit for native fixed buttons.',
+                'For selection submit buttons: option id for single, array of option ids for multiple. The host resolves configured values and records labels. For HTML input-enabled endpoints: text or JSON (max 16 KB). Omit for ordinary fixed buttons.',
           },
           'buttonId': {'type': 'string'},
           'participantRevision': {'type': 'integer', 'minimum': 0},
@@ -76,6 +82,7 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         if (name == 'sendInteractiveMessage' ||
             name == 'updateInteractiveMessage') ...{
           'showStatistics': interactiveStatisticsSchema,
+          'buttonColumns': interactiveButtonColumnsSchema,
           'participation': interactiveParticipationSchema,
           'interaction': sharedInteractionSchema,
           'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
@@ -94,6 +101,7 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
                 'body': interactiveBodySchema,
                 'buttons': interactiveButtonsSchema,
                 'showStatistics': interactiveStatisticsSchema,
+                'buttonColumns': interactiveButtonColumnsSchema,
               },
               'required': ['id', 'title', 'body', 'buttons'],
               'additionalProperties': false,
