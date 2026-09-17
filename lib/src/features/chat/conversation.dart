@@ -46,11 +46,19 @@ class Conversation {
   List<MessageSender> creationMembers = [];
   String? storedPreview;
   bool storedPreviewIsSystem = false;
+  AgentMessage? get _previewMessage => messages.reversed
+      .where(
+        (message) =>
+            (message.interactive?.canView(MessageSender.localUser.id) ??
+                true) &&
+            !(message.isSystem && message.text == '私密交互消息已更新'),
+      )
+      .firstOrNull;
   bool get previewIsSystem =>
       draft.isEmpty &&
       draftFiles.isEmpty &&
       draftImages.isEmpty &&
-      (messages.isNotEmpty ? messages.last.isSystem : storedPreviewIsSystem);
+      (_previewMessage?.isSystem ?? storedPreviewIsSystem);
   DateTime? storedUpdatedAt;
   DateTime? lastMessageAt;
   String? activeRunId;
@@ -64,7 +72,7 @@ class Conversation {
   int groupReadAt = 0;
   String groupReadId = '';
   bool get needsGroupReadCheckpoint {
-    final latest = messages.lastOrNull;
+    final latest = _previewMessage;
     if (latest == null) return false;
     final at = latest.createdAt.microsecondsSinceEpoch;
     return at > groupReadAt ||
@@ -129,7 +137,7 @@ class Conversation {
 
   String? get preview {
     if (draftPreview != null) return draftPreview;
-    final latest = messages.lastOrNull;
+    final latest = _previewMessage;
     if (latest != null)
       return MessageSummary.fromMessage(latest, withSender: true);
     return storedPreview ?? creationMessage;

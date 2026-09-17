@@ -259,16 +259,16 @@ extension InteractiveMessageActions on ChatController {
           whereArgs: [id],
         );
       }
+      if (card.participation['audience'] != null) return null;
       return InteractiveMessageStore.writeNotice(
         txn,
         source.id,
-        card.participation['audience'] == null
-            ? '${actor.sender.name}更新了“${card.title}”'
-            : '私密交互消息已更新',
+        '${actor.sender.name}更新了“${card.title}”',
       );
     });
     _replaceInteractiveCard(source.id, id, card, source: source);
-    _publishInteractiveChange(source.id, notice, source: source);
+    if (notice != null)
+      _publishInteractiveChange(source.id, notice, source: source);
     return {'updated': true, 'revision': card.revision};
   }
 

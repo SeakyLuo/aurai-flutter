@@ -122,13 +122,22 @@ class ToolCall {
       }
       return ToolCall.fromModel(id: id, name: name, arguments: decoded);
     } on FormatException catch (error) {
+      final offset = error.offset;
+      final start = offset == null
+          ? 0
+          : (offset - 100).clamp(0, arguments.length);
+      final end = offset == null
+          ? arguments.length.clamp(0, 200)
+          : (offset + 100).clamp(0, arguments.length);
       return ToolCall(
         id: id,
         name: name,
         arguments: {'invalidJson': arguments},
         argumentsError:
             '${error.message}'
-            '${error.offset == null ? '' : '（位置 ${error.offset}）'}',
+            '${offset == null ? '' : '（位置 $offset）'}'
+            '\n出错附近的原始 JSON（片段起点 $start）：'
+            '${jsonEncode(arguments.substring(start, end))}',
       );
     }
   }

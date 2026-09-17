@@ -102,6 +102,7 @@ class HtmlGameStore {
     required String conversationId,
     required MessageSender creator,
     required Map<String, Object?> args,
+    String? runId,
     bool standalone = false,
     bool groupMessage = true,
   }) => database.transaction((txn) async {
@@ -159,6 +160,7 @@ class HtmlGameStore {
       text: interactive?.participation['audience'] == null ? title : '私密交互消息',
       createdAt: DateTime.now(),
       isGroupMessage: groupMessage,
+      runId: runId,
       htmlGame: HtmlGameCard(
         title: title,
         width: width,

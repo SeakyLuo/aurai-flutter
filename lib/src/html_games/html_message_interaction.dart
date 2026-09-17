@@ -42,6 +42,7 @@ extension HtmlMessageInteraction on HtmlGameStore {
         inputValue: data['value'],
       );
       InteractiveMessageStore.changes.add(messageId);
+      MessageCallbacks.changes.add(null);
       return {
         'accepted': true,
         'eventId': eventId,

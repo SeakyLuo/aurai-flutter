@@ -25,6 +25,7 @@ class AgentMessage {
     this.isSystem = false,
     this.isFailure = false,
     this.isGroupMessage = false,
+    this.isRichReply = false,
     this.quote,
     this.interactive,
     this.htmlGame,
@@ -53,6 +54,7 @@ class AgentMessage {
     isSystem: isSystem,
     isFailure: isFailure,
     isGroupMessage: isGroupMessage,
+    isRichReply: isRichReply,
     quote: quote,
   );
 
@@ -62,6 +64,8 @@ class AgentMessage {
   final bool isSystem;
   final bool isFailure;
   final bool isGroupMessage;
+  // Derived in a page-wide read, including runs whose cards are off-page.
+  final bool isRichReply;
   final String id;
   final AgentMessageRole role;
   final String senderId;

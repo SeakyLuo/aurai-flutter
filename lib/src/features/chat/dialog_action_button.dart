@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../utils/widget_utils.dart';
 import 'settings_appearance.dart';
+import 'glass_surface.dart';
 
 enum DialogActionRole { primary, secondary, destructive, reject }
 
@@ -14,6 +15,7 @@ class DialogActionButton extends StatelessWidget {
     this.role = DialogActionRole.primary,
     this.detail,
     this.loading = false,
+    this.liquidGlass = false,
   });
 
   final String text;
@@ -21,6 +23,7 @@ class DialogActionButton extends StatelessWidget {
   final DialogActionRole role;
   final String? detail;
   final bool loading;
+  final bool liquidGlass;
 
   @override
   Widget build(BuildContext context) {
@@ -31,18 +34,21 @@ class DialogActionButton extends StatelessWidget {
         onPressed: onPressed,
         height: 46,
         loading: loading,
+        liquidGlass: liquidGlass,
       );
     }
     final colors = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final destructive = role == DialogActionRole.destructive;
-    return TextButton(
+    final button = TextButton(
       onPressed: loading ? null : onPressed,
       style: TextButton.styleFrom(
         foregroundColor: destructive || role == DialogActionRole.reject
             ? (dark ? const Color(0xffff8a80) : const Color(0xffd93025))
             : colors.onSurface,
-        backgroundColor: destructive
+        backgroundColor: liquidGlass
+            ? Colors.transparent
+            : destructive
             ? (dark ? const Color(0xff492b2b) : const Color(0xffffe9e7))
             : dialogControlColor(context),
         minimumSize: const Size(0, 46),
@@ -56,5 +62,6 @@ class DialogActionButton extends StatelessWidget {
             )
           : Text(label, textAlign: TextAlign.center),
     );
+    return liquidGlass ? GlassSurface(radius: 28, child: button) : button;
   }
 }

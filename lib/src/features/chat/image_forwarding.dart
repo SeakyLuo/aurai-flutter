@@ -196,7 +196,6 @@ extension ImageForwarding on ChatController {
         role: AgentMessageRole.user,
         senderId: MessageSender.localUser.id,
         text: [
-          '转发自 ${source.sender?.name ?? MessageSender.localUser.name}',
           if (source.htmlGame == null && source.interactive == null)
             source.text,
           if (note.isNotEmpty) note,

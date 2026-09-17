@@ -14,10 +14,14 @@ Future<void> loadConversationListPreviews(
   };
   if (groups.isEmpty) return;
   final rows = await database.rawQuery(
-    '''SELECT id, conversation_id, sender_id, kind, text, interactive_json IS NOT NULL AS has_interactive, created_at
+    '''SELECT id, conversation_id, sender_id, kind, text, json_extract(interactive_json, '\$.title') AS interactive_title, created_at
        FROM messages WHERE id IN (
          SELECT (SELECT id FROM messages
            WHERE conversation_id = conversations.id AND kind != 'commentary'
+             AND NOT (kind = 'system' AND text = '私密交互消息已更新')
+             AND (interactive_json IS NULL
+               OR json_extract(interactive_json, '\$.participation.audience') IS NULL
+               OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = 'user:local'))
            ORDER BY created_at DESC, id DESC LIMIT 1)
          FROM conversations WHERE id IN (${_slots(groups.length)})
        )''',
@@ -72,11 +76,11 @@ Future<void> loadConversationListPreviews(
         DateTime.fromMicrosecondsSinceEpoch(row['created_at'] as int);
     final text = row['id'] == 'group-created:${row['conversation_id']}'
         ? groups[row['conversation_id']]!.creationMessage!
-        : row['text'] as String;
+        : row['interactive_title'] as String? ?? row['text'] as String;
     final body = MessageSummary.content(
       text: text,
       htmlTitle: row['kind'] == 'html_game' ? text : null,
-      interactiveTitle: row['has_interactive'] == 1 ? text : null,
+      interactiveTitle: row['interactive_title'] as String?,
       attachments: [
         for (final attachment in attachments[row['id']] ?? const [])
           MessageSummary.attachment(

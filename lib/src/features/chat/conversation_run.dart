@@ -363,8 +363,9 @@ extension ConversationRun on ChatController {
             );
             runConversation.messageCount++;
           } else {
-            final previous = messages.last;
-            messages[messages.length - 1] = AgentMessage(
+            final index = messages.indexWhere((m) => m.id == turnMessageId);
+            final previous = messages[index];
+            messages[index] = AgentMessage(
               id: previous.id,
               role: previous.role,
               senderId: previous.senderId,
@@ -436,7 +437,8 @@ extension ConversationRun on ChatController {
         },
       );
       for (final message in messages.where(
-        (m) => m.runId == runId && m.interactive != null,
+        (m) =>
+            m.runId == runId && (m.interactive != null || m.htmlGame != null),
       )) {
         if (!runMessageIds.contains(message.id)) runMessageIds.add(message.id);
       }
@@ -476,7 +478,7 @@ extension ConversationRun on ChatController {
             activities: List.unmodifiable(
               groupParent != null
                   ? activities.where((a) => a.toolName != null)
-                  : answer.interactive != null
+                  : answer.interactive != null || answer.htmlGame != null
                   ? activities
                   : activities.take(
                       activities.indexWhere(
