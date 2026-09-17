@@ -1,3 +1,4 @@
+import '../platform/svg_image.dart';
 import '../domain/error_message.dart';
 import '../domain/tool_models.dart';
 import '../domain/message_image.dart';
@@ -167,11 +168,11 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
           (output.remove('_images') as List<MessageImage>?) ?? const [];
       final attachments = await Future.wait([
         for (final image in images)
-          File(image.path).readAsBytes().then(
-            (bytes) => ToolAttachment(
+          readVisionImage(File(image.path), image.mimeType).then(
+            (vision) => ToolAttachment(
               type: ToolAttachmentType.image,
-              mimeType: image.mimeType,
-              base64Data: base64Encode(bytes),
+              mimeType: vision.mimeType,
+              base64Data: base64Encode(vision.bytes),
             ),
           ),
       ]);

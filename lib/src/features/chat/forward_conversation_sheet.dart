@@ -218,6 +218,7 @@ class _ForwardConversationSheetState extends State<ForwardConversationSheet> {
                                         message.sender != null
                                     ? GroupMessageHeading(
                                         sender: message.sender!,
+                                        isFailure: message.isFailure,
                                         showName: message.htmlGame == null,
                                         onOpenProfile: () {},
                                         child: content,

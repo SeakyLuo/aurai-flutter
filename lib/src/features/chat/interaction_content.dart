@@ -15,19 +15,16 @@ class InteractionContent extends StatelessWidget {
     required this.readOnly,
     required this.allowChange,
     required this.eligible,
-    required this.editing,
     required this.busy,
     this.pendingButtonId,
-    required this.onEditing,
     required this.onClick,
   });
   final Map<String, Object?> view;
   final int buttonColumns;
   final List<Map<String, Object?>> buttons;
-  final bool readOnly, allowChange, eligible, editing, shared;
+  final bool readOnly, allowChange, eligible, shared;
   final String? busy;
   final String? pendingButtonId;
-  final ValueChanged<bool> onEditing;
   final void Function(Map<String, Object?> button, {Object? value}) onClick;
 
   @override
@@ -35,9 +32,9 @@ class InteractionContent extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final submitted = view['submitted'] == true;
     final collecting = view['phase'] == 'collecting' && view['closed'] != true;
-    final choosing = collecting && (!submitted || editing);
+    final choosing = collecting && (!submitted || allowChange);
     final self = view['self'] as Map?;
-    final selectedButton = collecting && submitted && !editing
+    final selectedButton = collecting && submitted && !allowChange
         ? buttons
               .where(
                 (button) =>
@@ -65,27 +62,26 @@ class InteractionContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!editing)
-          for (final component in view['components'] as List)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: switch (component['type']) {
-                'distribution' => InteractionDistribution(
-                  data: Map<String, Object?>.from(component as Map),
+        for (final component in view['components'] as List)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: switch (component['type']) {
+              'distribution' => InteractionDistribution(
+                data: Map<String, Object?>.from(component as Map),
+              ),
+              'metric' => Text(
+                '${component['label'] ?? ''} ${component['value'] ?? ''}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
                 ),
-                'metric' => Text(
-                  '${component['label'] ?? ''} ${component['value'] ?? ''}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                _ => Text(
-                  '${component['value'] ?? ''}',
-                  style: const TextStyle(fontSize: 15, height: 1.5),
-                ),
-              },
-            ),
+              ),
+              _ => Text(
+                '${component['value'] ?? ''}',
+                style: const TextStyle(fontSize: 15, height: 1.5),
+              ),
+            },
+          ),
         if (status != null)
           Text(
             status,
@@ -116,7 +112,7 @@ class InteractionContent extends StatelessWidget {
                   busy != null ||
                   pendingButtonId == button['id'],
               submitted: submitted,
-              editing: editing,
+              allowChange: allowChange,
               busy: busy == button['id'],
               onSubmit: (value) => onClick(button, value: value),
             ),
@@ -152,14 +148,6 @@ class InteractionContent extends StatelessWidget {
               ),
           ],
         ),
-        if (collecting && submitted && allowChange && eligible && !readOnly)
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: busy != null ? null : () => onEditing(!editing),
-              child: Text(editing ? '取消修改' : '修改选择'),
-            ),
-          ),
       ],
     );
   }

@@ -9,6 +9,8 @@ extension ConversationRun on ChatController {
     AgentMessage? groupUser,
     Conversation? groupParent,
   }) async {
+    final summaryOwner = groupParent ?? runConversation;
+    final historyVersion = _store.writer.historyVersion(summaryOwner.id);
     final alongsideGroup = identical(runConversation, _privateConversation);
     final messages = runConversation.messages;
     final steps = runConversation.steps;
@@ -104,6 +106,7 @@ extension ConversationRun on ChatController {
           summaryConfig: modelSettings.activeConfig,
           sharedContext: groupParent?.sharedContext,
         ),
+        ModelService.openRouter ||
         ModelService.deepSeek ||
         ModelService.qwen ||
         ModelService.kimi ||
@@ -273,8 +276,14 @@ extension ConversationRun on ChatController {
         ].join('\n\n'),
         onContextSummary: (summary) async {
           final owner = groupParent ?? runConversation;
-          owner.contextSummary = summary;
-          await _store.writer.saveContextSummary(owner.id, summary);
+          await _store.writer.saveContextSummary(
+            owner.id,
+            summary,
+            historyVersion: historyVersion,
+          );
+          if (_store.writer.historyVersion(owner.id) == historyVersion) {
+            owner.contextSummary = summary;
+          }
         },
         onCompactionChanged: (active) {
           if (groupParent != null) return;

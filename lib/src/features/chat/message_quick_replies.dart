@@ -33,7 +33,6 @@ extension MessageQuickReplies on ChatController {
     final conversation = activeConversation;
     if (source.role != AgentMessageRole.assistant ||
         source.isSystem ||
-        source.isFailure ||
         source.isReasoning) {
       throw StateError('这条消息不支持快捷回复');
     }
@@ -235,41 +234,46 @@ extension MessageQuickReplies on ChatController {
     String sourceId,
     String replyId,
   ) async {
-    await _store.writer.flush();
-    await _store.database.transaction((txn) async {
-      await txn.delete(
-        'messages',
-        where: "id = ? AND conversation_id = ? AND kind = 'quick_reply'",
-        whereArgs: [replyId, conversation.id],
+    await _store.writer.mutate(() async {
+      await _store.database.transaction((txn) async {
+        await txn.delete(
+          'messages',
+          where: "id = ? AND conversation_id = ? AND kind = 'quick_reply'",
+          whereArgs: [replyId, conversation.id],
+        );
+        await txn.rawUpdate(
+          'UPDATE conversations SET message_count = (SELECT COUNT(*) FROM messages WHERE conversation_id = ?) WHERE id = ?',
+          [conversation.id, conversation.id],
+        );
+        await txn.delete(
+          'app_state',
+          where: 'key = ?',
+          whereArgs: ['context_summary:${conversation.id}'],
+        );
+      });
+      _store.writer.invalidateHistory(
+        conversation.id,
+        deletedMessageId: replyId,
       );
-      await txn.rawUpdate(
-        'UPDATE conversations SET message_count = (SELECT COUNT(*) FROM messages WHERE conversation_id = ?) WHERE id = ?',
-        [conversation.id, conversation.id],
+      for (final value in _interactiveConversations(
+        conversation.id,
+        conversation,
+      )) {
+        _detachQuickReply(value, sourceId, replyId);
+        value.messages.removeWhere((message) => message.id == replyId);
+        value.messageCount--;
+        value.contextSummary = null;
+        value.sharedContext = null;
+      }
+      final execution = _executionStates[conversation.id];
+      execution?.groupDispatcher?.history.removeWhere(
+        (message) => message.id == replyId,
       );
-      await txn.delete(
-        'app_state',
-        where: 'key = ?',
-        whereArgs: ['context_summary:${conversation.id}'],
-      );
+      if (execution?.queuedUserMessageId == replyId) {
+        execution!.queuedUserMessageId = null;
+        conversation.pendingGoal = null;
+      }
     });
-    for (final value in _interactiveConversations(
-      conversation.id,
-      conversation,
-    )) {
-      _detachQuickReply(value, sourceId, replyId);
-      value.messages.removeWhere((message) => message.id == replyId);
-      value.messageCount--;
-      value.contextSummary = null;
-      value.sharedContext = null;
-    }
-    final execution = _executionStates[conversation.id];
-    execution?.groupDispatcher?.history.removeWhere(
-      (message) => message.id == replyId,
-    );
-    if (execution?.queuedUserMessageId == replyId) {
-      execution!.queuedUserMessageId = null;
-      conversation.pendingGoal = null;
-    }
     _updateConversationList(conversation);
     _notifyRun(conversation);
   }
@@ -286,7 +290,7 @@ extension MessageQuickReplies on ChatController {
     final rows = await _store.database.query(
       'messages',
       where:
-          "id = ? AND conversation_id = ? AND kind NOT IN ('system', 'message_failure', 'reasoning', 'quick_reply') AND conversation_id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL) AND (interactive_json IS NULL OR json_extract(interactive_json, '\$.participation.audience') IS NULL OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = ?))",
+          "id = ? AND conversation_id = ? AND kind NOT IN ('system', 'reasoning', 'quick_reply') AND conversation_id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL) AND (interactive_json IS NULL OR json_extract(interactive_json, '\$.participation.audience') IS NULL OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = ?))",
       whereArgs: [sourceId, conversation.id, actor, actor],
       limit: 1,
     );

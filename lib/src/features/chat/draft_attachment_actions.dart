@@ -44,24 +44,28 @@ extension DraftAttachmentActions on ChatController {
   Future<void> removeDraftImage(MessageImage image) =>
       _inConversation(activeConversation, () => _removeDraftImage(image));
 
-  Future<void> _removeDraftImage(MessageImage image) async {
-    final index = draftImages.indexOf(image);
-    draftImages.removeAt(index);
-    notifyListeners();
-    try {
-      await _store.writer.save(
-        activeConversation,
-        makeActive: false,
-        saveDraft: true,
-        saveMessages: false,
+  Future<void> _removeDraftImage(MessageImage image) =>
+      DraftAttachmentCleanup(_store.database, _imageStore.directory).remove(
+        image.path,
+        activeConversation.defaultSenderId,
+        () async {
+          final index = draftImages.indexOf(image);
+          draftImages.removeAt(index);
+          notifyListeners();
+          try {
+            await _store.writer.save(
+              activeConversation,
+              makeActive: false,
+              saveDraft: true,
+              saveMessages: false,
+            );
+          } on Object {
+            draftImages.insert(index, image);
+            notifyListeners();
+            rethrow;
+          }
+        },
       );
-    } on Object {
-      draftImages.insert(index, image);
-      notifyListeners();
-      rethrow;
-    }
-    await _imageStore.remove([image]);
-  }
 
   Future<List<MessageFile>> pickFiles(int remaining) =>
       MessageFileStore.pick(_imageStore.directory, remaining);
@@ -104,22 +108,26 @@ extension DraftAttachmentActions on ChatController {
   Future<void> removeDraftFile(MessageFile file) =>
       _inConversation(activeConversation, () => _removeDraftFile(file));
 
-  Future<void> _removeDraftFile(MessageFile file) async {
-    final index = draftFiles.indexOf(file);
-    draftFiles.removeAt(index);
-    notifyListeners();
-    try {
-      await _store.writer.save(
-        activeConversation,
-        makeActive: false,
-        saveDraft: true,
-        saveMessages: false,
+  Future<void> _removeDraftFile(MessageFile file) =>
+      DraftAttachmentCleanup(_store.database, _imageStore.directory).remove(
+        file.path,
+        activeConversation.defaultSenderId,
+        () async {
+          final index = draftFiles.indexOf(file);
+          draftFiles.removeAt(index);
+          notifyListeners();
+          try {
+            await _store.writer.save(
+              activeConversation,
+              makeActive: false,
+              saveDraft: true,
+              saveMessages: false,
+            );
+          } on Object {
+            draftFiles.insert(index, file);
+            notifyListeners();
+            rethrow;
+          }
+        },
       );
-    } on Object {
-      draftFiles.insert(index, file);
-      notifyListeners();
-      rethrow;
-    }
-    await MessageFileStore.remove([file]);
-  }
 }

@@ -1,3 +1,4 @@
+import 'svg_image.dart';
 import '../domain/error_message.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -40,7 +41,7 @@ class PreviewImageActions {
 
   static Future<bool> perform(ImageProvider image, String action) async {
     final bytes = await readBytes(image);
-    final mime = lookupMimeType('', headerBytes: bytes);
+    final mime = imageBytesMime(bytes);
     if (mime == null || !mime.startsWith('image/'))
       throw StateError('无法识别图片格式');
     final name =

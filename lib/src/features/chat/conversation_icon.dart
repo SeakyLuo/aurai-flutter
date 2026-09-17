@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
 class ConversationIcon extends StatelessWidget {
-  const ConversationIcon({super.key, this.temporary = false});
+  const ConversationIcon({super.key, this.temporary = false, this.color});
 
   final bool temporary;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: const Size.square(22),
     painter: _ConversationPainter(
-      Theme.of(context).colorScheme.onSurfaceVariant,
+      color ?? Theme.of(context).colorScheme.onSurfaceVariant,
       temporary,
     ),
   );

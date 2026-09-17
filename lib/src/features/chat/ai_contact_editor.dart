@@ -4,6 +4,7 @@ import 'contact_generator.dart';
 import 'glass_surface.dart';
 import 'random_contact.dart';
 import '../../domain/response_preferences.dart';
+import '../../domain/model_reasoning.dart';
 import 'personalization_controls.dart';
 import 'personality_traits_page.dart';
 import 'dart:io';
@@ -198,6 +199,7 @@ class _AiContactEditorState extends State<AiContactEditor> {
           customInstructions: _role.text.trim(),
           responses: _responses,
           screenAccess: old?.preferences.screenAccess ?? false,
+          reasoning: old?.preferences.reasoning ?? ModelReasoning.inherit,
         ),
         modelSelection:
             old?.modelSelection ??

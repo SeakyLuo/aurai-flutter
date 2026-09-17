@@ -70,6 +70,7 @@ class AgentRunStore {
           'senderName': sender.name,
           'provider': config.service.name,
           'model': config.model,
+          'reasoning': config.reasoning.name,
           'baseUrl': config.baseUrl,
           'systemPrompt': systemPrompt,
           'customInstructions': customInstructions,

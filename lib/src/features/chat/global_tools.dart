@@ -214,6 +214,7 @@ extension GlobalTools on ChatController {
       WebTool('searchWeb', webSources),
       SourceDatesTool(webSources),
       ImageSearchTool(),
+      ImageGenerationTool(_generateImage),
       WebTool('readWebPage', webSources),
       if (scheduledTasks.supported)
         for (final operation in ScheduleTaskTool.operations)

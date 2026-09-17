@@ -9,6 +9,7 @@ import 'settings_icon.dart';
 import 'choice_sheet.dart';
 import 'model_balance_tile.dart';
 import 'model_settings_sheet.dart';
+import 'model_reasoning_field.dart';
 import '../../scheduling/task_unsaved_dialog.dart';
 
 class AiModelPage extends StatefulWidget {
@@ -33,6 +34,7 @@ class _AiModelPageState extends State<AiModelPage> {
   late final _url = TextEditingController(
     text: widget.controller.aiConfig(widget.profile).baseUrl,
   );
+  late ModelReasoning _reasoning = widget.profile.preferences.reasoning;
   bool _saving = false,
       _changed = false,
       _leaveAllowed = false,
@@ -55,6 +57,9 @@ class _AiModelPageState extends State<AiModelPage> {
     try {
       await widget.controller.saveAi(
         widget.profile.copyWith(
+          preferences: widget.profile.preferences.copyWith(
+            reasoning: _reasoning,
+          ),
           modelSelection: AiModelSelection(
             provider: _service,
             model: _model.text.trim(),
@@ -135,6 +140,7 @@ class _AiModelPageState extends State<AiModelPage> {
                     if (!mounted || value == null || value == _service) return;
                     setState(() {
                       _service = value;
+                      _reasoning = ModelReasoning.inherit;
                       _changed = true;
                       _model.clear();
                       _url.text = widget.controller.modelSettings
@@ -149,6 +155,21 @@ class _AiModelPageState extends State<AiModelPage> {
             _model.text.isEmpty ? '选择模型' : modelDisplayName(_model.text),
             _saving || _loading ? null : _selectModel,
             loading: _loading,
+          ),
+          ModelReasoningField(
+            service: _service,
+            model: _model.text,
+            baseUrl: _url.text,
+            value: _reasoning,
+            inheritedValue: widget.controller.modelSettings
+                .profile(_service)
+                .reasoning,
+            onChanged: _saving || _loading
+                ? null
+                : (value) => setState(() {
+                    _reasoning = value;
+                    _changed = true;
+                  }),
           ),
           const SizedBox(height: 16),
           _label('账户余额'),
@@ -190,6 +211,7 @@ class _AiModelPageState extends State<AiModelPage> {
       final models = await catalog.load(
         baseUrl: Uri.parse(profile.baseUrl),
         apiKey: profile.apiKey,
+        openRouter: _service == ModelService.openRouter,
       );
       if (!mounted) return;
       if (models.isEmpty) {
@@ -207,6 +229,7 @@ class _AiModelPageState extends State<AiModelPage> {
       );
       if (!mounted || value == null) return;
       setState(() {
+        if (_model.text != value) _reasoning = ModelReasoning.inherit;
         _model.text = value;
         _url.text = profile.baseUrl;
         _changed = true;

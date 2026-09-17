@@ -88,7 +88,10 @@ extension PeerConversations on ChatController {
           await txn.insert('messages', messageRow(id, message));
           final attachments = txn.batch();
           for (var i = 0; i < images.length; i++) {
-            attachments.insert('attachments', attachmentRow(id, images[i], i, messageId: message.id));
+            attachments.insert(
+              'attachments',
+              attachmentRow(id, images[i], i, messageId: message.id),
+            );
           }
           await attachments.commit(noResult: true);
           await txn.rawUpdate(
@@ -114,6 +117,7 @@ extension PeerConversations on ChatController {
     List<AgentMessage> snapshot,
   ) async {
     final conversation = session.conversation;
+    final historyVersion = _store.writer.historyVersion(conversation.id);
     final profile = await groupStore.loadAi(senderId);
     final reply = _profileReplyContext(profile, group: false);
     final config = reply.config;
@@ -219,8 +223,14 @@ extension PeerConversations on ChatController {
         ],
         contextSummary: conversation.contextSummary,
         onContextSummary: (summary) async {
-          conversation.contextSummary = summary;
-          await _persistRun(conversation);
+          await _store.writer.saveContextSummary(
+            conversation.id,
+            summary,
+            historyVersion: historyVersion,
+          );
+          if (_store.writer.historyVersion(conversation.id) == historyVersion) {
+            conversation.contextSummary = summary;
+          }
         },
         personalContext: () async => [
           profile.preferences.responses.instructions,

@@ -1,3 +1,4 @@
+import '../../platform/svg_image.dart';
 import '../../domain/error_message.dart';
 import 'unavailable_image.dart';
 import 'image_action_scope.dart';
@@ -120,7 +121,7 @@ class _ImageAttachmentState extends State<ImageAttachment> {
         }
         if (!mounted) return;
         imageSize = await loadPreviewImageSize(
-          FileImage(File(widget.image.path)),
+          localImageProvider(widget.image.path),
           context,
         );
       } on Object catch (error) {
@@ -143,7 +144,8 @@ class _ImageAttachmentState extends State<ImageAttachment> {
             originMessageId: originMessageId,
             initialOriginMessageId: widget.sourceMessageId,
             images: [
-              for (final image in widget.gallery) FileImage(File(image.path)),
+              for (final image in widget.gallery)
+                localImageProvider(image.path),
             ],
             initialIndex: widget.gallery.indexOf(widget.image),
             heroTag: _heroTag,
@@ -171,15 +173,19 @@ class _ImageAttachmentState extends State<ImageAttachment> {
       tag: _heroTag,
       createRectTween: (begin, end) => RectTween(begin: begin, end: end),
       flightShuttleBuilder: (flightContext, animation, direction, from, to) =>
-          imagePreviewFlight(FileImage(File(widget.image.path)), animation),
+          imagePreviewFlight(localImageProvider(widget.image.path), animation),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(widget.borderRadius),
         child: Material(
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
           child: InkWell(
             onTap: _open,
-            child: Image.file(
-              File(widget.image.path),
+            child: Image(
+              image: ResizeImage.resizeIfNeeded(
+                (widget.size * MediaQuery.devicePixelRatioOf(context)).round(),
+                null,
+                localImageProvider(widget.image.path),
+              ),
               width: widget.size,
               height: widget.height ?? widget.size,
               fit: BoxFit.cover,
@@ -188,8 +194,6 @@ class _ImageAttachmentState extends State<ImageAttachment> {
                 height: widget.height ?? widget.size,
                 child: const UnavailableImage(),
               ),
-              cacheWidth: (widget.size * MediaQuery.devicePixelRatioOf(context))
-                  .round(),
             ),
           ),
         ),

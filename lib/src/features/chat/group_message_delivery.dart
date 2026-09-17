@@ -191,7 +191,7 @@ extension GroupMessageDelivery on ChatController {
       'participation': dispatcher.paused.contains(reply.senderId)
           ? 'paused'
           : 'active',
-      'instruction': '消息已发送，不要再重复。没有新的内容就结束本次执行。',
+      'instruction': '消息已发送，不要重复发送。当前意思表达完整就可以结束，无需主动寻找下一处补充。',
     };
   }
 

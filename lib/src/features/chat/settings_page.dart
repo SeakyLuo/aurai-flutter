@@ -1,3 +1,6 @@
+import 'personal_info_page.dart';
+import 'profile_avatar.dart';
+import 'default_models_page.dart';
 import '../../domain/error_message.dart';
 import 'archived_conversations_page.dart';
 import 'data_management_page.dart';
@@ -21,8 +24,10 @@ class SettingsPage extends StatelessWidget {
     super.key,
     required this.controller,
     required this.preparingGoal,
+    this.root = false,
   });
 
+  final bool root;
   final ChatController controller;
   final bool Function() preparingGoal;
 
@@ -99,10 +104,12 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     appBar: SettingsAppBar(
       title: '设置',
+      root: root,
       onBack: () => Navigator.maybePop(context),
     ),
     body: SafeArea(
       top: false,
+      bottom: false,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
@@ -131,11 +138,76 @@ class SettingsPage extends StatelessWidget {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 18),
               ),
               child: ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 16,
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  MediaQuery.paddingOf(context).bottom + 16,
                 ),
                 children: [
+                  Center(
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(26),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () => Navigator.push<void>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                PersonalInfoPage(memory: controller.memory),
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 16,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ProfileAvatar(
+                                style: controller.memory.avatar,
+                                name: controller.memory.nickname,
+                                size: 80,
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                controller.memory.nickname.isEmpty
+                                    ? '个人信息'
+                                    : controller.memory.nickname,
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Material(
+                    color: settingsFieldColor(context),
+                    borderRadius: BorderRadius.circular(26),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      leading: const SettingsIcon(type: SettingsIconType.model),
+                      title: const Text('模型供应商'),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: () => _openModel(context),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   Material(
                     color: settingsFieldColor(context),
                     borderRadius: BorderRadius.circular(26),
@@ -144,16 +216,20 @@ class SettingsPage extends StatelessWidget {
                       leading: const SettingsIcon(type: SettingsIconType.model),
                       title: const Text('模型设置'),
                       subtitle: Text(
-                        controller.needsConfiguration
-                            ? '连接模型'
-                            : modelDisplayName(controller.config.model),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        modelDisplayName(
+                          controller.modelSettings.activeConfig.model,
+                        ),
                       ),
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,
                       ),
-                      onTap: () => _openModel(context),
+                      onTap: () => Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              DefaultModelsPage(controller: controller),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -293,6 +369,20 @@ class SettingsPage extends StatelessWidget {
                         type: SettingsIconType.chevron,
                       ),
                       onTap: () => _archive(context),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    child: Center(
+                      child: Image.asset(
+                        'assets/branding/wordmark_white.png',
+                        width: 144,
+                        height: 48,
+                        fit: BoxFit.contain,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        colorBlendMode: BlendMode.srcIn,
+                        semanticLabel: 'AURAI',
+                      ),
                     ),
                   ),
                 ],

@@ -81,7 +81,7 @@ class QuoteIcon extends StatelessWidget {
   const QuoteIcon({super.key});
   @override
   Widget build(BuildContext context) => CustomPaint(
-    size: const Size(20, 20),
+    size: const Size.square(21),
     painter: _QuotePainter(Theme.of(context).colorScheme.onSurfaceVariant),
   );
 }
@@ -98,16 +98,22 @@ class _QuotePainter extends CustomPainter {
       ..strokeWidth = 1.65
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
-    canvas.drawPath(
-      Path()
-        ..moveTo(9, 5)
-        ..lineTo(3, 11)
-        ..lineTo(9, 17)
-        ..moveTo(3, 11)
-        ..lineTo(14, 11)
-        ..quadraticBezierTo(21, 11, 21, 19),
-      paint,
-    );
+    for (final x in [4.0, 14.0]) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, 5.5, 6, 7),
+          const Radius.circular(1.5),
+        ),
+        paint,
+      );
+      canvas.drawPath(
+        Path()
+          ..moveTo(x + 6, 11)
+          ..lineTo(x + 6, 13)
+          ..quadraticBezierTo(x + 6, 17, x + 1.5, 18.5),
+        paint,
+      );
+    }
   }
 
   @override

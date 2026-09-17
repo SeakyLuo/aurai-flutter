@@ -1,3 +1,4 @@
+import '../platform/svg_image.dart';
 import '../domain/error_message.dart';
 import '../domain/local_time.dart';
 import 'dart:convert';
@@ -57,9 +58,11 @@ class HistoryMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
       String? messageId = a['messageId'] as String?;
       if (name == 'readAttachment') {
         final rows = await database.query(
-          'attachments', columns: ['message_id'],
+          'attachments',
+          columns: ['message_id'],
           where: 'id = ? AND message_id IS NOT NULL',
-          whereArgs: [a['attachmentId']], limit: 1,
+          whereArgs: [a['attachmentId']],
+          limit: 1,
         );
         if (rows.isEmpty) throw StateError('附件不存在或已删除');
         messageId = rows.single['message_id'] as String;
@@ -118,10 +121,12 @@ class HistoryMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
           'senderName': results[0].single['name'],
           'role': message['role'],
           'kind': message['kind'],
-          'createdAt': localIsoTime(DateTime.fromMicrosecondsSinceEpoch(
-            message['created_at'] as int,
-            isUtc: true,
-          )),
+          'createdAt': localIsoTime(
+            DateTime.fromMicrosecondsSinceEpoch(
+              message['created_at'] as int,
+              isUtc: true,
+            ),
+          ),
           'text': message['text'],
           'textLength': message['text_length'],
           'nextOffset': next < (message['text_length'] as int) ? next : null,
@@ -137,11 +142,7 @@ class HistoryMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
       final attachments = await database.query(
         'attachments',
         where: 'id = ? AND message_id = ? AND conversation_id = ?',
-        whereArgs: [
-          a['attachmentId'],
-          messageId,
-          message['conversation_id'],
-        ],
+        whereArgs: [a['attachmentId'], messageId, message['conversation_id']],
         limit: 1,
       );
       if (attachments.isEmpty) throw StateError('附件不属于这条消息或已被删除');
@@ -149,17 +150,28 @@ class HistoryMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
       final file = File('$directory/${attachment['file_name']}');
       if (!await file.exists()) throw StateError('附件原文件已丢失，无法读取，请用户重新提供');
       final mime = attachment['mime_type'] as String;
-      if (['image/jpeg', 'image/png', 'image/webp'].contains(mime)) {
+      if ([
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'image/svg+xml',
+      ].contains(mime)) {
         if (await file.length() > 10 * 1024 * 1024)
           throw StateError('图片超过 10 MB，请用户压缩后重新提供');
+        final vision = await readVisionImage(file, mime);
         return _result(
           call,
-          {'contentRead': true, 'name': attachment['display_name']},
+          {
+            'contentRead': true,
+            'name': attachment['display_name'],
+            'imagePath': file.path,
+            'mimeType': mime,
+          },
           images: [
             ToolAttachment(
               type: ToolAttachmentType.image,
-              mimeType: mime,
-              base64Data: base64Encode(await file.readAsBytes()),
+              mimeType: vision.mimeType,
+              base64Data: base64Encode(vision.bytes),
               detail: 'auto',
             ),
           ],

@@ -49,6 +49,9 @@ extension AiIdentityController on ChatController {
       model: selection.model,
       baseUrl: selection.baseUrl,
       apiKey: modelSettings.profile(selection.provider).apiKey,
+      reasoning: ai.preferences.reasoning == ModelReasoning.inherit
+          ? modelSettings.profile(selection.provider).reasoning
+          : ai.preferences.reasoning,
     );
   }
 
@@ -134,12 +137,14 @@ extension AiIdentityController on ChatController {
 
   void _applySavedAi(AiProfile ai) {
     if (_activeAi?.sender.id == ai.sender.id) _activeAi = ai;
-    if (_groupReplies.containsKey(ai.sender.id)) {
-      _groupReplies[ai.sender.id] = _groupReplyContext(ai);
-      _groupSenders[ai.sender.id] = ai.sender;
+    for (final state in {_execution, ..._executionStates.values}) {
+      if (state.groupReplies.containsKey(ai.sender.id)) {
+        state.groupReplies[ai.sender.id] = _groupReplyContext(ai);
+        state.groupSenders[ai.sender.id] = ai.sender;
+      }
+      final memberRun = state.groupRuns[ai.sender.id];
+      if (memberRun != null) memberRun.replyingSenderName = ai.sender.name;
     }
-    final memberRun = _groupRuns[ai.sender.id];
-    if (memberRun != null) memberRun.replyingSenderName = ai.sender.name;
     final histories = [
       for (final conversation in {
         ..._conversations,
@@ -175,5 +180,15 @@ extension AiIdentityController on ChatController {
       }
     }
     _conversationChanged();
+  }
+
+  void _refreshGroupModelConfigs() {
+    for (final state in {_execution, ..._executionStates.values}) {
+      for (final id in state.groupReplies.keys.toList()) {
+        state.groupReplies[id] = _groupReplyContext(
+          state.groupReplies[id]!.profile,
+        );
+      }
+    }
   }
 }

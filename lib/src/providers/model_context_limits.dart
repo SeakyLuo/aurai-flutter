@@ -1,3 +1,5 @@
+import '../domain/model_provider.dart';
+import 'openrouter_models.dart';
 import 'dart:math' as math;
 
 /// Official model windows; aliases are listed explicitly so custom model names
@@ -19,10 +21,23 @@ class ModelContextLimits {
     outputTokens: 8192,
   );
 
-  int get inputBudget => contextWindow - outputTokens - toolReserve;
+  int get inputBudget =>
+      contextWindow - outputTokens - math.min(toolReserve, contextWindow ~/ 8);
   int get compactThreshold => inputBudget * 80 ~/ 100;
   int get compactTarget => inputBudget * 60 ~/ 100;
   int get summaryBatchBudget => math.min(128000, compactTarget);
+
+  static ModelContextLimits forConfig(ModelConfig config) {
+    final info = OpenRouterModels.forConfig(config);
+    if (info == null) return forModel(config.model);
+    return ModelContextLimits(
+      contextWindow: info.contextWindow,
+      outputTokens: math.min(
+        info.maxOutput ?? 8192,
+        math.min(32768, info.contextWindow ~/ 4),
+      ),
+    );
+  }
 
   // Unknown models use an estimated 64K window until their capacity is known.
   static ModelContextLimits forModel(String model) => switch (model) {

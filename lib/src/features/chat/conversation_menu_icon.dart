@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 
-enum ConversationMenuIconType { pin, unpin, rename, archive, unarchive, delete }
+enum ConversationMenuIconType {
+  pin,
+  unpin,
+  rename,
+  recall,
+  archive,
+  unarchive,
+  delete,
+}
 
 class ConversationMenuIcon extends StatelessWidget {
   const ConversationMenuIcon({
@@ -73,6 +81,18 @@ class _MenuIconPainter extends CustomPainter {
             ..close()
             ..moveTo(13.2, 6.3)
             ..lineTo(18.2, 11.3),
+          pen,
+        );
+      case ConversationMenuIconType.recall:
+        canvas.drawPath(
+          Path()
+            ..moveTo(8, 4.5)
+            ..lineTo(3.5, 9)
+            ..lineTo(8, 13.5)
+            ..moveTo(3.5, 9)
+            ..lineTo(14, 9)
+            ..cubicTo(22, 9, 22, 19.5, 14, 19.5)
+            ..lineTo(10, 19.5),
           pen,
         );
       case ConversationMenuIconType.archive:

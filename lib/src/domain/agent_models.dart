@@ -373,6 +373,7 @@ String _defaultToolTitle(String name) => switch (name) {
   'restoreAiContact' => '恢复 AI 联系人',
   'readAttachment' => '读取附件',
   'searchImages' => '搜索图片',
+  'generateImage' => '生成图片',
   'searchWeb' => '搜索网页',
   'setSourceDates' => '补充来源时间',
   'searchTools' => '搜索工具',

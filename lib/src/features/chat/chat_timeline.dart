@@ -305,7 +305,6 @@ List<ChatTimelineEntry> buildChatTimeline(
             },
             onQuickReply:
                 !message.isSystem &&
-                    !message.isFailure &&
                     !message.isReasoning &&
                     message.interactive?.systemPresentation != true &&
                     message.role == AgentMessageRole.assistant &&
@@ -339,6 +338,7 @@ List<ChatTimelineEntry> buildChatTimeline(
                   message.interactive?.systemPresentation != true
               ? GroupMessageHeading(
                   showName: message.htmlGame == null,
+                  isFailure: message.isFailure,
                   sender: message.sender!,
                   onMention: onMention == null
                       ? null

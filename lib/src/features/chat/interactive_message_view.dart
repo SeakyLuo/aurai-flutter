@@ -37,7 +37,6 @@ class InteractiveMessageView extends StatefulWidget {
 
 class _InteractiveMessageViewState extends State<InteractiveMessageView> {
   String? _busy;
-  bool _editing = false;
   late InteractiveMessage _card = widget.card;
 
   @override
@@ -45,7 +44,6 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
     super.didUpdateWidget(oldWidget);
     if (widget.actorId != oldWidget.actorId) {
       _card = widget.card;
-      _editing = false;
     } else {
       _acceptCard(widget.card);
     }
@@ -67,11 +65,6 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                                 as Map?)?['updatedAt']
                             as int? ??
                         0)))) {
-      if (next.shared &&
-          (next.engine.phase != 'collecting' ||
-              (_card.shared && next.engine.round != _card.engine.round))) {
-        _editing = false;
-      }
       _card = next;
     }
   }
@@ -89,7 +82,6 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
       if (result != null && mounted) {
         setState(() {
           _acceptCard(result.card);
-          _editing = false;
         });
         if (result.url != null) await widget.onOpenLink(result.url!);
       }
@@ -119,7 +111,6 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
       if (mounted)
         setState(() {
           _acceptCard(card);
-          _editing = false;
         });
     } on Object catch (error) {
       if (mounted)
@@ -260,9 +251,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                   (_card.interaction['actors'] as List).contains(
                     widget.actorId,
                   ),
-              editing: _editing,
               busy: _busy,
-              onEditing: (value) => setState(() => _editing = value),
               onClick: _click,
             )
           else

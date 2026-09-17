@@ -14,6 +14,17 @@ class ConversationWriter {
   final Database database;
   final _draftStore = NewConversationDraft();
   final Map<String, AgentMessage> _savedMessages = {};
+  // These guards outlive queued snapshots, but need not survive a process restart.
+  final Set<String> _deletedMessageIds = {};
+  final Map<String, int> _historyVersions = {};
+
+  int historyVersion(String id) => _historyVersions[id] ?? 0;
+
+  void invalidateHistory(String id, {String? deletedMessageId}) {
+    _historyVersions[id] = historyVersion(id) + 1;
+    if (deletedMessageId != null) _deletedMessageIds.add(deletedMessageId);
+  }
+
   Future<void> _saving = Future.value();
 
   Future<void> mutate(Future<void> Function() action) {
@@ -89,15 +100,27 @@ class ConversationWriter {
             ? <Map<String, Object?>>[]
             : await txn.query(
                 'messages',
-                columns: ['id'],
+                columns: [
+                  'id',
+                  'kind',
+                  'interactive_json IS NOT NULL AS has_interactive',
+                ],
                 where:
-                    "conversation_id = ? AND kind = 'system' AND id IN (SELECT value FROM json_each(?))",
+                    "conversation_id = ? AND id IN (SELECT value FROM json_each(?))",
                 whereArgs: [
                   conversation.id,
                   jsonEncode(messageRows.map((row) => row['id']).toList()),
                 ],
               );
-        final terminalIds = terminalRows.map((row) => row['id']).toSet();
+        final terminalIds = {
+          ..._deletedMessageIds,
+          for (final row in terminalRows)
+            if (row['kind'] == 'system') row['id'],
+        };
+        final interactiveIds = {
+          for (final row in terminalRows)
+            if (row['has_interactive'] == 1) row['id'],
+        };
         final batch = txn.batch();
         batch.insert(
           'conversations',
@@ -149,7 +172,10 @@ class ConversationWriter {
         }
         for (final row in messageRows) {
           if (terminalIds.contains(row['id'])) continue;
-          upsert(batch, 'messages', row);
+          // Existing cards are owned by the version-checked interaction store.
+          if (!interactiveIds.contains(row['id'])) {
+            upsert(batch, 'messages', row);
+          }
           if (row['run_id'] != null) {
             batch.insert('run_events', {
               'conversation_id': conversation.id,
@@ -258,8 +284,10 @@ class ConversationWriter {
 
   Future<void> saveContextSummary(
     String conversationId,
-    ContextSummary summary,
-  ) => mutate(() async {
+    ContextSummary summary, {
+    required int historyVersion,
+  }) => mutate(() async {
+    if (this.historyVersion(conversationId) != historyVersion) return;
     await database.rawInsert(
       "INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value WHERE (SELECT created_at FROM messages WHERE id = json_extract(excluded.value, '\$.throughMessageId')) >= (SELECT created_at FROM messages WHERE id = json_extract(app_state.value, '\$.throughMessageId'))",
       ['context_summary:$conversationId', jsonEncode(summary.toJson())],

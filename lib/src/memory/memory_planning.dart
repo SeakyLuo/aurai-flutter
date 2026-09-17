@@ -138,10 +138,29 @@ extension MemoryPlanning on MemoryController {
     _invalidate();
     final applyingRevision = _epoch;
     final now = DateTime.now().millisecondsSinceEpoch;
-    await database.transaction((txn) async {
+    await _commitRecords((txn) async {
       // The epoch is checked inside the transaction so queued user edits win.
       if (_disposed || applyingRevision != _epoch)
         throw StateError('记忆已变化，请重新整理');
+      final expected = {
+        for (final change in plan.changes)
+          for (var i = 0; i < change.ids.length; i++)
+            change.ids[i]: change.before[i],
+      };
+      if (expected.isNotEmpty) {
+        final current = await txn.query(
+          'user_memories',
+          columns: ['id', 'text', 'manual'],
+          where: '$_scopeWhere AND id IN (SELECT value FROM json_each(?))',
+          whereArgs: [..._scopeArgs, jsonEncode(expected.keys.toList())],
+        );
+        if (current.length != expected.length ||
+            current.any(
+              (row) => row['manual'] != 0 || row['text'] != expected[row['id']],
+            )) {
+          throw StateError('记忆已变化，请重新整理');
+        }
+      }
       final batch = txn.batch();
       for (final change in plan.changes) {
         final retainedId = change.text.isNotEmpty && change.ids.isNotEmpty
@@ -178,6 +197,5 @@ extension MemoryPlanning on MemoryController {
       }
       await batch.commit(noResult: true);
     });
-    await _reload();
   }
 }
