@@ -47,6 +47,9 @@ extension GlobalTools on ChatController {
         final message = await htmlGames.create(
           conversationId: conversation.id,
           creator: profile.sender,
+          runId: conversation.kind == ConversationKind.group
+              ? null
+              : conversation.activeRunId,
           standalone: true,
           groupMessage: conversation.kind == ConversationKind.group,
           args: {

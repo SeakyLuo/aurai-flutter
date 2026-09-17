@@ -88,7 +88,7 @@ class InteractiveMessageStore {
                 {
                   ...b,
                   'disabled': true,
-                  'label': b['completedLabel'] ?? '${b['label']} ✓',
+                  'label': b['completedLabel'] ?? b['label'],
                 }
               else
                 b,
@@ -216,16 +216,48 @@ class InteractiveMessageStore {
         },
       );
     }
-    final notice = await writeNotice(
-      txn,
-      conversationId,
-      card.participation['audience'] != null
-          ? '私密交互消息已更新'
-          : !card.visible('visibility') ||
-                card.participation['visibilityActors'] != null
-          ? '“${card.title}”有新的提交'
-          : '${actor.name}在“${card.title}”中选择了“${button['label']}”',
+    final conversations = await txn.query(
+      'conversations',
+      columns: ['kind', 'archived', 'default_sender_id'],
+      where: 'id = ?',
+      whereArgs: [conversationId],
+      limit: 1,
     );
+    final conversation = conversations.single;
+    final direct = conversation['kind'] == 'direct';
+    final notice = card.participation['audience'] != null && !direct
+        ? null
+        : await writeNotice(
+            txn,
+            conversationId,
+            !card.visible('visibility') ||
+                    card.participation['visibilityActors'] != null
+                ? '${actor.name}提交了“${card.title}”'
+                : '${actor.name}在“${card.title}”中选择了“${button['label']}”',
+          );
+    if (callbackId == null && actor.id == MessageSender.localUser.id) {
+      if (direct && conversation['archived'] == 0) {
+        final recipient = conversation['default_sender_id'] as String;
+        if (next.canView(recipient)) {
+          await MessageCallbacks.enqueue(
+            txn,
+            id: newMessageId(),
+            messageId: messageId,
+            conversationId: conversationId,
+            senderId: recipient,
+            payload: {
+              'source': 'interactionNotice',
+              'title': next.title,
+              if (next.visible('visibility', actor: recipient)) ...{
+                'actorName': actor.name,
+                'label': button['label'],
+              } else
+                'participationRecorded': true,
+            },
+          );
+        }
+      }
+    }
     return (
       card: next,
       notice: notice,

@@ -22,7 +22,7 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         : ToolSafety.lowRisk,
     description: switch (name) {
       'sendInteractiveMessage' =>
-        'Create a native interactive card in the current conversation. Use for persistent choices, shared participation and replayable rounds; ordinary one-off questions can use askUser. '
+        'Create a native interactive card in the current conversation. In private chat it is inserted into your current streamed reply at this point; continue ordinary text afterwards only when useful. Do not describe it as a separate message or repeat its contents. In group chat it is a separate group message. Use for persistent choices, shared participation and replayable rounds; ordinary one-off questions can use askUser. '
             'For shared interactions define interaction (state, completion rules, reveal timing and views) and submit buttons with JSON value. Each actor contributes one current-round submission. '
             'The app settles rules atomically; distribution/text/metric views render visible state. A poll and simultaneous-choice game use this same mechanism. nextRound keeps shared state and resets submissions plus roundInitial fields. '
             'notifyAi=true keeps the triggering participant waiting for a callback result. Complete it with updateInteractiveMessage plus callbackEventId; a plain chat reply is not a card result. update/nextState buttons change only the acting participant’s presentation. openUrl opens/returns HTTPS; notifyAi requests a creator callback. Every button requires id,label,action,repeatable. '

@@ -1,3 +1,4 @@
+import 'private_reply_layout.dart';
 import 'interactive_message_paging.dart';
 import 'recalled_message_notice.dart';
 import '../../html_games/html_game_view.dart';
@@ -51,6 +52,9 @@ List<ChatTimelineEntry> buildChatTimeline(
   }
   mentionMembers.removeWhere((name, _) => ambiguousNames.contains(name));
   final isGroup = conversation.kind == ConversationKind.group;
+  final richRuns = isGroup
+      ? <String>{}
+      : richReplyRuns(controller.visibleMessages);
   final watch = conversation.executionWatch;
   final showElapsed =
       !isGroup &&
@@ -64,7 +68,9 @@ List<ChatTimelineEntry> buildChatTimeline(
       );
   final hiddenIds = {
     for (final message in controller.visibleMessages)
-      if (!isGroup && message.taskSummary != null)
+      if (!isGroup &&
+          message.taskSummary != null &&
+          !richRuns.contains(message.runId))
         ...message.taskSummary!.intermediateMessageIds,
   };
   final toolsByMessage = <String, List<ChatTimelineEntry>>{};
@@ -145,6 +151,7 @@ List<ChatTimelineEntry> buildChatTimeline(
   final visibleMessages = controller.visibleMessages
       .where(
         (message) =>
+            !(message.isSystem && message.text == '私密交互消息已更新') &&
             (message.interactive?.canView(MessageSender.localUser.id) ??
                 true) &&
             (!hiddenIds.contains(message.id) ||
@@ -154,6 +161,12 @@ List<ChatTimelineEntry> buildChatTimeline(
   final end = beforeMessageId == null
       ? visibleMessages.length
       : visibleMessages.indexWhere((message) => message.id == beforeMessageId);
+  final replyParts = isGroup
+      ? <String, PrivateReplyPart>{}
+      : privateReplyLayout(
+          visibleMessages.take(end < 0 ? visibleMessages.length : end).toList(),
+          richRuns,
+        );
   return [
     if (conversation.kind == ConversationKind.group &&
         !(conversation.searchMessages != null
@@ -198,6 +211,7 @@ List<ChatTimelineEntry> buildChatTimeline(
             .take(end + (beforeMessageId == null ? 0 : 1))
             .indexed) ...[
       if (index > 0 &&
+          (replyParts[message.id]?.first ?? true) &&
           message.createdAt.difference(visibleMessages[index - 1].createdAt) >
               const Duration(minutes: 30))
         ChatTimelineEntry(
@@ -241,6 +255,7 @@ List<ChatTimelineEntry> buildChatTimeline(
             excludedActivityMessageId: conversation.searchMessageId,
             key: ValueKey(message.id),
             message: message,
+            replyPart: replyParts[message.id],
             mentionMembers: mentionMembers,
             htmlGameView: message.htmlGame == null
                 ? null
@@ -397,20 +412,27 @@ List<ChatTimelineEntry> buildChatTimeline(
   ];
 }
 
-Map<String, String> chatSummaryOwners(ChatController controller) => {
-  for (final message in controller.visibleMessages)
-    'time:${message.id}': message.id,
-  for (final message in controller.visibleMessages)
-    if (message.taskSummary != null) ...{
-      'elapsed:${message.runId}': message.id,
-      for (final id in message.taskSummary!.intermediateMessageIds)
-        if (id != controller.activeConversation.searchMessageId) id: message.id,
-      for (var i = 0; i < message.taskSummary!.activities.length; i++)
-        'tool:${message.runId}:$i': message.id,
-      if (message.runId == controller.activeConversation.activeRunId)
-        'progress:${controller.activeConversation.id}': message.id,
-    },
-};
+Map<String, String> chatSummaryOwners(ChatController controller) {
+  final richRuns = controller.activeConversation.kind == ConversationKind.group
+      ? <String>{}
+      : richReplyRuns(controller.visibleMessages);
+  return {
+    for (final message in controller.visibleMessages)
+      'time:${message.id}': message.id,
+    for (final message in controller.visibleMessages)
+      if (message.taskSummary != null) ...{
+        'elapsed:${message.runId}': message.id,
+        for (final id in message.taskSummary!.intermediateMessageIds)
+          if (id != controller.activeConversation.searchMessageId &&
+              !richRuns.contains(message.runId))
+            id: message.id,
+        for (var i = 0; i < message.taskSummary!.activities.length; i++)
+          'tool:${message.runId}:$i': message.id,
+        if (message.runId == controller.activeConversation.activeRunId)
+          'progress:${controller.activeConversation.id}': message.id,
+      },
+  };
+}
 
 class _ToolActivity extends StatelessWidget {
   const _ToolActivity({

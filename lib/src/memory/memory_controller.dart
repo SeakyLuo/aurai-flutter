@@ -205,7 +205,12 @@ ${jsonEncode({'nickname': nickname, 'occupation': occupation, 'about': about, 'm
       _transport = transport;
       var stage = 'plan';
       try {
-        final plan = await _plan(transport, user.text, automatic: true);
+        final plan = await _plan(
+          transport,
+          user.text,
+          automatic: true,
+          sourceMessage: user,
+        );
         if (_disposed || epoch != _epoch) return;
         stage = 'save';
         await _apply(

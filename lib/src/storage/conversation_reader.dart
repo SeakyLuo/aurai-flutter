@@ -274,14 +274,17 @@ class ConversationReader {
     ModelConfig? modelConfig,
     String? afterCheckpoint,
   }) async {
+    const richReply =
+        "run_id IN (SELECT run_id FROM messages WHERE conversation_id = ? AND run_id IS NOT NULL AND (interactive_json IS NOT NULL OR kind = 'html_game'))";
     final selectionWhere =
         'conversation_id = ?${forModel
             ? "${includeSystem ? '' : " AND kind != 'system'"} AND kind != 'message_failure' AND NOT (role = 'assistant' AND text = '')"
             : includeMessageId == null
-            ? " AND kind != 'commentary'"
-            : " AND (kind != 'commentary' OR id = ?)"}${afterCheckpoint == null ? '' : ' AND created_at >= (SELECT created_at FROM messages WHERE id = ?)'}${before == null ? '' : ' AND (created_at < ? OR (created_at = ? AND id < ?))'}${after == null ? '' : ' AND (created_at > ? OR (created_at = ? AND id > ?))'}${throughMessageId == null ? '' : ' AND (created_at, id) <= (SELECT created_at, id FROM messages WHERE id = ?)'}';
+            ? " AND (kind != 'commentary' OR $richReply)"
+            : " AND (kind != 'commentary' OR $richReply OR id = ?)"}${afterCheckpoint == null ? '' : ' AND created_at >= (SELECT created_at FROM messages WHERE id = ?)'}${before == null ? '' : ' AND (created_at < ? OR (created_at = ? AND id < ?))'}${after == null ? '' : ' AND (created_at > ? OR (created_at = ? AND id > ?))'}${throughMessageId == null ? '' : ' AND (created_at, id) <= (SELECT created_at, id FROM messages WHERE id = ?)'}';
     final selectionArgs = <Object?>[
       conversationId,
+      if (!forModel) conversationId,
       if (!forModel && includeMessageId != null) includeMessageId,
       if (afterCheckpoint != null) afterCheckpoint,
       if (before != null) ...[
@@ -336,6 +339,10 @@ class ConversationReader {
         .followedBy(quotes.values.map((q) => q.senderId))
         .toSet()
         .toList();
+    final pageRuns = {
+      for (final row in rows)
+        if (row['run_id'] != null) row['run_id'],
+    };
     final attachmentsAndSenders = await Future.wait([
       database.query(
         'attachments',
@@ -350,7 +357,22 @@ class ConversationReader {
         where: 'id IN (${_slots(senderIds.length)})',
         whereArgs: senderIds,
       ),
+      if (!forModel && pageRuns.isNotEmpty)
+        database.query(
+          'messages',
+          distinct: true,
+          columns: ['run_id'],
+          where:
+              'conversation_id = ? AND run_id IN (${_slots(pageRuns.length)}) '
+              "AND (interactive_json IS NOT NULL OR kind = 'html_game')",
+          whereArgs: [conversationId, ...pageRuns],
+        )
+      else
+        Future.value(<Map<String, Object?>>[]),
     ]);
+    final richRuns = attachmentsAndSenders[2]
+        .map((row) => row['run_id'])
+        .toSet();
     final images = attachmentsAndSenders[0];
     final senders = {
       for (final row in attachmentsAndSenders[1])
@@ -415,6 +437,7 @@ class ConversationReader {
             images: imageMap[row['id']] ?? const [],
             files: fileMap[row['id']] ?? const [],
             runId: row['run_id'] as String?,
+            isRichReply: richRuns.contains(row['run_id']),
             modelTurnId: row['model_turn_id'] as String?,
             taskSummary: summaries[row['id']],
             responseInput: protocol[row['id']],

@@ -1,3 +1,5 @@
+import 'private_reply_layout.dart';
+import 'message_reply_footer.dart';
 import 'forwarded_interactive_message.dart';
 import '../../storage/interactive_action_history.dart';
 import 'interactive_message_paging.dart';
@@ -31,9 +33,7 @@ import '../../domain/web_sources.dart';
 import '../../platform/aurai_platform.dart';
 import 'image_attachments.dart';
 import 'task_summary_view.dart';
-import 'copy_icon.dart';
 import 'message_actions_menu.dart';
-import 'message_time.dart';
 import 'source_citation_syntax.dart';
 import 'source_citation_view.dart';
 
@@ -43,6 +43,7 @@ class MessageItem extends StatefulWidget {
     super.key,
     required this.message,
     required this.onEdit,
+    this.replyPart,
     this.streaming = false,
     this.readOnly = false,
     this.groupBubble = false,
@@ -59,6 +60,7 @@ class MessageItem extends StatefulWidget {
     this.excludedActivityMessageId,
   });
   final AgentMessage message;
+  final PrivateReplyPart? replyPart;
   final Map<String, String> mentionMembers;
   final Future<InteractiveClickResult?> Function(
     String buttonId,
@@ -108,6 +110,7 @@ class _MessageItemState extends State<MessageItem> {
   void didUpdateWidget(MessageItem oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.message != message ||
+        (oldWidget.replyPart == null) != (widget.replyPart == null) ||
         oldWidget.groupBubble != widget.groupBubble ||
         oldWidget.readOnly != widget.readOnly ||
         oldWidget.onLocate != widget.onLocate ||
@@ -129,72 +132,39 @@ class _MessageItemState extends State<MessageItem> {
       : Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (!widget.groupBubble && message.taskSummary != null)
+            if (!widget.groupBubble &&
+                (widget.replyPart == null
+                    ? message.taskSummary != null
+                    : widget.replyPart!.summary != null))
               TaskSummaryView(
                 excludedMessageId: widget.excludedActivityMessageId,
                 messageId: message.id,
-                summary: message.taskSummary!,
+                summary: widget.replyPart?.summary ?? message.taskSummary!,
                 onOpenLink: (href) => _openLink(context, href),
               ),
-            if (widget.groupBubble || message.taskSummary?.stopped != true)
-              _selectableContent(),
+            if (widget.groupBubble ||
+                widget.replyPart != null ||
+                message.taskSummary?.stopped != true)
+              KeyedSubtree(
+                key: const ValueKey('message-content'),
+                child: _selectableContent(),
+              ),
             if (!widget.readOnly &&
                 !widget.groupBubble &&
-                message.htmlGame == null &&
+                (message.htmlGame == null || widget.replyPart != null) &&
                 !widget.streaming &&
-                message.taskSummary?.stopped != true)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 18, 20),
-                child: Row(
-                  children: [
-                    IconButton(
-                      tooltip: _copied ? '已复制' : '复制回复',
-                      onPressed: () => _copy(context),
-                      icon: CopyIcon(copied: _copied),
-                      style: IconButton.styleFrom(
-                        fixedSize: const Size.square(32),
-                        minimumSize: const Size.square(32),
-                        padding: const EdgeInsets.all(4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    if (widget.onQuote != null)
-                      IconButton(
-                        tooltip: '引用',
-                        onPressed: () => widget.onQuote!(message),
-                        icon: const QuoteIcon(),
-                        visualDensity: VisualDensity.compact,
-                        style: IconButton.styleFrom(
-                          fixedSize: const Size.square(32),
-                          minimumSize: const Size.square(32),
-                          padding: const EdgeInsets.all(4),
-                        ),
-                      ),
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message: messageTime(message.createdAt),
-                      triggerMode: TooltipTriggerMode.tap,
-                      child: Text(
-                        messageTime(message.createdAt),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                    if (_sources.isNotEmpty) ...[
-                      const Spacer(),
-                      MessageSourcesButton(
-                        sources: _sources,
-                        onOpenLink: (href) => _openLink(context, href),
-                      ),
-                    ],
-                  ],
-                ),
+                (widget.replyPart?.last ?? true) &&
+                (widget.replyPart != null ||
+                    message.taskSummary?.stopped != true))
+              MessageReplyFooter(
+                copied: _copied,
+                onCopy: () => _copy(context, widget.replyPart?.copyText),
+                onQuote: widget.onQuote == null
+                    ? null
+                    : () => widget.onQuote!(message),
+                createdAt: message.createdAt,
+                sources: _sources,
+                onOpenLink: (href) => _openLink(context, href),
               ),
           ],
         );
@@ -362,17 +332,21 @@ class _MessageItemState extends State<MessageItem> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Text(
-                    message.interactive?.systemPresentation == true
-                        ? '系统'
-                        : message.sender!.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
+                  child: widget.replyPart != null
+                      ? const SizedBox.shrink()
+                      : Text(
+                          message.interactive?.systemPresentation == true
+                              ? '系统'
+                              : message.sender!.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                 ),
                 if (!widget.readOnly)
                   Builder(
@@ -567,7 +541,6 @@ class _MessageItemState extends State<MessageItem> {
               key: ValueKey(page?.sequence),
               card: page?.snapshot ?? message.interactive!,
               historical: page?.snapshot != null,
-              titleTrailing: widget.groupBubble ? null : page?.control,
               readOnly: widget.readOnly || page?.snapshot != null,
               onClick: widget.onInteractiveClick!,
               onRetry: widget.onInteractiveRetry,
@@ -687,16 +660,19 @@ class _MessageItemState extends State<MessageItem> {
           ),
       ],
     );
-    if (!widget.groupBubble) {
+    if (!widget.groupBubble && message.interactive == null) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
         child: content,
       );
     }
-    return Align(
-      alignment: Alignment.centerLeft,
+    final bubble = Align(
+      key: const ValueKey('interactive-bubble'),
+      alignment: widget.groupBubble ? Alignment.centerLeft : Alignment.center,
       child: Container(
-        margin: const EdgeInsets.only(top: 6),
+        margin: widget.groupBubble
+            ? const EdgeInsets.only(top: 6)
+            : const EdgeInsets.fromLTRB(18, 8, 18, 8),
         constraints: message.htmlGame?.width == null
             ? null
             : BoxConstraints(
@@ -737,6 +713,18 @@ class _MessageItemState extends State<MessageItem> {
           ),
         ),
       ),
+    );
+    if (widget.groupBubble) return bubble;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (page?.control case final control?)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+            child: Align(alignment: Alignment.centerRight, child: control),
+          ),
+        bubble,
+      ],
     );
   }
 

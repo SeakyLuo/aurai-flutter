@@ -156,6 +156,8 @@ class AgentRuntime {
               '模型连续生成了无效工具参数，修正两次后仍失败，本轮工具未执行，请重试',
             );
           }
+        } else {
+          invalidArgumentTurns = 0;
         }
 
         final nextResults = <ToolResult>[];
@@ -206,7 +208,7 @@ class AgentRuntime {
                     'error': 'invalid_tool_arguments',
                     'detail': call.argumentsError,
                     'instruction':
-                        r'该工具未执行。请重新生成符合工具 schema 的完整 JSON 对象；字符串中的换行必须写为 \n，制表符写为 \t，双引号和反斜杠必须正确转义。不要重发已经成功执行的其他工具。',
+                        r'该工具未执行。请根据 detail 中的位置和原始 JSON 片段修正语法，特别检查对象/数组的闭合括号和逗号。不要原样重发错误参数。请重新生成符合工具 schema 的完整 JSON 对象；字符串中的换行必须写为 \n，制表符写为 \t，双引号和反斜杠必须正确转义。不要重发已经成功执行的其他工具。',
                   },
                 )
               : await _executor.execute(

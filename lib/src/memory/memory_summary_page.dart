@@ -1,4 +1,6 @@
 import '../domain/error_message.dart';
+import '../features/chat/delete_confirmation_dialog.dart';
+import '../features/chat/dialog_action_button.dart';
 import '../features/chat/search_type_segment.dart';
 import 'package:flutter/material.dart';
 
@@ -67,27 +69,20 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
 
   Future<void> _leave() async {
     if (_saving) return;
-    if (_planning || _plan != null) _cancelPlan();
     if (_text.text.trim().isNotEmpty) {
       final discard = await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('放弃未保存的记忆？'),
-          content: const Text('输入的内容尚未保存。'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('继续编辑'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('放弃'),
-            ),
-          ],
+        barrierColor: Colors.black.withValues(alpha: .24),
+        builder: (_) => const DeleteConfirmationDialog(
+          title: '放弃未保存的记忆？',
+          description: '输入的内容尚未保存。',
+          cancelLabel: '继续编辑',
+          confirmLabel: '放弃',
         ),
       );
       if (discard != true || !mounted) return;
     }
+    if (_planning || _plan != null) _cancelPlan();
     setState(() => _allowPop = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) Navigator.pop(context);
@@ -195,10 +190,12 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
         },
         child: Scaffold(
           extendBody: true,
+          extendBodyBehindAppBar: true,
           resizeToAvoidBottomInset: false,
           bottomNavigationBar: _group ? null : KeyboardInset(child: _footer()),
           appBar: SettingsAppBar(
             title: widget.title,
+            gradientBackground: true,
             titleWidget: widget.groupMemories == null
                 ? null
                 : SearchTypeSegment(
@@ -230,7 +227,7 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
                             ScrollViewKeyboardDismissBehavior.onDrag,
                         padding: EdgeInsets.fromLTRB(
                           8,
-                          8,
+                          MediaQuery.paddingOf(context).top + 8,
                           8,
                           MediaQuery.paddingOf(context).bottom + 28,
                         ),
@@ -277,7 +274,16 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
                 ),
               ),
               if (_groupVisited)
-                widget.groupMemories!
+                Padding(
+                  padding: EdgeInsets.only(
+                    top: MediaQuery.paddingOf(context).top + 76,
+                  ),
+                  child: MediaQuery.removePadding(
+                    context: context,
+                    removeTop: true,
+                    child: widget.groupMemories!,
+                  ),
+                )
               else
                 const SizedBox.shrink(),
             ],
@@ -301,45 +307,72 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: TextButton(
+                      child: DialogActionButton(
+                        text: '取消',
+                        liquidGlass: true,
+                        role: DialogActionRole.secondary,
                         onPressed: _saving ? null : _cancelPlan,
-                        child: const Text('取消'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: FilledButton(
+                      child: DialogActionButton(
+                        text: _saving ? '正在应用' : '确认应用',
+                        liquidGlass: true,
                         onPressed: _saving ? null : _apply,
-                        child: Text(_saving ? '正在应用' : '确认应用'),
                       ),
                     ),
                   ],
                 ),
               )
             else ...[
-              if (_planning)
-                TextButton(onPressed: _cancelPlan, child: const Text('取消整理')),
-              MessageComposer(
-                controller: _text,
-                focusNode: _focus,
-                enabled: !_saving && !_planning,
-                hintText: '整理或补充记忆',
-                maxLength: 300,
-                onChanged: (_) => setState(() {}),
-                action: RoundAction(
-                  label: _planning ? '正在整理' : '发送',
-                  icon: Icons.arrow_upward_rounded,
-                  primary: true,
-                  compact: true,
-                  onPressed: _saving || _planning || _text.text.trim().isEmpty
-                      ? null
-                      : _add,
-                  iconWidget: _planning
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : null,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: MessageComposer(
+                        embedded: true,
+                        controller: _text,
+                        focusNode: _focus,
+                        enabled: !_saving && !_planning,
+                        hintText: '整理或补充记忆',
+                        maxLength: 300,
+                        onChanged: (_) => setState(() {}),
+                        action: RoundAction(
+                          label: _planning ? '正在整理' : '发送',
+                          icon: Icons.arrow_upward_rounded,
+                          iconWidget: _planning
+                              ? const SizedBox.square(
+                                  dimension: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : null,
+                          primary: true,
+                          compact: true,
+                          onPressed:
+                              _planning || _saving || _text.text.trim().isEmpty
+                              ? null
+                              : _add,
+                        ),
+                      ),
+                    ),
+                    if (_planning) ...[
+                      const SizedBox(width: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: RoundAction(
+                          label: '停止整理',
+                          icon: Icons.stop_rounded,
+                          compact: true,
+                          onPressed: _cancelPlan,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],

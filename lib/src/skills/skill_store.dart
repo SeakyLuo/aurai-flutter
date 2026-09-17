@@ -74,6 +74,7 @@ class SkillStore extends ChangeNotifier {
   final _skills = <String, SavedSkill>{};
   final _installations = <String, Map<String, Object?>>{};
   final _statistics = <String, Map<String, int>>{};
+  final _timestamps = <String, Map<String, int>>{};
   final _members = <MessageSender>[];
   SkillSort sort = SkillSort.createdDescending;
   SkillPermission defaultPermission = SkillPermission.lowRisk;
@@ -94,7 +95,7 @@ class SkillStore extends ChangeNotifier {
   DateTime? updatedAt(String id) => _time(id, 'updated');
   int useCount(String id) => _statistics[id]?['uses'] ?? 0;
   DateTime? _time(String id, String field) {
-    final value = _statistics[id]?[field];
+    final value = _timestamps[id]?[field];
     return value == null ? null : DateTime.fromMicrosecondsSinceEpoch(value);
   }
 
@@ -113,8 +114,9 @@ class SkillStore extends ChangeNotifier {
   }
 
   int compareSkills(SavedSkill a, SavedSkill b) {
-    final first = _statistics[a.id]?[sort.field] ?? 0;
-    final second = _statistics[b.id]?[sort.field] ?? 0;
+    final values = sort.field == 'uses' ? _statistics : _timestamps;
+    final first = values[a.id]?[sort.field] ?? 0;
+    final second = values[b.id]?[sort.field] ?? 0;
     final comparison = first.compareTo(second);
     return comparison != 0
         ? (sort.descending ? -comparison : comparison)
@@ -242,6 +244,8 @@ class SkillStore extends ChangeNotifier {
     _members
       ..clear()
       ..addAll(rows[4].map(MessageSender.fromRow));
+    _statistics.clear();
+    _timestamps.clear();
     for (final row in rows[5]) {
       if (row['key'] == _key('skill_sort'))
         sort = SkillSort.values.byName(row['value'] as String);
@@ -249,14 +253,23 @@ class SkillStore extends ChangeNotifier {
         defaultPermission = SkillPermission.values.byName(
           row['value'] as String,
         );
-      if (row['key'] == _key('skill_statistics')) {
-        _statistics
-          ..clear()
-          ..addAll(
+      if ((row['key'] as String).endsWith('skill_statistics')) {
+        final statistics =
             (jsonDecode(row['value'] as String) as Map<String, dynamic>).map(
               (k, v) => MapEntry(k, Map<String, int>.from(v as Map)),
-            ),
-          );
+            );
+        if (row['key'] == _key('skill_statistics')) {
+          _statistics.addAll(statistics);
+        }
+        for (final entry in statistics.entries) {
+          final times = _timestamps.putIfAbsent(entry.key, () => {});
+          if (entry.value['created'] case final created?) {
+            times['created'] = min(times['created'] ?? created, created);
+          }
+          if (entry.value['updated'] case final updated?) {
+            times['updated'] = max(times['updated'] ?? updated, updated);
+          }
+        }
       }
     }
   }

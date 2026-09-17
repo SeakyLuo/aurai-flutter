@@ -54,6 +54,14 @@ class InteractiveMessageButton extends StatelessWidget {
           'acknowledge' => 'check',
           _ => 'info',
         };
+    final storedLabel = button['label'] as String;
+    final label =
+        disabled &&
+            button['repeatable'] == false &&
+            button['completedLabel'] == null &&
+            storedLabel.endsWith(' ✓')
+        ? storedLabel.substring(0, storedLabel.length - 2)
+        : storedLabel;
     return Material(
       color: background,
       borderRadius: BorderRadius.circular(12),
@@ -98,7 +106,7 @@ class InteractiveMessageButton extends StatelessWidget {
                   ],
                   Expanded(
                     child: Text(
-                      button['label'] as String,
+                      label,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,

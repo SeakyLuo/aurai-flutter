@@ -67,8 +67,13 @@ abstract final class MessageSummary {
     bool withSender = false,
     bool includeAttachments = true,
   }) {
+    if (message.interactive?.canView(MessageSender.localUser.id) == false) {
+      return '';
+    }
     final body = content(
-      text: message.text,
+      text: message.interactive == null
+          ? message.text
+          : '${message.interactive!.title}\n${message.interactive!.body}',
       htmlTitle: message.htmlGame?.title,
       interactiveTitle: message.interactive?.title,
       attachments: includeAttachments
