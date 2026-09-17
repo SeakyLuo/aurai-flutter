@@ -1,3 +1,6 @@
+import '../storage/html_callback_state.dart';
+import '../storage/message_callbacks.dart';
+import 'html_app_store.dart';
 import '../storage/interactive_message_store.dart';
 import 'package:flutter/material.dart';
 import 'html_message_theme.dart';
@@ -15,7 +18,9 @@ import 'html_game_document.dart';
 import 'html_game_store.dart';
 
 abstract final class HtmlGameSignals {
+  static final callbackChanges = HtmlCallbackState.changes;
   static final changes = StreamController<String>.broadcast();
+  static final appChanges = StreamController<String>.broadcast();
 }
 
 class HtmlGameSession extends ChangeNotifier {
@@ -36,6 +41,12 @@ class HtmlGameSession extends ChangeNotifier {
     _interactiveUpdates = InteractiveMessageStore.changes.stream
         .where((id) => id == game.messageId)
         .listen((_) => unawaited(_reload()));
+    _appUpdates = HtmlGameSignals.appChanges.stream
+        .where((id) => id == game.appId)
+        .listen((_) => unawaited(_reload()));
+    _callbackUpdates = HtmlCallbackState.changes.stream
+        .where((id) => id == game.messageId)
+        .listen((_) => unawaited(_sendCallbacks()));
     _updates = HtmlGameSignals.changes.stream
         .where((id) => id == game.messageId)
         .listen((_) => unawaited(_reload()));
@@ -62,6 +73,8 @@ class HtmlGameSession extends ChangeNotifier {
   HtmlGame game;
   final HtmlGameStore store;
   late final StreamSubscription<String> _updates;
+  late final StreamSubscription<String> _callbackUpdates;
+  late final StreamSubscription<String> _appUpdates;
   late final StreamSubscription<String> _interactiveUpdates;
   MethodChannel? _channel;
   bool _closed = false;
@@ -164,6 +177,7 @@ class HtmlGameSession extends ChangeNotifier {
         // may the view remove the previous preview covering the platform surface.
         await channel.invokeMethod<void>('theme', htmlMessageTheme(theme));
         await channel.invokeMethod<void>('state', jsonEncode(game.snapshot()));
+        await _sendCallbacks();
         if (_closed || _closing) return null;
         _readyTimeout.cancel();
         ready = true;
@@ -174,6 +188,31 @@ class HtmlGameSession extends ChangeNotifier {
         failed = true;
         error = 'HTML 消息运行中断：${call.arguments}';
         notifyListeners();
+      } else if (call.method == 'appData') {
+        try {
+          final args = (jsonDecode(call.arguments as String) as Map).cast<String, Object?>();
+          if (args['operation'] == 'events' || args['operation'] == 'retryEvent') {
+            final eventId = args['eventId'] as String?;
+            if (args['operation'] == 'retryEvent') {
+              await HtmlCallbackState.retry(store.database, game.messageId, eventId!);
+              MessageCallbacks.changes.add(null);
+            }
+            return jsonEncode({'events': await HtmlCallbackState.read(
+              store.database, game.messageId, eventId: eventId)});
+          }
+          final write = args['operation'] == 'write';
+          if (!['read', 'write'].contains(args['operation'])) {
+            throw ArgumentError('不支持的数据操作');
+          }
+          final result = await HtmlAppStore(store.database).data(
+            game.appId, args['name'] as String, actor: MessageSender.localUser.id,
+            messageId: game.messageId, write: write,
+            expectedRevision: args['expectedRevision'] as int?, value: args['value']);
+          if (write) HtmlGameSignals.appChanges.add(game.appId);
+          return jsonEncode(result);
+        } on Object catch (failure) {
+          return jsonEncode({'error': errorMessage(failure)});
+        }
       } else if (call.method == 'interaction') {
         try {
           return jsonEncode(
@@ -213,6 +252,21 @@ class HtmlGameSession extends ChangeNotifier {
       return null;
     });
     await channel.invokeMethod<void>('connect');
+  }
+
+  Future<void> _sendCallbacks() async {
+    try {
+      if (!_pageLoaded || _closed || _closing) return;
+      final events = await HtmlCallbackState.read(store.database, game.messageId);
+      if (!_closed && !_closing) {
+        await _channel?.invokeMethod<void>('callbacks', jsonEncode(events));
+      }
+    } on Object catch (failure) {
+      if (!_closed) {
+        error = '无法读取操作状态：${errorMessage(failure)}';
+        notifyListeners();
+      }
+    }
   }
 
   bool _isNewer(HtmlGame next) {
@@ -321,6 +375,8 @@ class HtmlGameSession extends ChangeNotifier {
     await _localWrite;
     _closed = true;
     await _updates.cancel();
+    await _appUpdates.cancel();
+    await _callbackUpdates.cancel();
     await _interactiveUpdates.cancel();
     try {
       await _channel

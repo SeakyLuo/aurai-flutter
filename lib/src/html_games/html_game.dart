@@ -9,6 +9,7 @@ abstract final class HtmlGameFeature {
 class HtmlGameCard {
   const HtmlGameCard({
     required this.title,
+    this.appId,
     this.preview,
     this.width,
     this.height = 320,
@@ -22,6 +23,7 @@ class HtmlGameCard {
     this.displayMode = 'hybrid',
     this.backgroundMode = 'message',
   });
+  final String? appId;
   final double? measuredWidth, measuredHeight, measuredScale;
   final int? measuredVersion;
   final String displayMode;
@@ -34,6 +36,7 @@ class HtmlGameCard {
   final String status;
   final bool canRetry;
   factory HtmlGameCard.fromRow(Map<String, Object?> row) => HtmlGameCard(
+    appId: row['app_id'] as String?,
     displayMode: row['display_mode'] as String,
     backgroundMode: row['background_mode'] as String,
     title: row['title'] as String,
@@ -54,6 +57,7 @@ class HtmlGame {
   const HtmlGame({
     this.interactionProjection,
     required this.messageId,
+    required this.appId,
     required this.conversationId,
     required this.creatorId,
     required this.title,
@@ -77,6 +81,7 @@ class HtmlGame {
   final int height;
   final bool canRetry;
   final String messageId;
+  final String appId;
   final String conversationId;
   final String creatorId;
   final String title;
@@ -92,6 +97,7 @@ class HtmlGame {
     interactionProjection:
         row['interaction_projection'] as Map<String, Object?>?,
     messageId: row['message_id'] as String,
+    appId: row['app_id'] as String,
     stateful: row['stateful'] == 1,
     backgroundMode: row['background_mode'] as String,
     width: row['display_width'] as int?,

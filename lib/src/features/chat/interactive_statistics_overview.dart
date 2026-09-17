@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../domain/interactive_selection.dart';
 import '../../domain/interactive_message.dart';
 import '../../domain/message_sender.dart';
 import 'member_avatar.dart';
@@ -26,11 +27,10 @@ class InteractiveStatisticsOverview extends StatelessWidget {
     final groups = <InteractiveOptionKey, List<String>>{};
     if (peopleVisible) {
       for (final entry in card.choices.entries) {
-        final key = (
-          entry.value['buttonId'] as String,
-          entry.value['label'] as String,
-        );
-        groups.putIfAbsent(key, () => []).add(entry.key);
+        for (final choice in selectionEntries(entry.value)) {
+          final key = (choice['buttonId'] as String, choice['label'] as String);
+          groups.putIfAbsent(key, () => []).add(entry.key);
+        }
       }
     }
     final people = peopleVisible

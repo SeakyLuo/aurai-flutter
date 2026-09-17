@@ -63,6 +63,7 @@ Future<List<CallbackCardUpdate>> transitionInteractiveCallbacks(
     }
     participant!['callback'] = {
       'id': event['id'],
+      'buttonId': callback?['buttonId'] ?? participant['buttonId'],
       'status': status,
       'updatedAt': now,
       if (error != null) 'error': error,

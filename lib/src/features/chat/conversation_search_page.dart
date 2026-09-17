@@ -302,6 +302,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
             alignment: Alignment.centerLeft,
             child: GlassSurface(
               radius: 28,
+              shadowOpacity: .65,
               child: RoundAction(
                 icon: Icons.arrow_back_rounded,
                 label: '返回',

@@ -1,3 +1,4 @@
+import 'delete_confirmation_dialog.dart';
 import '../../domain/error_message.dart';
 import 'dart:async';
 import 'dart:io';
@@ -122,19 +123,11 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
   Future<void> _leave() async {
     final discard = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('放弃未保存的修改？'),
-        content: const Text('个人信息的修改尚未保存。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('继续编辑'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('放弃修改'),
-          ),
-        ],
+      builder: (context) => const DeleteConfirmationDialog(
+        title: '放弃未保存的修改？',
+        description: '个人信息的修改尚未保存。',
+        confirmLabel: '放弃修改',
+        cancelLabel: '继续编辑',
       ),
     );
     if (!mounted || discard != true) return;

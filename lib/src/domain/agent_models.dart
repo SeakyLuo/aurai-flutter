@@ -5,6 +5,7 @@ import 'message_quote.dart';
 import 'message_file.dart';
 import 'message_sender.dart';
 import 'message_image.dart';
+import 'message_quick_reply.dart';
 
 enum AgentMessageRole { user, assistant }
 
@@ -25,10 +26,14 @@ class AgentMessage {
     this.isSystem = false,
     this.isFailure = false,
     this.isGroupMessage = false,
+    this.isReasoning = false,
     this.isRichReply = false,
     this.quote,
     this.interactive,
     this.htmlGame,
+    this.quickReplyToId,
+    this.quickReplyKey,
+    this.quickReplies = const [],
   });
 
   AgentMessage withSender(
@@ -54,8 +59,38 @@ class AgentMessage {
     isSystem: isSystem,
     isFailure: isFailure,
     isGroupMessage: isGroupMessage,
+    isReasoning: isReasoning,
     isRichReply: isRichReply,
     quote: quote,
+    quickReplyToId: quickReplyToId,
+    quickReplyKey: quickReplyKey,
+    quickReplies: quickReplies,
+  );
+
+  AgentMessage withQuickReplies(List<MessageQuickReply> value) => AgentMessage(
+    id: id,
+    role: role,
+    senderId: senderId,
+    sender: sender,
+    text: text,
+    interactive: interactive,
+    htmlGame: htmlGame,
+    createdAt: createdAt,
+    images: images,
+    files: files,
+    taskSummary: taskSummary,
+    runId: runId,
+    modelTurnId: modelTurnId,
+    responseInput: responseInput,
+    isSystem: isSystem,
+    isFailure: isFailure,
+    isGroupMessage: isGroupMessage,
+    isReasoning: isReasoning,
+    isRichReply: isRichReply,
+    quote: quote,
+    quickReplyToId: quickReplyToId,
+    quickReplyKey: quickReplyKey,
+    quickReplies: value,
   );
 
   final HtmlGameCard? htmlGame;
@@ -64,6 +99,7 @@ class AgentMessage {
   final bool isSystem;
   final bool isFailure;
   final bool isGroupMessage;
+  final bool isReasoning;
   // Derived in a page-wide read, including runs whose cards are off-page.
   final bool isRichReply;
   final String id;
@@ -78,6 +114,9 @@ class AgentMessage {
   final String? runId;
   final String? modelTurnId;
   final List<Map<String, Object?>>? responseInput;
+  final String? quickReplyToId;
+  final String? quickReplyKey;
+  final List<MessageQuickReply> quickReplies;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
@@ -89,6 +128,9 @@ class AgentMessage {
     if (isSystem) 'isSystem': true,
     if (isFailure) 'isFailure': true,
     if (isGroupMessage) 'isGroupMessage': true,
+    if (isReasoning) 'isReasoning': true,
+    if (quickReplyToId != null) 'quickReplyToId': quickReplyToId,
+    if (quickReplyKey != null) 'quickReplyKey': quickReplyKey,
     'text': text,
     'createdAt': createdAt.toIso8601String(),
     'images': images.map((image) => image.toJson()).toList(),
@@ -112,6 +154,9 @@ class AgentMessage {
     isSystem: json['isSystem'] == true,
     isFailure: json['isFailure'] == true,
     isGroupMessage: json['isGroupMessage'] == true,
+    isReasoning: json['isReasoning'] == true,
+    quickReplyToId: json['quickReplyToId'] as String?,
+    quickReplyKey: json['quickReplyKey'] as String?,
     quote: json['quote'] == null
         ? null
         : MessageQuote.fromJson((json['quote'] as Map).cast<String, Object?>()),
@@ -184,18 +229,21 @@ class AgentStep {
 class AgentTaskSummary {
   const AgentTaskSummary({
     required this.elapsedMilliseconds,
+    this.isTask = true,
     this.stopped = false,
     required this.intermediateMessageIds,
     required this.activities,
   });
 
   final int elapsedMilliseconds;
+  final bool isTask;
   final bool stopped;
   final List<String> intermediateMessageIds;
   final List<AgentTaskActivity> activities;
 
   Map<String, Object?> toJson() => {
     'elapsedMilliseconds': elapsedMilliseconds,
+    'isTask': isTask,
     'stopped': stopped,
     'intermediateMessageIds': intermediateMessageIds,
     'activities': activities.map((activity) => activity.toJson()).toList(),
@@ -205,6 +253,7 @@ class AgentTaskSummary {
     Map<String, Object?> json,
   ) => AgentTaskSummary(
     elapsedMilliseconds: json['elapsedMilliseconds']! as int,
+    isTask: json['isTask'] != false,
     stopped: json['stopped'] == true,
     intermediateMessageIds: (json['intermediateMessageIds']! as List)
         .cast<String>(),
@@ -220,6 +269,7 @@ class AgentTaskSummary {
 class AgentTaskActivity {
   const AgentTaskActivity({
     required this.text,
+    this.isReasoning = false,
     this.messageId,
     this.status,
     this.toolName,
@@ -228,6 +278,7 @@ class AgentTaskActivity {
   });
 
   final String text;
+  final bool isReasoning;
   final String? messageId;
   final String? toolName;
   final AgentStepStatus? status;
@@ -236,6 +287,7 @@ class AgentTaskActivity {
 
   Map<String, Object?> toJson() => {
     'text': text,
+    if (isReasoning) 'isReasoning': true,
     if (messageId != null) 'messageId': messageId,
     if (toolName != null) 'toolName': toolName,
     'status': status?.name,
@@ -247,6 +299,7 @@ class AgentTaskActivity {
     final status = json['status'] as String?;
     return AgentTaskActivity(
       text: json['text']! as String,
+      isReasoning: json['isReasoning'] == true,
       messageId: json['messageId'] as String?,
       toolName: json['toolName'] as String?,
       status: status == null ? null : AgentStepStatus.values.byName(status),
@@ -274,6 +327,9 @@ String toolTitle(String name) =>
 String _defaultToolTitle(String name) => switch (name) {
   'readMyProfile' => '读取自己的资料',
   'updateMyProfile' => '更新自己的资料',
+  'listHtmlApps' => '查找小应用',
+  'readHtmlAppData' => '读取小应用数据',
+  'writeHtmlAppData' => '保存小应用数据',
   'sendHtmlMessage' => '发送 HTML 消息',
   'readHtmlMessage' => '读取 HTML 消息',
   'updateHtmlMessage' => '更新 HTML 消息',
@@ -299,6 +355,7 @@ String _defaultToolTitle(String name) => switch (name) {
   'openModelConfiguration' => '打开模型设置',
   'sendGroupMessage' => '发送群消息',
   'sleepGroupChat' => '稍后查看群聊',
+  'sendQuickReply' => '发送快捷回复',
   'recallMessage' => '撤回消息',
   'listGroupChats' => '查询群聊',
   'readMessage' => '读取历史消息',

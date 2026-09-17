@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../domain/interactive_selection.dart';
 import 'message_callbacks.dart';
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
@@ -40,14 +41,24 @@ class InteractiveMessageStore {
         card.participantRevision(actor.id) != participantRevision)
       throw InteractiveMessageChanged(card);
     final pending = card.participants[actor.id]?['callback'] as Map?;
-    if (['queued', 'processing'].contains(pending?['status']))
+    if (['queued', 'processing'].contains(pending?['status']) &&
+        (pending?['buttonId'] ?? card.participants[actor.id]?['buttonId']) ==
+            buttonId)
       throw StateError('AI 正在处理这次操作，请等待结果');
     if (card.closed) throw StateError('这条交互消息已结束');
     final view = card.viewFor(actor.id);
-    final button = view.buttons.firstWhere((b) => b['id'] == buttonId);
+    var button = view.buttons.firstWhere((b) => b['id'] == buttonId);
     if (button['disabled'] == true) throw StateError('这个选项已处理');
     final action = button['action'] as String;
-    if (inputValue != null) {
+    if (action == 'openUrl' &&
+        button['notifyAi'] != true &&
+        button['repeatable'] != false)
+      return (card: card, notice: null, url: button['url'] as String);
+    if (button['selection'] case final Map config) {
+      button = InteractiveSelection(
+        Map<String, Object?>.from(config),
+      ).resolve(button, inputValue);
+    } else if (inputValue != null) {
       if (rows.single['kind'] != 'html_game' ||
           action != 'submit' ||
           !['text', 'json'].contains(button['input']))
@@ -64,7 +75,8 @@ class InteractiveMessageStore {
         ? switch (action) {
             'submit' => card.engine.submit(actor.id, actor.name, {
               ...button,
-              if (inputValue != null) 'value': inputValue,
+              if (inputValue != null && button['selection'] == null)
+                'value': inputValue,
             }),
             'nextRound' => card.engine.nextRound(actor.id),
             _ => card.engine,
@@ -107,12 +119,20 @@ class InteractiveMessageStore {
     final callbackId = button['notifyAi'] == true ? newMessageId() : null;
     final state = <String, Object?>{
       if (callbackId != null)
-        'callback': {'id': callbackId, 'status': 'queued', 'updatedAt': now},
+        'callback': {
+          'id': callbackId,
+          'buttonId': buttonId,
+          'status': 'queued',
+          'updatedAt': now,
+        },
       'name': actor.name,
       'revision': participantRevision + 1,
       'snapshotCount': snapshotCount + 1,
       'definitionRevision': revision,
       'showStatistics': target?['showStatistics'] ?? view.showStatistics,
+      'buttonColumns': newRound
+          ? card.buttonColumns
+          : target?['buttonColumns'] ?? view.buttonColumns,
       'title': newRound ? card.title : target?['title'] ?? view.title,
       'body': newRound
           ? card.body
@@ -121,6 +141,10 @@ class InteractiveMessageStore {
       'buttons': newRound ? card.buttons : nextButtons,
       'buttonId': buttonId,
       'label': button['label'],
+      if (button['selections'] != null) ...{
+        'selections': button['selections'],
+        'value': button['value'],
+      },
       'updatedAt': now,
     };
     final next = InteractiveMessage(
@@ -131,6 +155,7 @@ class InteractiveMessageStore {
           ? card.revision + 1
           : card.revision,
       showStatistics: card.showStatistics,
+      buttonColumns: card.buttonColumns,
       interaction: card.interaction,
       session: nextSession?.runtime ?? card.session,
       title: card.title,
@@ -145,6 +170,7 @@ class InteractiveMessageStore {
                   ..remove('title')
                   ..remove('body')
                   ..remove('buttons')
+                  ..remove('buttonColumns')
                   ..remove('callback'))
               : entry.value,
         actor.id: state,
@@ -161,6 +187,7 @@ class InteractiveMessageStore {
       'before_json': jsonEncode({
         'revision': view.revision,
         'showStatistics': view.showStatistics,
+        'buttonColumns': view.buttonColumns,
         'title': view.title,
         'body': view.body,
         'buttons': view.buttons,
@@ -174,6 +201,14 @@ class InteractiveMessageStore {
       }),
       'created_at': now,
     });
+    if (pending != null) {
+      await txn.update(
+        'message_callbacks',
+        {'status': 'expired', 'processed_at': now},
+        where: 'id = ? AND processed_at IS NULL',
+        whereArgs: [pending['id']],
+      );
+    }
     if (newRound) {
       await txn.update(
         'message_callbacks',
@@ -210,6 +245,10 @@ class InteractiveMessageStore {
             'actorName': actor.name,
             'buttonId': buttonId,
             'label': button['label'],
+            if (button['selections'] != null) ...{
+              'selections': button['selections'],
+              'value': button['value'],
+            },
           } else
             'participationRecorded': true,
           'revision': revision,

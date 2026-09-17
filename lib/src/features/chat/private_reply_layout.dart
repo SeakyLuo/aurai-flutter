@@ -77,12 +77,16 @@ Map<String, PrivateReplyPart> privateReplyLayout(
     }
     final process = summary == null
         ? null
-        : AgentTaskSummary(
+          : AgentTaskSummary(
             elapsedMilliseconds: summary.elapsedMilliseconds,
+            isTask: summary.isTask,
             stopped: summary.stopped,
             intermediateMessageIds: const [],
             activities: summary.activities
-                .where((activity) => activity.toolName != null)
+                .where(
+                  (activity) =>
+                      activity.toolName != null || activity.isReasoning,
+                )
                 .toList(),
           );
     final copyText = text.where((part) => part.isNotEmpty).join('\n\n');

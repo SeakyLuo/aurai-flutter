@@ -10,6 +10,7 @@ import '../features/chat/keyboard_inset.dart';
 import '../features/chat/settings_appearance.dart';
 import 'memory_controller.dart';
 import 'memory_plan_preview.dart';
+import 'memory_processing_border.dart';
 import '../providers/responses_transport.dart';
 import 'memory_editor.dart';
 import 'memory_actions_menu.dart';
@@ -328,51 +329,31 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
             else ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: MessageComposer(
-                        embedded: true,
-                        controller: _text,
-                        focusNode: _focus,
-                        enabled: !_saving && !_planning,
-                        hintText: '整理或补充记忆',
-                        maxLength: 300,
-                        onChanged: (_) => setState(() {}),
-                        action: RoundAction(
-                          label: _planning ? '正在整理' : '发送',
-                          icon: Icons.arrow_upward_rounded,
-                          iconWidget: _planning
-                              ? const SizedBox.square(
-                                  dimension: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : null,
-                          primary: true,
-                          compact: true,
-                          onPressed:
-                              _planning || _saving || _text.text.trim().isEmpty
-                              ? null
-                              : _add,
-                        ),
-                      ),
+                child: MemoryProcessingBorder(
+                  active: _planning,
+                  child: MessageComposer(
+                    embedded: true,
+                    controller: _text,
+                    focusNode: _focus,
+                    enabled: !_saving && !_planning,
+                    hintText: '整理或补充记忆',
+                    maxLength: 300,
+                    onChanged: (_) => setState(() {}),
+                    action: RoundAction(
+                      inkResponse: false,
+                      label: _planning ? '停止整理' : '发送',
+                      icon: _planning
+                          ? Icons.stop_rounded
+                          : Icons.arrow_upward_rounded,
+                      primary: true,
+                      compact: true,
+                      onPressed: _planning
+                          ? _cancelPlan
+                          : _saving || _text.text.trim().isEmpty
+                          ? null
+                          : _add,
                     ),
-                    if (_planning) ...[
-                      const SizedBox(width: 8),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: RoundAction(
-                          label: '停止整理',
-                          icon: Icons.stop_rounded,
-                          compact: true,
-                          onPressed: _cancelPlan,
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
             ],

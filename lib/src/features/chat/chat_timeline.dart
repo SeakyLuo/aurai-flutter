@@ -33,6 +33,7 @@ List<ChatTimelineEntry> buildChatTimeline(
   Future<void> Function(AgentMessage)? onRecall,
   ValueChanged<String>? onOpenQuote,
   ValueChanged<AgentMessage>? onReeditRecalled,
+  Future<void> Function(AgentMessage, String, String)? onQuickReply,
 }) {
   final conversation = controller.activeConversation;
   final mentionSenders = {
@@ -66,12 +67,16 @@ List<ChatTimelineEntry> buildChatTimeline(
             message.runId == conversation.activeRunId &&
             message.taskSummary != null,
       );
+  final reasoningIds = {
+    for (final message in controller.visibleMessages)
+      if (message.isReasoning) message.id,
+  };
   final hiddenIds = {
     for (final message in controller.visibleMessages)
-      if (!isGroup &&
-          message.taskSummary != null &&
-          !richRuns.contains(message.runId))
-        ...message.taskSummary!.intermediateMessageIds,
+      if (!isGroup && message.taskSummary != null)
+        for (final id in message.taskSummary!.intermediateMessageIds)
+          if (reasoningIds.contains(id) || !richRuns.contains(message.runId))
+            id,
   };
   final toolsByMessage = <String, List<ChatTimelineEntry>>{};
   final members = controller.groupRuns.toList();
@@ -267,13 +272,15 @@ List<ChatTimelineEntry> buildChatTimeline(
                   ),
             onInteractiveRetry: (eventId) =>
                 controller.retryInteractiveCallback(message.id, eventId),
-            onInteractiveClick: (button, revision, participantRevision) =>
-                controller.clickInteractiveMessage(
-                  message.id,
-                  button,
-                  revision,
-                  participantRevision,
-                ),
+            onInteractiveClick:
+                (button, revision, participantRevision, {value}) =>
+                    controller.clickInteractiveMessage(
+                      message.id,
+                      button,
+                      revision,
+                      participantRevision,
+                      value: value,
+                    ),
             groupBubble: conversation.kind == ConversationKind.group,
             onQuote:
                 conversation.kind == ConversationKind.group &&
@@ -296,6 +303,15 @@ List<ChatTimelineEntry> buildChatTimeline(
                 ),
               );
             },
+            onQuickReply:
+                !message.isSystem &&
+                    !message.isFailure &&
+                    !message.isReasoning &&
+                    message.interactive?.systemPresentation != true &&
+                    message.role == AgentMessageRole.assistant &&
+                    message.senderId != MessageSender.localUser.id
+                ? onQuickReply
+                : null,
             availableSources:
                 memberSources[message.runId] ??
                 (message.runId != null &&
@@ -416,6 +432,10 @@ Map<String, String> chatSummaryOwners(ChatController controller) {
   final richRuns = controller.activeConversation.kind == ConversationKind.group
       ? <String>{}
       : richReplyRuns(controller.visibleMessages);
+  final reasoningIds = {
+    for (final message in controller.visibleMessages)
+      if (message.isReasoning) message.id,
+  };
   return {
     for (final message in controller.visibleMessages)
       'time:${message.id}': message.id,
@@ -424,7 +444,7 @@ Map<String, String> chatSummaryOwners(ChatController controller) {
         'elapsed:${message.runId}': message.id,
         for (final id in message.taskSummary!.intermediateMessageIds)
           if (id != controller.activeConversation.searchMessageId &&
-              !richRuns.contains(message.runId))
+              (reasoningIds.contains(id) || !richRuns.contains(message.runId)))
             id: message.id,
         for (var i = 0; i < message.taskSummary!.activities.length; i++)
           'tool:${message.runId}:$i': message.id,

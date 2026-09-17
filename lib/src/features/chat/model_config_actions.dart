@@ -18,7 +18,50 @@ extension ModelConfigActions on ChatController {
       customInstructions: modelSettings.customInstructions,
       responsePreferences: modelSettings.responsePreferences,
     );
-    await _platform.saveModelSettings(nextSettings);
+    final encrypted = await _platform.encryptModelSettings(nextSettings);
+    final updatedAi = await _store.database.transaction((txn) async {
+      AiProfile? updated;
+      if (senderId != null) {
+        final profiles = await txn.query(
+          'ai_profiles',
+          where: 'sender_id = ?',
+          whereArgs: [senderId],
+        );
+        if (profiles.isEmpty) throw StateError('AI 已不存在');
+        final senders = await txn.query(
+          'message_senders',
+          where: 'id = ?',
+          whereArgs: [senderId],
+        );
+        updated =
+            AiProfile.fromRows(
+              MessageSender.fromRow(senders.single),
+              profiles.single,
+            ).copyWith(
+              modelSelection: AiModelSelection(
+                provider: newConfig.service,
+                model: newConfig.model,
+                baseUrl: newConfig.baseUrl,
+              ),
+            );
+        await txn.update(
+          'ai_profiles',
+          {
+            'provider': newConfig.service.name,
+            'model': newConfig.model,
+            'base_url': newConfig.baseUrl,
+            'updated_at': updated.updatedAt.microsecondsSinceEpoch,
+          },
+          where: 'sender_id = ?',
+          whereArgs: [senderId],
+        );
+      }
+      await txn.rawInsert(
+        'INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+        ['encrypted_model_config', encrypted],
+      );
+      return updated;
+    });
     modelSettings = nextSettings;
     final defaultConfig = nextSettings.activeConfig;
     groupStore.defaultSelection = AiModelSelection(
@@ -26,18 +69,7 @@ extension ModelConfigActions on ChatController {
       model: defaultConfig.model,
       baseUrl: defaultConfig.baseUrl,
     );
-    if (senderId != null) {
-      final ai = await groupStore.loadAi(senderId);
-      await saveAi(
-        ai.copyWith(
-          modelSelection: AiModelSelection(
-            provider: newConfig.service,
-            model: newConfig.model,
-            baseUrl: newConfig.baseUrl,
-          ),
-        ),
-      );
-    }
+    if (updatedAi != null) _applySavedAi(updatedAi);
     _conversationChanged();
   }
 }

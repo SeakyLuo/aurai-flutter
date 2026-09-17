@@ -107,16 +107,18 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
                   card: _card!,
                   onRetry: (eventId) => widget.controller
                       .retryInteractiveCallback(widget.result.id, eventId),
-                  onClick: (button, revision, participantRevision) async {
-                    final result = await widget.controller
-                        .clickInteractiveMessage(
-                          widget.result.id,
-                          button,
-                          revision,
-                          participantRevision,
-                        );
-                    return result;
-                  },
+                  onClick:
+                      (button, revision, participantRevision, {value}) async {
+                        final result = await widget.controller
+                            .clickInteractiveMessage(
+                              widget.result.id,
+                              button,
+                              revision,
+                              participantRevision,
+                              value: value,
+                            );
+                        return result;
+                      },
                   onOpenLink: (url) async {
                     try {
                       await AuraiPlatform.instance.startIntent({

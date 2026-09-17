@@ -31,6 +31,7 @@ class HtmlGameSurface extends StatelessWidget {
             },
             creationParams: {
               'messageId': session.game.messageId,
+              'appId': session.game.appId,
               'identity': session.identity,
               'stateful': session.game.stateful,
               'fullscreen': session.fullscreen,

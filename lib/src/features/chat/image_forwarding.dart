@@ -1,6 +1,15 @@
 part of 'chat_controller.dart';
 
 extension ImageForwarding on ChatController {
+  Future<T> _enqueueForward<T>(Future<T> Function() action) {
+    final next = _forwardingTail.then((_) => action());
+    _forwardingTail = next.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    return next;
+  }
+
   Future<List<Conversation>> imageForwardTargets(
     String query,
     int offset,
@@ -45,7 +54,7 @@ extension ImageForwarding on ChatController {
   Future<void> forwardImage(String? targetId, List<int> bytes, String text) =>
       _inConversation(
         activeConversation,
-        () => _forwardImage(targetId, bytes, text),
+        () => _enqueueForward(() => _forwardImage(targetId, bytes, text)),
       );
 
   Future<void> _forwardImage(
@@ -53,17 +62,12 @@ extension ImageForwarding on ChatController {
     List<int> bytes,
     String text,
   ) async {
-    if (_submitting) throw StateError('消息正在发送，请稍候');
-    _submitting = true;
     MessageImage? image;
     var saved = false;
     try {
       var target = targetId == null
           ? Conversation.empty()
           : await _forwardTarget(targetId);
-      if (target.kind == ConversationKind.direct &&
-          !(await _directReplyContext(target)).config.isConfigured)
-        throw StateError('请先配置目标 AI 的模型');
       image = await _imageStore.importBytes(bytes);
       final message = AgentMessage(
         id: newMessageId(),
@@ -76,28 +80,15 @@ extension ImageForwarding on ChatController {
       target =
           _liveConversation(target.id) ??
           (target.id == _viewConversation.id ? _viewConversation : target);
-      target.messages.add(message);
-      target.messageCount++;
-      try {
-        await _store.writer.save(
-          target,
-          makeActive: false,
-          recipients: target.kind == ConversationKind.group
-              ? {
-                  message.id: [target.defaultSenderId],
-                }
-              : const {},
-        );
-      } on Object {
-        target.messages.remove(message);
-        target.messageCount--;
-        rethrow;
-      }
+      await _saveForwardedMessage(
+        target,
+        message,
+        target.kind == ConversationKind.group
+            ? [target.defaultSenderId]
+            : const [],
+      );
       saved = true;
-      _updateConversationList(target);
-      unawaited(_deliverForwardedMessage(target, message));
     } finally {
-      _submitting = false;
       if (!saved && image != null) await _imageStore.remove([image]);
       _conversationChanged();
     }
@@ -109,7 +100,7 @@ extension ImageForwarding on ChatController {
     String note,
   ) => _inConversation(
     activeConversation,
-    () => _forwardMessage(targetId, source, note),
+    () => _enqueueForward(() => _forwardMessage(targetId, source, note)),
   );
 
   Future<String> _forwardMessage(
@@ -117,18 +108,12 @@ extension ImageForwarding on ChatController {
     AgentMessage source,
     String note,
   ) async {
-    if (_submitting) throw StateError('消息正在发送，请稍候');
-    _submitting = true;
     final copies = <File>[];
     var saved = false;
     try {
       var target = targetId == null
           ? Conversation.empty()
           : await _forwardTarget(targetId);
-      if (target.kind == ConversationKind.direct &&
-          !(await _directReplyContext(target)).config.isConfigured) {
-        throw StateError('请先配置目标 AI 的模型');
-      }
       final images = <MessageImage>[];
       final files = <MessageFile>[];
       Future<String> copy(String path) async {
@@ -164,7 +149,7 @@ extension ImageForwarding on ChatController {
       if (source.htmlGame != null) {
         final rows = await _store.database.query(
           'html_games',
-          columns: ['html', 'title'],
+          columns: ['title', 'conversation_id'],
           where:
               'message_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = ?)',
           whereArgs: [source.id, 'html_game'],
@@ -172,7 +157,11 @@ extension ImageForwarding on ChatController {
         );
         if (rows.isEmpty) throw StateError('原 HTML 消息已删除或撤回，无法转发');
         final document = rows.single;
-        final bytes = utf8.encode(document['html'] as String);
+        final application = await htmlGames.load(
+          document['conversation_id'] as String,
+          source.id,
+        );
+        final bytes = utf8.encode(application.html);
         final file = File('${_imageStore.directory}/${newMessageId()}.html');
         copies.add(file);
         await file.writeAsBytes(bytes);
@@ -210,27 +199,14 @@ extension ImageForwarding on ChatController {
       target =
           _liveConversation(target.id) ??
           (target.id == _viewConversation.id ? _viewConversation : target);
-      target.messages.add(message);
-      target.messageCount++;
-      try {
-        await _store.writer.save(
-          target,
-          makeActive: false,
-          recipients: target.kind == ConversationKind.group
-              ? {message.id: recipients}
-              : const {},
-        );
-      } on Object {
-        target.messages.remove(message);
-        target.messageCount--;
-        rethrow;
-      }
+      await _saveForwardedMessage(
+        target,
+        message,
+        target.kind == ConversationKind.group ? recipients : const [],
+      );
       saved = true;
-      _updateConversationList(target);
-      unawaited(_deliverForwardedMessage(target, message));
       return message.id;
     } finally {
-      _submitting = false;
       if (!saved) {
         for (final file in copies) {
           if (await file.exists()) await file.delete();
@@ -239,6 +215,43 @@ extension ImageForwarding on ChatController {
       _conversationChanged();
     }
   }
+
+  Future<void> _saveForwardedMessage(
+    Conversation target,
+    AgentMessage message,
+    List<String> recipients,
+  ) => _inConversation(target, () async {
+    final previousPending = target.pendingGoal;
+    final previousQueued = _execution.queuedUserMessageId;
+    _execution.forwardingMessage = true;
+    if (target.kind == ConversationKind.direct) {
+      target.pendingGoal = message.text;
+      _execution.queuedUserMessageId = message.id;
+    }
+    target.messages.add(message);
+    target.messageCount++;
+    try {
+      await _store.writer.save(
+        target,
+        makeActive: false,
+        recipients: target.kind == ConversationKind.group
+            ? {message.id: recipients}
+            : const {},
+      );
+    } on Object {
+      if (_execution.queuedUserMessageId == message.id) {
+        target.pendingGoal = previousPending;
+        _execution.queuedUserMessageId = previousQueued;
+      }
+      target.messages.removeWhere((item) => item.id == message.id);
+      target.messageCount--;
+      rethrow;
+    } finally {
+      _execution.forwardingMessage = false;
+    }
+    _updateConversationList(target);
+    unawaited(_deliverForwardedMessage(target, message));
+  });
 
   Future<Conversation> _forwardTarget(String id) async {
     final live = _liveConversation(id);
@@ -259,8 +272,12 @@ extension ImageForwarding on ChatController {
         return;
       }
       // Only successive messages in the same conversation share a reply turn.
-      if (_runningConversation != null || _systemEventLoading) {
-        _execution.forwardedReplyPending = true;
+      if (_runningConversation != null ||
+          _privateConversation != null ||
+          _submitting ||
+          _systemEventLoading) {
+        if (target.kind == ConversationKind.group)
+          _execution.forwardedReplyPending = true;
         return;
       }
       await _runForwardedImage(target);
@@ -274,18 +291,40 @@ extension ImageForwarding on ChatController {
   });
 
   void _resumeForwardedReply() {
-    if (!_execution.forwardedReplyPending || _callbacksDisposed) return;
+    if (_callbacksDisposed ||
+        _runningConversation != null ||
+        _privateConversation != null ||
+        _submitting ||
+        _execution.forwardingMessage ||
+        _systemEventLoading)
+      return;
+    if (!_execution.forwardedReplyPending &&
+        _execution.queuedUserMessageId == null)
+      return;
     _execution.forwardedReplyPending = false;
     final target = _execution.conversation!;
     unawaited(_inConversation(target, () => _runForwardedImage(target)));
   }
 
   Future<void> _runForwardedImage(Conversation target) async {
+    final queuedAtStart = _execution.queuedUserMessageId;
+    target.executionUserMessageId = null;
     _runningConversation = target;
     _conversationChanged();
     try {
+      if (target.kind == ConversationKind.direct &&
+          !(await _directReplyContext(target)).config.isConfigured) {
+        if (_execution.queuedUserMessageId == queuedAtStart)
+          _execution.queuedUserMessageId = null;
+        target.runState = ChatRunState.idle;
+        await _persistRun(target);
+        return;
+      }
       await _executeConversation(target);
     } on Object catch (error) {
+      if (target.executionUserMessageId == null &&
+          _execution.queuedUserMessageId == queuedAtStart)
+        _execution.queuedUserMessageId = null;
       target.runState = ChatRunState.failed;
       target.errorDetail = error.toString();
       await _persistRun(target);

@@ -65,7 +65,12 @@ extension MessageRecall on ChatController {
     }
     pendingComposerDraft = conversation.draft;
     _conversationChanged();
-    await _store.writer.save(conversation, makeActive: false);
+    await _store.writer.save(
+      conversation,
+      makeActive: false,
+      saveDraft: true,
+      saveMessages: false,
+    );
   }
 
   Future<Conversation> _messageConversation(
@@ -241,7 +246,12 @@ extension MessageRecall on ChatController {
         if (live) _replaceRecalled(dispatcher.history, message.id, notice);
         _store.writer.remember([notice]);
       });
-      await _store.writer.save(conversation, makeActive: false);
+      await _store.writer.save(
+        conversation,
+        makeActive: false,
+        saveDraft: true,
+        saveMessages: false,
+      );
       HtmlGameSignals.changes.add(message.id);
       if (message.interactive != null)
         InteractiveMessageStore.changes.add(message.id);

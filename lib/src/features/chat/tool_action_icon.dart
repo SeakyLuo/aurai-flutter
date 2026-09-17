@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'attachment_action_icon.dart';
 
 import 'capability_icon.dart';
+import 'conversation_icon.dart';
 import 'wrench_painter.dart';
 import 'file_tool_icon.dart';
 import 'question_icon.dart';
 import 'settings_icon.dart';
 import 'sidebar_action_icon.dart';
+import 'tool_semantic_icon.dart';
 
 class ToolActionIcon extends StatelessWidget {
   const ToolActionIcon({super.key, this.toolName, this.iconName});
@@ -33,10 +35,6 @@ class ToolActionIcon extends StatelessWidget {
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               'sendInteractiveMessage' ||
-              'findContacts' ||
-              'listFriends' ||
-              'addFriend' ||
-              'readExecutionLogs' ||
               'clickInteractiveMessage' ||
               'retryInteractiveCallback' ||
               'readInteractiveMessage' ||
@@ -47,16 +45,25 @@ class ToolActionIcon extends StatelessWidget {
               'setConversationArchived' ||
               'deleteConversation' ||
               'sendConversationMessage' ||
-              'openAppPage' ||
+              'readMessage' ||
               'locateMessage' ||
               'forwardMessage' ||
+              'sendQuickReply' ||
+              'recallMessage' => const ConversationIcon(),
+              'sleepGroupChat' ||
               'listGroupChats' ||
               'readGroupChat' ||
+              'readGroupMessages' ||
               'sendGroupMessage' ||
-              'recallMessage' ||
               'createGroupChat' ||
               'renameGroupChat' ||
-              'updateGroupChatMembers' ||
+              'updateGroupChatMembers' => SidebarActionIcon(
+                type: SidebarActionIconType.group,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              'findContacts' ||
+              'listFriends' ||
+              'addFriend' ||
               'listAiContacts' ||
               'readAiContact' ||
               'readMyProfile' ||
@@ -113,17 +120,21 @@ class ToolActionIcon extends StatelessWidget {
                 type: SettingsIconType.tasks,
               ),
               'askUser' => const QuestionIcon(type: QuestionIconType.question),
+              'createHtmlGame' ||
+              'readHtmlGame' ||
+              'actHtmlGame' => const SkillIcon('game'),
               'searchTools' ||
-              'searchImages' ||
               'searchWeb' ||
               'searchConversations' ||
-              'readMessage' ||
-              'readMessageAttachment' ||
-              'readGroupMessages' ||
-              'searchMessages' ||
-              'findApps' => SidebarActionIcon(
+              'searchMessages' => SidebarActionIcon(
                 type: SidebarActionIconType.search,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              'searchImages' => const ToolSemanticIcon(
+                type: ToolSemanticIconType.imageSearch,
+              ),
+              'findApps' => const ToolSemanticIcon(
+                type: ToolSemanticIconType.appSearch,
               ),
               'getDocumentFolders' ||
               'requestDocumentFolder' ||
@@ -132,29 +143,34 @@ class ToolActionIcon extends StatelessWidget {
               'listDirectory' => const FileToolIcon(
                 type: FileToolIconType.folder,
               ),
-              'readWebPage' || 'setSourceDates' => CustomPaint(
-                size: const Size.square(24),
-                painter: _GlobePainter(
-                  Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
+              'readWebPage' => const SkillIcon('browser'),
+              'setSourceDates' => const SkillIcon('calendar'),
               'readAttachment' ||
+              'readMessageAttachment' ||
+              'readExecutionLogs' ||
               'readDocument' ||
-              'createTextFile' ||
-              'shareFile' ||
               'readFile' ||
               'inspectLocalDatabase' ||
               'queryLocalDatabase' ||
-              'readLocalDatabase' ||
-              'inspectAndroidApi' => const FileToolIcon(
+              'readLocalDatabase' => const FileToolIcon(
                 type: FileToolIconType.read,
               ),
+              'createTextFile' => const ToolSemanticIcon(
+                type: ToolSemanticIconType.createFile,
+              ),
+              'shareFile' => const ToolSemanticIcon(
+                type: ToolSemanticIconType.shareFile,
+              ),
+              'inspectAndroidApi' => const SkillIcon('code'),
               'shell' || 'executeShizuku' || 'executeAndroidScript' =>
                 const CapabilityIcon(id: 'android.shell.app_uid'),
               'requestShizukuAccess' => const CapabilityIcon(
                 id: 'android.permissions',
               ),
-              'getDeviceExtensions' ||
+              'getDeviceExtensions' => SettingsIcon(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                type: SettingsIconType.device,
+              ),
               'startNetworkCapture' ||
               'stopNetworkCapture' ||
               'readNetworkTraffic' ||
@@ -182,13 +198,18 @@ class ToolActionIcon extends StatelessWidget {
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                 type: SidebarActionIconType.settings,
               ),
+              'openAppPage' => const CapabilityIcon(id: 'android.apps'),
               'launchApp' ||
               'startIntent' => const CapabilityIcon(id: 'android.intents'),
               'requestAccessibilityAccess' => const CapabilityIcon(
                 id: 'android.permissions',
               ),
               'getNetworkState' ||
-              'getNetworkEvents' => const CapabilityIcon(id: 'android.network'),
+              'getNetworkEvents' ||
+              'dnsLookup' ||
+              'httpProbe' ||
+              'tlsProbe' => const CapabilityIcon(id: 'android.network'),
+              'wait' => const SkillIcon('clock'),
               _ => CustomPaint(
                 size: const Size.square(24),
                 painter: WrenchPainter(
@@ -198,26 +219,4 @@ class ToolActionIcon extends StatelessWidget {
             },
     ),
   );
-}
-
-class _GlobePainter extends CustomPainter {
-  const _GlobePainter(this.color);
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.scale(size.width / 24, size.height / 24);
-    final pen = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.65
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    canvas.drawCircle(const Offset(12, 12), 9, pen);
-    canvas.drawOval(const Rect.fromLTRB(8, 3, 16, 21), pen);
-    canvas.drawLine(const Offset(3, 12), const Offset(21, 12), pen);
-  }
-
-  @override
-  bool shouldRepaint(_GlobePainter oldDelegate) => oldDelegate.color != color;
 }

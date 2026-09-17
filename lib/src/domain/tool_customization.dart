@@ -72,6 +72,7 @@ abstract final class ToolCustomizations {
       confirmationDescriptionBuilder: tool.confirmationDescriptionBuilder,
       taskScopedConfirmation: tool.taskScopedConfirmation,
       confirmationMayBeRequired: tool.confirmationMayBeRequired,
+      singleUseConfirmation: tool.singleUseConfirmation,
       waitsForUser: tool.waitsForUser,
     );
   }

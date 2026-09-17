@@ -19,7 +19,7 @@ object HtmlGamePool : ComponentCallbacks2 {
         val previous = pages[id]
         if (previous != null && previous.alive && previous.identity == identity) return previous
         previous?.destroy()
-        val page = HtmlGameRuntime(context, identity, id, args["stateful"] as Boolean)
+        val page = HtmlGameRuntime(context, identity, id, args["appId"] as String, args["stateful"] as Boolean)
         pages[id] = page
         return page
     }

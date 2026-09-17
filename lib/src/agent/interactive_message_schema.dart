@@ -1,3 +1,52 @@
+const interactiveSelectionSchema = {
+  'type': 'object',
+  'description':
+      'Native fixed-option selection followed by one explicit submit. Requires action:submit and a shared interaction. Single uses radio circles; multiple uses checkboxes. Options are not submitted until the confirmation button is pressed. Cannot combine with input. Works for humans and AI.',
+  'properties': {
+    'mode': {
+      'type': 'string',
+      'enum': ['single', 'multiple'],
+    },
+    'options': {
+      'type': 'array',
+      'minItems': 1,
+      'maxItems': 24,
+      'items': {
+        'type': 'object',
+        'properties': {
+          'id': {'type': 'string', 'minLength': 1},
+          'label': {'type': 'string', 'minLength': 1},
+          'value': {
+            'description':
+                'JSON value saved when selected; defaults to option id.',
+          },
+        },
+        'required': ['id', 'label'],
+        'additionalProperties': false,
+      },
+    },
+    'minSelections': {
+      'type': 'integer',
+      'minimum': 1,
+      'description': 'Default 1; single must be 1.',
+    },
+    'maxSelections': {
+      'type': 'integer',
+      'minimum': 1,
+      'description': 'Default all options for multiple, 1 for single.',
+    },
+  },
+  'required': ['mode', 'options'],
+  'additionalProperties': false,
+};
+
+const interactiveButtonColumnsSchema = {
+  'type': 'integer',
+  'enum': [1, 2],
+  'description':
+      'Native card button columns: 1 is a vertical list (default), 2 is an equal-width grid in row-major order. Use 2 for short voting/quiz options and 1 for long action labels. Odd final buttons stay half-width. This changes presentation only; tapping still executes immediately. Omitted updates/states/callbacks retain the current layout.',
+};
+
 const interactiveStatisticsSchema = {
   'type': 'boolean',
   'description':
@@ -53,9 +102,10 @@ const interactiveButtonsSchema = {
         'type': 'boolean',
         'default': false,
         'description':
-            'Queue an AI callback after this action. The participant waits until the creator commits title/body/buttons with updateInteractiveMessage + callbackEventId. Failures can retry the same event without repeating this action. Omit/false for local-only changes.',
+            'Queue an AI callback after this action. Only this button waits until the creator commits title/body/buttons with updateInteractiveMessage + callbackEventId. A later state-changing action expires the previous callback. Failures can retry the same event without repeating this action. Omit/false for local-only changes.',
       },
       'repeatable': {'type': 'boolean'},
+      'selection': interactiveSelectionSchema,
       'input': {
         'type': 'string',
         'enum': ['text', 'json'],

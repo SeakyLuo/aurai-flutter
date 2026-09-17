@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/tool_models.dart';
+import '../domain/local_time.dart';
 
 /// Each invocation opens the live SQLite file independently in read-only mode.
 /// WAL-backed messages remain visible without copying or exporting the database.
@@ -22,7 +23,7 @@ class LocalHistoryTool implements AgentTool, RuntimeCapabilityAgentTool {
   @override
   ToolDefinition get definition => ToolDefinition(
     name: name,
-    description: switch (name) {
+    description: 'Use created_at_local/updated_at_local for human-facing dates and times; these include the device UTC offset. Original numeric timestamps are retained for internal references. ' + switch (name) {
       'searchConversations' =>
         'Search saved conversation titles, drafts and message text with multiple literal keywords (case-insensitive OR). Empty keywords list recent conversations. Use for earlier conversations or past work. Returns only conversations accessible to this AI.',
       'searchMessages' =>
@@ -92,6 +93,11 @@ class LocalHistoryTool implements AgentTool, RuntimeCapabilityAgentTool {
         final row = <String, Object?>{};
         for (final entry in page[index].entries) {
           final value = entry.value;
+          if (entry.key == 'created_at' || entry.key == 'updated_at') {
+            row['${entry.key}_local'] = localIsoTime(
+              DateTime.fromMicrosecondsSinceEpoch(value as int, isUtc: true),
+            );
+          }
           if (value is String) {
             final available = remaining < 6000 ? remaining : 6000;
             if (value.length > available) {

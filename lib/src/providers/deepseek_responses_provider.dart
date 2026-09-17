@@ -48,6 +48,7 @@ class DeepSeekResponsesProvider implements ModelProvider {
     final json = await _transport.send(
       _requestBody(request),
       onTextChanged: request.onTextChanged,
+      onReasoningChanged: request.onReasoningChanged,
       onMessageStarted: request.onMessageStarted,
       onProcessingStarted: request.onProcessingStarted,
     );

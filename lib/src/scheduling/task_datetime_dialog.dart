@@ -2,8 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../features/chat/glass_surface.dart';
-import '../features/chat/settings_appearance.dart';
-import '../utils/widget_utils.dart';
+import '../features/chat/dialog_action_button.dart';
 
 Future<DateTime?> showTaskDateTimeDialog(
   BuildContext context, {
@@ -90,24 +89,16 @@ class _TaskDateTimeDialogState extends State<_TaskDateTimeDialog> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: TextButton.styleFrom(
-                            foregroundColor: colors.onSurface,
-                            backgroundColor: dialogControlColor(context),
-                            minimumSize: const Size(0, 46),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(23),
-                            ),
-                          ),
-                          child: const Text('取消'),
-                        ),
+                        child: DialogActionButton(
+                      text: '取消',
+                      role: DialogActionRole.secondary,
+                      onPressed: () => Navigator.pop(context),
+                    ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: WidgetUtils.primaryButton(
+                        child: DialogActionButton(
                           text: '确定',
-                          height: 46,
                           onPressed: () => Navigator.pop(context, _selected),
                         ),
                       ),

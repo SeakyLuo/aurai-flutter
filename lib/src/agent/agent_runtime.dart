@@ -40,6 +40,7 @@ class AgentRuntime {
     Future<void> Function(ToolResult)? onToolCompleted,
     bool Function(ToolResult)? endsRun,
     void Function(String text)? onTextChanged,
+    void Function(String text)? onReasoningChanged,
     void Function()? onProcessingStarted,
     void Function(int attempt)? onReconnect,
     void Function(int index)? onMessageStarted,
@@ -81,6 +82,10 @@ class AgentRuntime {
             onProcessingStarted: () {
               _throwIfCancelled();
               onProcessingStarted?.call();
+            },
+            onReasoningChanged: (text) {
+              _throwIfCancelled();
+              onReasoningChanged?.call(text);
             },
             onTextChanged: (text) {
               _throwIfCancelled();

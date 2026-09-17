@@ -1,3 +1,4 @@
+import '../features/chat/delete_confirmation_dialog.dart';
 import '../domain/error_message.dart';
 import 'package:flutter/material.dart';
 
@@ -40,19 +41,11 @@ class MemoryEditorState extends State<MemoryEditor> {
     if (dirty) {
       final discard = await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('放弃修改？'),
-          content: const Text('尚未保存的记忆修改会丢失。'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('继续编辑'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('放弃修改'),
-            ),
-          ],
+        builder: (context) => const DeleteConfirmationDialog(
+          title: '放弃修改？',
+          description: '尚未保存的记忆修改会丢失。',
+          confirmLabel: '放弃修改',
+          cancelLabel: '继续编辑',
         ),
       );
       if (discard != true || !mounted) return;

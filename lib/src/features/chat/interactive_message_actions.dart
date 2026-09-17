@@ -61,6 +61,17 @@ extension InteractiveMessageActions on ChatController {
     await _store.writer.flush();
     final id = args['messageId'] as String?;
     if (operation == 'sendInteractiveMessage') {
+      final targetId = args['conversationId'] as String? ?? source.id;
+      final sameConversation = targetId == source.id;
+      final access = await _store.database.query(
+        'conversation_members',
+        columns: ['sender_id'],
+        where: 'conversation_id = ? AND sender_id = ? AND left_at IS NULL',
+        whereArgs: [targetId, senderId],
+        limit: 1,
+      );
+      if (access.isEmpty) throw StateError('会话不存在或你无权访问该会话');
+      final target = sameConversation ? source : await _forwardTarget(targetId);
       final card = InteractiveMessage.fromJson({...args, 'revision': 0});
       card.validateTransport(html: false);
       final profile = await groupStore.loadAi(senderId);
@@ -74,27 +85,32 @@ extension InteractiveMessageActions on ChatController {
             : '私密交互消息',
         createdAt: DateTime.now(),
         interactive: card,
-        runId: source.activeRunId,
-        isGroupMessage: source.kind == ConversationKind.group,
+        runId: sameConversation ? source.activeRunId : null,
+        isGroupMessage: target.kind == ConversationKind.group,
       );
       if (source.kind == ConversationKind.group) {
         _checkGroupStopped(source);
         if (_removedGroupMembers.contains(senderId)) throw AgentCancelled();
       }
       await _store.database.transaction((txn) async {
-        await txn.insert('messages', messageRow(source.id, message));
+        await txn.insert('messages', messageRow(target.id, message));
         await txn.rawUpdate(
           'UPDATE conversations SET message_count = message_count + 1, preview = ?, updated_at = ? WHERE id = ?',
-          [message.text, message.createdAt.microsecondsSinceEpoch, source.id],
+          [message.text, message.createdAt.microsecondsSinceEpoch, target.id],
         );
       });
       _publishInteractiveChange(
-        source.id,
+        target.id,
         message,
-        source: source,
+        source: target,
         notifyParticipants: !card.systemPresentation,
       );
-      return {'sent': true, 'messageId': message.id, 'revision': 0};
+      return {
+        'sent': true,
+        'conversationId': target.id,
+        'messageId': message.id,
+        'revision': 0,
+      };
     }
     source = await _messageConversation(id!, senderId, source);
     final rows = await _store.database.query(
@@ -194,6 +210,7 @@ extension InteractiveMessageActions on ChatController {
           'states',
           'interaction',
           'showStatistics',
+          'buttonColumns',
         ].any(
           (key) =>
               jsonEncode(old.toJson()[key]) !=
@@ -214,6 +231,7 @@ extension InteractiveMessageActions on ChatController {
                   ..remove('body')
                   ..remove('buttons')
                   ..remove('showStatistics')
+                  ..remove('buttonColumns')
                   ..remove('callback'))
               : entry.value,
       },
@@ -378,8 +396,9 @@ extension InteractiveMessageActions on ChatController {
     String messageId,
     String buttonId,
     int revision,
-    int participantRevision,
-  ) async {
+    int participantRevision, {
+    Object? value,
+  }) async {
     final conversation = activeConversation;
     await _store.writer.flush();
     try {
@@ -390,6 +409,7 @@ extension InteractiveMessageActions on ChatController {
         revision,
         actor: MessageSender.localUser,
         participantRevision: participantRevision,
+        inputValue: value,
       );
       _replaceInteractiveCard(conversation.id, messageId, result.card);
       if (result.notice != null)

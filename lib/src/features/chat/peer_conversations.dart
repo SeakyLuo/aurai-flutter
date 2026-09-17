@@ -48,10 +48,12 @@ extension PeerConversations on ChatController {
   Future<Map<String, Object?>> _sendPeerMessage(
     String id,
     String senderId,
-    String text,
-  ) async {
+    String text, {
+    List<MessageImage> images = const [],
+    MessageQuote? quote,
+  }) async {
     text = text.trim();
-    if (text.isEmpty || text.length > 20000)
+    if ((text.isEmpty && images.isEmpty) || text.length > 20000)
       throw ArgumentError('消息需为 1–20000 字');
     var pending = _peerSessions.putIfAbsent(id, () => _loadPeerSession(id));
     _PeerSession session;
@@ -76,12 +78,19 @@ extension PeerConversations on ChatController {
         senderId: senderId,
         sender: profile.sender,
         text: text,
+        images: images,
+        quote: quote,
         createdAt: DateTime.now(),
         runId: session.runIds[senderId],
       );
       await _store.writer.mutate(
         () => _store.database.transaction((txn) async {
           await txn.insert('messages', messageRow(id, message));
+          final attachments = txn.batch();
+          for (var i = 0; i < images.length; i++) {
+            attachments.insert('attachments', attachmentRow(id, images[i], i, messageId: message.id));
+          }
+          await attachments.commit(noResult: true);
           await txn.rawUpdate(
             'UPDATE conversations SET message_count = message_count + 1, preview = ?, updated_at = ? WHERE id = ?',
             [text, message.createdAt.microsecondsSinceEpoch, id],

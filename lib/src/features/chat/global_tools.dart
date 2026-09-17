@@ -16,17 +16,61 @@ extension GlobalTools on ChatController {
   }) {
     final conversationId = conversation.id;
     return <AgentTool>[
-      ExecutionLogTool(),
+      QuickReplyTool((id, key) => _sendAiQuickReply(conversation, senderId, id, key)),
+      for (final name in HtmlAppDataTool.names)
+        HtmlAppDataTool(name, (operation, args) async {
+          final apps = HtmlAppStore(_store.database);
+          if (operation == 'listHtmlApps') {
+            return {'apps': await apps.list(senderId, args['query'] as String)};
+          }
+          final appId = args['appId'] as String;
+          final result = await apps.data(appId, args['name'] as String,
+            actor: senderId,
+            write: operation == 'writeHtmlAppData',
+            expectedRevision: args['expectedRevision'] as int?, value: args['value']);
+          if (operation == 'writeHtmlAppData') HtmlGameSignals.appChanges.add(appId);
+          return result;
+        }),
+      ExecutionLogTool(senderId: senderId, inGroup: conversation.kind == ConversationKind.group),
       for (final name in HtmlMessageUpdateTool.names)
         HtmlMessageUpdateTool(name, (operation, args) async {
+          await _store.writer.flush();
+          final target = await _messageConversation(
+            args['messageId'] as String, senderId, conversation,
+          );
           final result = await htmlGames.updateMessage(
             operation,
-            conversation.id,
+            target.id,
             senderId,
             args,
           );
-          if (result['updated'] == true)
-            HtmlGameSignals.changes.add(args['messageId'] as String);
+          if (result['callbackCompleted'] == true) {
+            HtmlGameSignals.callbackChanges.add(args['messageId'] as String);
+          }
+          if (result['updated'] == true) {
+            final id = args['messageId'] as String;
+            final saved = (await _store.reader.messages(
+              target.id, throughMessageId: id, includeMessageId: id, limit: 1,
+            )).single;
+            final peer = _peerSessions[target.id];
+            final dispatchers = [
+              if (_executionStates[target.id]?.groupDispatcher case final dispatcher?) dispatcher,
+              if (peer != null) (await peer).dispatcher,
+            ];
+            for (final dispatcher in dispatchers) {
+              final index = dispatcher.history.indexWhere((m) => m.id == id);
+              if (index >= 0) dispatcher.history[index] = saved;
+            }
+            for (final value in _interactiveConversations(target.id, target)) {
+              for (final history in [value.messages, if (value.searchMessages != null) value.searchMessages!]) {
+                final index = history.indexWhere((m) => m.id == id);
+                if (index >= 0) history[index] = saved;
+              }
+            }
+            _store.writer.remember([saved]);
+            _conversationChanged();
+            HtmlGameSignals.appChanges.add(result['appId'] as String);
+          }
           return result;
         }),
       for (final name in FriendTool.names)
@@ -38,6 +82,17 @@ extension GlobalTools on ChatController {
         ),
       HtmlMessageTool((args) async {
         await _store.writer.flush();
+        final targetId = args['conversationId'] as String? ?? conversation.id;
+        final access = await _store.database.query(
+          'conversation_members',
+          columns: ['sender_id'],
+          where: 'conversation_id = ? AND sender_id = ? AND left_at IS NULL',
+          whereArgs: [targetId, senderId],
+          limit: 1,
+        );
+        if (access.isEmpty) throw StateError('会话不存在或你无权访问该会话');
+        final target = targetId == conversation.id
+            ? conversation : await _forwardTarget(targetId);
         if (conversation.kind == ConversationKind.group) {
           _checkGroupStopped(conversation);
           if (_removedGroupMembers.contains(senderId))
@@ -45,13 +100,13 @@ extension GlobalTools on ChatController {
         }
         final profile = await groupStore.loadAi(senderId);
         final message = await htmlGames.create(
-          conversationId: conversation.id,
+          conversationId: target.id,
           creator: profile.sender,
-          runId: conversation.kind == ConversationKind.group
+          runId: target.id != conversation.id || target.kind == ConversationKind.group
               ? null
               : conversation.activeRunId,
           standalone: true,
-          groupMessage: conversation.kind == ConversationKind.group,
+          groupMessage: target.kind == ConversationKind.group,
           args: {
             ...args,
             'state': <String, Object?>{},
@@ -60,12 +115,15 @@ extension GlobalTools on ChatController {
           },
         );
         _publishInteractiveChange(
-          conversation.id,
+          target.id,
           message,
-          source: conversation,
+          source: target,
         );
         HtmlGameSignals.changes.add(message.id);
-        return {'sent': true, 'messageId': message.id};
+        final app = await htmlGames.load(target.id, message.id);
+        final ref = await HtmlAppStore.load(_store.database, app.appId);
+        return {'sent': true, 'messageId': message.id, 'conversationId': target.id,
+          ...await HtmlAppStore.reference(ref)};
       }),
       if (HtmlGameFeature.enabled &&
           conversation.kind == ConversationKind.group)
@@ -119,6 +177,7 @@ extension GlobalTools on ChatController {
           renameConversation,
           updateGroupMembers,
           _conversationChanged,
+          senderId: senderId,
         ),
       for (final operation in AiContactTool.operations)
         AiContactTool(
@@ -142,7 +201,13 @@ extension GlobalTools on ChatController {
           },
           ownerId: senderId,
         ),
-      AttachmentTool(history.expand((message) => message.files)),
+      AttachmentTool((call) async {
+        await _store.writer.flush();
+        return HistoryMessageTool(
+          _store.database, _store.reader.imageDirectory,
+          senderId: senderId, name: 'readAttachment', inGroup: groupId != null,
+        ).execute(call);
+      }),
       for (final operation in SkillTool.operations)
         SkillTool(skills, operation),
       RunSkillTool(skills, _platform, conversationId),

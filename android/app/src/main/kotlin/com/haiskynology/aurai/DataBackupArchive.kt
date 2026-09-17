@@ -37,15 +37,24 @@ class DataBackupArchive(private val context: Context) {
             } }
         }
     }
-    fun export(output: OutputStream, modelConfig: String?): Map<String, Any> {
+    fun export(output: OutputStream, legacyModelConfig: String?, decryptModel: (String) -> String): Map<String, Any> {
+        var modelConfig = legacyModelConfig
         val snapshot = File(context.cacheDir, "backup-snapshot.sqlite")
         snapshot.delete()
         try {
             SQLiteDatabase.openDatabase(context.getDatabasePath("aurai.sqlite").path, null, SQLiteDatabase.OPEN_READWRITE).use {
                 it.execSQL("VACUUM INTO ?", arrayOf(snapshot.path))
             }
+            // Device-bound ciphertext must not travel to another Android Keystore.
+            SQLiteDatabase.openDatabase(snapshot.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+                db.query("app_state", arrayOf("value"), "key = ?", arrayOf(ModelConfigPersistence.KEY), null, null, null).use {
+                    if (it.moveToFirst()) modelConfig = decryptModel(it.getString(0))
+                }
+                db.delete("app_state", "key = ?", arrayOf(ModelConfigPersistence.KEY))
+            }
+            val snapshotModelConfig = modelConfig
             val manifest = summary(snapshot).put("format", 1).put("createdAt", System.currentTimeMillis())
-                .put("hasModelKeys", containsKeys(modelConfig)).put("hasModelConfig", modelConfig != null)
+                .put("hasModelKeys", containsKeys(snapshotModelConfig)).put("hasModelConfig", snapshotModelConfig != null)
                 .put("missingAttachments", JSONArray(missingAttachments(snapshot, root)))
             val sources = mutableListOf("databases/aurai.sqlite" to snapshot)
             for (directory in listOf("files", "shared_prefs", "app_flutter")) {
@@ -60,7 +69,7 @@ class DataBackupArchive(private val context: Context) {
             ZipOutputStream(output).use { zip ->
                 fun entry(name: String, bytes: ByteArray) { zip.putNextEntry(ZipEntry(name)); zip.write(bytes); zip.closeEntry() }
                 entry("manifest.json", manifest.toString().toByteArray())
-                if (modelConfig != null) entry("model-config.json", modelConfig.toByteArray())
+                if (snapshotModelConfig != null) entry("model-config.json", snapshotModelConfig.toByteArray())
                 for ((name, file) in sources) {
                     zip.putNextEntry(ZipEntry(name)); file.inputStream().use { it.copyTo(zip) }; zip.closeEntry()
                 }
@@ -146,6 +155,9 @@ class DataBackupArchive(private val context: Context) {
         }
         if (!ready.exists()) { stage.deleteRecursively(); return }
         try {
+            SQLiteDatabase.openDatabase(File(stage, "databases/aurai.sqlite").path, null, SQLiteDatabase.OPEN_READWRITE).use {
+                it.delete("app_state", "key = ?", arrayOf(ModelConfigPersistence.KEY))
+            }
             val model = File(stage, "model-config.json")
             if (model.exists()) {
                 val prefs = File(stage, "shared_prefs/aurai.xml")

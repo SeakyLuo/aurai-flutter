@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'contact_relationships.dart';
 import '../domain/agent_models.dart';
 import 'group_system_notice.dart';
@@ -15,7 +16,18 @@ class GroupChatStore {
   Future<void> Function(String groupId, AgentMessage notice)? onSystemNotice;
 
   Future<void> _notifySystem(String id, AgentMessage? notice) async {
-    if (notice != null) await onSystemNotice?.call(id, notice);
+    if (notice == null) return;
+    // Membership and its notice have committed; delivery failure cannot undo them.
+    try {
+      await onSystemNotice?.call(id, notice);
+    } on Object catch (error, stack) {
+      developer.log(
+        'Committed group notice delivery failed',
+        name: 'aurai.group',
+        error: error,
+        stackTrace: stack,
+      );
+    }
   }
 
   late AiModelSelection defaultSelection;
@@ -355,7 +367,10 @@ class GroupChatStore {
           await ContactRelationships.befriend(txn, ownerId, profile.sender.id);
       });
 
-  Future<void> updateAi(AiProfile profile) => database.transaction((txn) async {
+  Future<void> updateAi(
+    AiProfile profile, {
+    bool addToMyContacts = false,
+  }) => database.transaction((txn) async {
     if (profile.sender.id == MessageSender.aurai.id &&
         profile.sender.archived) {
       throw StateError('内置 Aurai 不能归档');
@@ -365,16 +380,26 @@ class GroupChatStore {
     final count = await txn.update(
       'ai_profiles',
       {..._profileRow(profile)..remove('created_at')},
-      where: 'sender_id = ?',
-      whereArgs: [profile.sender.id],
+      where: 'sender_id = ? AND updated_at = ?',
+      whereArgs: [
+        profile.sender.id,
+        (profile.previousUpdatedAt ?? profile.updatedAt).microsecondsSinceEpoch,
+      ],
     );
-    if (count != 1) throw StateError('AI 已不存在');
+    if (count != 1) throw StateError('AI 资料已变化，请重新打开后修改');
     await txn.update(
       'message_senders',
       _senderRow(profile.sender),
       where: 'id = ? AND kind = ?',
       whereArgs: [profile.sender.id, 'agent'],
     );
+    if (addToMyContacts && !profile.isTemporary && !profile.sender.archived) {
+      await ContactRelationships.befriend(
+        txn,
+        MessageSender.localUser.id,
+        profile.sender.id,
+      );
+    }
   });
 
   // Archive an identity rather than deleting the author of historical messages.
@@ -388,16 +413,28 @@ class GroupChatStore {
       where: "id = ? AND kind = 'agent'",
       whereArgs: [senderId],
     );
+    await txn.update(
+      'ai_profiles',
+      {'updated_at': DateTime.now().microsecondsSinceEpoch},
+      where: 'sender_id = ?',
+      whereArgs: [senderId],
+    );
   });
 
-  Future<void> restoreAi(String senderId) async {
-    await database.update(
+  Future<void> restoreAi(String senderId) => database.transaction((txn) async {
+    await txn.update(
       'message_senders',
       {'archived': 0},
       where: "id = ? AND kind = 'agent'",
       whereArgs: [senderId],
     );
-  }
+    await txn.update(
+      'ai_profiles',
+      {'updated_at': DateTime.now().microsecondsSinceEpoch},
+      where: 'sender_id = ?',
+      whereArgs: [senderId],
+    );
+  });
 
   Future<Conversation> createGroup({
     String title = '',
@@ -445,6 +482,7 @@ class GroupChatStore {
             .map((id) => senders[id]!.name)
             .join('、');
       }
+      conversation.creationUserName = senders[MessageSender.localUser.id]!.name;
       conversation.creationMemberIds = allIds;
       conversation.creationMembers = [for (final id in allIds) senders[id]!];
       await txn.insert('conversations', conversationRow(conversation));

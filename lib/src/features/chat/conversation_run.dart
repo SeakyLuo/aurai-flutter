@@ -16,7 +16,7 @@ extension ConversationRun on ChatController {
     final diagnosticCalls = <String, Object?>{};
     final systemPrompt = groupParent == null
         ? reply.systemPrompt
-        : '${reply.systemPrompt}\n当前时间：${DateTime.now().toIso8601String()}。'
+        : '${reply.systemPrompt}\n'
               '${_groupDispatcher!.wokeFromSleep(reply.senderId) ? "这是你自己安排的睡眠到期，重新看看最新群聊；不代表用户发了新指令。" : "这是群消息触发的接话机会。"}';
     final memory = await aiMemory(
       reply.profile,
@@ -47,6 +47,12 @@ extension ConversationRun on ChatController {
     final lastUser = history.lastIndexWhere(
       (message) => message.role == AgentMessageRole.user,
     );
+    if (groupParent == null &&
+        callbackEvents.isEmpty &&
+        lastUser >= 0 &&
+        history[lastUser].id == _execution.queuedUserMessageId) {
+      _execution.queuedUserMessageId = null;
+    }
     final userMessage = callbackEvents.isNotEmpty
         ? _callbackContext(callbackEvents)
         : groupUser ?? history[lastUser];
@@ -236,6 +242,8 @@ extension ConversationRun on ChatController {
       final stepActivityIndices = <int>[];
       String? turnMessageId;
       int? turnActivityIndex;
+      String? reasoningMessageId;
+      int? reasoningActivityIndex;
       int? outputMessageIndex;
       await runtime.run(
         endsRun: groupParent == null
@@ -266,7 +274,7 @@ extension ConversationRun on ChatController {
         onContextSummary: (summary) async {
           final owner = groupParent ?? runConversation;
           owner.contextSummary = summary;
-          await _persistRun(owner);
+          await _store.writer.saveContextSummary(owner.id, summary);
         },
         onCompactionChanged: (active) {
           if (groupParent != null) return;
@@ -281,6 +289,8 @@ extension ConversationRun on ChatController {
           );
           turnMessageId = null;
           turnActivityIndex = null;
+          reasoningMessageId = null;
+          reasoningActivityIndex = null;
           outputMessageIndex = null;
           _setMemberStreaming(reply.senderId, null, groupParent);
           _notifyMember(runConversation, groupParent);
@@ -338,6 +348,58 @@ extension ConversationRun on ChatController {
           if (groupParent != null) return;
           if (runConversation.hasExecutionProcess) return;
           runConversation.hasExecutionProcess = true;
+          _notifyMember(runConversation, groupParent);
+        },
+        onReasoningChanged: (text) {
+          if (groupParent != null || text.trim().isEmpty) return;
+          if (reasoningMessageId == null) {
+            reasoningMessageId = newMessageId();
+            runMessageIds.add(reasoningMessageId!);
+            reasoningActivityIndex = activities.length;
+            activities.add(
+              AgentTaskActivity(
+                text: text,
+                messageId: reasoningMessageId,
+                isReasoning: true,
+              ),
+            );
+            messages.add(
+              AgentMessage(
+                id: reasoningMessageId!,
+                role: AgentMessageRole.assistant,
+                senderId: reply.senderId,
+                sender: reply.sender,
+                runId: runId,
+                modelTurnId: modelTurnId,
+                text: text,
+                createdAt: DateTime.now(),
+                isReasoning: true,
+              ),
+            );
+            runConversation.messageCount++;
+          } else {
+            final index = messages.indexWhere(
+              (message) => message.id == reasoningMessageId,
+            );
+            final previous = messages[index];
+            messages[index] = AgentMessage(
+              id: previous.id,
+              role: previous.role,
+              senderId: previous.senderId,
+              sender: previous.sender,
+              runId: previous.runId,
+              modelTurnId: previous.modelTurnId,
+              text: text,
+              createdAt: previous.createdAt,
+              isReasoning: true,
+            );
+          }
+          activities[reasoningActivityIndex!] = AgentTaskActivity(
+            text: text,
+            messageId: reasoningMessageId,
+            isReasoning: true,
+          );
+          _setMemberStreaming(reply.senderId, reasoningMessageId, groupParent);
           _notifyMember(runConversation, groupParent);
         },
         onTextChanged: (text) {
@@ -443,7 +505,9 @@ extension ConversationRun on ChatController {
         if (!runMessageIds.contains(message.id)) runMessageIds.add(message.id);
       }
       executionWatch.stop();
-      if (runMessageIds.isNotEmpty && runConversation.hasExecutionProcess) {
+      final hasReasoning = activities.any((activity) => activity.isReasoning);
+      if (runMessageIds.isNotEmpty &&
+          (runConversation.hasExecutionProcess || hasReasoning)) {
         final answerIndex = messages.lastIndexWhere(
           (m) => runMessageIds.contains(m.id),
         );
@@ -452,6 +516,7 @@ extension ConversationRun on ChatController {
           id: answer.id,
           role: answer.role,
           isGroupMessage: answer.isGroupMessage,
+          isReasoning: answer.isReasoning,
           senderId: answer.senderId,
           sender: answer.sender,
           runId: answer.runId,
@@ -464,6 +529,7 @@ extension ConversationRun on ChatController {
           quote: answer.quote,
           taskSummary: AgentTaskSummary(
             elapsedMilliseconds: executionWatch.elapsedMilliseconds,
+            isTask: runConversation.hasExecutionProcess,
             intermediateMessageIds: List.unmodifiable(
               groupParent == null
                   ? runMessageIds.where(
@@ -494,13 +560,15 @@ extension ConversationRun on ChatController {
         runId,
         'completed',
         executionWatch.elapsedMilliseconds,
+        keepPendingGoal: _execution.queuedUserMessageId != null,
         finalMessageId: runMessageIds.isEmpty
             ? null
             : messages.lastWhere((m) => runMessageIds.contains(m.id)).id,
         isTask: runConversation.hasExecutionProcess,
       );
       runConversation.liveToolSteps.clear();
-      if (groupHistory == null) runConversation.pendingGoal = null;
+      if (groupHistory == null && _execution.queuedUserMessageId == null)
+        runConversation.pendingGoal = null;
       if (runConversation.runState != ChatRunState.stopping) {
         runConversation.runState = ChatRunState.idle;
       }
@@ -536,7 +604,9 @@ extension ConversationRun on ChatController {
         final keepActivity =
             (groupParent == null && runConversation.hasExecutionProcess) ||
             messages.last.runId == runId ||
-            activities.any((activity) => activity.toolName != null);
+            activities.any(
+              (activity) => activity.toolName != null || activity.isReasoning,
+            );
         if (keepActivity) {
           if (messages.last.runId != runId) {
             messages.add(
@@ -557,6 +627,7 @@ extension ConversationRun on ChatController {
             id: last.id,
             role: last.role,
             isGroupMessage: last.isGroupMessage,
+            isReasoning: last.isReasoning,
             quote: last.quote,
             senderId: last.senderId,
             sender: last.sender,
@@ -568,10 +639,13 @@ extension ConversationRun on ChatController {
             runId: last.runId,
             modelTurnId: last.modelTurnId,
             createdAt: last.createdAt,
-            taskSummary: !runConversation.hasExecutionProcess
+            taskSummary:
+                !runConversation.hasExecutionProcess &&
+                    !activities.any((activity) => activity.isReasoning)
                 ? null
                 : AgentTaskSummary(
                     elapsedMilliseconds: executionWatch.elapsedMilliseconds,
+                    isTask: runConversation.hasExecutionProcess,
                     stopped: true,
                     intermediateMessageIds: [
                       for (final message in messages)
@@ -582,6 +656,7 @@ extension ConversationRun on ChatController {
                       for (final activity in activities)
                         AgentTaskActivity(
                           text: activity.text,
+                          isReasoning: activity.isReasoning,
                           messageId: activity.messageId,
                           toolName: activity.toolName,
                           requestJson: activity.requestJson,
@@ -624,7 +699,9 @@ extension ConversationRun on ChatController {
             outcome,
             conversationId: runConversation.id,
             title: runConversation.title,
-            reply: outcome == 'completed' ? messages.last.text : '',
+            reply: outcome == 'completed' && runMessageIds.isNotEmpty
+                ? messages.lastWhere((m) => runMessageIds.contains(m.id)).text
+                : '',
           );
         }
       } finally {
@@ -667,7 +744,11 @@ extension ConversationRun on ChatController {
               conversationId: runConversation.id,
               title: runConversation.title,
               runId: runId,
-              reply: messages.last.text,
+              reply: runMessageIds.isEmpty
+                  ? ''
+                  : messages
+                        .lastWhere((m) => runMessageIds.contains(m.id))
+                        .text,
             );
         }
       }
@@ -675,9 +756,25 @@ extension ConversationRun on ChatController {
   }
 
   Future<void> _persistRun(Conversation conversation) =>
-      _store.writer.save(conversation, makeActive: false);
+      _store.writer.save(conversation, makeActive: false, saveRuntime: true);
 
   void _notifyRun(Conversation conversation) {
+    if (conversation.kind == ConversationKind.group &&
+        _viewConversation.id == conversation.id &&
+        !identical(_viewConversation, conversation)) {
+      final messages =
+          {
+            for (final message in _viewConversation.messages)
+              message.id: message,
+            for (final message in conversation.messages) message.id: message,
+          }.values.toList()..sort((a, b) {
+            final order = a.createdAt.compareTo(b.createdAt);
+            return order == 0 ? a.id.compareTo(b.id) : order;
+          });
+      _viewConversation.messages
+        ..clear()
+        ..addAll(messages);
+    }
     _updateConversationList(conversation);
     _conversationChanged();
   }

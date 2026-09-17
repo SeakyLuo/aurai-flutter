@@ -1,202 +1,236 @@
+import '../../storage/quick_reply_recents.dart';
+import 'message_action.dart';
+export 'message_action.dart';
+import 'quick_reply_picker.dart';
+import 'sidebar_action_icon.dart';
 import '../../html_games/html_game_icon.dart';
 import 'attachment_action_icon.dart';
 import 'message_quote_view.dart';
 import 'settings_icon.dart';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../../domain/agent_models.dart';
-import 'glass_surface.dart';
 import 'message_time.dart';
 import 'copy_icon.dart';
 import 'conversation_menu_icon.dart';
 import 'text_selection_icon.dart';
 import 'settings_appearance.dart';
 
-enum MessageAction {
-  copy,
-  select,
-  edit,
-  quote,
-  recall,
-  forward,
-  fullscreen,
-  statistics,
-  history,
-}
-
 Future<MessageAction?> showMessageActionsMenu(
   BuildContext context, {
   required AgentMessage message,
-  required Offset position,
   bool allowEditing = true,
   bool allowStatistics = false,
   bool allowHistory = false,
   bool allowQuote = false,
   bool allowRecall = false,
   bool allowForward = false,
-}) => showGeneralDialog<MessageAction>(
-  context: context,
-  requestFocus: false,
-  barrierDismissible: true,
-  barrierLabel: '关闭消息菜单',
-  barrierColor: Colors.transparent,
-  transitionDuration: const Duration(milliseconds: 160),
-  pageBuilder: (context, animation, secondaryAnimation) {
-    final media = MediaQuery.of(context);
-    final width = math.min(
-      232.0,
-      media.size.width - media.padding.horizontal - 16,
-    );
-    final availableHeight =
-        media.size.height -
-        media.padding.top -
-        math.max(media.padding.bottom, media.viewInsets.bottom) -
-        16;
-    final actions = [
-      if (allowHistory)
-        (
-          MessageAction.history,
-          SettingsIcon(
-            type: SettingsIconType.tasks,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+  bool allowQuickReply = false,
+  String? sentQuickReplyKey,
+}) async {
+  final recent = allowQuickReply
+      ? await QuickReplyRecents.load()
+      : const <String>[];
+  if (!context.mounted) return null;
+  final options = {for (final option in quickReplyOptions) option.$4: option};
+  final visibleKeys = {
+    ...recent.where(options.containsKey),
+    ...quickReplyOptions.take(5).map((option) => option.$4),
+  }.take(5);
+  return showModalBottomSheet<MessageAction>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    barrierColor: Colors.black.withValues(alpha: .24),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    ),
+    builder: (context) {
+      final media = MediaQuery.of(context);
+      final actions = [
+        if (allowHistory)
+          (
+            MessageAction.history,
+            SettingsIcon(
+              type: SettingsIconType.tasks,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            '查看历史',
           ),
-          '查看历史',
-        ),
-      if (allowStatistics)
-        (
-          MessageAction.statistics,
-          SettingsIcon(
-            type: SettingsIconType.data,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        if (allowStatistics)
+          (
+            MessageAction.statistics,
+            SettingsIcon(
+              type: SettingsIconType.data,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            '查看统计',
           ),
-          '查看统计',
-        ),
-      if (message.htmlGame != null && message.htmlGame!.displayMode != 'inline')
-        (
-          MessageAction.fullscreen,
-          const HtmlGameIcon(HtmlGameIconType.expand),
-          '全屏运行',
-        ),
-      if (allowRecall)
-        (
-          MessageAction.recall,
-          SettingsIcon(
-            type: SettingsIconType.back,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        if (message.htmlGame != null &&
+            message.htmlGame!.displayMode != 'inline')
+          (
+            MessageAction.fullscreen,
+            const HtmlGameIcon(HtmlGameIconType.expand),
+            '全屏运行',
           ),
-          '撤回',
-        ),
-      if (allowQuote) (MessageAction.quote, const QuoteIcon(), '引用'),
-      if (allowForward)
-        (
-          MessageAction.forward,
-          AttachmentActionIcon(
-            type: AttachmentActionIconType.forward,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        if (allowQuote) (MessageAction.quote, const QuoteIcon(), '引用'),
+        if (allowForward)
+          (
+            MessageAction.forward,
+            AttachmentActionIcon(
+              type: AttachmentActionIconType.forward,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            '转发',
           ),
-          '转发',
-        ),
-      if (message.text.isNotEmpty) ...[
-        (
-          MessageAction.copy,
-          const CopyIcon(),
-          message.htmlGame != null ? '复制标题' : '复制',
-        ),
-        (MessageAction.select, const TextSelectionIcon(), '选择文本'),
-      ],
-      if (allowEditing && message.role == AgentMessageRole.user)
-        (
-          MessageAction.edit,
-          ConversationMenuIcon(
-            type: ConversationMenuIconType.rename,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        if (message.text.isNotEmpty) ...[
+          (
+            MessageAction.copy,
+            const CopyIcon(),
+            message.htmlGame != null ? '复制标题' : '复制',
           ),
-          '编辑消息',
-        ),
-    ];
-    final height = math.min(
-      availableHeight,
-      64 + actions.length * 46 * math.max(1, media.textScaler.scale(14) / 14),
-    );
-    final left = (position.dx - width / 2).clamp(
-      media.padding.left + 8,
-      media.size.width - media.padding.right - width - 8,
-    );
-    final top = (position.dy + 12).clamp(
-      media.padding.top + 8,
-      media.padding.top + 8 + availableHeight - height,
-    );
-    return Stack(
-      children: [
-        Positioned(
-          left: left,
-          top: top,
-          width: width,
-          child: FadeTransition(
-            opacity: animation,
-            child: GlassSurface(
-              radius: 24,
-              child: Material(
-                type: MaterialType.transparency,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: media.padding.top + 8 + availableHeight - top,
-                  ),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-                          child: Text(
-                            messageTime(message.createdAt),
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+          (MessageAction.select, const TextSelectionIcon(), '选择文本'),
+        ],
+        if (allowEditing && message.role == AgentMessageRole.user)
+          (
+            MessageAction.edit,
+            ConversationMenuIcon(
+              type: ConversationMenuIconType.rename,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            '编辑消息',
+          ),
+        if (allowRecall)
+          (
+            MessageAction.recall,
+            SettingsIcon(
+              type: SettingsIconType.back,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            '撤回',
+          ),
+      ];
+      return ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: media.size.height * .78),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (allowQuickReply) ...[
+                Row(
+                  children: [
+                    for (final (action, icon, label, key) in visibleKeys.map(
+                      (key) => options[key]!,
+                    ))
+                      Expanded(
+                        child: Tooltip(
+                          message: label,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(24),
+                            onTap: () => Navigator.pop(context, action),
+                            child: Container(
+                              height: 52,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: sentQuickReplyKey == key
+                                    ? Theme.of(
+                                        context,
+                                      ).colorScheme.primaryContainer
+                                    : null,
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              child: Text(
+                                icon,
+                                style: TextStyle(
+                                  fontSize: 30,
+                                  fontWeight: key == 'plus_one'
+                                      ? FontWeight.w600
+                                      : null,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                        for (final (action, icon, label) in actions)
-                          InkWell(
-                            borderRadius: BorderRadius.circular(18),
-                            onTap: () => Navigator.pop(context, action),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 11,
-                              ),
-                              child: Row(
-                                children: [
-                                  icon,
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Text(
-                                      label,
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                      ),
+                    Expanded(
+                      child: Tooltip(
+                        message: '更多表情',
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(24),
+                          onTap: () async {
+                            final action = await showQuickReplyPicker(
+                              context,
+                              selectedKey: sentQuickReplyKey,
+                            );
+                            if (context.mounted && action != null)
+                              Navigator.pop(context, action);
+                          },
+                          child: Container(
+                            height: 44,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const SidebarActionIcon(
+                              type: SidebarActionIconType.add,
                             ),
                           ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+              ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+                child: Text(
+                  messageTime(message.createdAt),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              for (final (action, icon, label) in actions)
+                InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => Navigator.pop(context, action),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        icon,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
-              ),
-            ),
+            ],
           ),
         ),
-      ],
-    );
-  },
-);
+      );
+    },
+  );
+}
 
 class MessageTextSelectionPage extends StatefulWidget {
   const MessageTextSelectionPage({super.key, required this.text});

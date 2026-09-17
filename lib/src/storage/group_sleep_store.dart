@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:sqflite/sqflite.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class GroupSleepStore {
   final _preferences = SharedPreferencesAsync();
+  late Database _database;
   static const _key = 'group_member_sleeps';
   final _groups = <String, Map<String, int>>{};
   Future<void> _writes = Future.value();
@@ -12,17 +14,61 @@ class GroupSleepStore {
   late Future<void> Function(String groupId, Set<String> members) _wake;
 
   Future<void> initialize(
+    Database database,
     Future<void> Function(String groupId, Set<String> members) wake,
   ) async {
+    _database = database;
     _wake = wake;
-    final saved = await _preferences.getString(_key);
-    if (saved != null) {
-      final data = jsonDecode(saved) as Map<String, dynamic>;
-      for (final entry in data.entries) {
-        _groups[entry.key] = (entry.value as Map).cast<String, int>();
-      }
+    final legacy = await _preferences.getString(_key);
+    if (legacy != null) {
+      await database.insert('app_state', {
+        'key': _key,
+        'value': legacy,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      await _preferences.remove(_key);
     }
+    await reload();
+  }
+
+  Future<void> reload() => _enqueue(() async {
+    final rows = await _database.query(
+      'app_state',
+      where: 'key = ?',
+      whereArgs: [_key],
+    );
+    _groups
+      ..clear()
+      ..addAll(_decode(rows.isEmpty ? '{}' : rows.single['value'] as String));
     _arm();
+  });
+
+  Map<String, Map<String, int>> _decode(String encoded) => {
+    for (final entry in (jsonDecode(encoded) as Map).entries)
+      entry.key as String: (entry.value as Map).cast<String, int>(),
+  };
+
+  static Future<void> removeIn(
+    DatabaseExecutor txn,
+    String group,
+    String member,
+  ) async {
+    final rows = await txn.query(
+      'app_state',
+      where: 'key = ?',
+      whereArgs: [_key],
+    );
+    if (rows.isEmpty) return;
+    final groups = jsonDecode(rows.single['value'] as String) as Map;
+    final members = groups[group] as Map?;
+    if (members == null) return;
+    members.remove(member);
+    if (members.isEmpty) groups.remove(group);
+    await txn.update(
+      'app_state',
+      {'value': jsonEncode(groups)},
+      where: 'key = ?',
+      whereArgs: [_key],
+    );
   }
 
   Map<String, DateTime> forGroup(String id) => {
@@ -30,41 +76,52 @@ class GroupSleepStore {
       entry.key: DateTime.fromMillisecondsSinceEpoch(entry.value),
   };
 
-  Future<void> save(String group, String member, DateTime until) => _edit(() {
-    _groups.putIfAbsent(group, () => {})[member] = until.millisecondsSinceEpoch;
+  Future<void> save(String group, String member, DateTime until) => _edit((
+    groups,
+  ) {
+    groups.putIfAbsent(group, () => {})[member] = until.millisecondsSinceEpoch;
   });
 
-  Future<void> remove(String group, [String? member]) => _edit(() {
+  Future<void> remove(String group, [String? member]) => _edit((groups) {
     if (member == null) {
-      _groups.remove(group);
+      groups.remove(group);
     } else {
-      _groups[group]?.remove(member);
-      if (_groups[group]?.isEmpty == true) _groups.remove(group);
+      groups[group]?.remove(member);
+      if (groups[group]?.isEmpty == true) groups.remove(group);
     }
   });
 
-  Future<void> retain(String group, Set<String> members) => _edit(() {
-    _groups[group]?.removeWhere((id, _) => !members.contains(id));
-    if (_groups[group]?.isEmpty == true) _groups.remove(group);
+  Future<void> retain(String group, Set<String> members) => _edit((groups) {
+    groups[group]?.removeWhere((id, _) => !members.contains(id));
+    if (groups[group]?.isEmpty == true) groups.remove(group);
   });
 
-  Future<void> _edit(void Function() edit) {
-    final next = _writes.then((_) async {
-      final before = jsonEncode(_groups);
-      edit();
-      try {
-        await _preferences.setString(_key, jsonEncode(_groups));
-      } on Object {
-        _groups.clear();
-        for (final entry in (jsonDecode(before) as Map).entries) {
-          _groups[entry.key as String] = (entry.value as Map)
-              .cast<String, int>();
-        }
-        rethrow;
-      } finally {
+  Future<void> _edit(void Function(Map<String, Map<String, int>>) edit) =>
+      _enqueue(() async {
+        final next = await _database.transaction((txn) async {
+          final rows = await txn.query(
+            'app_state',
+            where: 'key = ?',
+            whereArgs: [_key],
+          );
+          final groups = _decode(
+            rows.isEmpty ? '{}' : rows.single['value'] as String,
+          );
+          edit(groups);
+          await txn.insert('app_state', {
+            'key': _key,
+            'value': jsonEncode(groups),
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+          return groups;
+        });
+        _groups
+          ..clear()
+          ..addAll(next);
         _arm();
-      }
-    });
+      });
+
+  Future<void> _enqueue(Future<void> Function() action) {
+    final next = _writes.then((_) => action());
     _writes = next.then<void>((_) {}, onError: (Object _, StackTrace __) {});
     return next;
   }

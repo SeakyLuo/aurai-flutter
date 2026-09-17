@@ -1,3 +1,4 @@
+import '../domain/local_time.dart';
 import '../domain/tool_models.dart';
 
 class GroupSleepTool implements AgentTool, RuntimeCapabilityAgentTool {
@@ -52,7 +53,7 @@ class GroupSleepTool implements AgentTool, RuntimeCapabilityAgentTool {
         output: {
           'sleeping': until != null,
           'waitingForNewMessage': seconds == -1,
-          'wakeAt': until?.toIso8601String(),
+          'wakeAt': until == null ? null : localIsoTime(until),
         },
       );
     } on Object catch (error) {

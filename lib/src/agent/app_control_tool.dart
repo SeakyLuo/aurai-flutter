@@ -1,4 +1,5 @@
 import '../domain/tool_models.dart';
+import 'group_message_tool.dart';
 
 class AppControlTool implements AgentTool, RuntimeCapabilityAgentTool {
   AppControlTool(this.name, this.run);
@@ -16,7 +17,7 @@ class AppControlTool implements AgentTool, RuntimeCapabilityAgentTool {
     'deleteConversation':
         'Permanently delete an accessible conversation and its attachments only on explicit user request. Running conversations cannot be deleted.',
     'sendConversationMessage':
-        'Send text as yourself only to a private conversation you participate in. Group targets are rejected; use sendGroupMessage for every group message, including when sending from private chat. Never impersonate the user. Does not navigate. text is required; supports Markdown reference images. AI recipients in private conversations may respond naturally; human recipients are not automatically answered on their behalf. Do not repeat successfully sent text in your ordinary reply.',
+        'Send a message as yourself to any private or group conversation you participate in, without navigation. Supports text, imagePaths and quoteMessageId; mentionIds is for groups. text may be empty when sending images. Use sendGroupMessage when changing group participation. Never impersonate the user. AI recipients may respond naturally. Do not repeat successfully sent text in your ordinary reply.',
     'openAppPage':
         'Open an Aurai page only when the user asks. page is conversation, contact, skills, tasks or settings. conversationId is required for conversation, contactId for contact. App must be in foreground; opening does not modify data or send a message.',
   };
@@ -39,8 +40,12 @@ class AppControlTool implements AgentTool, RuntimeCapabilityAgentTool {
         if (name == 'createConversation') 'contactId': {'type': 'string'},
         if (name == 'setConversationPinned') 'pinned': {'type': 'boolean'},
         if (name == 'setConversationArchived') 'archived': {'type': 'boolean'},
-        if (name == 'sendConversationMessage')
-          'text': {'type': 'string', 'minLength': 1, 'maxLength': 20000},
+        if (name == 'sendConversationMessage') ...{
+          'text': {'type': 'string', 'maxLength': 20000},
+          'imagePaths': {'type': 'array', 'maxItems': 4, 'items': {'type': 'string'}},
+          'quoteMessageId': {'type': 'string'},
+          'mentionIds': {'type': 'array', 'items': {'type': 'string'}, 'uniqueItems': true},
+        },
         if (name == 'openAppPage') ...{
           'page': {
             'type': 'string',
@@ -65,6 +70,21 @@ class AppControlTool implements AgentTool, RuntimeCapabilityAgentTool {
   );
   @override
   Future<ToolResult> execute(ToolCall call) async {
+    if (name == 'sendConversationMessage') {
+      return GroupMessageTool((prepared) => run(name, {
+        'conversationId': call.arguments['conversationId'],
+        'message': prepared['message'],
+      })).execute(ToolCall(id: call.id, name: call.name, arguments: {
+        'groupId': call.arguments['conversationId'],
+        'message': {
+          'text': call.arguments['text'],
+          if (call.arguments.containsKey('imagePaths')) 'imagePaths': call.arguments['imagePaths'],
+          if (call.arguments.containsKey('quoteMessageId')) 'quoteMessageId': call.arguments['quoteMessageId'],
+          if (call.arguments.containsKey('mentionIds')) 'mentionIds': call.arguments['mentionIds'],
+        },
+        'participation': 'unchanged',
+      }));
+    }
     try {
       return ToolResult(
         callId: call.id,

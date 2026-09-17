@@ -21,7 +21,7 @@ class ForwardedInteractiveMessage extends StatelessWidget {
         child: InteractiveMessageView(
           card: card,
           readOnly: true,
-          onClick: (_, _, _) async => null,
+          onClick: (_, _, _, {value}) async => null,
           onOpenLink: (_) async {},
         ),
       ),

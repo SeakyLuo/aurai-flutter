@@ -45,7 +45,7 @@ class GroupSearchMessageTile extends StatelessWidget {
       readOnly: result.html == null,
       onLocate: onLocate,
       groupBubble: true,
-      onInteractiveClick: (_, _, _) async {
+      onInteractiveClick: (_, _, _, {value}) async {
         onLocate();
         return null;
       },

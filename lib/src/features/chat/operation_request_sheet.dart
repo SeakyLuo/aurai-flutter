@@ -177,18 +177,20 @@ class _OperationRequestSheetState extends State<_OperationRequestSheet> {
                   text: '允许一次',
                   onPressed: () => _answer(true),
                 ),
-                const SizedBox(height: 8),
-                DialogActionButton(
-                  text: '当前会话允许',
-                  role: DialogActionRole.secondary,
-                  onPressed: () => _answer(true, 'session'),
-                ),
-                const SizedBox(height: 8),
-                DialogActionButton(
-                  text: '始终允许',
-                  role: DialogActionRole.secondary,
-                  onPressed: () => _answer(true, 'always'),
-                ),
+                if (!widget.request.definition.singleUseConfirmation) ...[
+                  const SizedBox(height: 8),
+                  DialogActionButton(
+                    text: '当前会话允许',
+                    role: DialogActionRole.secondary,
+                    onPressed: () => _answer(true, 'session'),
+                  ),
+                  const SizedBox(height: 8),
+                  DialogActionButton(
+                    text: '始终允许',
+                    role: DialogActionRole.secondary,
+                    onPressed: () => _answer(true, 'always'),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 DialogActionButton(
                   text: '拒绝',

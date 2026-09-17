@@ -43,7 +43,12 @@ class _ChangeCard extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final deleting = change.ids.isNotEmpty && change.text.isEmpty;
     final adding = change.ids.isEmpty;
-    final accent = deleting ? colors.error : colors.primary;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final accent = deleting
+        ? colors.error
+        : adding
+        ? (dark ? const Color(0xff82d9bb) : const Color(0xff168365))
+        : colors.primary;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

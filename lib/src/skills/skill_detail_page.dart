@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../features/chat/chat_controller.dart';
 import '../features/chat/ai_contact_page.dart';
 import '../domain/message_sender.dart';
@@ -34,6 +35,11 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
   bool _busy = false;
   void _notice(String text) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  Future<void> _copyName(String name) async {
+    await Clipboard.setData(ClipboardData(text: name));
+    if (mounted) _notice('技能名称已复制');
+  }
+
   Future<void> _act(Future<void> Function() action, String success) async {
     setState(() => _busy = true);
     try {
@@ -162,9 +168,13 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
                       SkillIcon(skill.icon),
                       const SizedBox(width: 14),
                       Expanded(
-                        child: Text(
-                          skill.name,
-                          style: Theme.of(context).textTheme.titleLarge,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onLongPress: () => _copyName(skill.name),
+                          child: Text(
+                            skill.name,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
                         ),
                       ),
                     ],

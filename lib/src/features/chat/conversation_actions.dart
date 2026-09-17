@@ -7,9 +7,15 @@ extension ConversationActions on ChatController {
   }) => _store.reader.messages(id, before: before, limit: 50);
 
   Future<void> _switchConversation(String? id) async {
-    if (_submitting || addingImages || changingConversation)
+    if (_submitting || changingConversation)
       throw StateError('请等待当前操作完成，再切换会话');
-    if (id == activeConversation.id && !hasSearchWindow) return;
+    if (id == activeConversation.id && !hasSearchWindow) {
+      if (activeConversation.kind == ConversationKind.group) {
+        await _reloadGroupMessages(activeConversation);
+        _conversationChanged();
+      }
+      return;
+    }
     cancelSearchNavigation();
     changingConversation = true;
     _conversationChanged();
@@ -31,12 +37,21 @@ extension ConversationActions on ChatController {
                   ? ConversationReader.messagePageSize
                   : _loadedMessageCounts[id]!,
             );
+      if (conversation.kind == ConversationKind.group) {
+        await _reloadGroupMessages(conversation);
+      }
       if (id == null) {
         await _store.selectNewConversation();
       } else {
         if (conversation.runState == ChatRunState.idle &&
             conversation.pendingGoal == null) {
           conversation.seenRunId = conversation.activeRunId;
+          if (conversation.seenRunId != null) {
+            await _store.writer.markRunRead(
+              conversation.id,
+              conversation.seenRunId!,
+            );
+          }
         }
         if (conversation.kind == ConversationKind.direct &&
             conversation.messageCount == 0 &&
@@ -45,7 +60,7 @@ extension ConversationActions on ChatController {
           await _newDraftStore.save(conversation);
           await _store.selectNewConversation();
         } else {
-          await _store.writer.save(conversation);
+          await _store.writer.save(conversation, saveMessages: false);
         }
       }
       final previousIndex = _conversations.indexWhere(
@@ -81,6 +96,22 @@ extension ConversationActions on ChatController {
     }
   }
 
+  Future<void> _reloadGroupMessages(Conversation conversation) async {
+    await _store.writer.flush();
+    final latest = await _store.reader.messages(conversation.id);
+    final merged =
+        {
+          for (final message in conversation.messages) message.id: message,
+          for (final message in latest) message.id: message,
+        }.values.toList()..sort((a, b) {
+          final order = a.createdAt.compareTo(b.createdAt);
+          return order == 0 ? a.id.compareTo(b.id) : order;
+        });
+    conversation.messages
+      ..clear()
+      ..addAll(merged);
+  }
+
   Future<void> saveTemporaryConversation(String id) async {
     final conversation = await _targetConversation(id);
     final previousMode = conversation.mode;
@@ -101,6 +132,10 @@ extension ConversationActions on ChatController {
       conversation.isArchived = previouslyArchived;
       rethrow;
     }
+    _syncConversationMetadata(conversation, {
+      'mode': ConversationMode.normal.name,
+      'archived': 0,
+    });
     _updateConversationList(conversation);
     _conversationChanged();
   }
@@ -110,7 +145,7 @@ extension ConversationActions on ChatController {
     final previouslyArchived = conversation.isArchived;
     conversation.isArchived = true;
     try {
-      await _store.writer.save(conversation, makeActive: false);
+      await _saveConversationHeader(conversation, {'archived': 1});
     } on Object {
       conversation.isArchived = previouslyArchived;
       rethrow;
@@ -170,7 +205,7 @@ extension ConversationActions on ChatController {
     final previous = conversation.seenRunId;
     conversation.seenRunId = conversation.activeRunId;
     try {
-      await _persist();
+      await _store.writer.markRunRead(conversation.id, conversation.seenRunId!);
     } on Object {
       conversation.seenRunId = previous;
       rethrow;
@@ -200,7 +235,7 @@ extension ConversationActions on ChatController {
     final previous = conversation.isArchived;
     if (archived &&
         conversation.id == activeConversation.id &&
-        (_submitting || addingImages || changingConversation)) {
+        (_submitting || changingConversation)) {
       throw StateError('请等待当前操作完成，再归档会话');
     }
     conversation.isArchived = archived;
@@ -255,14 +290,17 @@ extension ConversationActions on ChatController {
             'title': name,
             'updated_at': notice.createdAt.microsecondsSinceEpoch,
             'preview': notice.text,
-            'message_count': conversation.messageCount + 1,
           },
           where: 'id = ?',
           whereArgs: [id],
         );
         await txn.insert('messages', messageRow(id, notice));
+        await txn.rawUpdate(
+          'UPDATE conversations SET message_count = message_count + 1 WHERE id = ?',
+          [id],
+        );
       });
-      conversation.storedTitle = name;
+      _syncConversationMetadata(conversation, {'title': name});
       conversation.messages.add(notice);
       conversation.messageCount++;
       conversation.storedPreview = notice.text;
@@ -288,17 +326,11 @@ extension ConversationActions on ChatController {
     Conversation conversation,
     Map<String, Object?> values,
   ) async {
+    await _store.writer.updateMetadata(conversation, values);
+    _syncConversationMetadata(conversation, values);
     if (conversation.id == activeConversation.id) {
-      await _persist();
       _updateConversationList();
     } else {
-      await _store.writer.flush();
-      await _store.database.update(
-        'conversations',
-        values,
-        where: 'id = ?',
-        whereArgs: [conversation.id],
-      );
       final membership = await _store.database.query(
         'conversation_members',
         columns: ['sender_id'],
@@ -307,6 +339,28 @@ extension ConversationActions on ChatController {
         limit: 1,
       );
       if (membership.isNotEmpty) _updateConversationList(conversation);
+    }
+  }
+
+  void _syncConversationMetadata(
+    Conversation source,
+    Map<String, Object?> values,
+  ) {
+    final copies = <Conversation>{
+      source,
+      _viewConversation,
+      ..._conversations,
+      for (final state in _executionStates.values)
+        if (state.conversation != null) state.conversation!,
+    }.where((conversation) => conversation.id == source.id);
+    for (final copy in copies) {
+      if (values.containsKey('title'))
+        copy.storedTitle = values['title'] as String;
+      if (values.containsKey('pinned')) copy.isPinned = values['pinned'] == 1;
+      if (values.containsKey('archived'))
+        copy.isArchived = values['archived'] == 1;
+      if (values.containsKey('mode'))
+        copy.mode = ConversationMode.values.byName(values['mode'] as String);
     }
   }
 

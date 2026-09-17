@@ -72,7 +72,7 @@ class AuraiApplication : Application() {
         FlutterInjector.instance().flutterLoader().ensureInitializationComplete(this, null)
         flutterEngine = FlutterEngine(this)
         GeneratedPluginRegistrant.registerWith(flutterEngine)
-        DataManagementAccess(this, flutterEngine.dartExecutor.binaryMessenger, ::loadModelConfig)
+        DataManagementAccess(this, flutterEngine.dartExecutor.binaryMessenger, ::loadModelConfig, ::decryptModelConfig)
         flutterEngine.platformViewsController.registry.registerViewFactory(
             "aurai/html_game", HtmlGameViewFactory(flutterEngine.dartExecutor.binaryMessenger),
         )
@@ -184,6 +184,13 @@ class AuraiApplication : Application() {
                 result.success(null)
             }
             "loadModelConfig" -> result.success(loadModelConfig())
+            "encryptModelConfig" -> {
+                try {
+                    result.success(encryptModelConfig(call.argument<String>("config")!!))
+                } catch (error: Exception) {
+                    result.error("secure_storage_error", "无法安全保存模型配置", null)
+                }
+            }
             "saveModelConfig" -> {
                 try {
                     saveModelConfig(call.argument<String>("config")!!)
@@ -508,7 +515,7 @@ class AuraiApplication : Application() {
     private fun preferences() = getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
     private fun saveModelConfig(config: String) {
-        check(preferences().edit().putString(MODEL_CONFIG_KEY, encryptModelConfig(config)).commit()) { "无法保存模型设置" }
+        ModelConfigPersistence.write(this, encryptModelConfig(config))
     }
 
     private fun encryptModelConfig(config: String): String {
@@ -520,7 +527,13 @@ class AuraiApplication : Application() {
     }
 
     private fun loadModelConfig(): String? {
-        val payload = preferences().getString(MODEL_CONFIG_KEY, null) ?: return null
+        // Preferences are read only for configurations saved before database storage.
+        val payload = ModelConfigPersistence.read(this)
+            ?: preferences().getString(MODEL_CONFIG_KEY, null) ?: return null
+        return decryptModelConfig(payload)
+    }
+
+    private fun decryptModelConfig(payload: String): String {
         val parts = payload.split('.', limit = 2)
         val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
         cipher.init(

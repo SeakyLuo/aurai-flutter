@@ -53,7 +53,7 @@ class HtmlGameView(context: Context, messenger: BinaryMessenger, id: Int, args: 
 
 @SuppressLint("SetJavaScriptEnabled")
 class HtmlGameRuntime(context: Context, val identity: String, private val messageId: String,
-                      private val stateful: Boolean) {
+                      private val appId: String, private val stateful: Boolean) {
     private val webContext = MutableContextWrapper(context.applicationContext)
     val web = WebView(webContext)
     private var channel: MethodChannel? = null
@@ -114,7 +114,7 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                 web.post { if (!disposed) channel?.invokeMethod("scriptError", message) }
             }
             @JavascriptInterface fun loadState(): String =
-                if (stateful) preferences.getString(messageId, "null")!! else "null"
+                if (stateful) preferences.getString(appId, "null")!! else "null"
             @JavascriptInterface fun saveStateAsync(requestId: Int, json: String) {
                 if (!stateful || json.toByteArray(Charsets.UTF_8).size > 65536) {
                     web.post { if (!disposed) web.evaluateJavascript("window.__auraiSaved($requestId,false)", null) }
@@ -138,7 +138,7 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                                 value to requests
                             }
                         } ?: break
-                        val success = preferences.edit().putString(messageId, batch.first).commit()
+                        val success = preferences.edit().putString(appId, batch.first).commit()
                         web.post {
                             if (!disposed) for (request in batch.second)
                                 web.evaluateJavascript("window.__auraiSaved($request,$success)", null)
@@ -161,6 +161,21 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
             @JavascriptInterface fun localState(json: String) {
                 if (json.length <= 65536) web.post {
                     if (!disposed) channel?.invokeMethod("localState", json)
+                }
+            }
+            @JavascriptInterface fun appData(requestId: Int, json: String) {
+                web.post {
+                    if (disposed) return@post
+                    fun reply(value: String) { if (!disposed) web.evaluateJavascript("window.__auraiDataReply($requestId,$value)", null) }
+                    if (json.toByteArray(Charsets.UTF_8).size > 4 * 1024 * 1024 + 1024 || channel == null) {
+                        reply("{\"error\":\"数据未保存，请检查文件大小后重试\"}")
+                        return@post
+                    }
+                    channel?.invokeMethod("appData", json, object : MethodChannel.Result {
+                        override fun success(result: Any?) = reply(result as String)
+                        override fun error(code: String, message: String?, details: Any?) = reply("{\"error\":${JSONObject.quote(message ?: "数据读写失败")}}")
+                        override fun notImplemented() = error("unavailable", "数据接口不可用", null)
+                    })
                 }
             }
             @JavascriptInterface fun postInteraction(eventId: String, json: String) {
@@ -219,6 +234,10 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                     else channel?.invokeMethod("requestDocument", null)
                     web.onResume()
                     web.evaluateJavascript("window.__auraiLifecycle?.(false); document.documentElement.dataset.auraiDisplay=" + JSONObject.quote(if (fullscreen) "fullscreen" else "inline") + "; document.dispatchEvent(new Event('aurai:displaychange')); window.dispatchEvent(new Event('resize')); window.__auraiMeasure?.(); AuraiGameBridge.editing(window.__auraiEditing?.()===true);", null)
+                    result.success(null)
+                }
+                "callbacks" -> {
+                    web.evaluateJavascript("window.__auraiCallbacks?.(${call.arguments as String})", null)
                     result.success(null)
                 }
                 "theme" -> {

@@ -1,14 +1,15 @@
+import 'delete_confirmation_dialog.dart';
 import 'question_icon.dart';
 import '../../skills/skill_icon_picker.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../domain/agent_models.dart';
 import '../../domain/tool_models.dart';
 import '../../domain/tool_customization.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'conversation_menu_icon.dart';
-import 'dialog_action_button.dart';
 import 'tool_action_icon.dart';
 import 'tool_payload_section.dart';
 
@@ -38,6 +39,15 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
       _description.text != _tool.description ||
       _parameters.text != _encode(_tool.inputSchema);
 
+  Future<void> _copyName() async {
+    await Clipboard.setData(ClipboardData(text: _savedTitle));
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('工具名称已复制')));
+    }
+  }
+
   @override
   void dispose() {
     _name.dispose();
@@ -51,20 +61,11 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
     if (_editing && _changed) {
       final discard = await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('放弃未保存的修改？'),
-          actions: [
-            DialogActionButton(
-              text: '继续编辑',
-              role: DialogActionRole.secondary,
-              onPressed: () => Navigator.pop(context, false),
-            ),
-            DialogActionButton(
-              text: '放弃修改',
-              role: DialogActionRole.destructive,
-              onPressed: () => Navigator.pop(context, true),
-            ),
-          ],
+        builder: (context) => const DeleteConfirmationDialog(
+          title: '放弃未保存的修改？',
+          description: '工具的修改尚未保存。',
+          confirmLabel: '放弃修改',
+          cancelLabel: '继续编辑',
         ),
       );
       if (discard != true || !mounted) return;
@@ -201,72 +202,85 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
                       ),
                     ),
                   ),
-                  TextField(
-                    controller: _name,
-                    readOnly: !_editing,
-                    enabled: !_saving,
-                    style: const TextStyle(fontSize: 16),
-                    onChanged: (_) => setState(() {}),
-                    onTapOutside: (_) =>
-                        FocusManager.instance.primaryFocus?.unfocus(),
-                    decoration: InputDecoration(
-                      prefixIcon: Padding(
-                        padding: const EdgeInsets.only(left: 6, right: 4),
-                        child: Tooltip(
-                          message: '选择工具图标',
-                          child: Material(
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(24),
-                            clipBehavior: Clip.antiAlias,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(24),
-                              onTap: !_editing || _saving
-                                  ? null
-                                  : () async {
-                                      FocusManager.instance.primaryFocus
-                                          ?.unfocus();
-                                      final icon = await showSkillIconPicker(
-                                        context,
-                                        _icon.startsWith('skill:')
-                                            ? _icon.substring(6)
-                                            : '',
-                                        title: '选择工具图标',
-                                      );
-                                      if (mounted && icon != null)
-                                        setState(() => _icon = 'skill:$icon');
-                                    },
-                              child: SizedBox.square(
-                                dimension: 48,
-                                child: Center(
-                                  child: ColorFiltered(
-                                    colorFilter: ColorFilter.mode(
-                                      Theme.of(context).colorScheme.onSurface,
-                                      BlendMode.srcIn,
-                                    ),
-                                    child: ToolActionIcon(
-                                      toolName: _tool.name,
-                                      iconName: _icon,
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onLongPress: _editing ? null : _copyName,
+                    child: AbsorbPointer(
+                      absorbing: !_editing,
+                      child: TextField(
+                        controller: _name,
+                        readOnly: !_editing,
+                        enabled: !_saving,
+                        style: const TextStyle(fontSize: 16),
+                        onChanged: (_) => setState(() {}),
+                        onTapOutside: (_) =>
+                            FocusManager.instance.primaryFocus?.unfocus(),
+                        decoration: InputDecoration(
+                          prefixIcon: Padding(
+                            padding: const EdgeInsets.only(left: 6, right: 4),
+                            child: Tooltip(
+                              message: '选择工具图标',
+                              child: Material(
+                                color: Colors.transparent,
+                                borderRadius: BorderRadius.circular(24),
+                                clipBehavior: Clip.antiAlias,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(24),
+                                  onTap: !_editing || _saving
+                                      ? null
+                                      : () async {
+                                          FocusManager.instance.primaryFocus
+                                              ?.unfocus();
+                                          final icon =
+                                              await showSkillIconPicker(
+                                                context,
+                                                _icon.startsWith('skill:')
+                                                    ? _icon.substring(6)
+                                                    : '',
+                                                title: '选择工具图标',
+                                              );
+                                          if (mounted && icon != null) {
+                                            setState(
+                                              () => _icon = 'skill:$icon',
+                                            );
+                                          }
+                                        },
+                                  child: SizedBox.square(
+                                    dimension: 48,
+                                    child: Center(
+                                      child: ColorFiltered(
+                                        colorFilter: ColorFilter.mode(
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
+                                          BlendMode.srcIn,
+                                        ),
+                                        child: ToolActionIcon(
+                                          toolName: _tool.name,
+                                          iconName: _icon,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
+                          prefixIconConstraints: const BoxConstraints(
+                            minWidth: 60,
+                            minHeight: 48,
+                          ),
+                          filled: true,
+                          fillColor: settingsFieldColor(context),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 20,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(26),
+                            borderSide: BorderSide.none,
+                          ),
                         ),
-                      ),
-                      prefixIconConstraints: const BoxConstraints(
-                        minWidth: 60,
-                        minHeight: 48,
-                      ),
-                      filled: true,
-                      fillColor: settingsFieldColor(context),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 20,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(26),
-                        borderSide: BorderSide.none,
                       ),
                     ),
                   ),

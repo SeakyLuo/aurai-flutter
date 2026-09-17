@@ -45,7 +45,7 @@ abstract final class MessageSummary {
       else ...[
         ...htmlFiles,
         if (interactiveTitle != null)
-          '[交互消息] ${body.isEmpty ? interactiveTitle : body}'
+          body.isEmpty ? interactiveTitle : body
         else if (body.isNotEmpty)
           body,
       ],

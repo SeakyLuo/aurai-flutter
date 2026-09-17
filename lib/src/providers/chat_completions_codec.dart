@@ -130,6 +130,7 @@ Map<String, Object?> _imagePart(Map part) => {
 Future<Map<String, Object?>> readChatCompletionsStream(
   Stream<List<int>> bytes, {
   void Function(String)? onTextChanged,
+  void Function(String)? onReasoningChanged,
   void Function()? onProcessingStarted,
   void Function(int)? onMessageStarted,
 }) async {
@@ -157,12 +158,15 @@ Future<Map<String, Object?>> readChatCompletionsStream(
       if (choice['index'] != 0) continue;
       finish = choice['finish_reason'] as String? ?? finish;
       final delta = choice['delta'] as Map;
-      if (!processing &&
-          (delta['reasoning_content'] != null || delta['tool_calls'] != null)) {
+      if (!processing && delta['tool_calls'] != null) {
         processing = true;
         onProcessingStarted?.call();
       }
-      reasoning.write(delta['reasoning_content'] as String? ?? '');
+      final reasoningChunk = delta['reasoning_content'] as String? ?? '';
+      if (reasoningChunk.isNotEmpty) {
+        reasoning.write(reasoningChunk);
+        onReasoningChanged?.call(reasoning.toString());
+      }
       final chunk = delta['content'] as String? ?? '';
       if (chunk.isNotEmpty) {
         if (!started) {

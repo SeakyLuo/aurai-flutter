@@ -1,3 +1,4 @@
+import 'quick_reply_chips.dart';
 import 'private_reply_layout.dart';
 import 'message_reply_footer.dart';
 import 'forwarded_interactive_message.dart';
@@ -33,9 +34,12 @@ import '../../domain/web_sources.dart';
 import '../../platform/aurai_platform.dart';
 import 'image_attachments.dart';
 import 'task_summary_view.dart';
+import 'reasoning_message_view.dart';
 import 'message_actions_menu.dart';
 import 'source_citation_syntax.dart';
 import 'source_citation_view.dart';
+
+part 'message_item_actions.dart';
 
 class MessageItem extends StatefulWidget {
   static const userTopMargin = 16.0;
@@ -55,6 +59,7 @@ class MessageItem extends StatefulWidget {
     this.onLocate,
     this.onOpenQuote,
     this.onOpenMember,
+    this.onQuickReply,
     this.availableSources = const {},
     this.mentionMembers = const {},
     this.excludedActivityMessageId,
@@ -65,14 +70,17 @@ class MessageItem extends StatefulWidget {
   final Future<InteractiveClickResult?> Function(
     String buttonId,
     int revision,
-    int participantRevision,
-  )?
+    int participantRevision, {
+    Object? value,
+  })?
   onInteractiveClick;
   final Future<InteractiveMessage> Function(String)? onInteractiveRetry;
   final ValueChanged<AgentMessage>? onQuote;
   final Future<void> Function(AgentMessage)? onRecall;
   final ValueChanged<String>? onOpenQuote;
   final ValueChanged<String>? onOpenMember;
+  final Future<void> Function(AgentMessage message, String key, String text)?
+  onQuickReply;
   final String? excludedActivityMessageId;
   final bool streaming;
   final bool readOnly;
@@ -128,7 +136,19 @@ class _MessageItemState extends State<MessageItem> {
 
   Widget _buildMessage(BuildContext context) =>
       message.role == AgentMessageRole.user
-      ? _withActions(_content)
+      ? Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            _withActions(_content),
+            if (message.quickReplies.isNotEmpty)
+              this._buildQuickReplies(context),
+          ],
+        )
+      : message.isReasoning
+      ? ReasoningMessageView(
+          streaming: widget.streaming,
+          child: _selectableContent(),
+        )
       : Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -149,6 +169,8 @@ class _MessageItemState extends State<MessageItem> {
                 key: const ValueKey('message-content'),
                 child: _selectableContent(),
               ),
+            if (message.quickReplies.isNotEmpty)
+              this._buildQuickReplies(context),
             if (!widget.readOnly &&
                 !widget.groupBubble &&
                 (message.htmlGame == null || widget.replyPart != null) &&
@@ -170,9 +192,14 @@ class _MessageItemState extends State<MessageItem> {
         );
 
   Widget _selectableContent() {
+    if (widget.streaming) return _withActions(_content);
     if (message.interactive != null && !widget.groupBubble)
       return _withActions(_content);
-    if (widget.groupBubble || message.htmlGame != null) return _content;
+    if (widget.groupBubble || message.htmlGame != null) {
+      return widget.onQuote == null && widget.onQuickReply == null
+          ? _content
+          : _withActions(_content);
+    }
     final content = SelectionArea(
       contextMenuBuilder: (context, selection) =>
           AdaptiveTextSelectionToolbar.buttonItems(
@@ -192,131 +219,13 @@ class _MessageItemState extends State<MessageItem> {
           ),
       child: _content,
     );
-    return widget.onQuote == null ? content : _withActions(content);
+    return widget.onQuote == null && widget.onQuickReply == null
+        ? content
+        : _withActions(content);
   }
 
-  Widget _withActions(Widget child) => GestureDetector(
-    onLongPressStart: (details) => _openActions(details.globalPosition),
-    child: child,
-  );
-
-  Future<void> _openActions(Offset position) async {
-    final snapshot = message;
-    var hasHistory = false;
-    if (snapshot.interactive != null &&
-        (!widget.readOnly || widget.onLocate != null)) {
-      try {
-        hasHistory = await hasInteractiveHistory(
-          ImageActionScope.of(context).groupStore.database,
-          snapshot.id,
-          MessageSender.localUser.id,
-        );
-      } on Object catch (error) {
-        if (mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
-        return;
-      }
-      if (!mounted) return;
-    }
-    final action = await showMessageActionsMenu(
-      context,
-      message: snapshot,
-      position: position,
-      allowEditing: widget.onEdit != null,
-      allowStatistics:
-          snapshot.interactive
-                  ?.viewFor(MessageSender.localUser.id)
-                  .showStatistics ==
-              true &&
-          (!widget.readOnly || widget.onLocate != null),
-      allowHistory: hasHistory,
-      allowQuote: widget.onQuote != null,
-      allowRecall: widget.onRecall != null,
-      allowForward:
-          !widget.streaming &&
-          (message.htmlGame != null ||
-              message.text.isNotEmpty ||
-              message.images.isNotEmpty ||
-              message.files.isNotEmpty),
-    );
-    if (!mounted) return;
-    switch (action) {
-      case MessageAction.history:
-        await Navigator.push<void>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => InteractiveHistoryPage(
-              database: ImageActionScope.of(context).groupStore.database,
-              messageId: snapshot.id,
-            ),
-          ),
-        );
-      case MessageAction.statistics:
-        await showInteractiveStatistics(
-          context,
-          database: ImageActionScope.of(context).groupStore.database,
-          messageId: snapshot.id,
-        );
-      case MessageAction.fullscreen:
-        await (widget.htmlGameView! as HtmlGameView).openFullscreen(context);
-      case MessageAction.forward:
-        var htmlCard = snapshot.htmlGame;
-        if (htmlCard != null) {
-          try {
-            htmlCard = await (widget.htmlGameView! as HtmlGameView)
-                .captureForwardPreview();
-          } on Object catch (error) {
-            if (mounted) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
-            }
-            return;
-          }
-          if (!mounted) return;
-        }
-        final sent = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(
-            builder: (_) => ImageForwardPage.message(
-              controller: ImageActionScope.of(context),
-              message: AgentMessage(
-                id: snapshot.id,
-                senderId: snapshot.senderId,
-                role: snapshot.role,
-                text: snapshot.text,
-                images: List.of(snapshot.images),
-                files: List.of(snapshot.files),
-                htmlGame: htmlCard,
-                interactive: snapshot.interactive,
-                createdAt: snapshot.createdAt,
-              ),
-            ),
-          ),
-        );
-        if (mounted && sent == true)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('已转发')));
-      case MessageAction.recall:
-        await widget.onRecall?.call(snapshot);
-      case MessageAction.quote:
-        widget.onQuote?.call(snapshot);
-      case MessageAction.copy:
-        await _copy(context, snapshot.text);
-      case MessageAction.select:
-        await Navigator.of(context).push<void>(
-          MaterialPageRoute(
-            builder: (_) => MessageTextSelectionPage(text: snapshot.text),
-          ),
-        );
-      case MessageAction.edit:
-        await widget.onEdit?.call(snapshot);
-      case null:
-        break;
-    }
-  }
+  Widget _withActions(Widget child) =>
+      GestureDetector(onLongPress: this._openActions, child: child);
 
   Widget _buildContent(BuildContext context) {
     if (message.htmlGame != null) {
@@ -355,13 +264,7 @@ class _MessageItemState extends State<MessageItem> {
                       label: '消息菜单',
                       child: InkWell(
                         borderRadius: BorderRadius.circular(16),
-                        onTap: () {
-                          final box =
-                              buttonContext.findRenderObject()! as RenderBox;
-                          _openActions(
-                            box.localToGlobal(box.size.center(Offset.zero)),
-                          );
-                        },
+                        onTap: _openActions,
                         child: SizedBox(
                           width: 32,
                           height: 18,
@@ -456,14 +359,7 @@ class _MessageItemState extends State<MessageItem> {
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
-                      onLongPress: () {
-                        final box =
-                            _bubbleKey.currentContext!.findRenderObject()!
-                                as RenderBox;
-                        _openActions(
-                          box.localToGlobal(box.size.center(Offset.zero)),
-                        );
-                      },
+                      onLongPress: _openActions,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 20,
@@ -495,8 +391,10 @@ class _MessageItemState extends State<MessageItem> {
     }
     final page = InteractivePageScope.of(context);
     final body = TextStyle(
-      color: Theme.of(context).colorScheme.onSurface,
-      fontSize: widget.groupBubble ? 15 : 16,
+      color: message.isReasoning
+          ? Theme.of(context).colorScheme.onSurfaceVariant
+          : Theme.of(context).colorScheme.onSurface,
+      fontSize: widget.groupBubble || message.isReasoning ? 15 : 16,
       height: widget.groupBubble ? 1.4 : 1.65,
     );
     final availableSources = {
@@ -660,6 +558,7 @@ class _MessageItemState extends State<MessageItem> {
           ),
       ],
     );
+    if (message.isReasoning) return content;
     if (!widget.groupBubble && message.interactive == null) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
@@ -685,11 +584,7 @@ class _MessageItemState extends State<MessageItem> {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: message.interactive != null ? widget.onLocate : null,
-            onLongPress: () {
-              final box =
-                  _bubbleKey.currentContext!.findRenderObject()! as RenderBox;
-              _openActions(box.localToGlobal(box.size.center(Offset.zero)));
-            },
+            onLongPress: _openActions,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: message.isFailure

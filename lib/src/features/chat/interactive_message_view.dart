@@ -1,3 +1,4 @@
+import 'interactive_button_layout.dart';
 import 'interaction_content.dart';
 import '../../domain/error_message.dart';
 import 'interactive_message_button.dart';
@@ -25,8 +26,9 @@ class InteractiveMessageView extends StatefulWidget {
   final Future<InteractiveClickResult?> Function(
     String buttonId,
     int revision,
-    int participantRevision,
-  )
+    int participantRevision, {
+    Object? value,
+  })
   onClick;
   final Future<void> Function(String url) onOpenLink;
   @override
@@ -74,7 +76,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
     }
   }
 
-  Future<void> _click(Map<String, Object?> button) async {
+  Future<void> _click(Map<String, Object?> button, {Object? value}) async {
     if (_busy != null) return;
     setState(() => _busy = button['id'] as String);
     try {
@@ -82,6 +84,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         button['id'] as String,
         _card.revision,
         _card.participantRevision(widget.actorId),
+        value: value,
       );
       if (result != null && mounted) {
         setState(() {
@@ -136,6 +139,9 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
     final callback = selected?['callback'] as Map?;
     final callbackStatus = callback?['status'];
     final callbackLocked = ['queued', 'processing'].contains(callbackStatus);
+    final pendingButtonId = callbackLocked
+        ? (callback?['buttonId'] ?? selected?['buttonId']) as String?
+        : null;
     final canRetry =
         !widget.readOnly &&
         !widget.historical &&
@@ -237,14 +243,16 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
           const SizedBox(height: 16),
           if (sharedView != null)
             InteractionContent(
+              key: ValueKey((widget.actorId, card.title, card.body)),
               view: sharedView,
               shared: _card.shared,
               buttons: card.buttons,
+              buttonColumns: card.buttonColumns,
               readOnly:
                   widget.readOnly ||
-                  callbackLocked ||
                   widget.historical ||
                   _card.snapshotView != null,
+              pendingButtonId: pendingButtonId,
               allowChange: _card.hasInteraction && _card.engine.allowChange,
               eligible:
                   !_card.shared ||
@@ -258,19 +266,22 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               onClick: _click,
             )
           else
-            for (final (index, button) in card.buttons.indexed) ...[
-              if (index > 0) const SizedBox(height: 8),
-              InteractiveMessageButton(
-                button: button,
-                busy: _busy == button['id'],
-                locked:
-                    _busy != null ||
-                    widget.readOnly ||
-                    card.closed ||
-                    callbackLocked,
-                onPressed: () => _click(button),
-              ),
-            ],
+            InteractiveButtonLayout(
+              columns: card.buttonColumns,
+              children: [
+                for (final button in card.buttons)
+                  InteractiveMessageButton(
+                    button: button,
+                    busy: _busy == button['id'],
+                    locked:
+                        _busy != null ||
+                        widget.readOnly ||
+                        card.closed ||
+                        pendingButtonId == button['id'],
+                    onPressed: () => _click(button),
+                  ),
+              ],
+            ),
         ],
       ),
     );

@@ -6,9 +6,35 @@ import 'response_citations.dart';
 Future<Map<String, Object?>> readResponsesStream(
   Stream<List<int>> bytes, {
   void Function(String text)? onTextChanged,
+  void Function(String text)? onReasoningChanged,
   void Function()? onProcessingStarted,
   void Function(int index)? onMessageStarted,
 }) async {
+  final reasoningParts = <(int, String, int), String>{};
+  String lastReasoning = '';
+  void reportReasoning() {
+    final text = reasoningParts.values.join('\n');
+    if (text.isEmpty || text == lastReasoning) return;
+    lastReasoning = text;
+    onReasoningChanged?.call(text);
+  }
+
+  void readReasoningItem(Map item, int index) {
+    if (item['type'] != 'reasoning') return;
+    final content = item['content'] as List? ?? const [];
+    final summary = item['summary'] as List? ?? const [];
+    final source = content.isNotEmpty ? content : summary;
+    final kind = content.isNotEmpty ? 'text' : 'summary';
+    reasoningParts.removeWhere((key, _) => key.$1 == index);
+    for (var i = 0; i < source.length; i++) {
+      final part = source[i] as Map;
+      if (part['type'] == 'reasoning_text' || part['type'] == 'summary_text') {
+        reasoningParts[(index, kind, i)] = part['text'] as String;
+      }
+    }
+    reportReasoning();
+  }
+
   var processingReported = false;
   void inspectItem(Map item) {
     final type = item['type'];
@@ -50,10 +76,25 @@ Future<Map<String, Object?>> readResponsesStream(
     if (payload == '[DONE]') break;
     final event = (jsonDecode(payload) as Map).cast<String, Object?>();
     switch (event['type']) {
+      case 'response.reasoning_text.delta':
+      case 'response.reasoning_summary_text.delta':
+        final summary =
+            event['type'] == 'response.reasoning_summary_text.delta';
+        final key = (
+          event['output_index'] as int,
+          summary ? 'summary' : 'text',
+          event[summary ? 'summary_index' : 'content_index'] as int,
+        );
+        reasoningParts[key] =
+            '${reasoningParts[key] ?? ''}${event['delta'] as String}';
+        reportReasoning();
       case 'response.output_item.added':
       case 'response.output_item.done':
         final item = event['item'] as Map;
         inspectItem(item);
+        if (event['type'] == 'response.output_item.done') {
+          readReasoningItem(item, event['output_index'] as int);
+        }
         if (event['type'] == 'response.output_item.done' &&
             item['type'] == 'message') {
           final text = (item['content'] as List)
@@ -95,8 +136,11 @@ Future<Map<String, Object?>> readResponsesStream(
       case 'response.failed':
       case 'response.completed':
         final response = (event['response']! as Map).cast<String, Object?>();
-        for (final item in response['output'] as List) {
-          inspectItem(item as Map);
+        final output = response['output'] as List;
+        for (var i = 0; i < output.length; i++) {
+          final item = output[i] as Map;
+          inspectItem(item);
+          readReasoningItem(item, i);
         }
         return response;
       case 'error':

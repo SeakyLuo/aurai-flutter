@@ -183,6 +183,7 @@ class ModelRequest {
     this.onContextSummary,
     this.onCompactionChanged,
     this.onTextChanged,
+    this.onReasoningChanged,
     this.onProcessingStarted,
     this.onReconnect,
     this.onMessageStarted,
@@ -201,6 +202,7 @@ class ModelRequest {
   final List<ToolResult> toolResults;
   final List<String> userUpdates;
   final void Function(String text)? onTextChanged;
+  final void Function(String text)? onReasoningChanged;
   final void Function()? onProcessingStarted;
   final void Function(int attempt)? onReconnect;
   final void Function(int index)? onMessageStarted;

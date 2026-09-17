@@ -1,3 +1,4 @@
+import '../../domain/interactive_selection.dart';
 import 'interactive_message_paging.dart';
 import 'interactive_snapshot_statistics.dart';
 import 'interactive_statistics_overview.dart';
@@ -314,11 +315,12 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
 
   Widget _participants(InteractiveMessage card) {
     final option = _option!;
-    final people = card.participants.entries
+    final people = card.choices.entries
         .where(
-          (entry) =>
-              entry.value['buttonId'] == option.$1 &&
-              entry.value['label'] == option.$2,
+          (entry) => selectionEntries(entry.value).any(
+            (choice) =>
+                choice['buttonId'] == option.$1 && choice['label'] == option.$2,
+          ),
         )
         .toList();
     return ListView(
