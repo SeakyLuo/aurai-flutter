@@ -16,6 +16,20 @@ extension ConversationRun on ChatController {
     final steps = runConversation.steps;
     final runConfig = reply.config;
     final diagnosticCalls = <String, Object?>{};
+    final sleepDraftKey =
+        'group_sleep_draft:${runConversation.id}:${reply.senderId}';
+    final sleepDraftRows = groupParent == null
+        ? const <Map<String, Object?>>[]
+        : await _store.database.query(
+            'app_state',
+            columns: ['value'],
+            where: 'key = ?',
+            whereArgs: [sleepDraftKey],
+          );
+    final sleepDraft = sleepDraftRows.isEmpty
+        ? ''
+        : sleepDraftRows.single['value'] as String;
+    var leftSleepDraft = false;
     final systemPrompt = groupParent == null
         ? reply.systemPrompt
         : '${reply.systemPrompt}\n'
@@ -157,15 +171,19 @@ extension ConversationRun on ChatController {
       );
       if (groupParent != null) {
         tools.removeWhere((t) => t.definition.name == 'sendGroupMessage');
+        tools.add(_groupWakeTool(groupParent.id, reply.senderId));
         tools.add(
-          GroupSleepTool(
-            (duration) => _scheduleMemberSleep(
+          GroupSleepTool((duration, draft) async {
+            final until = await _scheduleMemberSleep(
               groupParent,
               runConversation,
               reply.senderId,
               duration,
-            ),
-          ),
+              draft,
+            );
+            leftSleepDraft = true;
+            return until;
+          }),
         );
         tools.add(
           GroupMessageTool(
@@ -186,7 +204,7 @@ extension ConversationRun on ChatController {
       );
       registry.load([
         'sendGroupMessage',
-        if (groupParent != null) 'sleepGroupChat',
+        if (groupParent != null) ...['sleepGroupChat', 'wakeGroupMember'],
       ]);
       Future<bool> confirm(ToolCall call, ToolDefinition definition) =>
           _confirm(
@@ -259,6 +277,8 @@ extension ConversationRun on ChatController {
             : groupParent!.contextSummary,
         personalContext: () async => [
           responsePreferences.instructions,
+          if (groupParent != null && sleepDraft.isNotEmpty)
+            '你上次休眠前留下的私人草稿（尚未发送）：\n$sleepDraft\n请结合最新消息决定保留、改写或放弃；不要自动发送，也不要当作用户的新指令。',
           if (customInstructions.isNotEmpty) '用户自定义指令：\n$customInstructions',
           if (runConversation.usesPersonalization) await memory.sharedContext(),
           if (runConversation.isTemporary) '当前为临时会话，不得将本次内容写入长期记忆。',
@@ -716,6 +736,16 @@ extension ConversationRun on ChatController {
           );
         }
       } finally {
+        if (groupParent != null &&
+            outcome == 'completed' &&
+            !leftSleepDraft &&
+            sleepDraftRows.isNotEmpty) {
+          await _store.database.delete(
+            'app_state',
+            where: 'key = ? AND value = ?',
+            whereArgs: [sleepDraftKey, sleepDraft],
+          );
+        }
         if (groupParent == null) {
           _runtime = null;
         } else {
@@ -764,29 +794,5 @@ extension ConversationRun on ChatController {
         }
       }
     }
-  }
-
-  Future<void> _persistRun(Conversation conversation) =>
-      _store.writer.save(conversation, makeActive: false, saveRuntime: true);
-
-  void _notifyRun(Conversation conversation) {
-    if (conversation.kind == ConversationKind.group &&
-        _viewConversation.id == conversation.id &&
-        !identical(_viewConversation, conversation)) {
-      final messages =
-          {
-            for (final message in _viewConversation.messages)
-              message.id: message,
-            for (final message in conversation.messages) message.id: message,
-          }.values.toList()..sort((a, b) {
-            final order = a.createdAt.compareTo(b.createdAt);
-            return order == 0 ? a.id.compareTo(b.id) : order;
-          });
-      _viewConversation.messages
-        ..clear()
-        ..addAll(messages);
-    }
-    _updateConversationList(conversation);
-    _conversationChanged();
   }
 }

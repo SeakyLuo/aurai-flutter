@@ -31,17 +31,49 @@ extension MessageQuickReplies on ChatController {
     String text,
   ) async {
     final conversation = activeConversation;
-    if (source.role != AgentMessageRole.assistant ||
+    if ((source.role != AgentMessageRole.assistant &&
+            source.senderId != MessageSender.localUser.id) ||
         source.isSystem ||
         source.isReasoning) {
       throw StateError('这条消息不支持快捷回复');
     }
     final own = source.quickReplies
-        .where((reply) => reply.senderId == MessageSender.localUser.id)
+        .where(
+          (reply) =>
+              reply.senderId == MessageSender.localUser.id && reply.key == key,
+        )
         .firstOrNull;
     if (own != null) {
       await _removeQuickReply(conversation, source.id, own.id);
-      if (own.key == key) return false;
+      _notifyRun(conversation);
+      return false;
+    }
+    if (source.senderId == MessageSender.localUser.id) {
+      final message = _quickReplyMessage(source, key, text);
+      _attachQuickReply(
+        conversation,
+        source.id,
+        MessageQuickReply(
+          id: message.id,
+          senderId: message.senderId,
+          key: key,
+          text: text,
+          createdAt: message.createdAt,
+        ),
+      );
+      conversation.messages.add(message);
+      conversation.messageCount++;
+      try {
+        await _store.writer.save(conversation, makeActive: false);
+      } on Object {
+        _detachQuickReply(conversation, source.id, message.id);
+        conversation.messages.removeWhere((item) => item.id == message.id);
+        conversation.messageCount--;
+        rethrow;
+      }
+      QuickReplyRecents.record(key);
+      _notifyRun(conversation);
+      return false;
     }
     if (conversation.kind == ConversationKind.group) {
       final members = await _store.groups.members(conversation.id);
@@ -171,16 +203,20 @@ extension MessageQuickReplies on ChatController {
     String key,
     String text,
   ) {
-    final quote = MessageQuote(
-      messageId: source.id,
-      senderId: source.senderId,
-      text: [
-        if (source.images.isNotEmpty) '[图片]',
-        for (final file in source.files) '[文件] ${file.name}',
-        if (source.text.isNotEmpty)
-          String.fromCharCodes(source.text.runes.take(1000)),
-      ].join(' '),
-    )..senderName = source.sender?.name ?? 'AI';
+    final quote =
+        MessageQuote(
+            messageId: source.id,
+            senderId: source.senderId,
+            text: [
+              if (source.images.isNotEmpty) '[图片]',
+              for (final file in source.files) '[文件] ${file.name}',
+              if (source.text.isNotEmpty)
+                String.fromCharCodes(source.text.runes.take(1000)),
+            ].join(' '),
+          )
+          ..senderName = source.senderId == MessageSender.localUser.id
+              ? MessageSender.localUser.name
+              : source.sender?.name ?? 'AI';
     return AgentMessage(
       id: newMessageId(),
       role: AgentMessageRole.user,
@@ -297,21 +333,25 @@ extension MessageQuickReplies on ChatController {
     if (rows.isEmpty) throw StateError('消息不存在或不可见');
     final existing = await _store.database.query(
       'message_quick_replies',
-      where: 'parent_message_id = ? AND actor_id = ?',
-      whereArgs: [sourceId, actor],
+      where: 'parent_message_id = ? AND actor_id = ? AND reply_key = ?',
+      whereArgs: [sourceId, actor, key],
     );
-    if (existing.isNotEmpty) {
-      if (existing.single['reply_key'] == key) return {'sent': true};
-      await _removeQuickReply(
-        conversation,
-        sourceId,
-        existing.single['message_id'] as String,
-      );
-    }
+    if (existing.isNotEmpty) return {'sent': true};
+    final senderIds = {actor, rows.single['sender_id'] as String};
+    final senderRows = await _store.database.query(
+      'message_senders',
+      where: 'id IN (${List.filled(senderIds.length, '?').join(',')})',
+      whereArgs: senderIds.toList(),
+    );
+    final senders = {
+      for (final row in senderRows)
+        row['id'] as String: MessageSender.fromRow(row),
+    };
     final message = AgentMessage(
       id: newMessageId(),
       role: AgentMessageRole.assistant,
       senderId: actor,
+      sender: senders[actor]!,
       text: text,
       createdAt: DateTime.now(),
       quickReplyToId: sourceId,
@@ -322,7 +362,7 @@ extension MessageQuickReplies on ChatController {
         text: String.fromCharCodes(
           (rows.single['text'] as String).runes.take(1000),
         ),
-      ),
+      )..senderName = senders[rows.single['sender_id']]!.name,
     );
     await _store.database.transaction((txn) async {
       await txn.insert('messages', messageRow(conversation.id, message));

@@ -50,6 +50,7 @@ class ToolActionIcon extends StatelessWidget {
               'forwardMessage' ||
               'sendQuickReply' ||
               'recallMessage' => const ConversationIcon(),
+              'wakeGroupMember' ||
               'sleepGroupChat' ||
               'listGroupChats' ||
               'readGroupChat' ||

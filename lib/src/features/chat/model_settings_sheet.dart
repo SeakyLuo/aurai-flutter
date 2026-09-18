@@ -145,7 +145,9 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 if (!widget.accountOnly &&
-                                    settings.activeService == service) ...[
+                                    settings.activeConfig.isConfigured &&
+                                    settings.activeConfig.service ==
+                                        service) ...[
                                   Text(
                                     '默认',
                                     style: TextStyle(

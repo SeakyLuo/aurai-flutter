@@ -16,12 +16,15 @@ import 'message_quick_reply_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 34,
+  version: 35,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion >= 33 && oldVersion < 35) {
+      await migrateMultipleQuickReplies(db);
+    }
     if (oldVersion < 34) {
       await db.execute(htmlAppSchema);
       await db.execute(htmlAppIndex);

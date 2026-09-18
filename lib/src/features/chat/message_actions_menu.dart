@@ -27,7 +27,7 @@ Future<MessageAction?> showMessageActionsMenu(
   bool allowRecall = false,
   bool allowForward = false,
   bool allowQuickReply = false,
-  String? sentQuickReplyKey,
+  Set<String> sentQuickReplyKeys = const {},
 }) async {
   final recent = allowQuickReply
       ? await QuickReplyRecents.load()
@@ -137,7 +137,7 @@ Future<MessageAction?> showMessageActionsMenu(
                               height: 52,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: sentQuickReplyKey == key
+                                color: sentQuickReplyKeys.contains(key)
                                     ? Theme.of(
                                         context,
                                       ).colorScheme.primaryContainer
@@ -165,7 +165,7 @@ Future<MessageAction?> showMessageActionsMenu(
                           onTap: () async {
                             final action = await showQuickReplyPicker(
                               context,
-                              selectedKey: sentQuickReplyKey,
+                              selectedKeys: sentQuickReplyKeys,
                             );
                             if (context.mounted && action != null)
                               Navigator.pop(context, action);

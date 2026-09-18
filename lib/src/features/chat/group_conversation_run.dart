@@ -170,6 +170,7 @@ extension GroupConversationRun on ChatController {
       dispatcher.start([
         for (final id in ids)
           if ((wakeMembers == null || wakeMembers.contains(id)) &&
+              (user.interactive?.canView(id) ?? true) &&
               (wakeMembers != null || id != user.senderId) &&
               (!paused.contains(id) ||
                   wakeMembers != null ||
@@ -181,8 +182,9 @@ extension GroupConversationRun on ChatController {
       final queued = _queuedSystemNotices.remove(conversation.id) ?? [];
       final known = dispatcher.history.map((m) => m.id).toSet();
       final fresh = queued.where((m) => !known.contains(m.id)).toList();
-      if (fresh.isNotEmpty)
-        dispatcher.receive(fresh, mentions: _groupNoticeMentions(fresh));
+      for (final notice in fresh) {
+        _dispatchGroupNotice(dispatcher, notice);
+      }
       await dispatcher.done;
       _checkGroupStopped(conversation);
       conversation.pendingGoal = null;

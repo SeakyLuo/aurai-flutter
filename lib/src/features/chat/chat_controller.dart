@@ -1,3 +1,5 @@
+import '../../agent/group_wake_tool.dart';
+import '../../storage/group_system_notice.dart';
 import '../../platform/svg_image.dart';
 import '../../domain/image_generation_config.dart';
 import '../../providers/image_generation_client.dart';
@@ -142,6 +144,7 @@ part 'image_forwarding.dart';
 part 'draft_attachment_actions.dart';
 part 'conversation_search_navigation.dart';
 part 'conversation_run.dart';
+part 'conversation_run_persistence.dart';
 part 'scheduled_execution.dart';
 part 'message_edit_actions.dart';
 part 'accessibility_request.dart';

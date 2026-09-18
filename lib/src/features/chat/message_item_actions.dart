@@ -43,14 +43,16 @@ extension _MessageItemActions on _MessageItemState {
               message.files.isNotEmpty),
       allowQuickReply:
           widget.onQuickReply != null &&
-          !widget.streaming &&
+          (!widget.streaming ||
+              snapshot.senderId == MessageSender.localUser.id) &&
           !snapshot.isSystem &&
           !snapshot.isReasoning &&
-          snapshot.role == AgentMessageRole.assistant,
-      sentQuickReplyKey: snapshot.quickReplies
+          (snapshot.role == AgentMessageRole.assistant ||
+              snapshot.senderId == MessageSender.localUser.id),
+      sentQuickReplyKeys: snapshot.quickReplies
           .where((reply) => reply.senderId == MessageSender.localUser.id)
-          .firstOrNull
-          ?.key,
+          .map((reply) => reply.key)
+          .toSet(),
     );
     if (!mounted) return;
     switch (action) {
@@ -144,6 +146,33 @@ extension _MessageItemActions on _MessageItemState {
       case MessageAction.quickKiss:
       case MessageAction.quickPleading:
       case MessageAction.quickSleepy:
+      case MessageAction.quickGoodNight:
+      case MessageAction.quickMoon:
+      case MessageAction.quickStar:
+      case MessageAction.quickWish:
+      case MessageAction.quickGoodMorning:
+      case MessageAction.quickSun:
+      case MessageAction.quickRose:
+      case MessageAction.quickSmilingHearts:
+      case MessageAction.quickStarStruck:
+      case MessageAction.quickPeeking:
+      case MessageAction.quickGiggle:
+      case MessageAction.quickBee:
+      case MessageAction.quickOwl:
+      case MessageAction.quickOtter:
+      case MessageAction.quickChick:
+      case MessageAction.quickSparklingHeart:
+      case MessageAction.quickTwoHearts:
+      case MessageAction.quickLoveLetter:
+      case MessageAction.quickStrawberry:
+      case MessageAction.quickCherries:
+      case MessageAction.quickChocolate:
+      case MessageAction.quickIceCream:
+      case MessageAction.quickSunflower:
+      case MessageAction.quickTulip:
+      case MessageAction.quickDaisy:
+      case MessageAction.quickMapleLeaf:
+      case MessageAction.quickSnowflake:
       case MessageAction.quickProud:
       case MessageAction.quickScared:
       case MessageAction.quickNauseated:

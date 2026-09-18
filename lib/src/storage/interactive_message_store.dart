@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'dart:async';
 import '../domain/interactive_selection.dart';
 import 'message_callbacks.dart';
@@ -127,7 +128,7 @@ class InteractiveMessageStore {
         },
       'name': actor.name,
       'revision': participantRevision + 1,
-      'snapshotCount': snapshotCount + 1,
+      'snapshotCount': snapshotCount,
       'definitionRevision': revision,
       'showStatistics': target?['showStatistics'] ?? view.showStatistics,
       'buttonColumns': newRound
@@ -176,6 +177,22 @@ class InteractiveMessageStore {
         actor.id: state,
       },
     );
+    final nextView = next.viewFor(actor.id);
+    final pageChanged = newRound ||
+        (nextSession != null && nextSession.phase != card.engine.phase) ||
+        view.title != nextView.title ||
+        view.body != nextView.body ||
+        view.buttonColumns != nextView.buttonColumns ||
+        view.showStatistics != nextView.showStatistics ||
+        !const DeepCollectionEquality().equals(
+          [for (final b in view.buttons) {...b}..remove('disabled')],
+          [for (final b in nextView.buttons)
+            {...b,
+              if (b['disabled'] == true && b['completedLabel'] == b['label'])
+                'label': view.buttons.firstWhere((old) => old['id'] == b['id'])['label'],
+            }..remove('disabled')],
+        );
+    state['snapshotCount'] = snapshotCount + (pageChanged ? 1 : 0);
     await txn.insert('interactive_actions', {
       'message_id': messageId,
       'actor_id': actor.id,
@@ -184,7 +201,7 @@ class InteractiveMessageStore {
       'label': button['label'],
       'definition_revision': revision,
       'participant_revision': participantRevision + 1,
-      'before_json': jsonEncode({
+      'before_json': pageChanged ? jsonEncode({
         'revision': view.revision,
         'showStatistics': view.showStatistics,
         'buttonColumns': view.buttonColumns,
@@ -198,7 +215,7 @@ class InteractiveMessageStore {
           'interactionView': card.interactionView(actor.id),
         if (card.choices[actor.id] case final previous?)
           'selectedLabel': previous['label'],
-      }),
+      }) : null,
       'created_at': now,
     });
     if (pending != null) {
@@ -264,16 +281,15 @@ class InteractiveMessageStore {
     );
     final conversation = conversations.single;
     final direct = conversation['kind'] == 'direct';
-    final notice = card.participation['audience'] != null && !direct
-        ? null
-        : await writeNotice(
-            txn,
-            conversationId,
-            !card.visible('visibility') ||
-                    card.participation['visibilityActors'] != null
-                ? '${actor.name}提交了“${card.title}”'
-                : '${actor.name}在“${card.title}”中选择了“${button['label']}”',
-          );
+    final notice = await writeNotice(
+      txn,
+      conversationId,
+      !card.visible('visibility', actor: actor.id) ||
+              card.participation['visibilityActors'] != null
+          ? '${actor.name}提交了“${card.title}”'
+          : '${actor.name}在“${card.title}”中选择了“${button['label']}”',
+      audience: (card.participation['audience'] as List?)?.cast<String>(),
+    );
     if (callbackId == null && actor.id == MessageSender.localUser.id) {
       if (direct && conversation['archived'] == 0) {
         final recipient = conversation['default_sender_id'] as String;
@@ -307,20 +323,36 @@ class InteractiveMessageStore {
   static Future<AgentMessage> writeNotice(
     DatabaseExecutor db,
     String conversationId,
-    String text,
-  ) async {
+    String text, {
+    List<String>? audience,
+  }) async {
     final notice = AgentMessage(
       id: newMessageId(),
       role: AgentMessageRole.user,
       senderId: MessageSender.localUser.id,
       text: text,
       isSystem: true,
+      interactive: audience == null
+          ? null
+          : InteractiveMessage(
+              revision: 0,
+              title: text,
+              body: '',
+              buttons: const [],
+              participation: {'audience': audience},
+            ),
       createdAt: DateTime.now(),
     );
     await db.insert('messages', messageRow(conversationId, notice));
     await db.rawUpdate(
       'UPDATE conversations SET message_count = message_count + 1, preview = ?, updated_at = ? WHERE id = ?',
-      [text, notice.createdAt.microsecondsSinceEpoch, conversationId],
+      [
+        notice.interactive?.canView(MessageSender.localUser.id) == false
+            ? '私密交互消息'
+            : text,
+        notice.createdAt.microsecondsSinceEpoch,
+        conversationId,
+      ],
     );
     return notice;
   }

@@ -149,7 +149,11 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
           : '${selected.service.label} · ${selected.model.name}';
     }
     final selected = settings.modelDefaults[purpose];
-    if (selected != null) return '${selected.service.label} · ${selected.name}';
+    if (selected != null) {
+      return settings.profile(selected.service).isConfigured
+          ? '${selected.service.label} · ${selected.name}'
+          : '未配置供应商 · ${selected.service.label}';
+    }
     if (purpose == ModelPurpose.text) {
       final config = settings.activeConfig;
       return config.isConfigured
