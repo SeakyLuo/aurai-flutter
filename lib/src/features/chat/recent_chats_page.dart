@@ -1,3 +1,4 @@
+import 'conversation_list_skeleton.dart';
 import '../../scheduling/tasks_page.dart';
 import 'settings_icon.dart';
 import 'conversation_search_page.dart';
@@ -237,7 +238,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
     body: !_loaded
         ? Center(
             child: _loading
-                ? const CircularProgressIndicator()
+                ? const ConversationListSkeleton()
                 : TextButton(onPressed: reload, child: const Text('重试加载')),
           )
         : PaginationListener(

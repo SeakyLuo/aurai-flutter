@@ -1,3 +1,4 @@
+import 'conversation_list_skeleton.dart';
 import '../../domain/error_message.dart';
 import 'conversation_preview_text.dart';
 import 'group_chat_navigation.dart';
@@ -118,7 +119,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
             child: _items.isEmpty
                 ? Center(
                     child: _loading
-                        ? const CircularProgressIndicator()
+                        ? const ConversationListSkeleton()
                         : Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 class SearchSkeleton extends StatefulWidget {
-  const SearchSkeleton({super.key});
+  const SearchSkeleton({super.key, this.label = '正在搜索', this.rowGap = 24});
+  final String label;
+  final double rowGap;
   @override
   State<SearchSkeleton> createState() => _SearchSkeletonState();
 }
@@ -44,7 +46,7 @@ class _SearchSkeletonState extends State<SearchSkeleton>
       context,
     ).colorScheme.onSurface.withValues(alpha: .12);
     return Semantics(
-      label: '正在搜索',
+      label: widget.label,
       child: ExcludeSemantics(
         child: AnimatedBuilder(
           animation: _animation,
@@ -63,7 +65,7 @@ class _SearchSkeletonState extends State<SearchSkeleton>
             children: [
               for (var i = 0; i < 5; i++)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 24),
+                  padding: EdgeInsets.only(bottom: widget.rowGap),
                   child: Row(
                     children: [
                       _block(24, 24),

@@ -243,7 +243,7 @@ class InteractiveMessage {
     },
   );
 
-  factory InteractiveMessage.fromJson(Map<String, Object?> json) {
+  factory InteractiveMessage.fromDefinition(Map<String, Object?> json) {
     _validateButtonColumns(json['buttonColumns']);
     final title = json['title'] as String;
     final body = json['body'] as String;
@@ -298,6 +298,19 @@ class InteractiveMessage {
           throw ArgumentError('$key 必须为参与者标识列表');
       }
     }
+    return InteractiveMessage.fromJson(json);
+  }
+
+  // System notices carry audience metadata, not an actionable card.
+  factory InteractiveMessage.fromJson(Map<String, Object?> json) {
+    final title = json['title'] as String;
+    final body = json['body'] as String;
+    final buttons = (json['buttons'] as List)
+        .map((b) => Map<String, Object?>.from(b as Map))
+        .toList();
+    final states = (json['states'] as List? ?? const [])
+        .map((state) => Map<String, Object?>.from(state as Map))
+        .toList();
     final interaction = Map<String, Object?>.from(
       json['interaction'] as Map? ?? const {},
     );

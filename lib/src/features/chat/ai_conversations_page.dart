@@ -1,3 +1,4 @@
+import 'conversation_list_skeleton.dart';
 import 'conversation_status_dot.dart';
 import '../../domain/error_message.dart';
 import 'conversation_preview_text.dart';
@@ -155,7 +156,9 @@ class _AiConversationsPageState extends State<AiConversationsPage>
     ),
     body: _items.isEmpty
         ? Center(
-            child: _loading || _opening
+            child: _loading
+                ? const ConversationListSkeleton()
+                : _opening
                 ? const CircularProgressIndicator()
                 : _failed
                 ? TextButton(

@@ -57,7 +57,7 @@ completeInteractiveCallback(
   if (['interaction', 'participation', 'states'].any(result.containsKey)) {
     throw ArgumentError('回调结果使用 title、body、buttons；修改共享规则请另行更新定义');
   }
-  final presentation = InteractiveMessage.fromJson({
+  final presentation = InteractiveMessage.fromDefinition({
     ...card.toJson(),
     'title': result['title'],
     'body': result['body'],

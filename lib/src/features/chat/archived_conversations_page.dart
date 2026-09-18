@@ -1,3 +1,4 @@
+import 'conversation_list_skeleton.dart';
 import '../../domain/error_message.dart';
 import 'conversation_preview_text.dart';
 import 'package:flutter/material.dart';
@@ -72,7 +73,9 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
-            child: _items.isEmpty && !_loading && !_failed
+            child: _items.isEmpty && _loading
+                ? const ConversationListSkeleton()
+                : _items.isEmpty && !_failed
                 ? Text(
                     '暂无归档会话',
                     style: TextStyle(color: colors.onSurfaceVariant),
