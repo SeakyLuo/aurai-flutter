@@ -154,7 +154,7 @@ class HtmlGameStore {
       throw ArgumentError('请选择包含你和用户的 2–8 位当前群成员，并指定有效的下一位玩家');
     final interactive = args['interaction'] == null
         ? null
-        : InteractiveMessage.fromJson({
+        : InteractiveMessage.fromDefinition({
             'title': title,
             'body': '',
             'revision': 0,

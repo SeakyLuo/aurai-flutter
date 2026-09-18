@@ -8,7 +8,7 @@ extension InteractiveMessageActions on ChatController {
   }) async {
     await _store.writer.flush();
     final conversation = activeConversation;
-    final card = InteractiveMessage.fromJson({
+    final card = InteractiveMessage.fromDefinition({
       ...definition,
       'revision': 0,
       'participation': {
@@ -72,7 +72,7 @@ extension InteractiveMessageActions on ChatController {
       );
       if (access.isEmpty) throw StateError('会话不存在或你无权访问该会话');
       final target = sameConversation ? source : await _forwardTarget(targetId);
-      final card = InteractiveMessage.fromJson({...args, 'revision': 0});
+      final card = InteractiveMessage.fromDefinition({...args, 'revision': 0});
       card.validateTransport(html: false);
       final profile = await groupStore.loadAi(senderId);
       final message = AgentMessage(
@@ -216,7 +216,7 @@ extension InteractiveMessageActions on ChatController {
               jsonEncode(old.toJson()[key]) !=
               jsonEncode(args[key] ?? old.toJson()[key]),
         );
-    var card = InteractiveMessage.fromJson({
+    var card = InteractiveMessage.fromDefinition({
       ...old.toJson(includeParticipants: true),
       ...args,
       'participation': {
