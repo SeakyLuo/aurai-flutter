@@ -4,18 +4,18 @@ import 'quick_reply_groups.dart';
 
 Future<MessageAction?> showQuickReplyPicker(
   BuildContext context, {
-  String? selectedKey,
+  Set<String> selectedKeys = const {},
 }) => showModalBottomSheet<MessageAction>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
   showDragHandle: true,
-  builder: (_) => _QuickReplyPicker(selectedKey: selectedKey),
+  builder: (_) => _QuickReplyPicker(selectedKeys: selectedKeys),
 );
 
 class _QuickReplyPicker extends StatelessWidget {
-  const _QuickReplyPicker({this.selectedKey});
-  final String? selectedKey;
+  const _QuickReplyPicker({required this.selectedKeys});
+  final Set<String> selectedKeys;
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +63,7 @@ class _QuickReplyPicker extends StatelessWidget {
                                   alignment: Alignment.center,
                                   height: 60,
                                   decoration: BoxDecoration(
-                                    color: selectedKey == key
+                                    color: selectedKeys.contains(key)
                                         ? Theme.of(
                                             context,
                                           ).colorScheme.primaryContainer

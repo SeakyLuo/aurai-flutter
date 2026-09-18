@@ -136,15 +136,7 @@ extension MessageRecall on ChatController {
     final peer = _peerSessions[conversation.id];
     if (peer != null) {
       final session = await peer;
-      final notice = AgentMessage(
-        id: message.id,
-        role: message.role,
-        senderId: message.senderId,
-        sender: message.sender,
-        text: '${message.sender!.name}撤回了一条消息',
-        createdAt: message.createdAt,
-        isSystem: true,
-      );
+      final notice = _recallNotice(message, userInitiated: false);
       _replaceRecalled(session.conversation.messages, messageId, notice);
       _replaceRecalled(session.dispatcher.history, messageId, notice);
     }
@@ -169,15 +161,7 @@ extension MessageRecall on ChatController {
     required bool userInitiated,
   }) async {
     if (!_recallingMessages.add(message.id)) return;
-    final notice = AgentMessage(
-      id: message.id,
-      role: message.role,
-      senderId: message.senderId,
-      sender: message.sender,
-      text: userInitiated ? '你撤回了一条消息' : '${message.sender!.name}撤回了一条消息',
-      createdAt: message.createdAt,
-      isSystem: true,
-    );
+    final notice = _recallNotice(message, userInitiated: userInitiated);
     final dispatcher = _runningConversation?.id == conversation.id
         ? _groupDispatcher
         : null;
@@ -195,6 +179,9 @@ extension MessageRecall on ChatController {
               'quote_json': null,
               'run_id': null,
               'model_turn_id': null,
+              'interactive_json': notice.interactive == null
+                  ? null
+                  : jsonEncode(notice.interactive!.toJson()),
             },
             where: 'id = ? AND conversation_id = ?',
             whereArgs: [message.id, conversation.id],
@@ -260,7 +247,11 @@ extension MessageRecall on ChatController {
       _conversationChanged();
       if (userInitiated && live) {
         dispatcher.start(
-          _groupReplies.keys.where((id) => !dispatcher.paused.contains(id)),
+          _groupReplies.keys.where(
+            (id) =>
+                !dispatcher.paused.contains(id) &&
+                (notice.interactive?.canView(id) ?? true),
+          ),
         );
       } else if (userInitiated) {
         await _receiveGroupSystemNotice(conversation.id, notice);
@@ -276,6 +267,33 @@ extension MessageRecall on ChatController {
     senderId: quote.senderId,
     text: '消息已撤回',
   )..senderName = quote.senderName;
+
+  AgentMessage _recallNotice(
+    AgentMessage message, {
+    required bool userInitiated,
+  }) {
+    final text = userInitiated ? '你撤回了一条消息' : '${message.sender!.name}撤回了一条消息';
+    final audience = message.interactive?.participation['audience'];
+    return AgentMessage(
+      id: message.id,
+      role: message.role,
+      senderId: message.senderId,
+      sender: message.sender,
+      text: text,
+      createdAt: message.createdAt,
+      isSystem: true,
+      // Preserve visibility without retaining the recalled card's content or controls.
+      interactive: audience == null
+          ? null
+          : InteractiveMessage(
+              revision: message.interactive!.revision,
+              title: text,
+              body: '',
+              buttons: const [],
+              participation: {'audience': List<String>.from(audience as List)},
+            ),
+    );
+  }
 
   void _replaceRecalled(
     List<AgentMessage> messages,

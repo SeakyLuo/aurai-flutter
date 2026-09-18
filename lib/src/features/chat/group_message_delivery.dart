@@ -30,15 +30,20 @@ extension GroupMessageDelivery on ChatController {
     final item = arguments['message'] as Map<String, Object?>?;
     _cacheGroupMessageDraft(reply.senderId, item);
     final seen = {for (final m in observed) m.id: m};
-    final fresh = dispatcher.history
+    final updates = dispatcher.history
         .where(
           (m) => !seen.containsKey(m.id) || seen[m.id]!.isSystem != m.isSystem,
         )
         .toList();
     dispatcher.acknowledge(reply.senderId);
+    observed.removeWhere((m) => updates.any((f) => f.id == m.id));
+    observed.addAll(updates);
+    final fresh = updates
+        .where(
+          (message) => message.interactive?.canView(reply.senderId) ?? true,
+        )
+        .toList();
     if (fresh.isNotEmpty) {
-      observed.removeWhere((m) => fresh.any((f) => f.id == m.id));
-      observed.addAll(fresh);
       return {
         'sent': false,
         'reason': 'new_messages',

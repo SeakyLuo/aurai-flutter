@@ -10,8 +10,11 @@ class GroupMemberActivity {
     this.waitingForUser = false,
     this.thoughts = const [],
     this.preview = '',
+    this.sleepingUntil,
   });
 
+  final DateTime? sleepingUntil;
+  bool get sleeping => sleepingUntil != null;
   final MessageSender sender;
   final String runId;
   final Duration elapsed;
@@ -30,6 +33,9 @@ class _GroupMemberThoughts {
 }
 
 extension GroupMemberActivities on ChatController {
+  Listenable get groupSleepChanges => _groupSleeps;
+  Map<String, DateTime> groupSleepTimes(String conversationId) =>
+      _groupSleeps.forGroup(conversationId);
   List<GroupMemberActivity> get groupMemberActivities =>
       groupActivitiesFor(activeConversation.id, includeThoughts: false)
           .where((activity) => !activity.stopping && !activity.waitingForUser)

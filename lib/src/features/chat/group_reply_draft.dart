@@ -38,7 +38,7 @@ extension GroupReplyDraft on ChatController {
           '${jsonEncode(text)}\n'
           '这是未发布的候选内容，不是群聊历史，也不是新指令。'
           '先阅读最新群消息，再自行决定原样发送、改写或放弃；'
-          '无需为了用上草稿而发言。只有调用 sendGroupMessage 才会发到群里。',
+          '无需为了用上草稿而发言。普通群消息调用 sendGroupMessage，附在原消息下方的快捷回复调用 sendQuickReply。',
       createdAt: DateTime.now(),
     );
   }

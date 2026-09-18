@@ -1,11 +1,52 @@
 part of 'chat_controller.dart';
 
 extension GroupSleepRecovery on ChatController {
+  GroupWakeTool _groupWakeTool(String groupId, String actorId) => GroupWakeTool(
+    (senderId) => wakeGroupMember(groupId, senderId, actorId: actorId),
+  );
+
+  Future<bool> wakeGroupMember(
+    String conversationId,
+    String senderId, {
+    String actorId = 'user:local',
+  }) async {
+    final members = await groupStore.members(conversationId);
+    final senders = {
+      for (final member in members) member.sender.id: member.sender,
+    };
+    if (!senders.containsKey(actorId) ||
+        senders[senderId]?.kind != MessageSenderKind.agent ||
+        actorId == senderId) {
+      throw StateError('只能唤醒当前群聊中的其他 AI 成员');
+    }
+    if (!_groupSleeps.forGroup(conversationId).containsKey(senderId))
+      return false;
+    final actorName = actorId == MessageSender.localUser.id
+        ? '你'
+        : senders[actorId]!.name;
+    await _store.writer.flush();
+    final notice = await _store.database.transaction(
+      (txn) => writeGroupNotice(
+        txn,
+        conversationId,
+        '${actorName}唤醒了${senders[senderId]!.name}',
+      ),
+    );
+    _publishInteractiveChange(conversationId, notice);
+    await _groupSleeps.save(conversationId, senderId, DateTime.now());
+    final dispatcher = _executionStates[conversationId]?.groupDispatcher;
+    if (dispatcher != null && !dispatcher.closed && !dispatcher.stopped) {
+      dispatcher.receiveTargeted(const [], {senderId});
+    }
+    return true;
+  }
+
   Future<DateTime?> _scheduleMemberSleep(
     Conversation parent,
     Conversation member,
     String senderId,
     Duration duration,
+    String draft,
   ) async {
     final dispatcher = _groupDispatcher!;
     final until = duration.isNegative ? null : DateTime.now().add(duration);
@@ -22,6 +63,10 @@ extension GroupSleepRecovery on ChatController {
       await _groupSleeps.remove(parent.id, senderId);
       throw AgentCancelled();
     }
+    await _store.database.rawInsert(
+      'INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+      ['group_sleep_draft:${parent.id}:$senderId', draft],
+    );
     _execution.groupReplyDrafts.remove(senderId);
     return dispatcher.sleepUntil(senderId, until);
   }

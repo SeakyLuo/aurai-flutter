@@ -354,6 +354,7 @@ String _defaultToolTitle(String name) => switch (name) {
   'getModelConfiguration' => '检查模型配置',
   'openModelConfiguration' => '打开模型设置',
   'sendGroupMessage' => '发送群消息',
+  'wakeGroupMember' => '唤醒群成员',
   'sleepGroupChat' => '稍后查看群聊',
   'sendQuickReply' => '发送快捷回复',
   'recallMessage' => '撤回消息',

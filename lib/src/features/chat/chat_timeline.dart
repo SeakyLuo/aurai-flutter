@@ -307,8 +307,8 @@ List<ChatTimelineEntry> buildChatTimeline(
                 !message.isSystem &&
                     !message.isReasoning &&
                     message.interactive?.systemPresentation != true &&
-                    message.role == AgentMessageRole.assistant &&
-                    message.senderId != MessageSender.localUser.id
+                    (message.role == AgentMessageRole.assistant ||
+                        message.senderId == MessageSender.localUser.id)
                 ? onQuickReply
                 : null,
             availableSources:

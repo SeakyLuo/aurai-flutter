@@ -1,6 +1,26 @@
 part of 'chat_page.dart';
 
 extension _ChatGroupNavigation on _ChatPageState {
+  Widget _groupStatus(Conversation conversation) => GroupStatusBuilder(
+    key: ValueKey(conversation.id),
+    controller: widget.controller,
+    conversationId: conversation.id,
+    includeThoughts: false,
+    builder: (context, activities) => GroupActivityAvatars(
+      activities: activities
+          .where((a) => !a.stopping && !a.waitingForUser)
+          .toList(),
+      onPressed: () {
+        _focusNode.unfocus();
+        showGroupActivitySheet(
+          context,
+          controller: widget.controller,
+          conversationId: conversation.id,
+        );
+      },
+    ),
+  );
+
   Widget _groupIntroduction(
     List<ChatTimelineEntry> timeline,
     double top,

@@ -1,3 +1,4 @@
+import 'group_status_builder.dart';
 import 'ai_contact_page.dart';
 import 'personal_info_page.dart';
 import 'home_page.dart';
@@ -473,18 +474,7 @@ class _ChatPageState extends State<ChatPage>
                         left: 0,
                         right: 0,
                         bottom: bottom,
-                        child: GroupActivityAvatars(
-                          key: ValueKey(active.id),
-                          activities: controller.groupMemberActivities,
-                          onPressed: () {
-                            _focusNode.unfocus();
-                            showGroupActivitySheet(
-                              context,
-                              controller: controller,
-                              conversationId: active.id,
-                            );
-                          },
-                        ),
+                        child: _groupStatus(active),
                       ),
                   ],
                 );

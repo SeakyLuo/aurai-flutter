@@ -221,9 +221,11 @@ class SettingsPage extends StatelessWidget {
                       leading: const SettingsIcon(type: SettingsIconType.model),
                       title: const Text('模型设置'),
                       subtitle: Text(
-                        modelDisplayName(
-                          controller.modelSettings.activeConfig.model,
-                        ),
+                        controller.modelSettings.activeConfig.isConfigured
+                            ? modelDisplayName(
+                                controller.modelSettings.activeConfig.model,
+                              )
+                            : '未设置',
                       ),
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,

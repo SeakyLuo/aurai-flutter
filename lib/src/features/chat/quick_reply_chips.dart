@@ -42,12 +42,6 @@ class QuickReplyChips extends StatelessWidget {
               shrinkWrap: true,
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
               children: [
-                const Text(
-                  '回应详情',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 20),
                 for (final key in replies.map((r) => r.key).toSet()) ...[
                   Text(
                     '${replies.firstWhere((r) => r.key == key).text} · ${replies.where((r) => r.key == key).length}',
@@ -95,7 +89,7 @@ class QuickReplyChips extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               child: InkWell(
                 borderRadius: BorderRadius.circular(16),
-                onTap: own && onTap != null
+                onTap: onTap != null
                     ? () => onTap!(key, group.first.text)
                     : null,
                 onLongPress: () => _showPeople(context),

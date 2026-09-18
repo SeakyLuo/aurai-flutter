@@ -1,6 +1,22 @@
 part of 'chat_controller.dart';
 
 extension GroupSystemEvents on ChatController {
+  void _dispatchGroupNotice(GroupDispatcher dispatcher, AgentMessage notice) {
+    if (notice.interactive?.participation['audience'] == null) {
+      dispatcher.receive([notice], mentions: _groupNoticeMentions([notice]));
+    } else {
+      dispatcher.receiveTargeted(
+        [notice],
+        {
+          for (final id in _groupReplies.keys)
+            if (notice.interactive!.canView(id) &&
+                !dispatcher.paused.contains(id))
+              id,
+        },
+      );
+    }
+  }
+
   Set<String> _groupNoticeMentions(Iterable<AgentMessage> messages) => {
     for (final entry in _groupSenders.entries)
       if (messages.any(
@@ -42,9 +58,7 @@ extension GroupSystemEvents on ChatController {
         _store.writer.remember([notice]);
         _notifyRun(running);
         if (!dispatcher.history.any((m) => m.id == notice.id)) {
-          dispatcher.receive([
-            notice,
-          ], mentions: _groupNoticeMentions([notice]));
+          _dispatchGroupNotice(dispatcher, notice);
         }
       } finally {
         dispatcher.release();

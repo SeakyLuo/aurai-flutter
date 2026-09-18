@@ -22,7 +22,7 @@ class TaskUnsavedDialog extends StatelessWidget {
         const SizedBox(height: 10),
         DialogActionButton(
           text: '放弃修改',
-          role: DialogActionRole.destructive,
+          role: DialogActionRole.reject,
           onPressed: () => Navigator.pop(context, 'discard'),
         ),
         const SizedBox(height: 10),

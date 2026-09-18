@@ -81,6 +81,9 @@ abstract final class GlobalUI {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: colors,
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: dark ? const Color(0xffc4b5fd) : onPrimary,
+      ),
       scaffoldBackgroundColor: colors.surface,
       switchTheme: SwitchThemeData(
         trackColor: WidgetStateProperty.resolveWith((states) {

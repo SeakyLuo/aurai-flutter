@@ -1,9 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class GroupSleepStore {
+class GroupSleepStore extends ChangeNotifier {
   final _preferences = SharedPreferencesAsync();
   late Database _database;
   static const _key = 'group_member_sleeps';
@@ -40,6 +41,7 @@ class GroupSleepStore {
       ..clear()
       ..addAll(_decode(rows.isEmpty ? '{}' : rows.single['value'] as String));
     _arm();
+    notifyListeners();
   });
 
   Map<String, Map<String, int>> _decode(String encoded) => {
@@ -118,6 +120,7 @@ class GroupSleepStore {
           ..clear()
           ..addAll(next);
         _arm();
+        notifyListeners();
       });
 
   Future<void> _enqueue(Future<void> Function() action) {
@@ -167,7 +170,9 @@ class GroupSleepStore {
     }
   }
 
+  @override
   void dispose() {
+    super.dispose();
     _disposed = true;
     _timer?.cancel();
   }

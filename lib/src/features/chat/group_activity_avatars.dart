@@ -21,7 +21,7 @@ class GroupActivityAvatars extends StatefulWidget {
 }
 
 class _ActivityAvatarsState extends State<GroupActivityAvatars>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const _showAfter = Duration(seconds: 1);
   static const _avatarSize = 26.0;
   static const _avatarStride = 16.0;
@@ -30,6 +30,21 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
     vsync: this,
     duration: const Duration(milliseconds: 2800),
   );
+  late final AnimationController _sleepAnimation =
+      AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1848),
+      )..addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          _sleepPause = Timer(const Duration(seconds: 4), () {
+            _sleepPause = null;
+            if (_animate && _visible.any((a) => a.sleeping)) {
+              _sleepAnimation.forward(from: 0);
+            }
+          });
+        }
+      });
+  Timer? _sleepPause;
   Timer? _revealTimer;
   List<GroupMemberActivity> _visible = const [];
   bool _animate = false;
@@ -65,7 +80,7 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
     Duration? nextReveal;
     for (final activity in widget.activities) {
       final remaining = _showAfter - activity.elapsed - _sinceUpdate.elapsed;
-      if (remaining <= Duration.zero) {
+      if (activity.sleeping || remaining <= Duration.zero) {
         visible.add(activity);
       } else if (nextReveal == null || remaining < nextReveal) {
         nextReveal = remaining;
@@ -79,11 +94,20 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
   }
 
   void _updateAnimation() {
-    if (_animate && _visible.isNotEmpty) {
+    if (_animate && _visible.any((a) => !a.sleeping)) {
       if (!_animation.isAnimating) _animation.repeat();
     } else {
       _animation.stop();
       _animation.value = 0;
+    }
+    if (_animate && _visible.any((a) => a.sleeping)) {
+      if (!_sleepAnimation.isAnimating && _sleepPause == null) {
+        _sleepAnimation.forward(from: 0);
+      }
+    } else {
+      _sleepPause?.cancel();
+      _sleepPause = null;
+      _sleepAnimation.reset();
     }
   }
 
@@ -91,6 +115,8 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
   void dispose() {
     _revealTimer?.cancel();
     _sinceUpdate.stop();
+    _sleepPause?.cancel();
+    _sleepAnimation.dispose();
     _animation.dispose();
     super.dispose();
   }
@@ -147,7 +173,7 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
     final shown = _visible.take(count).toList();
     return Semantics(
       button: true,
-      label: '查看 ${_visible.length} 位成员的思考状态',
+      label: '查看 ${_visible.length} 位成员的状态',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: widget.onPressed,
@@ -194,38 +220,87 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
     );
   }
 
-  Widget _buildAvatar(GroupMemberActivity activity, int index) =>
-      AnimatedBuilder(
-        animation: _animation,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            shape: BoxShape.circle,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(1),
-            child: MemberAvatar(sender: activity.sender, size: 24),
-          ),
+  Widget _sleepLetter(int index) {
+    final progress = ((_sleepAnimation.value * 1848 - index * 224) / 1400)
+        .clamp(0.0, 1.0);
+    final wave = _animate ? (1 - math.cos(progress * math.pi * 2)) / 2 : 0.0;
+    return Transform.scale(
+      alignment: Alignment.bottomCenter,
+      scale: 1 - .35 * wave,
+      child: Text(
+        'z',
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
-        builder: (context, child) {
-          final phase =
-              (_animation.value - index * .19 - (index % 3) * .035) % 1;
-          final pose = _animate ? _bouncePose(phase, index) : _restingPose;
-          return Transform.translate(
-            offset: Offset(0, pose.y),
-            child: Transform.rotate(
-              angle: pose.angle,
-              alignment: Alignment.bottomCenter,
-              child: Transform.scale(
-                scaleX: pose.scaleX,
-                scaleY: pose.scaleY,
-                alignment: Alignment.bottomCenter,
-                child: child,
+      ),
+    );
+  }
+
+  Widget _buildAvatar(GroupMemberActivity activity, int index) =>
+      activity.sleeping
+      ? Stack(
+          clipBehavior: Clip.none,
+          children: [
+            MemberAvatar(sender: activity.sender, size: 24),
+            Positioned(
+              right: -4,
+              top: -6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: AnimatedBuilder(
+                  animation: _sleepAnimation,
+                  builder: (context, _) => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (var i = 0; i < 3; i++)
+                        Padding(
+                          padding: EdgeInsets.only(right: i < 2 ? 1.5 : 0),
+                          child: _sleepLetter(i),
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
-          );
-        },
-      );
+          ],
+        )
+      : AnimatedBuilder(
+          animation: _animation,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              shape: BoxShape.circle,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(1),
+              child: MemberAvatar(sender: activity.sender, size: 24),
+            ),
+          ),
+          builder: (context, child) {
+            final phase =
+                (_animation.value - index * .19 - (index % 3) * .035) % 1;
+            final pose = _animate ? _bouncePose(phase, index) : _restingPose;
+            return Transform.translate(
+              offset: Offset(0, pose.y),
+              child: Transform.rotate(
+                angle: pose.angle,
+                alignment: Alignment.bottomCenter,
+                child: Transform.scale(
+                  scaleX: pose.scaleX,
+                  scaleY: pose.scaleY,
+                  alignment: Alignment.bottomCenter,
+                  child: child,
+                ),
+              ),
+            );
+          },
+        );
 }
 
 typedef _BouncePose = ({double y, double scaleX, double scaleY, double angle});

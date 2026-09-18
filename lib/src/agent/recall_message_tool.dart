@@ -13,7 +13,7 @@ class RecallMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
     description:
         '撤回你自己在有权访问的私聊或群聊中已经发送的消息，无需切换会话。'
         '从当前消息上下文或 searchMessages 获取消息 ID，不要让用户填写 ID。'
-        '不能撤回用户、其他 AI 或系统消息。撤回后保留系统提示，引用内容变为消息已撤回。'
+        '不能撤回用户、其他 AI 或系统消息。撤回提示沿用原消息的可见范围，原本无权查看的人看不到撤回事件；引用内容变为消息已撤回。'
         '这不会撤销消息中提及的实际操作，也无法让其他成员忘记已经读到的内容。',
     inputSchema: {
       'type': 'object',
