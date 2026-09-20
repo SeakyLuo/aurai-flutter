@@ -99,6 +99,17 @@ class SettingsPage extends StatelessWidget {
     }
   }
 
+  Future<void> _openBackground(BuildContext context) async {
+    try {
+      await controller.openBatterySettings();
+    } on Object catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showGlassSnackBar(
+        SnackBar(content: Text('无法打开后台运行设置：${errorMessage(error)}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
@@ -280,6 +291,23 @@ class SettingsPage extends StatelessWidget {
                         type: SettingsIconType.chevron,
                       ),
                       onTap: () => _openNotifications(context),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Material(
+                    color: settingsFieldColor(context),
+                    borderRadius: BorderRadius.circular(26),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      leading: const SettingsIcon(
+                        type: SettingsIconType.device,
+                      ),
+                      title: const Text('后台运行'),
+                      subtitle: const Text('允许息屏后继续回复，减少省电限制'),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: () => _openBackground(context),
                     ),
                   ),
                   const SizedBox(height: 12),

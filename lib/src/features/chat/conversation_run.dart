@@ -112,6 +112,13 @@ extension ConversationRun on ChatController {
         .map((m) => {'id': m.id, 'name': m.name})
         .toList();
     try {
+      if (!sessionStarted) {
+        await _platform.startAgentSession(
+          scheduled ? '正在执行定时任务' : '正在回复',
+          conversationId: runConversation.id,
+        );
+        sessionStarted = true;
+      }
       await _persistMember(runConversation, groupParent);
       await refreshCapabilities();
       if (runConversation.runState == ChatRunState.stopping)
@@ -224,13 +231,6 @@ extension ConversationRun on ChatController {
       } else {
         _groupRuntimes[reply.senderId] = runtime;
       }
-      if (scheduled) {
-        await _platform.startAgentSession(
-          '正在执行定时任务',
-          conversationId: runConversation.id,
-        );
-        sessionStarted = true;
-      }
       if (runConversation.runState == ChatRunState.stopping)
         throw AgentCancelled();
       var turnOrdinal = 0;
@@ -306,13 +306,6 @@ extension ConversationRun on ChatController {
         },
         onToolStarted: (call) async {
           diagnosticCalls[call.id] = ExecutionLog.argumentShape(call.arguments);
-          if (!sessionStarted) {
-            await _platform.startAgentSession(
-              toolTitle(call.name),
-              conversationId: runConversation.id,
-            );
-            sessionStarted = true;
-          }
           await _store.runs.startTool(
             runConversation.id,
             runId,

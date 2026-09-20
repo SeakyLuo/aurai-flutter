@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -9,21 +10,120 @@ class JumpToBottomButton extends StatelessWidget {
     super.key,
     required this.streaming,
     required this.onPressed,
+    this.visible = true,
   });
 
   final bool streaming;
+  final bool visible;
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => GlassSurface(
-    radius: 28,
-    child: RoundAction(
-      label: '回到底部',
-      onPressed: onPressed,
-      icon: Icons.arrow_downward_rounded,
-      iconWidget: streaming ? const _BouncingDots() : null,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final visibility = context
+        .dependOnInheritedWidgetOfExactType<_JumpVisibility>()!
+        .notifier!;
+    return ValueListenableBuilder<bool>(
+      valueListenable: visibility,
+      builder: (context, scrolling, child) {
+        final shown = visible && scrolling;
+        final duration = MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 220);
+        return IgnorePointer(
+          ignoring: !shown,
+          child: ExcludeSemantics(
+            excluding: !shown,
+            child: AnimatedOpacity(
+              opacity: shown ? 1 : 0,
+              duration: duration,
+              curve: Curves.easeOutCubic,
+              child: AnimatedSlide(
+                offset: shown ? Offset.zero : const Offset(0, .2),
+                duration: duration,
+                curve: Curves.easeOutCubic,
+                child: AnimatedScale(
+                  scale: shown ? 1 : .9,
+                  duration: duration,
+                  curve: Curves.easeOutCubic,
+                  child: child,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      child: GlassSurface(
+        radius: 28,
+        child: RoundAction(
+          label: '回到底部',
+          onPressed: onPressed,
+          icon: Icons.arrow_downward_rounded,
+          iconWidget: streaming ? const _BouncingDots() : null,
+        ),
+      ),
+    );
+  }
+}
+
+/// Keeps gesture visibility even before scrolling reveals the jump button.
+class ScrollAwareJumpStack extends StatefulWidget {
+  const ScrollAwareJumpStack({
+    super.key,
+    required this.children,
+    this.fit = StackFit.loose,
+  });
+  final List<Widget> children;
+  final StackFit fit;
+
+  @override
+  State<ScrollAwareJumpStack> createState() => _ScrollAwareJumpStackState();
+}
+
+class _ScrollAwareJumpStackState extends State<ScrollAwareJumpStack> {
+  final _visible = ValueNotifier(false);
+  Timer? _hideTimer;
+  bool _userScroll = false;
+
+  bool _onScroll(ScrollNotification event) {
+    if (event.metrics.axis != Axis.vertical) return false;
+    if (event is ScrollStartNotification && event.dragDetails != null) {
+      _userScroll = true;
+    }
+    if (event is ScrollUpdateNotification && event.dragDetails != null) {
+      _userScroll = true;
+    }
+    if (_userScroll) {
+      _visible.value = true;
+      _hideTimer?.cancel();
+      _hideTimer = Timer(
+        const Duration(seconds: 5),
+        () => _visible.value = false,
+      );
+    }
+    if (event is ScrollEndNotification) _userScroll = false;
+    return false;
+  }
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    _visible.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      NotificationListener<ScrollNotification>(
+        onNotification: _onScroll,
+        child: _JumpVisibility(
+          notifier: _visible,
+          child: Stack(fit: widget.fit, children: widget.children),
+        ),
+      );
+}
+
+class _JumpVisibility extends InheritedNotifier<ValueNotifier<bool>> {
+  const _JumpVisibility({required super.notifier, required super.child});
 }
 
 class _BouncingDots extends StatefulWidget {

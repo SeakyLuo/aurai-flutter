@@ -107,7 +107,9 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
             if (widget.includeInactive && active.contains(member.id))
               bySender[member.id]!
             else if (!active.contains(member.id) &&
-                (widget.includeInactive || sleeps.containsKey(member.id)))
+                (widget.includeInactive ||
+                    sleeps.containsKey(member.id) ||
+                    _paused.contains(member.id)))
               GroupMemberActivity(
                 sender: member,
                 runId: 'inactive:${member.id}',

@@ -242,28 +242,6 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                       const SizedBox(height: 12),
                       _surface(
                         ListTile(
-                          minTileHeight: 60,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                          ),
-                          title: const Text(
-                            '群成员状态',
-                            style: TextStyle(fontSize: 15),
-                          ),
-                          trailing: const SettingsIcon(
-                            type: SettingsIconType.chevron,
-                          ),
-                          onTap: () => _open(
-                            GroupActivityPage(
-                              controller: widget.controller,
-                              conversationId: _conversation.id,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _surface(
-                        ListTile(
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16,
                           ),
@@ -304,6 +282,28 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                           '查找聊天记录',
                           () => _open(
                             GroupMessageSearchPage(
+                              controller: widget.controller,
+                              conversationId: _conversation.id,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _surface(
+                        ListTile(
+                          minTileHeight: 60,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                          ),
+                          title: const Text(
+                            '群成员状态',
+                            style: TextStyle(fontSize: 15),
+                          ),
+                          trailing: const SettingsIcon(
+                            type: SettingsIconType.chevron,
+                          ),
+                          onTap: () => _open(
+                            GroupActivityPage(
                               controller: widget.controller,
                               conversationId: _conversation.id,
                             ),

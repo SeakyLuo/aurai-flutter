@@ -412,18 +412,6 @@ class ChatViewportState extends State<ChatViewport> {
                   if (notification is ScrollEndNotification && _userScrolling) {
                     _rememberPosition();
                     _userScrolling = false;
-                    final anchor = _anchor;
-                    if (!_following && anchor != null) {
-                      final revision = _scrollRevision;
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (!mounted ||
-                            _userScrolling ||
-                            _following ||
-                            revision != _scrollRevision)
-                          return;
-                        _preserveEntry(anchor.messageId);
-                      });
-                    }
                   }
                 }
                 return false;

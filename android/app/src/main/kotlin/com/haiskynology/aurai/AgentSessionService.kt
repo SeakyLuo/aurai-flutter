@@ -11,9 +11,40 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.Looper
 
 class AgentSessionService : Service() {
+    private val power by lazy { getSystemService(PowerManager::class.java) }
+    private val executionLock by lazy {
+        power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Aurai:agentExecution").apply {
+            setReferenceCounted(false)
+        }
+    }
+    private val renewExecutionLock = object : Runnable {
+        override fun run() {
+            executionLock.acquire(10 * 60_000L)
+            handler.postDelayed(this, 5 * 60_000L)
+        }
+    }
+
+    private fun keepExecutionAwake() {
+        handler.removeCallbacks(renewExecutionLock)
+        renewExecutionLock.run()
+    }
+
+    private fun releaseExecutionLock() {
+        handler.removeCallbacks(renewExecutionLock)
+        if (executionLock.isHeld) executionLock.release()
+    }
+
+    override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
+        releaseExecutionLock()
+        running = false
+        super.onDestroy()
+    }
+
     private var groupChat = false
     private var avatar: ByteArray? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -31,6 +62,7 @@ class AgentSessionService : Service() {
                 avatar = null
                 running = true
                 startForeground(NOTIFICATION_ID, runningNotification("正在启动定时任务"))
+                keepExecutionAwake()
                 ScheduledTasks.dispatch()
                 handler.postDelayed({ ScheduledTasks.startupTimedOut() }, 60_000)
             }
@@ -39,6 +71,7 @@ class AgentSessionService : Service() {
                 avatar = intent.getByteArrayExtra("avatar")
                 running = true
                 startForeground(NOTIFICATION_ID, runningNotification(intent!!.getStringExtra(EXTRA_STEP)!!))
+                keepExecutionAwake()
             }
             ACTION_STEP -> notificationManager().notify(
                 NOTIFICATION_ID,
@@ -71,11 +104,13 @@ class AgentSessionService : Service() {
         val previousAvatar = avatar
         avatar = completedAvatar
         handler.removeCallbacksAndMessages(null)
+        if (keepRunning) keepExecutionAwake()
         if (!keepRunning) {
+            releaseExecutionLock()
             running = false
             stopForeground(STOP_FOREGROUND_REMOVE)
         }
-        if (!completedGroupChat && outcome != "cancelled" && !MainActivity.isResumed &&
+        if (!completedGroupChat && outcome != "cancelled" && !(MainActivity.isResumed && power.isInteractive) &&
             (outcome != "completed" || reply!!.isNotBlank())) {
             notificationManager().notify(
                 conversationId, FINISHED_NOTIFICATION_ID,

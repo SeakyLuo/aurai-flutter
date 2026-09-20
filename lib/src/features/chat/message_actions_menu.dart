@@ -57,17 +57,6 @@ Future<MessageMenuResult?> showMessageActionsMenu(
           ? Theme.of(context).colorScheme.onSurfaceVariant
           : const Color(0xff222222);
       final actions = [
-        if (allowStar)
-          (
-            const MessageActionResult(MessageAction.star),
-            SettingsIcon(
-              type: starred
-                  ? SettingsIconType.starFilled
-                  : SettingsIconType.star,
-              color: starred ? const Color(0xffe5ad24) : iconColor,
-            ),
-            starred ? '取消收藏' : '收藏',
-          ),
         if (allowHistory)
           (
             const MessageActionResult(MessageAction.history),
@@ -102,18 +91,29 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             ),
             '转发',
           ),
-        if (message.text.isNotEmpty) ...[
+        if (message.text.isNotEmpty)
           (
             const MessageActionResult(MessageAction.copy),
             CopyIcon(color: iconColor),
             message.htmlGame != null ? '复制标题' : '复制',
           ),
+        if (allowStar)
+          (
+            const MessageActionResult(MessageAction.star),
+            SettingsIcon(
+              type: starred
+                  ? SettingsIconType.starFilled
+                  : SettingsIconType.star,
+              color: starred ? const Color(0xffe5ad24) : iconColor,
+            ),
+            starred ? '取消收藏' : '收藏',
+          ),
+        if (message.text.isNotEmpty)
           (
             const MessageActionResult(MessageAction.select),
             TextSelectionIcon(color: iconColor),
             '选择文本',
           ),
-        ],
         if (allowEditing && message.role == AgentMessageRole.user)
           (
             const MessageActionResult(MessageAction.edit),
