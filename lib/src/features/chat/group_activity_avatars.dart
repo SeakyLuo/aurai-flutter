@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'chat_controller.dart';
 import 'member_avatar.dart';
+import 'question_icon.dart';
 
 class GroupActivityAvatars extends StatefulWidget {
   const GroupActivityAvatars({
@@ -80,7 +81,9 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
     Duration? nextReveal;
     for (final activity in widget.activities) {
       final remaining = _showAfter - activity.elapsed - _sinceUpdate.elapsed;
-      if (activity.sleeping || remaining <= Duration.zero) {
+      if (activity.sleeping ||
+          activity.autoReplyPaused ||
+          remaining <= Duration.zero) {
         visible.add(activity);
       } else if (nextReveal == null || remaining < nextReveal) {
         nextReveal = remaining;
@@ -94,7 +97,7 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
   }
 
   void _updateAnimation() {
-    if (_animate && _visible.any((a) => !a.sleeping)) {
+    if (_animate && _visible.any((a) => !a.sleeping && !a.idle)) {
       if (!_animation.isAnimating) _animation.repeat();
     } else {
       _animation.stop();
@@ -238,50 +241,81 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
     );
   }
 
-  Widget _buildAvatar(GroupMemberActivity activity, int index) =>
+  Widget _framedAvatar(GroupMemberActivity activity) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      shape: BoxShape.circle,
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(1),
+      child: MemberAvatar(sender: activity.sender, size: 24),
+    ),
+  );
+
+  Widget _buildAvatar(GroupMemberActivity activity, int index) => Stack(
+    clipBehavior: Clip.none,
+    children: [
+      _avatarBody(activity, index),
+      if (activity.autoReplyPaused)
+        Positioned(
+          right: -4,
+          top: -6,
+          child: Semantics(
+            label: '自动接话已暂停',
+            child: Container(
+              padding: const EdgeInsets.all(1),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: const SizedBox.square(
+                dimension: 14,
+                child: QuestionIcon(type: QuestionIconType.pause),
+              ),
+            ),
+          ),
+        ),
+    ],
+  );
+
+  Widget _avatarBody(GroupMemberActivity activity, int index) =>
       activity.sleeping
       ? Stack(
           clipBehavior: Clip.none,
           children: [
-            MemberAvatar(sender: activity.sender, size: 24),
-            Positioned(
-              right: -4,
-              top: -6,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: AnimatedBuilder(
-                  animation: _sleepAnimation,
-                  builder: (context, _) => Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (var i = 0; i < 3; i++)
-                        Padding(
-                          padding: EdgeInsets.only(right: i < 2 ? 1.5 : 0),
-                          child: _sleepLetter(i),
-                        ),
-                    ],
+            _framedAvatar(activity),
+            if (!activity.autoReplyPaused)
+              Positioned(
+                right: -4,
+                top: -6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: AnimatedBuilder(
+                    animation: _sleepAnimation,
+                    builder: (context, _) => Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (var i = 0; i < 3; i++)
+                          Padding(
+                            padding: EdgeInsets.only(right: i < 2 ? 1.5 : 0),
+                            child: _sleepLetter(i),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         )
+      : activity.idle
+      ? _framedAvatar(activity)
       : AnimatedBuilder(
           animation: _animation,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              shape: BoxShape.circle,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(1),
-              child: MemberAvatar(sender: activity.sender, size: 24),
-            ),
-          ),
+          child: _framedAvatar(activity),
           builder: (context, child) {
             final phase =
                 (_animation.value - index * .19 - (index % 3) * .035) % 1;

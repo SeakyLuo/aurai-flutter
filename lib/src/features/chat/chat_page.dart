@@ -357,7 +357,8 @@ class _ChatPageState extends State<ChatPage>
                     Center(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 760),
-                        child: Stack(
+                        child: ScrollAwareJumpStack(
+                          key: ValueKey(_conversationId),
                           children: [
                             Positioned.fill(
                               child: timeline.isEmpty && isGroup
@@ -452,20 +453,22 @@ class _ChatPageState extends State<ChatPage>
                                   ),
                                 ),
                               ),
-                            if (!_followOutput &&
-                                (_contentBelow || controller.hasSearchWindow) &&
-                                timeline.isNotEmpty)
-                              Positioned(
-                                left: 0,
-                                right: 0,
-                                bottom: bottom + 8,
-                                child: Center(
-                                  child: JumpToBottomButton(
-                                    streaming: controller.hasStreamingMessages,
-                                    onPressed: _scrollToBottom,
-                                  ),
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: bottom + 8,
+                              child: Center(
+                                child: JumpToBottomButton(
+                                  visible:
+                                      !_followOutput &&
+                                      (_contentBelow ||
+                                          controller.hasSearchWindow) &&
+                                      timeline.isNotEmpty,
+                                  streaming: controller.hasStreamingMessages,
+                                  onPressed: _scrollToBottom,
                                 ),
                               ),
+                            ),
                           ],
                         ),
                       ),

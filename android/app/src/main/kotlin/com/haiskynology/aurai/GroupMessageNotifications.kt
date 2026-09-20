@@ -7,12 +7,13 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.PowerManager
 
 object GroupMessageNotifications {
     private const val CHANNEL_ID = "aurai_group_messages"
 
     fun show(context: Context, conversationId: String, title: String, body: String, avatar: ByteArray) {
-        if (MainActivity.isResumed) return
+        if (MainActivity.isResumed && context.getSystemService(PowerManager::class.java).isInteractive) return
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, "群消息", NotificationManager.IMPORTANCE_HIGH).apply {

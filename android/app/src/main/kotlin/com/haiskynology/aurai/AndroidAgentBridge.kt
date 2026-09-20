@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
+import android.os.PowerManager
 import android.os.Looper
 import android.provider.Settings
 import android.os.SystemClock
@@ -80,9 +81,12 @@ class AndroidAgentBridge(private val context: Context) {
             "openSourceFile" -> SourceFileOpener.open(context, call.argument<String>("uri")!!, result)
             "openSettings" -> result.success(openSettings(call.argument<String>("screen")!!))
             "openBatterySettings" -> {
+                val exempt = context.getSystemService(PowerManager::class.java)
+                    .isIgnoringBatteryOptimizations(context.packageName)
                 startActivity(
                     Intent(
-                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        if (exempt) Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                        else Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                         Uri.parse("package:${context.packageName}"),
                     ),
                 )
@@ -107,6 +111,7 @@ class AndroidAgentBridge(private val context: Context) {
                 sessions.remove(id)
                 sessions[id] = session
                 AgentSessionService.start(context, session.step, session.groupChat, session.avatar)
+                requestMessageNotificationsOnce()
                 result.success(null)
             }
             "updateAttentionNotification" -> {
@@ -164,6 +169,15 @@ class AndroidAgentBridge(private val context: Context) {
             else -> return false
         }
         return true
+    }
+
+    private fun requestMessageNotificationsOnce() {
+        if (notificationGranted() || !MainActivity.isResumed) return
+        val preferences = context.getSharedPreferences("aurai", Context.MODE_PRIVATE)
+        if (preferences.getBoolean("notification_permission_requested", false)) return
+        val activity = MainActivity.current ?: return
+        preferences.edit().putBoolean("notification_permission_requested", true).apply()
+        activity.requestNotificationPermission { }
     }
 
     private fun backgroundRunReadiness() = mapOf(

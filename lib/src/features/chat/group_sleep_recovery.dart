@@ -21,9 +21,7 @@ extension GroupSleepRecovery on ChatController {
     }
     if (!_groupSleeps.forGroup(conversationId).containsKey(senderId))
       return false;
-    final actorName = actorId == MessageSender.localUser.id
-        ? '你'
-        : senders[actorId]!.name;
+    final actorName = senders[actorId]!.name;
     await _store.writer.flush();
     final notice = await _store.database.transaction(
       (txn) => writeGroupNotice(
