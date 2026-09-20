@@ -45,6 +45,51 @@ extension GroupSleepRecovery on ChatController {
     return true;
   }
 
+  Future<int> wakeAllGroupMembers(String conversationId) async {
+    final results = await Future.wait<Object>([
+      groupStore.members(conversationId),
+      GroupParticipation(_store.database).paused(conversationId),
+    ]);
+    final members = results[0] as List<ConversationMember>;
+    final paused = results[1] as Set<String>;
+    final actor = members
+        .firstWhere((member) => member.sender.id == MessageSender.localUser.id)
+        .sender;
+    final sleeping = _groupSleeps.forGroup(conversationId);
+    final targets = members
+        .where(
+          (member) =>
+              member.sender.kind == MessageSenderKind.agent &&
+              sleeping.containsKey(member.sender.id) &&
+              !paused.contains(member.sender.id),
+        )
+        .map((member) => member.sender)
+        .toList();
+    if (targets.isEmpty) return 0;
+    final ids = targets.map((sender) => sender.id).toSet();
+    await _store.writer.flush();
+    final notice = await _store.database.transaction(
+      (txn) => writeGroupNotice(
+        txn,
+        conversationId,
+        '${actor.name}唤醒了${targets.map((sender) => sender.name).join('、')}',
+      ),
+    );
+    _publishInteractiveChange(conversationId, notice);
+    final dispatcher = _executionStates[conversationId]?.groupDispatcher;
+    final immediate =
+        dispatcher != null && !dispatcher.closed && !dispatcher.stopped;
+    await _groupSleeps.wakeMembers(conversationId, ids, immediate: immediate);
+    if (immediate) {
+      if (!dispatcher.closed && !dispatcher.stopped) {
+        dispatcher.receiveTargeted(const [], ids);
+      } else {
+        await _groupSleeps.saveMembers(conversationId, ids, DateTime.now());
+      }
+    }
+    return targets.length;
+  }
+
   Future<DateTime?> _scheduleMemberSleep(
     Conversation parent,
     Conversation member,

@@ -46,6 +46,14 @@ extension GroupMemberActivities on ChatController {
     notifyListeners();
   }
 
+  Future<int> resumeAllGroupAutoReply(String groupId) async {
+    final ids = await GroupParticipation(_store.database).resumeAll(groupId);
+    _executionStates[groupId]?.groupDispatcher?.paused.removeAll(ids);
+    groupActivityChanges.value++;
+    notifyListeners();
+    return ids.length;
+  }
+
   HideThinkingTool _hideThinkingTool(
     Conversation member,
     Conversation? parent,
