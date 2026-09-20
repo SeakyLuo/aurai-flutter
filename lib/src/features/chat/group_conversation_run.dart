@@ -91,8 +91,9 @@ extension GroupConversationRun on ChatController {
         ..clear()
         ..addEntries(members.map((m) => MapEntry(m.sender.id, m.sender)));
       _checkGroupStopped(conversation);
+      _execution.groupNotificationStep = null;
       await _platform.startAgentSession(
-        'Aurai',
+        '${conversation.title}\n正在准备思考',
         conversationId: conversation.id,
         groupChat: true,
       );
@@ -264,6 +265,26 @@ extension GroupConversationRun on ChatController {
     } else {
       _mergeMember(member, parent);
       _notifyRun(parent);
+      final names = groupActivitiesFor(parent.id, includeThoughts: false)
+          .where((activity) => !activity.stopping && !activity.waitingForUser)
+          .map((activity) => activity.sender.name)
+          .toList();
+      final summary = names.isEmpty
+          ? '当前无人思考'
+          : names.length <= 2
+          ? '${names.join('、')}正在思考'
+          : '${names.take(2).join('、')}等 ${names.length} 人正在思考';
+      final step = '${parent.title}\n$summary';
+      if (_execution.groupNotificationStep != step) {
+        _execution.groupNotificationStep = step;
+        unawaited(
+          _platform
+              .updateAgentSessionStep(step, conversationId: parent.id)
+              .catchError((Object error) {
+                debugPrint('Group status notification failed: $error');
+              }),
+        );
+      }
     }
   }
 

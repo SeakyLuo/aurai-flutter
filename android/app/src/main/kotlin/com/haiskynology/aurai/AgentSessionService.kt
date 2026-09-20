@@ -130,6 +130,9 @@ class AgentSessionService : Service() {
             .apply {
                 if (groupChat) {
                     setShowWhen(false)
+                    setContentTitle(step.substringBefore('\n'))
+                    setContentText(step.substringAfter('\n', ""))
+                    setStyle(Notification.BigTextStyle().bigText(step.substringAfter('\n', "")))
                 } else {
                     setContentTitle(step)
                 }

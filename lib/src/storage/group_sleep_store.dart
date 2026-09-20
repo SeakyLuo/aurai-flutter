@@ -93,6 +93,32 @@ class GroupSleepStore extends ChangeNotifier {
     }
   });
 
+  Future<void> saveMembers(String group, Set<String> members, DateTime until) =>
+      _edit((groups) {
+        final sleepers = groups.putIfAbsent(group, () => {});
+        for (final member in members) {
+          sleepers[member] = until.millisecondsSinceEpoch;
+        }
+      });
+
+  Future<void> wakeMembers(
+    String group,
+    Set<String> members, {
+    required bool immediate,
+  }) => _edit((groups) {
+    final sleepers = groups[group];
+    if (sleepers == null) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final member in members) {
+      if (immediate) {
+        sleepers.remove(member);
+      } else if (sleepers.containsKey(member)) {
+        sleepers[member] = now;
+      }
+    }
+    if (sleepers.isEmpty) groups.remove(group);
+  });
+
   Future<void> retain(String group, Set<String> members) => _edit((groups) {
     groups[group]?.removeWhere((id, _) => !members.contains(id));
     if (groups[group]?.isEmpty == true) groups.remove(group);

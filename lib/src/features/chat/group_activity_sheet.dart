@@ -1,3 +1,4 @@
+import 'header_action_menu.dart';
 import '../../app/glass_notice.dart';
 import 'group_status_builder.dart';
 import 'package:flutter/material.dart';
@@ -48,6 +49,89 @@ class GroupActivityPage extends StatefulWidget {
 
 class _GroupActivitySheetState extends State<GroupActivityPage> {
   final _waking = <String>{};
+
+  bool _wakingAll = false;
+
+  bool _resumingAll = false;
+
+  Future<void> _resumeAll() async {
+    setState(() => _resumingAll = true);
+    try {
+      final count = await widget.controller.resumeAllGroupAutoReply(
+        widget.conversationId,
+      );
+      if (mounted)
+        ScaffoldMessenger.of(context).showGlassSnackBar(
+          SnackBar(
+            content: Text(count == 0 ? '当前没有需要恢复接话的成员' : '已恢复 $count 位成员的自动接话'),
+          ),
+        );
+    } on Object catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showGlassSnackBar(
+          SnackBar(content: Text('恢复接话失败：${errorMessage(error)}')),
+        );
+    } finally {
+      if (mounted) setState(() => _resumingAll = false);
+    }
+  }
+
+  Widget _batchActions() => Builder(
+    builder: (buttonContext) {
+      final busy =
+          _wakingAll ||
+          _resumingAll ||
+          _waking.isNotEmpty ||
+          _resuming.isNotEmpty;
+      return _MemberAction(
+        label: '更多',
+        icon: Icons.more_vert_rounded,
+        onPressed: busy
+            ? null
+            : () async {
+                final action = await showHeaderActionMenu(
+                  buttonContext,
+                  items: const [
+                    (
+                      value: 'wake',
+                      label: '全部唤醒',
+                      icon: QuestionIcon(type: QuestionIconType.play),
+                    ),
+                    (
+                      value: 'resume',
+                      label: '全部恢复接话',
+                      icon: QuestionIcon(type: QuestionIconType.play),
+                    ),
+                  ],
+                );
+                if (!mounted) return;
+                if (action == 'wake') await _wakeAll();
+                if (action == 'resume') await _resumeAll();
+              },
+      );
+    },
+  );
+
+  Future<void> _wakeAll() async {
+    setState(() => _wakingAll = true);
+    try {
+      final count = await widget.controller.wakeAllGroupMembers(
+        widget.conversationId,
+      );
+      if (mounted && count == 0) {
+        ScaffoldMessenger.of(
+          context,
+        ).showGlassSnackBar(const SnackBar(content: Text('当前没有需要唤醒的成员')));
+      }
+    } on Object catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showGlassSnackBar(
+          SnackBar(content: Text('唤醒失败：${errorMessage(error)}')),
+        );
+    } finally {
+      if (mounted) setState(() => _wakingAll = false);
+    }
+  }
 
   Future<void> _wake(GroupMemberActivity activity) async {
     setState(() => _waking.add(activity.sender.id));
@@ -219,7 +303,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
           ),
           const SizedBox(width: 8),
           if (activity.autoReplyPaused)
-            SettingsGlassAction(
+            _MemberAction(
               label: _resuming.contains(activity.sender.id) ? '恢复中' : '恢复接话',
               icon: Icons.play_arrow_rounded,
               iconWidget: _resuming.contains(activity.sender.id)
@@ -231,7 +315,10 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                       ),
                     )
                   : const QuestionIcon(type: QuestionIconType.play),
-              onPressed: _resuming.contains(activity.sender.id)
+              onPressed:
+                  _resumingAll ||
+                      _wakingAll ||
+                      _resuming.contains(activity.sender.id)
                   ? null
                   : () => _resume(activity),
             ),
@@ -242,7 +329,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
               activity: activity,
             )
           else if (activity.sleeping && !activity.autoReplyPaused)
-            SettingsGlassAction(
+            _MemberAction(
               label: _waking.contains(activity.sender.id) ? '唤醒中' : '唤醒',
               icon: Icons.play_arrow_rounded,
               iconWidget: _waking.contains(activity.sender.id)
@@ -254,7 +341,10 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                       ),
                     )
                   : const QuestionIcon(type: QuestionIconType.play),
-              onPressed: _waking.contains(activity.sender.id)
+              onPressed:
+                  _resumingAll ||
+                      _wakingAll ||
+                      _waking.contains(activity.sender.id)
                   ? null
                   : () => _wake(activity),
             ),
@@ -295,7 +385,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
           top: false,
           child: Column(
             children: [
-              const _ActivitySheetHeader(title: '群成员状态'),
+              _ActivitySheetHeader(title: '群成员状态', trailing: _batchActions()),
               Expanded(child: content),
             ],
           ),
@@ -305,6 +395,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
     return Scaffold(
       appBar: SettingsAppBar(
         title: '群成员状态',
+        actions: [_batchActions()],
         onBack: () => Navigator.pop(context),
       ),
       body: SafeArea(top: false, child: content),
@@ -551,7 +642,7 @@ class _StopMemberButtonState extends State<_StopMemberButton> {
   Widget build(BuildContext context) {
     final stopping = _busy || (widget.activity.stopping && !_retry);
     final colors = Theme.of(context).colorScheme;
-    return SettingsGlassAction(
+    return _MemberAction(
       label: stopping ? '终止中' : '终止思考',
       icon: Icons.stop_rounded,
       onPressed: stopping ? null : _stop,
@@ -578,6 +669,34 @@ class _StopMemberButtonState extends State<_StopMemberButton> {
       ),
     );
   }
+}
+
+class _MemberAction extends StatelessWidget {
+  const _MemberAction({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.iconWidget,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final Widget? iconWidget;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: label,
+    onPressed: onPressed,
+    icon: iconWidget ?? Icon(icon, size: 24),
+    color: Theme.of(context).colorScheme.onSurfaceVariant,
+    style: IconButton.styleFrom(
+      fixedSize: const Size.square(40),
+      minimumSize: const Size.square(40),
+      padding: const EdgeInsets.all(8),
+      shape: const CircleBorder(),
+    ),
+  );
 }
 
 class _ActivitySheetHeader extends StatelessWidget {

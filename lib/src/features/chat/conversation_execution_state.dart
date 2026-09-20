@@ -14,6 +14,7 @@ class _ConversationExecutionState {
   AgentRuntime? runtime;
   bool systemEventLoading = false;
   GroupDispatcher? groupDispatcher;
+  String? groupNotificationStep;
   Map<String, _ReplyContext> groupReplies = {};
   Map<String, MessageSender> groupSenders = {};
   Map<String, Conversation> groupRuns = {};
