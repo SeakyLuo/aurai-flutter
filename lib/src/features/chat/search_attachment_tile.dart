@@ -40,9 +40,15 @@ class SearchAttachmentTile extends StatelessWidget {
                   ),
                 ),
               )
-            : SizedBox(
-                height: compact ? 144 : 84,
-                child: FileAttachmentCard(file: result.file!, onOpen: onOpen),
+            : LayoutBuilder(
+                builder: (context, constraints) => SizedBox(
+                  height: compact ? math.min(constraints.maxWidth, 144) : 84,
+                  child: FileAttachmentCard(
+                    file: result.file!,
+                    onOpen: onOpen,
+                    vertical: compact,
+                  ),
+                ),
               ),
         if (result.matchText != null)
           Padding(

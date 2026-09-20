@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'group_status_builder.dart';
 import 'package:flutter/material.dart';
 
@@ -10,23 +11,22 @@ import 'question_icon.dart';
 import 'settings_appearance.dart';
 import 'thinking_indicator.dart';
 
-Future<void> showGroupActivitySheet(
+Future<void> showGroupActivityPage(
   BuildContext context, {
   required ChatController controller,
   required String conversationId,
-}) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  showDragHandle: false,
-  builder: (_) => _GroupActivitySheet(
-    controller: controller,
-    conversationId: conversationId,
+}) => Navigator.of(context).push<void>(
+  MaterialPageRoute(
+    builder: (_) => GroupActivityPage(
+      controller: controller,
+      conversationId: conversationId,
+    ),
   ),
 );
 
-class _GroupActivitySheet extends StatefulWidget {
-  const _GroupActivitySheet({
+class GroupActivityPage extends StatefulWidget {
+  const GroupActivityPage({
+    super.key,
     required this.controller,
     required this.conversationId,
   });
@@ -34,10 +34,10 @@ class _GroupActivitySheet extends StatefulWidget {
   final String conversationId;
 
   @override
-  State<_GroupActivitySheet> createState() => _GroupActivitySheetState();
+  State<GroupActivityPage> createState() => _GroupActivitySheetState();
 }
 
-class _GroupActivitySheetState extends State<_GroupActivitySheet> {
+class _GroupActivitySheetState extends State<GroupActivityPage> {
   final _waking = <String>{};
 
   Future<void> _wake(GroupMemberActivity activity) async {
@@ -51,9 +51,42 @@ class _GroupActivitySheetState extends State<_GroupActivitySheet> {
       if (mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('唤醒失败：${errorMessage(error)}')));
+        ).showGlassSnackBar(SnackBar(content: Text('唤醒失败：${errorMessage(error)}')));
     } finally {
       if (mounted) setState(() => _waking.remove(activity.sender.id));
+    }
+  }
+
+  Future<void> _openSleepDetails(GroupMemberActivity activity) async {
+    try {
+      final rows = await widget.controller.groupStore.database.query(
+        'app_state',
+        columns: ['value'],
+        where: 'key = ?',
+        whereArgs: [
+          'group_sleep_reason:${widget.conversationId}:${activity.sender.id}',
+        ],
+      );
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: false,
+        builder: (_) => _GroupThoughtDetails(
+          controller: widget.controller,
+          conversationId: widget.conversationId,
+          activity: activity,
+          sleepReason: rows.isEmpty
+              ? '本次睡眠未记录原因'
+              : rows.single['value'] as String,
+        ),
+      );
+    } on Object catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showGlassSnackBar(
+        SnackBar(content: Text('读取睡眠原因失败：${errorMessage(error)}')),
+      );
     }
   }
 
@@ -70,168 +103,166 @@ class _GroupActivitySheetState extends State<_GroupActivitySheet> {
         ),
       );
 
-  @override
-  Widget build(BuildContext context) => GroupStatusBuilder(
-    controller: widget.controller,
-    conversationId: widget.conversationId,
-    builder: (context, activities) {
-      return ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * .7,
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const _ActivitySheetHeader(title: '成员状态'),
-              Flexible(
-                child: activities.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 32, 24, 48),
-                        child: Text(
-                          '当前没有成员在思考或睡眠',
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      )
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                        itemCount: activities.length,
-                        itemBuilder: (context, index) {
-                          final activity = activities[index];
-                          if (activity.sleeping) {
-                            final until = activity.sleepingUntil!.toLocal();
-                            final time =
-                                '${until.hour.toString().padLeft(2, '0')}:${until.minute.toString().padLeft(2, '0')}:${until.second.toString().padLeft(2, '0')}';
-                            return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 4,
-                              ),
-                              leading: MemberAvatar(
-                                sender: activity.sender,
-                                size: 40,
-                              ),
-                              title: Text(activity.sender.name),
-                              subtitle: Text(
-                                until.isAfter(DateTime.now())
-                                    ? '睡眠中 · 预计 $time 唤醒'
-                                    : '睡眠到期 · 等待调度',
-                              ),
-                              trailing: SettingsGlassAction(
-                                label: '唤醒${activity.sender.name}',
-                                icon: Icons.play_arrow_rounded,
-                                iconWidget: const QuestionIcon(
-                                  type: QuestionIconType.play,
-                                ),
-                                onPressed: _waking.contains(activity.sender.id)
-                                    ? null
-                                    : () => _wake(activity),
-                              ),
-                              onTap: () => Navigator.push<void>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => AiContactPage(
-                                    controller: widget.controller,
-                                    senderId: activity.sender.id,
-                                    groupId: widget.conversationId,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
-                          return Row(
-                            key: ValueKey(activity.runId),
-                            children: [
-                              Expanded(
-                                child: Semantics(
-                                  button: true,
-                                  label: '查看${activity.sender.name}的思考详情',
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onTap: () => _openDetails(activity),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 12,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          MemberAvatar(
-                                            sender: activity.sender,
-                                            size: 40,
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  activity.sender.name,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    fontSize: 15,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                if (activity
-                                                        .preview
-                                                        .isNotEmpty &&
-                                                    !activity.stopping)
-                                                  Text(
-                                                    activity.preview,
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: TextStyle(
-                                                      fontSize: 13,
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .onSurfaceVariant,
-                                                    ),
-                                                  )
-                                                else
-                                                  ThinkingIndicator(
-                                                    label: activity.description,
-                                                    fontSize: 13,
-                                                    singleLine: true,
-                                                    animate:
-                                                        !activity.stopping &&
-                                                        !activity
-                                                            .waitingForUser,
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              _StopMemberButton(
-                                controller: widget.controller,
-                                conversationId: widget.conversationId,
-                                activity: activity,
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-              ),
-            ],
+  final _resuming = <String>{};
+
+  Future<void> _resume(GroupMemberActivity activity) async {
+    setState(() => _resuming.add(activity.sender.id));
+    try {
+      await widget.controller.resumeGroupAutoReply(
+        widget.conversationId,
+        activity.sender.id,
+      );
+    } on Object catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showGlassSnackBar(
+          SnackBar(content: Text('恢复接话失败：${errorMessage(error)}')),
+        );
+    } finally {
+      if (mounted) setState(() => _resuming.remove(activity.sender.id));
+    }
+  }
+
+  Widget _avatar(GroupMemberActivity activity) => Semantics(
+    button: true,
+    label: '查看${activity.sender.name}的资料',
+    child: GestureDetector(
+      onTap: () => Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => AiContactPage(
+            controller: widget.controller,
+            senderId: activity.sender.id,
+            groupId: widget.conversationId,
           ),
         ),
-      );
-    },
+      ),
+      child: MemberAvatar(sender: activity.sender, size: 40),
+    ),
+  );
+
+  Widget _row(GroupMemberActivity activity) {
+    final running = !activity.idle && !activity.sleeping;
+    final colors = Theme.of(context).colorScheme;
+    var description = activity.description;
+    if (activity.sleeping) {
+      final until = activity.sleepingUntil!.toLocal();
+      final time =
+          '${until.hour.toString().padLeft(2, '0')}:${until.minute.toString().padLeft(2, '0')}:${until.second.toString().padLeft(2, '0')}';
+      description = until.isAfter(DateTime.now())
+          ? '睡眠中 · 预计 $time 唤醒'
+          : '睡眠到期 · 等待调度';
+    }
+    return Padding(
+      key: ValueKey(activity.sender.id),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          _avatar(activity),
+          const SizedBox(width: 12),
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: running
+                  ? () => _openDetails(activity)
+                  : activity.sleeping
+                  ? () => _openSleepDetails(activity)
+                  : null,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    activity.sender.name,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  if (running && activity.preview.isEmpty)
+                    ThinkingIndicator(
+                      label: description,
+                      fontSize: 13,
+                      singleLine: true,
+                      animate: !activity.stopping && !activity.waitingForUser,
+                    )
+                  else
+                    Text(
+                      running && !activity.stopping
+                          ? activity.preview
+                          : description,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  if (running && activity.autoReplyPaused)
+                    Text(
+                      '自动接话已关闭',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (activity.autoReplyPaused)
+            TextButton(
+              onPressed: _resuming.contains(activity.sender.id)
+                  ? null
+                  : () => _resume(activity),
+              child: Text(
+                _resuming.contains(activity.sender.id) ? '恢复中' : '恢复接话',
+              ),
+            ),
+          if (running)
+            _StopMemberButton(
+              controller: widget.controller,
+              conversationId: widget.conversationId,
+              activity: activity,
+            )
+          else if (activity.sleeping && !activity.autoReplyPaused)
+            TextButton(
+              onPressed: _waking.contains(activity.sender.id)
+                  ? null
+                  : () => _wake(activity),
+              child: Text(_waking.contains(activity.sender.id) ? '唤醒中' : '唤醒'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: SettingsAppBar(
+      title: '群成员状态',
+      onBack: () => Navigator.pop(context),
+    ),
+    body: SafeArea(
+      top: false,
+      child: GroupStatusBuilder(
+        controller: widget.controller,
+        conversationId: widget.conversationId,
+        includeInactive: true,
+        builder: (context, activities) => activities.isEmpty
+            ? Center(
+                child: Text(
+                  '群内暂无 AI 成员',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
+                children: [for (final activity in activities) _row(activity)],
+              ),
+      ),
+    ),
   );
 }
 
@@ -240,10 +271,12 @@ class _GroupThoughtDetails extends StatefulWidget {
     required this.controller,
     required this.conversationId,
     required this.activity,
+    this.sleepReason,
   });
   final ChatController controller;
   final String conversationId;
   final GroupMemberActivity activity;
+  final String? sleepReason;
 
   @override
   State<_GroupThoughtDetails> createState() => _GroupThoughtDetailsState();
@@ -255,6 +288,7 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
   late final _updates = Listenable.merge([
     widget.controller,
     widget.controller.groupActivityChanges,
+    widget.controller.groupSleepChanges,
   ]);
   bool _running = true;
   bool _showJumpToBottom = false;
@@ -306,7 +340,14 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final status = _running
+    final status = widget.sleepReason != null
+        ? (widget.controller.groupSleepTimes(
+                    widget.conversationId,
+                  )[_activity.sender.id] ==
+                  _activity.sleepingUntil
+              ? '睡眠中'
+              : '本次睡眠已结束')
+        : _running
         ? _activity.description
         : _activity.stopping
         ? '已终止'
@@ -347,21 +388,22 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
                     )
                   : null,
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: ThinkingIndicator(
-                  label: status,
-                  fontSize: 13,
-                  singleLine: true,
-                  animate:
-                      _running &&
-                      !_activity.stopping &&
-                      !_activity.waitingForUser,
+            if (status != '正在思考' || _activity.thinkingHidden)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: ThinkingIndicator(
+                    label: status,
+                    fontSize: 13,
+                    singleLine: true,
+                    animate:
+                        _running &&
+                        !_activity.stopping &&
+                        !_activity.waitingForUser,
+                  ),
                 ),
               ),
-            ),
             Expanded(
               child: Stack(
                 fit: StackFit.expand,
@@ -370,6 +412,20 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
                     controller: _scroll,
                     padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
                     children: [
+                      if (widget.sleepReason != null) ...[
+                        const Text(
+                          '睡眠原因',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SelectableText(
+                          widget.sleepReason!,
+                          style: const TextStyle(fontSize: 15, height: 1.65),
+                        ),
+                      ],
                       if (_activity.thoughts.isNotEmpty)
                         SelectableText(
                           _activity.thoughts.join('\n\n'),
@@ -437,7 +493,7 @@ class _StopMemberButtonState extends State<_StopMemberButton> {
         _retry = true;
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('终止失败：${errorMessage(error)}')));
+        ).showGlassSnackBar(SnackBar(content: Text('终止失败：${errorMessage(error)}')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);

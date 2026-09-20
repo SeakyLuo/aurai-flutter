@@ -1,6 +1,8 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
-import '../../scheduling/tasks_page.dart';
+import '../../skills/skills_page.dart';
+import 'starred_messages_page.dart';
 import 'archived_conversations_page.dart';
 import 'chat_controller.dart';
 import 'conversation_menu_icon.dart';
@@ -28,21 +30,33 @@ class MePage extends StatelessWidget {
         await openHomeConversation(context, controller, id);
     } on Object catch (error) {
       if (context.mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
         );
     }
   }
 
+  Future<void> _skills(BuildContext context) async {
+    try {
+      final store = await controller.aiSkills('user:local');
+      if (!context.mounted) return;
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              SkillsPage(store: store, controller: controller, library: true),
+        ),
+      );
+    } on Object catch (error) {
+      if (context.mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    extendBodyBehindAppBar: true,
-    appBar: const SettingsAppBar(
-      gradientBackground: true,
-      title: '我',
-      onBack: null,
-      root: true,
-    ),
     body: ListenableBuilder(
       listenable: controller.memory,
       builder: (context, _) {
@@ -52,79 +66,88 @@ class MePage extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 640),
             child: ListView(
               padding: EdgeInsets.fromLTRB(
-                0,
+                16,
                 View.of(context).padding.top /
                         View.of(context).devicePixelRatio +
-                    76 +
-                    12,
-                0,
-                24,
+                    16,
+                16,
+                MediaQuery.paddingOf(context).bottom + 16,
               ),
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(24),
-                    onTap: () => Navigator.push<void>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => PersonalInfoPage(memory: memory),
+                Center(
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(26),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PersonalInfoPage(memory: memory),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 16,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ProfileAvatar(
+                              style: memory.avatar,
+                              name: memory.nickname,
+                              size: 80,
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              memory.nickname.isEmpty
+                                  ? '个人信息'
+                                  : memory.nickname,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 20,
-                      ),
-                      child: Row(
-                        children: [
-                          ProfileAvatar(
-                            style: memory.avatar,
-                            name: memory.nickname,
-                            size: 72,
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  memory.nickname.isEmpty
-                                      ? '个人信息'
-                                      : memory.nickname,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 23,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 7),
-                                Text(
-                                  memory.nickname.isEmpty ? '设置头像与昵称' : '个人信息',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const SettingsIcon(type: SettingsIconType.chevron),
-                        ],
-                      ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _entry(
+                  context,
+                  '个人信息',
+                  const SettingsIcon(type: SettingsIconType.personalInfo),
+                  () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PersonalInfoPage(memory: memory),
                     ),
                   ),
                 ),
                 _entry(
                   context,
-                  '定时任务',
-                  const SettingsIcon(type: SettingsIconType.tasks),
-                  () => openScheduledTasks(context, controller),
+                  '技能库',
+                  const SettingsIcon(type: SettingsIconType.skills),
+                  () => _skills(context),
+                ),
+                _entry(
+                  context,
+                  '收藏',
+                  const SettingsIcon(type: SettingsIconType.star),
+                  () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          StarredMessagesPage(controller: controller),
+                    ),
+                  ),
                 ),
                 _entry(
                   context,
@@ -136,13 +159,6 @@ class MePage extends StatelessWidget {
                         : const Color(0xff222222),
                   ),
                   () => _archive(context),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: SizedBox(
-                    height: 8,
-                    child: ColoredBox(color: settingsFieldColor(context)),
-                  ),
                 ),
                 _entry(
                   context,
@@ -171,11 +187,27 @@ class MePage extends StatelessWidget {
     String title,
     Widget icon,
     VoidCallback onTap,
-  ) => ListTile(
-    contentPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
-    leading: icon,
-    title: Text(title, style: const TextStyle(fontSize: 16)),
-    trailing: const SettingsIcon(type: SettingsIconType.chevron),
-    onTap: onTap,
+  ) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Material(
+      color: settingsFieldColor(context),
+      borderRadius: BorderRadius.circular(26),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+        minVerticalPadding: 18,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+        leading: icon,
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        trailing: const SettingsIcon(type: SettingsIconType.chevron),
+        onTap: onTap,
+      ),
+    ),
   );
 }

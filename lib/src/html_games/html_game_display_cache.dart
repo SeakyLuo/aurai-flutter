@@ -11,6 +11,10 @@ class HtmlGameDisplayCache {
         ({String html, String background, bool stateful, String token})
       >{};
 
+  static void releaseContent() {
+    _games.clear();
+  }
+
   static Future<HtmlGame> load(
     HtmlGameStore store,
     String conversationId,

@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../providers/model_catalog.dart';
 import 'package:flutter/material.dart';
@@ -76,7 +77,7 @@ class _AiModelPageState extends State<AiModelPage> {
       }
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('保存失败，请重试：${errorMessage(error)}')),
         );
     } finally {
@@ -187,7 +188,7 @@ class _AiModelPageState extends State<AiModelPage> {
     ),
   );
   void _notice(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _selectModel() async {
     if (_loading) return;

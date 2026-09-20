@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'chat_header_background.dart';
 import '../../domain/error_message.dart';
 import 'conversation_more.dart';
@@ -316,7 +317,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
               );
             } on Object catch (error) {
               if (messenger.mounted)
-                messenger.showSnackBar(
+                messenger.showGlassSnackBar(
                   SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
                 );
             }

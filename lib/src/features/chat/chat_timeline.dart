@@ -248,6 +248,7 @@ List<ChatTimelineEntry> buildChatTimeline(
               child: RecalledMessageNotice(
                 message: message,
                 onEdit: onReeditRecalled,
+                onOpenSource: onOpenQuote,
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.6,

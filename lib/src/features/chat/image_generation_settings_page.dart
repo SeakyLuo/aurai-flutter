@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/image_generation_config.dart';
@@ -47,7 +48,7 @@ class _ImageGenerationSettingsPageState
     super.dispose();
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(context).showSnackBar(
+  void _notice(String text) => ScaffoldMessenger.of(context).showGlassSnackBar(
     SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
   );
 

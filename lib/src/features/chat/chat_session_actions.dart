@@ -26,7 +26,7 @@ extension _ChatSessionActions on _ChatPageState {
     if (mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('请在“电池”或“后台耗电管理”中允许 Aurai 后台运行')));
+      ).showGlassSnackBar(SnackBar(content: Text('请在“电池”或“后台耗电管理”中允许 Aurai 后台运行')));
     }
   }
 

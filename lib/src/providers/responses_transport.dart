@@ -46,7 +46,10 @@ class ResponsesTransport {
               onReconnect?.call(0);
               onTextChanged?.call(text);
             },
-            onReasoningChanged: onReasoningChanged,
+            onReasoningChanged: (text) {
+              if (text.isNotEmpty) onReconnect?.call(0);
+              onReasoningChanged?.call(text);
+            },
             onProcessingStarted: () {
               onReconnect?.call(0);
               onProcessingStarted?.call();
@@ -157,6 +160,7 @@ class ResponsesTransport {
         }
         throw error;
       }
+      onReconnect?.call(0);
       final result =
           await (chat ? readChatCompletionsStream : readResponsesStream)(
             response,

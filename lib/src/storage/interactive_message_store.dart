@@ -1,3 +1,4 @@
+import '../domain/message_quote.dart';
 import 'package:collection/collection.dart';
 import 'dart:async';
 import '../domain/interactive_selection.dart';
@@ -23,6 +24,15 @@ class InteractiveMessageStore {
     required int participantRevision,
     Object? inputValue,
   }) => database.transaction((txn) async {
+    if (actor.id == MessageSender.localUser.id) {
+      final users = await txn.query(
+        'message_senders',
+        where: 'id = ?',
+        whereArgs: [actor.id],
+        limit: 1,
+      );
+      actor = MessageSender.fromRow(users.single);
+    }
     final rows = await txn.query(
       'messages',
       columns: ['kind', 'interactive_json', 'sender_id'],
@@ -178,19 +188,27 @@ class InteractiveMessageStore {
       },
     );
     final nextView = next.viewFor(actor.id);
-    final pageChanged = newRound ||
+    final pageChanged =
+        newRound ||
         (nextSession != null && nextSession.phase != card.engine.phase) ||
         view.title != nextView.title ||
         view.body != nextView.body ||
         view.buttonColumns != nextView.buttonColumns ||
         view.showStatistics != nextView.showStatistics ||
         !const DeepCollectionEquality().equals(
-          [for (final b in view.buttons) {...b}..remove('disabled')],
-          [for (final b in nextView.buttons)
-            {...b,
-              if (b['disabled'] == true && b['completedLabel'] == b['label'])
-                'label': view.buttons.firstWhere((old) => old['id'] == b['id'])['label'],
-            }..remove('disabled')],
+          [
+            for (final b in view.buttons) {...b}..remove('disabled'),
+          ],
+          [
+            for (final b in nextView.buttons)
+              {
+                ...b,
+                if (b['disabled'] == true && b['completedLabel'] == b['label'])
+                  'label': view.buttons.firstWhere(
+                    (old) => old['id'] == b['id'],
+                  )['label'],
+              }..remove('disabled'),
+          ],
         );
     state['snapshotCount'] = snapshotCount + (pageChanged ? 1 : 0);
     await txn.insert('interactive_actions', {
@@ -201,21 +219,23 @@ class InteractiveMessageStore {
       'label': button['label'],
       'definition_revision': revision,
       'participant_revision': participantRevision + 1,
-      'before_json': pageChanged ? jsonEncode({
-        'revision': view.revision,
-        'showStatistics': view.showStatistics,
-        'buttonColumns': view.buttonColumns,
-        'title': view.title,
-        'body': view.body,
-        'buttons': view.buttons,
-        'participation': view.participation,
-        if (card.participants[actor.id]?['callback'] != null)
-          'callback': card.participants[actor.id]!['callback'],
-        if (card.hasInteraction)
-          'interactionView': card.interactionView(actor.id),
-        if (card.choices[actor.id] case final previous?)
-          'selectedLabel': previous['label'],
-      }) : null,
+      'before_json': pageChanged
+          ? jsonEncode({
+              'revision': view.revision,
+              'showStatistics': view.showStatistics,
+              'buttonColumns': view.buttonColumns,
+              'title': view.title,
+              'body': view.body,
+              'buttons': view.buttons,
+              'participation': view.participation,
+              if (card.participants[actor.id]?['callback'] != null)
+                'callback': card.participants[actor.id]!['callback'],
+              if (card.hasInteraction)
+                'interactionView': card.interactionView(actor.id),
+              if (card.choices[actor.id] case final previous?)
+                'selectedLabel': previous['label'],
+            })
+          : null,
       'created_at': now,
     });
     if (pending != null) {
@@ -288,6 +308,11 @@ class InteractiveMessageStore {
               card.participation['visibilityActors'] != null
           ? '${actor.name}提交了“${card.title}”'
           : '${actor.name}在“${card.title}”中选择了“${button['label']}”',
+      source: MessageQuote(
+        messageId: messageId,
+        senderId: rows.single['sender_id'] as String,
+        text: card.title,
+      ),
       audience: (card.participation['audience'] as List?)?.cast<String>(),
     );
     if (callbackId == null && actor.id == MessageSender.localUser.id) {
@@ -325,6 +350,7 @@ class InteractiveMessageStore {
     String conversationId,
     String text, {
     List<String>? audience,
+    required MessageQuote source,
   }) async {
     final notice = AgentMessage(
       id: newMessageId(),
@@ -332,6 +358,7 @@ class InteractiveMessageStore {
       senderId: MessageSender.localUser.id,
       text: text,
       isSystem: true,
+      quote: source,
       interactive: audience == null
           ? null
           : InteractiveMessage(

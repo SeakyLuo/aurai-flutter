@@ -12,6 +12,7 @@ extension GroupConversationRun on ChatController {
   Future<void> _executeConversation(
     Conversation conversation, {
     bool scheduled = false,
+    bool callbacksOnly = false,
   }) => _inConversation(conversation, () async {
     final ownsSlot = _runningConversation == null;
     if (ownsSlot) _runningConversation = conversation;
@@ -22,6 +23,7 @@ extension GroupConversationRun on ChatController {
         await _executeMember(
           conversation,
           scheduled: scheduled,
+          callbacksOnly: callbacksOnly,
           reply: await _directReplyContext(conversation),
         );
       }
@@ -37,7 +39,9 @@ extension GroupConversationRun on ChatController {
   Future<void> _executeGroupChat(
     Conversation conversation, {
     Set<String>? wakeMembers,
+    bool callbacksOnly = false,
   }) async {
+    final callbackStarts = callbacksOnly ? {...wakeMembers!} : <String>{};
     final user = conversation.messages.last;
     _removedGroupMembers.clear();
     conversation.runState = ChatRunState.running;
@@ -145,6 +149,7 @@ extension GroupConversationRun on ChatController {
             await _executeMember(
               member,
               reply: reply,
+              callbacksOnly: callbackStarts.remove(id),
               groupHistory: snapshot,
               groupUser: snapshot.last,
               groupParent: conversation,

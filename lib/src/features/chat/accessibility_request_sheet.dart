@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'dart:async';
 
@@ -20,7 +21,7 @@ Future<void> showAccessibilityRequestSheet(
   );
   if (controller.accessibilityRequestPending) {
     controller.cancelAccessibilityRequest();
-    messenger.showSnackBar(const SnackBar(content: Text('本次暂不开启无障碍')));
+    messenger.showGlassSnackBar(const SnackBar(content: Text('本次暂不开启无障碍')));
   }
 }
 
@@ -78,7 +79,7 @@ class _AccessibilityRequestSheetState
         navigator.removeRoute(route);
       }
       if (timedOut) {
-        messenger.showSnackBar(const SnackBar(content: Text('等待超时，已自动拒绝本次请求')));
+        messenger.showGlassSnackBar(const SnackBar(content: Text('等待超时，已自动拒绝本次请求')));
       }
     });
   }
@@ -92,7 +93,7 @@ class _AccessibilityRequestSheetState
       await widget.controller.enableRequestedAccessibility();
     } on Object catch (error) {
       if (mounted) {
-        _messenger.showSnackBar(
+        _messenger.showGlassSnackBar(
           SnackBar(content: Text('无法打开无障碍设置，请重试：${errorMessage(error)}')),
         );
       }

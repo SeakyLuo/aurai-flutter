@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../domain/message_sender.dart';
 import 'dialog_action_button.dart';
@@ -45,7 +46,7 @@ class _AiContactPageState extends State<AiContactPage> {
   }
 
   void _notice(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
   Future<void> _reload() async {
     try {
       final ai = await widget.controller.groupStore.loadAi(widget.senderId);
@@ -77,6 +78,7 @@ class _AiContactPageState extends State<AiContactPage> {
         widget.controller,
         id,
         waitForClose: true,
+        resetStack: true,
       );
     } on Object catch (error) {
       if (mounted) _notice('无法打开私聊，请稍后重试：${errorMessage(error)}');
@@ -143,8 +145,10 @@ class _AiContactPageState extends State<AiContactPage> {
   Widget build(BuildContext context) {
     final ai = _ai;
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: '朋友',
+        gradientBackground: true,
         onBack: () => Navigator.pop(context),
         actions: [
           if (ai != null)
@@ -199,7 +203,15 @@ class _AiContactPageState extends State<AiContactPage> {
       body: ai == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                View.of(context).padding.top /
+                        View.of(context).devicePixelRatio +
+                    76 +
+                    12,
+                16,
+                32,
+              ),
               children: [
                 Center(
                   child: ProfileAvatar(

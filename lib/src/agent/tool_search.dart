@@ -10,7 +10,7 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
   ToolDefinition get definition => const ToolDefinition(
     name: 'searchTools',
     description:
-        'Find and load tools for your next model turn. Start with offset 0; use nextOffset only to inspect more matches. Search by a specific task in Chinese or English, or exact tool name. Available domains: web, reusable skills, Aurai AI contacts/address book, group chat creation/members/management, memory, conversation history/database, scheduled tasks, notifications, model balance/top-up, Android UI/apps/settings, network diagnostics, Android API/scripts and shell. Returns at most 10 matches and loads them; up to 20 recently loaded or used tools are kept, with recent tools restored from this conversation on later user messages. Exact tool names return only that tool. Call tools already provided directly; search only when a needed tool is absent. Searching does not execute the tool or grant permission.',
+        'Find and load tools for your next model turn. Start with offset 0; use nextOffset only to inspect more matches. Search by a specific task in Chinese or English, or exact tool name. Available domains: web, reusable skills, Aurai AI contacts/address book, group chat creation/members/management, memory, conversation history/database, scheduled tasks, notifications, model balance/top-up, Android UI/apps/settings, network diagnostics, Android API/scripts and shell. Returns at most 5 relevant matches and loads them; up to 20 search candidates are kept separately from tools used during the current run, which remain loaded. Recent tools are restored from this conversation on later user messages. Explicit tool names in a query restrict results to those tools. Call tools already provided directly; search only when a needed tool is absent. Searching does not execute the tool or grant permission.',
     inputSchema: {
       'type': 'object',
       'properties': {
@@ -37,11 +37,17 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
       );
     }
     final catalog = registry.catalog;
-    final exactMatch = catalog.any((tool) => tool.name.toLowerCase() == query);
+    final words = RegExp(
+      r'[a-z0-9_]+',
+    ).allMatches(query).map((match) => match[0]!).toSet();
+    final namedTools = catalog
+        .where((tool) => words.contains(tool.name.toLowerCase()))
+        .map((tool) => tool.name)
+        .toSet();
     final ranked = [
       for (final definition in catalog)
         if (definition.name != 'searchTools' && definition.name != 'askUser')
-          if (!exactMatch || definition.name.toLowerCase() == query)
+          if (namedTools.isEmpty || namedTools.contains(definition.name))
             (definition: definition, score: _score(definition, query)),
     ]..removeWhere((entry) => entry.score == 0);
     ranked.sort((a, b) {
@@ -50,9 +56,13 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
           ? score
           : a.definition.name.compareTo(b.definition.name);
     });
+    if (ranked.isNotEmpty && namedTools.isEmpty) {
+      final bestScore = ranked.first.score;
+      ranked.removeWhere((entry) => entry.score < bestScore * 0.4);
+    }
     final matches = ranked
         .skip(offset)
-        .take(10)
+        .take(5)
         .map((entry) => entry.definition)
         .toList();
     registry.load(matches.reversed.map((tool) => tool.name));

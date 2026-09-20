@@ -4,6 +4,7 @@ extension ConversationRun on ChatController {
   Future<void> _executeMember(
     Conversation runConversation, {
     bool scheduled = false,
+    bool callbacksOnly = false,
     required _ReplyContext reply,
     List<AgentMessage>? groupHistory,
     AgentMessage? groupUser,
@@ -44,13 +45,14 @@ extension ConversationRun on ChatController {
     final customInstructions = reply.profile.preferences.customInstructions;
     final responsePreferences = reply.profile.preferences.responses;
     final memoryRevision = memory.revision;
+    final callbackEvents = await MessageCallbacks(
+      _store.database,
+    ).pending(runConversation.id, reply.senderId);
+    if (callbacksOnly && callbackEvents.isEmpty) return;
     final htmlEvents = await _pendingHtmlEvents(
       runConversation,
       reply.senderId,
     );
-    final callbackEvents = await MessageCallbacks(
-      _store.database,
-    ).pending(runConversation.id, reply.senderId);
     await _persistMember(runConversation, groupParent);
     final history =
         groupHistory ??
@@ -79,10 +81,11 @@ extension ConversationRun on ChatController {
     runConversation.executionUserMessageId = userMessage.id;
     final runId = await _store.runs.start(
       runConversation.id,
-      userMessage.id,
+      callbackEvents.lastOrNull?['message_id'] as String? ?? userMessage.id,
       runConfig,
       senderId: reply.senderId,
       group: groupParent != null,
+      callbackEventId: callbackEvents.lastOrNull?['id'] as String?,
       systemPrompt: systemPrompt ?? agentSystemPrompt,
       customInstructions: customInstructions,
       responsePreferences: responsePreferences,
@@ -168,33 +171,17 @@ extension ConversationRun on ChatController {
           }
           _notifyMember(runConversation, groupParent);
         }),
-      );
+      )..add(_hideThinkingTool(runConversation, groupParent));
       if (groupParent != null) {
         tools.removeWhere((t) => t.definition.name == 'sendGroupMessage');
-        tools.add(_groupWakeTool(groupParent.id, reply.senderId));
-        tools.add(
-          GroupSleepTool((duration, draft) async {
-            final until = await _scheduleMemberSleep(
-              groupParent,
-              runConversation,
-              reply.senderId,
-              duration,
-              draft,
-            );
-            leftSleepDraft = true;
-            return until;
-          }),
-        );
-        tools.add(
-          GroupMessageTool(
-            (arguments) => _deliverGroupMessage(
-              arguments: arguments,
-              member: runConversation,
-              parent: groupParent,
-              reply: reply,
-              observed: observed,
-              publishedIds: runMessageIds,
-            ),
+        tools.addAll(
+          _groupRunTools(
+            parent: groupParent,
+            member: runConversation,
+            reply: reply,
+            observed: observed,
+            publishedIds: runMessageIds,
+            onSleep: () => leftSleepDraft = true,
           ),
         );
       }
@@ -248,13 +235,11 @@ extension ConversationRun on ChatController {
         throw AgentCancelled();
       var turnOrdinal = 0;
       late String modelTurnId;
-
       final stepActivityIndices = <int>[];
       String? turnMessageId;
       int? turnActivityIndex;
       String? reasoningMessageId;
-      int? reasoningActivityIndex;
-      int? outputMessageIndex;
+      int? reasoningActivityIndex, outputMessageIndex;
       await runtime.run(
         endsRun: groupParent == null
             ? null
@@ -371,7 +356,7 @@ extension ConversationRun on ChatController {
           _notifyMember(runConversation, groupParent);
         },
         onReasoningChanged: (text) {
-          if (text.trim().isEmpty) return;
+          if (runConversation.thinkingHidden || text.trim().isEmpty) return;
           if (groupParent != null) {
             _recordGroupThought(reply.senderId, runId, turnOrdinal, text);
             return;

@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../domain/message_quick_reply.dart';
@@ -65,7 +66,7 @@ class QuickReplyChips extends StatelessWidget {
       if (context.mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
     }
   }
 

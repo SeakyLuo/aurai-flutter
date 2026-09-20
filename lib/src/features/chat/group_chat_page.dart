@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'conversation_list_skeleton.dart';
 import '../../domain/error_message.dart';
 import 'conversation_preview_text.dart';
@@ -62,7 +63,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _failed = true);
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showGlassSnackBar(
         SnackBar(
           content: Text('群聊加载失败，请重试：${errorMessage(error)}'),
           action: SnackBarAction(
@@ -83,7 +84,14 @@ class _GroupChatPageState extends State<GroupChatPage> {
         builder: (_) => GroupCreatePage(controller: widget.controller),
       ),
     );
-    if (mounted && id != null) await _open(id);
+    if (mounted && id != null) {
+      await openGroupConversation(
+        context,
+        widget.controller,
+        id,
+        resetStack: true,
+      );
+    }
   }
 
   Future<void> _open(String id) async {

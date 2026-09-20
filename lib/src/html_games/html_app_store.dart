@@ -26,6 +26,7 @@ const htmlAppIndex =
 class HtmlAppStore {
   HtmlAppStore(this.database);
   final Database database;
+  static const maxHtmlBytes = 4 * 1024 * 1024;
   static const maxDataBytes = 4 * 1024 * 1024;
 
   static Future<Directory> directory(String id) async {

@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import 'chat_controller.dart';
@@ -49,7 +50,7 @@ class _AiGroupListState extends State<AiGroupList> {
         });
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(
             content: Text('群聊加载失败：${errorMessage(error)}'),
             action: SnackBarAction(label: '重试', onPressed: _load),
@@ -84,7 +85,7 @@ class _AiGroupListState extends State<AiGroupList> {
                   });
               } on Object catch (error) {
                 if (context.mounted)
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(context).showGlassSnackBar(
                     SnackBar(content: Text('创建失败，请重试：${errorMessage(error)}')),
                   );
               }

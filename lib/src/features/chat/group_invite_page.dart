@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -55,7 +56,7 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
   }
 
   void _notice(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _load({bool reset = false}) async {
     if (!reset && (_loading || !_hasMore)) return;

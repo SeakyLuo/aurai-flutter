@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 class CopyIcon extends StatelessWidget {
-  const CopyIcon({super.key, this.copied = false});
+  const CopyIcon({super.key, this.copied = false, this.color});
 
   final bool copied;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => SizedBox.square(
@@ -24,7 +25,7 @@ class CopyIcon extends StatelessWidget {
         size: const Size.square(21),
         painter: _CopyPainter(
           copied,
-          Theme.of(context).colorScheme.onSurfaceVariant,
+          color ?? Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
     ),

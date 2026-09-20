@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../domain/agent_models.dart';
 import '../../domain/ui_tool_actions.dart';
@@ -103,7 +104,7 @@ class _OperationRequestSheetState extends State<_OperationRequestSheet> {
         );
       } catch (caughtError) {
         if (mounted)
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showGlassSnackBar(
             SnackBar(content: Text('保存授权失败，请重试：${errorMessage(caughtError)}')),
           );
         return;

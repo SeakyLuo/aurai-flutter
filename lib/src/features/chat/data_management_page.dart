@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -39,7 +40,7 @@ class _DataManagementPageState extends State<DataManagementPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ).showGlassSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _loadUsage() async {

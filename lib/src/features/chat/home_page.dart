@@ -2,13 +2,21 @@ import 'package:flutter/material.dart';
 import 'chat_controller.dart';
 import 'recent_chats_page.dart';
 import 'ai_contacts_page.dart';
-import 'settings_page.dart';
+import 'me_page.dart';
 import 'home_tab_bar.dart';
 
 final homeRouteObserver = RouteObserver<PageRoute<dynamic>>();
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.controller});
+  static final navigationKey = GlobalKey<_HomePageState>();
+
+  static void showConversations() {
+    final state = navigationKey.currentState!;
+    state._pages.jumpToPage(0);
+    state._pageChanged(0);
+  }
+
   final ChatController controller;
   @override
   State<HomePage> createState() => _HomePageState();
@@ -26,13 +34,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
     _HomeTabPage(
       child: AiContactsPage(controller: widget.controller, root: true),
     ),
-    _HomeTabPage(
-      child: SettingsPage(
-        controller: widget.controller,
-        preparingGoal: () => false,
-        root: true,
-      ),
-    ),
+    _HomeTabPage(child: MePage(controller: widget.controller)),
   ];
 
   @override

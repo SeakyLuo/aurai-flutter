@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/interactive_selection.dart';
 import 'interactive_message_paging.dart';
 import 'interactive_snapshot_statistics.dart';
@@ -86,7 +87,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+    ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
   }
 
   Future<void> _load() async {

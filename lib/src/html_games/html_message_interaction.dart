@@ -169,8 +169,8 @@ extension HtmlMessageInteraction on HtmlGameStore {
       throw ArgumentError('backgroundMode 必须为 message 或 transparent');
     }
     if (html != null &&
-        (html.trim().isEmpty || utf8.encode(html).length > 256 * 1024))
-      throw ArgumentError('HTML 不能为空且最多 256 KB');
+        (html.trim().isEmpty || utf8.encode(html).length > HtmlAppStore.maxHtmlBytes))
+      throw ArgumentError('HTML 不能为空且最多 4 MB');
     final nextState = args['state'] == null
         ? app['state_json'] as String
         : jsonEncode(args['state']);

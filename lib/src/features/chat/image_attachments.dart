@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../platform/svg_image.dart';
 import '../../domain/error_message.dart';
 import 'unavailable_image.dart';
@@ -116,7 +117,7 @@ class _ImageAttachmentState extends State<ImageAttachment> {
           if (mounted)
             ScaffoldMessenger.of(
               context,
-            ).showSnackBar(const SnackBar(content: Text('图片文件已丢失，无法打开')));
+            ).showGlassSnackBar(const SnackBar(content: Text('图片文件已丢失，无法打开')));
           return;
         }
         if (!mounted) return;
@@ -126,7 +127,7 @@ class _ImageAttachmentState extends State<ImageAttachment> {
         );
       } on Object catch (error) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showGlassSnackBar(
             SnackBar(content: Text('图片无法打开，请重试：${errorMessage(error)}')),
           );
         }

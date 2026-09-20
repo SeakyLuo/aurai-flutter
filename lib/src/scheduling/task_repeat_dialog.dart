@@ -1,3 +1,4 @@
+import '../app/glass_notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../features/chat/glass_surface.dart';
@@ -49,13 +50,13 @@ class _RepeatDialogState extends State<_RepeatDialog> {
     if (interval == null || interval < 1 || interval > 99) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('间隔请输入 1 到 99')));
+      ).showGlassSnackBar(const SnackBar(content: Text('间隔请输入 1 到 99')));
       return;
     }
     if (_value.frequency == 'WEEKLY' && _value.weekdays.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('至少选择一天')));
+      ).showGlassSnackBar(const SnackBar(content: Text('至少选择一天')));
       return;
     }
     _value.interval = interval;

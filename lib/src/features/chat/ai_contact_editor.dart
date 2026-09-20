@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'dart:async';
 import 'contact_generator.dart';
@@ -120,7 +121,7 @@ class _AiContactEditorState extends State<AiContactEditor> {
   }
 
   void _notice(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
   Future<void> _avatarSource(AvatarSource source) async {
     try {
       if (source == AvatarSource.custom) {

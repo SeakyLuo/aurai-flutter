@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'image_generation_settings_page.dart';
 import 'package:flutter/material.dart';
 import '../../domain/error_message.dart';
@@ -132,7 +133,7 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
       if (mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
     } finally {
       _catalog?.close();
       _catalog = null;

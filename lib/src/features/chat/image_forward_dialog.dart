@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../domain/agent_models.dart';
 import 'message_forward_preview.dart';
@@ -79,7 +80,7 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
     } on Object catch (error) {
       if (mounted) {
         setState(() => _sending = false);
-        _messenger.currentState!.showSnackBar(
+        _messenger.currentState!.showGlassSnackBar(
           SnackBar(
             content: Text(
               error is StateError

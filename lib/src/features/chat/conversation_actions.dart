@@ -279,7 +279,8 @@ extension ConversationActions on ChatController {
         role: AgentMessageRole.user,
         senderId: MessageSender.localUser.id,
         isSystem: true,
-        text: '你将群名改为“$name”',
+        text:
+            '${memory.nickname.isEmpty ? MessageSender.localUser.name : memory.nickname}将群名改为“$name”',
         createdAt: DateTime.now(),
       );
       await _store.writer.flush();

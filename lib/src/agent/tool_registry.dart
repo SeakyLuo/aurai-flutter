@@ -36,6 +36,7 @@ class ToolRegistry {
   }
 
   final _loaded = <String>[];
+  final _retained = <String>{};
   Set<String> _exposed = {};
 
   List<ToolDefinition> get availableDefinitions => catalog
@@ -43,7 +44,9 @@ class ToolRegistry {
         (tool) =>
             tool.name == 'searchTools' ||
             tool.name == 'askUser' ||
-            _loaded.contains(tool.name),
+            tool.name == 'hideThinking' ||
+            _loaded.contains(tool.name) ||
+            _retained.contains(tool.name),
       )
       .toList(growable: false);
 
@@ -59,11 +62,16 @@ class ToolRegistry {
     final available = catalog.map((tool) => tool.name).toSet()
       ..removeAll(['searchTools', 'askUser']);
     for (final name in names) {
-      if (!available.contains(name)) continue;
+      if (!available.contains(name) || _retained.contains(name)) continue;
       _loaded.remove(name);
       _loaded.add(name);
     }
     if (_loaded.length > 20) _loaded.removeRange(0, _loaded.length - 20);
+  }
+
+  void retain(String name) {
+    _loaded.remove(name);
+    _retained.add(name);
   }
 
   AgentTool? find(String name) => _tools[name];

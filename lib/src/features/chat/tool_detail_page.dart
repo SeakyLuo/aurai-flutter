@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'delete_confirmation_dialog.dart';
 import 'question_icon.dart';
 import '../../skills/skill_icon_picker.dart';
@@ -44,7 +45,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
     if (mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('工具名称已复制')));
+      ).showGlassSnackBar(const SnackBar(content: Text('工具名称已复制')));
     }
   }
 
@@ -129,7 +130,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
       });
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(
             content: Text(
               error is FormatException

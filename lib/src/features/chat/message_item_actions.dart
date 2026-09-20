@@ -1,9 +1,30 @@
 part of 'message_item.dart';
 
 extension _MessageItemActions on _MessageItemState {
-  Future<void> _openActions() async {
+  Future<void> _openActions({bool showStar = true}) async {
     final snapshot = message;
     var hasHistory = false;
+    final allowStar =
+        showStar &&
+        !widget.streaming &&
+        !snapshot.isSystem &&
+        !snapshot.isReasoning &&
+        (!widget.readOnly || widget.onLocate != null);
+    var starred = false;
+    if (allowStar) {
+      try {
+        starred = await StarredMessages(
+          ImageActionScope.of(context).groupStore.database,
+        ).contains(snapshot.id);
+      } on Object catch (error) {
+        if (mounted)
+          ScaffoldMessenger.of(
+            context,
+          ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        return;
+      }
+      if (!mounted) return;
+    }
     if (snapshot.interactive != null &&
         (!widget.readOnly || widget.onLocate != null)) {
       try {
@@ -16,15 +37,17 @@ extension _MessageItemActions on _MessageItemState {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+          ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
         }
         return;
       }
       if (!mounted) return;
     }
-    final action = await showMessageActionsMenu(
+    final result = await showMessageActionsMenu(
       context,
       message: snapshot,
+      allowStar: allowStar,
+      starred: starred,
       allowEditing: widget.onEdit != null,
       allowStatistics:
           snapshot.interactive
@@ -49,144 +72,41 @@ extension _MessageItemActions on _MessageItemState {
           !snapshot.isReasoning &&
           (snapshot.role == AgentMessageRole.assistant ||
               snapshot.senderId == MessageSender.localUser.id),
-      sentQuickReplyKeys: snapshot.quickReplies
-          .where((reply) => reply.senderId == MessageSender.localUser.id)
-          .map((reply) => reply.key)
-          .toSet(),
+      sentQuickReplyKeys:
+          !widget.groupBubble && snapshot.role == AgentMessageRole.assistant
+          ? const {}
+          : snapshot.quickReplies
+                .where((reply) => reply.senderId == MessageSender.localUser.id)
+                .map((reply) => reply.key)
+                .toSet(),
     );
-    if (!mounted) return;
+    if (!mounted || result == null) return;
+    if (result case MessageQuickReplyResult(:final option)) {
+      await widget.onQuickReply?.call(snapshot, option.key, option.text);
+      return;
+    }
+    final action = (result as MessageActionResult).action;
     switch (action) {
-      case MessageAction.quickDislike:
-      case MessageAction.quickLove:
-      case MessageAction.quickLaugh:
-      case MessageAction.quickCelebrate:
-      case MessageAction.quickSmile:
-      case MessageAction.quickSurprised:
-      case MessageAction.quickSad:
-      case MessageAction.quickAngry:
-      case MessageAction.quickThinking:
-      case MessageAction.quickSweat:
-      case MessageAction.quickSpeechless:
-      case MessageAction.quickCool:
-      case MessageAction.quickClap:
-      case MessageAction.quickThanks:
-      case MessageAction.quickStrong:
-      case MessageAction.quickFire:
-      case MessageAction.quickHundred:
-      case MessageAction.quickHug:
-      case MessageAction.quickHeartEyes:
-      case MessageAction.quickRainbow:
-      case MessageAction.quickFlower:
-      case MessageAction.quickGift:
-      case MessageAction.quickRocket:
-      case MessageAction.quickCoffee:
-      case MessageAction.quickDiamond:
-      case MessageAction.quickClover:
-      case MessageAction.quickIce:
-      case MessageAction.quickParty:
-      case MessageAction.quickBullseye:
-      case MessageAction.quickPenguin:
-      case MessageAction.quickCat:
-      case MessageAction.quickUnicorn:
-      case MessageAction.quickGhost:
-      case MessageAction.quickRobot:
-      case MessageAction.quickPoop:
-      case MessageAction.quickMelon:
-      case MessageAction.quickLemon:
-      case MessageAction.quickBeer:
-      case MessageAction.quickBrokenHeart:
-      case MessageAction.quickWiltedFlower:
-      case MessageAction.quickSleep:
-      case MessageAction.quickDog:
-      case MessageAction.quickSob:
-      case MessageAction.quickTouched:
-      case MessageAction.quickEyeRoll:
-      case MessageAction.quickMindBlown:
-      case MessageAction.quickSalute:
-      case MessageAction.quickHandshake:
-      case MessageAction.quickPanda:
-      case MessageAction.quickFox:
-      case MessageAction.quickPopcorn:
-      case MessageAction.quickBrain:
-      case MessageAction.quickTrophy:
-      case MessageAction.quickHeartHands:
-      case MessageAction.quickSkull:
-      case MessageAction.quickAlien:
-      case MessageAction.quickSeeNoEvil:
-      case MessageAction.quickShush:
-      case MessageAction.quickZipMouth:
-      case MessageAction.quickYawn:
-      case MessageAction.quickSick:
-      case MessageAction.quickMelting:
-      case MessageAction.quickUpsideDown:
-      case MessageAction.quickWink:
-      case MessageAction.quickWave:
-      case MessageAction.quickFistBump:
-      case MessageAction.quickVictory:
-      case MessageAction.quickPointUp:
-      case MessageAction.quickWriting:
-      case MessageAction.quickFrog:
-      case MessageAction.quickRabbit:
-      case MessageAction.quickBear:
-      case MessageAction.quickTiger:
-      case MessageAction.quickDragon:
-      case MessageAction.quickButterfly:
-      case MessageAction.quickSnail:
-      case MessageAction.quickTurtle:
-      case MessageAction.quickShark:
-      case MessageAction.quickPizza:
-      case MessageAction.quickCake:
-      case MessageAction.quickMilkTea:
-      case MessageAction.quickCheers:
-      case MessageAction.quickSparkles:
-      case MessageAction.quickBomb:
-      case MessageAction.quickGrin:
-      case MessageAction.quickBeaming:
-      case MessageAction.quickRollingLaugh:
-      case MessageAction.quickKiss:
-      case MessageAction.quickPleading:
-      case MessageAction.quickSleepy:
-      case MessageAction.quickGoodNight:
-      case MessageAction.quickMoon:
-      case MessageAction.quickStar:
-      case MessageAction.quickWish:
-      case MessageAction.quickGoodMorning:
-      case MessageAction.quickSun:
-      case MessageAction.quickRose:
-      case MessageAction.quickSmilingHearts:
-      case MessageAction.quickStarStruck:
-      case MessageAction.quickPeeking:
-      case MessageAction.quickGiggle:
-      case MessageAction.quickBee:
-      case MessageAction.quickOwl:
-      case MessageAction.quickOtter:
-      case MessageAction.quickChick:
-      case MessageAction.quickSparklingHeart:
-      case MessageAction.quickTwoHearts:
-      case MessageAction.quickLoveLetter:
-      case MessageAction.quickStrawberry:
-      case MessageAction.quickCherries:
-      case MessageAction.quickChocolate:
-      case MessageAction.quickIceCream:
-      case MessageAction.quickSunflower:
-      case MessageAction.quickTulip:
-      case MessageAction.quickDaisy:
-      case MessageAction.quickMapleLeaf:
-      case MessageAction.quickSnowflake:
-      case MessageAction.quickProud:
-      case MessageAction.quickScared:
-      case MessageAction.quickNauseated:
-      case MessageAction.quickDrooling:
-      case MessageAction.quickSneezing:
-      case MessageAction.quickPartyFace:
-      case MessageAction.quickLike:
-      case MessageAction.quickPlusOne:
-      case MessageAction.quickDone:
-      case MessageAction.quickReceived:
-      case MessageAction.quickViewing:
-      case MessageAction.quickQuestion:
-        final reply = quickReplyForAction(action!);
-        await widget.onQuickReply?.call(snapshot, reply!.key, reply.text);
+      case MessageAction.star:
+        try {
+          final store = StarredMessages(
+            ImageActionScope.of(context).groupStore.database,
+          );
+          if (starred) {
+            await removeFavorite(context, store, snapshot.id);
+          } else {
+            await store.set(snapshot.id, true);
+            if (mounted)
+              ScaffoldMessenger.of(
+                context,
+              ).showGlassSnackBar(const SnackBar(content: Text('已收藏')));
+          }
+        } on Object catch (error) {
+          if (mounted)
+            ScaffoldMessenger.of(
+              context,
+            ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        }
       case MessageAction.history:
         await Navigator.push<void>(
           context,
@@ -215,7 +135,7 @@ extension _MessageItemActions on _MessageItemState {
             if (mounted) {
               ScaffoldMessenger.of(
                 context,
-              ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+              ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
             }
             return;
           }
@@ -242,7 +162,7 @@ extension _MessageItemActions on _MessageItemState {
         if (mounted && sent == true) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('已转发')));
+          ).showGlassSnackBar(const SnackBar(content: Text('已转发')));
         }
       case MessageAction.recall:
         await widget.onRecall?.call(snapshot);
@@ -258,8 +178,6 @@ extension _MessageItemActions on _MessageItemState {
         );
       case MessageAction.edit:
         await widget.onEdit?.call(snapshot);
-      case null:
-        break;
     }
   }
 

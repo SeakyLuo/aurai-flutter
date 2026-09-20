@@ -119,7 +119,8 @@ class GroupDispatcher {
     if (stopped || closed || !_members.containsKey(id)) {
       throw StateError('群聊已停止');
     }
-    if (paused.contains(id)) throw StateError('已暂停自动接话，不能安排唤醒');
+    if (paused.contains(id) && until != null)
+      throw StateError('已暂停自动接话，不能安排唤醒');
     final mailbox = _members[id]!;
     mailbox.sleepUntil = until;
     return until;

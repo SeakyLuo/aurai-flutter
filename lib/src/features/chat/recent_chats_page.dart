@@ -1,3 +1,5 @@
+import 'animated_entry_list.dart';
+import '../../app/glass_notice.dart';
 import 'conversation_list_skeleton.dart';
 import '../../scheduling/tasks_page.dart';
 import 'settings_icon.dart';
@@ -96,7 +98,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
       });
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(
             content: Text('会话加载失败：${errorMessage(error)}'),
             action: SnackBarAction(label: '重试', onPressed: reload),
@@ -135,7 +137,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
       );
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('无法新建会话，请重试：${errorMessage(error)}')),
         );
     } finally {
@@ -151,7 +153,12 @@ class RecentChatsPageState extends State<RecentChatsPage> {
       ),
     );
     if (mounted && id != null)
-      await openHomeConversation(context, widget.controller, id);
+      await openHomeConversation(
+        context,
+        widget.controller,
+        id,
+        resetStack: true,
+      );
   }
 
   @override
@@ -244,16 +251,23 @@ class RecentChatsPageState extends State<RecentChatsPage> {
         : PaginationListener(
             hasMore: _more,
             loadMore: _load,
-            child: ListView(
+            child: AnimatedEntryList(
               padding: EdgeInsets.fromLTRB(
                 12,
                 MediaQuery.paddingOf(context).top + 76 + 8,
                 12,
                 MediaQuery.paddingOf(context).bottom + 24,
               ),
-              children: [
-                if (_loaded && _items.isEmpty)
-                  _roundedTile(
+              empty: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  12,
+                  MediaQuery.paddingOf(context).top + 84,
+                  12,
+                  0,
+                ),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: _roundedTile(
                     ListTile(
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -273,6 +287,9 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                       onTap: _newConversation,
                     ),
                   ),
+                ),
+              ),
+              children: [
                 for (final item in _items)
                   ConversationMore(
                     key: ValueKey(item.id),
@@ -345,7 +362,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
             await openHomeConversation(context, widget.controller, item.id);
           } on Object catch (error) {
             if (mounted)
-              ScaffoldMessenger.of(context).showSnackBar(
+              ScaffoldMessenger.of(context).showGlassSnackBar(
                 SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
               );
           }

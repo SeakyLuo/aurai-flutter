@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
@@ -13,10 +14,11 @@ Future<void> openAiChat(
 ) async {
   try {
     final id = await controller.openAiConversation(ai);
-    if (context.mounted) await openHomeConversation(context, controller, id);
+    if (context.mounted)
+      await openHomeConversation(context, controller, id, resetStack: true);
   } on Object catch (error) {
     if (context.mounted)
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showGlassSnackBar(
         SnackBar(content: Text('无法打开会话，请稍后重试：${errorMessage(error)}')),
       );
   }
@@ -80,12 +82,12 @@ Future<void> changeAiArchive(
       await controller.groupStore.archiveAi(ai.sender.id);
     }
     if (context.mounted)
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showGlassSnackBar(
         SnackBar(content: Text(ai.sender.archived ? '已恢复朋友' : '已归档朋友')),
       );
   } on Object catch (error) {
     if (context.mounted)
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showGlassSnackBar(
         SnackBar(content: Text('操作失败，请重试：${errorMessage(error)}')),
       );
   }

@@ -5,6 +5,7 @@ extension PrivateGroupMessage on ChatController {
     Map<String, Object?> arguments,
     String senderId, {
     bool requireGroup = true,
+    String? sourceId,
   }) async {
     final id = arguments['groupId'] as String?;
     if (id == null) throw ArgumentError('私聊发送群消息需要先用 listGroupChats 确认目标群');
@@ -84,12 +85,17 @@ extension PrivateGroupMessage on ChatController {
       return _sendPeerMessage(id, senderId, text, images: images, quote: quote);
     }
     final target = await _forwardTarget(id);
+    final inlineRunId = !isGroup && sourceId == id
+        ? _runningConversation?.activeRunId
+        : null;
     final message = AgentMessage(
       id: newMessageId(),
       role: AgentMessageRole.assistant,
       senderId: senderId,
       sender: senders[senderId]!,
       isGroupMessage: isGroup,
+      runId: inlineRunId,
+      isRichReply: inlineRunId != null,
       text: [...prefixes, if (text.isNotEmpty) text].join(' '),
       images: images,
       quote: quote,

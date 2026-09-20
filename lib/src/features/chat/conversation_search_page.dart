@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'search_filter_menu.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -162,7 +163,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
       if (mounted && generation == _generation) {
         setState(() => _searchFailed = true);
         if (_submitted)
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showGlassSnackBar(
             SnackBar(
               content: Text('搜索失败，请重试：${errorMessage(error)}'),
               action: SnackBarAction(
@@ -226,7 +227,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
 
   void _historyNotice(Object error) => ScaffoldMessenger.of(
     context,
-  ).showSnackBar(SnackBar(content: Text('搜索记录保存或读取失败：${errorMessage(error)}')));
+  ).showGlassSnackBar(SnackBar(content: Text('搜索记录保存或读取失败：${errorMessage(error)}')));
 
   Future<void> _saveHistory(List<String> values) async {
     setState(() => _history = values);
@@ -277,7 +278,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
       }
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('最近文件加载失败：${errorMessage(error)}')),
         );
     } finally {
@@ -313,7 +314,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
       );
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
         );
       }

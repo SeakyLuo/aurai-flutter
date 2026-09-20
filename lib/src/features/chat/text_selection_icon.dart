@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
 class TextSelectionIcon extends StatelessWidget {
-  const TextSelectionIcon({super.key});
+  const TextSelectionIcon({super.key, this.color});
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: const Size.square(21),
     painter: _TextSelectionPainter(
-      Theme.of(context).colorScheme.onSurfaceVariant,
+      color ?? Theme.of(context).colorScheme.onSurfaceVariant,
     ),
   );
 }

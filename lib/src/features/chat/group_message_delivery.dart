@@ -9,7 +9,9 @@ extension GroupMessageDelivery on ChatController {
     required _ReplyContext reply,
     required List<AgentMessage> observed,
     required List<String> publishedIds,
+    required GroupDispatcher dispatcher,
   }) async {
+    if (dispatcher.stopped || dispatcher.closed) throw const AgentCancelled();
     final groupId = arguments['groupId'] as String?;
     if (groupId != null && groupId != parent.id) {
       _checkGroupStopped(parent);
@@ -26,7 +28,6 @@ extension GroupMessageDelivery on ChatController {
         member.runState == ChatRunState.stopping) {
       throw const AgentCancelled();
     }
-    final dispatcher = _groupDispatcher!;
     final item = arguments['message'] as Map<String, Object?>?;
     _cacheGroupMessageDraft(reply.senderId, item);
     final seen = {for (final m in observed) m.id: m};
@@ -148,6 +149,7 @@ extension GroupMessageDelivery on ChatController {
           ),
         )) {
       return _deliverGroupMessage(
+        dispatcher: dispatcher,
         arguments: {...arguments, 'participation': 'unchanged'},
         member: member,
         parent: parent,
@@ -232,6 +234,7 @@ extension GroupMessageDelivery on ChatController {
     String senderId,
     bool paused,
   ) async {
+    GroupParticipation.changes.add(groupId);
     try {
       final state = _executionStates[groupId];
       if (state != null) {

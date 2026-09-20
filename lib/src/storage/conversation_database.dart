@@ -1,3 +1,4 @@
+import 'starred_messages.dart';
 import '../html_games/html_app_store.dart';
 import 'interactive_action_history.dart';
 import 'message_callbacks.dart';
@@ -16,12 +17,28 @@ import 'message_quick_reply_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 35,
+  version: 38,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion == 37) {
+      await db.execute(
+        'ALTER TABLE starred_messages RENAME TO starred_messages_legacy',
+      );
+      await db.execute('DROP INDEX starred_messages_time');
+      await db.execute(starredMessagesSchema);
+      await db.execute(starredMessagesIndex);
+      await db.execute(
+        "INSERT INTO starred_messages(owner_id, message_id, starred_at) SELECT 'user:local', message_id, starred_at FROM starred_messages_legacy",
+      );
+      await db.execute('DROP TABLE starred_messages_legacy');
+    }
+    if (oldVersion < 37) {
+      await db.execute(starredMessagesSchema);
+      await db.execute(starredMessagesIndex);
+    }
     if (oldVersion >= 33 && oldVersion < 35) {
       await migrateMultipleQuickReplies(db);
     }
@@ -33,6 +50,11 @@ Future<Database> openConversationDatabase() async => openDatabase(
       for (final statement in messageQuickReplySchema) {
         await db.execute(statement);
       }
+    }
+    if (oldVersion < 36) {
+      await db.rawUpdate(
+        "UPDATE messages SET text = '👊 拳头' WHERE id IN (SELECT message_id FROM message_quick_replies WHERE reply_key = 'fist_bump')",
+      );
     }
     if (oldVersion >= 25 && oldVersion < 32) {
       await db.execute(
@@ -178,19 +200,27 @@ Future<Database> openConversationDatabase() async => openDatabase(
     if (oldVersion < 29) await migrateSkillLibrary(db);
     if (oldVersion < 34) {
       if (oldVersion >= 20) {
-        await db.execute('ALTER TABLE html_games ADD COLUMN app_id TEXT REFERENCES html_apps(id)');
+        await db.execute(
+          'ALTER TABLE html_games ADD COLUMN app_id TEXT REFERENCES html_apps(id)',
+        );
       }
       await db.execute('CREATE INDEX html_games_app ON html_games(app_id)');
-      await db.execute('''INSERT INTO html_apps
+      await db.execute(
+        '''INSERT INTO html_apps
         (id, creator_id, title, legacy_html, state_json, stateful, version, updated_at)
-        SELECT message_id, creator_id, title, html, state_json, stateful, version, updated_at FROM html_games''');
-      await db.execute("UPDATE html_games SET app_id = message_id, html = '', state_json = '{}'");
+        SELECT message_id, creator_id, title, html, state_json, stateful, version, updated_at FROM html_games''',
+      );
+      await db.execute(
+        "UPDATE html_games SET app_id = message_id, html = '', state_json = '{}'",
+      );
     }
   },
   onCreate: (db, version) async {
     final batch = db.batch();
     for (final statement in [
       ..._schema,
+      starredMessagesSchema,
+      starredMessagesIndex,
       ...interactiveActionSchema,
       messageCallbackSchema,
       messageCallbackIndex,

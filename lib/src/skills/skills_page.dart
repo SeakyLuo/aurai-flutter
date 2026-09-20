@@ -1,3 +1,4 @@
+import '../app/glass_notice.dart';
 import 'package:flutter/material.dart';
 import '../features/chat/chat_controller.dart';
 import '../features/chat/member_avatar.dart';
@@ -50,7 +51,7 @@ class _SkillsPageState extends State<SkillsPage> {
       if (mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -97,7 +98,7 @@ class _SkillsPageState extends State<SkillsPage> {
       if (mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(errorMessage(e))));
+        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(e))));
     }
   }
 
@@ -163,12 +164,12 @@ class _SkillsPageState extends State<SkillsPage> {
       if (mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        ).showGlassSnackBar(SnackBar(content: Text(message)));
     } on Object catch (error) {
       if (mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
     } finally {
       _acting = false;
     }
@@ -223,7 +224,7 @@ class _SkillsPageState extends State<SkillsPage> {
       if (mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(errorMessage(e))));
+        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(e))));
     }
   }
 

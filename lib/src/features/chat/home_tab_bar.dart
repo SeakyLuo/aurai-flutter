@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'conversation_icon.dart';
 import 'glass_surface.dart';
 import 'settings_icon.dart';
-import 'sidebar_action_icon.dart';
 
 class HomeTabBar extends StatelessWidget {
   const HomeTabBar({
@@ -84,10 +83,8 @@ class HomeTabBar extends StatelessWidget {
                     _tab(
                       context,
                       2,
-                      '设置',
-                      const SidebarActionIcon(
-                        type: SidebarActionIconType.settings,
-                      ),
+                      '我',
+                      const SettingsIcon(type: SettingsIconType.personalInfo),
                     ),
                   ],
                 ),

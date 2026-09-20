@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'message_action.dart';
+import '../../domain/quick_reply_option.dart';
 import 'quick_reply_groups.dart';
 
-Future<MessageAction?> showQuickReplyPicker(
+Future<QuickReplyOption?> showQuickReplyPicker(
   BuildContext context, {
   Set<String> selectedKeys = const {},
-}) => showModalBottomSheet<MessageAction>(
+}) => showModalBottomSheet<QuickReplyOption>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -19,7 +19,7 @@ class _QuickReplyPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final options = {for (final option in quickReplyOptions) option.$4: option};
+    final options = quickReplyOptionsByKey;
     return ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * .78,
@@ -50,20 +50,21 @@ class _QuickReplyPicker extends StatelessWidget {
                     builder: (context, constraints) => Wrap(
                       runSpacing: 8,
                       children: [
-                        for (final (action, emoji, label, key)
-                            in group.value.map((key) => options[key]!))
+                        for (final option in group.value.map(
+                          (key) => options[key]!,
+                        ))
                           SizedBox(
                             width: constraints.maxWidth / 6,
                             child: Tooltip(
-                              message: label,
+                              message: option.label,
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(18),
-                                onTap: () => Navigator.pop(context, action),
+                                onTap: () => Navigator.pop(context, option),
                                 child: Container(
                                   alignment: Alignment.center,
                                   height: 60,
                                   decoration: BoxDecoration(
-                                    color: selectedKeys.contains(key)
+                                    color: selectedKeys.contains(option.key)
                                         ? Theme.of(
                                             context,
                                           ).colorScheme.primaryContainer
@@ -71,7 +72,7 @@ class _QuickReplyPicker extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(18),
                                   ),
                                   child: Text(
-                                    emoji,
+                                    option.emoji,
                                     style: const TextStyle(fontSize: 32),
                                   ),
                                 ),

@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'package:flutter/material.dart';
 import '../../domain/agent_models.dart';
 import '../../domain/error_message.dart';
@@ -59,7 +60,7 @@ class _ForwardConversationSheetState extends State<ForwardConversationSheet> {
       });
     } on Object catch (error) {
       if (mounted)
-        _messenger.currentState!.showSnackBar(
+        _messenger.currentState!.showGlassSnackBar(
           SnackBar(
             content: Text('会话读取失败：${errorMessage(error)}'),
             action: SnackBarAction(label: '重试', onPressed: _load),

@@ -1,3 +1,4 @@
+import '../app/glass_notice.dart';
 import 'html_game_display_cache.dart';
 import '../domain/error_message.dart';
 import 'dart:async';
@@ -59,10 +60,9 @@ class HtmlGameView extends StatefulWidget {
 
 class _HtmlGameViewState extends State<HtmlGameView>
     with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
-  static _HtmlGameViewState? _active;
+  Timer? _idleTimer;
   int _openRevision = 0;
   static final _heights = <(String, double, bool, double, int), double>{};
-  Timer? _offscreenTimer;
   @override
   bool get wantKeepAlive => _session != null || _opening || _closing != null;
   final _anchor = GlobalKey();
@@ -75,6 +75,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
   late HtmlGameCard _card;
   Uint8List? _preview;
   double? _contentHeight;
+  (double, double, double, int)? _savedSize;
   (String, double, bool, double, int)? _heightKey;
   bool _surfaceReady = false;
   bool _opening = false, _retrying = false;
@@ -166,40 +167,28 @@ class _HtmlGameViewState extends State<HtmlGameView>
   }
 
   void _checkVisibility() {
-    if (!_tabVisible &&
-        _foreground &&
-        !_leaving &&
-        htmlRouteObserver.isVisible(ModalRoute.of(context)!)) {
-      _offscreenTimer?.cancel();
-      _offscreenTimer = null;
-      unawaited(_session?.setVisible(false));
-      return;
-    }
     if (!_visible) {
-      if (!_foreground ||
-          _leaving ||
-          !htmlRouteObserver.isVisible(ModalRoute.of(context)!)) {
-        _offscreenTimer?.cancel();
-        _offscreenTimer = null;
+      if (_leaving || !htmlRouteObserver.isVisible(ModalRoute.of(context)!)) {
         if (_session != null) unawaited(_close());
-      } else if (_session != null && _offscreenTimer == null) {
-        _offscreenTimer = Timer(const Duration(milliseconds: 700), () {
-          _offscreenTimer = null;
-          if (mounted && !_visible) unawaited(_close());
-        });
+      } else {
+        unawaited(_session?.setVisible(false));
+        if (_session != null) {
+          _idleTimer ??= Timer(const Duration(minutes: 1), () {
+            _idleTimer = null;
+            if (mounted && !_visible) unawaited(_close());
+          });
+        }
       }
       return;
     }
-    _offscreenTimer?.cancel();
-    _offscreenTimer = null;
+    _idleTimer?.cancel();
+    _idleTimer = null;
     if (_session != null) {
       unawaited(_session!.setVisible(true));
       return;
     }
     // A fling uses snapshots; mount new platform views once scrolling settles.
-    if (_views.where((view) => view._session != null || view._opening).length <
-            3 &&
-        !_opening &&
+    if (!_opening &&
         !_failed &&
         _closing == null &&
         !(_scroll?.isScrollingNotifier.value ?? false) &&
@@ -217,11 +206,22 @@ class _HtmlGameViewState extends State<HtmlGameView>
     _checkVisibility();
   }
 
+  @override
+  void didHaveMemoryPressure() {
+    HtmlGameDisplayCache.releaseContent();
+    if (!_visible) {
+      _openRevision++;
+      _idleTimer?.cancel();
+      _idleTimer = null;
+      unawaited(_close());
+    }
+  }
+
   void _notice(String message) {
     if (mounted)
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ).showGlassSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _refreshCard() async {
@@ -245,22 +245,14 @@ class _HtmlGameViewState extends State<HtmlGameView>
       return;
     }
     final revision = ++_openRevision;
-    final previous =
-        _views
-            .where(
-              (view) =>
-                  !identical(view, this) &&
-                  view.widget.messageId == widget.messageId &&
-                  (view._session != null || view._opening),
-            )
-            .firstOrNull ??
-        (_views
-                    .where((view) => view._session != null || view._opening)
-                    .length >=
-                3
-            ? _active
-            : null);
-    _active = this;
+    final previous = _views
+        .where(
+          (view) =>
+              !identical(view, this) &&
+              view.widget.messageId == widget.messageId &&
+              (view._session != null || view._opening),
+        )
+        .firstOrNull;
     setState(() {
       _opening = true;
       _failed = false;
@@ -291,7 +283,6 @@ class _HtmlGameViewState extends State<HtmlGameView>
       if (mounted) setState(() => _failed = true);
       _notice('卡片加载失败，请点击重试：${errorMessage(caughtError)}');
     } finally {
-      if (_session == null && identical(_active, this)) _active = null;
       if (mounted) {
         setState(() => _opening = false);
         updateKeepAlive();
@@ -311,17 +302,27 @@ class _HtmlGameViewState extends State<HtmlGameView>
           (session.contentHeight! - _contentHeight!).abs() >= 2) {
         _contentHeight = session.contentHeight;
         changed = true;
-        if (!widget.fullscreen && _heightKey != null) {
+      }
+      if (!widget.fullscreen && _heightKey != null) {
+        final size = (
+          _heightKey!.$2,
+          _contentHeight!,
+          MediaQuery.textScalerOf(context).scale(1),
+          session.game.version,
+        );
+        if (_savedSize != size) {
+          _savedSize = size;
           unawaited(
             widget.store
                 .saveMeasuredSize(
                   widget.messageId,
-                  _heightKey!.$2,
-                  _contentHeight!,
-                  MediaQuery.textScalerOf(context).scale(1),
-                  session.game.version,
+                  size.$1,
+                  size.$2,
+                  size.$3,
+                  size.$4,
                 )
                 .catchError((Object error) {
+                  if (_savedSize == size) _savedSize = null;
                   if (mounted) _notice('尺寸保存失败：${errorMessage(error)}');
                 }),
           );
@@ -376,10 +377,10 @@ class _HtmlGameViewState extends State<HtmlGameView>
     if (session == null) return;
     session.removeListener(_sessionChanged);
     await session.close();
-    if (session.previewVersion == session.game.version)
+    if (session.previewVersion == session.game.version &&
+        session.preview != null)
       _preview = session.preview;
     _session = null;
-    if (identical(_active, this)) _active = null;
     if (mounted) setState(() {});
     for (final view in _views) {
       view._scheduleVisibility();
@@ -388,7 +389,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
 
   @override
   void dispose() {
-    _offscreenTimer?.cancel();
+    _idleTimer?.cancel();
     htmlRouteObserver.removeListener(_scheduleVisibility);
     _views.remove(this);
     _scroll?.removeListener(_scheduleVisibility);
@@ -528,8 +529,17 @@ class _HtmlGameViewState extends State<HtmlGameView>
               _card.version,
             );
             if (_heightKey != key) {
+              final previousKey = _heightKey;
+              final previousHeight = _contentHeight;
               _heightKey = key;
-              _contentHeight = _heights[key];
+              _contentHeight =
+                  _heights[key] ??
+                  (previousKey != null &&
+                          previousKey.$2 == key.$2 &&
+                          previousKey.$3 == key.$3 &&
+                          previousKey.$4 == key.$4
+                      ? previousHeight
+                      : null);
               if (_contentHeight == null &&
                   !widget.fullscreen &&
                   _card.measuredWidth == width &&
@@ -539,7 +549,12 @@ class _HtmlGameViewState extends State<HtmlGameView>
                 _contentHeight = _card.measuredHeight;
               }
             }
-            final height = _contentHeight ?? 96.0;
+            final height =
+                _contentHeight ??
+                (_card.measuredVersion == _card.version
+                    ? _card.measuredHeight
+                    : null) ??
+                _card.height.toDouble();
             return SizedBox(
               key: _anchor,
               width: math.min(
@@ -564,9 +579,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
                             : const Color(0xffefeff3),
                       ),
                     )
-                  else if (_preview != null &&
-                      _contentHeight != null &&
-                      !_failed)
+                  else if (_preview != null && !_failed)
                     GestureDetector(
                       onTap: _open,
                       child: ClipRRect(
@@ -574,7 +587,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
                         child: Image.memory(
                           _preview!,
                           gaplessPlayback: true,
-                          height: _contentHeight,
+                          height: height,
                           fit: BoxFit.fitWidth,
                           alignment: Alignment.topCenter,
                         ),
@@ -583,41 +596,18 @@ class _HtmlGameViewState extends State<HtmlGameView>
                   else
                     SizedBox(
                       height: height,
-                      child: InkWell(
-                        onTap: _opening ? null : _open,
-                        borderRadius: BorderRadius.circular(22),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _card.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 15),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                _opening
-                                    ? '正在加载…'
-                                    : _failed
-                                    ? '加载失败，点击重试'
-                                    : '点击查看内容',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
+                      child: Center(
+                        child: _failed
+                            ? TextButton(
+                                onPressed: _open,
+                                child: const Text('加载失败，点击重试'),
+                              )
+                            : const SizedBox.square(
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                   if (_card.canRetry)

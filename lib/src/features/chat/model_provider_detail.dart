@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../providers/openrouter_models.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
@@ -356,7 +357,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     }
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(context).showSnackBar(
+  void _notice(String text) => ScaffoldMessenger.of(context).showGlassSnackBar(
     SnackBar(
       content: Text(text),
       behavior: SnackBarBehavior.floating,

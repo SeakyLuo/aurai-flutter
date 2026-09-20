@@ -1,3 +1,4 @@
+import '../html_games/html_app_store.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -5,7 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 /// File sources use the same private workspace as Android AppShellJobs.
 abstract final class HtmlMessageSource {
-  static const maxBytes = 256 * 1024;
+  static const maxBytes = HtmlAppStore.maxHtmlBytes;
   static const schema = {
     'type': ['string', 'null'],
     'description':
@@ -61,10 +62,10 @@ abstract final class HtmlMessageSource {
       late final String content;
       try {
         if (await handle.length() > maxBytes) {
-          throw ArgumentError('HTML 最多 256 KB');
+          throw ArgumentError('HTML 最多 4 MB');
         }
         final bytes = await handle.read(maxBytes + 1);
-        if (bytes.length > maxBytes) throw ArgumentError('HTML 最多 256 KB');
+        if (bytes.length > maxBytes) throw ArgumentError('HTML 最多 4 MB');
         content = utf8.decode(bytes);
       } finally {
         await handle.close();
@@ -83,7 +84,7 @@ abstract final class HtmlMessageSource {
 
   static void _validate(String html) {
     if (html.trim().isEmpty || utf8.encode(html).length > maxBytes) {
-      throw ArgumentError('HTML 不能为空且最多 256 KB');
+      throw ArgumentError('HTML 不能为空且最多 4 MB');
     }
   }
 }

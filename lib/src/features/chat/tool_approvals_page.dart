@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import 'chat_controller.dart';
@@ -23,7 +24,7 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
       );
     } catch (caughtError) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('撤销授权失败，请重试：${errorMessage(caughtError)}')),
         );
     } finally {

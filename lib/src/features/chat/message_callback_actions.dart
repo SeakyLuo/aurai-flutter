@@ -94,9 +94,9 @@ extension MessageCallbackActions on ChatController {
           _callbacksDisposed)
         return false;
       if (conversation.kind == ConversationKind.group) {
-        await _recoverGroupSleep(id, {senderId});
+        await _recoverGroupSleep(id, {senderId}, callbacksOnly: true);
       } else {
-        await _executeConversation(conversation);
+        await _executeConversation(conversation, callbacksOnly: true);
       }
       final remaining = await _store.database.query(
         'message_callbacks',

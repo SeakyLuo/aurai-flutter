@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'dart:convert';
 import 'chat_scroll_anchor.dart';
 import 'package:flutter/material.dart';
@@ -74,7 +75,7 @@ class _InteractiveMessagePagingState extends State<InteractiveMessagePaging> {
       if (mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -14,7 +14,6 @@ import android.webkit.PermissionRequest
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -24,7 +23,6 @@ import io.flutter.plugin.common.StandardMessageCodec
 import io.flutter.plugin.platform.PlatformView
 import io.flutter.plugin.platform.PlatformViewFactory
 import org.json.JSONObject
-import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
 
@@ -83,7 +81,7 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
             databaseEnabled = false
             allowFileAccess = false
             allowContentAccess = false
-            blockNetworkLoads = true
+            blockNetworkLoads = false
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             javaScriptCanOpenWindowsAutomatically = false
             setSupportMultipleWindows(false)
@@ -95,8 +93,6 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
         }
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = true
-            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest) =
-                WebResourceResponse("text/plain", "UTF-8", ByteArrayInputStream(ByteArray(0)))
             override fun onPageFinished(view: WebView, url: String) {
                 if (!disposed) { loaded = true; channel?.invokeMethod("ready", null); if (!attached) pause() }
             }

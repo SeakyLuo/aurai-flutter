@@ -82,11 +82,16 @@ extension AppControlActions on ChatController {
         if (navigate == null) throw StateError('当前无法打开页面');
         await navigate({...args, 'senderId': senderId});
       case 'sendConversationMessage':
-        return _sendPrivateGroupMessage({
-          'groupId': id,
-          'message': args['message'],
-          'participation': 'unchanged',
-        }, senderId, requireGroup: false);
+        return _sendPrivateGroupMessage(
+          {
+            'groupId': id,
+            'message': args['message'],
+            'participation': 'unchanged',
+          },
+          senderId,
+          requireGroup: false,
+          sourceId: sourceId,
+        );
       default:
         throw ArgumentError('不支持的操作');
     }

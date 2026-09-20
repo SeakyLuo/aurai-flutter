@@ -1,3 +1,5 @@
+import '../../app/glass_notice.dart';
+import 'group_activity_sheet.dart';
 import '../../domain/error_message.dart';
 import 'dart:math' as math;
 import 'dialog_action_button.dart';
@@ -77,7 +79,7 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
     } on Object catch (error) {
       if (mounted) {
         setState(() => _failed = true);
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('群聊信息加载失败，请重试：${errorMessage(error)}')),
         );
       }
@@ -235,6 +237,28 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                             ),
                             const SizedBox(height: 8),
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _surface(
+                        ListTile(
+                          minTileHeight: 60,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                          ),
+                          title: const Text(
+                            '群成员状态',
+                            style: TextStyle(fontSize: 15),
+                          ),
+                          trailing: const SettingsIcon(
+                            type: SettingsIconType.chevron,
+                          ),
+                          onTap: () => _open(
+                            GroupActivityPage(
+                              controller: widget.controller,
+                              conversationId: _conversation.id,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),

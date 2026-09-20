@@ -78,11 +78,14 @@ class MessageQuoteView extends StatelessWidget {
 }
 
 class QuoteIcon extends StatelessWidget {
-  const QuoteIcon({super.key});
+  const QuoteIcon({super.key, this.color});
+  final Color? color;
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: const Size.square(21),
-    painter: _QuotePainter(Theme.of(context).colorScheme.onSurfaceVariant),
+    painter: _QuotePainter(
+      color ?? Theme.of(context).colorScheme.onSurfaceVariant,
+    ),
   );
 }
 

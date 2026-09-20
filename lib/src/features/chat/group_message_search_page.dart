@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/message_sender.dart';
 import 'ai_contact_page.dart';
 import 'personal_info_page.dart';
@@ -105,7 +106,7 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
     } on Object catch (error) {
       if (!mounted || generation != _generation) return;
       setState(() => page.failed = true);
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showGlassSnackBar(
         SnackBar(
           content: Text('搜索失败：${errorMessage(error)}'),
           action: SnackBarAction(
@@ -159,7 +160,7 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
       );
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('无法定位消息：${errorMessage(error)}')),
         );
     }

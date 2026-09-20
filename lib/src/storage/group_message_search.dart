@@ -82,6 +82,12 @@ class GroupMessageSearch {
       limit: pageSize,
       offset: offset,
     );
+    return hydrate(rows);
+  }
+
+  Future<List<GroupMessageSearchResult>> hydrate(
+    List<Map<String, Object?>> rows,
+  ) async {
     if (rows.isEmpty) return [];
     final ids = rows.map((r) => r['id']).toList();
     final senderIds = rows.map((r) => r['sender_id']).toSet().toList();

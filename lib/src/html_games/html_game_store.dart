@@ -137,8 +137,8 @@ class HtmlGameStore {
     if (title.isEmpty ||
         title.length > 100 ||
         html.trim().isEmpty ||
-        utf8.encode(html).length > 256 * 1024)
-      throw ArgumentError('请提供标题和不超过 256 KB 的 HTML');
+        utf8.encode(html).length > HtmlAppStore.maxHtmlBytes)
+      throw ArgumentError('请提供标题和不超过 4 MB 的 HTML');
     checkJson(state, 64 * 1024, '游戏状态');
     final members = standalone
         ? <String>{}

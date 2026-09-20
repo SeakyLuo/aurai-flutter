@@ -8,15 +8,31 @@ class RecalledMessageNotice extends StatelessWidget {
     super.key,
     required this.message,
     this.onEdit,
+    this.onOpenSource,
     required this.style,
   });
   final AgentMessage message;
   final ValueChanged<AgentMessage>? onEdit;
   final TextStyle style;
+  final ValueChanged<String>? onOpenSource;
 
   @override
   Widget build(BuildContext context) {
     final text = Text(message.text, textAlign: TextAlign.center, style: style);
+    if (message.quote != null && onOpenSource != null) {
+      return Semantics(
+        button: true,
+        label: '定位交互消息',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => onOpenSource!(message.quote!.messageId),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: text,
+          ),
+        ),
+      );
+    }
     if (message.senderId != MessageSender.localUser.id || onEdit == null) {
       return text;
     }

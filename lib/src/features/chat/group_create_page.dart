@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import '../../domain/agent_models.dart';
@@ -49,7 +50,7 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
   }
 
   void _notice(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
   Future<void> _load() async {
     try {
       final saved = await _draft.load();

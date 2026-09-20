@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../domain/avatar_style.dart';
 import '../../domain/message_sender.dart';
@@ -98,7 +99,7 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
       });
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('会话加载失败，请重新搜索：${errorMessage(error)}')),
         );
     } finally {
@@ -156,7 +157,7 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
       await PreviewImageActions.perform(widget.image!, 'share');
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('无法打开分享，请重试：${errorMessage(error)}')),
         );
     } finally {

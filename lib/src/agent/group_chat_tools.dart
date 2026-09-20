@@ -1,7 +1,8 @@
 import '../domain/tool_models.dart';
 import '../storage/group_chat_store.dart';
 
-class GroupChatTool implements AgentTool, RuntimeCapabilityAgentTool, PreflightAgentTool {
+class GroupChatTool
+    implements AgentTool, RuntimeCapabilityAgentTool, PreflightAgentTool {
   GroupChatTool(
     this.store,
     this.operation,
@@ -29,11 +30,32 @@ class GroupChatTool implements AgentTool, RuntimeCapabilityAgentTool, PreflightA
   @override
   Future<ToolResult?> preflight(ToolCall call) async {
     if (operation == 'list' || operation == 'create') return null;
-    final rows = await store.database.query('conversations', columns: ['title'],
-      where: "id = ? AND kind = 'group' AND id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)",
-      whereArgs: [call.arguments['id'] ?? currentConversationId, senderId], limit: 1);
-    if (rows.isEmpty) return ToolResult(callId: call.id, toolName: call.name,
-      status: ToolResultStatus.error, output: {'message': '群聊不存在或你不是当前成员'});
+    if (!call.arguments.containsKey('id')) {
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: ToolResultStatus.error,
+        output: {
+          'message':
+              '缺少必填参数 id。目标群请使用 id 字段，不是 groupId；只有操作当前群时才传 id: null。请修正参数后重试。',
+        },
+      );
+    }
+    final rows = await store.database.query(
+      'conversations',
+      columns: ['title'],
+      where:
+          "id = ? AND kind = 'group' AND id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)",
+      whereArgs: [call.arguments['id'] ?? currentConversationId, senderId],
+      limit: 1,
+    );
+    if (rows.isEmpty)
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: ToolResultStatus.error,
+        output: {'message': '群聊不存在或你不是当前成员'},
+      );
     _groupTitle = rows.single['title'] as String;
     return null;
   }
@@ -46,9 +68,12 @@ class GroupChatTool implements AgentTool, RuntimeCapabilityAgentTool, PreflightA
     capabilityId: 'local.group_chats',
     safety: ['list', 'read'].contains(operation)
         ? ToolSafety.readOnly
-        : operation == 'updateMembers' ? ToolSafety.sensitive : ToolSafety.lowRisk,
+        : operation == 'updateMembers'
+        ? ToolSafety.sensitive
+        : ToolSafety.lowRisk,
     singleUseConfirmation: operation == 'updateMembers',
-    confirmationDescriptionBuilder: (_) => '是否允许调整“$_groupTitle”的成员？移除成员会停止其当前任务，新成员可以参与群聊。',
+    confirmationDescriptionBuilder: (_) =>
+        '是否允许调整“$_groupTitle”的成员？移除成员会停止其当前任务，新成员可以参与群聊。',
     description: switch (operation) {
       'list' =>
         'Search saved Aurai group chats by title with offset pagination, at most 50. Returns internal IDs; never ask the user to enter IDs. Does not search messages; use readGroupMessages for group message contents.',
@@ -72,7 +97,7 @@ class GroupChatTool implements AgentTool, RuntimeCapabilityAgentTool, PreflightA
           'id': {
             'type': ['string', 'null'],
             'description':
-                'Group ID returned by listGroupChats; null uses the current group.',
+                'Required field named id (not groupId), returned by listGroupChats. In a private chat, supply the target group ID. Explicit null uses the current conversation only when it is a group.',
           },
         if (['create', 'rename'].contains(operation))
           'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
@@ -106,7 +131,8 @@ class GroupChatTool implements AgentTool, RuntimeCapabilityAgentTool, PreflightA
         final rows = await store.database.query(
           'conversations',
           columns: ['id', 'title', 'updated_at'],
-          where: "kind = 'group' AND instr(lower(title), ?) > 0 AND id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)",
+          where:
+              "kind = 'group' AND instr(lower(title), ?) > 0 AND id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)",
           whereArgs: [(a['query'] as String).toLowerCase(), senderId],
           orderBy: 'updated_at DESC, id',
           limit: 51,
@@ -136,7 +162,8 @@ class GroupChatTool implements AgentTool, RuntimeCapabilityAgentTool, PreflightA
         final rows = await store.database.query(
           'conversations',
           columns: ['id', 'title'],
-          where: "id = ? AND kind = 'group' AND id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)",
+          where:
+              "id = ? AND kind = 'group' AND id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)",
           whereArgs: [id, senderId],
         );
         if (rows.isEmpty) throw StateError('未找到群聊，请先查询群聊列表');
