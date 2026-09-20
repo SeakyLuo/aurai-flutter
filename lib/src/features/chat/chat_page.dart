@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'group_status_builder.dart';
 import 'ai_contact_page.dart';
 import 'personal_info_page.dart';
@@ -140,7 +141,7 @@ class _ChatPageState extends State<ChatPage>
           if (mounted)
             ScaffoldMessenger.of(
               context,
-            ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+            ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
         }),
       );
     });
@@ -636,7 +637,7 @@ class _ChatPageState extends State<ChatPage>
       await widget.controller.saveDraft();
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('草稿保存失败，请稍后重试：${errorMessage(error)}')),
         );
       }
@@ -744,7 +745,7 @@ class _ChatPageState extends State<ChatPage>
       return;
     }
     final stopped = widget.controller.runState == ChatRunState.cancelled;
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showGlassSnackBar(
       SnackBar(content: Text(stopped ? '任务已停止' : errorMessage(error))),
     );
   }

@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'dart:io';
 
@@ -47,7 +48,7 @@ class _ConversationMoreState extends State<ConversationMore> {
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ).showGlassSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _saveChat() async {
@@ -90,7 +91,7 @@ class _ConversationMoreState extends State<ConversationMore> {
     final messenger = ScaffoldMessenger.of(context);
     void notice(String message, {SnackBarAction? action}) {
       if (messenger.mounted) {
-        messenger.showSnackBar(
+        messenger.showGlassSnackBar(
           SnackBar(
             content: Text(message),
             action: action,

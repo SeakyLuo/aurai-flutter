@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'header_action_menu.dart';
 import '../../scheduling/task_filter_menu.dart';
 import '../../domain/error_message.dart';
@@ -77,7 +78,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
       });
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(
             content: Text('朋友加载失败：${errorMessage(error)}'),
             action: SnackBarAction(
@@ -120,10 +121,11 @@ class _AiContactsPageState extends State<AiContactsPage> {
         widget.controller,
         id,
         waitForClose: true,
+        resetStack: true,
       );
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('无法新建会话，请重试：${errorMessage(error)}')),
         );
       }

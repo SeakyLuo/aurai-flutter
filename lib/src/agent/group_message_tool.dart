@@ -1,3 +1,5 @@
+import '../diagnostics/execution_log.dart';
+import 'agent_runtime.dart' show AgentCancelled;
 import '../platform/svg_image.dart';
 import '../domain/error_message.dart';
 import '../domain/tool_models.dart';
@@ -22,7 +24,7 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         'the supplied history for quotes. Never invent IDs. In the current group, if new messages arrived, '
         'nothing is sent and the new messages are returned: reconsider your draft, '
         'then retry or remain silent. Do not repeat already executed device actions. '
-        'Only explicit instructions from the human user may change participation. '
+        'Only explicit instructions from the human user may change participation. participation=paused is persistent until restored. For a temporary pause, consider sleepGroupChat instead: seconds=-1 waits for new messages, while a positive duration schedules a wake-up. Choose based on the user intent and context rather than matching fixed phrases. '
         'paused stops automatic replies, active resumes them, unchanged preserves state. '
         'A null message allows silence or participation changes. '
         'message must be a nested JSON object, never JSON encoded inside a string. '
@@ -183,7 +185,15 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         output: output,
         attachments: attachments,
       );
-    } on Object catch (error) {
+    } on AgentCancelled {
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: ToolResultStatus.cancelled,
+        output: const {'cancelled': true, 'message': '本次任务已停止'},
+      );
+    } on Object catch (error, stack) {
+      await ExecutionLog.toolException(call.name, call.id, error, stack);
       return ToolResult(
         callId: call.id,
         toolName: call.name,

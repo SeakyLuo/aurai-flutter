@@ -41,18 +41,59 @@ class ToolExecutor {
       );
     }
     final tool = _registry.find(call.name);
-    if (tool == null || !_registry.isExposed(call.name)) {
+    if (tool == null) {
       return ToolResult(
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.error,
         output: const <String, Object?>{
-          'error': 'Tool is not loaded for this turn. Use searchTools first.',
+          'code': 'unknown_tool',
+          'error':
+              'Tool does not exist. Use searchTools to find an available tool.',
         },
       );
     }
-    _registry.load([call.name]);
     final capability = _registry.capabilityFor(tool);
+    if (tool is! RuntimeCapabilityAgentTool &&
+        (capability == null ||
+            capability.availability == CapabilityAvailability.unavailable ||
+            capability.availability == CapabilityAvailability.unsupported)) {
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: ToolResultStatus.error,
+        output: <String, Object?>{
+          'code': 'capability_unavailable',
+          'error': 'Capability is not available',
+          'capability': tool.definition.capabilityId,
+          'availability': capability?.availability.name ?? 'unavailable',
+          'reason': capability?.reason ?? 'Capability was not reported',
+        },
+      );
+    }
+    if (!_registry.isExposed(call.name)) {
+      final definition = _registry.catalog.firstWhere(
+        (item) => item.name == call.name,
+      );
+      _registry.retain(call.name);
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: ToolResultStatus.error,
+        output: {
+          'code': 'tool_loaded_for_next_turn',
+          'executed': false,
+          'message':
+              'Tool loaded automatically. On the next model turn, call it using the provided schema. No searchTools call is needed. Loading grants no permission.',
+          'tool': {
+            'name': definition.name,
+            'description': definition.description,
+            'parameters': definition.modelInputSchema,
+          },
+        },
+      );
+    }
+    _registry.retain(call.name);
     final questions = _registry.find('askUser') as AskUserTool?;
     if (call.userAction != null &&
         (tool.definition.waitsForUser ||
@@ -71,22 +112,6 @@ class ToolExecutor {
     if (tool is PreflightAgentTool) {
       final rejected = await (tool as PreflightAgentTool).preflight(call);
       if (rejected != null) return rejected;
-    }
-    if (tool is! RuntimeCapabilityAgentTool &&
-        (capability == null ||
-            capability.availability == CapabilityAvailability.unavailable ||
-            capability.availability == CapabilityAvailability.unsupported)) {
-      return ToolResult(
-        callId: call.id,
-        toolName: call.name,
-        status: ToolResultStatus.error,
-        output: <String, Object?>{
-          'error': 'Capability is not available',
-          'capability': tool.definition.capabilityId,
-          'availability': capability?.availability.name ?? 'unavailable',
-          'reason': capability?.reason ?? 'Capability was not reported',
-        },
-      );
     }
     final safety = tool.definition.safetyFor(call.arguments);
     final needsConfirmation = tool is ToolConfirmationPolicyAgentTool

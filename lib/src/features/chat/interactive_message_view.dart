@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'interactive_button_layout.dart';
 import 'interaction_content.dart';
 import '../../domain/error_message.dart';
@@ -89,7 +90,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
       if (mounted && error is InteractiveMessageChanged)
         setState(() => _acceptCard(error.card));
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(
             content: Text(
               error is StateError
@@ -116,7 +117,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
       if (mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -188,32 +189,17 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
             ),
           ],
-          if (callbackLocked || callbackStatus == 'failed') ...[
+          if (callbackStatus == 'failed') ...[
             const SizedBox(height: 8),
             Row(
               children: [
-                if (callbackLocked && !widget.historical) ...[
-                  const SizedBox.square(
-                    dimension: 12,
-                    child: CircularProgressIndicator(strokeWidth: 1.5),
-                  ),
-                  const SizedBox(width: 8),
-                ],
                 Expanded(
                   child: GestureDetector(
-                    onTap: callbackStatus == 'failed'
-                        ? () => ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(callback!['error'] as String),
-                            ),
-                          )
-                        : null,
+                    onTap: () => ScaffoldMessenger.of(context).showGlassSnackBar(
+                      SnackBar(content: Text(callback!['error'] as String)),
+                    ),
                     child: Text(
-                      callbackStatus == 'queued'
-                          ? '等待 AI 处理'
-                          : callbackStatus == 'processing'
-                          ? 'AI 正在处理'
-                          : '处理未完成',
+                      '处理未完成',
                       style: TextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
@@ -221,7 +207,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                     ),
                   ),
                 ),
-                if (callbackStatus == 'failed' && canRetry)
+                if (canRetry)
                   TextButton(
                     onPressed: _busy == null
                         ? () => _retry(callback!['id'] as String)

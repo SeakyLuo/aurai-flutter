@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'delete_confirmation_dialog.dart';
 import '../../domain/error_message.dart';
 import 'dart:async';
@@ -159,7 +160,7 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
   }
 
   void _notice(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
 
   Widget _profileField(
     String label,

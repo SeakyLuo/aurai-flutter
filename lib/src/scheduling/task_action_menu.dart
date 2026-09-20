@@ -1,3 +1,4 @@
+import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -216,7 +217,7 @@ Future<bool> manageTask(
   try {
     await tasks.manage(id, action);
     if (context.mounted)
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showGlassSnackBar(
         SnackBar(
           content: Text(switch (action) {
             'delete' => '任务已删除',
@@ -229,7 +230,7 @@ Future<bool> manageTask(
     return true;
   } on Object catch (e) {
     if (context.mounted)
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showGlassSnackBar(
         SnackBar(
           content: Text(
             e is PlatformException
@@ -262,7 +263,7 @@ Future<void> openTaskConversation(
       );
   } on Object catch (error) {
     if (context.mounted)
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showGlassSnackBar(
         SnackBar(content: Text('无法打开对应会话，可能已被删除：${errorMessage(error)}')),
       );
   }

@@ -1,3 +1,4 @@
+import '../app/glass_notice.dart';
 import 'package:flutter/material.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
@@ -47,7 +48,7 @@ class _SkillVisibilityPickerState extends State<SkillVisibilityPicker> {
             if (_visibility == 'selected' && _selected.isEmpty) {
               ScaffoldMessenger.of(
                 context,
-              ).showSnackBar(const SnackBar(content: Text('请选择可见的人或 AI')));
+              ).showGlassSnackBar(const SnackBar(content: Text('请选择可见的人或 AI')));
               return;
             }
             Navigator.pop(context, (_visibility, _selected));

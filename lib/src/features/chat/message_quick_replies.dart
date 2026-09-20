@@ -37,13 +37,16 @@ extension MessageQuickReplies on ChatController {
         source.isReasoning) {
       throw StateError('这条消息不支持快捷回复');
     }
+    final sendAsMessage =
+        conversation.kind == ConversationKind.direct &&
+        source.role == AgentMessageRole.assistant;
     final own = source.quickReplies
         .where(
           (reply) =>
               reply.senderId == MessageSender.localUser.id && reply.key == key,
         )
         .firstOrNull;
-    if (own != null) {
+    if (own != null && !sendAsMessage) {
       await _removeQuickReply(conversation, source.id, own.id);
       _notifyRun(conversation);
       return false;
@@ -92,7 +95,15 @@ extension MessageQuickReplies on ChatController {
 
     cancelSearchNavigation();
     _submitting = true;
-    final message = _quickReplyMessage(source, key, text);
+    final message = sendAsMessage
+        ? AgentMessage(
+            id: newMessageId(),
+            role: AgentMessageRole.user,
+            senderId: MessageSender.localUser.id,
+            text: text,
+            createdAt: DateTime.now(),
+          )
+        : _quickReplyMessage(source, key, text);
     final attached = MessageQuickReply(
       id: message.id,
       senderId: message.senderId,
@@ -101,7 +112,7 @@ extension MessageQuickReplies on ChatController {
       createdAt: message.createdAt,
     );
     try {
-      _attachQuickReply(conversation, source.id, attached);
+      if (!sendAsMessage) _attachQuickReply(conversation, source.id, attached);
       conversation.messages.add(message);
       conversation.messageCount++;
       conversation.pendingGoal = text;
@@ -124,7 +135,8 @@ extension MessageQuickReplies on ChatController {
               : const {},
         );
       } on Object {
-        _detachQuickReply(conversation, source.id, message.id);
+        if (!sendAsMessage)
+          _detachQuickReply(conversation, source.id, message.id);
         conversation.messages.removeWhere((item) => item.id == message.id);
         conversation.messageCount--;
         conversation.pendingGoal = previousPending;

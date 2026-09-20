@@ -15,6 +15,7 @@ class GlassSurface extends StatelessWidget {
     this.regular = false,
     this.tintOpacity = 1,
     this.shadowOpacity = 1,
+    this.gradientColors,
   });
   final Widget child;
   final double radius;
@@ -23,6 +24,7 @@ class GlassSurface extends StatelessWidget {
   final bool regular;
   final double tintOpacity;
   final double shadowOpacity;
+  final List<Color>? gradientColors;
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
@@ -62,32 +64,34 @@ class GlassSurface extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors:
-                  (regular
-                          ? (dark ||
+                  (gradientColors ??
+                          (regular
+                              ? (dark ||
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                    ? const [
+                                        Color(0xf238383a),
+                                        Color(0xeb303032),
+                                        Color(0xf2333335),
+                                      ]
+                                    : const [
+                                        Color(0xfaffffff),
+                                        Color(0xf2ffffff),
+                                        Color(0xf7f8f8fa),
+                                      ])
+                              : (dark ||
                                     Theme.of(context).brightness ==
-                                        Brightness.dark
-                                ? const [
-                                    Color(0xf238383a),
-                                    Color(0xeb303032),
-                                    Color(0xf2333335),
-                                  ]
-                                : const [
-                                    Color(0xfaffffff),
-                                    Color(0xf2ffffff),
-                                    Color(0xf7f8f8fa),
-                                  ])
-                          : (dark ||
-                                Theme.of(context).brightness == Brightness.dark)
-                          ? const [
-                              Color(0xb348484b),
-                              Color(0x99202023),
-                              Color(0xc22b2b2e),
-                            ]
-                          : const [
-                              Color(0xe0ffffff),
-                              Color(0xb8ffffff),
-                              Color(0xccf2effa),
-                            ])
+                                        Brightness.dark)
+                              ? const [
+                                  Color(0xb348484b),
+                                  Color(0x99202023),
+                                  Color(0xc22b2b2e),
+                                ]
+                              : const [
+                                  Color(0xe0ffffff),
+                                  Color(0xb8ffffff),
+                                  Color(0xccf2effa),
+                                ]))
                       .map(
                         (color) =>
                             color.withValues(alpha: color.a * tintOpacity),

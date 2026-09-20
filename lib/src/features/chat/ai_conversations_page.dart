@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'conversation_list_skeleton.dart';
 import 'conversation_status_dot.dart';
 import '../../domain/error_message.dart';
@@ -85,7 +86,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
     } on Object catch (error) {
       if (mounted) setState(() => _failed = true);
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(
             content: Text('会话加载失败：${errorMessage(error)}'),
             action: SnackBarAction(
@@ -118,7 +119,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
       if (mounted) await _load(reset: true);
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
         );
     } finally {

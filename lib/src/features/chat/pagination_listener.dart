@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 
@@ -28,7 +29,7 @@ class _PaginationListenerState extends State<PaginationListener> {
       await widget.loadMore();
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(
             content: Text('加载失败，请重试：${errorMessage(error)}'),
             action: SnackBarAction(label: '重试', onPressed: _load),

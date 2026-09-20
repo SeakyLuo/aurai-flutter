@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -43,7 +44,7 @@ class _DocumentFoldersPageState extends State<DocumentFoldersPage>
   }
 
   void _notice(String message) =>
-      _messenger.currentState!.showSnackBar(SnackBar(content: Text(message)));
+      _messenger.currentState!.showGlassSnackBar(SnackBar(content: Text(message)));
   Future<void> _perform(Future<void> Function() action) async {
     setState(() => _busy = true);
     try {

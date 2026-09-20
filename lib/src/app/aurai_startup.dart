@@ -1,3 +1,4 @@
+import 'glass_notice.dart';
 import '../domain/error_message.dart';
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import '../features/chat/chat_controller.dart';
 import '../platform/aurai_platform.dart';
 import 'aurai_app.dart';
 import 'appearance_settings.dart';
+import 'language_settings.dart';
 import 'global_ui.dart';
 import 'startup_brand.dart';
 
@@ -34,7 +36,10 @@ class _AuraiStartupState extends State<AuraiStartup> {
     _messenger.currentState?.clearSnackBars();
     final controller = ChatController(AuraiPlatform.instance);
     try {
-      await AppearanceSettings.instance.load();
+      await Future.wait([
+        AppearanceSettings.instance.load(),
+        LanguageSettings.instance.load(),
+      ]);
       await controller.initialize();
       if (!mounted) {
         controller.dispose();
@@ -52,7 +57,7 @@ class _AuraiStartupState extends State<AuraiStartup> {
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _messenger.currentState!.showSnackBar(
+        _messenger.currentState!.showGlassSnackBar(
           SnackBar(
             content: Text('无法打开会话，请重试：${errorMessage(error)}'),
             duration: Duration(days: 365),

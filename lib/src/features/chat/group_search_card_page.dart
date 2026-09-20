@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'dart:async';
 import '../../storage/interactive_message_store.dart';
 import 'interactive_statistics_sheet.dart';
@@ -68,7 +69,7 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
         _card = null;
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
         final route = ModalRoute.of(context)!;
         if (route.isCurrent) {
           Navigator.pop(context);
@@ -127,7 +128,7 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
                       });
                     } on Object catch (error) {
                       if (context.mounted)
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        ScaffoldMessenger.of(context).showGlassSnackBar(
                           SnackBar(content: Text(errorMessage(error))),
                         );
                     }

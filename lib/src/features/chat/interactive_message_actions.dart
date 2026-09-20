@@ -282,6 +282,11 @@ extension InteractiveMessageActions on ChatController {
         txn,
         source.id,
         '${actor.sender.name}更新了“${card.title}”',
+        source: MessageQuote(
+          messageId: id,
+          senderId: actor.sender.id,
+          text: card.title,
+        ),
       );
     });
     _replaceInteractiveCard(source.id, id, card, source: source);

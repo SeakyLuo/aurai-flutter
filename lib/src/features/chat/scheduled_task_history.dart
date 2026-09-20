@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -48,7 +49,7 @@ class ScheduledTaskHistory extends StatelessWidget {
       content = Align(
         alignment: Alignment.centerLeft,
         child: TextButton(
-          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+          onPressed: () => ScaffoldMessenger.of(context).showGlassSnackBar(
             SnackBar(
               content: Text(
                 (output?['message'] ?? output?['error'] ?? '此记录未保存未完成原因')

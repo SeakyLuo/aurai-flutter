@@ -1,6 +1,7 @@
 import '../../storage/quick_reply_recents.dart';
 import 'message_action.dart';
 export 'message_action.dart';
+import '../../domain/quick_reply_option.dart';
 import 'quick_reply_picker.dart';
 import 'sidebar_action_icon.dart';
 import '../../html_games/html_game_icon.dart';
@@ -17,9 +18,11 @@ import 'conversation_menu_icon.dart';
 import 'text_selection_icon.dart';
 import 'settings_appearance.dart';
 
-Future<MessageAction?> showMessageActionsMenu(
+Future<MessageMenuResult?> showMessageActionsMenu(
   BuildContext context, {
   required AgentMessage message,
+  bool allowStar = false,
+  bool starred = false,
   bool allowEditing = true,
   bool allowStatistics = false,
   bool allowHistory = false,
@@ -33,12 +36,12 @@ Future<MessageAction?> showMessageActionsMenu(
       ? await QuickReplyRecents.load()
       : const <String>[];
   if (!context.mounted) return null;
-  final options = {for (final option in quickReplyOptions) option.$4: option};
+  final options = quickReplyOptionsByKey;
   final visibleKeys = {
     ...recent.where(options.containsKey),
-    ...quickReplyOptions.take(5).map((option) => option.$4),
+    ...quickReplyOptions.take(5).map((option) => option.key),
   }.take(5);
-  return showModalBottomSheet<MessageAction>(
+  return showModalBottomSheet<MessageMenuResult>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -50,65 +53,82 @@ Future<MessageAction?> showMessageActionsMenu(
     ),
     builder: (context) {
       final media = MediaQuery.of(context);
+      final iconColor = Theme.of(context).brightness == Brightness.dark
+          ? Theme.of(context).colorScheme.onSurfaceVariant
+          : const Color(0xff222222);
       final actions = [
+        if (allowStar)
+          (
+            const MessageActionResult(MessageAction.star),
+            SettingsIcon(
+              type: starred
+                  ? SettingsIconType.starFilled
+                  : SettingsIconType.star,
+              color: starred ? const Color(0xffe5ad24) : iconColor,
+            ),
+            starred ? '取消收藏' : '收藏',
+          ),
         if (allowHistory)
           (
-            MessageAction.history,
-            SettingsIcon(
-              type: SettingsIconType.tasks,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+            const MessageActionResult(MessageAction.history),
+            SettingsIcon(type: SettingsIconType.tasks, color: iconColor),
             '查看历史',
           ),
         if (allowStatistics)
           (
-            MessageAction.statistics,
-            SettingsIcon(
-              type: SettingsIconType.data,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+            const MessageActionResult(MessageAction.statistics),
+            SettingsIcon(type: SettingsIconType.data, color: iconColor),
             '查看统计',
           ),
         if (message.htmlGame != null &&
             message.htmlGame!.displayMode != 'inline')
           (
-            MessageAction.fullscreen,
-            const HtmlGameIcon(HtmlGameIconType.expand),
+            const MessageActionResult(MessageAction.fullscreen),
+            HtmlGameIcon(HtmlGameIconType.expand, color: iconColor),
             '全屏运行',
           ),
-        if (allowQuote) (MessageAction.quote, const QuoteIcon(), '引用'),
+        if (allowQuote)
+          (
+            const MessageActionResult(MessageAction.quote),
+            QuoteIcon(color: iconColor),
+            '引用',
+          ),
         if (allowForward)
           (
-            MessageAction.forward,
+            const MessageActionResult(MessageAction.forward),
             AttachmentActionIcon(
               type: AttachmentActionIconType.forward,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: iconColor,
             ),
             '转发',
           ),
         if (message.text.isNotEmpty) ...[
           (
-            MessageAction.copy,
-            const CopyIcon(),
+            const MessageActionResult(MessageAction.copy),
+            CopyIcon(color: iconColor),
             message.htmlGame != null ? '复制标题' : '复制',
           ),
-          (MessageAction.select, const TextSelectionIcon(), '选择文本'),
+          (
+            const MessageActionResult(MessageAction.select),
+            TextSelectionIcon(color: iconColor),
+            '选择文本',
+          ),
         ],
         if (allowEditing && message.role == AgentMessageRole.user)
           (
-            MessageAction.edit,
+            const MessageActionResult(MessageAction.edit),
             ConversationMenuIcon(
               type: ConversationMenuIconType.rename,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: iconColor,
             ),
             '编辑消息',
           ),
         if (allowRecall)
           (
-            MessageAction.recall,
+            const MessageActionResult(MessageAction.recall),
             ConversationMenuIcon(
               type: ConversationMenuIconType.recall,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: iconColor,
             ),
             '撤回',
           ),
@@ -124,20 +144,23 @@ Future<MessageAction?> showMessageActionsMenu(
               if (allowQuickReply) ...[
                 Row(
                   children: [
-                    for (final (action, icon, label, key) in visibleKeys.map(
+                    for (final option in visibleKeys.map(
                       (key) => options[key]!,
                     ))
                       Expanded(
                         child: Tooltip(
-                          message: label,
+                          message: option.label,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(24),
-                            onTap: () => Navigator.pop(context, action),
+                            onTap: () => Navigator.pop(
+                              context,
+                              MessageQuickReplyResult(option),
+                            ),
                             child: Container(
                               height: 52,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: sentQuickReplyKeys.contains(key)
+                                color: sentQuickReplyKeys.contains(option.key)
                                     ? Theme.of(
                                         context,
                                       ).colorScheme.primaryContainer
@@ -145,10 +168,10 @@ Future<MessageAction?> showMessageActionsMenu(
                                 borderRadius: BorderRadius.circular(24),
                               ),
                               child: Text(
-                                icon,
+                                option.emoji,
                                 style: TextStyle(
                                   fontSize: 30,
-                                  fontWeight: key == 'plus_one'
+                                  fontWeight: option.key == 'plus_one'
                                       ? FontWeight.w600
                                       : null,
                                 ),
@@ -163,12 +186,16 @@ Future<MessageAction?> showMessageActionsMenu(
                         child: InkWell(
                           borderRadius: BorderRadius.circular(24),
                           onTap: () async {
-                            final action = await showQuickReplyPicker(
+                            final option = await showQuickReplyPicker(
                               context,
                               selectedKeys: sentQuickReplyKeys,
                             );
-                            if (context.mounted && action != null)
-                              Navigator.pop(context, action);
+                            if (context.mounted && option != null) {
+                              Navigator.pop(
+                                context,
+                                MessageQuickReplyResult(option),
+                              );
+                            }
                           },
                           child: Container(
                             height: 44,
@@ -201,10 +228,10 @@ Future<MessageAction?> showMessageActionsMenu(
                   ),
                 ),
               ),
-              for (final (action, icon, label) in actions)
+              for (final (result, icon, label) in actions)
                 InkWell(
                   borderRadius: BorderRadius.circular(18),
-                  onTap: () => Navigator.pop(context, action),
+                  onTap: () => Navigator.pop(context, result),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
@@ -212,7 +239,10 @@ Future<MessageAction?> showMessageActionsMenu(
                     ),
                     child: Row(
                       children: [
-                        icon,
+                        SizedBox.square(
+                          dimension: 24,
+                          child: FittedBox(child: icon),
+                        ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Text(

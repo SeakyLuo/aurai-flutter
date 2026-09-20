@@ -1,3 +1,6 @@
+import '../../agent/user_data_read_tool.dart';
+import '../../app/language_settings.dart';
+import '../../agent/hide_thinking_tool.dart';
 import '../../agent/group_wake_tool.dart';
 import '../../storage/group_system_notice.dart';
 import '../../platform/svg_image.dart';
@@ -8,6 +11,7 @@ import '../../providers/openrouter_models.dart';
 import '../../storage/draft_attachment_cleanup.dart';
 import '../../storage/quick_reply_recents.dart';
 import '../../agent/quick_reply_tool.dart';
+import '../../agent/starred_message_tool.dart';
 import '../../agent/html_app_data_tool.dart';
 import '../../html_games/html_app_store.dart';
 import '../../storage/interactive_callback_result.dart';
@@ -151,6 +155,8 @@ part 'accessibility_request.dart';
 part 'pending_confirmation.dart';
 part 'conversation_execution_state.dart';
 part 'group_sleep_recovery.dart';
+part 'group_run_tools.dart';
+part 'user_data_read_access.dart';
 
 class ChatController extends ChangeNotifier {
   AiProfile? _activeAi;
@@ -394,7 +400,10 @@ class ChatController extends ChangeNotifier {
         ? await groupStore.loadAi(activeConversation.defaultSenderId)
         : null;
     await _reloadConversations();
-    await DraftAttachmentCleanup(_store.database, _imageStore.directory).recover();
+    await DraftAttachmentCleanup(
+      _store.database,
+      _imageStore.directory,
+    ).recover();
     _callbackCardChanges = MessageCallbacks.cardChanges.stream.listen((
       updates,
     ) {
@@ -420,7 +429,8 @@ class ChatController extends ChangeNotifier {
       _htmlGameEvents = HtmlGameEventPump(
         htmlGames,
         () => changingConversation,
-        _recoverGroupSleep,
+        (id, members) =>
+            _recoverGroupSleep(id, members, requireDueSleep: false),
       )..start();
     }
     notifyListeners();

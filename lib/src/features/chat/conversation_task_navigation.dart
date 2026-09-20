@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'package:flutter/material.dart';
 import '../../scheduling/task_detail_page.dart';
 import '../../scheduling/task_filter_menu.dart';
@@ -30,7 +31,7 @@ Future<void> openConversationTask(
   if (tasks.isEmpty) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('关联任务已删除')));
+    ).showGlassSnackBar(const SnackBar(content: Text('关联任务已删除')));
     return;
   }
   String? id;

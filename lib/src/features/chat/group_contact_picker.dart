@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
@@ -49,7 +50,7 @@ class _GroupContactPickerState extends State<GroupContactPicker> {
     } catch (caughtError) {
       if (mounted) {
         setState(() => _failed = true);
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('通讯录读取失败，请重试：${errorMessage(caughtError)}')),
         );
       }
@@ -98,7 +99,7 @@ class _GroupContactPickerState extends State<GroupContactPicker> {
                 } else {
                   ScaffoldMessenger.of(
                     context,
-                  ).showSnackBar(const SnackBar(content: Text('群成员已达上限')));
+                  ).showGlassSnackBar(const SnackBar(content: Text('群成员已达上限')));
                 }
               }),
             ),

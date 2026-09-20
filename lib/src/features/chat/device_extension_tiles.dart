@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'dart:async';
 
@@ -58,7 +59,7 @@ class _DeviceExtensionTilesState extends State<DeviceExtensionTiles>
     if (mounted)
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ).showGlassSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _load() async {

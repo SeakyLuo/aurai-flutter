@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 
@@ -21,7 +22,7 @@ class CapabilityPage extends StatefulWidget {
       await controller.refreshCapabilities();
     } on Object catch (error) {
       if (context.mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('无法读取设备能力，请稍后再试：${errorMessage(error)}')),
         );
       return;
@@ -108,7 +109,7 @@ class _CapabilityPageState extends State<CapabilityPage>
       await action();
     } on Object {
       if (mounted)
-        _messenger.currentState!.showSnackBar(
+        _messenger.currentState!.showGlassSnackBar(
           const SnackBar(content: Text('操作未完成，请稍后重试')),
         );
     }

@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
@@ -50,7 +51,7 @@ class _InteractiveHistoryPageState extends State<InteractiveHistoryPage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
         if (_events.isEmpty) Navigator.pop(context);
       }
     } finally {
@@ -179,7 +180,7 @@ class InteractiveHistoryTile extends StatelessWidget {
       if (context.mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
     }
   }
 

@@ -1,3 +1,4 @@
+import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
 import 'package:flutter/material.dart';
 
@@ -58,7 +59,7 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
   }
 
   void _notice(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
   Future<void> _permission() async {
     try {
       await tasks.permission();
@@ -342,7 +343,7 @@ Future<void> openScheduledTasks(
     await controller.submitGoal(request);
   } on Object catch (error) {
     if (context.mounted)
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showGlassSnackBar(
         SnackBar(
           content: Text(
             error is StateError

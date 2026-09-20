@@ -1,3 +1,4 @@
+import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
 import 'skill_visibility_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -54,7 +55,7 @@ class _SkillEditorState extends State<SkillEditor> {
 
   void _notice(String message) => ScaffoldMessenger.of(
     context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  ).showGlassSnackBar(SnackBar(content: Text(message)));
   Future<bool> _save() async {
     setState(() => _busy = true);
     try {

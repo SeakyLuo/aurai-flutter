@@ -282,7 +282,7 @@ class ConversationReader {
     String? afterCheckpoint,
   }) async {
     const richReply =
-        "run_id IN (SELECT run_id FROM messages WHERE conversation_id = ? AND run_id IS NOT NULL AND (interactive_json IS NOT NULL OR kind = 'html_game'))";
+        "run_id IN (SELECT run_id FROM messages WHERE conversation_id = ? AND run_id IS NOT NULL AND (interactive_json IS NOT NULL OR kind = 'html_game' OR (kind = 'assistant' AND model_turn_id IS NULL)))";
     final selectionWhere =
         'conversation_id = ?${forModel
             ? "${includeSystem ? '' : " AND kind != 'system'"} AND kind NOT IN ('message_failure', 'reasoning') AND NOT (role = 'assistant' AND text = '')"
@@ -371,7 +371,7 @@ class ConversationReader {
           columns: ['run_id'],
           where:
               'conversation_id = ? AND run_id IN (${_slots(pageRuns.length)}) '
-              "AND (interactive_json IS NOT NULL OR kind = 'html_game')",
+              "AND (interactive_json IS NOT NULL OR kind = 'html_game' OR (kind = 'assistant' AND model_turn_id IS NULL))",
           whereArgs: [conversationId, ...pageRuns],
         )
       else

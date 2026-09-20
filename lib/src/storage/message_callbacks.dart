@@ -56,9 +56,16 @@ class MessageCallbacks {
       }
       if (html && existing.single['status'] == 'legacy') {
         // Older HTML callbacks had no receipt. Do not replay an uncertain result.
-        await db.update('message_callbacks', {
-          'status': existing.single['processed_at'] == null ? 'failed' : 'completed',
-        }, where: 'id = ?', whereArgs: [id]);
+        await db.update(
+          'message_callbacks',
+          {
+            'status': existing.single['processed_at'] == null
+                ? 'failed'
+                : 'completed',
+          },
+          where: 'id = ?',
+          whereArgs: [id],
+        );
       }
       return;
     }
@@ -144,8 +151,8 @@ class MessageCallbacks {
         await txn.rawUpdate(
           success
               ? 'UPDATE message_callbacks SET processed_at = ? WHERE id IN ($legacySlots)'
-              : 'UPDATE message_callbacks SET attempts = attempts + 1 WHERE id IN ($legacySlots)',
-          [if (success) DateTime.now().microsecondsSinceEpoch, ...legacy],
+              : 'UPDATE message_callbacks SET processed_at = ?, attempts = attempts + 1 WHERE id IN ($legacySlots)',
+          [DateTime.now().microsecondsSinceEpoch, ...legacy],
         );
       }
       await HtmlCallbackState.transition(txn, remaining, 'failed');

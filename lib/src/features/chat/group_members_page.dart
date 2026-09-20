@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'ai_contact_page.dart';
 import '../../domain/message_sender.dart';
@@ -44,7 +45,7 @@ class _GroupMembersPageState extends State<GroupMembersPage> {
     } on Object catch (error) {
       if (mounted) {
         setState(() => _failed = true);
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('群成员加载失败，请重试：${errorMessage(error)}')),
         );
       }

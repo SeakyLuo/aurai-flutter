@@ -272,7 +272,12 @@ extension MessageRecall on ChatController {
     AgentMessage message, {
     required bool userInitiated,
   }) {
-    final text = userInitiated ? '你撤回了一条消息' : '${message.sender!.name}撤回了一条消息';
+    final actorName = userInitiated
+        ? (memory.nickname.isEmpty
+              ? MessageSender.localUser.name
+              : memory.nickname)
+        : message.sender!.name;
+    final text = '${actorName}撤回了一条消息';
     final audience = message.interactive?.participation['audience'];
     return AgentMessage(
       id: message.id,

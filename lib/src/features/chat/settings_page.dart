@@ -1,13 +1,9 @@
-import 'personal_info_page.dart';
-import 'profile_avatar.dart';
+import '../../app/glass_notice.dart';
+import '../../app/language_settings.dart';
 import 'default_models_page.dart';
 import '../../domain/error_message.dart';
-import 'archived_conversations_page.dart';
 import 'data_management_page.dart';
-import 'conversation_menu_icon.dart';
-import 'home_navigation.dart';
 import 'tools_page.dart';
-import '../../skills/skills_page.dart';
 import 'package:flutter/material.dart';
 
 import '../../providers/model_catalog.dart';
@@ -31,31 +27,11 @@ class SettingsPage extends StatelessWidget {
   final ChatController controller;
   final bool Function() preparingGoal;
 
-  Future<void> _archive(BuildContext context) async {
-    final navigator = Navigator.of(context);
-    try {
-      final id = await navigator.push<String>(
-        MaterialPageRoute(
-          builder: (_) => ArchivedConversationsPage(controller: controller),
-        ),
-      );
-      if (navigator.mounted && id != null) {
-        await openHomeConversation(navigator.context, controller, id);
-      }
-    } on Object catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
-        );
-      }
-    }
-  }
-
   Future<void> _openModel(BuildContext context) async {
     if (controller.addingImages) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('正在处理图片，请稍候')));
+      ).showGlassSnackBar(const SnackBar(content: Text('正在处理图片，请稍候')));
       return;
     }
     await ModelSettingsSheet.show(
@@ -64,6 +40,29 @@ class SettingsPage extends StatelessWidget {
       continueAfterSave: false,
       accountOnly: true,
     );
+  }
+
+  Future<void> _chooseLanguage(BuildContext context) async {
+    final settings = LanguageSettings.instance;
+    final language = await showChoiceSheet<PreferredLanguage>(
+      context,
+      title: '偏好语言',
+      selected: settings.language,
+      choices: [
+        for (final language in PreferredLanguage.values)
+          (value: language, label: language.label),
+      ],
+    );
+    if (language == null || language == settings.language) return;
+    try {
+      await settings.setLanguage(language);
+    } on Object catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showGlassSnackBar(
+          SnackBar(content: Text('无法保存偏好语言：${errorMessage(error)}')),
+        );
+      }
+    }
   }
 
   Future<void> _chooseAppearance(BuildContext context) async {
@@ -83,7 +82,7 @@ class SettingsPage extends StatelessWidget {
       await settings.setMode(mode);
     } on Object catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showGlassSnackBar(
         SnackBar(content: Text('无法保存夜间模式，请重试：${errorMessage(error)}')),
       );
     }
@@ -94,7 +93,7 @@ class SettingsPage extends StatelessWidget {
       await controller.openNotificationSettings();
     } on Object catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showGlassSnackBar(
         SnackBar(content: Text('无法打开通知设置，请重试：${errorMessage(error)}')),
       );
     }
@@ -120,6 +119,7 @@ class SettingsPage extends StatelessWidget {
               controller,
               controller.memory,
               AppearanceSettings.instance,
+              LanguageSettings.instance,
             ]),
             builder: (context, _) => ListTileTheme(
               data: ListTileThemeData(
@@ -150,61 +150,14 @@ class SettingsPage extends StatelessWidget {
                   MediaQuery.paddingOf(context).bottom + 16,
                 ),
                 children: [
-                  Center(
-                    child: Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(26),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () => Navigator.push<void>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                PersonalInfoPage(memory: controller.memory),
-                          ),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ProfileAvatar(
-                                style: controller.memory.avatar,
-                                name: controller.memory.nickname,
-                                size: 80,
-                              ),
-                              const SizedBox(height: 14),
-                              Text(
-                                controller.memory.nickname.isEmpty
-                                    ? '个人信息'
-                                    : controller.memory.nickname,
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w600,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
                   Material(
                     color: settingsFieldColor(context),
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
-                      leading: const SettingsIcon(type: SettingsIconType.model),
+                      leading: const SettingsIcon(
+                        type: SettingsIconType.modelProvider,
+                      ),
                       title: const Text('模型供应商'),
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,
@@ -218,7 +171,9 @@ class SettingsPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
-                      leading: const SettingsIcon(type: SettingsIconType.model),
+                      leading: const SettingsIcon(
+                        type: SettingsIconType.modelSettings,
+                      ),
                       title: const Text('模型设置'),
                       subtitle: Text(
                         controller.modelSettings.activeConfig.isConfigured
@@ -260,35 +215,7 @@ class SettingsPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      leading: const SettingsIcon(
-                        type: SettingsIconType.skills,
-                      ),
-                      title: const Text('技能库'),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: () async {
-                        final store = await controller.aiSkills('user:local');
-                        if (!context.mounted) return;
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute<void>(
-                            builder: (_) => SkillsPage(
-                              store: store,
-                              controller: controller,
-                              library: true,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 12),
+
                   Material(
                     color: settingsFieldColor(context),
                     borderRadius: BorderRadius.circular(26),
@@ -302,6 +229,23 @@ class SettingsPage extends StatelessWidget {
                         type: SettingsIconType.chevron,
                       ),
                       onTap: () => CapabilityPage.show(context, controller),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Material(
+                    color: settingsFieldColor(context),
+                    borderRadius: BorderRadius.circular(26),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      leading: const SettingsIcon(
+                        type: SettingsIconType.language,
+                      ),
+                      title: const Text('偏好语言'),
+                      subtitle: Text(LanguageSettings.instance.language.label),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: () => _chooseLanguage(context),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -360,24 +304,7 @@ class SettingsPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      leading: ConversationMenuIcon(
-                        type: ConversationMenuIconType.archive,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Theme.of(context).colorScheme.onSurfaceVariant
-                            : const Color(0xff222222),
-                      ),
-                      title: const Text('已归档会话'),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: () => _archive(context),
-                    ),
-                  ),
+
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 32),
                     child: Center(

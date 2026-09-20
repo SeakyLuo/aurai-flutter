@@ -251,7 +251,10 @@ class ExecutionProgress extends StatelessWidget {
         child: ThinkingIndicator(label: '正在压缩上下文', singleLine: true),
       );
     }
-    if (state == ChatRunState.running && reconnectAttempt > 0) {
+    if (state == ChatRunState.running &&
+        reconnectAttempt > 0 &&
+        !replying &&
+        !steps.any((step) => step.status == AgentStepStatus.running)) {
       return ReconnectIndicator(attempt: reconnectAttempt);
     }
 

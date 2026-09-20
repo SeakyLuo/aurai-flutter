@@ -12,7 +12,7 @@ extension _ChatGroupNavigation on _ChatPageState {
           .toList(),
       onPressed: () {
         _focusNode.unfocus();
-        showGroupActivitySheet(
+        showGroupActivityPage(
           context,
           controller: widget.controller,
           conversationId: conversation.id,

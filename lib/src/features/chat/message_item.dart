@@ -1,3 +1,6 @@
+import '../../app/glass_notice.dart';
+import 'remove_favorite.dart';
+import '../../storage/starred_messages.dart';
 import 'quick_reply_chips.dart';
 import 'private_reply_layout.dart';
 import 'message_reply_footer.dart';
@@ -180,6 +183,8 @@ class _MessageItemState extends State<MessageItem> {
                     message.taskSummary?.stopped != true))
               MessageReplyFooter(
                 copied: _copied,
+                messageId: message.id,
+                onMore: () => _openActions(showStar: false),
                 onCopy: () => _copy(context, widget.replyPart?.copyText),
                 onQuote: widget.onQuote == null
                     ? null
@@ -663,5 +668,5 @@ class _MessageItemState extends State<MessageItem> {
   }
 
   void _notice(BuildContext context, String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
 }

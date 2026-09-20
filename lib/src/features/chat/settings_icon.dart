@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'wrench_painter.dart';
 
 enum SettingsIconType {
+  star,
+  starFilled,
   tools,
   data,
   contacts,
@@ -12,8 +14,11 @@ enum SettingsIconType {
   personalInfo,
   balance,
   appearance,
+  language,
   notifications,
   model,
+  modelProvider,
+  modelSettings,
   device,
   chevron,
   back,
@@ -60,6 +65,29 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.language:
+        canvas.drawCircle(const Offset(12, 12), 9, pen);
+        canvas.drawOval(const Rect.fromLTWH(8, 3, 8, 18), pen);
+        canvas.drawLine(const Offset(3, 12), const Offset(21, 12), pen);
+        break;
+      case SettingsIconType.star:
+      case SettingsIconType.starFilled:
+        if (type == SettingsIconType.starFilled) pen.style = PaintingStyle.fill;
+        canvas.drawPath(
+          Path()
+            ..moveTo(12, 3)
+            ..lineTo(14.8, 8.7)
+            ..lineTo(21, 9.6)
+            ..lineTo(16.5, 14)
+            ..lineTo(17.6, 20.2)
+            ..lineTo(12, 17.3)
+            ..lineTo(6.4, 20.2)
+            ..lineTo(7.5, 14)
+            ..lineTo(3, 9.6)
+            ..lineTo(9.2, 8.7)
+            ..close(),
+          pen,
+        );
       case SettingsIconType.data:
         canvas.drawOval(const Rect.fromLTWH(4, 3, 16, 6), pen);
         canvas.drawPath(
@@ -279,6 +307,37 @@ class _SettingsIconPainter extends CustomPainter {
             ..quadraticBezierTo(12, 22, 14.5, 20),
           pen,
         );
+      case SettingsIconType.modelProvider:
+        canvas.drawPath(
+          Path()
+            ..moveTo(12, 8)
+            ..lineTo(12, 12)
+            ..lineTo(5, 12)
+            ..lineTo(5, 16)
+            ..moveTo(12, 12)
+            ..lineTo(19, 12)
+            ..lineTo(19, 16),
+          pen,
+        );
+        for (final center in [
+          const Offset(12, 5.5),
+          const Offset(5, 18.5),
+          const Offset(19, 18.5),
+        ]) {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromCenter(center: center, width: 5, height: 5),
+              const Radius.circular(1.5),
+            ),
+            pen,
+          );
+        }
+      case SettingsIconType.modelSettings:
+        for (final (y, x) in [(5.0, 8.0), (12.0, 16.0), (19.0, 10.0)]) {
+          canvas.drawLine(Offset(3, y), Offset(x - 2, y), pen);
+          canvas.drawLine(Offset(x + 2, y), Offset(21, y), pen);
+          canvas.drawCircle(Offset(x, y), 2, pen);
+        }
       case SettingsIconType.model:
         canvas.drawPath(
           Path()

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:sqflite/sqflite.dart';
 import 'group_sleep_store.dart';
 
@@ -13,6 +14,7 @@ CREATE TABLE group_participation (
 class GroupParticipation {
   GroupParticipation(this.database);
   final Database database;
+  static final changes = StreamController<String>.broadcast();
 
   Future<Set<String>> paused(String groupId) async {
     final rows = await database.query(
@@ -24,8 +26,10 @@ class GroupParticipation {
     return rows.map((row) => row['sender_id'] as String).toSet();
   }
 
-  Future<void> set(String groupId, String senderId, bool paused) =>
-      database.transaction((txn) => setIn(txn, groupId, senderId, paused));
+  Future<void> set(String groupId, String senderId, bool paused) async {
+    await database.transaction((txn) => setIn(txn, groupId, senderId, paused));
+    changes.add(groupId);
+  }
 
   static Future<void> setIn(
     DatabaseExecutor txn,

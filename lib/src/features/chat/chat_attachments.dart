@@ -94,5 +94,5 @@ extension _ChatAttachments on _ChatPageState {
   void _imageNotice(String message, {SnackBarAction? action}) =>
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(message), action: action));
+      ).showGlassSnackBar(SnackBar(content: Text(message), action: action));
 }

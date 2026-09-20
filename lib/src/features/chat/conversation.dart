@@ -50,6 +50,8 @@ class Conversation {
   AgentMessage? get _previewMessage => messages.reversed
       .where(
         (message) =>
+            !message.isReasoning &&
+            message.quickReplyToId == null &&
             (message.interactive?.canView(MessageSender.localUser.id) ??
                 true) &&
             !(message.isSystem && message.text == '私密交互消息已更新'),
@@ -95,6 +97,7 @@ class Conversation {
   String? errorDetail;
   ChatRunState runState = ChatRunState.idle;
   int reconnectAttempt = 0;
+  bool thinkingHidden = false;
 
   bool get isEmpty =>
       messageCount == 0 &&

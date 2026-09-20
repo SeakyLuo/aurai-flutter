@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 
@@ -16,7 +17,7 @@ class WebPageToolDetails extends StatelessWidget {
       });
     } on Object catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('无法打开链接，请稍后再试：${errorMessage(error)}')),
         );
       }

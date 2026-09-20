@@ -1,3 +1,4 @@
+import '../app/glass_notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../features/chat/chat_controller.dart';
@@ -34,7 +35,7 @@ class SkillDetailPage extends StatefulWidget {
 class _SkillDetailPageState extends State<SkillDetailPage> {
   bool _busy = false;
   void _notice(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
   Future<void> _copyName(String name) async {
     await Clipboard.setData(ClipboardData(text: name));
     if (mounted) _notice('技能名称已复制');

@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -48,10 +49,10 @@ class _MarkdownCodeBlock extends StatelessWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('代码已复制')));
+      ).showGlassSnackBar(const SnackBar(content: Text('代码已复制')));
     } on Object catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showGlassSnackBar(
         SnackBar(content: Text('复制失败，请重试：${errorMessage(error)}')),
       );
     }

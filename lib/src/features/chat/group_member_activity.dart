@@ -10,9 +10,14 @@ class GroupMemberActivity {
     this.waitingForUser = false,
     this.thoughts = const [],
     this.preview = '',
+    this.thinkingHidden = false,
     this.sleepingUntil,
+    this.autoReplyPaused = false,
+    this.idle = false,
   });
 
+  final bool autoReplyPaused;
+  final bool idle;
   final DateTime? sleepingUntil;
   bool get sleeping => sleepingUntil != null;
   final MessageSender sender;
@@ -23,6 +28,7 @@ class GroupMemberActivity {
   final bool waitingForUser;
   final List<String> thoughts;
   final String preview;
+  final bool thinkingHidden;
 }
 
 class _GroupMemberThoughts {
@@ -33,6 +39,25 @@ class _GroupMemberThoughts {
 }
 
 extension GroupMemberActivities on ChatController {
+  Future<void> resumeGroupAutoReply(String groupId, String senderId) async {
+    await GroupParticipation(_store.database).set(groupId, senderId, false);
+    await _applyPrivateGroupParticipation(groupId, senderId, false);
+    groupActivityChanges.value++;
+    notifyListeners();
+  }
+
+  HideThinkingTool _hideThinkingTool(
+    Conversation member,
+    Conversation? parent,
+  ) {
+    member.thinkingHidden = false;
+    return HideThinkingTool(() {
+      member.thinkingHidden = true;
+      _notifyMember(member, parent);
+      groupActivityChanges.value++;
+    });
+  }
+
   Listenable get groupSleepChanges => _groupSleeps;
   Map<String, DateTime> groupSleepTimes(String conversationId) =>
       _groupSleeps.forGroup(conversationId);
@@ -67,6 +92,7 @@ extension GroupMemberActivities on ChatController {
   List<GroupMemberActivity> groupActivitiesFor(
     String conversationId, {
     bool includeThoughts = true,
+    Set<String> pausedMembers = const {},
   }) {
     final state = _executionStates[conversationId];
     final conversation = state?.runningConversation;
@@ -98,13 +124,17 @@ extension GroupMemberActivities on ChatController {
       final stopping = member.runState == ChatRunState.stopping;
       final thoughts = state.groupThoughts[entry.key];
       final hasThoughts =
-          includeThoughts && thoughts?.runId == member.activeRunId;
+          includeThoughts &&
+          !member.thinkingHidden &&
+          thoughts?.runId == member.activeRunId;
       activities.add(
         GroupMemberActivity(
           sender: entry.value,
           runId: member.activeRunId!,
           elapsed: member.executionWatch!.elapsed,
           stopping: stopping,
+          autoReplyPaused: pausedMembers.contains(entry.key),
+          thinkingHidden: member.thinkingHidden,
           waitingForUser:
               confirming || waitingForAction || step?.toolName == 'askUser',
           thoughts: hasThoughts
@@ -119,6 +149,8 @@ extension GroupMemberActivities on ChatController {
               ? '等待你的操作'
               : step?.toolName == 'askUser'
               ? '等待你的回答'
+              : member.thinkingHidden
+              ? '正在思考'
               : member.reconnectAttempt > 0
               ? '正在重新连接'
               : switch (step?.toolName) {

@@ -17,6 +17,7 @@ class AgentRunStore {
     ModelConfig config, {
     String senderId = 'agent:aurai',
     bool group = false,
+    String? callbackEventId,
     required String systemPrompt,
     required String customInstructions,
     required ResponsePreferences responsePreferences,
@@ -33,7 +34,31 @@ class AgentRunStore {
         ''',
         [userMessageId, conversationId],
       );
-      final target = group
+      final target = callbackEventId != null
+          ? await txn.query(
+              'message_callbacks',
+              columns: ['id'],
+              where:
+                  'id = ? AND message_id = ? AND conversation_id = ? '
+                  'AND sender_id = ? AND processed_at IS NULL '
+                  "AND status IN ('legacy', 'processing') "
+                  'AND EXISTS (SELECT 1 FROM messages WHERE id = message_callbacks.message_id '
+                  'AND conversation_id = message_callbacks.conversation_id) '
+                  'AND EXISTS (SELECT 1 FROM conversations c '
+                  'WHERE c.id = message_callbacks.conversation_id '
+                  "AND ((c.kind = 'direct' AND c.default_sender_id = message_callbacks.sender_id) "
+                  "OR (c.kind = 'group' AND EXISTS (SELECT 1 FROM conversation_members cm "
+                  'WHERE cm.conversation_id = c.id AND cm.sender_id = message_callbacks.sender_id '
+                  'AND cm.left_at IS NULL))))',
+              whereArgs: [
+                callbackEventId,
+                userMessageId,
+                conversationId,
+                senderId,
+              ],
+              limit: 1,
+            )
+          : group
           ? await txn.query(
               'conversation_members',
               columns: ['sender_id'],

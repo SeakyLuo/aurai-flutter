@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'unavailable_image.dart';
 import 'chat_controller.dart';
@@ -178,7 +179,7 @@ class _PreviewPageState extends State<_PreviewPage> {
       if (mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('图片文件已丢失，无法保存或转发')));
+        ).showGlassSnackBar(const SnackBar(content: Text('图片文件已丢失，无法保存或转发')));
       return;
     }
     if (!mounted) return;
@@ -193,7 +194,7 @@ class _PreviewPageState extends State<_PreviewPage> {
       }
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('无法读取图片来源：${errorMessage(error)}')),
         );
     }
@@ -215,7 +216,7 @@ class _PreviewPageState extends State<_PreviewPage> {
       if (sent == true && mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('已转发')));
+        ).showGlassSnackBar(const SnackBar(content: Text('已转发')));
       return;
     }
     if (action == 'locate') {
@@ -229,7 +230,7 @@ class _PreviewPageState extends State<_PreviewPage> {
         );
       } on Object catch (error) {
         if (mounted)
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showGlassSnackBar(
             SnackBar(content: Text('无法定位原消息，可能已被删除：${errorMessage(error)}')),
           );
       }
@@ -241,11 +242,11 @@ class _PreviewPageState extends State<_PreviewPage> {
       if (mounted && action == 'save' && saved) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('图片已保存到应用目录')));
+        ).showGlassSnackBar(const SnackBar(content: Text('图片已保存到应用目录')));
       }
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(
             content: Text(
               action == 'save'

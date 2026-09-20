@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 
@@ -35,7 +36,7 @@ class _ConversationRenameDialogState extends State<ConversationRenameDialog> {
   }
 
   void _notice(String text) =>
-      _messenger.currentState!.showSnackBar(SnackBar(content: Text(text)));
+      _messenger.currentState!.showGlassSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _save() async {
     if (_saving) return;

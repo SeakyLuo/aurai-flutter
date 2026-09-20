@@ -33,10 +33,16 @@ extension GroupSleepRecovery on ChatController {
       ),
     );
     _publishInteractiveChange(conversationId, notice);
-    await _groupSleeps.save(conversationId, senderId, DateTime.now());
     final dispatcher = _executionStates[conversationId]?.groupDispatcher;
     if (dispatcher != null && !dispatcher.closed && !dispatcher.stopped) {
-      dispatcher.receiveTargeted(const [], {senderId});
+      await _groupSleeps.remove(conversationId, senderId);
+      if (!dispatcher.closed && !dispatcher.stopped) {
+        dispatcher.receiveTargeted(const [], {senderId});
+      } else {
+        await _groupSleeps.save(conversationId, senderId, DateTime.now());
+      }
+    } else {
+      await _groupSleeps.save(conversationId, senderId, DateTime.now());
     }
     return true;
   }
@@ -47,9 +53,17 @@ extension GroupSleepRecovery on ChatController {
     String senderId,
     Duration duration,
     String draft,
+    String reason,
+    GroupDispatcher dispatcher,
   ) async {
-    final dispatcher = _groupDispatcher!;
+    if (dispatcher.stopped ||
+        dispatcher.closed ||
+        member.runState == ChatRunState.stopping)
+      throw const AgentCancelled();
     final until = duration.isNegative ? null : DateTime.now().add(duration);
+    if (dispatcher.paused.contains(senderId) && until != null) {
+      throw StateError('自动接话已关闭，不能安排定时唤醒；如需结束本次任务并等待新消息，请使用 seconds=-1');
+    }
     if (until == null) {
       await _groupSleeps.remove(parent.id, senderId);
     } else {
@@ -58,25 +72,46 @@ extension GroupSleepRecovery on ChatController {
     if (dispatcher.stopped ||
         dispatcher.closed ||
         member.runState == ChatRunState.stopping ||
-        dispatcher.paused.contains(senderId) ||
         _removedGroupMembers.contains(senderId)) {
       await _groupSleeps.remove(parent.id, senderId);
       throw AgentCancelled();
     }
-    await _store.database.rawInsert(
-      'INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-      ['group_sleep_draft:${parent.id}:$senderId', draft],
-    );
+    final batch = _store.database.batch();
+    for (final entry in {'draft': draft, 'reason': reason}.entries) {
+      batch.rawInsert(
+        'INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+        ['group_sleep_${entry.key}:${parent.id}:$senderId', entry.value],
+      );
+    }
+    await batch.commit(noResult: true);
     _execution.groupReplyDrafts.remove(senderId);
     return dispatcher.sleepUntil(senderId, until);
   }
 
-  Future<void> _recoverGroupSleep(String id, Set<String> members) async {
+  Future<void> _recoverGroupSleep(
+    String id,
+    Set<String> members, {
+    bool callbacksOnly = false,
+    bool requireDueSleep = true,
+  }) async {
     final target = await _forwardTarget(id);
-    await _inConversation(target, () => _recoverGroupSleepIn(id, members));
+    await _inConversation(
+      target,
+      () => _recoverGroupSleepIn(
+        id,
+        members,
+        callbacksOnly: callbacksOnly,
+        requireDueSleep: requireDueSleep,
+      ),
+    );
   }
 
-  Future<void> _recoverGroupSleepIn(String id, Set<String> members) async {
+  Future<void> _recoverGroupSleepIn(
+    String id,
+    Set<String> members, {
+    bool callbacksOnly = false,
+    bool requireDueSleep = true,
+  }) async {
     if (hasRunningTask) return;
     _systemEventLoading = true;
     try {
@@ -94,9 +129,35 @@ extension GroupSleepRecovery on ChatController {
       final conversation = id == activeConversation.id
           ? activeConversation
           : await _store.load(id);
+      final sleeps = _groupSleeps.forGroup(id);
+      final now = DateTime.now();
+      final recipients = callbacksOnly || !requireDueSleep
+          ? {...members}
+          : {
+              for (final member in members)
+                if (sleeps[member] case final until? when !until.isAfter(now))
+                  member,
+            };
+      if (callbacksOnly) {
+        final pending = await _store.database.query(
+          'message_callbacks',
+          columns: ['sender_id'],
+          where:
+              'conversation_id = ? AND sender_id IN (${List.filled(members.length, '?').join(',')}) AND ${MessageCallbacks.readyWhere}',
+          whereArgs: [id, ...members],
+          limit: 20,
+        );
+        final senders = pending.map((event) => event['sender_id']).toSet();
+        recipients.removeWhere((member) => !senders.contains(member));
+      }
+      if (recipients.isEmpty) return;
       _runningConversation = conversation;
       _systemEventLoading = false;
-      await _executeGroupChat(conversation, wakeMembers: members);
+      await _executeGroupChat(
+        conversation,
+        wakeMembers: recipients,
+        callbacksOnly: callbacksOnly,
+      );
     } on Object catch (error, stack) {
       debugPrint('Group sleep recovery failed: $error\n$stack');
     } finally {

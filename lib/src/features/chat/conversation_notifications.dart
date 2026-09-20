@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'notification_avatar.dart';
 import '../../domain/error_message.dart';
 import 'app_page_navigation.dart';
@@ -93,7 +94,7 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
       await widget.controller.markActiveConversationRead();
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('会话暂时无法打开，请稍后重试：${errorMessage(error)}')),
         );
       }
@@ -103,7 +104,7 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
   void _onMemoryNotice() {
     final notice = widget.controller.memory.notices.value;
     if (notice == null) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(notice)));
+    ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(notice)));
   }
 
   void _onCompleted() {

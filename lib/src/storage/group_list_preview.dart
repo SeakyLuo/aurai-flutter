@@ -17,7 +17,7 @@ Future<void> loadConversationListPreviews(
     '''SELECT id, conversation_id, sender_id, kind, text, json_extract(interactive_json, '\$.title') AS interactive_title, json_extract(interactive_json, '\$.body') AS interactive_body, created_at
        FROM messages WHERE id IN (
          SELECT (SELECT id FROM messages
-           WHERE conversation_id = conversations.id AND kind != 'commentary'
+           WHERE conversation_id = conversations.id AND kind NOT IN ('commentary', 'quick_reply', 'reasoning')
              AND NOT (kind = 'system' AND text = '私密交互消息已更新')
              AND (interactive_json IS NULL
                OR json_extract(interactive_json, '\$.participation.audience') IS NULL
@@ -53,6 +53,13 @@ Future<void> loadConversationListPreviews(
     for (final row in results[0]) row['id']: MessageSender.fromRow(row),
   };
   final groupsWithMessages = rows.map((r) => r['conversation_id']).toSet();
+  for (final conversation in groups.values) {
+    if (!groupsWithMessages.contains(conversation.id)) {
+      conversation.storedPreview = null;
+      conversation.storedPreviewIsSystem = false;
+      conversation.lastMessageAt = null;
+    }
+  }
   for (final group in groups.values.where(
     (c) => c.kind == ConversationKind.group,
   )) {

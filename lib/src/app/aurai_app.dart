@@ -47,7 +47,7 @@ class AuraiApp extends StatelessWidget {
     ),
     child: ConversationNotifications(
       controller: controller,
-      child: HomePage(controller: controller),
+      child: HomePage(key: HomePage.navigationKey, controller: controller),
     ),
   );
 }

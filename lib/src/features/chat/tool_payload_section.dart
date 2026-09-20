@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'dart:convert';
 
@@ -86,12 +87,12 @@ class _ToolPayloadSectionState extends State<ToolPayloadSection> {
                         try {
                           await Clipboard.setData(ClipboardData(text: text));
                           if (!context.mounted) return;
-                          messenger.showSnackBar(
+                          messenger.showGlassSnackBar(
                             SnackBar(content: Text('已复制${widget.title}')),
                           );
                         } on Object catch (error) {
                           if (!context.mounted) return;
-                          messenger.showSnackBar(
+                          messenger.showGlassSnackBar(
                             SnackBar(
                               content: Text('复制失败，请重试：${errorMessage(error)}'),
                             ),

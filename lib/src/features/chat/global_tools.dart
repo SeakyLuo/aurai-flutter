@@ -16,7 +16,16 @@ extension GlobalTools on ChatController {
   }) {
     final conversationId = conversation.id;
     return <AgentTool>[
-      QuickReplyTool((id, key) => _sendAiQuickReply(conversation, senderId, id, key)),
+      for (final name in StarredMessageTool.names)
+        StarredMessageTool(
+          _store.database,
+          senderId,
+          name,
+          () => _store.writer.flush(),
+        ),
+      QuickReplyTool(
+        (id, key) => _sendAiQuickReply(conversation, senderId, id, key),
+      ),
       for (final name in HtmlAppDataTool.names)
         HtmlAppDataTool(name, (operation, args) async {
           final apps = HtmlAppStore(_store.database);
@@ -24,19 +33,29 @@ extension GlobalTools on ChatController {
             return {'apps': await apps.list(senderId, args['query'] as String)};
           }
           final appId = args['appId'] as String;
-          final result = await apps.data(appId, args['name'] as String,
+          final result = await apps.data(
+            appId,
+            args['name'] as String,
             actor: senderId,
             write: operation == 'writeHtmlAppData',
-            expectedRevision: args['expectedRevision'] as int?, value: args['value']);
-          if (operation == 'writeHtmlAppData') HtmlGameSignals.appChanges.add(appId);
+            expectedRevision: args['expectedRevision'] as int?,
+            value: args['value'],
+          );
+          if (operation == 'writeHtmlAppData')
+            HtmlGameSignals.appChanges.add(appId);
           return result;
         }),
-      ExecutionLogTool(senderId: senderId, inGroup: conversation.kind == ConversationKind.group),
+      ExecutionLogTool(
+        senderId: senderId,
+        inGroup: conversation.kind == ConversationKind.group,
+      ),
       for (final name in HtmlMessageUpdateTool.names)
         HtmlMessageUpdateTool(name, (operation, args) async {
           await _store.writer.flush();
           final target = await _messageConversation(
-            args['messageId'] as String, senderId, conversation,
+            args['messageId'] as String,
+            senderId,
+            conversation,
           );
           final result = await htmlGames.updateMessage(
             operation,
@@ -50,11 +69,16 @@ extension GlobalTools on ChatController {
           if (result['updated'] == true) {
             final id = args['messageId'] as String;
             final saved = (await _store.reader.messages(
-              target.id, throughMessageId: id, includeMessageId: id, limit: 1,
+              target.id,
+              throughMessageId: id,
+              includeMessageId: id,
+              limit: 1,
             )).single;
             final peer = _peerSessions[target.id];
             final dispatchers = [
-              if (_executionStates[target.id]?.groupDispatcher case final dispatcher?) dispatcher,
+              if (_executionStates[target.id]?.groupDispatcher
+                  case final dispatcher?)
+                dispatcher,
               if (peer != null) (await peer).dispatcher,
             ];
             for (final dispatcher in dispatchers) {
@@ -62,7 +86,10 @@ extension GlobalTools on ChatController {
               if (index >= 0) dispatcher.history[index] = saved;
             }
             for (final value in _interactiveConversations(target.id, target)) {
-              for (final history in [value.messages, if (value.searchMessages != null) value.searchMessages!]) {
+              for (final history in [
+                value.messages,
+                if (value.searchMessages != null) value.searchMessages!,
+              ]) {
                 final index = history.indexWhere((m) => m.id == id);
                 if (index >= 0) history[index] = saved;
               }
@@ -92,7 +119,8 @@ extension GlobalTools on ChatController {
         );
         if (access.isEmpty) throw StateError('会话不存在或你无权访问该会话');
         final target = targetId == conversation.id
-            ? conversation : await _forwardTarget(targetId);
+            ? conversation
+            : await _forwardTarget(targetId);
         if (conversation.kind == ConversationKind.group) {
           _checkGroupStopped(conversation);
           if (_removedGroupMembers.contains(senderId))
@@ -102,7 +130,9 @@ extension GlobalTools on ChatController {
         final message = await htmlGames.create(
           conversationId: target.id,
           creator: profile.sender,
-          runId: target.id != conversation.id || target.kind == ConversationKind.group
+          runId:
+              target.id != conversation.id ||
+                  target.kind == ConversationKind.group
               ? null
               : conversation.activeRunId,
           standalone: true,
@@ -114,16 +144,16 @@ extension GlobalTools on ChatController {
             'turnSenderId': null,
           },
         );
-        _publishInteractiveChange(
-          target.id,
-          message,
-          source: target,
-        );
+        _publishInteractiveChange(target.id, message, source: target);
         HtmlGameSignals.changes.add(message.id);
         final app = await htmlGames.load(target.id, message.id);
         final ref = await HtmlAppStore.load(_store.database, app.appId);
-        return {'sent': true, 'messageId': message.id, 'conversationId': target.id,
-          ...await HtmlAppStore.reference(ref)};
+        return {
+          'sent': true,
+          'messageId': message.id,
+          'conversationId': target.id,
+          ...await HtmlAppStore.reference(ref),
+        };
       }),
       if (HtmlGameFeature.enabled &&
           conversation.kind == ConversationKind.group)
@@ -204,8 +234,11 @@ extension GlobalTools on ChatController {
       AttachmentTool((call) async {
         await _store.writer.flush();
         return HistoryMessageTool(
-          _store.database, _store.reader.imageDirectory,
-          senderId: senderId, name: 'readAttachment', inGroup: groupId != null,
+          _store.database,
+          _store.reader.imageDirectory,
+          senderId: senderId,
+          name: 'readAttachment',
+          inGroup: groupId != null,
         ).execute(call);
       }),
       for (final operation in SkillTool.operations)
@@ -284,7 +317,7 @@ extension GlobalTools on ChatController {
         DocumentTool(_platform, name, access: documents),
       for (final name in DeviceExtensionTool.names)
         DeviceExtensionTool(_platform, name),
-    ];
+    ].map((tool) => _withUserDataReadAccess(tool, conversation, senderId, groupId)).toList();
   }
 
   List<ToolDefinition> get globalToolDefinitions {

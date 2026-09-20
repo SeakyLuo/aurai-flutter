@@ -1,3 +1,4 @@
+import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -81,7 +82,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   }
 
   void _notice(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
 
   Future<bool> _save() async {
     if (_title.text.trim().isEmpty || _prompt.text.trim().isEmpty) {

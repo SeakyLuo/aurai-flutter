@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
@@ -29,7 +30,7 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
   final _selected = <String>{};
   bool _saving = false;
   void _notice(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _remove() async {
     if (_saving || _selected.isEmpty) return;

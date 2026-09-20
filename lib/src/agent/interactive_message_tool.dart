@@ -1,3 +1,4 @@
+import '../diagnostics/execution_log.dart';
 import 'shared_interaction_schema.dart';
 import 'interactive_message_schema.dart';
 import '../domain/tool_models.dart';
@@ -131,13 +132,35 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
   @override
   Future<ToolResult> execute(ToolCall call) async {
     try {
+      final required = definition.inputSchema['required'] as List;
+      for (final key in required) {
+        if (!call.arguments.containsKey(key) || call.arguments[key] == null) {
+          throw ArgumentError('缺少必填参数 $key，请按工具定义补齐后重试');
+        }
+      }
+      for (final key in [
+        'messageId',
+        'title',
+        'body',
+        'callbackEventId',
+        'buttonId',
+      ]) {
+        if (call.arguments.containsKey(key) && call.arguments[key] is! String) {
+          throw ArgumentError('$key 必须是字符串');
+        }
+      }
+      if (call.arguments.containsKey('buttons') &&
+          call.arguments['buttons'] is! List) {
+        throw ArgumentError('buttons 必须是按钮对象数组，不是序列化后的字符串');
+      }
       return ToolResult(
         callId: call.id,
         toolName: name,
         status: ToolResultStatus.success,
         output: await run(name, call.arguments),
       );
-    } on Object catch (error) {
+    } on Object catch (error, stack) {
+      await ExecutionLog.toolException(call.name, call.id, error, stack);
       return ToolResult(
         callId: call.id,
         toolName: name,

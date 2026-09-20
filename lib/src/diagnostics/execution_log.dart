@@ -6,6 +6,24 @@ import 'package:path_provider/path_provider.dart';
 /// Serialized, rotating JSONL diagnostics; logging failure cannot fail a reply.
 class ExecutionLog {
   static Future<void> _tail = Future.value();
+
+  static Future<void> toolException(
+    String tool,
+    String callId,
+    Object error,
+    StackTrace stack,
+  ) async {
+    if (error is! Error || error is ArgumentError || error is StateError)
+      return;
+    await write({
+      'event': 'tool_exception',
+      'tool': tool,
+      'callId': callId,
+      'exceptionType': error.runtimeType.toString(),
+      'stackTrace': stack.toString(),
+    }, apiKey: '');
+  }
+
   static Future<void> write(
     Map<String, Object?> event, {
     required String apiKey,

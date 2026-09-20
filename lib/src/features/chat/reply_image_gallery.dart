@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import 'image_action_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -97,7 +98,7 @@ class _ReplyImageCardState extends State<_ReplyImageCard> {
   void _notice() {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('图片加载失败，点按图片重试')));
+    ).showGlassSnackBar(const SnackBar(content: Text('图片加载失败，点按图片重试')));
   }
 
   Future<void> _open() async {

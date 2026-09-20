@@ -1,3 +1,4 @@
+import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -53,7 +54,7 @@ class _AvatarColorLibraryState extends State<AvatarColorLibrary> {
 
   void _notice(String message) => ScaffoldMessenger.of(
     context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  ).showGlassSnackBar(SnackBar(content: Text(message)));
   Future<bool> _save(bool gradient, List<String> values) async {
     setState(() => _busy = true);
     try {
