@@ -1,3 +1,5 @@
+import '../../app/global_ui.dart';
+import 'glass_surface.dart';
 import '../../app/glass_notice.dart';
 import 'group_status_builder.dart';
 import 'ai_contact_page.dart';
@@ -94,11 +96,17 @@ class _ChatPageState extends State<ChatPage>
   bool _preparingGoal = false;
   bool _accessibilitySheetShowing = false;
   bool _markReadScheduled = false;
+  bool _locatingInitialMessage = true;
+  final _unreadTarget = ValueNotifier<_UnreadTarget?>(null);
+  bool _jumpingToUnread = false;
+  String? _highlightedMessageId;
+  Timer? _highlightTimer;
   bool _temporaryExitPending = false;
   bool _temporaryExitReady = false;
   MessageEditSession? _editing;
 
   void _updateEditing(VoidCallback change) => setState(change);
+  void _clearMessageHighlight() => setState(() => _highlightedMessageId = null);
   @override
   void initState() {
     super.initState();
@@ -109,9 +117,7 @@ class _ChatPageState extends State<ChatPage>
     widget.controller.addListener(_onControllerChanged);
     _textController.addListener(_onTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.initialMessageId case final id?) {
-        _locateSearchMessage(id);
-      }
+      unawaited(_locateInitialMessage());
       _loadImages();
     });
   }
@@ -168,6 +174,8 @@ class _ChatPageState extends State<ChatPage>
     _textController
       ..removeListener(_onTextChanged)
       ..dispose();
+    _unreadTarget.dispose();
+    _highlightTimer?.cancel();
     _focusNode.dispose();
     super.dispose();
   }
@@ -203,6 +211,7 @@ class _ChatPageState extends State<ChatPage>
       onOpenQuote: _openQuotedMessage,
       onQuickReply: _sendQuickReply,
       beforeMessageId: _editing?.message.id,
+      highlightedMessageId: _highlightedMessageId,
       allowEditing: _editing == null,
     );
     final showProgress =
@@ -358,6 +367,11 @@ class _ChatPageState extends State<ChatPage>
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 760),
                         child: ScrollAwareJumpStack(
+                          messages: controller.messages,
+                          atBottom:
+                              !_contentBelow &&
+                              !(controller.hasSearchWindow &&
+                                  controller.activeConversation.searchHasLater),
                           key: ValueKey(_conversationId),
                           children: [
                             Positioned.fill(
@@ -419,6 +433,7 @@ class _ChatPageState extends State<ChatPage>
                                             controller.loadVisibleLaterMessages,
                                         loadEarlierMessages: controller
                                             .loadVisibleEarlierMessages,
+                                        onUserScroll: _dismissReachedUnread,
                                         onBookmark: (bookmark) {
                                           if (_editing == null)
                                             _scrollBookmarks[conversationId] =
@@ -459,10 +474,14 @@ class _ChatPageState extends State<ChatPage>
                               bottom: bottom + 8,
                               child: Center(
                                 child: JumpToBottomButton(
+                                  alignUnreadToRight: true,
                                   visible:
                                       !_followOutput &&
                                       (_contentBelow ||
-                                          controller.hasSearchWindow) &&
+                                          (controller.hasSearchWindow &&
+                                              controller
+                                                  .activeConversation
+                                                  .searchHasLater)) &&
                                       timeline.isNotEmpty,
                                   streaming: controller.hasStreamingMessages,
                                   onPressed: _scrollToBottom,
@@ -473,6 +492,7 @@ class _ChatPageState extends State<ChatPage>
                         ),
                       ),
                     ),
+                    _unreadPositionHint(top),
                     if (isGroup)
                       Positioned(
                         left: 0,
@@ -694,17 +714,12 @@ class _ChatPageState extends State<ChatPage>
     }
   }
 
-  Future<void> _sendQuickReply(
-    AgentMessage message,
-    String key,
-    String text,
-  ) async {
+  Future<void> _sendQuickReply(AgentMessage message, String key) async {
     final conversationId = widget.controller.activeConversation.id;
     try {
       final needsSettings = await widget.controller.submitQuickReply(
         message,
         key,
-        text,
       );
       if (needsSettings && mounted) {
         _preparingGoal = true;
@@ -741,16 +756,6 @@ class _ChatPageState extends State<ChatPage>
 
   Future<void> _stop() async {
     await widget.controller.stop();
-  }
-
-  void _showRunNotice(Object error) {
-    if (!mounted) {
-      return;
-    }
-    final stopped = widget.controller.runState == ChatRunState.cancelled;
-    ScaffoldMessenger.of(context).showGlassSnackBar(
-      SnackBar(content: Text(stopped ? '任务已停止' : errorMessage(error))),
-    );
   }
 
   Future<void> _openSettings({required bool continueAfterSave}) async {

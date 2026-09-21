@@ -82,7 +82,7 @@ extension _MessageItemActions on _MessageItemState {
     );
     if (!mounted || result == null) return;
     if (result case MessageQuickReplyResult(:final option)) {
-      await widget.onQuickReply?.call(snapshot, option.key, option.text);
+      await widget.onQuickReply?.call(snapshot, option.key);
       return;
     }
     final action = (result as MessageActionResult).action;
@@ -188,7 +188,7 @@ extension _MessageItemActions on _MessageItemState {
       database: ImageActionScope.of(context).groupStore.database,
       onTap: widget.onQuickReply == null
           ? null
-          : (key, text) => widget.onQuickReply!(message, key, text),
+          : (key) => widget.onQuickReply!(message, key),
     ),
   );
 }

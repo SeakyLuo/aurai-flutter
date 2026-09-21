@@ -46,8 +46,9 @@ extension AiIdentityController on ChatController {
     final selection = ai.modelSelection!;
     return ModelConfig(
       service: selection.provider,
+      details: modelSettings.profile(selection.provider).details,
       model: selection.model,
-      baseUrl: selection.baseUrl,
+      baseUrl: modelSettings.profile(selection.provider).baseUrl,
       apiKey: modelSettings.profile(selection.provider).apiKey,
       reasoning: ai.preferences.reasoning == ModelReasoning.inherit
           ? modelSettings.profile(selection.provider).reasoning

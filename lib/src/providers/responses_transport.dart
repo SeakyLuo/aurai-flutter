@@ -91,7 +91,7 @@ class ResponsesTransport {
       final base = config.baseUrl.endsWith('/')
           ? config.baseUrl.substring(0, config.baseUrl.length - 1)
           : config.baseUrl;
-      final chat = config.service.usesChatCompletions;
+      final chat = config.usesChatCompletions;
       final request = await client.postUrl(
         Uri.parse('$base/${chat ? 'chat/completions' : 'responses'}'),
       );

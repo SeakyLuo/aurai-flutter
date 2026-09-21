@@ -1,3 +1,4 @@
+import 'provider_key_dialog.dart';
 import 'image_generation_settings_page.dart';
 import 'package:flutter/material.dart';
 import '../../skills/skills_page.dart';
@@ -18,6 +19,23 @@ Future<void> navigateAppPage(
   if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
     throw StateError('请先回到 Aurai，再打开页面');
   }
+  if (args['page'] == 'providerKey') {
+    final cancelled = args['cancelled'] as ValueNotifier<bool>;
+    if (cancelled.value) return;
+    args['saved'] =
+        await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => ProviderKeyDialog(
+            controller: controller,
+            service: ModelService.byName(args['service'] as String),
+            baseUrl: args['baseUrl'] as String,
+            cancelled: cancelled,
+          ),
+        ) ??
+        false;
+    return;
+  }
   if (args['page'] == 'conversation') {
     await openHomeConversation(
       context,
@@ -34,7 +52,7 @@ Future<void> navigateAppPage(
           controller: controller,
           continueAfterSave: false,
           accountOnly: true,
-          initialService: ModelService.values.byName(args['service'] as String),
+          initialService: ModelService.byName(args['service'] as String),
         ),
       ),
     );

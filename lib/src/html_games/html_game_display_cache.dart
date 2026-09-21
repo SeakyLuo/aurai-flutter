@@ -11,6 +11,8 @@ class HtmlGameDisplayCache {
         ({String html, String background, bool stateful, String token})
       >{};
 
+  static void invalidate(String messageId) => _games.remove(messageId);
+
   static void releaseContent() {
     _games.clear();
   }

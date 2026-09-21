@@ -95,7 +95,7 @@ class _ImageGenerationSettingsPageState
       selected: _service,
       choices: [
         for (final service in [ModelService.openRouter, ModelService.qwen])
-          (value: service, label: service.label),
+          (value: service, label: widget.controller.modelSettings.profile(service).displayName),
       ],
     );
     if (!mounted || value == null || value == _service) return;
@@ -197,7 +197,7 @@ class _ImageGenerationSettingsPageState
               children: [
                 _row(
                   title: '服务商',
-                  subtitle: _service.label,
+                  subtitle: widget.controller.modelSettings.profile(_service).displayName,
                   leading: ModelProviderIcon(service: _service),
                   onTap: _locked ? null : _chooseService,
                 ),

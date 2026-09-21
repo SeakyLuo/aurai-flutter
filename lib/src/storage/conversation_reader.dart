@@ -361,8 +361,10 @@ class ConversationReader {
       ),
       database.query(
         'message_senders',
-        where: 'id IN (${_slots(senderIds.length)})',
-        whereArgs: senderIds,
+        where: forModel
+            ? 'id IN (${_slots(senderIds.length)})'
+            : 'id IN (${_slots(senderIds.length)}) OR id IN (SELECT actor_id FROM message_quick_replies WHERE parent_message_id IN ($selectedMessages))',
+        whereArgs: [...senderIds, if (!forModel) ...selectedArgs],
       ),
       if (!forModel && pageRuns.isNotEmpty)
         database.query(
@@ -416,8 +418,8 @@ class ConversationReader {
             MessageQuickReply(
               id: row['id'] as String,
               senderId: relation['actor_id'] as String,
+              senderName: senders[relation['actor_id']]!.name,
               key: relation['reply_key'] as String,
-              text: row['text'] as String,
               createdAt: DateTime.fromMicrosecondsSinceEpoch(
                 row['created_at'] as int,
               ),

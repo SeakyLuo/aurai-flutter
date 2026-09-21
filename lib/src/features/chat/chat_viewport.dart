@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -32,6 +33,7 @@ class ChatViewport extends StatefulWidget {
     required this.loadLaterMessages,
     required this.loadEarlierMessages,
     required this.onBookmark,
+    this.onUserScroll,
     required this.onFollowOutputChanged,
     required this.summaryOwners,
     this.bookmark,
@@ -49,6 +51,7 @@ class ChatViewport extends StatefulWidget {
   final Future<void> Function() loadLaterMessages;
   final Future<void> Function() loadEarlierMessages;
   final ValueChanged<ChatScrollBookmark> onBookmark;
+  final VoidCallback? onUserScroll;
   final ValueChanged<bool> onFollowOutputChanged;
   final Map<String, String> summaryOwners;
   final ChatScrollBookmark? bookmark;
@@ -272,6 +275,65 @@ class ChatViewportState extends State<ChatViewport> {
     widget.onBookmark(_anchor!);
   }
 
+  Future<bool?> unreadFitsViewport(
+    String messageId, {
+    required double headerBottom,
+  }) async {
+    // Freeze the entry range; new messages must not enlarge this unread batch.
+    final entryIds = widget.entries.map((entry) => entry.id).toList();
+    final firstIndex = entryIds.indexOf(messageId);
+    if (widget.hasLaterMessages || firstIndex < 0) return false;
+    final unreadIds = entryIds.sublist(firstIndex);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return null;
+    final viewport = context.findRenderObject()! as RenderBox;
+    final view = View.of(context);
+    final keyboardHeight = view.viewInsets.bottom / view.devicePixelRatio;
+    final readableHeight =
+        viewport.localToGlobal(Offset.zero).dy +
+        viewport.size.height -
+        widget.padding.bottom +
+        keyboardHeight -
+        headerBottom;
+    // Size callbacks run after layout. Wait for two unchanged layout frames,
+    // including any initial bottom alignment, before committing the decision.
+    var heights = [for (final id in unreadIds) _entryHeights[id]];
+    var stableFrames = 0;
+    while (stableFrames < 2) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return null;
+      final next = [for (final id in unreadIds) _entryHeights[id]];
+      stableFrames =
+          !_restoring && !_bottomSyncQueued && listEquals(heights, next)
+          ? stableFrames + 1
+          : 0;
+      heights = next;
+    }
+    var unreadHeight = 0.0;
+    for (final height in heights) {
+      // Virtualized entries without a measurement cannot establish a fit.
+      if (height == null) return false;
+      unreadHeight += height;
+      if (unreadHeight > readableHeight) return false;
+    }
+    return true;
+  }
+
+  bool hasReachedMessageStart(String id, {required double headerBottom}) {
+    final targetIndex = _indices[id];
+    if (targetIndex == null) return false;
+    final viewport = context.findRenderObject()! as RenderBox;
+    final top = headerBottom - viewport.localToGlobal(Offset.zero).dy;
+    final bottom = viewport.size.height - widget.padding.bottom;
+    return _positions.itemPositions.value.any((item) {
+      final leading = item.itemLeadingEdge * _height;
+      final trailing = item.itemTrailingEdge * _height;
+      if (trailing <= top || leading >= bottom) return false;
+      return item.index < targetIndex ||
+          (item.index == targetIndex && leading >= top);
+    });
+  }
+
   void _preserveEntry(String id) {
     final revision = ++_scrollRevision;
     _keepSentMessageAtTop = false;
@@ -408,6 +470,11 @@ class ChatViewportState extends State<ChatViewport> {
                     widget.onFollowOutputChanged(false);
                     _userScrolling = true;
                     FocusManager.instance.primaryFocus?.unfocus();
+                  }
+                  if (_userScrolling &&
+                      (notification is ScrollUpdateNotification ||
+                          notification is ScrollEndNotification)) {
+                    widget.onUserScroll?.call();
                   }
                   if (notification is ScrollEndNotification && _userScrolling) {
                     _rememberPosition();

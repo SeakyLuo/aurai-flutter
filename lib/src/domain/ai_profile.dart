@@ -74,7 +74,7 @@ class AiProfile {
     modelSelection: row['provider'] == null
         ? null
         : AiModelSelection(
-            provider: ModelService.values.byName(row['provider'] as String),
+            provider: ModelService.byName(row['provider'] as String),
             model: row['model'] as String,
             baseUrl: row['base_url'] as String,
           ),

@@ -333,6 +333,7 @@ class HtmlGameSession extends ChangeNotifier {
       previewVersion = null;
     }
     if (next.html != game.html) {
+      HtmlGameDisplayCache.invalidate(game.messageId);
       failed = true;
       error = null;
       notifyListeners();

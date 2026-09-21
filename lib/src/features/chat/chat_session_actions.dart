@@ -24,15 +24,15 @@ extension _ChatSessionActions on _ChatPageState {
   Future<void> _openBatterySettings() async {
     await widget.controller.openBatterySettings();
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(SnackBar(content: Text('请在“电池”或“后台耗电管理”中允许 Aurai 后台运行')));
+      ScaffoldMessenger.of(context).showGlassSnackBar(
+        SnackBar(content: Text('请在“电池”或“后台耗电管理”中允许 Aurai 后台运行')),
+      );
     }
   }
 
   void _scheduleMarkRead() {
     final conversation = widget.controller.activeConversation;
-    if (_markReadScheduled) return;
+    if (_markReadScheduled || _locatingInitialMessage) return;
     if (conversation.kind == ConversationKind.group) {
       if (_contentBelow ||
           conversation.searchHasLater ||

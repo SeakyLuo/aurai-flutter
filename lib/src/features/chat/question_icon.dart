@@ -34,8 +34,8 @@ class _QuestionPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
       case QuestionIconType.pause:
-        canvas.drawLine(const Offset(8, 5), const Offset(8, 19), pen);
-        canvas.drawLine(const Offset(16, 5), const Offset(16, 19), pen);
+        canvas.drawLine(const Offset(7.5, 5), const Offset(7.5, 19), pen);
+        canvas.drawLine(const Offset(16.5, 5), const Offset(16.5, 19), pen);
       case QuestionIconType.play:
         canvas.drawPath(
           Path()

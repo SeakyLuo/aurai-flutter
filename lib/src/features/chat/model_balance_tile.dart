@@ -1,3 +1,4 @@
+import '../../platform/aurai_platform.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
@@ -81,6 +82,11 @@ class _ModelBalanceTileState extends State<ModelBalanceTile>
       if (ModelBalanceClient.supports(widget.config) &&
           widget.config.service == ModelService.deepSeek) {
         await ModelTopUp.open(widget.config);
+      } else if (widget.config.service.isCustom) {
+        await AuraiPlatform.instance.startIntent({
+          'action': 'android.intent.action.VIEW',
+          'data': widget.config.website,
+        });
       } else {
         await ModelTopUp.openConsole(widget.config.service);
       }
@@ -92,8 +98,9 @@ class _ModelBalanceTileState extends State<ModelBalanceTile>
     }
   }
 
-  void _notice(String text) =>
-      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text) => ScaffoldMessenger.of(
+    context,
+  ).showGlassSnackBar(SnackBar(content: Text(text)));
 
   @override
   void dispose() {
@@ -107,8 +114,9 @@ class _ModelBalanceTileState extends State<ModelBalanceTile>
     final balance = _balance;
     final time = balance?.checkedAt.toLocal();
     final official = ModelBalanceClient.supports(widget.config);
-    final canTopUp =
-        !official || widget.config.service == ModelService.deepSeek;
+    final canTopUp = (widget.config.service.isCustom
+        ? widget.config.website.isNotEmpty
+        : (!official || widget.config.service == ModelService.deepSeek));
     final colors = Theme.of(context).colorScheme;
     return Material(
       color: settingsFieldColor(context),
@@ -128,7 +136,10 @@ class _ModelBalanceTileState extends State<ModelBalanceTile>
         title: balance == null || !official
             ? Text(
                 !official
-                    ? '${widget.config.service.label} 官方后台'
+                    ? widget.config.service.isCustom &&
+                              widget.config.website.isEmpty
+                          ? '请在供应商网站查看余额'
+                          : '${widget.config.displayName} 官方后台'
                     : _loading
                     ? '正在查询余额…'
                     : widget.config.isConfigured

@@ -131,6 +131,20 @@ abstract final class GlobalUI {
       snackBarTheme: const SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
       ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: dark
+              ? const Color(0xffc4b5fd)
+              : const Color(0xff7563ad),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: dark
+              ? const Color(0xffc4b5fd)
+              : const Color(0xff7563ad),
+        ),
+      ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size(48, 52),

@@ -130,11 +130,7 @@ extension ConversationRun on ChatController {
           summaryConfig: modelSettings.activeConfig,
           sharedContext: groupParent?.sharedContext,
         ),
-        ModelService.openRouter ||
-        ModelService.deepSeek ||
-        ModelService.qwen ||
-        ModelService.kimi ||
-        ModelService.glm => DeepSeekResponsesProvider(
+        _ => DeepSeekResponsesProvider(
           runConfig,
           systemPrompt: systemPrompt,
           summaryConfig: modelSettings.activeConfig,
@@ -146,7 +142,7 @@ extension ConversationRun on ChatController {
         conversation: groupParent ?? runConversation,
         senderId: reply.senderId,
         messageId: userMessage.id,
-        providerLabel: runConfig.service.label,
+        providerLabel: runConfig.displayName,
         memory: memory,
         skills: skills,
         documents: documents,

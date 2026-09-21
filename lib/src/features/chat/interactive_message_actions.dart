@@ -367,14 +367,8 @@ extension InteractiveMessageActions on ChatController {
     }
     _store.writer.remember([message]);
     final dispatcher = _executionStates[conversationId]?.groupDispatcher;
-    if (dispatcher != null &&
-        !dispatcher.history.any((m) => m.id == message.id)) {
-      if (notifyParticipants && !dispatcher.closed && !dispatcher.stopped) {
-        dispatcher.receive([message]);
-      } else {
-        dispatcher.history.add(message);
-      }
-    } else if (notifyParticipants && source?.kind == ConversationKind.group) {
+    if (notifyParticipants &&
+        (source?.kind == ConversationKind.group || dispatcher != null)) {
       unawaited(
         _receiveGroupSystemNotice(conversationId, message).catchError((
           Object error,
@@ -382,6 +376,9 @@ extension InteractiveMessageActions on ChatController {
           developer.log('Interactive message dispatch failed', error: error);
         }),
       );
+    } else if (dispatcher != null &&
+        !dispatcher.history.any((m) => m.id == message.id)) {
+      dispatcher.history.add(message);
     }
     _conversationChanged();
   }
@@ -418,7 +415,13 @@ extension InteractiveMessageActions on ChatController {
       );
       _replaceInteractiveCard(conversation.id, messageId, result.card);
       if (result.notice != null)
-        _publishInteractiveChange(conversation.id, result.notice!);
+        _publishInteractiveChange(
+          conversation.id,
+          result.notice!,
+          source: conversation,
+          notifyParticipants:
+              result.card.participants[MessageSender.localUser.id]?['callback'] == null,
+        );
       MessageCallbacks.changes.add(null);
       return (card: result.card, url: result.url);
     } on InteractiveMessageChanged catch (error) {

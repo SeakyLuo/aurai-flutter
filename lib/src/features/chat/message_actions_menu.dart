@@ -148,8 +148,8 @@ Future<MessageMenuResult?> showMessageActionsMenu(
                       (key) => options[key]!,
                     ))
                       Expanded(
-                        child: Tooltip(
-                          message: option.label,
+                        child: Semantics(
+                          label: option.emoji,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(24),
                             onTap: () => Navigator.pop(

@@ -46,7 +46,7 @@ class ImageGenerationConfig {
 
   factory ImageGenerationConfig.fromJson(Map<String, dynamic> json) =>
       ImageGenerationConfig(
-        service: ModelService.values.byName(json['service'] as String),
+        service: ModelService.byName(json['service'] as String),
         model: ImageGenerationModel.fromJson(
           json['model'] as Map<String, dynamic>,
         ),

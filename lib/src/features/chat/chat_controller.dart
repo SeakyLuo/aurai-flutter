@@ -1,3 +1,7 @@
+import '../../domain/quick_reply_option.dart';
+import '../../agent/provider_configuration_tool.dart';
+import '../../providers/model_catalog.dart';
+import '../../providers/provider_connection_check.dart';
 import '../../agent/user_data_read_tool.dart';
 import '../../app/language_settings.dart';
 import '../../agent/hide_thinking_tool.dart';
@@ -143,6 +147,7 @@ part 'interactive_message_actions.dart';
 part 'message_callback_actions.dart';
 part 'html_game_actions.dart';
 part 'model_config_actions.dart';
+part 'provider_configuration_actions.dart';
 part 'image_generation_actions.dart';
 part 'image_forwarding.dart';
 part 'draft_attachment_actions.dart';
@@ -202,6 +207,7 @@ class ChatController extends ChangeNotifier {
   List<MessageImage> get draftImages => activeConversation.draftImages;
   List<MessageFile> get draftFiles => activeConversation.draftFiles;
   Future<void> Function(Map<String, Object?>)? openAppPage;
+  Future<void> _modelSettingsWrite = Future<void>.value();
   final notificationOpenRequests = ValueNotifier<int>(0);
   Future<String?> takeNotificationConversation() =>
       _platform.takeNotificationConversation();
