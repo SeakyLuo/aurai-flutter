@@ -1,3 +1,4 @@
+import 'miniapp_icon.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -6,7 +7,6 @@ import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
 import '../features/chat/chat_controller.dart';
 import '../features/chat/settings_appearance.dart';
-import '../features/chat/settings_icon.dart';
 import '../features/chat/sidebar_action_icon.dart';
 import '../features/chat/member_avatar.dart';
 import 'miniapp_detail_page.dart';
@@ -98,7 +98,7 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
       title: Row(
         children: [
-          const SettingsIcon(type: SettingsIconType.miniapps),
+          MiniappIcon(path: entry.iconPath),
           const SizedBox(width: 10),
           Expanded(child: Text(entry.title)),
         ],

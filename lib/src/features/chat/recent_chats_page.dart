@@ -4,13 +4,11 @@ import 'conversation_list_skeleton.dart';
 import '../../scheduling/tasks_page.dart';
 import 'settings_icon.dart';
 import 'conversation_search_page.dart';
-import 'conversation_status_dot.dart';
+import 'conversation_list_tile.dart';
 import '../../domain/error_message.dart';
 import 'ai_contacts_page.dart';
 import 'temporary_conversation_dialog.dart';
-import 'message_time.dart';
 import 'conversation_icon.dart';
-import 'conversation_preview_text.dart';
 import 'header_action_menu.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -358,75 +356,36 @@ class RecentChatsPageState extends State<RecentChatsPage> {
   Widget _tile(Conversation item) {
     final group = item.kind == ConversationKind.group;
     final sender = group ? null : _senders[item.defaultSenderId]!;
-    return _roundedTile(
-      ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-        horizontalTitleGap: 12,
-        leading: ConversationUnreadAvatar(
-          controller: widget.controller,
-          conversation: item,
-          child: group
-              ? GroupAvatar(members: _groups[item.id]!, size: 48)
-              : ProfileAvatar(
-                  style: AvatarStyle(
-                    icon: sender!.avatarIcon,
-                    color: sender.avatarColor,
-                    path: sender.avatarPath,
-                  ),
-                  name: sender.name,
-                  size: 48,
-                ),
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                item.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 16),
+    return ConversationListTile(
+      controller: widget.controller,
+      conversation: item,
+      avatar: group
+          ? GroupAvatar(members: _groups[item.id]!, size: 48)
+          : ProfileAvatar(
+              style: AvatarStyle(
+                icon: sender!.avatarIcon,
+                color: sender.avatarColor,
+                path: sender.avatarPath,
               ),
+              name: sender.name,
+              size: 48,
             ),
-
-            if (item.lastMessageAt != null) ...[
-              const SizedBox(width: 8),
-              Text(
-                conversationMessageTime(item.lastMessageAt!),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ],
-        ),
-        subtitle: ConversationPreviewText(
-          prefix: group && item.unreadMessageCount > 0
-              ? '[${item.unreadMessageCount}条] '
-              : '',
-          showFailure: true,
-          conversation: item,
-          emptyText: '开始聊天',
-        ),
-        onTap: () async {
-          try {
-            await openHomeConversation(
-              context,
-              widget.controller,
-              item.id,
-              waitForClose: widget.groupsOnly,
+      onTap: () async {
+        try {
+          await openHomeConversation(
+            context,
+            widget.controller,
+            item.id,
+            waitForClose: widget.groupsOnly,
+          );
+        } on Object catch (error) {
+          if (mounted)
+            ScaffoldMessenger.of(context).showGlassSnackBar(
+              SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
             );
-          } on Object catch (error) {
-            if (mounted)
-              ScaffoldMessenger.of(context).showGlassSnackBar(
-                SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
-              );
-          }
-          if (mounted) reload();
-        },
-      ),
-      pinned: item.isPinned,
+        }
+        if (mounted) reload();
+      },
     );
   }
 

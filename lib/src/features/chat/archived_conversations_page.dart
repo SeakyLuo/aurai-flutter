@@ -4,12 +4,16 @@ import 'search_skeleton.dart';
 import 'ai_contacts_page.dart';
 import 'search_type_segment.dart';
 import '../../domain/error_message.dart';
-import 'conversation_preview_text.dart';
+import 'conversation_list_tile.dart';
 import 'package:flutter/material.dart';
 
 import '../../storage/conversation_reader.dart';
 import 'chat_controller.dart';
-import 'conversation_menu_icon.dart';
+import '../../domain/avatar_style.dart';
+import '../../domain/message_sender.dart';
+import '../../storage/home_conversations.dart';
+import 'group_avatar.dart';
+import 'profile_avatar.dart';
 import 'conversation_more.dart';
 import 'settings_appearance.dart';
 
@@ -24,6 +28,8 @@ class ArchivedConversationsPage extends StatefulWidget {
 
 class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
   final _items = <Conversation>[];
+  final _senders = <String, MessageSender>{};
+  final _groups = <String, List<MessageSender>>{};
   bool _friends = false;
   bool _friendsOpened = false;
   bool _loading = true;
@@ -48,10 +54,25 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
       final page = await widget.controller.archivedConversations(
         after: reset || _items.isEmpty ? null : _items.last,
       );
+      final avatars = await Future.wait<Object>([
+        HomeConversations(widget.controller.groupStore).senders(page),
+        widget.controller.groupStore.avatarMembers(
+          page
+              .where((item) => item.kind == ConversationKind.group)
+              .map((item) => item.id)
+              .toList(),
+        ),
+      ]);
       if (!mounted) return;
       setState(() {
-        if (reset) _items.clear();
+        if (reset) {
+          _items.clear();
+          _senders.clear();
+          _groups.clear();
+        }
         _items.addAll(page);
+        _senders.addAll(avatars[0] as Map<String, MessageSender>);
+        _groups.addAll(avatars[1] as Map<String, List<MessageSender>>);
         _loaded = true;
         _hasMore = page.length == ConversationReader.pageSize;
       });
@@ -64,6 +85,22 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Widget _avatar(Conversation conversation) {
+    if (conversation.kind == ConversationKind.group) {
+      return GroupAvatar(members: _groups[conversation.id]!, size: 48);
+    }
+    final sender = _senders[conversation.defaultSenderId]!;
+    return ProfileAvatar(
+      style: AvatarStyle(
+        icon: sender.avatarIcon,
+        color: sender.avatarColor,
+        path: sender.avatarPath,
+      ),
+      name: sender.name,
+      size: 48,
+    );
   }
 
   @override
@@ -94,17 +131,21 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
                 constraints: const BoxConstraints(maxWidth: 640),
                 child: AnimatedEntryList(
                   padding: EdgeInsets.fromLTRB(
-                    16,
-                    MediaQuery.paddingOf(context).top + 76 + 16,
-                    16,
-                    16,
+                    12,
+                    MediaQuery.paddingOf(context).top + 76 + 8,
+                    12,
+                    24,
                   ),
                   children: [
                     if (!_loaded && _loading)
                       const Padding(
                         key: ValueKey('loading'),
                         padding: EdgeInsets.all(8),
-                        child: SearchSkeleton(label: '正在加载会话', rowGap: 32),
+                        child: SearchSkeleton(
+                          label: '正在加载归档会话',
+                          rowGap: 32,
+                          avatarSize: 48,
+                        ),
                       )
                     else if (_items.isEmpty && !_loading && !_failed)
                       Padding(
@@ -142,48 +183,16 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
                                 );
                               }
                               final conversation = _items[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: ConversationMore(
+                              return ConversationMore(
+                                controller: widget.controller,
+                                conversation: conversation,
+                                onChanged: () => _load(reset: true),
+                                child: ConversationListTile(
                                   controller: widget.controller,
                                   conversation: conversation,
-                                  onChanged: () => _load(reset: true),
-                                  child: Material(
-                                    color: settingsFieldColor(context),
-                                    borderRadius: BorderRadius.circular(26),
-                                    clipBehavior: Clip.antiAlias,
-                                    child: ListTile(
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 8,
-                                          ),
-                                      leading: ConversationMenuIcon(
-                                        type: ConversationMenuIconType.archive,
-                                        color: colors.onSurfaceVariant,
-                                      ),
-                                      title: Text(
-                                        conversation.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      subtitle:
-                                          conversation.draftPreview != null
-                                          ? ConversationPreviewText(
-                                              conversation: conversation,
-                                            )
-                                          : conversation.preview == null
-                                          ? null
-                                          : ConversationPreviewText(
-                                              conversation: conversation,
-                                              maxLines: 2,
-                                            ),
-                                      onTap: () => Navigator.pop(
-                                        context,
-                                        conversation.id,
-                                      ),
-                                    ),
-                                  ),
+                                  avatar: _avatar(conversation),
+                                  onTap: () =>
+                                      Navigator.pop(context, conversation.id),
                                 ),
                               );
                             },

@@ -1,3 +1,11 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import '../domain/agent_models.dart';
+import 'miniapp_icon.dart';
+
 import 'package:flutter/material.dart';
 
 import '../app/glass_notice.dart';
@@ -27,14 +35,69 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
   late final _name = TextEditingController(text: _saved.title);
   late final _description = TextEditingController(text: _saved.description);
   bool _busy = false, _leaving = false;
+  late String? _iconPath = _saved.iconPath;
+  final _draftIcons = <String>{};
   bool get _dirty =>
-      _name.text != _saved.title || _description.text != _saved.description;
+      _name.text != _saved.title ||
+      _description.text != _saved.description ||
+      _iconPath != _saved.iconPath;
 
   @override
   void dispose() {
+    for (final path in _draftIcons) {
+      unawaited(File(path).delete().catchError((Object _) => File(path)));
+    }
     _name.dispose();
     _description.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickIcon() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final image = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 90,
+      );
+      if (image == null || !mounted) return;
+      final codec = await ui.instantiateImageCodec(await image.readAsBytes());
+      late final List<int> bytes;
+      try {
+        final frame = await codec.getNextFrame();
+        try {
+          bytes = (await frame.image.toByteData(
+            format: ui.ImageByteFormat.png,
+          ))!.buffer.asUint8List();
+        } finally {
+          frame.image.dispose();
+        }
+      } finally {
+        codec.dispose();
+      }
+      final root = await getApplicationSupportDirectory();
+      final folder = await Directory(
+        '${root.path}/miniapp_icons',
+      ).create(recursive: true);
+      final file = await File(
+        '${folder.path}/${newMessageId()}.png',
+      ).writeAsBytes(bytes, flush: true);
+      if (!mounted) {
+        await file.delete();
+        return;
+      }
+      _draftIcons.add(file.path);
+      setState(() => _iconPath = file.path);
+    } on Object catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showGlassSnackBar(
+          SnackBar(content: Text('无法选择图标：${errorMessage(error)}')),
+        );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<bool> _save() async {
@@ -43,13 +106,16 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
     try {
       await MiniappMetadataStore(
         widget.store.database,
-      ).save(_saved, _name.text, _description.text);
+      ).save(_saved, _name.text, _description.text, iconPath: _iconPath);
+      _draftIcons.remove(_iconPath);
       if (!mounted) return true;
       setState(() {
         _saved = _saved.withMetadata(
           _name.text.trim(),
           _description.text.trim(),
           _saved.metadataRevision + 1,
+          iconPath: _iconPath,
+          replaceIcon: true,
         );
         _name.text = _saved.title;
         _description.text = _saved.description;
@@ -170,6 +236,43 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+                  child: Text(
+                    '图标',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+                  child: Row(
+                    children: [
+                      Semantics(
+                        button: true,
+                        label: '选择小程序图标',
+                        child: GestureDetector(
+                          onTap: _busy ? null : _pickIcon,
+                          child: MiniappIcon(path: _iconPath, size: 64),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      TextButton(
+                        onPressed: _busy ? null : _pickIcon,
+                        child: Text(_iconPath == null ? '选择图片' : '更换图片'),
+                      ),
+                      if (_iconPath != null)
+                        TextButton(
+                          onPressed: _busy
+                              ? null
+                              : () => setState(() => _iconPath = null),
+                          child: const Text('移除'),
+                        ),
+                    ],
+                  ),
+                ),
                 _field('名称', _name, 100),
                 _field('简介', _description, 500, multiline: true),
                 Padding(

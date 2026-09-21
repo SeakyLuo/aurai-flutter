@@ -1,3 +1,4 @@
+import 'miniapp_icon.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -255,7 +256,7 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
               children: [
                 Row(
                   children: [
-                    const SettingsIcon(type: SettingsIconType.miniapps),
+                    MiniappIcon(path: entry.iconPath),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Text(

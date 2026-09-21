@@ -1,3 +1,4 @@
+import 'search_skeleton.dart';
 import '../../html_games/miniapp_favorites_list.dart';
 import 'search_type_segment.dart';
 import 'animated_entry_list.dart';
@@ -23,6 +24,7 @@ class StarredMessagesPage extends StatefulWidget {
 
 class _StarredMessagesPageState extends State<StarredMessagesPage> {
   bool _miniapps = false;
+  bool _miniappsOpened = false;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -31,14 +33,29 @@ class _StarredMessagesPageState extends State<StarredMessagesPage> {
       titleWidget: SearchTypeSegment(
         files: _miniapps,
         labels: const ['消息', '小程序'],
-        onChanged: (value) => setState(() => _miniapps = value),
+        onChanged: (value) => setState(() {
+          _miniapps = value;
+          if (value) _miniappsOpened = true;
+        }),
       ),
       gradientBackground: true,
       onBack: () => Navigator.maybePop(context),
     ),
-    body: _miniapps
-        ? MiniappFavoritesList(controller: widget.controller)
-        : _StarredMessageList(controller: widget.controller),
+    body: IndexedStack(
+      index: _miniapps ? 1 : 0,
+      children: [
+        TickerMode(
+          enabled: !_miniapps,
+          child: _StarredMessageList(controller: widget.controller),
+        ),
+        TickerMode(
+          enabled: _miniapps,
+          child: _miniappsOpened
+              ? MiniappFavoritesList(controller: widget.controller)
+              : const SizedBox.expand(),
+        ),
+      ],
+    ),
   );
 }
 
@@ -189,72 +206,87 @@ class _StarredMessageListState extends State<_StarredMessageList> {
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedEntryList(
-    controller: _scroll,
-    empty: Padding(
-      padding: const EdgeInsets.only(top: 40),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Text(
-          '还没有收藏\n长按聊天消息即可添加',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+  Widget build(BuildContext context) => _loading && _rows.isEmpty
+      ? const SingleChildScrollView(
+          physics: NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.all(16),
+          child: SearchSkeleton(
+            label: '正在加载收藏消息',
+            avatarSize: 32,
+            contentHeight: 96,
+            rowCount: 4,
+            rowGap: 28,
           ),
-        ),
-      ),
-    ),
-    padding: EdgeInsets.fromLTRB(
-      16,
-      16,
-      16,
-      MediaQuery.paddingOf(context).bottom + 24,
-    ),
-    children:
-        List.generate(_rows.length + ((_loading || _failed || _more) ? 1 : 0), (
-              index,
-            ) {
-              if (index == _rows.length) {
-                if (_loading)
-                  return const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                if (_failed)
-                  return Center(
-                    child: TextButton(
-                      onPressed: () => _load(),
-                      child: const Text('重试'),
-                    ),
-                  );
-                if (_more)
-                  return Center(
-                    child: TextButton(
-                      onPressed: () => _load(),
-                      child: const Text('加载更多'),
-                    ),
-                  );
-                return const SizedBox.shrink();
-              }
-              final row = _rows[index];
-              return StarredMessageTile(
-                key: ValueKey(row['id']),
-                result: _messages[row['id']]!,
-                conversationId: row['conversation_id'] as String,
-                conversationTitle: _titles[row['conversation_id']]!,
-                controller: widget.controller,
-                onLocate: () => _open(row),
-                onRemove: () => _remove(row),
-              );
-            }).indexed
-            .map(
-              (entry) => KeyedSubtree(
-                key: ValueKey(
-                  entry.$1 == _rows.length ? 'footer' : _rows[entry.$1]['id'],
+        )
+      : AnimatedEntryList(
+          controller: _scroll,
+          empty: Padding(
+            padding: const EdgeInsets.only(top: 40),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Text(
+                '还没有收藏\n长按聊天消息即可添加',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
-                child: entry.$2,
               ),
-            )
-            .toList(),
-  );
+            ),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            MediaQuery.paddingOf(context).bottom + 24,
+          ),
+          children:
+              List.generate(
+                    _rows.length + ((_loading || _failed || _more) ? 1 : 0),
+                    (index) {
+                      if (index == _rows.length) {
+                        if (_loading)
+                          return const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        if (_failed)
+                          return Center(
+                            child: TextButton(
+                              onPressed: () => _load(),
+                              child: const Text('重试'),
+                            ),
+                          );
+                        if (_more)
+                          return Center(
+                            child: TextButton(
+                              onPressed: () => _load(),
+                              child: const Text('加载更多'),
+                            ),
+                          );
+                        return const SizedBox.shrink();
+                      }
+                      final row = _rows[index];
+                      return StarredMessageTile(
+                        key: ValueKey(row['id']),
+                        result: _messages[row['id']]!,
+                        conversationId: row['conversation_id'] as String,
+                        conversationTitle: _titles[row['conversation_id']]!,
+                        controller: widget.controller,
+                        onLocate: () => _open(row),
+                        onRemove: () => _remove(row),
+                      );
+                    },
+                  ).indexed
+                  .map(
+                    (entry) => KeyedSubtree(
+                      key: ValueKey(
+                        entry.$1 == _rows.length
+                            ? 'footer'
+                            : _rows[entry.$1]['id'],
+                      ),
+                      child: entry.$2,
+                    ),
+                  )
+                  .toList(),
+        );
 }

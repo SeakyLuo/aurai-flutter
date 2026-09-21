@@ -1,3 +1,4 @@
+import 'search_skeleton.dart';
 import '../../app/glass_notice.dart';
 import 'header_action_menu.dart';
 import '../../domain/error_message.dart';
@@ -45,6 +46,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
   final _items = <AiProfile>[];
   Timer? _debounce;
   int _generation = 0;
+  int? _count;
   bool _loading = false, _more = true;
   late bool _archived;
   @override
@@ -66,17 +68,30 @@ class _AiContactsPageState extends State<AiContactsPage> {
     final generation = reset ? ++_generation : _generation;
     setState(() {
       _loading = true;
-      if (reset) _items.clear();
+      if (reset) {
+        _items.clear();
+        _count = null;
+      }
     });
     try {
-      final page = await widget.controller.groupStore.contacts(
-        _search.text.trim(),
-        archived: _archived,
-        offset: _items.length,
-      );
+      final query = _search.text.trim();
+      final (page, count) = await (
+        widget.controller.groupStore.contacts(
+          query,
+          archived: _archived,
+          offset: _items.length,
+        ),
+        reset
+            ? widget.controller.groupStore.contactCount(
+                query,
+                archived: _archived,
+              )
+            : Future<int?>.value(_count),
+      ).wait;
       if (!mounted || generation != _generation) return;
       setState(() {
         _items.addAll(page);
+        _count = count;
         _more = page.length == 50;
       });
     } on Object catch (error) {
@@ -255,29 +270,30 @@ class _AiContactsPageState extends State<AiContactsPage> {
 
   Widget _body() => Column(
     children: [
-      Padding(
-        padding: const EdgeInsets.all(16),
-        child: TextField(
-          controller: _search,
-          decoration: InputDecoration(
-            hintText: '搜索朋友',
-            filled: true,
-            fillColor: settingsFieldColor(context),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(26),
-              borderSide: BorderSide.none,
+      if (!_archived)
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: TextField(
+            controller: _search,
+            decoration: InputDecoration(
+              hintText: '搜索朋友',
+              filled: true,
+              fillColor: settingsFieldColor(context),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(26),
+                borderSide: BorderSide.none,
+              ),
             ),
+            onChanged: (_) {
+              _generation++;
+              _debounce?.cancel();
+              _debounce = Timer(
+                const Duration(milliseconds: 250),
+                () => _load(reset: true),
+              );
+            },
           ),
-          onChanged: (_) {
-            _generation++;
-            _debounce?.cancel();
-            _debounce = Timer(
-              const Duration(milliseconds: 250),
-              () => _load(reset: true),
-            );
-          },
         ),
-      ),
       if (!_archived && !widget.selectForConversation)
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -311,7 +327,17 @@ class _AiContactsPageState extends State<AiContactsPage> {
           ),
         ),
       Expanded(
-        child: _items.isEmpty
+        child: _archived && _loading && _items.isEmpty
+            ? const SingleChildScrollView(
+                physics: NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(20, 16, 20, 24),
+                child: SearchSkeleton(
+                  label: '正在加载归档朋友',
+                  avatarSize: 44,
+                  rowGap: 32,
+                ),
+              )
+            : _items.isEmpty
             ? Center(
                 child: _loading
                     ? const CircularProgressIndicator()
@@ -378,6 +404,21 @@ class _AiContactsPageState extends State<AiContactsPage> {
                 ),
               ),
       ),
+      if (_count != null && (!_archived || _items.isNotEmpty))
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Text(
+              _archived ? '共 $_count 位已归档朋友' : '共 $_count 位朋友',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
     ],
   );
 }
