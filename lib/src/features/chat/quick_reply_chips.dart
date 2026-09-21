@@ -110,7 +110,17 @@ class QuickReplyChips extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('${quickReplyOptionsByKey[key]!.emoji} | '),
+                          Text(quickReplyOptionsByKey[key]!.emoji),
+                          Container(
+                            width: .5,
+                            height: 10,
+                            margin: const EdgeInsets.symmetric(horizontal: 6),
+                            color:
+                                (own
+                                        ? colors.onPrimaryContainer
+                                        : colors.onSurfaceVariant)
+                                    .withValues(alpha: .2),
+                          ),
                           Flexible(
                             child: Text(
                               group.first.senderName,

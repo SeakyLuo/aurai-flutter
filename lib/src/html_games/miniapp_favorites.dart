@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
 import 'miniapp_entry.dart';
+import 'miniapp_metadata_store.dart';
 import '../storage/favorites.dart';
 
 class MiniappFavorite {
@@ -30,6 +31,7 @@ class MiniappFavorites {
         'title': entry.title,
         'publisher': entry.publisher,
         'description': entry.description,
+        'iconPath': entry.iconPath,
         'kind': entry.kind.name,
         'asset': entry.asset,
         'bundleVersion': entry.bundleVersion,
@@ -56,7 +58,7 @@ class MiniappFavorites {
 
   Future<List<MiniappFavorite>> page({required int offset}) async {
     final rows = await Favorites(database).page('miniapp', offset: offset);
-    return rows.map((row) {
+    final favorites = rows.map((row) {
       final data =
           jsonDecode(row['metadata_json'] as String) as Map<String, dynamic>;
       return MiniappFavorite(
@@ -65,6 +67,7 @@ class MiniappFavorites {
           title: data['title'] as String,
           publisher: data['publisher'] as String,
           description: data['description'] as String,
+          iconPath: data['iconPath'] as String?,
           kind: MiniappKind.values.byName(data['kind'] as String),
           asset: data['asset'] as String?,
           bundleVersion: data['bundleVersion'] as String?,
@@ -73,5 +76,12 @@ class MiniappFavorites {
         row['starred_at'] as int,
       );
     }).toList();
+    final entries = await MiniappMetadataStore(
+      database,
+    ).apply(favorites.map((favorite) => favorite.entry).toList());
+    return [
+      for (var i = 0; i < favorites.length; i++)
+        MiniappFavorite(entries[i], favorites[i].starredAt),
+    ];
   }
 }

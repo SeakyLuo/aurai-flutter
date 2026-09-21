@@ -52,7 +52,10 @@ class StarredMessageTile extends StatelessWidget {
         (
           value: 'remove',
           label: '取消收藏',
-          icon: const SettingsIcon(type: SettingsIconType.star),
+          icon: const SettingsIcon(
+            type: SettingsIconType.starFilled,
+            color: Color(0xffe5ad24),
+          ),
         ),
       ],
     );

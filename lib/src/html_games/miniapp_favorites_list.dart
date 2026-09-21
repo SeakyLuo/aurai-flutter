@@ -1,3 +1,4 @@
+import '../features/chat/search_skeleton.dart';
 import 'package:flutter/material.dart';
 
 import '../app/glass_notice.dart';
@@ -9,6 +10,7 @@ import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
 import 'miniapp_detail_page.dart';
 import 'miniapp_favorites.dart';
+import 'miniapp_icon.dart';
 import 'miniapp_library_page.dart';
 import 'miniapp_library_store.dart';
 
@@ -146,7 +148,10 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
         (
           value: 'remove',
           label: '取消收藏',
-          icon: const SettingsIcon(type: SettingsIconType.star),
+          icon: const SettingsIcon(
+            type: SettingsIconType.starFilled,
+            color: Color(0xffe5ad24),
+          ),
         ),
       ],
     );
@@ -175,7 +180,7 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
           horizontal: 18,
           vertical: 10,
         ),
-        leading: const SettingsIcon(type: SettingsIconType.miniapps),
+        leading: MiniappIcon(path: item.entry.iconPath),
         title: Text(item.entry.title),
         subtitle: Text(
           [
@@ -201,42 +206,48 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
   );
 
   @override
-  Widget build(BuildContext context) => AnimatedEntryList(
-    controller: _scroll,
-    padding: EdgeInsets.fromLTRB(
-      16,
-      16,
-      16,
-      MediaQuery.paddingOf(context).bottom + 24,
-    ),
-    empty: Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '还没有收藏的小程序',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+  Widget build(BuildContext context) => _loading && _items.isEmpty
+      ? const SingleChildScrollView(
+          physics: NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.all(20),
+          child: SearchSkeleton(label: '正在加载收藏小程序', avatarSize: 40, rowGap: 40),
+        )
+      : AnimatedEntryList(
+          controller: _scroll,
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            MediaQuery.paddingOf(context).bottom + 24,
+          ),
+          empty: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '还没有收藏的小程序',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
-    ),
-    children: [
-      for (final item in _items) _tile(item),
-      if (_loading || _failed || _more)
-        Padding(
-          key: const ValueKey('footer'),
-          padding: const EdgeInsets.all(24),
-          child: Center(
-            child: _loading
-                ? const CircularProgressIndicator()
-                : TextButton(
-                    onPressed: _load,
-                    child: Text(_failed ? '重试' : '加载更多'),
-                  ),
-          ),
-        ),
-    ],
-  );
+          children: [
+            for (final item in _items) _tile(item),
+            if (_loading || _failed || _more)
+              Padding(
+                key: const ValueKey('footer'),
+                padding: const EdgeInsets.all(24),
+                child: Center(
+                  child: _loading
+                      ? const CircularProgressIndicator()
+                      : TextButton(
+                          onPressed: _load,
+                          child: Text(_failed ? '重试' : '加载更多'),
+                        ),
+                ),
+              ),
+          ],
+        );
 }

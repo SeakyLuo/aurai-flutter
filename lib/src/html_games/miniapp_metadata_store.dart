@@ -6,6 +6,7 @@ const miniappMetadataSchema = '''CREATE TABLE miniapp_metadata (
   app_id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   description TEXT NOT NULL,
+  icon_path TEXT,
   revision INTEGER NOT NULL
 )''';
 
@@ -15,7 +16,13 @@ Future<void> migrateMiniappMetadata(DatabaseExecutor database) async {
   final columns = await database.rawQuery(
     'PRAGMA table_info(miniapp_metadata)',
   );
-  if (columns.isEmpty) await database.execute(miniappMetadataSchema);
+  if (columns.isEmpty) {
+    await database.execute(miniappMetadataSchema);
+  } else if (!columns.any((column) => column['name'] == 'icon_path')) {
+    await database.execute(
+      'ALTER TABLE miniapp_metadata ADD COLUMN icon_path TEXT',
+    );
+  }
 }
 
 /// Display metadata is separate from application code, releases and saved data.
@@ -40,6 +47,8 @@ class MiniappMetadataStore {
               row['title'] as String,
               row['description'] as String,
               row['revision'] as int,
+              iconPath: row['icon_path'] as String?,
+              replaceIcon: true,
             );
     }).toList();
   }
@@ -47,18 +56,30 @@ class MiniappMetadataStore {
   Future<void> save(
     MiniappEntry entry,
     String title,
-    String description,
-  ) async {
+    String description, {
+    required String? iconPath,
+  }) async {
     if (!entry.canEditMetadata) throw StateError('只能编辑自己小程序的资料');
-    await database.transaction((txn) => write(txn, entry, title, description));
+    await database.transaction(
+      (txn) => write(
+        txn,
+        entry,
+        title,
+        description,
+        updateIcon: true,
+        iconPath: iconPath,
+      ),
+    );
   }
 
   static Future<void> write(
     DatabaseExecutor txn,
     MiniappEntry entry,
     String title,
-    String description,
-  ) async {
+    String description, {
+    bool updateIcon = false,
+    String? iconPath,
+  }) async {
     title = title.trim();
     description = description.trim();
     if (title.isEmpty ||
@@ -79,6 +100,7 @@ class MiniappMetadataStore {
       'title': title,
       'description': description,
       'revision': revision + 1,
+      if (updateIcon) 'icon_path': iconPath,
     };
     if (rows.isEmpty) {
       await txn.insert('miniapp_metadata', {

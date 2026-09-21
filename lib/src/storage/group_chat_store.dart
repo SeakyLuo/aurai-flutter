@@ -60,6 +60,17 @@ class GroupChatStore {
     return result;
   }
 
+  Future<int> contactCount(String query, {required bool archived}) async {
+    final rows = await database.query(
+      'ai_profiles',
+      columns: ['COUNT(*) AS count'],
+      where:
+          'sender_id IN (SELECT friend_id FROM contact_friendships WHERE owner_id = ?) AND sender_id IN (SELECT id FROM message_senders WHERE archived = ? AND instr(lower(name), ?) > 0)',
+      whereArgs: ['user:local', archived ? 1 : 0, query.toLowerCase()],
+    );
+    return rows.single['count'] as int;
+  }
+
   Future<List<AiProfile>> contacts(
     String query, {
     required bool archived,

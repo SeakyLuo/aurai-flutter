@@ -298,7 +298,8 @@ class _HtmlGameViewState extends State<HtmlGameView>
     final session = _session!;
     var changed = _surfaceReady != session.ready;
     _surfaceReady = session.ready;
-    if (session.contentHeight != null) {
+    // Keep the saved dimensions while the document and its state are loading.
+    if (session.ready && session.contentHeight != null) {
       if (_contentHeight == null ||
           (session.contentHeight! - _contentHeight!).abs() >= 2) {
         _contentHeight = session.contentHeight;

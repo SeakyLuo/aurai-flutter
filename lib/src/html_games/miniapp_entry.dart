@@ -8,6 +8,7 @@ class MiniappEntry {
     required this.title,
     required this.publisher,
     this.publisherProfile,
+    this.iconPath,
     this.description = '',
     this.publishedTitle,
     this.asset,
@@ -23,6 +24,7 @@ class MiniappEntry {
   });
   final String id, title, publisher, description;
   final MessageSender? publisherProfile;
+  final String? iconPath;
   final String? asset,
       bundleVersion,
       sourceId,
@@ -37,25 +39,31 @@ class MiniappEntry {
       bundled ||
       (kind == MiniappKind.published && publisherProfile?.id == 'user:local');
 
-  MiniappEntry withMetadata(String name, String summary, int revision) =>
-      MiniappEntry(
-        id: id,
-        title: name,
-        description: summary,
-        publisher: publisher,
-        publisherProfile: publisherProfile,
-        publishedTitle: name,
-        asset: asset,
-        bundleVersion: bundleVersion,
-        updatedAt: updatedAt,
-        kind: kind,
-        sourceId: sourceId,
-        installedId: installedId,
-        installedRevision: installedRevision,
-        revision: this.revision,
-        metadataRevision: revision,
-        listed: listed,
-      );
+  MiniappEntry withMetadata(
+    String name,
+    String summary,
+    int revision, {
+    String? iconPath,
+    bool replaceIcon = false,
+  }) => MiniappEntry(
+    id: id,
+    title: name,
+    description: summary,
+    publisher: publisher,
+    publisherProfile: publisherProfile,
+    iconPath: replaceIcon ? iconPath : this.iconPath,
+    publishedTitle: name,
+    asset: asset,
+    bundleVersion: bundleVersion,
+    updatedAt: updatedAt,
+    kind: kind,
+    sourceId: sourceId,
+    installedId: installedId,
+    installedRevision: installedRevision,
+    revision: this.revision,
+    metadataRevision: revision,
+    listed: listed,
+  );
   final bool listed;
   bool get bundled => asset != null;
   bool get draft => kind == MiniappKind.draft;

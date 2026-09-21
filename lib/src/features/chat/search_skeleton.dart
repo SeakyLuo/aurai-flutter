@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
 
 class SearchSkeleton extends StatefulWidget {
-  const SearchSkeleton({super.key, this.label = '正在搜索', this.rowGap = 24});
+  const SearchSkeleton({
+    super.key,
+    this.label = '正在搜索',
+    this.rowGap = 24,
+    this.avatarSize = 24,
+    this.contentHeight = 0,
+    this.rowCount = 5,
+  });
   final String label;
   final double rowGap;
+  final double avatarSize, contentHeight;
+  final int rowCount;
   @override
   State<SearchSkeleton> createState() => _SearchSkeletonState();
 }
@@ -63,26 +72,43 @@ class _SearchSkeletonState extends State<SearchSkeleton>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (var i = 0; i < 5; i++)
+              for (var i = 0; i < widget.rowCount; i++)
                 Padding(
                   padding: EdgeInsets.only(bottom: widget.rowGap),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _block(24, 24),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            FractionallySizedBox(
-                              widthFactor: i.isEven ? .7 : .5,
-                              child: _block(double.infinity, 16),
+                      Row(
+                        children: [
+                          _block(
+                            widget.avatarSize,
+                            widget.avatarSize,
+                            radius: widget.avatarSize / 2,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                FractionallySizedBox(
+                                  widthFactor: i.isEven ? .7 : .5,
+                                  child: _block(double.infinity, 16),
+                                ),
+                                const SizedBox(height: 10),
+                                _block(double.infinity, 12),
+                              ],
                             ),
-                            const SizedBox(height: 10),
-                            _block(double.infinity, 12),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
+                      if (widget.contentHeight > 0) ...[
+                        const SizedBox(height: 12),
+                        _block(
+                          double.infinity,
+                          widget.contentHeight,
+                          radius: 18,
+                        ),
+                      ],
                     ],
                   ),
                 ),
