@@ -94,7 +94,7 @@ class _MiniappFavoriteActionState extends State<MiniappFavoriteAction> {
   Widget build(BuildContext context) => Builder(
     builder: (anchor) => SettingsGlassAction(
       label: '更多',
-      icon: Icons.more_horiz_rounded,
+      icon: Icons.more_vert_rounded,
       onPressed: _busy ? null : () => _more(anchor),
     ),
   );

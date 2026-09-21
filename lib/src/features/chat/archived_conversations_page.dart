@@ -1,3 +1,4 @@
+import 'retained_tab_view.dart';
 import 'animated_entry_list.dart';
 import '../../app/glass_notice.dart';
 import 'search_skeleton.dart';
@@ -121,8 +122,12 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
         ),
         onBack: () => Navigator.pop(context),
       ),
-      body: IndexedStack(
+      body: RetainedTabView(
         index: _friends ? 1 : 0,
+        onChanged: (index) => setState(() {
+          _friends = index == 1;
+          _friendsOpened |= _friends;
+        }),
         children: [
           SafeArea(
             top: false,

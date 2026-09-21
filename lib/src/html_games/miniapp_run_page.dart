@@ -121,23 +121,45 @@ class _MiniappRunPageState extends State<MiniappRunPage>
       if (!didPop) unawaited(_leave());
     },
     child: Scaffold(
-      appBar: SettingsAppBar(
-        title: widget.game.title,
-        onBack: _leave,
-        actions: [
-          MiniappFavoriteAction(appId: widget.game.appId, store: widget.store),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: ListenableBuilder(
-          listenable: _session!,
-          builder: (context, _) => HtmlGameSurface(
-            session: _session!,
-            borderRadius: BorderRadius.zero,
-            loadingBackground: Theme.of(context).scaffoldBackgroundColor,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          ListenableBuilder(
+            listenable: _session!,
+            builder: (context, _) => HtmlGameSurface(
+              session: _session!,
+              borderRadius: BorderRadius.zero,
+              loadingBackground: Theme.of(context).scaffoldBackgroundColor,
+            ),
           ),
-        ),
+          Positioned(
+            top: MediaQuery.paddingOf(context).top,
+            left: 0,
+            width: 64,
+            height: 76,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 16),
+              child: Center(
+                child: SettingsGlassAction(
+                  label: '返回',
+                  icon: Icons.arrow_back_rounded,
+                  onPressed: _leave,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.paddingOf(context).top,
+            right: 16,
+            height: 76,
+            child: Center(
+              child: MiniappFavoriteAction(
+                appId: widget.game.appId,
+                store: widget.store,
+              ),
+            ),
+          ),
+        ],
       ),
     ),
   );

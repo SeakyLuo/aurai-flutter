@@ -1,3 +1,4 @@
+import 'retained_tab_view.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/message_sender.dart';
 import 'ai_contact_page.dart';
@@ -244,8 +245,9 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
             ),
             const SizedBox(height: 8),
             Expanded(
-              child: IndexedStack(
+              child: RetainedTabView(
                 index: _type.index,
+                onChanged: (index) => _select(GroupSearchType.values[index]),
                 children: [
                   for (final type in GroupSearchType.values)
                     TickerMode(

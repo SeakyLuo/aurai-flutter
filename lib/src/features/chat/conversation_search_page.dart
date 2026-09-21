@@ -1,3 +1,4 @@
+import 'retained_tab_view.dart';
 import '../../app/glass_notice.dart';
 import 'search_filter_menu.dart';
 import 'settings_appearance.dart';
@@ -48,6 +49,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
   final _search = TextEditingController();
   final _focus = FocusNode();
   final _scroll = ScrollController();
+  final _filesScroll = ScrollController();
   bool _searchFailed = false;
   final _senders = <String, MessageSender>{};
   final _groups = <String, List<MessageSender>>{};
@@ -107,7 +109,10 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
       _loadingQuery = query;
       _searchFailed = false;
     });
-    if (reset && _submitted && _scroll.hasClients) _scroll.jumpTo(0);
+    if (reset && _submitted) {
+      if (_scroll.hasClients) _scroll.jumpTo(0);
+      if (_filesScroll.hasClients) _filesScroll.jumpTo(0);
+    }
     try {
       final pages = await Future.wait([
         if (query.isNotEmpty && (reset || !filesTab))
@@ -202,6 +207,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
     _search.dispose();
     _focus.dispose();
     _scroll.dispose();
+    _filesScroll.dispose();
     super.dispose();
   }
 
@@ -225,9 +231,10 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
     }
   }
 
-  void _historyNotice(Object error) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text('搜索记录保存或读取失败：${errorMessage(error)}')));
+  void _historyNotice(Object error) =>
+      ScaffoldMessenger.of(context).showGlassSnackBar(
+        SnackBar(content: Text('搜索记录保存或读取失败：${errorMessage(error)}')),
+      );
 
   Future<void> _saveHistory(List<String> values) async {
     setState(() => _history = values);
@@ -297,6 +304,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
       _filesTab = false;
     });
     if (_scroll.hasClients) _scroll.jumpTo(0);
+    if (_filesScroll.hasClients) _filesScroll.jumpTo(0);
     if (_loading && _loadingQuery == query) return;
     if (_query == query && !_searchFailed) return;
     _load(reset: true);
@@ -324,10 +332,6 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
   @override
   Widget build(BuildContext context) {
     final query = _submitted ? _search.text.trim().toLowerCase() : '';
-    final pending = _submitted
-        ? _loading || (!_searchFailed && query != _query)
-        : _loadingRecent;
-    final results = query == _query ? _results : <ConversationSearchResult>[];
     final media = MediaQuery.of(context);
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
@@ -396,7 +400,6 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
                 files: _filesTab,
                 onChanged: (files) {
                   setState(() => _filesTab = files);
-                  if (_scroll.hasClients) _scroll.jumpTo(0);
                 },
               ),
       ),
@@ -521,154 +524,150 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
             children: [
               SizedBox(height: media.padding.top + 64),
               Expanded(
-                child:
-                    query.isNotEmpty &&
-                        _filesTab &&
-                        !pending &&
-                        !_searchFailed &&
-                        _files.isEmpty
-                    ? Padding(
-                        padding: EdgeInsets.only(
-                          bottom:
-                              media.viewInsets.bottom +
-                              media.viewPadding.bottom +
-                              104,
-                        ),
-                        child: Center(
-                          child: Text(
-                            '没有找到相关文件',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: colors.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      )
-                    : PaginationListener(
-                        hasMore:
-                            query.isNotEmpty &&
-                            (_filesTab ? _filesMore : _hasMore),
-                        loadMore: () => _load(),
-                        child: ListView.builder(
-                          controller: _scroll,
-                          keyboardDismissBehavior:
-                              ScrollViewKeyboardDismissBehavior.onDrag,
-                          padding: EdgeInsets.fromLTRB(
-                            _filesTab || query.isEmpty ? 16 : 8,
-                            4,
-                            _filesTab || query.isEmpty ? 16 : 8,
-                            media.viewInsets.bottom +
-                                media.viewPadding.bottom +
-                                104,
-                          ),
-                          itemCount: query.isEmpty
-                              ? 1
-                              : (_filesTab
-                                        ? (query == _query ? _files.length : 0)
-                                        : results.length) +
-                                    1,
-                          itemBuilder: (context, index) {
-                            final empty = query.isEmpty
-                                ? _recentFiles.isEmpty
-                                : (_filesTab
-                                      ? _files.isEmpty
-                                      : results.isEmpty);
-                            if (pending && (query != _query || empty)) {
-                              return index == 0
-                                  ? const SearchSkeleton()
-                                  : const SizedBox.shrink();
-                            }
-                            if (query.isEmpty)
-                              return SearchLandingContent(
-                                files: _recentFiles,
-                                history: _history,
-                                onSearch: (value) {
-                                  _search.text = value;
-                                  _submit();
-                                },
-                                onRemove: (value) => _saveHistory(
-                                  _history
-                                      .where((item) => item != value)
-                                      .toList(),
-                                ),
-                                onClear: () => _saveHistory([]),
-                              );
-                            final count = _filesTab
-                                ? (query == _query ? _files.length : 0)
-                                : results.length;
-                            if (index == count)
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 20,
-                                ),
-                                child: Text(
-                                  pending
-                                      ? '正在搜索…'
-                                      : count == 0 && !_searchFailed
-                                      ? (_filesTab ? '没有找到相关文件' : '没有找到相关会话')
-                                      : '',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: colors.onSurfaceVariant,
-                                  ),
-                                ),
-                              );
-                            if (_filesTab) {
-                              final file = _files[index];
-                              return SearchFileResultTile(
-                                result: file,
-                                title: _highlight(file.fileName),
-                                subtitle: _highlight(
-                                  file.messageExcerpt,
-                                  literal: false,
-                                ),
-                                onTap: () => _openSearchConversation(
-                                  file.conversationId,
-                                  file.messageId,
-                                ),
-                              );
-                            }
-                            final result = results[index];
-                            return SearchResultTile(
-                              plain: true,
-                              avatar: _avatar(result.conversation),
-                              conversation: result.conversation,
-                              title: _highlight(
-                                result.conversation.title,
-                                archived: result.conversation.isArchived,
-                              ),
-                              subtitle: result.snippet.isEmpty
-                                  ? null
-                                  : TextSpan(
-                                      children: [
-                                        if (result.sender != null)
-                                          TextSpan(
-                                            text: '${result.sender!.name}：',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        _highlight(
-                                          result.snippet,
-                                          literal: false,
-                                          archived:
-                                              result.conversation.isArchived,
-                                        ),
-                                      ],
-                                    ),
-                              onTap: () => _openSearchConversation(
-                                result.conversation.id,
-                                result.messageId,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                child: RetainedTabView(
+                  index: query.isEmpty ? 0 : (_filesTab ? 1 : 0),
+                  onChanged: (index) => setState(() => _filesTab = index == 1),
+                  children: [
+                    _resultsPage(false),
+                    if (query.isNotEmpty) _resultsPage(true),
+                  ],
+                ),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _resultsPage(bool filesTab) {
+    final query = _submitted ? _search.text.trim().toLowerCase() : '';
+    final pending = _submitted
+        ? _loading || (!_searchFailed && query != _query)
+        : _loadingRecent;
+    final results = query == _query ? _results : <ConversationSearchResult>[];
+    final media = MediaQuery.of(context);
+    final colors = Theme.of(context).colorScheme;
+    return query.isNotEmpty &&
+            filesTab &&
+            !pending &&
+            !_searchFailed &&
+            _files.isEmpty
+        ? Padding(
+            padding: EdgeInsets.only(
+              bottom: media.viewInsets.bottom + media.viewPadding.bottom + 104,
+            ),
+            child: Center(
+              child: Text(
+                '没有找到相关文件',
+                style: TextStyle(fontSize: 14, color: colors.onSurfaceVariant),
+              ),
+            ),
+          )
+        : PaginationListener(
+            hasMore: query.isNotEmpty && (filesTab ? _filesMore : _hasMore),
+            loadMore: () => _load(),
+            child: ListView.builder(
+              controller: filesTab ? _filesScroll : _scroll,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.fromLTRB(
+                filesTab || query.isEmpty ? 16 : 8,
+                4,
+                filesTab || query.isEmpty ? 16 : 8,
+                media.viewInsets.bottom + media.viewPadding.bottom + 104,
+              ),
+              itemCount: query.isEmpty
+                  ? 1
+                  : (filesTab
+                            ? (query == _query ? _files.length : 0)
+                            : results.length) +
+                        1,
+              itemBuilder: (context, index) {
+                final empty = query.isEmpty
+                    ? _recentFiles.isEmpty
+                    : (filesTab ? _files.isEmpty : results.isEmpty);
+                if (pending && (query != _query || empty)) {
+                  return index == 0
+                      ? const SearchSkeleton()
+                      : const SizedBox.shrink();
+                }
+                if (query.isEmpty)
+                  return SearchLandingContent(
+                    files: _recentFiles,
+                    history: _history,
+                    onSearch: (value) {
+                      _search.text = value;
+                      _submit();
+                    },
+                    onRemove: (value) => _saveHistory(
+                      _history.where((item) => item != value).toList(),
+                    ),
+                    onClear: () => _saveHistory([]),
+                  );
+                final count = filesTab
+                    ? (query == _query ? _files.length : 0)
+                    : results.length;
+                if (index == count)
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
+                      pending
+                          ? '正在搜索…'
+                          : count == 0 && !_searchFailed
+                          ? (filesTab ? '没有找到相关文件' : '没有找到相关会话')
+                          : '',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  );
+                if (filesTab) {
+                  final file = _files[index];
+                  return SearchFileResultTile(
+                    result: file,
+                    title: _highlight(file.fileName),
+                    subtitle: _highlight(file.messageExcerpt, literal: false),
+                    onTap: () => _openSearchConversation(
+                      file.conversationId,
+                      file.messageId,
+                    ),
+                  );
+                }
+                final result = results[index];
+                return SearchResultTile(
+                  plain: true,
+                  avatar: _avatar(result.conversation),
+                  conversation: result.conversation,
+                  title: _highlight(
+                    result.conversation.title,
+                    archived: result.conversation.isArchived,
+                  ),
+                  subtitle: result.snippet.isEmpty
+                      ? null
+                      : TextSpan(
+                          children: [
+                            if (result.sender != null)
+                              TextSpan(
+                                text: '${result.sender!.name}：',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            _highlight(
+                              result.snippet,
+                              literal: false,
+                              archived: result.conversation.isArchived,
+                            ),
+                          ],
+                        ),
+                  onTap: () => _openSearchConversation(
+                    result.conversation.id,
+                    result.messageId,
+                  ),
+                );
+              },
+            ),
+          );
   }
 }
