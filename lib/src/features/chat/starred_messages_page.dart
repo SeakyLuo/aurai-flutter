@@ -1,3 +1,4 @@
+import 'retained_tab_view.dart';
 import 'search_skeleton.dart';
 import '../../html_games/miniapp_favorites_list.dart';
 import 'search_type_segment.dart';
@@ -41,8 +42,12 @@ class _StarredMessagesPageState extends State<StarredMessagesPage> {
       gradientBackground: true,
       onBack: () => Navigator.maybePop(context),
     ),
-    body: IndexedStack(
+    body: RetainedTabView(
       index: _miniapps ? 1 : 0,
+      onChanged: (index) => setState(() {
+        _miniapps = index == 1;
+        _miniappsOpened |= _miniapps;
+      }),
       children: [
         TickerMode(
           enabled: !_miniapps,

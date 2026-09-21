@@ -1,3 +1,4 @@
+import '../features/chat/retained_tab_view.dart';
 import '../domain/error_message.dart';
 import '../features/chat/delete_confirmation_dialog.dart';
 import '../features/chat/dialog_action_button.dart';
@@ -213,8 +214,16 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
                   ),
             onBack: _saving ? null : _leave,
           ),
-          body: IndexedStack(
+          body: RetainedTabView(
             index: _group ? 1 : 0,
+            swipeEnabled: !_saving && !_planning && widget.groupMemories != null,
+            onChanged: (index) {
+              _focus.unfocus();
+              setState(() {
+                _group = index == 1;
+                _groupVisited |= _group;
+              });
+            },
             children: [
               Builder(
                 builder: (context) => SafeArea(

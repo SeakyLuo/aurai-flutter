@@ -4,7 +4,7 @@ import 'dart:ui' as ui;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../domain/agent_models.dart';
-import 'miniapp_icon.dart';
+import 'miniapp_icon_editor.dart';
 
 import 'package:flutter/material.dart';
 
@@ -236,42 +236,12 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
-                  child: Text(
-                    '图标',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
-                  child: Row(
-                    children: [
-                      Semantics(
-                        button: true,
-                        label: '选择小程序图标',
-                        child: GestureDetector(
-                          onTap: _busy ? null : _pickIcon,
-                          child: MiniappIcon(path: _iconPath, size: 64),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      TextButton(
-                        onPressed: _busy ? null : _pickIcon,
-                        child: Text(_iconPath == null ? '选择图片' : '更换图片'),
-                      ),
-                      if (_iconPath != null)
-                        TextButton(
-                          onPressed: _busy
-                              ? null
-                              : () => setState(() => _iconPath = null),
-                          child: const Text('移除'),
-                        ),
-                    ],
-                  ),
+                MiniappIconEditor(
+                  path: _iconPath,
+                  onPick: _busy ? null : _pickIcon,
+                  onRemove: _busy
+                      ? null
+                      : () => setState(() => _iconPath = null),
                 ),
                 _field('名称', _name, 100),
                 _field('简介', _description, 500, multiline: true),
