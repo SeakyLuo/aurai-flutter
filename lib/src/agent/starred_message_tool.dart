@@ -1,3 +1,4 @@
+import '../storage/favorites.dart';
 import 'dart:convert';
 import '../domain/interactive_message.dart';
 import '../domain/tool_models.dart';
@@ -102,18 +103,11 @@ class StarredMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
             card.requireViewer(senderId);
             card.requireViewer(owner);
           }
+          final favorites = Favorites(txn, ownerId: owner);
           if (starred) {
-            await txn.insert('starred_messages', {
-              'owner_id': owner,
-              'message_id': id,
-              'starred_at': DateTime.now().microsecondsSinceEpoch,
-            }, conflictAlgorithm: ConflictAlgorithm.ignore);
+            await favorites.add('message', id);
           } else {
-            await txn.delete(
-              'starred_messages',
-              where: 'owner_id = ? AND message_id = ?',
-              whereArgs: [owner, id],
-            );
+            await favorites.remove('message', id);
           }
         });
         StarredMessages.changes.add((

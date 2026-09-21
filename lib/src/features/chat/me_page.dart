@@ -1,7 +1,7 @@
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
-import '../../skills/skills_page.dart';
+import 'model_settings_sheet.dart';
 import 'starred_messages_page.dart';
 import 'archived_conversations_page.dart';
 import 'chat_controller.dart';
@@ -36,23 +36,19 @@ class MePage extends StatelessWidget {
     }
   }
 
-  Future<void> _skills(BuildContext context) async {
-    try {
-      final store = await controller.aiSkills('user:local');
-      if (!context.mounted) return;
-      await Navigator.push<void>(
+  Future<void> _providers(BuildContext context) async {
+    if (controller.addingImages) {
+      ScaffoldMessenger.of(
         context,
-        MaterialPageRoute(
-          builder: (_) =>
-              SkillsPage(store: store, controller: controller, library: true),
-        ),
-      );
-    } on Object catch (error) {
-      if (context.mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+      ).showGlassSnackBar(const SnackBar(content: Text('正在处理图片，请稍候')));
+      return;
     }
+    await ModelSettingsSheet.show(
+      context,
+      controller: controller,
+      continueAfterSave: false,
+      accountOnly: true,
+    );
   }
 
   @override
@@ -133,9 +129,9 @@ class MePage extends StatelessWidget {
                 ),
                 _entry(
                   context,
-                  '技能库',
-                  const SettingsIcon(type: SettingsIconType.skills),
-                  () => _skills(context),
+                  '模型供应商',
+                  const SettingsIcon(type: SettingsIconType.modelProvider),
+                  () => _providers(context),
                 ),
                 _entry(
                   context,
@@ -151,7 +147,7 @@ class MePage extends StatelessWidget {
                 ),
                 _entry(
                   context,
-                  '已归档会话',
+                  '已归档',
                   ConversationMenuIcon(
                     type: ConversationMenuIconType.archive,
                     color: Theme.of(context).brightness == Brightness.dark

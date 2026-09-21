@@ -1,4 +1,6 @@
-import 'starred_messages.dart';
+import '../html_games/miniapp_metadata_store.dart';
+import 'favorites.dart';
+import '../html_games/miniapp_publication_schema.dart';
 import '../html_games/html_app_store.dart';
 import 'interactive_action_history.dart';
 import 'message_callbacks.dart';
@@ -17,28 +19,13 @@ import 'message_quick_reply_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 38,
+  version: 41,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
-    if (oldVersion == 37) {
-      await db.execute(
-        'ALTER TABLE starred_messages RENAME TO starred_messages_legacy',
-      );
-      await db.execute('DROP INDEX starred_messages_time');
-      await db.execute(starredMessagesSchema);
-      await db.execute(starredMessagesIndex);
-      await db.execute(
-        "INSERT INTO starred_messages(owner_id, message_id, starred_at) SELECT 'user:local', message_id, starred_at FROM starred_messages_legacy",
-      );
-      await db.execute('DROP TABLE starred_messages_legacy');
-    }
-    if (oldVersion < 37) {
-      await db.execute(starredMessagesSchema);
-      await db.execute(starredMessagesIndex);
-    }
+    if (oldVersion < 41) await migrateMiniappMetadata(db);
     if (oldVersion >= 33 && oldVersion < 35) {
       await migrateMultipleQuickReplies(db);
     }
@@ -214,18 +201,21 @@ Future<Database> openConversationDatabase() async => openDatabase(
         "UPDATE html_games SET app_id = message_id, html = '', state_json = '{}'",
       );
     }
+    if (oldVersion < 39) await migrateMiniappPublications(db);
+    if (oldVersion < 40) await migrateFavorites(db);
   },
   onCreate: (db, version) async {
     final batch = db.batch();
     for (final statement in [
       ..._schema,
-      starredMessagesSchema,
-      starredMessagesIndex,
+      ...favoritesSchema,
       ...interactiveActionSchema,
       messageCallbackSchema,
       messageCallbackIndex,
       htmlAppSchema,
       htmlAppIndex,
+      ...miniappPublicationSchema,
+      miniappMetadataSchema,
       ...htmlGameSchema,
       'CREATE INDEX html_games_app ON html_games(app_id)',
       ...groupChatTables,

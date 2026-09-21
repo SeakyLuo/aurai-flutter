@@ -26,6 +26,8 @@ extension GlobalTools on ChatController {
       QuickReplyTool(
         (id, key) => _sendAiQuickReply(conversation, senderId, id, key),
       ),
+      for (final name in HtmlAppPublicationTool.names)
+        HtmlAppPublicationTool(name, MiniappLibraryStore(_store.database), senderId),
       for (final name in HtmlAppDataTool.names)
         HtmlAppDataTool(name, (operation, args) async {
           final apps = HtmlAppStore(_store.database);
@@ -249,7 +251,7 @@ extension GlobalTools on ChatController {
       WebTool('searchWeb', webSources),
       SourceDatesTool(webSources),
       ImageSearchTool(),
-      ImageGenerationTool(_generateImage),
+      ImageGenerationTool(_generateImage, configuration: () => imageGeneration),
       WebTool('readWebPage', webSources),
       if (scheduledTasks.supported)
         for (final operation in ScheduleTaskTool.operations)

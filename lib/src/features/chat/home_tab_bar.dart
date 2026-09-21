@@ -35,7 +35,7 @@ class HomeTabBar extends StatelessWidget {
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: SizedBox(
-                          width: constraints.maxWidth / 3,
+                          width: constraints.maxWidth / 4,
                           height: constraints.maxHeight,
                           child: DecoratedBox(
                             decoration: BoxDecoration(
@@ -53,7 +53,7 @@ class HomeTabBar extends StatelessWidget {
                             : pages.initialPage.toDouble();
                         return Transform.translate(
                           offset: Offset(
-                            page.clamp(0.0, 2.0) * constraints.maxWidth / 3,
+                            page.clamp(0.0, 3.0) * constraints.maxWidth / 4,
                             0,
                           ),
                           child: child,
@@ -83,6 +83,12 @@ class HomeTabBar extends StatelessWidget {
                     _tab(
                       context,
                       2,
+                      '发现',
+                      const SettingsIcon(type: SettingsIconType.discover),
+                    ),
+                    _tab(
+                      context,
+                      3,
                       '我',
                       const SettingsIcon(type: SettingsIconType.personalInfo),
                     ),

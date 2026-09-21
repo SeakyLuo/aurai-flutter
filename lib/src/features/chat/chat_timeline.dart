@@ -285,11 +285,12 @@ List<ChatTimelineEntry> buildChatTimeline(
                     ),
             groupBubble: conversation.kind == ConversationKind.group,
             onQuote:
-                conversation.kind == ConversationKind.group &&
-                    !controller.isStreamingMessage(message.id) &&
+                !controller.isStreamingMessage(message.id) &&
                     (message.text.isNotEmpty ||
                         message.images.isNotEmpty ||
-                        message.files.isNotEmpty)
+                        message.files.isNotEmpty ||
+                        message.interactive != null ||
+                        message.htmlGame != null)
                 ? onQuote
                 : null,
             onOpenQuote: onOpenQuote,

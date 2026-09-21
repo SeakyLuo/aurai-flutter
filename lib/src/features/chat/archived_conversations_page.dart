@@ -1,6 +1,8 @@
 import 'animated_entry_list.dart';
 import '../../app/glass_notice.dart';
-import 'conversation_list_skeleton.dart';
+import 'search_skeleton.dart';
+import 'ai_contacts_page.dart';
+import 'search_type_segment.dart';
 import '../../domain/error_message.dart';
 import 'conversation_preview_text.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +24,8 @@ class ArchivedConversationsPage extends StatefulWidget {
 
 class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
   final _items = <Conversation>[];
+  bool _friends = false;
+  bool _friendsOpened = false;
   bool _loading = true;
   bool _loaded = false;
   bool _failed = false;
@@ -69,115 +73,151 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         gradientBackground: true,
-        title: '已归档会话',
+        title: '已归档',
+        titleWidget: SearchTypeSegment(
+          files: _friends,
+          labels: const ['会话', '朋友'],
+          onChanged: (value) => setState(() {
+            _friends = value;
+            if (value) _friendsOpened = true;
+          }),
+        ),
         onBack: () => Navigator.pop(context),
       ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: !_loaded && _loading
-                ? const ConversationListSkeleton()
-                : AnimatedEntryList(
-                    empty: Center(
-                      child: Text(
-                        '暂无归档会话',
-                        style: TextStyle(color: colors.onSurfaceVariant),
-                      ),
-                    ),
-                    padding: EdgeInsets.fromLTRB(
-                      16,
-                      MediaQuery.paddingOf(context).top + 76 + 16,
-                      16,
-                      16,
-                    ),
-                    children:
-                        List.generate(
-                              _items.length +
-                                  ((_loading || _hasMore || _failed) ? 1 : 0),
-                              (index) {
-                                if (index == _items.length) {
-                                  if (_loading) {
-                                    return const Padding(
-                                      padding: EdgeInsets.all(20),
-                                      child: Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    );
-                                  }
-                                  if (!_hasMore && !_failed)
-                                    return const SizedBox.shrink();
-                                  return Center(
-                                    child: TextButton(
-                                      onPressed: () =>
-                                          _load(reset: _failed && _retryReset),
-                                      child: Text(_failed ? '重试' : '加载更多'),
+      body: IndexedStack(
+        index: _friends ? 1 : 0,
+        children: [
+          SafeArea(
+            top: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: AnimatedEntryList(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    MediaQuery.paddingOf(context).top + 76 + 16,
+                    16,
+                    16,
+                  ),
+                  children: [
+                    if (!_loaded && _loading)
+                      const Padding(
+                        key: ValueKey('loading'),
+                        padding: EdgeInsets.all(8),
+                        child: SearchSkeleton(label: '正在加载会话', rowGap: 32),
+                      )
+                    else if (_items.isEmpty && !_loading && !_failed)
+                      Padding(
+                        key: const ValueKey('empty'),
+                        padding: const EdgeInsets.symmetric(vertical: 40),
+                        child: Center(
+                          child: Text(
+                            '暂无已归档会话',
+                            style: TextStyle(color: colors.onSurfaceVariant),
+                          ),
+                        ),
+                      )
+                    else
+                      ...List.generate(
+                            _items.length +
+                                ((_loading || _hasMore || _failed) ? 1 : 0),
+                            (index) {
+                              if (index == _items.length) {
+                                if (_loading) {
+                                  return const Padding(
+                                    padding: EdgeInsets.all(20),
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
                                     ),
                                   );
                                 }
-                                final conversation = _items[index];
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: ConversationMore(
-                                    controller: widget.controller,
-                                    conversation: conversation,
-                                    onChanged: () => _load(reset: true),
-                                    child: Material(
-                                      color: settingsFieldColor(context),
-                                      borderRadius: BorderRadius.circular(26),
-                                      clipBehavior: Clip.antiAlias,
-                                      child: ListTile(
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 8,
+                                if (!_hasMore && !_failed)
+                                  return const SizedBox.shrink();
+                                return Center(
+                                  child: TextButton(
+                                    onPressed: () =>
+                                        _load(reset: _failed && _retryReset),
+                                    child: Text(_failed ? '重试' : '加载更多'),
+                                  ),
+                                );
+                              }
+                              final conversation = _items[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: ConversationMore(
+                                  controller: widget.controller,
+                                  conversation: conversation,
+                                  onChanged: () => _load(reset: true),
+                                  child: Material(
+                                    color: settingsFieldColor(context),
+                                    borderRadius: BorderRadius.circular(26),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: ListTile(
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 8,
+                                          ),
+                                      leading: ConversationMenuIcon(
+                                        type: ConversationMenuIconType.archive,
+                                        color: colors.onSurfaceVariant,
+                                      ),
+                                      title: Text(
+                                        conversation.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      subtitle:
+                                          conversation.draftPreview != null
+                                          ? ConversationPreviewText(
+                                              conversation: conversation,
+                                            )
+                                          : conversation.preview == null
+                                          ? null
+                                          : ConversationPreviewText(
+                                              conversation: conversation,
+                                              maxLines: 2,
                                             ),
-                                        leading: ConversationMenuIcon(
-                                          type:
-                                              ConversationMenuIconType.archive,
-                                          color: colors.onSurfaceVariant,
-                                        ),
-                                        title: Text(
-                                          conversation.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        subtitle:
-                                            conversation.draftPreview != null
-                                            ? ConversationPreviewText(
-                                                conversation: conversation,
-                                              )
-                                            : conversation.preview == null
-                                            ? null
-                                            : ConversationPreviewText(
-                                                conversation: conversation,
-                                                maxLines: 2,
-                                              ),
-                                        onTap: () => Navigator.pop(
-                                          context,
-                                          conversation.id,
-                                        ),
+                                      onTap: () => Navigator.pop(
+                                        context,
+                                        conversation.id,
                                       ),
                                     ),
                                   ),
-                                );
-                              },
-                            ).indexed
-                            .map(
-                              (entry) => KeyedSubtree(
-                                key: ValueKey(
-                                  entry.$1 == _items.length
-                                      ? 'footer'
-                                      : _items[entry.$1].id,
                                 ),
-                                child: entry.$2,
+                              );
+                            },
+                          ).indexed
+                          .map(
+                            (entry) => KeyedSubtree(
+                              key: ValueKey(
+                                entry.$1 == _items.length
+                                    ? 'footer'
+                                    : _items[entry.$1].id,
                               ),
-                            )
-                            .toList(),
-                  ),
+                              child: entry.$2,
+                            ),
+                          )
+                          .toList(),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
+          if (_friendsOpened)
+            Padding(
+              padding: EdgeInsets.only(
+                top: MediaQuery.paddingOf(context).top + 76,
+              ),
+              child: AiContactsPage(
+                controller: widget.controller,
+                archived: true,
+                embedded: true,
+              ),
+            )
+          else
+            const SizedBox.shrink(),
+        ],
       ),
     );
   }

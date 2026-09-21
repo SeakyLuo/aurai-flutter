@@ -73,11 +73,11 @@ class HtmlAppStore {
         'html_apps',
         columns: [
           'id AS appId',
-          'title',
+          '(COALESCE((SELECT title FROM miniapp_metadata WHERE app_id = html_apps.id), title)) AS title',
           'source_path AS sourcePath',
           'updated_at',
         ],
-        where: 'creator_id = ? AND instr(lower(title), lower(?)) > 0',
+        where: 'creator_id = ? AND instr(lower(COALESCE((SELECT title FROM miniapp_metadata WHERE app_id = html_apps.id), title)), lower(?)) > 0',
         whereArgs: [creator, query],
         orderBy: 'updated_at DESC, id',
         limit: 50,

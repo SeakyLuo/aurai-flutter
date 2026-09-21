@@ -1,3 +1,4 @@
+import 'message_jump_arrow.dart';
 import '../../app/global_ui.dart';
 import 'glass_surface.dart';
 import '../../app/glass_notice.dart';
@@ -398,11 +399,8 @@ class _ChatPageState extends State<ChatPage>
                                       child: ChatViewport(
                                         key: _viewportKey,
                                         entries: timeline,
-                                        showScrollbar:
-                                            controller
-                                                .activeConversation
-                                                .kind ==
-                                            ConversationKind.group,
+                                        showScrollbar: true,
+                                        onScrollToLatest: _scrollToBottom,
                                         bookmark:
                                             _scrollBookmarks[_conversationId],
                                         followOutput: _followOutput,
@@ -469,12 +467,11 @@ class _ChatPageState extends State<ChatPage>
                                 ),
                               ),
                             Positioned(
-                              left: 0,
-                              right: 0,
+                              right: 16,
                               bottom: bottom + 8,
                               child: Center(
                                 child: JumpToBottomButton(
-                                  alignUnreadToRight: true,
+                                  newMessagesOnly: true,
                                   visible:
                                       !_followOutput &&
                                       (_contentBelow ||
@@ -483,7 +480,6 @@ class _ChatPageState extends State<ChatPage>
                                                   .activeConversation
                                                   .searchHasLater)) &&
                                       timeline.isNotEmpty,
-                                  streaming: controller.hasStreamingMessages,
                                   onPressed: _scrollToBottom,
                                 ),
                               ),

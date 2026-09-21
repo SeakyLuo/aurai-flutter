@@ -240,9 +240,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       final until = activity.sleepingUntil!.toLocal();
       final time =
           '${until.hour.toString().padLeft(2, '0')}:${until.minute.toString().padLeft(2, '0')}:${until.second.toString().padLeft(2, '0')}';
-      description = until.isAfter(DateTime.now())
-          ? '睡眠中 · 预计 $time 唤醒'
-          : '睡眠到期 · 等待调度';
+      description = '睡眠中 · 预计 $time 唤醒';
     }
     return Padding(
       key: ValueKey(activity.sender.id),
@@ -303,7 +301,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
           ),
           const SizedBox(width: 8),
           if (activity.autoReplyPaused)
-            _MemberAction(
+            SettingsGlassAction(
               label: _resuming.contains(activity.sender.id) ? '恢复中' : '恢复接话',
               icon: Icons.play_arrow_rounded,
               iconWidget: _resuming.contains(activity.sender.id)
@@ -329,7 +327,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
               activity: activity,
             )
           else if (activity.sleeping && !activity.autoReplyPaused)
-            _MemberAction(
+            SettingsGlassAction(
               label: _waking.contains(activity.sender.id) ? '唤醒中' : '唤醒',
               icon: Icons.play_arrow_rounded,
               iconWidget: _waking.contains(activity.sender.id)
@@ -548,12 +546,10 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
                   ),
                   if (_showJumpToBottom)
                     Positioned(
-                      left: 0,
-                      right: 0,
+                      right: 16,
                       bottom: 8,
                       child: Center(
                         child: JumpToBottomButton(
-                          streaming: false,
                           onPressed: _jumpToBottom,
                         ),
                       ),
@@ -647,19 +643,17 @@ class _MemberAction extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onPressed,
-    this.iconWidget,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback? onPressed;
-  final Widget? iconWidget;
 
   @override
   Widget build(BuildContext context) => IconButton(
     tooltip: label,
     onPressed: onPressed,
-    icon: iconWidget ?? Icon(icon, size: 24),
+    icon: Icon(icon, size: 24),
     color: Theme.of(context).colorScheme.onSurfaceVariant,
     style: IconButton.styleFrom(
       fixedSize: const Size.square(40),

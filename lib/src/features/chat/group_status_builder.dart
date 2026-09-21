@@ -29,12 +29,14 @@ class GroupStatusBuilder extends StatefulWidget {
 class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
   Map<String, MessageSender> _members = {};
   Set<String> _paused = {};
+  Timer? _sleepExpiry;
   bool _loaded = false;
   bool _failed = false;
   late final StreamSubscription<String> _participation;
 
   @override
   void dispose() {
+    _sleepExpiry?.cancel();
     _participation.cancel();
     super.dispose();
   }
@@ -98,7 +100,19 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
         pausedMembers: _paused,
       );
       final active = activities.map((a) => a.sender.id).toSet();
-      final sleeps = widget.controller.groupSleepTimes(widget.conversationId);
+      final now = DateTime.now();
+      final sleeps = {
+        for (final entry
+            in widget.controller.groupSleepTimes(widget.conversationId).entries)
+          if (entry.value.isAfter(now)) entry.key: entry.value,
+      };
+      _sleepExpiry?.cancel();
+      if (sleeps.isNotEmpty) {
+        final nextExpiry = sleeps.values.reduce(
+          (a, b) => a.isBefore(b) ? a : b,
+        );
+        _sleepExpiry = Timer(nextExpiry.difference(now), () => setState(() {}));
+      }
       final bySender = {for (final a in activities) a.sender.id: a};
       return widget.builder(context, [
         if (!widget.includeInactive) ...activities,

@@ -159,6 +159,28 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                     if (!disposed) channel?.invokeMethod("localState", json)
                 }
             }
+
+            @JavascriptInterface fun ai(requestId: Int, json: String) {
+                web.post {
+                    if (disposed) return@post
+                    val owner = lease
+                    fun reply(value: String) {
+                        if (!disposed && owner == lease) web.evaluateJavascript("window.__auraiAiReply?.($requestId,$value)", null)
+                    }
+                    if (json.toByteArray(Charsets.UTF_8).size > 256 * 1024 || channel == null) {
+                        reply("{\"error\":\"AI 请求过大或接口不可用\",\"code\":\"unavailable\"}")
+                        return@post
+                    }
+                    channel?.invokeMethod("ai", mapOf("id" to requestId, "request" to json), object : MethodChannel.Result {
+                        override fun success(result: Any?) = reply(result as String)
+                        override fun error(code: String, message: String?, details: Any?) = reply("{\"error\":\"AI 调用失败\",\"code\":\"request_failed\"}")
+                        override fun notImplemented() = reply("{\"error\":\"当前版本不支持 AI 接口\",\"code\":\"unavailable\"}")
+                    })
+                }
+            }
+            @JavascriptInterface fun cancelAi(requestId: Int) {
+                web.post { if (!disposed) channel?.invokeMethod("cancelAi", requestId) }
+            }
             @JavascriptInterface fun appData(requestId: Int, json: String) {
                 web.post {
                     if (disposed) return@post
@@ -248,6 +270,11 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                             override fun onComplete(requestId: Long) = result.success(null)
                         })
                     }
+                }
+                "aiUpdate" -> {
+                    val update = JSONObject(call.arguments as String)
+                    web.evaluateJavascript("window.__auraiAiUpdate?.(${update.getInt("id")},${JSONObject.quote(update.getString("text"))})", null)
+                    result.success(null)
                 }
                 "flushForm" -> web.evaluateJavascript("window.__auraiFlushForm?.()") { result.success(null) }
                 "snapshot" -> {

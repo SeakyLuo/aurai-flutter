@@ -1,3 +1,4 @@
+import 'favorites.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
@@ -29,7 +30,7 @@ class StarredMessages {
         _pending[database] = null;
         try {
           final rows = await database.rawQuery(
-            "SELECT message_id FROM starred_messages WHERE owner_id = 'user:local' AND message_id IN (SELECT value FROM json_each(?))",
+            "SELECT object_id AS message_id FROM favorites WHERE owner_id = 'user:local' AND object_type = 'message' AND object_id IN (SELECT value FROM json_each(?))",
             [jsonEncode(requests.keys.toList())],
           );
           final ids = rows.map((row) => row['message_id']).toSet();
@@ -55,27 +56,15 @@ class StarredMessages {
   final String ownerId;
   final Database database;
 
-  Future<bool> contains(String messageId) async => (await database.query(
-    'starred_messages',
-    columns: ['message_id'],
-    where: 'owner_id = ? AND message_id = ?',
-    whereArgs: [ownerId, messageId],
-    limit: 1,
-  )).isNotEmpty;
+  Future<bool> contains(String messageId) =>
+      Favorites(database, ownerId: ownerId).contains('message', messageId);
 
   Future<void> set(String messageId, bool starred, {int? starredAt}) async {
+    final store = Favorites(database, ownerId: ownerId);
     if (starred) {
-      await database.insert('starred_messages', {
-        'owner_id': ownerId,
-        'message_id': messageId,
-        'starred_at': starredAt ?? DateTime.now().microsecondsSinceEpoch,
-      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      await store.add('message', messageId, starredAt: starredAt);
     } else {
-      await database.delete(
-        'starred_messages',
-        where: 'owner_id = ? AND message_id = ?',
-        whereArgs: [ownerId, messageId],
-      );
+      await store.remove('message', messageId);
     }
     changes.add((owner: ownerId, message: messageId, starred: starred));
   }
@@ -83,15 +72,15 @@ class StarredMessages {
   Future<int?> removeForUndo(String messageId) async {
     final timestamp = await database.transaction((txn) async {
       final rows = await txn.query(
-        'starred_messages',
+        'favorites',
         columns: ['starred_at'],
-        where: 'owner_id = ? AND message_id = ?',
+        where: "owner_id = ? AND object_type = 'message' AND object_id = ?",
         whereArgs: [ownerId, messageId],
       );
       if (rows.isEmpty) return null;
       await txn.delete(
-        'starred_messages',
-        where: 'owner_id = ? AND message_id = ?',
+        'favorites',
+        where: "owner_id = ? AND object_type = 'message' AND object_id = ?",
         whereArgs: [ownerId, messageId],
       );
       return rows.single['starred_at'] as int;
@@ -106,20 +95,22 @@ class StarredMessages {
     String? viewerId,
   }) async {
     final stars = await database.query(
-      'starred_messages',
-      where: '''owner_id = ? AND EXISTS (SELECT 1 FROM messages
-        WHERE messages.id = starred_messages.message_id
+      'favorites',
+      columns: ['object_id AS message_id', 'starred_at'],
+      where:
+          '''owner_id = ? AND object_type = 'message' AND EXISTS (SELECT 1 FROM messages
+        WHERE messages.id = favorites.object_id
         AND (interactive_json IS NULL
           OR json_extract(interactive_json, '\$.participation.audience') IS NULL
           OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience')
             WHERE value = ?)))
-        ${viewerId == null ? '' : "AND EXISTS (SELECT 1 FROM messages WHERE messages.id = starred_messages.message_id AND conversation_id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL) AND (interactive_json IS NULL OR json_extract(interactive_json, '\$.participation.audience') IS NULL OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = ?)))"}''',
+        ${viewerId == null ? '' : "AND EXISTS (SELECT 1 FROM messages WHERE messages.id = favorites.object_id AND conversation_id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL) AND (interactive_json IS NULL OR json_extract(interactive_json, '\$.participation.audience') IS NULL OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = ?)))"}''',
       whereArgs: [
         ownerId,
         ownerId,
         if (viewerId != null) ...[viewerId, viewerId],
       ],
-      orderBy: 'starred_at DESC, message_id DESC',
+      orderBy: 'starred_at DESC, object_id DESC',
       limit: 50,
       offset: offset,
     );

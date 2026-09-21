@@ -52,7 +52,7 @@ Future<void> changeAiArchive(
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  '保留聊天记录和已有群聊关系，可在已归档朋友中恢复。',
+                  '保留聊天记录和已有群聊关系，可在“我的 → 已归档”中恢复。',
                   style: TextStyle(fontSize: 14),
                 ),
                 const SizedBox(height: 20),

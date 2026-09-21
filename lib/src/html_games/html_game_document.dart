@@ -1,3 +1,4 @@
+import 'html_ai_script.dart';
 import 'package:flutter/material.dart';
 import 'html_message_theme.dart';
 import 'html_message_components.dart';
@@ -33,6 +34,7 @@ $htmlMessageComponentStyles
  window.addEventListener('error',e=>report(e.message||'网页资源加载失败'));
  window.addEventListener('unhandledrejection',e=>report(String(e.reason?.message||e.reason)));
 })();
+$htmlAiScript
 $htmlGameLifecycleScript
 (()=>{
  let snapshot=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('$snapshot'),c=>c.charCodeAt(0))));

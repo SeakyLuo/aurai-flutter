@@ -1,6 +1,5 @@
 import '../../app/glass_notice.dart';
 import 'header_action_menu.dart';
-import '../../scheduling/task_filter_menu.dart';
 import '../../domain/error_message.dart';
 import '../../domain/message_sender.dart';
 import 'home_navigation.dart';
@@ -18,6 +17,8 @@ import 'profile_avatar.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'pagination_listener.dart';
+import 'recent_chats_page.dart';
+import 'sidebar_action_icon.dart';
 
 class AiContactsPage extends StatefulWidget {
   const AiContactsPage({
@@ -25,12 +26,14 @@ class AiContactsPage extends StatefulWidget {
     required this.controller,
     this.archived = false,
     this.root = false,
+    this.embedded = false,
     this.selectForConversation = false,
     this.conversationMode = ConversationMode.normal,
   });
   final ChatController controller;
   final bool archived;
   final bool root;
+  final bool embedded;
   final bool selectForConversation;
   final ConversationMode conversationMode;
   @override
@@ -222,174 +225,159 @@ class _AiContactsPageState extends State<AiContactsPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: SettingsAppBar(
-      title: widget.selectForConversation
-          ? switch (widget.conversationMode) {
-              ConversationMode.normal => '选择朋友',
-              ConversationMode.temporaryPersonalized => '临时个性化 · 选择朋友',
-              ConversationMode.temporaryPlain => '临时非个性化 · 选择朋友',
-            }
-          : _archived
-          ? '已归档朋友'
-          : '通讯录',
-      root: widget.root,
-      onBack: () => Navigator.pop(context),
-      titleWidget: widget.selectForConversation
-          ? null
-          : Builder(
-              builder: (anchor) => GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () async {
-                  final box = anchor.findRenderObject()! as RenderBox;
-                  final selected = await showTaskChoiceMenu(
-                    context,
-                    anchor: box.localToGlobal(Offset.zero) & box.size,
-                    selected: _archived ? 'archived' : 'active',
-                    label: '通讯录',
-                    centerOnAnchor: true,
-                    choices: const [
-                      (value: 'active', label: '通讯录'),
-                      (value: 'archived', label: '已归档朋友'),
-                    ],
-                  );
-                  if (!mounted || selected == null) return;
-                  final archived = selected == 'archived';
-                  if (archived == _archived) return;
-                  _debounce?.cancel();
-                  setState(() => _archived = archived);
-                  _load(reset: true);
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          _archived ? '已归档朋友' : '通讯录',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      const RotatedBox(
-                        quarterTurns: 1,
-                        child: SizedBox.square(
-                          dimension: 18,
-                          child: FittedBox(
-                            child: SettingsIcon(type: SettingsIconType.chevron),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+  Widget build(BuildContext context) => widget.embedded
+      ? _body()
+      : Scaffold(
+          appBar: SettingsAppBar(
+            title: widget.selectForConversation
+                ? switch (widget.conversationMode) {
+                    ConversationMode.normal => '选择朋友',
+                    ConversationMode.temporaryPersonalized => '临时个性化 · 选择朋友',
+                    ConversationMode.temporaryPlain => '临时非个性化 · 选择朋友',
+                  }
+                : _archived
+                ? '已归档朋友'
+                : '通讯录',
+            root: widget.root,
+            onBack: () => Navigator.pop(context),
+            actions: [
+              if (!_archived)
+                SettingsGlassAction(
+                  label: '添加朋友',
+                  icon: Icons.add_rounded,
+                  iconWidget: const SettingsIcon(type: SettingsIconType.add),
+                  onPressed: _create,
+                ),
+            ],
+          ),
+          body: _body(),
+        );
+
+  Widget _body() => Column(
+    children: [
+      Padding(
+        padding: const EdgeInsets.all(16),
+        child: TextField(
+          controller: _search,
+          decoration: InputDecoration(
+            hintText: '搜索朋友',
+            filled: true,
+            fillColor: settingsFieldColor(context),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(26),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          onChanged: (_) {
+            _generation++;
+            _debounce?.cancel();
+            _debounce = Timer(
+              const Duration(milliseconds: 250),
+              () => _load(reset: true),
+            );
+          },
+        ),
+      ),
+      if (!_archived && !widget.selectForConversation)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 6),
+            horizontalTitleGap: 12,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+            ),
+            leading: Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: settingsFieldColor(context),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const SidebarActionIcon(type: SidebarActionIconType.group),
+            ),
+            title: const Text('群聊', style: TextStyle(fontSize: 16)),
+            trailing: const SettingsIcon(type: SettingsIconType.chevron),
+            onTap: () => Navigator.push<void>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RecentChatsPage(
+                  controller: widget.controller,
+                  groupsOnly: true,
                 ),
               ),
             ),
-      actions: [
-        SettingsGlassAction(
-          label: '添加朋友',
-          icon: Icons.add_rounded,
-          iconWidget: const SettingsIcon(type: SettingsIconType.add),
-          onPressed: _create,
-        ),
-      ],
-    ),
-    body: Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: TextField(
-            controller: _search,
-            decoration: InputDecoration(
-              hintText: '搜索朋友',
-              filled: true,
-              fillColor: settingsFieldColor(context),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(26),
-                borderSide: BorderSide.none,
-              ),
-            ),
-            onChanged: (_) {
-              _generation++;
-              _debounce?.cancel();
-              _debounce = Timer(
-                const Duration(milliseconds: 250),
-                () => _load(reset: true),
-              );
-            },
           ),
         ),
-        Expanded(
-          child: _items.isEmpty
-              ? Center(
-                  child: _loading
-                      ? const CircularProgressIndicator()
-                      : Text(
-                          _search.text.isNotEmpty
-                              ? '没有找到朋友'
-                              : _archived
-                              ? '没有已归档朋友'
-                              : '点击右上角，创建你的第一个 AI',
-                        ),
-                )
-              : PaginationListener(
-                  hasMore: _more,
-                  loadMore: _load,
-                  child: ListView.builder(
-                    padding: EdgeInsets.fromLTRB(
-                      12,
-                      0,
-                      12,
-                      MediaQuery.paddingOf(context).bottom + 16,
-                    ),
-                    itemCount: _items.length,
-                    itemBuilder: (context, index) {
-                      final ai = _items[index];
-                      return Builder(
-                        builder: (anchorContext) => ListTile(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 0,
-                          ),
-                          horizontalTitleGap: 12,
-                          leading: ProfileAvatar(
-                            style: AvatarStyle(
-                              icon: ai.sender.avatarIcon,
-                              color: ai.sender.avatarColor,
-                              path: ai.sender.avatarPath,
-                            ),
-                            name: ai.sender.name,
-                            size: 44,
-                          ),
-                          title: Text(
-                            ai.sender.name,
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                          subtitle: ai.description.isEmpty
-                              ? null
-                              : Text(
-                                  ai.description,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                          onTap: () => widget.selectForConversation
-                              ? _startConversation(ai)
-                              : _open(ai.sender.id),
-                          onLongPress: widget.selectForConversation
-                              ? null
-                              : () => _menu(ai, anchorContext),
-                        ),
-                      );
-                    },
+      Expanded(
+        child: _items.isEmpty
+            ? Center(
+                child: _loading
+                    ? const CircularProgressIndicator()
+                    : Text(
+                        _search.text.isNotEmpty
+                            ? '没有找到朋友'
+                            : _archived
+                            ? '没有已归档朋友'
+                            : '点击右上角，创建你的第一个 AI',
+                      ),
+              )
+            : PaginationListener(
+                hasMore: _more,
+                loadMore: _load,
+                child: ListView.builder(
+                  padding: EdgeInsets.fromLTRB(
+                    12,
+                    0,
+                    12,
+                    MediaQuery.paddingOf(context).bottom + 16,
                   ),
+                  itemCount: _items.length,
+                  itemBuilder: (context, index) {
+                    final ai = _items[index];
+                    return Builder(
+                      builder: (anchorContext) => ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 0,
+                        ),
+                        horizontalTitleGap: 12,
+                        leading: ProfileAvatar(
+                          style: AvatarStyle(
+                            icon: ai.sender.avatarIcon,
+                            color: ai.sender.avatarColor,
+                            path: ai.sender.avatarPath,
+                          ),
+                          name: ai.sender.name,
+                          size: 44,
+                        ),
+                        title: Text(
+                          ai.sender.name,
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                        subtitle: ai.description.isEmpty
+                            ? null
+                            : Text(
+                                ai.description,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                        onTap: () => widget.selectForConversation
+                            ? _startConversation(ai)
+                            : _open(ai.sender.id),
+                        onLongPress: widget.selectForConversation
+                            ? null
+                            : () => _menu(ai, anchorContext),
+                      ),
+                    );
+                  },
                 ),
-        ),
-      ],
-    ),
+              ),
+      ),
+    ],
   );
 }

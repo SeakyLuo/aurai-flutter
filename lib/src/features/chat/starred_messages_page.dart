@@ -1,3 +1,5 @@
+import '../../html_games/miniapp_favorites_list.dart';
+import 'search_type_segment.dart';
 import 'animated_entry_list.dart';
 import '../../app/glass_notice.dart';
 import 'remove_favorite.dart';
@@ -14,11 +16,40 @@ import 'settings_appearance.dart';
 class StarredMessagesPage extends StatefulWidget {
   const StarredMessagesPage({super.key, required this.controller});
   final ChatController controller;
+
   @override
   State<StarredMessagesPage> createState() => _StarredMessagesPageState();
 }
 
 class _StarredMessagesPageState extends State<StarredMessagesPage> {
+  bool _miniapps = false;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: SettingsAppBar(
+      title: '收藏',
+      titleWidget: SearchTypeSegment(
+        files: _miniapps,
+        labels: const ['消息', '小程序'],
+        onChanged: (value) => setState(() => _miniapps = value),
+      ),
+      gradientBackground: true,
+      onBack: () => Navigator.maybePop(context),
+    ),
+    body: _miniapps
+        ? MiniappFavoritesList(controller: widget.controller)
+        : _StarredMessageList(controller: widget.controller),
+  );
+}
+
+class _StarredMessageList extends StatefulWidget {
+  const _StarredMessageList({required this.controller});
+  final ChatController controller;
+  @override
+  State<_StarredMessageList> createState() => _StarredMessageListState();
+}
+
+class _StarredMessageListState extends State<_StarredMessageList> {
   final _scroll = ScrollController();
   final _rows = <Map<String, Object?>>[];
   final _messages = <String, GroupMessageSearchResult>{};
@@ -158,81 +189,72 @@ class _StarredMessagesPageState extends State<StarredMessagesPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    extendBodyBehindAppBar: true,
-    appBar: SettingsAppBar(
-      title: '收藏',
-      gradientBackground: true,
-      onBack: () => Navigator.maybePop(context),
-    ),
-    body: AnimatedEntryList(
-      controller: _scroll,
-      empty: Padding(
-        padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 152),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: Text(
-            '还没有收藏\n长按聊天消息即可添加',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+  Widget build(BuildContext context) => AnimatedEntryList(
+    controller: _scroll,
+    empty: Padding(
+      padding: const EdgeInsets.only(top: 40),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Text(
+          '还没有收藏\n长按聊天消息即可添加',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
       ),
-      padding: EdgeInsets.fromLTRB(
-        16,
-        View.of(context).padding.top / View.of(context).devicePixelRatio + 88,
-        16,
-        MediaQuery.paddingOf(context).bottom + 24,
-      ),
-      children:
-          List.generate(
-                _rows.length + ((_loading || _failed || _more) ? 1 : 0),
-                (index) {
-                  if (index == _rows.length) {
-                    if (_loading)
-                      return const Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Center(child: CircularProgressIndicator()),
-                      );
-                    if (_failed)
-                      return Center(
-                        child: TextButton(
-                          onPressed: () => _load(),
-                          child: const Text('重试'),
-                        ),
-                      );
-                    if (_more)
-                      return Center(
-                        child: TextButton(
-                          onPressed: () => _load(),
-                          child: const Text('加载更多'),
-                        ),
-                      );
-                    return const SizedBox.shrink();
-                  }
-                  final row = _rows[index];
-                  return StarredMessageTile(
-                    key: ValueKey(row['id']),
-                    result: _messages[row['id']]!,
-                    conversationId: row['conversation_id'] as String,
-                    conversationTitle: _titles[row['conversation_id']]!,
-                    controller: widget.controller,
-                    onLocate: () => _open(row),
-                    onRemove: () => _remove(row),
-                  );
-                },
-              ).indexed
-              .map(
-                (entry) => KeyedSubtree(
-                  key: ValueKey(
-                    entry.$1 == _rows.length ? 'footer' : _rows[entry.$1]['id'],
-                  ),
-                  child: entry.$2,
-                ),
-              )
-              .toList(),
     ),
+    padding: EdgeInsets.fromLTRB(
+      16,
+      16,
+      16,
+      MediaQuery.paddingOf(context).bottom + 24,
+    ),
+    children:
+        List.generate(_rows.length + ((_loading || _failed || _more) ? 1 : 0), (
+              index,
+            ) {
+              if (index == _rows.length) {
+                if (_loading)
+                  return const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                if (_failed)
+                  return Center(
+                    child: TextButton(
+                      onPressed: () => _load(),
+                      child: const Text('重试'),
+                    ),
+                  );
+                if (_more)
+                  return Center(
+                    child: TextButton(
+                      onPressed: () => _load(),
+                      child: const Text('加载更多'),
+                    ),
+                  );
+                return const SizedBox.shrink();
+              }
+              final row = _rows[index];
+              return StarredMessageTile(
+                key: ValueKey(row['id']),
+                result: _messages[row['id']]!,
+                conversationId: row['conversation_id'] as String,
+                conversationTitle: _titles[row['conversation_id']]!,
+                controller: widget.controller,
+                onLocate: () => _open(row),
+                onRemove: () => _remove(row),
+              );
+            }).indexed
+            .map(
+              (entry) => KeyedSubtree(
+                key: ValueKey(
+                  entry.$1 == _rows.length ? 'footer' : _rows[entry.$1]['id'],
+                ),
+                child: entry.$2,
+              ),
+            )
+            .toList(),
   );
 }

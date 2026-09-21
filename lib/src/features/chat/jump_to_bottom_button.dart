@@ -1,25 +1,20 @@
-import 'dart:math' as math;
 import '../../domain/agent_models.dart';
-
 import 'package:flutter/material.dart';
-
 import 'glass_surface.dart';
-import 'settings_icon.dart';
+import 'message_jump_arrow.dart';
 import '../../app/global_ui.dart';
 import '../../domain/message_sender.dart';
 
 class JumpToBottomButton extends StatelessWidget {
   const JumpToBottomButton({
     super.key,
-    required this.streaming,
     required this.onPressed,
     this.visible = true,
-    this.alignUnreadToRight = false,
+    this.newMessagesOnly = false,
   });
 
-  final bool streaming;
   final bool visible;
-  final bool alignUnreadToRight;
+  final bool newMessagesOnly;
   final VoidCallback onPressed;
 
   @override
@@ -29,78 +24,67 @@ class JumpToBottomButton extends StatelessWidget {
         .notifier!;
     return ValueListenableBuilder<({bool visible, int unread})>(
       valueListenable: visibility,
-      builder: (context, state, child) {
-        final shown = state.unread > 0 || (visible && state.visible);
+      builder: (context, state, _) {
+        final shown =
+            state.unread > 0 || (!newMessagesOnly && visible && state.visible);
         final duration = MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
             : const Duration(milliseconds: 220);
-        final button = IgnorePointer(
+        final color = GlobalUI.taskTimeColor(context);
+        return IgnorePointer(
           ignoring: !shown,
           child: ExcludeSemantics(
             excluding: !shown,
             child: AnimatedOpacity(
               opacity: shown ? 1 : 0,
               duration: duration,
-              curve: Curves.easeOutCubic,
               child: AnimatedSlide(
                 offset: shown ? Offset.zero : const Offset(0, .2),
                 duration: duration,
                 curve: Curves.easeOutCubic,
-                child: AnimatedScale(
-                  scale: shown ? 1 : .9,
-                  duration: duration,
-                  curve: Curves.easeOutCubic,
-                  child: state.unread > 0
-                      ? GlassSurface(
-                          radius: 24,
-                          child: TextButton.icon(
-                            onPressed: onPressed,
-                            style: TextButton.styleFrom(
-                              foregroundColor: GlobalUI.taskTimeColor(context),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 10,
+                child: GlassSurface(
+                  radius: 24,
+                  child: AnimatedSize(
+                    duration: duration,
+                    alignment: Alignment.centerRight,
+                    curve: Curves.easeOutCubic,
+                    child: TextButton(
+                      onPressed: onPressed,
+                      style: TextButton.styleFrom(
+                        foregroundColor: color,
+                        minimumSize: const Size(56, 40),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: Semantics(
+                        label: state.unread > 0
+                            ? '${state.unread}条新消息，回到最新消息'
+                            : '回到底部',
+                        excludeSemantics: true,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            MessageJumpArrow(color: color),
+                            if (state.unread > 0) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                '${state.unread > 9999 ? '9999+' : state.unread}条新消息',
                               ),
-                            ),
-                            icon: SizedBox.square(
-                              dimension: 18,
-                              child: RotatedBox(
-                                quarterTurns: 1,
-                                child: SettingsIcon(
-                                  type: SettingsIconType.chevron,
-                                  color: GlobalUI.taskTimeColor(context),
-                                ),
-                              ),
-                            ),
-                            label: Text('${state.unread}条新消息'),
-                          ),
-                        )
-                      : child,
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
         );
-        if (!alignUnreadToRight) return button;
-        return Align(
-          alignment: state.unread > 0
-              ? Alignment.centerRight
-              : Alignment.center,
-          child: Padding(
-            padding: EdgeInsets.only(right: state.unread > 0 ? 16 : 0),
-            child: button,
-          ),
-        );
       },
-      child: GlassSurface(
-        radius: 28,
-        child: RoundAction(
-          label: '回到底部',
-          onPressed: onPressed,
-          icon: Icons.arrow_downward_rounded,
-          iconWidget: streaming ? const _BouncingDots() : null,
-        ),
-      ),
     );
   }
 }
@@ -206,68 +190,4 @@ class _ScrollAwareJumpStackState extends State<ScrollAwareJumpStack> {
 class _JumpVisibility
     extends InheritedNotifier<ValueNotifier<({bool visible, int unread})>> {
   const _JumpVisibility({required super.notifier, required super.child});
-}
-
-class _BouncingDots extends StatefulWidget {
-  const _BouncingDots();
-
-  @override
-  State<_BouncingDots> createState() => _BouncingDotsState();
-}
-
-class _BouncingDotsState extends State<_BouncingDots>
-    with SingleTickerProviderStateMixin {
-  late final _animation = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1000),
-  );
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _animation.stop();
-      _animation.value = 0;
-    } else {
-      _animation.repeat();
-    }
-  }
-
-  @override
-  void dispose() {
-    _animation.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => ExcludeSemantics(
-    child: RepaintBoundary(
-      child: SizedBox.square(
-        dimension: 25,
-        child: AnimatedBuilder(
-          animation: _animation,
-          builder: (context, _) => Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List.generate(3, (index) {
-              final phase = (_animation.value - index * 0.16) % 1;
-              final lift = phase < 0.5
-                  ? math.sin(phase * math.pi * 2) * 4
-                  : 0.0;
-              return Transform.translate(
-                offset: Offset(0, -lift),
-                child: Container(
-                  width: 4,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-      ),
-    ),
-  );
 }

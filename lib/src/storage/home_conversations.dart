@@ -10,6 +10,8 @@ class HomeConversations {
   HomeConversations(this.store);
   final GroupChatStore store;
   static const pageSize = 50;
+  static const _groupsWhere =
+      "kind = 'group' AND archived = 0 AND $visibleConversation AND $localUserConversation";
 
   Future<List<Conversation>> recent({int offset = 0}) async {
     final rows = await store.database.query(
@@ -18,6 +20,36 @@ class HomeConversations {
       orderBy: 'pinned DESC, updated_at DESC, id DESC',
       limit: pageSize,
       offset: offset,
+    );
+    return _headers(rows);
+  }
+
+  Future<int> groupCount() async {
+    final rows = await store.database.query(
+      'conversations',
+      columns: ['COUNT(*) AS count'],
+      where: _groupsWhere,
+    );
+    return rows.single['count'] as int;
+  }
+
+  Future<List<Conversation>> groups({Conversation? after}) async {
+    final rows = await store.database.query(
+      'conversations',
+      where:
+          '$_groupsWhere'
+          "${after == null ? '' : ' AND (pinned < ? OR (pinned = ? AND (updated_at < ? OR (updated_at = ? AND id < ?))))'}",
+      whereArgs: after == null
+          ? null
+          : [
+              after.isPinned ? 1 : 0,
+              after.isPinned ? 1 : 0,
+              after.updatedAt.microsecondsSinceEpoch,
+              after.updatedAt.microsecondsSinceEpoch,
+              after.id,
+            ],
+      orderBy: 'pinned DESC, updated_at DESC, id DESC',
+      limit: pageSize,
     );
     return _headers(rows);
   }
