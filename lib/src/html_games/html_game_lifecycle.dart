@@ -27,6 +27,7 @@ const htmlGameLifecycleScript = r'''
     value.error?pending.reject(new Error(value.error)):pending.resolve(value);
   };
   window.AuraiHTML=Object.freeze({
+    ai:window.__auraiAi,
     get events(){return structuredClone(events)},
     async readEvent(eventId){const result=await appData({operation:'events',eventId});return result.events[0]??null},
     async retryEvent(eventId){

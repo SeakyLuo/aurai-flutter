@@ -1,3 +1,4 @@
+import 'miniapp_favorite_action.dart';
 import '../app/glass_notice.dart';
 import 'html_game_display_cache.dart';
 import '../domain/error_message.dart';
@@ -23,12 +24,14 @@ class HtmlGameView extends StatefulWidget {
     required this.conversationId,
     required this.store,
     this.fullscreen = false,
+    this.backLabel = '返回会话',
   });
   final HtmlGameCard card;
   final String messageId;
   final String conversationId;
   final HtmlGameStore store;
   final bool fullscreen;
+  final String backLabel;
 
   Future<HtmlGameCard> captureForwardPreview() async {
     final view = _HtmlGameViewState._views
@@ -51,6 +54,7 @@ class HtmlGameView extends StatefulWidget {
             conversationId: conversationId,
             store: store,
             fullscreen: true,
+            backLabel: backLabel,
           ),
         ),
       );
@@ -188,10 +192,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
       return;
     }
     // Visible cards start opening during scrolling; _open rechecks visibility after loading.
-    if (!_opening &&
-        !_failed &&
-        _closing == null &&
-        Platform.isAndroid) {
+    if (!_opening && !_failed && _closing == null && Platform.isAndroid) {
       unawaited(_open());
     }
   }
@@ -439,11 +440,20 @@ class _HtmlGameViewState extends State<HtmlGameView>
                     ? TextButton(onPressed: _open, child: const Text('重试'))
                     : const CircularProgressIndicator(strokeWidth: 2),
               ),
+            if (_session != null)
+              Positioned(
+                top: 12,
+                right: 16,
+                child: MiniappFavoriteAction(
+                  appId: _session!.game.appId,
+                  store: widget.store,
+                ),
+              ),
             Positioned(
               top: 12,
               left: 16,
               child: SettingsGlassAction(
-                label: '返回会话',
+                label: widget.backLabel,
                 icon: Icons.arrow_back_ios_new_rounded,
                 onPressed: _leaveFullscreen,
               ),
@@ -524,9 +534,16 @@ class _HtmlGameViewState extends State<HtmlGameView>
               _card.width?.toDouble() ?? constraints.maxWidth,
               constraints.maxWidth,
             );
+            // Keep the document at its measured layout width across surfaces.
+            final layoutWidth =
+                (_card.measuredVersion == _card.version
+                    ? _card.measuredWidth
+                    : null) ??
+                (_heightKey?.$5 == _card.version ? _heightKey?.$2 : null) ??
+                width;
             final key = (
               widget.messageId,
-              width,
+              layoutWidth,
               widget.fullscreen,
               MediaQuery.textScalerOf(context).scale(1),
               _card.version,
@@ -545,19 +562,20 @@ class _HtmlGameViewState extends State<HtmlGameView>
                       : null);
               if (_contentHeight == null &&
                   !widget.fullscreen &&
-                  _card.measuredWidth == width &&
+                  _card.measuredWidth == layoutWidth &&
                   _card.measuredScale ==
                       MediaQuery.textScalerOf(context).scale(1) &&
                   _card.measuredVersion == _card.version) {
                 _contentHeight = _card.measuredHeight;
               }
             }
-            final height =
+            final documentHeight =
                 _contentHeight ??
                 (_card.measuredVersion == _card.version
                     ? _card.measuredHeight
                     : null) ??
                 _card.height.toDouble();
+            final height = documentHeight * width / layoutWidth;
             return SizedBox(
               key: _anchor,
               width: math.min(
@@ -572,14 +590,24 @@ class _HtmlGameViewState extends State<HtmlGameView>
                     // Resizing the native surface should not animate its clip.
                     SizedBox(
                       height: height,
-                      child: HtmlGameSurface(
-                        session: _session!,
-                        preview: _preview,
-                        loadingBackground: _card.backgroundMode == 'transparent'
-                            ? Colors.transparent
-                            : Theme.of(context).brightness == Brightness.dark
-                            ? const Color(0xff2a292f)
-                            : const Color(0xffefeff3),
+                      child: FittedBox(
+                        fit: BoxFit.contain,
+                        alignment: Alignment.topLeft,
+                        child: SizedBox(
+                          width: layoutWidth,
+                          height: documentHeight,
+                          child: HtmlGameSurface(
+                            session: _session!,
+                            preview: _preview,
+                            loadingBackground:
+                                _card.backgroundMode == 'transparent'
+                                ? Colors.transparent
+                                : Theme.of(context).brightness ==
+                                      Brightness.dark
+                                ? const Color(0xff2a292f)
+                                : const Color(0xffefeff3),
+                          ),
+                        ),
                       ),
                     )
                   else if (_preview != null && !_failed)

@@ -17,6 +17,8 @@ import '../../storage/quick_reply_recents.dart';
 import '../../agent/quick_reply_tool.dart';
 import '../../agent/starred_message_tool.dart';
 import '../../agent/html_app_data_tool.dart';
+import '../../agent/html_app_publication_tool.dart';
+import '../../html_games/miniapp_library_store.dart';
 import '../../html_games/html_app_store.dart';
 import '../../storage/interactive_callback_result.dart';
 import '../../storage/interactive_callback_state.dart';

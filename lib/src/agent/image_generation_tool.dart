@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:io';
 
 import '../domain/error_message.dart';
+import '../domain/image_generation_config.dart';
 import '../domain/tool_models.dart';
 import '../providers/image_generation_client.dart';
 
 class ImageGenerationTool implements AgentTool, RuntimeCapabilityAgentTool {
-  ImageGenerationTool(this.run);
+  ImageGenerationTool(this.run, {required this.configuration});
+  final ImageGenerationConfig? Function() configuration;
   final Future<Map<String, Object?>> Function(
     Map<String, Object?> arguments,
     ImageGenerationClient client,
@@ -14,18 +16,30 @@ class ImageGenerationTool implements AgentTool, RuntimeCapabilityAgentTool {
   run;
   ImageGenerationClient? _client;
 
+  String get _modelDescription {
+    final selected = configuration();
+    if (selected == null) {
+      return 'No default image model is configured. Ask the user to configure image generation in model settings first. ';
+    }
+    final model = selected.model;
+    return 'Current default image model: ${model.name}. '
+        '${model.supportsReference ? 'Reference image editing is supported.' : 'Text-to-image only; referenceImage must be null.'} '
+        'Supported aspect ratios: ${['auto', ...model.aspectRatios].join(', ')}. ';
+  }
+
   @override
-  ToolDefinition get definition => const ToolDefinition(
+  ToolDefinition get definition => ToolDefinition(
     name: 'generateImage',
     description:
+        _modelDescription +
         'Generate one image, or edit an existing image, using the user-configured image model. '
-        'Saves the generated image locally and returns imagePath and mimeType. This tool does not send messages. '
-        'To send the result, separately call sendConversationMessage or sendGroupMessage with imagePaths containing imagePath. '
-        'Choose whether and where to send based on the task. Use only when an image is requested or helps the task. '
-        'referenceImage accepts a known local image path, HTTP(S) image URL, or image data URL; images may come from any conversation. '
-        'Use readAttachment to obtain a stored image path when necessary. Never invent paths. '
-        'Use null for text-to-image. If configuration is missing, opens image settings without charging; '
-        'wait for the user to configure it. Do not automatically retry failures: the provider may have charged.',
+            'Saves the generated image locally and returns imagePath and mimeType. This tool does not send messages. '
+            'To send the result, separately call sendConversationMessage or sendGroupMessage with imagePaths containing imagePath. '
+            'Choose whether and where to send based on the task. Use only when an image is requested or helps the task. '
+            'referenceImage accepts a known local image path, HTTP(S) image URL, or image data URL; images may come from any conversation. '
+            'Use readAttachment to obtain a stored image path when necessary. Never invent paths. '
+            'Use null for text-to-image. If configuration is missing, opens image settings without charging; '
+            'wait for the user to configure it. Do not automatically retry failures: the provider may have charged.',
     inputSchema: {
       'type': 'object',
       'properties': {

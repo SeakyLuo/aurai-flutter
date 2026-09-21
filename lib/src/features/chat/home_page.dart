@@ -3,6 +3,7 @@ import 'chat_controller.dart';
 import 'recent_chats_page.dart';
 import 'ai_contacts_page.dart';
 import 'me_page.dart';
+import 'discover_page.dart';
 import 'home_tab_bar.dart';
 
 final homeRouteObserver = RouteObserver<PageRoute<dynamic>>();
@@ -34,6 +35,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
     _HomeTabPage(
       child: AiContactsPage(controller: widget.controller, root: true),
     ),
+    _HomeTabPage(child: DiscoverPage(controller: widget.controller)),
     _HomeTabPage(child: MePage(controller: widget.controller)),
   ];
 

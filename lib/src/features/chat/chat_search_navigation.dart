@@ -99,14 +99,16 @@ extension _ChatSearchNavigation on _ChatPageState {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CustomPaint(
-                      size: const Size(18, 18),
-                      painter: _UnreadArrowPainter(
-                        GlobalUI.taskTimeColor(context),
-                      ),
+                    MessageJumpArrow(
+                      color: GlobalUI.taskTimeColor(context),
+                      upward: true,
                     ),
                     const SizedBox(width: 6),
-                    Text(target.count > 0 ? '${target.count}条新消息' : '新消息'),
+                    Text(
+                      target.count > 0
+                          ? '${target.count > 9999 ? '9999+' : target.count}条未读消息'
+                          : '未读消息',
+                    ),
                   ],
                 ),
               ),
@@ -146,34 +148,4 @@ extension _ChatSearchNavigation on _ChatPageState {
     );
     _viewportKey = GlobalKey<ChatViewportState>();
   }
-}
-
-class _UnreadArrowPainter extends CustomPainter {
-  const _UnreadArrowPainter(this.color);
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.scale(size.width / 24, size.height / 24);
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.65
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    canvas.drawPath(
-      Path()
-        ..moveTo(6, 12)
-        ..lineTo(12, 6)
-        ..lineTo(18, 12)
-        ..moveTo(6, 18)
-        ..lineTo(12, 12)
-        ..lineTo(18, 18),
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_UnreadArrowPainter oldDelegate) =>
-      oldDelegate.color != color;
 }

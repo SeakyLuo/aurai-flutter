@@ -34,6 +34,7 @@ class ChatViewport extends StatefulWidget {
     required this.loadEarlierMessages,
     required this.onBookmark,
     this.onUserScroll,
+    this.onScrollToLatest,
     required this.onFollowOutputChanged,
     required this.summaryOwners,
     this.bookmark,
@@ -52,6 +53,7 @@ class ChatViewport extends StatefulWidget {
   final Future<void> Function() loadEarlierMessages;
   final ValueChanged<ChatScrollBookmark> onBookmark;
   final VoidCallback? onUserScroll;
+  final VoidCallback? onScrollToLatest;
   final ValueChanged<bool> onFollowOutputChanged;
   final Map<String, String> summaryOwners;
   final ChatScrollBookmark? bookmark;
@@ -334,6 +336,40 @@ class ChatViewportState extends State<ChatViewport> {
     });
   }
 
+  void _dragScrollbar(double position) {
+    _scrollRevision++;
+    _restoring = false;
+    _userScrolling = true;
+    _following = false;
+    _keepSentMessageAtTop = false;
+    widget.onFollowOutputChanged(false);
+    final index = position.floor().clamp(0, widget.entries.length - 1);
+    final height = _entryHeights[widget.entries[index].id];
+    final withinItem = height == null ? 0.0 : (position - index) * height;
+    _items.jumpTo(
+      index: index,
+      alignment: _listAlignment(
+        index,
+        (widget.padding.top - withinItem) / _height,
+      ),
+    );
+    widget.onUserScroll?.call();
+  }
+
+  void _endScrollbarDrag(bool atEnd) {
+    _userScrolling = false;
+    if (atEnd) {
+      if (widget.onScrollToLatest != null) {
+        widget.onScrollToLatest!();
+      } else {
+        scrollToBottom(interrupt: true);
+        widget.onFollowOutputChanged(true);
+      }
+    } else {
+      _rememberPosition();
+    }
+  }
+
   void _preserveEntry(String id) {
     final revision = ++_scrollRevision;
     _keepSentMessageAtTop = false;
@@ -528,6 +564,8 @@ class ChatViewportState extends State<ChatViewport> {
           positions: _positions.itemPositions,
           itemCount: widget.entries.length + 1,
           padding: widget.padding,
+          onDragTo: _dragScrollbar,
+          onDragEnd: _endScrollbarDrag,
           child: list,
         );
       },

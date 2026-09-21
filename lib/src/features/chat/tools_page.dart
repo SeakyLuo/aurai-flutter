@@ -44,7 +44,7 @@ class _ToolsPageState extends State<ToolsPage> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        title: '工具',
+        title: '工具库',
         gradientBackground: true,
         onBack: () => Navigator.pop(context),
       ),

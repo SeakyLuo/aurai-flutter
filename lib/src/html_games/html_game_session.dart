@@ -1,3 +1,5 @@
+import 'miniapp_library_store.dart';
+import 'html_ai_service.dart';
 import '../storage/html_callback_state.dart';
 import '../storage/message_callbacks.dart';
 import 'html_app_store.dart';
@@ -30,6 +32,7 @@ class HtmlGameSession extends ChangeNotifier {
     this.localState = const [],
     required this.theme,
     this.fullscreen = false,
+    this.independent = false,
   }) {
     _readyTimeout = Timer(const Duration(seconds: 15), () {
       if (!_closed && !ready) {
@@ -62,6 +65,7 @@ class HtmlGameSession extends ChangeNotifier {
   bool _editing = false;
   HtmlGame? _pendingUpdate;
   final bool fullscreen;
+  final bool independent;
   late final Timer _readyTimeout;
   Future<void> _localWrite = Future.value();
   Timer? _captureTimer;
@@ -76,6 +80,7 @@ class HtmlGameSession extends ChangeNotifier {
   late final StreamSubscription<String> _callbackUpdates;
   late final StreamSubscription<String> _appUpdates;
   late final StreamSubscription<String> _interactiveUpdates;
+  final _ai = HtmlAiService();
   MethodChannel? _channel;
   bool _closed = false;
   bool _closing = false;
@@ -188,10 +193,25 @@ class HtmlGameSession extends ChangeNotifier {
         failed = true;
         error = 'HTML 消息运行中断：${call.arguments}';
         notifyListeners();
+      } else if (call.method == 'ai') {
+        if (!_visible) return jsonEncode({'error': '请打开小程序后使用 AI', 'code': 'inactive'});
+        final args = (call.arguments as Map).cast<String, Object?>();
+        final id = args['id'] as int;
+        return jsonEncode(await _ai.invoke(id, args['request'] as String, onText: (text) {
+          if (!_closed && !_closing) {
+            unawaited(channel.invokeMethod<void>('aiUpdate', jsonEncode({'id': id, 'text': text})).catchError((Object _) {}));
+          }
+        }));
+      } else if (call.method == 'cancelAi') {
+        await _ai.cancel(call.arguments as int);
       } else if (call.method == 'appData') {
         try {
           final args = (jsonDecode(call.arguments as String) as Map).cast<String, Object?>();
           if (args['operation'] == 'events' || args['operation'] == 'retryEvent') {
+            if (independent) {
+              if (args['operation'] == 'retryEvent') throw StateError('请从原会话打开小程序后重试');
+              return jsonEncode({'events': <Object?>[]});
+            }
             final eventId = args['eventId'] as String?;
             if (args['operation'] == 'retryEvent') {
               await HtmlCallbackState.retry(store.database, game.messageId, eventId!);
@@ -205,8 +225,8 @@ class HtmlGameSession extends ChangeNotifier {
             throw ArgumentError('不支持的数据操作');
           }
           final result = await HtmlAppStore(store.database).data(
-            game.appId, args['name'] as String, actor: MessageSender.localUser.id,
-            messageId: game.messageId, write: write,
+            game.appId, args['name'] as String, actor: independent ? game.creatorId : MessageSender.localUser.id,
+            messageId: independent ? null : game.messageId, write: write,
             expectedRevision: args['expectedRevision'] as int?, value: args['value']);
           if (write) HtmlGameSignals.appChanges.add(game.appId);
           return jsonEncode(result);
@@ -215,6 +235,11 @@ class HtmlGameSession extends ChangeNotifier {
         }
       } else if (call.method == 'interaction') {
         try {
+          if (independent) {
+            error = '此操作需要从原会话打开小程序';
+            notifyListeners();
+            return jsonEncode({'error': error});
+          }
           return jsonEncode(
             await store.submitInteraction(
               game.conversationId,
@@ -228,6 +253,7 @@ class HtmlGameSession extends ChangeNotifier {
         }
       } else if (call.method == 'event') {
         try {
+          if (independent) throw StateError('此操作需要从原会话打开小程序');
           final args = (jsonDecode(call.arguments as String) as Map)
               .cast<String, Object?>();
           final result = await store.apply(
@@ -256,7 +282,7 @@ class HtmlGameSession extends ChangeNotifier {
 
   Future<void> _sendCallbacks() async {
     try {
-      if (!_pageLoaded || _closed || _closing) return;
+      if (!_pageLoaded || _closed || _closing || independent) return;
       final events = await HtmlCallbackState.read(store.database, game.messageId);
       if (!_closed && !_closing) {
         await _channel?.invokeMethod<void>('callbacks', jsonEncode(events));
@@ -289,7 +315,9 @@ class HtmlGameSession extends ChangeNotifier {
 
   Future<void> _reload() async {
     try {
-      final next = await store.load(game.conversationId, game.messageId);
+      final next = independent
+          ? await MiniappLibraryStore(store.database).loadIndependent(game.appId)
+          : await store.load(game.conversationId, game.messageId);
       if (_closed || _closing || !_isNewer(next)) return;
       if (_editing && next.html != game.html) {
         if (_pendingUpdate == null || next.version > _pendingUpdate!.version)
@@ -308,7 +336,10 @@ class HtmlGameSession extends ChangeNotifier {
   Future<void> setVisible(bool value) async {
     if (_visible == value || _closed || _closing) return;
     _visible = value;
-    if (!value) _captureTimer?.cancel();
+    if (!value) {
+      _captureTimer?.cancel();
+      await _ai.cancelAll();
+    }
     if (ready) await _channel?.invokeMethod<void>('visibility', value);
   }
 
@@ -346,7 +377,7 @@ class HtmlGameSession extends ChangeNotifier {
   }
 
   Future<void> capture() async {
-    if (!ready || !_visible || _closed || _closing || _capturing) return;
+    if (independent || !ready || !_visible || _closed || _closing || _capturing) return;
     _capturing = true;
     final version = game.version;
     try {
@@ -372,21 +403,29 @@ class HtmlGameSession extends ChangeNotifier {
     _closing = true;
     _readyTimeout.cancel();
     _captureTimer?.cancel();
-    await _channel?.invokeMethod<void>('flushForm');
-    await _localWrite;
-    _closed = true;
-    await _updates.cancel();
-    await _appUpdates.cancel();
-    await _callbackUpdates.cancel();
-    await _interactiveUpdates.cancel();
     try {
-      await _channel
-          ?.invokeMethod<void>('dispose')
-          .timeout(const Duration(seconds: 1));
-    } on Object {
-      /* The platform view may already have been removed. */
+      await _ai.cancelAll();
+      try {
+        await _channel?.invokeMethod<void>('flushForm')
+            .timeout(const Duration(seconds: 2));
+      } finally {
+        await _localWrite;
+      }
+    } finally {
+      _closed = true;
+      await _updates.cancel();
+      await _appUpdates.cancel();
+      await _callbackUpdates.cancel();
+      await _interactiveUpdates.cancel();
+      try {
+        await _channel
+            ?.invokeMethod<void>('dispose')
+            .timeout(const Duration(seconds: 1));
+      } on Object {
+        /* The platform view may already have been removed. */
+      }
+      _channel?.setMethodCallHandler(null);
+      dispose();
     }
-    _channel?.setMethodCallHandler(null);
-    dispose();
   }
 }

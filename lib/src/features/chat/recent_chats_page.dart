@@ -28,8 +28,13 @@ import 'settings_appearance.dart';
 import 'sidebar_action_icon.dart';
 
 class RecentChatsPage extends StatefulWidget {
-  const RecentChatsPage({super.key, required this.controller});
+  const RecentChatsPage({
+    super.key,
+    required this.controller,
+    this.groupsOnly = false,
+  });
   final ChatController controller;
+  final bool groupsOnly;
   @override
   State<RecentChatsPage> createState() => RecentChatsPageState();
 }
@@ -39,6 +44,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
   final _senders = <String, MessageSender>{};
   final _groups = <String, List<MessageSender>>{};
   Timer? _updates;
+  int _groupCount = 0;
   bool _loading = false, _more = true, _loaded = false;
   @override
   void initState() {
@@ -73,7 +79,18 @@ class RecentChatsPageState extends State<RecentChatsPage> {
     setState(() => _loading = true);
     try {
       final reader = HomeConversations(widget.controller.groupStore);
-      final page = await reader.recent(offset: reset ? 0 : _items.length);
+      late final List<Conversation> page;
+      var groupCount = _groupCount;
+      if (widget.groupsOnly) {
+        final results = await Future.wait<Object>([
+          reader.groups(after: reset || _items.isEmpty ? null : _items.last),
+          reader.groupCount(),
+        ]);
+        page = results[0] as List<Conversation>;
+        groupCount = results[1] as int;
+      } else {
+        page = await reader.recent(offset: reset ? 0 : _items.length);
+      }
       final avatars = await Future.wait<Object>([
         reader.senders(page),
         widget.controller.groupStore.avatarMembers(
@@ -90,18 +107,23 @@ class RecentChatsPageState extends State<RecentChatsPage> {
           _senders.clear();
           _groups.clear();
         }
-        _items.addAll(page);
+        final existing = _items.map((item) => item.id).toSet();
+        _items.addAll(page.where((item) => !existing.contains(item.id)));
         _senders.addAll(avatars[0] as Map<String, MessageSender>);
         _groups.addAll(avatars[1] as Map<String, List<MessageSender>>);
         _more = page.length == HomeConversations.pageSize;
         _loaded = true;
+        _groupCount = groupCount;
       });
     } on Object catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(
             content: Text('会话加载失败：${errorMessage(error)}'),
-            action: SnackBarAction(label: '重试', onPressed: reload),
+            action: SnackBarAction(
+              label: '重试',
+              onPressed: () => _load(reset: reset),
+            ),
           ),
         );
     } finally {
@@ -165,83 +187,104 @@ class RecentChatsPageState extends State<RecentChatsPage> {
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
-      title: '会话',
+      title: widget.groupsOnly ? '群聊' : '会话',
       gradientBackground: true,
-      onBack: null,
-      root: true,
-      leadingAction: SettingsGlassAction(
-        label: '搜索会话',
-        icon: Icons.search_rounded,
-        iconWidget: const SidebarActionIcon(type: SidebarActionIconType.search),
-        onPressed: () => Navigator.push<void>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ConversationSearchPage(
-              controller: widget.controller,
-              preparingGoal: () => false,
+      onBack: widget.groupsOnly ? () => Navigator.pop(context) : null,
+      root: !widget.groupsOnly,
+      leadingAction: widget.groupsOnly
+          ? null
+          : SettingsGlassAction(
+              label: '搜索会话',
+              icon: Icons.search_rounded,
+              iconWidget: const SidebarActionIcon(
+                type: SidebarActionIconType.search,
+              ),
+              onPressed: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ConversationSearchPage(
+                    controller: widget.controller,
+                    preparingGoal: () => false,
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-      ),
       actions: [
-        Builder(
-          builder: (buttonContext) => SettingsGlassAction(
-            label: '添加',
-            icon: Icons.add_rounded,
-            iconWidget: const SidebarActionIcon(
-              type: SidebarActionIconType.add,
+        if (!widget.groupsOnly)
+          Builder(
+            builder: (buttonContext) => SettingsGlassAction(
+              label: '添加',
+              icon: Icons.add_rounded,
+              iconWidget: const SidebarActionIcon(
+                type: SidebarActionIconType.add,
+              ),
+              onPressed: () async {
+                final iconColor =
+                    Theme.of(buttonContext).brightness == Brightness.dark
+                    ? Theme.of(buttonContext).colorScheme.onSurfaceVariant
+                    : const Color(0xff222222);
+                final action = await showHeaderActionMenu(
+                  buttonContext,
+                  items: [
+                    (
+                      value: 'conversation',
+                      label: '发起会话',
+                      icon: ConversationIcon(color: iconColor),
+                    ),
+                    (
+                      value: 'temporary',
+                      label: '发起临时会话',
+                      icon: ConversationIcon(temporary: true, color: iconColor),
+                    ),
+                    (
+                      value: 'group',
+                      label: '发起群聊',
+                      icon: SidebarActionIcon(
+                        type: SidebarActionIconType.group,
+                        color: iconColor,
+                      ),
+                    ),
+                    (
+                      value: 'tasks',
+                      label: '定时任务',
+                      icon: SettingsIcon(
+                        type: SettingsIconType.tasks,
+                        color: iconColor,
+                      ),
+                    ),
+                  ],
+                );
+                if (!mounted) return;
+                if (action == 'conversation') {
+                  await _newConversation();
+                } else if (action == 'temporary') {
+                  await _temporaryConversation();
+                } else if (action == 'group') {
+                  await _group();
+                } else if (action == 'tasks') {
+                  await openScheduledTasks(context, widget.controller);
+                }
+              },
             ),
-            onPressed: () async {
-              final iconColor =
-                  Theme.of(buttonContext).brightness == Brightness.dark
-                  ? Theme.of(buttonContext).colorScheme.onSurfaceVariant
-                  : const Color(0xff222222);
-              final action = await showHeaderActionMenu(
-                buttonContext,
-                items: [
-                  (
-                    value: 'conversation',
-                    label: '发起会话',
-                    icon: ConversationIcon(color: iconColor),
-                  ),
-                  (
-                    value: 'temporary',
-                    label: '发起临时会话',
-                    icon: ConversationIcon(temporary: true, color: iconColor),
-                  ),
-                  (
-                    value: 'group',
-                    label: '发起群聊',
-                    icon: SidebarActionIcon(
-                      type: SidebarActionIconType.group,
-                      color: iconColor,
-                    ),
-                  ),
-                  (
-                    value: 'tasks',
-                    label: '定时任务',
-                    icon: SettingsIcon(
-                      type: SettingsIconType.tasks,
-                      color: iconColor,
-                    ),
-                  ),
-                ],
-              );
-              if (!mounted) return;
-              if (action == 'conversation') {
-                await _newConversation();
-              } else if (action == 'temporary') {
-                await _temporaryConversation();
-              } else if (action == 'group') {
-                await _group();
-              } else if (action == 'tasks') {
-                await openScheduledTasks(context, widget.controller);
-              }
-            },
           ),
-        ),
       ],
     ),
+    bottomNavigationBar: widget.groupsOnly && _loaded
+        ? SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Text(
+                '共 $_groupCount 个群聊',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          )
+        : null,
     body: !_loaded
         ? Center(
             child: _loading
@@ -258,38 +301,42 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                 12,
                 MediaQuery.paddingOf(context).bottom + 24,
               ),
-              empty: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  12,
-                  MediaQuery.paddingOf(context).top + 84,
-                  12,
-                  0,
-                ),
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: _roundedTile(
-                    ListTile(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+              empty: widget.groupsOnly
+                  ? const Center(child: Text('暂无群聊'))
+                  : Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        12,
+                        MediaQuery.paddingOf(context).top + 84,
+                        12,
+                        0,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 0,
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: _roundedTile(
+                          ListTile(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 0,
+                            ),
+                            horizontalTitleGap: 12,
+                            leading: const ProfileAvatar(
+                              style: AvatarStyle(icon: 'app_logo'),
+                              name: 'Aurai',
+                              size: 48,
+                            ),
+                            title: const Text('开始新会话'),
+                            subtitle: const Text('选择一个 AI 开始聊天'),
+                            onTap: _newConversation,
+                          ),
+                        ),
                       ),
-                      horizontalTitleGap: 12,
-                      leading: const ProfileAvatar(
-                        style: AvatarStyle(icon: 'app_logo'),
-                        name: 'Aurai',
-                        size: 48,
-                      ),
-                      title: const Text('开始新会话'),
-                      subtitle: const Text('选择一个 AI 开始聊天'),
-                      onTap: _newConversation,
                     ),
-                  ),
-                ),
-              ),
               children: [
+                if (_loading && _items.isEmpty)
+                  const Center(child: CircularProgressIndicator()),
                 for (final item in _items)
                   ConversationMore(
                     key: ValueKey(item.id),
@@ -297,6 +344,11 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                     conversation: item,
                     onChanged: reload,
                     child: _tile(item),
+                  ),
+                if (_loading && _items.isNotEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator()),
                   ),
               ],
             ),
@@ -359,7 +411,12 @@ class RecentChatsPageState extends State<RecentChatsPage> {
         ),
         onTap: () async {
           try {
-            await openHomeConversation(context, widget.controller, item.id);
+            await openHomeConversation(
+              context,
+              widget.controller,
+              item.id,
+              waitForClose: widget.groupsOnly,
+            );
           } on Object catch (error) {
             if (mounted)
               ScaffoldMessenger.of(context).showGlassSnackBar(

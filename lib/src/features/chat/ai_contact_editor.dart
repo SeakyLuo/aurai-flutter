@@ -120,8 +120,9 @@ class _AiContactEditorState extends State<AiContactEditor> {
     super.dispose();
   }
 
-  void _notice(String text) =>
-      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text) => ScaffoldMessenger.of(
+    context,
+  ).showGlassSnackBar(SnackBar(content: Text(text)));
   Future<void> _avatarSource(AvatarSource source) async {
     try {
       if (source == AvatarSource.custom) {
@@ -254,7 +255,9 @@ class _AiContactEditorState extends State<AiContactEditor> {
       if (!didPop && !_saving) _leave();
     },
     child: Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
+        gradientBackground: true,
         title: widget.profile == null ? '新建朋友' : '个人资料',
         onBack: () => Navigator.maybePop(context),
         actions: [
@@ -303,7 +306,14 @@ class _AiContactEditorState extends State<AiContactEditor> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          View.of(context).padding.top / View.of(context).devicePixelRatio +
+              76 +
+              12,
+          16,
+          32,
+        ),
         children: [
           Center(
             child: ProfileAvatarEditor(

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'wrench_painter.dart';
 
 enum SettingsIconType {
+  discover,
+  miniapps,
   star,
   starFilled,
   tools,
@@ -66,6 +68,34 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.discover:
+        canvas.drawCircle(const Offset(12, 12), 9, pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(15.8, 8.2)
+            ..lineTo(13.5, 13.5)
+            ..lineTo(8.2, 15.8)
+            ..lineTo(10.5, 10.5)
+            ..close(),
+          pen,
+        );
+        break;
+      case SettingsIconType.miniapps:
+        for (final offset in [
+          const Offset(4, 4),
+          const Offset(14, 4),
+          const Offset(4, 14),
+          const Offset(14, 14),
+        ]) {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              offset & const Size(6, 6),
+              const Radius.circular(2),
+            ),
+            pen,
+          );
+        }
+        break;
       case SettingsIconType.drag:
         canvas.drawLine(const Offset(5, 9), const Offset(19, 9), pen);
         canvas.drawLine(const Offset(5, 15), const Offset(19, 15), pen);

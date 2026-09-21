@@ -1,3 +1,4 @@
+import 'message_swipe_quote.dart';
 import '../../app/glass_notice.dart';
 import 'remove_favorite.dart';
 import '../../storage/starred_messages.dart';
@@ -134,7 +135,25 @@ class _MessageItemState extends State<MessageItem> {
   Widget build(BuildContext context) =>
       message.interactive?.canView('user:local') == false
       ? const SizedBox.shrink()
-      : ImageMessageScope(messageId: message.id, child: _buildMessage(context));
+      : ImageMessageScope(
+          messageId: message.id,
+          child:
+              widget.onQuote != null &&
+                  !widget.readOnly &&
+                  !widget.streaming &&
+                  !message.isReasoning &&
+                  message.htmlGame == null
+              ? MessageSwipeQuote(
+                  belowAvatar:
+                      widget.groupBubble &&
+                      message.role == AgentMessageRole.assistant &&
+                      message.sender != null &&
+                      message.interactive?.systemPresentation != true,
+                  onQuote: () => widget.onQuote!(message),
+                  child: _buildMessage(context),
+                )
+              : _buildMessage(context),
+        );
 
   Widget _buildMessage(BuildContext context) =>
       message.role == AgentMessageRole.user

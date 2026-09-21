@@ -3,13 +3,11 @@ import '../../app/language_settings.dart';
 import 'default_models_page.dart';
 import '../../domain/error_message.dart';
 import 'data_management_page.dart';
-import 'tools_page.dart';
 import 'package:flutter/material.dart';
 
 import '../../providers/model_catalog.dart';
 import 'capability_page.dart';
 import 'chat_controller.dart';
-import 'model_settings_sheet.dart';
 import 'settings_icon.dart';
 import 'settings_appearance.dart';
 import 'choice_sheet.dart';
@@ -26,21 +24,6 @@ class SettingsPage extends StatelessWidget {
   final bool root;
   final ChatController controller;
   final bool Function() preparingGoal;
-
-  Future<void> _openModel(BuildContext context) async {
-    if (controller.addingImages) {
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(const SnackBar(content: Text('正在处理图片，请稍候')));
-      return;
-    }
-    await ModelSettingsSheet.show(
-      context,
-      controller: controller,
-      continueAfterSave: false,
-      accountOnly: true,
-    );
-  }
 
   Future<void> _chooseLanguage(BuildContext context) async {
     final settings = LanguageSettings.instance;
@@ -167,25 +150,6 @@ class SettingsPage extends StatelessWidget {
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
                       leading: const SettingsIcon(
-                        type: SettingsIconType.modelProvider,
-                      ),
-                      title: const Text('模型供应商'),
-                      subtitle: Text(
-                        '已配置 ${controller.modelSettings.profiles.values.where((profile) => profile.isConfigured).length} 个供应商',
-                      ),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: () => _openModel(context),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      leading: const SettingsIcon(
                         type: SettingsIconType.modelSettings,
                       ),
                       title: const Text('模型设置'),
@@ -209,27 +173,6 @@ class SettingsPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      leading: const SettingsIcon(type: SettingsIconType.tools),
-                      title: const Text('工具'),
-                      subtitle: const Text('查看工具与管理授权'),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => ToolsPage(controller: controller),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
                   Material(
                     color: settingsFieldColor(context),
                     borderRadius: BorderRadius.circular(26),
