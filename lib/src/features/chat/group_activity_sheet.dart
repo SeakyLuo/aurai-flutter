@@ -477,18 +477,6 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final status = widget.sleepReason != null
-        ? (widget.controller.groupSleepTimes(
-                    widget.conversationId,
-                  )[_activity.sender.id] ==
-                  _activity.sleepingUntil
-              ? '睡眠中'
-              : '本次睡眠已结束')
-        : _running
-        ? _activity.description
-        : _activity.stopping
-        ? '已终止'
-        : '本次思考已结束';
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * .8,
       child: SafeArea(
@@ -525,23 +513,6 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
                     )
                   : null,
             ),
-            if (status != '睡眠中' &&
-                (status != '正在思考' || _activity.thinkingHidden))
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: ThinkingIndicator(
-                    label: status,
-                    fontSize: 13,
-                    singleLine: true,
-                    animate:
-                        _running &&
-                        !_activity.stopping &&
-                        !_activity.waitingForUser,
-                  ),
-                ),
-              ),
             Expanded(
               child: ScrollAwareJumpStack(
                 fit: StackFit.expand,
@@ -642,7 +613,7 @@ class _StopMemberButtonState extends State<_StopMemberButton> {
   Widget build(BuildContext context) {
     final stopping = _busy || (widget.activity.stopping && !_retry);
     final colors = Theme.of(context).colorScheme;
-    return _MemberAction(
+    return SettingsGlassAction(
       label: stopping ? '终止中' : '终止思考',
       icon: Icons.stop_rounded,
       onPressed: stopping ? null : _stop,

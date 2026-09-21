@@ -180,6 +180,8 @@ extension GlobalTools on ChatController {
           name,
           (operation, args) => _assistApp(operation, args, senderId),
         ),
+      for (final name in ProviderConfigurationTool.descriptions.keys)
+        ProviderConfigurationTool(name, _configureProvider),
       RecallMessageTool((id) => _recallAiMessage(conversation, senderId, id)),
       if (conversation.usesPersonalization)
         for (final update in [false, true])
@@ -326,7 +328,7 @@ extension GlobalTools on ChatController {
       conversation: conversation,
       senderId: MessageSender.aurai.id,
       messageId: null,
-      providerLabel: config.service.label,
+      providerLabel: config.displayName,
       memory: memory,
       skills: skills,
       documents: AiDocumentScope(_store.database, MessageSender.aurai.id),

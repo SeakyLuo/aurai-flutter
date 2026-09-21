@@ -2,6 +2,7 @@ import '../../app/glass_notice.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../domain/message_quick_reply.dart';
+import '../../domain/quick_reply_option.dart';
 import '../../domain/message_sender.dart';
 import '../../domain/error_message.dart';
 import 'member_avatar.dart';
@@ -15,7 +16,7 @@ class QuickReplyChips extends StatelessWidget {
   });
   final List<MessageQuickReply> replies;
   final Database database;
-  final Future<void> Function(String, String)? onTap;
+  final Future<void> Function(String)? onTap;
 
   Future<void> _showPeople(BuildContext context) async {
     try {
@@ -45,7 +46,7 @@ class QuickReplyChips extends StatelessWidget {
               children: [
                 for (final key in replies.map((r) => r.key).toSet()) ...[
                   Text(
-                    '${replies.firstWhere((r) => r.key == key).text} · ${replies.where((r) => r.key == key).length}',
+                    '${quickReplyOptionsByKey[key]!.emoji} · ${replies.where((r) => r.key == key).length}',
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
@@ -90,22 +91,36 @@ class QuickReplyChips extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               child: InkWell(
                 borderRadius: BorderRadius.circular(16),
-                onTap: onTap != null
-                    ? () => onTap!(key, group.first.text)
-                    : null,
+                onTap: onTap != null ? () => onTap!(key) : null,
                 onLongPress: () => _showPeople(context),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  child: Text(
-                    '${group.first.text}${group.length > 1 ? ' ${group.length}' : ''}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: own
-                          ? colors.onPrimaryContainer
-                          : colors.onSurfaceVariant,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 240),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    child: DefaultTextStyle(
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: own
+                            ? colors.onPrimaryContainer
+                            : colors.onSurfaceVariant,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('${quickReplyOptionsByKey[key]!.emoji} | '),
+                          Flexible(
+                            child: Text(
+                              group.first.senderName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (group.length > 1) Text('等 ${group.length} 人'),
+                        ],
+                      ),
                     ),
                   ),
                 ),

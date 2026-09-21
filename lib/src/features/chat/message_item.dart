@@ -82,8 +82,7 @@ class MessageItem extends StatefulWidget {
   final Future<void> Function(AgentMessage)? onRecall;
   final ValueChanged<String>? onOpenQuote;
   final ValueChanged<String>? onOpenMember;
-  final Future<void> Function(AgentMessage message, String key, String text)?
-  onQuickReply;
+  final Future<void> Function(AgentMessage message, String key)? onQuickReply;
   final String? excludedActivityMessageId;
   final bool streaming;
   final bool readOnly;
@@ -667,6 +666,7 @@ class _MessageItemState extends State<MessageItem> {
     }
   }
 
-  void _notice(BuildContext context, String text) =>
-      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(BuildContext context, String text) => ScaffoldMessenger.of(
+    context,
+  ).showGlassSnackBar(SnackBar(content: Text(text)));
 }

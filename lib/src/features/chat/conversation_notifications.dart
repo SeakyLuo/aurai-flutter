@@ -91,7 +91,6 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
   Future<void> _openConversation(String id) async {
     try {
       await openHomeConversation(context, widget.controller, id);
-      await widget.controller.markActiveConversationRead();
     } on Object catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showGlassSnackBar(
@@ -104,7 +103,9 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
   void _onMemoryNotice() {
     final notice = widget.controller.memory.notices.value;
     if (notice == null) return;
-    ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(notice)));
+    ScaffoldMessenger.of(
+      context,
+    ).showGlassSnackBar(SnackBar(content: Text(notice)));
   }
 
   void _onCompleted() {

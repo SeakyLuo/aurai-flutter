@@ -125,7 +125,7 @@ class _AiModelPageState extends State<AiModelPage> {
         children: [
           _label('供应商'),
           _choice(
-            _service.label,
+            widget.controller.modelSettings.profile(_service).displayName,
             _saving || _loading
                 ? null
                 : () async {
@@ -134,8 +134,14 @@ class _AiModelPageState extends State<AiModelPage> {
                       title: '供应商',
                       selected: _service,
                       choices: [
-                        for (final service in ModelService.values)
-                          (value: service, label: service.label),
+                        for (final service
+                            in widget.controller.modelSettings.profiles.keys)
+                          (
+                            value: service,
+                            label: widget.controller.modelSettings
+                                .profile(service)
+                                .displayName,
+                          ),
                       ],
                     );
                     if (!mounted || value == null || value == _service) return;
@@ -178,6 +184,9 @@ class _AiModelPageState extends State<AiModelPage> {
             key: ValueKey((_service, _url.text)),
             config: ModelConfig(
               service: _service,
+              details: widget.controller.modelSettings
+                  .profile(_service)
+                  .details,
               apiKey: widget.controller.modelSettings.profile(_service).apiKey,
               model: _model.text,
               baseUrl: _url.text,
@@ -187,8 +196,9 @@ class _AiModelPageState extends State<AiModelPage> {
       ),
     ),
   );
-  void _notice(String text) =>
-      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text) => ScaffoldMessenger.of(
+    context,
+  ).showGlassSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _selectModel() async {
     if (_loading) return;
@@ -209,14 +219,16 @@ class _AiModelPageState extends State<AiModelPage> {
         profile = widget.controller.modelSettings.profile(_service);
         if (profile.apiKey.isEmpty) return;
       }
-      final models = await catalog.load(
-        baseUrl: Uri.parse(profile.baseUrl),
-        apiKey: profile.apiKey,
-        openRouter: _service == ModelService.openRouter,
-      );
+      final models = profile.autoSyncModels
+          ? await catalog.load(
+              baseUrl: Uri.parse(profile.baseUrl),
+              apiKey: profile.apiKey,
+              openRouter: _service == ModelService.openRouter,
+            )
+          : profile.savedModels;
       if (!mounted) return;
       if (models.isEmpty) {
-        _notice('该供应商没有返回可用模型');
+        _notice('供应商没有返回可用模型');
         return;
       }
       final value = await showChoiceSheet<String>(

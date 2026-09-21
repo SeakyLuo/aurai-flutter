@@ -43,16 +43,6 @@ extension ConversationActions on ChatController {
       if (id == null) {
         await _store.selectNewConversation();
       } else {
-        if (conversation.runState == ChatRunState.idle &&
-            conversation.pendingGoal == null) {
-          conversation.seenRunId = conversation.activeRunId;
-          if (conversation.seenRunId != null) {
-            await _store.writer.markRunRead(
-              conversation.id,
-              conversation.seenRunId!,
-            );
-          }
-        }
         if (conversation.kind == ConversationKind.direct &&
             conversation.messageCount == 0 &&
             !conversation.isTemporary &&

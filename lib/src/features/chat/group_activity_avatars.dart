@@ -263,13 +263,13 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
           child: Semantics(
             label: '自动接话已暂停',
             child: Container(
-              padding: const EdgeInsets.all(1),
+              padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(5),
               ),
               child: const SizedBox.square(
-                dimension: 14,
+                dimension: 16,
                 child: QuestionIcon(type: QuestionIconType.pause),
               ),
             ),

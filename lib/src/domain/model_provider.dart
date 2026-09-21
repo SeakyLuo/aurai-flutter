@@ -1,3 +1,6 @@
+import 'dart:math';
+import 'provider_details.dart';
+export 'provider_details.dart';
 import 'model_defaults.dart';
 export 'model_defaults.dart';
 import 'model_reasoning.dart';
@@ -10,10 +13,47 @@ import 'context_summary.dart';
 import 'capability.dart';
 import 'tool_models.dart';
 
-enum ModelService { openAi, deepSeek, qwen, kimi, glm, openRouter }
+class ModelService {
+  const ModelService._(this.name);
+  final String name;
+  static const openAi = ModelService._('openAi');
+  static const deepSeek = ModelService._('deepSeek');
+  static const qwen = ModelService._('qwen');
+  static const kimi = ModelService._('kimi');
+  static const glm = ModelService._('glm');
+  static const openRouter = ModelService._('openRouter');
+  static const dmxapi = ModelService._('dmxapi');
+  static const values = [openAi, deepSeek, qwen, kimi, glm, openRouter, dmxapi];
+
+  factory ModelService.custom(String label) {
+    if (label.trim().isEmpty || label.length > 60) {
+      throw ArgumentError('供应商名称需为 1–60 字');
+    }
+    return ModelService._('custom:${label.trim()}');
+  }
+  factory ModelService.create() => ModelService._(
+    'provider:${List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16).padLeft(2, "0")).join()}',
+  );
+
+  static ModelService byName(String name) {
+    if (name.startsWith('provider:')) return ModelService._(name);
+    if (name.startsWith('custom:'))
+      return ModelService.custom(name.substring(7));
+    return values.firstWhere((service) => service.name == name);
+  }
+
+  bool get isCustom =>
+      name.startsWith('custom:') || name.startsWith('provider:');
+  @override
+  bool operator ==(Object other) => other is ModelService && other.name == name;
+  @override
+  int get hashCode => name.hashCode;
+}
 
 extension ModelServiceDetails on ModelService {
   bool get usesChatCompletions =>
+      isCustom ||
+      this == ModelService.dmxapi ||
       this == ModelService.openRouter ||
       this == ModelService.qwen ||
       this == ModelService.kimi ||
@@ -25,6 +65,8 @@ extension ModelServiceDetails on ModelService {
     ModelService.kimi => 'Kimi',
     ModelService.glm => 'GLM',
     ModelService.openRouter => 'OpenRouter',
+    ModelService.dmxapi => 'DMXAPI',
+    _ => name.startsWith('custom:') ? name.substring(7) : '自定义供应商',
   };
 
   String get defaultModel => switch (this) {
@@ -34,6 +76,8 @@ extension ModelServiceDetails on ModelService {
     ModelService.kimi => 'kimi-k2.6',
     ModelService.glm => 'glm-4.7',
     ModelService.openRouter => 'openai/gpt-5.6-sol',
+    ModelService.dmxapi => 'gpt-4o-mini',
+    _ => '',
   };
 
   String get defaultBaseUrl => switch (this) {
@@ -43,6 +87,8 @@ extension ModelServiceDetails on ModelService {
     ModelService.kimi => 'https://api.moonshot.cn/v1',
     ModelService.glm => 'https://open.bigmodel.cn/api/paas/v4',
     ModelService.openRouter => 'https://openrouter.ai/api/v1',
+    ModelService.dmxapi => 'https://www.dmxapi.cn/v1',
+    _ => '',
   };
 }
 
@@ -53,6 +99,7 @@ class ModelConfig {
     required this.model,
     required this.baseUrl,
     this.reasoning = ModelReasoning.automatic,
+    this.details,
   });
 
   factory ModelConfig.defaults(ModelService service, {String apiKey = ''}) =>
@@ -68,6 +115,43 @@ class ModelConfig {
   final String model;
   final String baseUrl;
   final ModelReasoning reasoning;
+  final ProviderDetails? details;
+  String get displayName => details?.name ?? service.label;
+  String get website =>
+      details?.website ??
+      switch (service) {
+        ModelService.openAi => 'https://openai.com',
+        ModelService.deepSeek => 'https://www.deepseek.com',
+        ModelService.qwen => 'https://bailian.console.aliyun.com',
+        ModelService.kimi => 'https://platform.moonshot.cn',
+        ModelService.glm => 'https://open.bigmodel.cn',
+        ModelService.openRouter => 'https://openrouter.ai',
+        ModelService.dmxapi => 'https://www.dmxapi.cn',
+        _ => '',
+      };
+  ProviderProtocol get protocol =>
+      details?.protocol ??
+      (service.usesChatCompletions
+          ? ProviderProtocol.openaiChatCompletions
+          : ProviderProtocol.responses);
+  bool get usesChatCompletions =>
+      protocol == ProviderProtocol.openaiChatCompletions;
+  bool get autoSyncModels => details?.autoSyncModels ?? true;
+  List<String> get savedModels => details?.models ?? const [];
+  ModelConfig copyWith({
+    String? apiKey,
+    String? model,
+    String? baseUrl,
+    ModelReasoning? reasoning,
+    ProviderDetails? details,
+  }) => ModelConfig(
+    service: service,
+    apiKey: apiKey ?? this.apiKey,
+    model: model ?? this.model,
+    baseUrl: baseUrl ?? this.baseUrl,
+    reasoning: reasoning ?? this.reasoning,
+    details: details ?? this.details,
+  );
 
   bool get isConfigured => apiKey.isNotEmpty;
 
@@ -77,9 +161,15 @@ class ModelConfig {
     'model': model,
     'baseUrl': baseUrl,
     'reasoning': reasoning.name,
+    if (details != null) 'providerDetails': details!.toJson(),
   };
 
   factory ModelConfig.fromJson(Map<String, Object?> json) => ModelConfig(
+    details: json['providerDetails'] == null
+        ? null
+        : ProviderDetails.fromJson(
+            Map<String, dynamic>.from(json['providerDetails'] as Map),
+          ),
     service: _serviceFromStored(json['service']! as String),
     apiKey: json['apiKey']! as String,
     model: json['model']! as String,
@@ -134,6 +224,7 @@ class ModelSettings {
       model: selection.model,
       baseUrl: account.baseUrl,
       reasoning: account.reasoning,
+      details: account.details,
     );
   }
 
@@ -190,11 +281,12 @@ class ModelSettings {
           : ResponsePreferences.fromJson(
               Map<String, dynamic>.from(json['responsePreferences'] as Map),
             ),
-      activeService: ModelService.values.byName(
-        json['activeService']! as String,
-      ),
+      activeService: ModelService.byName(json['activeService']! as String),
       profiles: <ModelService, ModelConfig>{
-        for (final service in ModelService.values)
+        for (final service in {
+          ...rawProfiles.keys.map(ModelService.byName),
+          ...ModelService.values,
+        })
           service: !rawProfiles.containsKey(service.name)
               ? ModelConfig.defaults(service)
               : ModelConfig.fromJson(
@@ -213,7 +305,8 @@ ModelService _serviceFromStored(String value) => switch (value) {
   'kimi' => ModelService.kimi,
   'glm' => ModelService.glm,
   'openRouter' => ModelService.openRouter,
-  _ => throw FormatException('Unknown model service: $value'),
+  'dmxapi' => ModelService.dmxapi,
+  _ => ModelService.byName(value),
 };
 
 class ModelRequest {

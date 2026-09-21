@@ -33,7 +33,7 @@ extension AppAssistanceActions on ChatController {
       }
       return {
         'provider': model.service.name,
-        'providerName': model.service.label,
+        'providerName': model.displayName,
         'model': model.model,
         'configured': missing.isEmpty,
         'missing': missing,

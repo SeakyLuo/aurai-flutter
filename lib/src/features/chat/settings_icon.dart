@@ -26,6 +26,7 @@ enum SettingsIconType {
   tasks,
   filter,
   sort,
+  drag,
   eye,
   eyeOff,
 }
@@ -65,6 +66,10 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.drag:
+        canvas.drawLine(const Offset(5, 9), const Offset(19, 9), pen);
+        canvas.drawLine(const Offset(5, 15), const Offset(19, 15), pen);
+
       case SettingsIconType.language:
         canvas.drawCircle(const Offset(12, 12), 9, pen);
         canvas.drawOval(const Rect.fromLTWH(8, 3, 8, 18), pen);

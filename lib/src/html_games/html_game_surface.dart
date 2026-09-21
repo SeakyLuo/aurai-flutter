@@ -23,6 +23,7 @@ class HtmlGameSurface extends StatelessWidget {
       children: [
         Positioned.fill(
           child: AndroidView(
+            key: ObjectKey(session),
             viewType: 'aurai/html_game',
             gestureRecognizers: {
               Factory<HtmlGameGestureRecognizer>(

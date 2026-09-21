@@ -170,6 +170,9 @@ class SettingsPage extends StatelessWidget {
                         type: SettingsIconType.modelProvider,
                       ),
                       title: const Text('模型供应商'),
+                      subtitle: Text(
+                        '已配置 ${controller.modelSettings.profiles.values.where((profile) => profile.isConfigured).length} 个供应商',
+                      ),
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,
                       ),
@@ -236,6 +239,9 @@ class SettingsPage extends StatelessWidget {
                         type: SettingsIconType.device,
                       ),
                       title: const Text('设备能力'),
+                      subtitle: Text(
+                        '共 ${CapabilityPage.itemCount(controller)} 项设备能力',
+                      ),
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,
                       ),

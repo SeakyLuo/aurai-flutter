@@ -1,7 +1,57 @@
 part of 'chat_controller.dart';
 
 extension ModelConfigActions on ChatController {
+  Future<void> _serializeModelSettings(Future<void> Function() operation) {
+    final result = _modelSettingsWrite.then((_) => operation());
+    _modelSettingsWrite = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    return result;
+  }
+
+  Future<void> reorderModelProviders(
+    List<ModelService> order,
+  ) => _serializeModelSettings(() async {
+    final next = ModelSettings(
+      activeService: modelSettings.activeService,
+      profiles: {
+        for (final service in order) service: modelSettings.profile(service),
+      },
+      systemPrompt: modelSettings.systemPrompt,
+      customInstructions: modelSettings.customInstructions,
+      responsePreferences: modelSettings.responsePreferences,
+      modelDefaults: modelSettings.modelDefaults,
+    );
+    final encrypted = await _platform.encryptModelSettings(next);
+    await _store.database.rawInsert(
+      'INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+      ['encrypted_model_config', encrypted],
+    );
+    modelSettings = next;
+    _conversationChanged();
+  });
+
   Future<void> saveDefaultModel(
+    ModelPurpose purpose,
+    DefaultModelSelection selection,
+  ) => _serializeModelSettings(() => _saveDefaultModel(purpose, selection));
+
+  Future<void> saveConfig(
+    ModelConfig newConfig, {
+    String? senderId,
+    List<ModelConfig> profiles = const [],
+    required ModelService defaultService,
+  }) => _serializeModelSettings(
+    () => _saveConfig(
+      newConfig,
+      senderId: senderId,
+      profiles: profiles,
+      defaultService: defaultService,
+    ),
+  );
+
+  Future<void> _saveDefaultModel(
     ModelPurpose purpose,
     DefaultModelSelection selection,
   ) async {
@@ -30,12 +80,28 @@ extension ModelConfigActions on ChatController {
     _conversationChanged();
   }
 
-  Future<void> saveConfig(
+  Future<void> _saveConfig(
     ModelConfig newConfig, {
     String? senderId,
     List<ModelConfig> profiles = const [],
     required ModelService defaultService,
   }) async {
+    newConfig = newConfig.copyWith(
+      details:
+          newConfig.details ??
+          modelSettings.profiles[newConfig.service]?.details,
+    );
+    if (newConfig.details != null) {
+      validateProviderDetails(newConfig.details!, newConfig.baseUrl);
+      if (modelSettings.profiles.values.any(
+        (other) =>
+            other.service != newConfig.service &&
+            other.displayName.toLowerCase() ==
+                newConfig.displayName.toLowerCase(),
+      )) {
+        throw ArgumentError('该供应商名称已存在');
+      }
+    }
     final nextSettings = ModelSettings(
       activeService: defaultService,
       profiles: {

@@ -133,8 +133,8 @@ const aiQuickReplyKeys = {
   'party_face',
 };
 
-final quickReplyTexts = {
-  for (final key in aiQuickReplyKeys) key: quickReplyOptionsByKey[key]!.text,
+final quickReplyEmojis = {
+  for (final key in aiQuickReplyKeys) key: quickReplyOptionsByKey[key]!.emoji,
 };
 
 class QuickReplyTool implements AgentTool, RuntimeCapabilityAgentTool {
@@ -153,7 +153,7 @@ class QuickReplyTool implements AgentTool, RuntimeCapabilityAgentTool {
       'type': 'object',
       'properties': {
         'messageId': {'type': 'string'},
-        'key': {'type': 'string', 'enum': quickReplyTexts.keys.toList()},
+        'key': {'type': 'string', 'enum': quickReplyEmojis.keys.toList()},
       },
       'required': ['messageId', 'key'],
       'additionalProperties': false,

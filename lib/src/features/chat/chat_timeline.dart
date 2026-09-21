@@ -27,13 +27,14 @@ List<ChatTimelineEntry> buildChatTimeline(
   ChatController controller, {
   required Future<void> Function(AgentMessage) onEdit,
   String? beforeMessageId,
+  String? highlightedMessageId,
   bool allowEditing = true,
   ValueChanged<AgentMessage>? onQuote,
   ValueChanged<MessageSender>? onMention,
   Future<void> Function(AgentMessage)? onRecall,
   ValueChanged<String>? onOpenQuote,
   ValueChanged<AgentMessage>? onReeditRecalled,
-  Future<void> Function(AgentMessage, String, String)? onQuickReply,
+  Future<void> Function(AgentMessage, String)? onQuickReply,
 }) {
   final conversation = controller.activeConversation;
   final mentionSenders = {
@@ -394,21 +395,20 @@ List<ChatTimelineEntry> buildChatTimeline(
                   child: pagedBody,
                 )
               : pagedBody;
-          if (message.id != conversation.searchMessageId) return item;
+          if (message.id != highlightedMessageId) return item;
           return TweenAnimationBuilder<double>(
             tween: Tween(begin: .28, end: 0),
             duration: const Duration(seconds: 4),
             curve: const Interval(.5, 1, curve: Curves.easeOut),
             builder: (context, opacity, child) => DecoratedBox(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
                 color: Theme.of(
                   context,
                 ).colorScheme.primary.withValues(alpha: opacity),
               ),
               child: child,
             ),
-            child: item,
+            child: SizedBox(width: double.infinity, child: item),
           );
         }),
       if (showElapsed &&

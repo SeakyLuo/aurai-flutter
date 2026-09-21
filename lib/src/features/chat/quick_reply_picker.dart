@@ -55,8 +55,8 @@ class _QuickReplyPicker extends StatelessWidget {
                         ))
                           SizedBox(
                             width: constraints.maxWidth / 6,
-                            child: Tooltip(
-                              message: option.label,
+                            child: Semantics(
+                              label: option.emoji,
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(18),
                                 onTap: () => Navigator.pop(context, option),

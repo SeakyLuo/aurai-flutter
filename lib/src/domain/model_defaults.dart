@@ -28,7 +28,7 @@ class DefaultModelSelection {
 
   factory DefaultModelSelection.fromJson(Map<String, dynamic> json) =>
       DefaultModelSelection(
-        service: ModelService.values.byName(json['service'] as String),
+        service: ModelService.byName(json['service'] as String),
         model: json['model'] as String,
         name: json['name'] as String,
       );

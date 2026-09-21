@@ -163,7 +163,7 @@ extension PeerConversations on ChatController {
         conversation: conversation,
         senderId: senderId,
         messageId: snapshot.last.id,
-        providerLabel: config.service.label,
+        providerLabel: config.displayName,
         memory: memory,
         skills: skills,
         documents: documents,

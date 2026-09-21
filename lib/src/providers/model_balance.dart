@@ -73,7 +73,7 @@ class ModelBalanceClient {
       throw const ModelProviderException('暂未接入该模型服务的余额查询');
     }
     if (!config.isConfigured) {
-      throw ModelProviderException('请先在模型设置中配置 ${config.service.label} 密钥');
+      throw ModelProviderException('请先在模型设置中配置 ${config.displayName} 密钥');
     }
     if (!supports(config)) {
       throw const ModelProviderException('当前为自定义服务地址，尚未接入该服务的余额查询');
@@ -87,7 +87,7 @@ class ModelBalanceClient {
       throw ModelProviderException('查询余额超时，请稍后重试', detail: error.toString());
     } on SocketException catch (error) {
       throw ModelProviderException(
-        '无法连接 ${config.service.label}，请检查网络',
+        '无法连接 ${config.displayName}，请检查网络',
         detail: error.toString(),
       );
     } on HandshakeException catch (error) {
@@ -99,12 +99,12 @@ class ModelBalanceClient {
       throw ModelProviderException('余额查询连接中断，请稍后重试', detail: error.toString());
     } on FormatException catch (error) {
       throw ModelProviderException(
-        '${config.service.label} 未返回有效的余额数据',
+        '${config.displayName} 未返回有效的余额数据',
         detail: error.toString(),
       );
     } on TypeError catch (error) {
       throw ModelProviderException(
-        '${config.service.label} 返回的余额数据格式不符合接口约定',
+        '${config.displayName} 返回的余额数据格式不符合接口约定',
         detail: error.toString(),
       );
     } finally {
@@ -128,9 +128,9 @@ class ModelBalanceClient {
     final response = await request.close();
     if (response.statusCode != 200) {
       throw ModelProviderException(switch (response.statusCode) {
-        401 || 403 => '${config.service.label} 密钥无效或无权查询余额，请检查模型设置',
+        401 || 403 => '${config.displayName} 密钥无效或无权查询余额，请检查模型设置',
         429 => '余额查询过于频繁，请稍后再试',
-        _ => '${config.service.label} 余额查询失败，请稍后重试',
+        _ => '${config.displayName} 余额查询失败，请稍后重试',
       });
     }
     final json = jsonDecode(await utf8.decoder.bind(response).join()) as Map;

@@ -187,11 +187,10 @@ class _HtmlGameViewState extends State<HtmlGameView>
       unawaited(_session!.setVisible(true));
       return;
     }
-    // A fling uses snapshots; mount new platform views once scrolling settles.
+    // Visible cards start opening during scrolling; _open rechecks visibility after loading.
     if (!_opening &&
         !_failed &&
         _closing == null &&
-        !(_scroll?.isScrollingNotifier.value ?? false) &&
         Platform.isAndroid) {
       unawaited(_open());
     }
@@ -286,6 +285,7 @@ class _HtmlGameViewState extends State<HtmlGameView>
       if (mounted) {
         setState(() => _opening = false);
         updateKeepAlive();
+        _scheduleVisibility();
       }
       for (final view in _views) {
         if (!identical(view, this)) view._scheduleVisibility();
@@ -370,7 +370,10 @@ class _HtmlGameViewState extends State<HtmlGameView>
 
   Future<void> _close() => _closing ??= _closeSession().whenComplete(() {
     _closing = null;
-    if (mounted) updateKeepAlive();
+    if (mounted) {
+      updateKeepAlive();
+      _scheduleVisibility();
+    }
   });
   Future<void> _closeSession() async {
     final session = _session;

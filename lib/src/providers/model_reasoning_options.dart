@@ -34,6 +34,7 @@ List<ModelReasoning> providerReasoningOptions(ModelService service) =>
         ModelReasoning.max,
       ],
       ModelService.qwen || ModelService.kimi || ModelService.glm => _toggle,
+      _ => _defaultOnly,
     };
 
 /// Offer only documented controls; leaving the preference at default sends no
@@ -113,6 +114,8 @@ List<ModelReasoning> modelReasoningOptions(
         'glm-5.2' => _toggle,
         _ => _defaultOnly,
       };
+    default:
+      return _defaultOnly;
   }
 }
 
@@ -196,5 +199,6 @@ Map<String, Object?> modelReasoningParameters(ModelConfig config) {
         'type': effort == ModelReasoning.none ? 'disabled' : 'enabled',
       },
     },
+    _ => const {},
   };
 }

@@ -14,6 +14,17 @@ class CapabilityPage extends StatefulWidget {
 
   final ChatController controller;
 
+  static Iterable<Capability> standardCapabilities(ChatController controller) =>
+      controller.capabilities.where(
+        (capability) =>
+            !capability.id.startsWith('android.execution.') &&
+            capability.id != 'android.network.capture',
+      );
+
+  // Shizuku 和本地 VPN 由 DeviceExtensionTiles 单独显示。
+  static int itemCount(ChatController controller) =>
+      standardCapabilities(controller).length + 2;
+
   static Future<void> show(
     BuildContext context,
     ChatController controller,
@@ -91,10 +102,10 @@ class _CapabilityPageState extends State<CapabilityPage>
               ),
               children: [
                 const SizedBox(height: 8),
-                for (final capability in widget.controller.capabilities)
-                  if (!capability.id.startsWith('android.execution.') &&
-                      capability.id != 'android.network.capture')
-                    _capabilityTile(capability),
+                for (final capability in CapabilityPage.standardCapabilities(
+                  widget.controller,
+                ))
+                  _capabilityTile(capability),
                 const DeviceExtensionTiles(),
               ],
             ),

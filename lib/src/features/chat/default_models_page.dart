@@ -64,7 +64,7 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
       selected: settings.modelDefaults[purpose]?.service,
       choices: [
         for (final account in accounts)
-          (value: account.service, label: account.service.label),
+          (value: account.service, label: account.displayName),
       ],
     );
     if (!mounted || service == null) return;
@@ -79,15 +79,17 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
         }
         final catalog = ModelCatalog();
         _catalog = catalog;
-        final models = await catalog.load(
-          baseUrl: Uri.parse(account.baseUrl),
-          apiKey: account.apiKey,
-          openRouter: service == ModelService.openRouter,
-          textOnly: purpose != ModelPurpose.videoGeneration,
-        );
+        final models = purpose == ModelPurpose.text && !account.autoSyncModels
+            ? account.savedModels
+            : await catalog.load(
+                baseUrl: Uri.parse(account.baseUrl),
+                apiKey: account.apiKey,
+                openRouter: service == ModelService.openRouter,
+                textOnly: purpose != ModelPurpose.videoGeneration,
+              );
         for (final model in models) {
           final info = service == ModelService.openRouter
-              ? OpenRouterModels.lookup(account.baseUrl, model)!
+              ? OpenRouterModels.lookup(account.baseUrl, model)
               : null;
           final eligible = switch (purpose) {
             ModelPurpose.text => info?.supportsText ?? true,
@@ -147,18 +149,18 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
       final selected = widget.controller.imageGeneration;
       return selected == null
           ? '未设置'
-          : '${selected.service.label} · ${selected.model.name}';
+          : '${settings.profile(selected.service).displayName} · ${selected.model.name}';
     }
     final selected = settings.modelDefaults[purpose];
     if (selected != null) {
       return settings.profile(selected.service).isConfigured
-          ? '${selected.service.label} · ${selected.name}'
-          : '未配置供应商 · ${selected.service.label}';
+          ? '${settings.profile(selected.service).displayName} · ${selected.name}'
+          : '未配置供应商 · ${settings.profile(selected.service).displayName}';
     }
     if (purpose == ModelPurpose.text) {
       final config = settings.activeConfig;
       return config.isConfigured
-          ? '${config.service.label} · ${modelDisplayName(config.model)}'
+          ? '${config.displayName} · ${modelDisplayName(config.model)}'
           : '未设置';
     }
     return '未设置';

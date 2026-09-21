@@ -1,6 +1,22 @@
 part of 'chat_page.dart';
 
 extension _ChatProgress on _ChatPageState {
+  void _showRunNotice(Object error) {
+    if (!mounted) return;
+    final controller = widget.controller;
+    final message = errorMessage(error);
+    final displayedInConversation =
+        controller.activeConversation.kind != ConversationKind.group &&
+        controller.groupRuns.isEmpty &&
+        controller.runState == ChatRunState.failed &&
+        controller.errorDetail == message;
+    if (displayedInConversation) return;
+    final stopped = controller.runState == ChatRunState.cancelled;
+    ScaffoldMessenger.of(
+      context,
+    ).showGlassSnackBar(SnackBar(content: Text(stopped ? '任务已停止' : message)));
+  }
+
   Widget _buildProgress(ChatController controller) =>
       controller.groupRuns.isNotEmpty ||
           controller.activeConversation.kind == ConversationKind.group

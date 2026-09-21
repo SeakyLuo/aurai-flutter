@@ -1,11 +1,47 @@
 part of 'chat_controller.dart';
 
 extension ConversationSearchNavigation on ChatController {
+  Future<String?> firstUnreadMessageId() async {
+    final conversation = activeConversation;
+    if (conversation.kind == ConversationKind.group) {
+      await _store.writer.flush();
+      await GroupUnreadMessages(_store.database).load([conversation]);
+      if (conversation.unreadMessageCount == 0) return null;
+      final rows = await _store.database.rawQuery(
+        "SELECT COALESCE((SELECT parent_message_id FROM message_quick_replies WHERE message_id = messages.id), id) AS target FROM messages WHERE conversation_id = ? AND sender_id != ? AND role = 'assistant' AND kind NOT IN ('commentary', 'system') AND (created_at > ? OR (created_at = ? AND id > ?)) AND (interactive_json IS NULL OR json_extract(interactive_json, '\$.participation.audience') IS NULL OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = ?)) ORDER BY created_at, id LIMIT 1",
+        [
+          conversation.id,
+          MessageSender.localUser.id,
+          conversation.groupReadAt,
+          conversation.groupReadAt,
+          conversation.groupReadId,
+          MessageSender.localUser.id,
+        ],
+      );
+      return rows.isEmpty ? null : rows.single['target'] as String;
+    }
+    if (conversation.activeRunId == null ||
+        conversation.activeRunId == conversation.seenRunId)
+      return null;
+    final rows = await _store.database.query(
+      'messages',
+      columns: ['id'],
+      where:
+          "conversation_id = ? AND run_id = ? AND role = 'assistant' AND kind NOT IN ('system', 'quick_reply', 'commentary', 'reasoning')",
+      whereArgs: [conversation.id, conversation.activeRunId],
+      orderBy: 'created_at, id',
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.single['id'] as String;
+  }
+
   List<AgentMessage> get visibleMessages {
     final conversation = activeConversation;
     final window = conversation.searchMessages;
     if (window == null)
-      return messages.where((message) => message.quickReplyToId == null).toList();
+      return messages
+          .where((message) => message.quickReplyToId == null)
+          .toList();
     if (conversation.searchHasLater) return window;
     final combined = {
       for (final message in window) message.id: message,
@@ -17,9 +53,7 @@ extension ConversationSearchNavigation on ChatController {
       final order = a.createdAt.compareTo(b.createdAt);
       return order == 0 ? a.id.compareTo(b.id) : order;
     });
-    return combined
-        .where((message) => message.quickReplyToId == null)
-        .toList();
+    return combined.where((message) => message.quickReplyToId == null).toList();
   }
 
   bool get hasSearchWindow => activeConversation.searchMessages != null;

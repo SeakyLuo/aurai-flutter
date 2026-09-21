@@ -3,11 +3,7 @@ part of 'chat_controller.dart';
 extension MessageQuickReplies on ChatController {
   static final _pendingQuickReplies = <String, Object>{};
 
-  Future<bool> submitQuickReply(
-    AgentMessage source,
-    String key,
-    String text,
-  ) async {
+  Future<bool> submitQuickReply(AgentMessage source, String key) async {
     final conversation = activeConversation;
     final pendingKey = '${conversation.id}:${source.id}';
     if (_pendingQuickReplies.containsKey(pendingKey)) return false;
@@ -16,7 +12,8 @@ extension MessageQuickReplies on ChatController {
     try {
       return await _inConversation(
         conversation,
-        () => _submitQuickReply(source, key, text),
+        () =>
+            _submitQuickReply(source, key, quickReplyOptionsByKey[key]!.emoji),
       );
     } finally {
       if (identical(_pendingQuickReplies[pendingKey], token)) {
@@ -59,8 +56,8 @@ extension MessageQuickReplies on ChatController {
         MessageQuickReply(
           id: message.id,
           senderId: message.senderId,
+          senderName: MessageSender.localUser.name,
           key: key,
-          text: text,
           createdAt: message.createdAt,
         ),
       );
@@ -107,8 +104,8 @@ extension MessageQuickReplies on ChatController {
     final attached = MessageQuickReply(
       id: message.id,
       senderId: message.senderId,
+      senderName: MessageSender.localUser.name,
       key: key,
-      text: text,
       createdAt: message.createdAt,
     );
     try {
@@ -178,8 +175,8 @@ extension MessageQuickReplies on ChatController {
     final attached = MessageQuickReply(
       id: message.id,
       senderId: message.senderId,
+      senderName: MessageSender.localUser.name,
       key: key,
-      text: text,
       createdAt: message.createdAt,
     );
     dispatcher.hold();
@@ -332,7 +329,7 @@ extension MessageQuickReplies on ChatController {
     String sourceId,
     String key,
   ) async {
-    final text = quickReplyTexts[key];
+    final text = quickReplyEmojis[key];
     if (text == null) throw StateError('不支持的快捷回复');
     await _store.writer.flush();
     final rows = await _store.database.query(
@@ -399,8 +396,8 @@ extension MessageQuickReplies on ChatController {
         MessageQuickReply(
           id: message.id,
           senderId: actor,
+          senderName: senders[actor]!.name,
           key: key,
-          text: text,
           createdAt: message.createdAt,
         ),
       );
