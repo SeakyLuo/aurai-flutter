@@ -258,45 +258,61 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
             child: ListView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
               children: [
-                Row(
-                  children: [
-                    MiniappIcon(path: entry.iconPath, asset: entry.iconAsset),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        entry.title,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                Center(
+                  child: Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      color: settingsFieldColor(context),
+                      borderRadius: BorderRadius.circular(22),
                     ),
-                  ],
+                    alignment: Alignment.center,
+                    child: MiniappIcon(
+                      path: entry.iconPath,
+                      asset: entry.iconAsset,
+                      size: entry.iconPath == null && entry.iconAsset == null
+                          ? 36
+                          : 96,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  entry.title,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 12),
-                Text(entry.description),
-                const SizedBox(height: 12),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     if (entry.publisherProfile != null) ...[
-                      Padding(
-                        padding: const EdgeInsets.all(3),
-                        child: MemberAvatar(
-                          sender: entry.publisherProfile!,
-                          size: 32,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
+                      MemberAvatar(sender: entry.publisherProfile!, size: 24),
+                      const SizedBox(width: 8),
                     ],
-                    Expanded(
+                    Flexible(
                       child: Text(
                         entry.publisher,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
                   ],
                 ),
+                if (entry.description.isNotEmpty) ...[
+                  const SizedBox(height: 32),
+                  Text(
+                    entry.description,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(height: 1.6),
+                  ),
+                ],
               ],
             ),
           ),

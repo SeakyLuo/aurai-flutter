@@ -338,7 +338,19 @@ class _AiContactsPageState extends State<AiContactsPage> {
                     ),
                   ),
                 ),
-              if (_items.isEmpty)
+              if (_items.isEmpty && _archived && !_loading)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Text(
+                      '没有已归档朋友',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                )
+              else if (_items.isEmpty)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
@@ -426,7 +438,8 @@ class _AiContactsPageState extends State<AiContactsPage> {
                     ),
                   ),
                 ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              if (!_archived || _items.isNotEmpty || _loading)
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
             ],
           ),
         ),

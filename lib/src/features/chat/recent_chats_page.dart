@@ -267,22 +267,6 @@ class RecentChatsPageState extends State<RecentChatsPage> {
           ),
       ],
     ),
-    bottomNavigationBar: widget.groupsOnly && _loaded
-        ? SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Text(
-                '共 $_groupCount 个群聊',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          )
-        : null,
     body: !_loaded
         ? Center(
             child: _loading
@@ -347,6 +331,19 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                   const Padding(
                     padding: EdgeInsets.all(16),
                     child: Center(child: CircularProgressIndicator()),
+                  ),
+                if (widget.groupsOnly && _items.isNotEmpty)
+                  Padding(
+                    key: const ValueKey('group-count'),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Text(
+                      '共 $_groupCount 个群聊',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
               ],
             ),

@@ -225,16 +225,11 @@ class _StarredMessageListState extends State<_StarredMessageList> {
         )
       : AnimatedEntryList(
           controller: _scroll,
-          empty: Padding(
-            padding: const EdgeInsets.only(top: 40),
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: Text(
-                '还没有收藏\n长按聊天消息即可添加',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+          empty: Center(
+            child: Text(
+              '还没有收藏的消息',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
