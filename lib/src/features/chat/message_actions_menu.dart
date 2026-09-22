@@ -22,6 +22,8 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   BuildContext context, {
   required AgentMessage message,
   bool allowStar = false,
+  bool allowCopy = true,
+  bool allowSelect = true,
   bool starred = false,
   bool allowEditing = true,
   bool allowStatistics = false,
@@ -91,7 +93,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             ),
             '转发',
           ),
-        if (message.text.isNotEmpty)
+        if (allowCopy && message.text.isNotEmpty)
           (
             const MessageActionResult(MessageAction.copy),
             CopyIcon(color: iconColor),
@@ -108,7 +110,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             ),
             starred ? '取消收藏' : '收藏',
           ),
-        if (message.text.isNotEmpty)
+        if (allowSelect && message.text.isNotEmpty)
           (
             const MessageActionResult(MessageAction.select),
             TextSelectionIcon(color: iconColor),

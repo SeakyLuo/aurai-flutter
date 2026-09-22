@@ -11,11 +11,12 @@ class MiniappIconEditor extends StatelessWidget {
   const MiniappIconEditor({
     super.key,
     required this.path,
+    this.asset,
     required this.onPick,
     required this.onRemove,
   });
 
-  final String? path;
+  final String? path, asset;
   final VoidCallback? onPick;
   final VoidCallback? onRemove;
 
@@ -75,7 +76,8 @@ class MiniappIconEditor extends StatelessWidget {
                           child: Center(
                             child: MiniappIcon(
                               path: path,
-                              size: path == null ? 36 : 96,
+                              asset: asset,
+                              size: path == null && asset == null ? 36 : 96,
                             ),
                           ),
                         ),

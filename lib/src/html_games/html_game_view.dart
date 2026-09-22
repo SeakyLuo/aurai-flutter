@@ -1,3 +1,4 @@
+import 'miniapp_recent_store.dart';
 import 'miniapp_favorite_action.dart';
 import '../app/glass_notice.dart';
 import 'html_game_display_cache.dart';
@@ -269,6 +270,10 @@ class _HtmlGameViewState extends State<HtmlGameView>
         widget.messageId,
       );
       if (!_visible || revision != _openRevision) return;
+      if (widget.fullscreen) {
+        await recordMiniappOpen(widget.store.database, game.appId);
+        if (!_visible || revision != _openRevision) return;
+      }
       final session = HtmlGameSession(
         game,
         widget.store,

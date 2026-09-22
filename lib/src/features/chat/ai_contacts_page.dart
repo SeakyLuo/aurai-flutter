@@ -294,131 +294,143 @@ class _AiContactsPageState extends State<AiContactsPage> {
             },
           ),
         ),
-      if (!_archived && !widget.selectForConversation)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 6),
-            horizontalTitleGap: 12,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(22),
-            ),
-            leading: Container(
-              width: 44,
-              height: 44,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: settingsFieldColor(context),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const SidebarActionIcon(type: SidebarActionIconType.group),
-            ),
-            title: const Text('群聊', style: TextStyle(fontSize: 16)),
-            trailing: const SettingsIcon(type: SettingsIconType.chevron),
-            onTap: () => Navigator.push<void>(
-              context,
-              MaterialPageRoute(
-                builder: (_) => RecentChatsPage(
-                  controller: widget.controller,
-                  groupsOnly: true,
-                ),
-              ),
-            ),
-          ),
-        ),
       Expanded(
-        child: _archived && _loading && _items.isEmpty
-            ? const SingleChildScrollView(
-                physics: NeverScrollableScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(20, 16, 20, 24),
-                child: SearchSkeleton(
-                  label: '正在加载归档朋友',
-                  avatarSize: 44,
-                  rowGap: 32,
-                ),
-              )
-            : _items.isEmpty
-            ? Center(
-                child: _loading
-                    ? const CircularProgressIndicator()
-                    : Text(
-                        _search.text.isNotEmpty
-                            ? '没有找到朋友'
-                            : _archived
-                            ? '没有已归档朋友'
-                            : '点击右上角，创建你的第一个 AI',
+        child: PaginationListener(
+          hasMore: _more,
+          loadMore: _load,
+          child: CustomScrollView(
+            slivers: [
+              if (!_archived && !widget.selectForConversation)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 6),
+                      horizontalTitleGap: 12,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(22),
                       ),
-              )
-            : PaginationListener(
-                hasMore: _more,
-                loadMore: _load,
-                child: ListView.builder(
-                  padding: EdgeInsets.fromLTRB(
-                    12,
-                    0,
-                    12,
-                    MediaQuery.paddingOf(context).bottom + 16,
-                  ),
-                  itemCount: _items.length,
-                  itemBuilder: (context, index) {
-                    final ai = _items[index];
-                    return Builder(
-                      builder: (anchorContext) => ListTile(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(22),
+                      leading: Container(
+                        width: 44,
+                        height: 44,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: settingsFieldColor(context),
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 0,
+                        child: const SidebarActionIcon(
+                          type: SidebarActionIconType.group,
                         ),
-                        horizontalTitleGap: 12,
-                        leading: ProfileAvatar(
-                          style: AvatarStyle(
-                            icon: ai.sender.avatarIcon,
-                            color: ai.sender.avatarColor,
-                            path: ai.sender.avatarPath,
+                      ),
+                      title: const Text('群聊', style: TextStyle(fontSize: 16)),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: () => Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => RecentChatsPage(
+                            controller: widget.controller,
+                            groupsOnly: true,
                           ),
-                          name: ai.sender.name,
-                          size: 44,
                         ),
-                        title: Text(
-                          ai.sender.name,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                        subtitle: ai.description.isEmpty
-                            ? null
-                            : Text(
-                                ai.description,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                        onTap: () => widget.selectForConversation
-                            ? _startConversation(ai)
-                            : _open(ai.sender.id),
-                        onLongPress: widget.selectForConversation
-                            ? null
-                            : () => _menu(ai, anchorContext),
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
-              ),
-      ),
-      if (_count != null && (!_archived || _items.isNotEmpty))
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Text(
-              _archived ? '共 $_count 位已归档朋友' : '共 $_count 位朋友',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
+              if (_items.isEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+                    child: _archived && _loading
+                        ? const SearchSkeleton(
+                            label: '正在加载归档朋友',
+                            avatarSize: 44,
+                            rowGap: 32,
+                          )
+                        : Center(
+                            child: _loading
+                                ? const CircularProgressIndicator()
+                                : Text(
+                                    _search.text.isNotEmpty
+                                        ? '没有找到朋友'
+                                        : _archived
+                                        ? '没有已归档朋友'
+                                        : '点击右上角，创建你的第一个 AI',
+                                  ),
+                          ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  sliver: SliverList.builder(
+                    itemCount: _items.length,
+                    itemBuilder: (context, index) {
+                      final ai = _items[index];
+                      return Builder(
+                        builder: (anchorContext) => ListTile(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 0,
+                          ),
+                          horizontalTitleGap: 12,
+                          leading: ProfileAvatar(
+                            style: AvatarStyle(
+                              icon: ai.sender.avatarIcon,
+                              color: ai.sender.avatarColor,
+                              path: ai.sender.avatarPath,
+                            ),
+                            name: ai.sender.name,
+                            size: 44,
+                          ),
+                          title: Text(
+                            ai.sender.name,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          subtitle: ai.description.isEmpty
+                              ? null
+                              : Text(
+                                  ai.description,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                          onTap: () => widget.selectForConversation
+                              ? _startConversation(ai)
+                              : _open(ai.sender.id),
+                          onLongPress: widget.selectForConversation
+                              ? null
+                              : () => _menu(ai, anchorContext),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              if (_count != null && (!_archived || _items.isNotEmpty))
+                SliverToBoxAdapter(
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Text(
+                        _archived ? '共 $_count 位已归档朋友' : '共 $_count 位朋友',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            ],
           ),
         ),
+      ),
     ],
   );
 }

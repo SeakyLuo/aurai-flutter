@@ -1,5 +1,5 @@
 import 'miniapp_icon.dart';
-import 'dart:io';
+import 'miniapp_launcher.dart';
 
 import 'package:flutter/material.dart';
 
@@ -13,10 +13,8 @@ import '../features/chat/dialog_action_button.dart';
 import '../scheduling/task_action_menu.dart';
 import 'miniapp_metadata_editor.dart';
 import 'html_game_store.dart';
-import 'html_game_view.dart';
 import 'miniapp_library_store.dart';
 import 'miniapp_publish_dialog.dart';
-import 'miniapp_run_page.dart';
 
 class MiniappDetailPage extends StatefulWidget {
   const MiniappDetailPage({
@@ -134,37 +132,8 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      if (!Platform.isAndroid) throw StateError('请在 Android 版 Aurai 中打开小程序');
-      var id = _entry.runtimeId;
-      if (!_entry.draft && _entry.installedId == null) {
-        id = await _library.install(_entry);
-        await _reload();
-      }
-      final launcher = _entry.draft ? await _library.launcher(id) : null;
-      late final Widget page;
-      if (launcher == null) {
-        final game = await _library.loadIndependent(id);
-        page = MiniappRunPage(game: game, store: widget.store);
-      } else {
-        final messageId = launcher['message_id'] as String;
-        final conversationId = launcher['conversation_id'] as String;
-        final card = await widget.store.card(messageId);
-        // Validate the original entry before navigating to its existing runtime.
-        await widget.store.load(conversationId, messageId);
-        page = HtmlGameView(
-          card: card,
-          messageId: messageId,
-          conversationId: conversationId,
-          store: widget.store,
-          fullscreen: true,
-          backLabel: '返回详情',
-        );
-      }
-      if (!mounted) return;
-      await Navigator.push<void>(
-        context,
-        MaterialPageRoute(builder: (_) => page),
-      );
+      await openMiniapp(context, _entry, widget.store);
+      if (mounted) await _reload();
     } on Object catch (error) {
       if (mounted) _notice(errorMessage(error));
     } finally {
@@ -256,12 +225,14 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
               children: [
                 Row(
                   children: [
-                    MiniappIcon(path: entry.iconPath),
+                    MiniappIcon(path: entry.iconPath, asset: entry.iconAsset),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Text(
                         entry.title,
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],

@@ -3,8 +3,9 @@
     "id": "builtin.tipoff",
     "title": "TipOff",
     "description": "选择一位球员，重新打完整个职业生涯。创建球员、参加比赛，体验成长与交易。",
+    "publisherId": "user:local",
     "asset": "assets/miniapps/tipoff.html",
-    "version": "22b9d84c43aafc4d78f2fe2440bd26db3e0ddb55df46c318a196922279a22ef8",
-    "publisherId": "user:local"
+    "iconAsset": "assets/miniapps/icons/tipoff-logo.jpg",
+    "version": "1a11f3c975fdb0bc678387d8c2ebaf6303264bf06804324335ce6720070d8d59"
   }
 ]

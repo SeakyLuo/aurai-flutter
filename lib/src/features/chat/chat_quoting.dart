@@ -27,10 +27,16 @@ extension _ChatQuoting on _ChatPageState {
     }
   }
 
-  Future<void> _quoteMessage(AgentMessage? message) async {
+  Future<void> _quoteMessage(
+    AgentMessage? message, {
+    String? selectedText,
+  }) async {
     final conversation = widget.controller.activeConversation;
     try {
-      await widget.controller.setDraftQuote(message);
+      await widget.controller.setDraftQuote(
+        message,
+        selectedText: selectedText,
+      );
       if (mounted &&
           message != null &&
           identical(conversation, widget.controller.activeConversation))

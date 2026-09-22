@@ -238,6 +238,7 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
               children: [
                 MiniappIconEditor(
                   path: _iconPath,
+                  asset: _saved.iconAsset,
                   onPick: _busy ? null : _pickIcon,
                   onRemove: _busy
                       ? null

@@ -1,3 +1,4 @@
+import '../html_games/miniapp_recent_store.dart';
 import '../html_games/miniapp_metadata_store.dart';
 import 'favorites.dart';
 import '../html_games/miniapp_publication_schema.dart';
@@ -19,7 +20,7 @@ import 'message_quick_reply_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 42,
+  version: 43,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -38,6 +39,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
         await db.execute(statement);
       }
     }
+    if (oldVersion < 43) await migrateMiniappRecents(db);
     if (oldVersion < 36) {
       await db.rawUpdate(
         "UPDATE messages SET text = '👊 拳头' WHERE id IN (SELECT message_id FROM message_quick_replies WHERE reply_key = 'fist_bump')",
@@ -214,6 +216,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
       messageCallbackIndex,
       htmlAppSchema,
       htmlAppIndex,
+      miniappRecentIndex,
       ...miniappPublicationSchema,
       miniappMetadataSchema,
       ...htmlGameSchema,

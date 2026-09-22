@@ -3,8 +3,13 @@ import 'package:flutter/material.dart';
 import '../features/chat/settings_icon.dart';
 
 class MiniappIcon extends StatelessWidget {
-  const MiniappIcon({super.key, required this.path, this.size = 24});
-  final String? path;
+  const MiniappIcon({
+    super.key,
+    required this.path,
+    this.asset,
+    this.size = 24,
+  });
+  final String? path, asset;
   final double size;
 
   Widget _defaultIcon() => SizedBox.square(
@@ -16,7 +21,17 @@ class MiniappIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => path == null
-      ? _defaultIcon()
+      ? asset == null
+            ? _defaultIcon()
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(size * .22),
+                child: Image.asset(
+                  asset!,
+                  width: size,
+                  height: size,
+                  fit: BoxFit.cover,
+                ),
+              )
       : ClipRRect(
           borderRadius: BorderRadius.circular(size * .22),
           child: Image.file(

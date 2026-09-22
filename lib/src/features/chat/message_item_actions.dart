@@ -1,11 +1,10 @@
 part of 'message_item.dart';
 
 extension _MessageItemActions on _MessageItemState {
-  Future<void> _openActions({bool showStar = true}) async {
+  Future<void> _openActions({bool compactMenu = false}) async {
     final snapshot = message;
     var hasHistory = false;
     final allowStar =
-        showStar &&
         !widget.streaming &&
         !snapshot.isSystem &&
         !snapshot.isReasoning &&
@@ -47,6 +46,8 @@ extension _MessageItemActions on _MessageItemState {
       context,
       message: snapshot,
       allowStar: allowStar,
+      allowCopy: !compactMenu,
+      allowSelect: !compactMenu,
       starred: starred,
       allowEditing: widget.onEdit != null,
       allowStatistics:
@@ -56,7 +57,7 @@ extension _MessageItemActions on _MessageItemState {
               true &&
           (!widget.readOnly || widget.onLocate != null),
       allowHistory: hasHistory,
-      allowQuote: widget.onQuote != null,
+      allowQuote: !compactMenu && widget.onQuote != null,
       allowRecall: widget.onRecall != null,
       allowForward:
           !widget.streaming &&

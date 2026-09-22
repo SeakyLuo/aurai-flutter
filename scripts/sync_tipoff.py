@@ -19,6 +19,7 @@ entry = {
     'description': '选择一位球员，重新打完整个职业生涯。创建球员、参加比赛，体验成长与交易。',
     'publisherId': 'user:local',
     'asset': 'assets/miniapps/tipoff.html',
+    'iconAsset': 'assets/miniapps/icons/tipoff-logo.jpg',
     'version': hashlib.sha256(data).hexdigest(),
 }
 catalog = [item for item in catalog if item['id'] != entry['id']]

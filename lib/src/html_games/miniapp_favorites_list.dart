@@ -180,8 +180,14 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
           horizontal: 18,
           vertical: 10,
         ),
-        leading: MiniappIcon(path: item.entry.iconPath),
-        title: Text(item.entry.title),
+        leading: MiniappIcon(
+          path: item.entry.iconPath,
+          asset: item.entry.iconAsset,
+        ),
+        title: Text(
+          item.entry.title,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
         subtitle: Text(
           [
             if (item.entry.description.isNotEmpty) item.entry.description,
