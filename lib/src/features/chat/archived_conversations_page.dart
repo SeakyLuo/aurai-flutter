@@ -135,6 +135,17 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 640),
                 child: AnimatedEntryList(
+                  empty: Padding(
+                    padding: EdgeInsets.only(
+                      top: MediaQuery.paddingOf(context).top + 76,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '没有已归档会话',
+                        style: TextStyle(color: colors.onSurfaceVariant),
+                      ),
+                    ),
+                  ),
                   padding: EdgeInsets.fromLTRB(
                     12,
                     MediaQuery.paddingOf(context).top + 76 + 8,
@@ -152,18 +163,7 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
                           avatarSize: 48,
                         ),
                       )
-                    else if (_items.isEmpty && !_loading && !_failed)
-                      Padding(
-                        key: const ValueKey('empty'),
-                        padding: const EdgeInsets.symmetric(vertical: 40),
-                        child: Center(
-                          child: Text(
-                            '暂无已归档会话',
-                            style: TextStyle(color: colors.onSurfaceVariant),
-                          ),
-                        ),
-                      )
-                    else
+                    else if (_items.isNotEmpty || _loading || _failed)
                       ...List.generate(
                             _items.length +
                                 ((_loading || _hasMore || _failed) ? 1 : 0),

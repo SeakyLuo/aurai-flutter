@@ -134,6 +134,7 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
       child: Column(
         children: [
           ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 18),
             title: const Text(
               '最近使用',
               style: TextStyle(fontWeight: FontWeight.w600),
@@ -232,22 +233,23 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
     clipBehavior: Clip.antiAlias,
     child: ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-      title: Row(
-        children: [
-          MiniappIcon(path: entry.iconPath, asset: entry.iconAsset),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              entry.title,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
+      leading: MiniappIcon(
+        path: entry.iconPath,
+        asset: entry.iconAsset,
+        size: 48,
+      ),
+      horizontalTitleGap: 14,
+      titleAlignment: ListTileTitleAlignment.center,
+      title: Text(
+        entry.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w500),
       ),
       subtitle: entry.description.isEmpty
           ? null
           : Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: 4),
               child: Text(
                 entry.description,
                 maxLines: 2,
