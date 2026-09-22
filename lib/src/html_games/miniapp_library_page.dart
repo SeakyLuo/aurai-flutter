@@ -11,7 +11,6 @@ import '../domain/error_message.dart';
 import '../features/chat/chat_controller.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/sidebar_action_icon.dart';
-import '../features/chat/member_avatar.dart';
 import 'miniapp_detail_page.dart';
 import 'miniapp_library_store.dart';
 
@@ -245,38 +244,16 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
           ),
         ],
       ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (entry.description.isNotEmpty) ...[
-              Text(
+      subtitle: entry.description.isEmpty
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
                 entry.description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 12),
-            ],
-            Row(
-              children: [
-                if (entry.publisherProfile != null) ...[
-                  MemberAvatar(sender: entry.publisherProfile!, size: 24),
-                  const SizedBox(width: 8),
-                ],
-                Expanded(
-                  child: Text(
-                    entry.publisher,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                ),
-              ],
             ),
-          ],
-        ),
-      ),
       onTap: _opening
           ? null
           : () async {

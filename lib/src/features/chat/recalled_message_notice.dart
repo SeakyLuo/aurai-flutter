@@ -17,7 +17,12 @@ class RecalledMessageNotice extends StatelessWidget {
   final ValueChanged<String>? onOpenSource;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: _notice(context),
+  );
+
+  Widget _notice(BuildContext context) {
     final text = Text(message.text, textAlign: TextAlign.center, style: style);
     if (message.quote != null && onOpenSource != null) {
       return Semantics(
@@ -26,10 +31,7 @@ class RecalledMessageNotice extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () => onOpenSource!(message.quote!.messageId),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: text,
-          ),
+          child: text,
         ),
       );
     }
@@ -49,13 +51,12 @@ class RecalledMessageNotice extends StatelessWidget {
             InkWell(
               borderRadius: BorderRadius.circular(4),
               onTap: () => onEdit!(message),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  '重新编辑',
-                  style: style.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+              child: Text(
+                '重新编辑',
+                style: style.copyWith(
+                  color: Theme.of(
+                    context,
+                  ).textButtonTheme.style!.foregroundColor!.resolve(const {}),
                 ),
               ),
             ),

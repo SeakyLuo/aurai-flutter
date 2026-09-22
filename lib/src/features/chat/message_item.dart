@@ -1,3 +1,4 @@
+import '../../html_games/miniapp_forward.dart';
 import 'message_swipe_quote.dart';
 import '../../app/glass_notice.dart';
 import 'remove_favorite.dart';
@@ -650,6 +651,10 @@ class _MessageItemState extends State<MessageItem> {
 
   Future<void> _openLink(BuildContext context, String? href) async {
     final memberLink = Uri.tryParse(href ?? '');
+    if (memberLink?.scheme == 'aurai' && memberLink?.host == 'miniapp') {
+      await openMiniappLink(context, memberLink!);
+      return;
+    }
     if (memberLink?.scheme == 'aurai' &&
         memberLink?.host == 'member' &&
         memberLink!.pathSegments.length == 1) {

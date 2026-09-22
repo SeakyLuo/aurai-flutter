@@ -8,7 +8,6 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
 import 'html_game.dart';
 import 'html_game_session.dart';
@@ -446,22 +445,13 @@ class _HtmlGameViewState extends State<HtmlGameView>
                     ? TextButton(onPressed: _open, child: const Text('重试'))
                     : const CircularProgressIndicator(strokeWidth: 2),
               ),
-            if (_session != null)
-              Positioned(
-                top: 12,
-                right: 16,
-                child: MiniappFavoriteAction(
-                  appId: _session!.game.appId,
-                  store: widget.store,
-                ),
-              ),
             Positioned(
               top: 12,
-              left: 16,
-              child: SettingsGlassAction(
-                label: widget.backLabel,
-                icon: Icons.arrow_back_ios_new_rounded,
-                onPressed: _leaveFullscreen,
+              right: 16,
+              child: MiniappFavoriteAction(
+                appId: _session?.game.appId,
+                store: widget.store,
+                onClose: _leaveFullscreen,
               ),
             ),
           ],

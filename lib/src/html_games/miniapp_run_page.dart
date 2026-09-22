@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 
 import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
-import '../features/chat/settings_appearance.dart';
 import 'html_game.dart';
 import 'html_game_session.dart';
 import 'html_game_store.dart';
@@ -60,6 +59,8 @@ class _MiniappRunPageState extends State<MiniappRunPage>
         fullscreen: true,
         independent: true,
         hostTopInset: MediaQuery.paddingOf(context).top + 76,
+        hostSafeTopInset: MediaQuery.paddingOf(context).top,
+        hostRightInset: 124,
       )..addListener(_changed);
     } else {
       unawaited(_session!.updateTheme(Theme.of(context)));
@@ -148,27 +149,12 @@ class _MiniappRunPageState extends State<MiniappRunPage>
           ),
           Positioned(
             top: MediaQuery.paddingOf(context).top,
-            left: 0,
-            width: 64,
-            height: 76,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 16),
-              child: Center(
-                child: SettingsGlassAction(
-                  label: '返回',
-                  icon: Icons.arrow_back_rounded,
-                  onPressed: _leave,
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: MediaQuery.paddingOf(context).top,
             right: 16,
             height: 76,
             child: Center(
               child: MiniappFavoriteAction(
                 appId: widget.game.appId,
+                onClose: _leave,
                 store: widget.store,
               ),
             ),
