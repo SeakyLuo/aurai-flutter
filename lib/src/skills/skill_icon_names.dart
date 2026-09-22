@@ -1,5 +1,11 @@
 const skillIcons = {
   'skill': '技能',
+  'discover': '发现',
+  'conversation': '会话',
+  'miniapp': '小程序',
+  'tools': '工具',
+  'data': '数据',
+  'task': '任务',
   'phone': '手机',
   'settings': '设置',
   'browser': '浏览器',
@@ -23,7 +29,11 @@ const skillIcons = {
   'shopping': '购物',
   'location': '地点',
   'photo': '图片',
+  'image-search': '图片搜索',
+  'app-search': '应用搜索',
   'music': '音乐',
+  'audio': '音频',
+  'video': '视频',
   'chart': '统计',
   'translate': '翻译',
   'mail': '邮件',
@@ -51,4 +61,27 @@ const skillIcons = {
   'check': '完成',
   'gallery': '相册',
   'document': '文档',
+  'create-file': '创建文件',
+  'pdf': 'PDF',
+  'presentation': '演示文稿',
+  'package': '压缩包',
 };
+
+const _skillActionIcons = {
+  'filter',
+  'pin',
+  'unpin',
+  'rename',
+  'archive',
+  'unarchive',
+  'delete',
+  'compose',
+  'question',
+  'close',
+  'check',
+  'gallery',
+};
+
+final skillIconChoices = Map.fromEntries(
+  skillIcons.entries.where((entry) => !_skillActionIcons.contains(entry.key)),
+);

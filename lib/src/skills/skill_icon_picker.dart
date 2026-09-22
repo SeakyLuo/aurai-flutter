@@ -64,9 +64,9 @@ Future<String?> showSkillIconPicker(
                   crossAxisSpacing: 8,
                   mainAxisSpacing: 8,
                 ),
-                itemCount: skillIcons.length,
+                itemCount: skillIconChoices.length,
                 itemBuilder: (context, index) {
-                  final entry = skillIcons.entries.elementAt(index);
+                  final entry = skillIconChoices.entries.elementAt(index);
                   return Semantics(
                     selected: selected == entry.key,
                     button: true,
