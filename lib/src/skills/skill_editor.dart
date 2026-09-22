@@ -275,15 +275,7 @@ class _SkillEditorState extends State<SkillEditor> {
                                 },
                           child: SizedBox.square(
                             dimension: 48,
-                            child: Center(
-                              child: ColorFiltered(
-                                colorFilter: ColorFilter.mode(
-                                  Theme.of(context).colorScheme.onSurface,
-                                  BlendMode.srcIn,
-                                ),
-                                child: SkillIcon(_icon),
-                              ),
-                            ),
+                            child: Center(child: SkillIcon(_icon)),
                           ),
                         ),
                       ),
@@ -319,10 +311,7 @@ class _SkillEditorState extends State<SkillEditor> {
                       ),
                       title: Text(
                         skillVisibilityLabel(_visibility),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                        style: const TextStyle(fontSize: 16),
                       ),
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,
