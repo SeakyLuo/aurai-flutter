@@ -1,3 +1,7 @@
+import 'miniapp_favorites.dart';
+import '../features/chat/header_action_menu.dart';
+import '../features/chat/attachment_action_icon.dart';
+import 'miniapp_forward.dart';
 import 'miniapp_icon.dart';
 import 'miniapp_launcher.dart';
 
@@ -31,6 +35,8 @@ class MiniappDetailPage extends StatefulWidget {
 
 class _MiniappDetailPageState extends State<MiniappDetailPage> {
   bool _busy = true;
+  bool _menuBusy = false;
+  bool _opening = false;
   late MiniappEntry _entry = widget.entry;
   late final _library = MiniappLibraryStore(widget.store.database);
 
@@ -105,39 +111,28 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
     }
   }
 
-  Future<void> _update() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      final yes = await showDialog<bool>(
-        context: context,
-        builder: (_) => const AppConfirmationDialog(
-          title: '更新小程序？',
-          description: '使用最新发布的代码，保留你现有的存档。',
-          confirmLabel: '更新',
-        ),
-      );
-      if (yes != true) return;
-      await _library.install(_entry);
-      await _reload();
-      if (mounted) _notice('已更新，存档已保留');
-    } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   Future<void> _open() async {
     if (_busy) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _opening = true;
+    });
     try {
-      await openMiniapp(context, _entry, widget.store);
+      await openMiniapp(
+        context,
+        _entry,
+        widget.store,
+        onReady: () => setState(() => _opening = false),
+      );
       if (mounted) await _reload();
     } on Object catch (error) {
       if (mounted) _notice(errorMessage(error));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted)
+        setState(() {
+          _busy = false;
+          _opening = false;
+        });
     }
   }
 
@@ -159,6 +154,58 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
     }
   }
 
+  Future<void> _more(BuildContext anchor) async {
+    if (_busy || _menuBusy) return;
+    setState(() => _menuBusy = true);
+    try {
+      final favorites = MiniappFavorites(widget.store.database);
+      final starred = await favorites.contains(_entry);
+      if (!anchor.mounted) return;
+      final action = await showHeaderActionMenu(
+        anchor,
+        items: [
+          if (_entry.canEditMetadata)
+            (value: 'edit', label: '编辑', icon: const TaskActionIcon('edit')),
+          (
+            value: 'forward',
+            label: '转发',
+            icon: const AttachmentActionIcon(
+              type: AttachmentActionIconType.forward,
+            ),
+          ),
+          (
+            value: 'favorite',
+            label: starred ? '取消收藏' : '收藏',
+            icon: SettingsIcon(
+              type: starred
+                  ? SettingsIconType.starFilled
+                  : SettingsIconType.star,
+              color: starred ? const Color(0xffe5ad24) : null,
+            ),
+          ),
+        ],
+      );
+      if (!mounted) return;
+      switch (action) {
+        case 'edit':
+          await _edit();
+        case 'forward':
+          await forwardMiniapp(context, _entry);
+        case 'favorite':
+          if (starred) {
+            await favorites.remove(_entry);
+          } else {
+            await favorites.add(_entry);
+          }
+          if (mounted) _notice(starred ? '已取消收藏' : '已收藏小程序');
+      }
+    } on Object catch (error) {
+      if (mounted) _notice(errorMessage(error));
+    } finally {
+      if (mounted) setState(() => _menuBusy = false);
+    }
+  }
+
   Widget _action(String title, VoidCallback action) => ListTile(
     contentPadding: EdgeInsets.zero,
     title: Text(title),
@@ -170,25 +217,19 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
   Widget build(BuildContext context) {
     final entry = _entry;
     final canOpen = entry.draft || entry.installedId != null || entry.listed;
-    final status = entry.installedId != null
-        ? '已添加'
-        : entry.listed
-        ? '已发布'
-        : entry.revision > 0
-        ? '已撤下'
-        : '未发布';
     return Scaffold(
       appBar: SettingsAppBar(
         title: '小程序详情',
         onBack: () => Navigator.pop(context),
         actions: [
-          if (entry.canEditMetadata)
-            SettingsGlassAction(
-              label: '编辑',
-              icon: Icons.edit_outlined,
-              iconWidget: const TaskActionIcon('edit'),
-              onPressed: _busy ? null : _edit,
+          Builder(
+            builder: (anchor) => SettingsGlassAction(
+              label: '更多',
+              icon: Icons.more_vert_rounded,
+              iconWidget: const TaskActionIcon('more'),
+              onPressed: _busy || _menuBusy ? null : () => _more(anchor),
             ),
+          ),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -202,13 +243,9 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
               child: SizedBox(
                 width: double.infinity,
                 child: DialogActionButton(
-                  text: !canOpen
-                      ? '已撤下'
-                      : !entry.draft && entry.installedId == null
-                      ? '添加并打开'
-                      : '打开',
+                  text: !canOpen ? '已撤下' : '打开',
                   onPressed: _busy || !canOpen ? null : _open,
-                  loading: _busy,
+                  loading: _opening,
                 ),
               ),
             ),
@@ -258,22 +295,8 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Text(
-                      status,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                if (entry.hasUpdate) _action('更新', _update),
-                if (entry.draft) ...[
-                  _action(entry.listed ? '发布更新' : '发布', _publish),
-                  if (entry.listed) _action('撤下', _withdraw),
-                ],
               ],
             ),
           ),

@@ -221,6 +221,19 @@ class MiniappLibraryStore {
     );
   }
 
+  Future<MiniappEntry> entryForPublication(String id) async {
+    final rows = await database.query(
+      'miniapp_publications',
+      where: 'app_id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) throw StateError('小程序已不存在');
+    return (await MiniappMetadataStore(
+      database,
+    ).apply(await _published(rows))).single;
+  }
+
   Future<MiniappEntry> entryForApp(String appId) async {
     final builtins = await bundled();
     for (final entry in builtins) {

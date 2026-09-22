@@ -77,7 +77,7 @@ extension MiniappPublicationOperations on MiniappLibraryStore {
       where: 'app_id = ? AND revision = ? AND listed = 1',
       whereArgs: [entry.id, entry.revision],
     );
-    if (changed != 1) throw StateError('发布状态已变化，请重新打开详情');
+    if (changed != 1) throw StateError('小程序版本正在变化，请重试打开');
   }
 
   Future<String> install(MiniappEntry entry) async {
@@ -93,8 +93,6 @@ extension MiniappPublicationOperations on MiniappLibraryStore {
     );
     if (releases.isEmpty) throw StateError('此小程序已撤下，已添加的版本仍可使用');
     final release = releases.single;
-    if (release['revision'] != entry.revision)
-      throw StateError('已有新发布版本，请重新打开详情');
     final installations = await database.query(
       'miniapp_installations',
       where: 'source_id = ? AND owner_id = ?',
@@ -116,7 +114,7 @@ extension MiniappPublicationOperations on MiniappLibraryStore {
       );
       if (latest.single['revision'] != release['revision'] ||
           latest.single['listed'] != 1) {
-        throw StateError('发布状态已变化，请重新打开详情');
+        throw StateError('小程序版本正在变化，请重试打开');
       }
       final values = <String, Object?>{
         'title': release['title'],

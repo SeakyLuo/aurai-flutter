@@ -8,15 +8,23 @@ import 'miniapp_run_page.dart';
 Future<void> openMiniapp(
   BuildContext context,
   MiniappEntry entry,
-  HtmlGameStore store,
-) async {
+  HtmlGameStore store, {
+  VoidCallback? onReady,
+}) async {
   final library = MiniappLibraryStore(store.database);
   if (!Platform.isAndroid) throw StateError('请在 Android 版 Aurai 中打开小程序');
-  var id = entry.runtimeId;
-  if (!entry.draft && entry.installedId == null) {
-    id = await library.install(entry);
+  final current = entry.kind == MiniappKind.installed
+      ? await library.entryForApp(entry.runtimeId)
+      : await library.refresh(entry);
+  var id = current.runtimeId;
+  if (!current.draft) {
+    if (current.listed) {
+      id = await library.install(current);
+    } else if (current.installedId == null) {
+      throw StateError('此小程序已撤下');
+    }
   }
-  final launcher = entry.draft ? await library.launcher(id) : null;
+  final launcher = current.draft ? await library.launcher(id) : null;
   late final Widget page;
   if (launcher == null) {
     final game = await library.loadIndependent(id);
@@ -37,5 +45,6 @@ Future<void> openMiniapp(
     );
   }
   if (!context.mounted) return;
+  onReady?.call();
   await Navigator.push<void>(context, MaterialPageRoute(builder: (_) => page));
 }
