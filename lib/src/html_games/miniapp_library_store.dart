@@ -42,6 +42,7 @@ class MiniappLibraryStore {
               publisherProfile: profiles[e['publisherId']],
               description: e['description'] as String,
               asset: e['asset'] as String,
+              iconAsset: e['iconAsset'] as String?,
               bundleVersion: e['version'] as String,
               listed: true,
               revision: 1,
@@ -186,6 +187,38 @@ class MiniappLibraryStore {
         updatedAt: r['updated_at'] as int,
       );
     }).toList();
+  }
+
+  Future<({List<MiniappEntry> entries, bool more, int? time, String? id})>
+  recent({int limit = 20, int? beforeTime, String? beforeId}) async {
+    final rows = await database.query(
+      'html_apps',
+      columns: ['id', 'title', 'creator_id', 'updated_at', 'last_opened_at'],
+      where:
+          'last_opened_at IS NOT NULL' +
+          (beforeTime == null
+              ? ''
+              : ' AND (last_opened_at < ? OR (last_opened_at = ? AND id > ?))'),
+      whereArgs: beforeTime == null ? [] : [beforeTime, beforeTime, beforeId],
+      orderBy: 'last_opened_at DESC, id',
+      limit: limit + 1,
+    );
+    final slice = rows.take(limit).toList();
+    final builtins = await bundled();
+    final builtinByRuntime = {
+      for (final entry in builtins) entry.runtimeId: entry,
+    };
+    final entries = await MiniappMetadataStore(
+      database,
+    ).apply(await _mine(slice));
+    return (
+      entries: [
+        for (final entry in entries) builtinByRuntime[entry.id] ?? entry,
+      ],
+      more: rows.length > limit,
+      time: slice.lastOrNull?['last_opened_at'] as int?,
+      id: slice.lastOrNull?['id'] as String?,
+    );
   }
 
   Future<MiniappEntry> entryForApp(String appId) async {

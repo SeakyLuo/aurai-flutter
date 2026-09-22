@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:sqflite/sqflite.dart';
 
-import 'miniapp_entry.dart';
+import 'miniapp_library_store.dart';
 import 'miniapp_metadata_store.dart';
 import '../storage/favorites.dart';
 
@@ -32,6 +32,7 @@ class MiniappFavorites {
         'publisher': entry.publisher,
         'description': entry.description,
         'iconPath': entry.iconPath,
+        'iconAsset': entry.iconAsset,
         'kind': entry.kind.name,
         'asset': entry.asset,
         'bundleVersion': entry.bundleVersion,
@@ -68,6 +69,7 @@ class MiniappFavorites {
           publisher: data['publisher'] as String,
           description: data['description'] as String,
           iconPath: data['iconPath'] as String?,
+          iconAsset: data['iconAsset'] as String?,
           kind: MiniappKind.values.byName(data['kind'] as String),
           asset: data['asset'] as String?,
           bundleVersion: data['bundleVersion'] as String?,
@@ -79,9 +81,14 @@ class MiniappFavorites {
     final entries = await MiniappMetadataStore(
       database,
     ).apply(favorites.map((favorite) => favorite.entry).toList());
+    final bundled = await MiniappLibraryStore(database).bundled();
+    final builtins = {for (final entry in bundled) entry.publicationId: entry};
     return [
       for (var i = 0; i < favorites.length; i++)
-        MiniappFavorite(entries[i], favorites[i].starredAt),
+        MiniappFavorite(
+          builtins[entries[i].publicationId] ?? entries[i],
+          favorites[i].starredAt,
+        ),
     ];
   }
 }

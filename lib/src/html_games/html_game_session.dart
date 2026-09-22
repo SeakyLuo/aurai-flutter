@@ -33,6 +33,7 @@ class HtmlGameSession extends ChangeNotifier {
     required this.theme,
     this.fullscreen = false,
     this.independent = false,
+    this.hostTopInset = 0,
   }) {
     _readyTimeout = Timer(const Duration(seconds: 15), () {
       if (!_closed && !ready) {
@@ -66,6 +67,7 @@ class HtmlGameSession extends ChangeNotifier {
   HtmlGame? _pendingUpdate;
   final bool fullscreen;
   final bool independent;
+  final double hostTopInset;
   late final Timer _readyTimeout;
   Future<void> _localWrite = Future.value();
   Timer? _captureTimer;
@@ -100,6 +102,7 @@ class HtmlGameSession extends ChangeNotifier {
       theme: theme,
       localState: local,
       fullscreen: fullscreen,
+      hostTopInset: hostTopInset,
     );
   }
 

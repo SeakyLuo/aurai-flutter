@@ -68,6 +68,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/miniapps/
+    - assets/miniapps/icons/
     - assets/providers/
     - assets/tokenizers/deepseek_v4.json.gz
     - assets/branding/app_logo.png

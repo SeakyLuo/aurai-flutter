@@ -79,7 +79,7 @@ class MessageItem extends StatefulWidget {
   })?
   onInteractiveClick;
   final Future<InteractiveMessage> Function(String)? onInteractiveRetry;
-  final ValueChanged<AgentMessage>? onQuote;
+  final void Function(AgentMessage message, {String? selectedText})? onQuote;
   final Future<void> Function(AgentMessage)? onRecall;
   final ValueChanged<String>? onOpenQuote;
   final ValueChanged<String>? onOpenMember;
@@ -102,6 +102,7 @@ class _MessageItemState extends State<MessageItem> {
   late Widget _content;
   List<SourceReference> _sources = const [];
   bool _copied = false;
+  String? _selectedText;
   final _bubbleKey = GlobalKey();
   Timer? _copyResetTimer;
 
@@ -201,12 +202,13 @@ class _MessageItemState extends State<MessageItem> {
                     message.taskSummary?.stopped != true))
               MessageReplyFooter(
                 copied: _copied,
-                messageId: message.id,
-                onMore: () => _openActions(showStar: false),
-                onCopy: () => _copy(context, widget.replyPart?.copyText),
+                onMore: () => _openActions(compactMenu: true),
+                onCopy: () =>
+                    _copy(context, _selectedText ?? widget.replyPart?.copyText),
                 onQuote: widget.onQuote == null
                     ? null
-                    : () => widget.onQuote!(message),
+                    : () =>
+                          widget.onQuote!(message, selectedText: _selectedText),
                 createdAt: message.createdAt,
                 sources: _sources,
                 onOpenLink: (href) => _openLink(context, href),
@@ -224,6 +226,7 @@ class _MessageItemState extends State<MessageItem> {
           : _withActions(_content);
     }
     final content = SelectionArea(
+      onSelectionChanged: (selection) => _selectedText = selection?.plainText,
       contextMenuBuilder: (context, selection) =>
           AdaptiveTextSelectionToolbar.buttonItems(
             anchors: selection.contextMenuAnchors,
@@ -233,18 +236,17 @@ class _MessageItemState extends State<MessageItem> {
                 ContextMenuButtonItem(
                   label: '引用',
                   onPressed: () {
+                    final text = _selectedText;
                     selection.hideToolbar();
                     selection.clearSelection();
-                    widget.onQuote!(message);
+                    widget.onQuote!(message, selectedText: text);
                   },
                 ),
             ],
           ),
       child: _content,
     );
-    return widget.onQuote == null && widget.onQuickReply == null
-        ? content
-        : _withActions(content);
+    return content;
   }
 
   Widget _withActions(Widget child) =>
@@ -287,7 +289,8 @@ class _MessageItemState extends State<MessageItem> {
                       label: '消息菜单',
                       child: InkWell(
                         borderRadius: BorderRadius.circular(16),
-                        onTap: _openActions,
+                        onTap: () =>
+                            _openActions(compactMenu: !widget.groupBubble),
                         child: SizedBox(
                           width: 32,
                           height: 18,

@@ -29,7 +29,7 @@ List<ChatTimelineEntry> buildChatTimeline(
   String? beforeMessageId,
   String? highlightedMessageId,
   bool allowEditing = true,
-  ValueChanged<AgentMessage>? onQuote,
+  void Function(AgentMessage message, {String? selectedText})? onQuote,
   ValueChanged<MessageSender>? onMention,
   Future<void> Function(AgentMessage)? onRecall,
   ValueChanged<String>? onOpenQuote,

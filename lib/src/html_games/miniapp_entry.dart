@@ -9,6 +9,7 @@ class MiniappEntry {
     required this.publisher,
     this.publisherProfile,
     this.iconPath,
+    this.iconAsset,
     this.description = '',
     this.publishedTitle,
     this.asset,
@@ -24,7 +25,7 @@ class MiniappEntry {
   });
   final String id, title, publisher, description;
   final MessageSender? publisherProfile;
-  final String? iconPath;
+  final String? iconPath, iconAsset;
   final String? asset,
       bundleVersion,
       sourceId,
@@ -51,6 +52,7 @@ class MiniappEntry {
     description: summary,
     publisher: publisher,
     publisherProfile: publisherProfile,
+    iconAsset: iconAsset,
     iconPath: replaceIcon ? iconPath : this.iconPath,
     publishedTitle: name,
     asset: asset,

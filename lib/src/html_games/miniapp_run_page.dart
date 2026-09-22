@@ -1,3 +1,4 @@
+import 'miniapp_recent_store.dart';
 import 'miniapp_favorite_action.dart';
 import 'dart:async';
 
@@ -34,6 +35,18 @@ class _MiniappRunPageState extends State<MiniappRunPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     htmlRouteObserver.addListener(_visibility);
+    unawaited(_recordOpen());
+  }
+
+  Future<void> _recordOpen() async {
+    try {
+      await recordMiniappOpen(widget.store.database, widget.game.appId);
+    } on Object catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+    }
   }
 
   @override
@@ -46,6 +59,7 @@ class _MiniappRunPageState extends State<MiniappRunPage>
         theme: Theme.of(context),
         fullscreen: true,
         independent: true,
+        hostTopInset: MediaQuery.paddingOf(context).top + 76,
       )..addListener(_changed);
     } else {
       unawaited(_session!.updateTheme(Theme.of(context)));

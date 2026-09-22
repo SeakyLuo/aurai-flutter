@@ -16,7 +16,8 @@ const htmlAppSchema = '''CREATE TABLE html_apps (
   state_json TEXT NOT NULL,
   stateful INTEGER NOT NULL DEFAULT 0,
   version INTEGER NOT NULL DEFAULT 0,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  last_opened_at INTEGER
 )''';
 
 const htmlAppIndex =
