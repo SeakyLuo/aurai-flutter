@@ -1,11 +1,10 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../../agent/ask_user_tool.dart';
 import 'glass_surface.dart';
 import 'question_icon.dart';
 import 'message_composer.dart';
+import 'thinking_indicator.dart';
 import 'user_question_option_tile.dart';
 
 class UserQuestionCard extends StatefulWidget {
@@ -47,13 +46,9 @@ class _UserQuestionCardState extends State<UserQuestionCard> {
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: double.infinity,
-          maxHeight: math.min(
-            MediaQuery.sizeOf(context).height * 0.65,
-            MediaQuery.sizeOf(context).height -
-                MediaQuery.viewInsetsOf(context).bottom -
-                MediaQuery.paddingOf(context).vertical -
-                24,
-          ),
+          maxHeight:
+              MediaQuery.sizeOf(context).height -
+              MediaQuery.paddingOf(context).top,
         ),
         child: BackdropGroup(
           child: GlassSurface(
@@ -68,17 +63,27 @@ class _UserQuestionCardState extends State<UserQuestionCard> {
                   children: [
                     Row(
                       children: [
-                        QuestionIcon(
-                          type: question.isUserAction
-                              ? QuestionIconType.userAction
-                              : QuestionIconType.question,
+                        Expanded(
+                          child: ThinkingIndicator(
+                            label:
+                                question.title ??
+                                (question.isUserAction ? '等待你操作' : '问题'),
+                            animate: false,
+                            singleLine: true,
+                            leading: SizedBox.square(
+                              dimension: MediaQuery.textScalerOf(
+                                context,
+                              ).scale(18),
+                              child: FittedBox(
+                                child: QuestionIcon(
+                                  type: question.isUserAction
+                                      ? QuestionIconType.userAction
+                                      : QuestionIconType.question,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          question.isUserAction ? '等待你操作' : '问题',
-                          style: TextStyle(color: colors.onSurfaceVariant),
-                        ),
-                        const Spacer(),
                         IconButton(
                           tooltip: question.isUserAction ? '取消等待' : '跳过问题',
                           onPressed: _submitted

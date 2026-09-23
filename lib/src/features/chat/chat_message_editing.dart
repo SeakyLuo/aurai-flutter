@@ -87,7 +87,10 @@ extension _ChatMessageEditing on _ChatPageState {
     if (session.saving || session.picking) return;
     _updateEditing(() => session.picking = true);
     try {
-      final source = await showImageSourceMenu(buttonContext);
+      final source = await showImageSourceMenu(
+        buttonContext,
+        allowFavorites: false,
+      );
       if (source == null || !mounted || !identical(_editing, session)) return;
       if (source == AttachmentSource.file) {
         final remaining = MessageFileStore.maxFiles - session.files.length;

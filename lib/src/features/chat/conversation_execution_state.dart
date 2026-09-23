@@ -11,6 +11,8 @@ class _ConversationExecutionState {
   bool forwardedReplyPending = false;
   String? queuedUserMessageId;
   bool submitting = false;
+  Completer<void>? runFinished;
+  Completer<void>? privateRunFinished;
   AgentRuntime? runtime;
   bool systemEventLoading = false;
   GroupDispatcher? groupDispatcher;
@@ -70,6 +72,7 @@ extension ConversationExecutionState on ChatController {
     final state = _executionStates[id];
     return state != null &&
             (state.runningConversation != null ||
+                _pendingMessageQueues[id]?.busy == true ||
                 state.submitting ||
                 state.attachmentJobs > 0 ||
                 state.forwardingMessage ||
@@ -102,6 +105,7 @@ extension ConversationExecutionState on ChatController {
   Future<void> stop() => _inConversation(activeConversation, _stopConversation);
 
   Future<void> _stopConversation() async {
+    pendingMessageQueue.paused = true;
     _execution.queuedUserMessageId = null;
     if (identical(activeConversation, _privateConversation)) {
       _privateConversation!.runState = ChatRunState.stopping;
@@ -158,13 +162,27 @@ extension ConversationExecutionState on ChatController {
   Map<String, String> get _groupStreaming => _execution.groupStreaming;
   Conversation? get _runningConversation => _execution.runningConversation;
   set _runningConversation(Conversation? value) {
+    if (value != null) {
+      _execution.runFinished ??= Completer<void>();
+    } else {
+      _execution.runFinished?.complete();
+      _execution.runFinished = null;
+    }
     _execution.runningConversation = value;
     if (value == null) _callbacksPending = true;
   }
 
   Conversation? get _privateConversation => _execution.privateConversation;
-  set _privateConversation(Conversation? value) =>
-      _execution.privateConversation = value;
+  set _privateConversation(Conversation? value) {
+    if (value != null) {
+      _execution.privateRunFinished ??= Completer<void>();
+    } else {
+      _execution.privateRunFinished?.complete();
+      _execution.privateRunFinished = null;
+    }
+    _execution.privateConversation = value;
+  }
+
   String? get streamingMessageId => _execution.streamingMessageId;
   set streamingMessageId(String? value) =>
       _execution.streamingMessageId = value;

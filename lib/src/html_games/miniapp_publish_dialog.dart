@@ -26,12 +26,14 @@ class _MiniappPublishDialogState extends State<MiniappPublishDialog> {
   late final _description = TextEditingController(
     text: widget.entry.description,
   );
+  final _changeLog = TextEditingController();
   bool _saving = false;
 
   @override
   void dispose() {
     _title.dispose();
     _description.dispose();
+    _changeLog.dispose();
     super.dispose();
   }
 
@@ -39,7 +41,12 @@ class _MiniappPublishDialogState extends State<MiniappPublishDialog> {
     if (_saving) return;
     setState(() => _saving = true);
     try {
-      await widget.store.publish(widget.entry, _title.text, _description.text);
+      await widget.store.publish(
+        widget.entry,
+        _title.text,
+        _description.text,
+        changeLog: _changeLog.text,
+      );
       if (mounted) Navigator.pop(context, true);
     } on Object catch (error) {
       if (mounted)
@@ -82,6 +89,18 @@ class _MiniappPublishDialogState extends State<MiniappPublishDialog> {
               minLines: 3,
               maxLines: 5,
               decoration: const InputDecoration(labelText: '简介'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _changeLog,
+              enabled: !_saving,
+              maxLength: 2000,
+              minLines: 3,
+              maxLines: 6,
+              decoration: const InputDecoration(
+                labelText: '更新日志',
+                hintText: '介绍本次发布的新功能、改进或修复',
+              ),
             ),
             const SizedBox(height: 12),
             Text(

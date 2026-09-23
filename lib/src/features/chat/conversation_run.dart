@@ -151,6 +151,21 @@ extension ConversationRun on ChatController {
         groupId: groupHistory == null ? null : runConversation.id,
         questionTool: AskUserTool(runConversation.id, (question) {
           pendingQuestion = question;
+          final target = groupParent ?? runConversation;
+          if (question == null || question.isUserAction) {
+            target.pendingQuestionPreviews.remove(runId);
+          } else {
+            final heading = question.title?.trim();
+            final preview =
+                '${reply.sender.name}：[问题] ${heading == null || heading.isEmpty ? question.question : heading}';
+            target.pendingQuestionPreviews[runId] = preview;
+            questionNotifications.value = ConversationCompletion(
+              conversationId: target.id,
+              title: target.title,
+              runId: runId,
+              reply: preview,
+            );
+          }
           unawaited(
             _platform.updateAttentionNotification(
               runConversation.id,

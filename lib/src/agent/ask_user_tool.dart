@@ -24,9 +24,11 @@ class UserQuestion {
     required this.conversationId,
     required this.question,
     required this.options,
+    this.title,
     this.isUserAction = false,
   });
   final String conversationId;
+  final String? title;
   final String question;
   final List<Object> options;
   final bool isUserAction;
@@ -95,7 +97,7 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
     name: 'askUser',
     waitsForUser: true,
     description:
-        'Ask one concise question when a user preference or missing information is needed. Present up to four options, or no options for a free-text question. Each option may be plain text or an object with a short title and supporting content. Use title=null for content only; avoid repeating the title in content. The user may select one, write their own answer, or skip. waitForResponse=true or null waits for the answer. Set false only when independent work can continue without it: returns pending immediately and the actual answer arrives as a user update on a later model turn. Do not perform answer-dependent work or claim a final outcome while pending. Never infer an answer from skipping. Do not repeat the question in prose before calling. Incorporate later answers or skips before finalizing; a skip is not consent. For skipped optional details, use a reasonable stated assumption; otherwise explain what is still needed. Do not use this for device permission approval.',
+        'Ask one concise question when a user preference or missing information is needed. title is an optional short heading shown instead of the generic question label. Present up to four options, or no options for a free-text question. Each option may be plain text or an object with a short title and supporting content. Set an option title to null for content only; avoid repeating the option title in its content. The user may select one, write their own answer, or skip. waitForResponse=true or null waits for the answer. Set false only when independent work can continue without it: returns pending immediately and the actual answer arrives as a user update on a later model turn. Do not perform answer-dependent work or claim a final outcome while pending. Never infer an answer from skipping. Do not repeat the question in prose before calling. Incorporate later answers or skips before finalizing; a skip is not consent. For skipped optional details, use a reasonable stated assumption; otherwise explain what is still needed. Do not use this for device permission approval.',
     inputSchema: {
       'type': 'object',
       'properties': {
@@ -105,6 +107,12 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
               'true or null: wait for an answer (default). false: continue independent work while the question remains open.',
         },
         'question': {'type': 'string', 'minLength': 1, 'maxLength': 600},
+        'title': {
+          'type': 'string',
+          'minLength': 1,
+          'maxLength': 20,
+          'description': 'Optional short heading shown above the question.',
+        },
         'options': {
           'type': 'array',
           'items': {
@@ -158,6 +166,7 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
     }
     final question = UserQuestion(
       conversationId: conversationId,
+      title: call.arguments['title'] as String?,
       question: call.arguments['question'] as String,
       options: List<Object>.from(call.arguments['options'] as List),
     );

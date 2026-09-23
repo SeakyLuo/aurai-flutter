@@ -15,14 +15,13 @@ String _markdownText(String text) => text.replaceAllMapped(
   (match) => '\\${match[0]}',
 );
 
-Future<void> forwardMiniapp(BuildContext context, MiniappEntry entry) async {
-  final controller = ImageActionScope.of(context);
+AgentMessage miniappForwardMessage(MiniappEntry entry) {
   final uri = Uri(
     scheme: 'aurai',
     host: 'miniapp',
     pathSegments: [entry.kind.name, entry.id],
   );
-  final message = AgentMessage(
+  return AgentMessage(
     id: newMessageId(),
     role: AgentMessageRole.user,
     senderId: MessageSender.localUser.id,
@@ -31,6 +30,11 @@ Future<void> forwardMiniapp(BuildContext context, MiniappEntry entry) async {
         '${entry.description.isEmpty ? '' : '\n\n${_markdownText(entry.description)}'}',
     createdAt: DateTime.now(),
   );
+}
+
+Future<void> forwardMiniapp(BuildContext context, MiniappEntry entry) async {
+  final controller = ImageActionScope.of(context);
+  final message = miniappForwardMessage(entry);
   final sent = await Navigator.push<bool>(
     context,
     MaterialPageRoute(

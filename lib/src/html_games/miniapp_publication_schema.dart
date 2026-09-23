@@ -35,3 +35,14 @@ Future<void> migrateMiniappPublications(DatabaseExecutor database) async {
     "INSERT OR IGNORE INTO miniapp_installations(source_id, owner_id, app_id, revision) SELECT id, 'user:local', id, 'legacy' FROM html_apps WHERE id = 'builtin.tipoff'",
   );
 }
+
+/// Earlier releases credited every publication to the user instead of its creator.
+Future<void> migrateMiniappCreatorCredits(DatabaseExecutor database) async {
+  await database.rawUpdate("""
+    UPDATE miniapp_publications
+    SET publisher_id = (SELECT creator_id FROM html_apps WHERE id = miniapp_publications.app_id)
+    WHERE publisher_id = 'user:local'
+      AND EXISTS (SELECT 1 FROM html_apps
+        WHERE id = miniapp_publications.app_id AND creator_id != 'user:local')
+  """);
+}

@@ -298,6 +298,7 @@ extension ImageForwarding on ChatController {
         _execution.forwardingMessage ||
         _systemEventLoading)
       return;
+    if (pendingMessageQueue.busy || _resumePendingMessages()) return;
     if (!_execution.forwardedReplyPending &&
         _execution.queuedUserMessageId == null)
       return;

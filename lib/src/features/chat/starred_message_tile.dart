@@ -22,11 +22,13 @@ class StarredMessageTile extends StatelessWidget {
     required this.controller,
     required this.onLocate,
     required this.onRemove,
+    this.selectionMode = false,
   });
   final GroupMessageSearchResult result;
   final String conversationId, conversationTitle;
   final ChatController controller;
   final VoidCallback onLocate, onRemove;
+  final bool selectionMode;
 
   void _openProfile(BuildContext context) {
     Navigator.of(context).push<void>(
@@ -97,28 +99,32 @@ class StarredMessageTile extends StatelessWidget {
                         color: colors.onSurface,
                       ),
                     ),
-                    Text(
-                      conversationTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colors.onSurfaceVariant,
+                    if (conversationTitle.isNotEmpty)
+                      Text(
+                        conversationTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colors.onSurfaceVariant,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
-              Builder(
-                builder: (buttonContext) => IconButton(
-                  tooltip: '更多',
-                  onPressed: () => _more(buttonContext),
-                  icon: Icon(
-                    Icons.more_horiz_rounded,
-                    color: colors.onSurfaceVariant,
+              if (selectionMode)
+                const SizedBox(width: 40)
+              else
+                Builder(
+                  builder: (buttonContext) => IconButton(
+                    tooltip: '更多',
+                    onPressed: () => _more(buttonContext),
+                    icon: Icon(
+                      Icons.more_horiz_rounded,
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 10),

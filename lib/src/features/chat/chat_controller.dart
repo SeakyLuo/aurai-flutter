@@ -1,3 +1,4 @@
+import 'pending_message_queue.dart';
 import '../../domain/quick_reply_option.dart';
 import '../../agent/provider_configuration_tool.dart';
 import '../../providers/model_catalog.dart';
@@ -93,6 +94,7 @@ import '../../agent/agent_runtime.dart';
 import '../../agent/system_prompt.dart';
 import '../../agent/ask_user_tool.dart';
 import '../../agent/model_balance_tool.dart';
+import '../../agent/default_model_tools.dart';
 import '../../agent/memory_tools.dart';
 import '../../agent/model_top_up_tool.dart';
 import '../../agent/group_tool_executor.dart';
@@ -128,6 +130,7 @@ import '../../storage/conversation_rows.dart';
 export 'conversation.dart';
 
 part 'message_quote_actions.dart';
+part 'pending_message_submission.dart';
 part 'message_recall.dart';
 part 'message_submission.dart';
 part 'message_quick_replies.dart';
@@ -213,6 +216,7 @@ class ChatController extends ChangeNotifier {
   final notificationOpenRequests = ValueNotifier<int>(0);
   Future<String?> takeNotificationConversation() =>
       _platform.takeNotificationConversation();
+  final questionNotifications = ValueNotifier<ConversationCompletion?>(null);
   final completedReplies = ValueNotifier<ConversationCompletion?>(null);
   final _store = ConversationStore();
   HtmlGameEventPump? _htmlGameEvents;
@@ -229,6 +233,7 @@ class ChatController extends ChangeNotifier {
   late Conversation _newConversation;
   final List<Conversation> _conversations = [];
   late Conversation _viewConversation;
+  final _pendingMessageQueues = <String, PendingMessageQueue>{};
   final _executionStates = <String, _ConversationExecutionState>{};
   final _uiZone = Zone.current;
   var _viewExecution = _ConversationExecutionState();
@@ -293,6 +298,7 @@ class ChatController extends ChangeNotifier {
   bool get hasStreamingMessages =>
       streamingMessageId != null || _groupStreaming.isNotEmpty;
   bool get hasRunningTask =>
+      pendingMessageQueue.busy ||
       _systemEventLoading ||
       _runningConversation != null ||
       _privateConversation != null ||
@@ -324,6 +330,7 @@ class ChatController extends ChangeNotifier {
     _memory?.dispose();
     _accessibilityTimer?.cancel();
     completedReplies.dispose();
+    questionNotifications.dispose();
     notificationOpenRequests.dispose();
     groupActivityChanges.dispose();
     super.dispose();
@@ -343,7 +350,8 @@ class ChatController extends ChangeNotifier {
       identical(_runningConversation, activeConversation) &&
       runState == ChatRunState.running;
 
-  bool get canEditDraft => !_submitting && !changingConversation;
+  bool get canEditDraft =>
+      !_submitting && !changingConversation && !pendingMessageQueue.busy;
 
   ModelConfig get config =>
       _activeAi == null ? modelSettings.activeConfig : aiConfig(_activeAi!);
@@ -375,6 +383,7 @@ class ChatController extends ChangeNotifier {
       _platform.loadLegacyAppState,
       _platform.clearLegacyAppState,
     );
+    await _loadPendingMessageQueues();
     await _loadImageGeneration();
     groupStore.onSystemNotice = _receiveGroupSystemNotice;
     _platform.notificationAvatar = NotificationAvatar(groupStore).render;

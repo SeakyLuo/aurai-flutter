@@ -1,3 +1,5 @@
+import 'send_favorite_sheet.dart';
+import 'pending_message_panel.dart';
 import 'message_jump_arrow.dart';
 import '../../app/global_ui.dart';
 import 'glass_surface.dart';
@@ -49,6 +51,7 @@ part 'chat_message_editing.dart';
 part 'chat_attachments.dart';
 part 'chat_search_navigation.dart';
 part 'chat_quoting.dart';
+part 'chat_message_submission.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({
@@ -277,79 +280,92 @@ class _ChatPageState extends State<ChatPage>
                 systemNavigationBarContrastEnforced: false,
               ),
               child: KeyboardInset(
-                child:
-                    controller.pendingQuestion?.conversationId ==
-                        _conversationId
-                    ? UserQuestionCard(
-                        key: ObjectKey(controller.pendingQuestion),
-                        question: controller.pendingQuestion!,
-                      )
-                    : ChatComposer(
-                        controller: _textController,
-                        hintText: _editing != null
-                            ? '编辑消息'
-                            : isGroup
-                            ? ''
-                            : '回复 ${controller.activeAi!.sender.name}',
-                        quote: _editing != null
-                            ? _editing!.message.quote
-                            : controller.activeConversation.draftQuote,
-                        onCancelQuote: _editing == null
-                            ? () => _quoteMessage(null)
-                            : null,
-                        focusNode: _focusNode,
-                        savingEdit: _editing?.saving == true,
-                        draftEnabled: _editing != null
-                            ? !_editing!.saving
-                            : controller.canEditDraft && !_preparingGoal,
-                        enabled: isGroup
-                            ? true
-                            : _editing != null
-                            ? !_editing!.saving
-                            : !controller.isBusy ||
-                                  _canSend ||
-                                  controller.draftImages.isNotEmpty ||
-                                  controller.draftFiles.isNotEmpty,
-                        canSend:
-                            _canSend ||
-                            (_editing?.images ?? controller.draftImages)
-                                .isNotEmpty ||
-                            (_editing?.files ?? controller.draftFiles)
-                                .isNotEmpty,
-                        images: _editing?.images ?? controller.draftImages,
-                        files: _editing?.files ?? controller.draftFiles,
-                        onRemoveFile: (file) async {
-                          if (_editing != null) {
-                            _updateEditing(() => _editing!.files.remove(file));
-                            return;
-                          }
-                          try {
-                            await controller.removeDraftFile(file);
-                          } on Object catch (error) {
-                            if (mounted)
-                              _imageNotice('附件移除失败，请重试：${errorMessage(error)}');
-                          }
-                        },
-                        addingImages:
-                            controller.addingImages ||
-                            _editing?.picking == true,
-                        onAddImages: _editing != null
-                            ? _addEditImages
-                            : _addImages,
-                        onRemoveImage: _editing != null
-                            ? _removeEditImage
-                            : _removeImage,
-                        stopping: controller.runState == ChatRunState.stopping,
-                        onSend: _editing != null ? _submitMessageEdit : _send,
-                        canResume:
-                            !isGroup &&
-                            _editing == null &&
-                            (controller.runState == ChatRunState.cancelled ||
-                                controller.runState == ChatRunState.idle) &&
-                            controller.pendingGoal != null,
-                        onResume: _continuePending,
-                        onStop: _stop,
-                      ),
+                child: PendingMessagePanel(
+                  controller: controller,
+                  onSend: _sendQueuedMessages,
+                  child:
+                      controller.pendingQuestion?.conversationId ==
+                          _conversationId
+                      ? UserQuestionCard(
+                          key: ObjectKey(controller.pendingQuestion),
+                          question: controller.pendingQuestion!,
+                        )
+                      : ChatComposer(
+                          controller: _textController,
+                          hintText: _editing != null
+                              ? '编辑消息'
+                              : isGroup
+                              ? ''
+                              : '回复 ${controller.activeAi!.sender.name}',
+                          quote: _editing != null
+                              ? _editing!.message.quote
+                              : controller.activeConversation.draftQuote,
+                          onCancelQuote: _editing == null
+                              ? () => _quoteMessage(null)
+                              : null,
+                          focusNode: _focusNode,
+                          queueing:
+                              !isGroup && controller.shouldQueuePrivateMessage,
+                          savingEdit: _editing?.saving == true,
+                          draftEnabled: _editing != null
+                              ? !_editing!.saving
+                              : controller.canEditDraft && !_preparingGoal,
+                          enabled: isGroup
+                              ? true
+                              : _editing != null
+                              ? !_editing!.saving
+                              : !controller.isBusy ||
+                                    _canSend ||
+                                    controller.draftImages.isNotEmpty ||
+                                    controller.draftFiles.isNotEmpty,
+                          canSend:
+                              !controller.pendingMessageQueue.busy &&
+                              (_canSend ||
+                                  (_editing?.images ?? controller.draftImages)
+                                      .isNotEmpty ||
+                                  (_editing?.files ?? controller.draftFiles)
+                                      .isNotEmpty),
+                          images: _editing?.images ?? controller.draftImages,
+                          files: _editing?.files ?? controller.draftFiles,
+                          onRemoveFile: (file) async {
+                            if (_editing != null) {
+                              _updateEditing(
+                                () => _editing!.files.remove(file),
+                              );
+                              return;
+                            }
+                            try {
+                              await controller.removeDraftFile(file);
+                            } on Object catch (error) {
+                              if (mounted)
+                                _imageNotice(
+                                  '附件移除失败，请重试：${errorMessage(error)}',
+                                );
+                            }
+                          },
+                          addingImages:
+                              controller.addingImages ||
+                              _editing?.picking == true,
+                          onAddImages: _editing != null
+                              ? _addEditImages
+                              : _addImages,
+                          onRemoveImage: _editing != null
+                              ? _removeEditImage
+                              : _removeImage,
+                          stopping:
+                              controller.runState == ChatRunState.stopping,
+                          onSend: _editing != null ? _submitMessageEdit : _send,
+                          canResume:
+                              !isGroup &&
+                              _editing == null &&
+                              controller.pendingMessageQueue.messages.isEmpty &&
+                              (controller.runState == ChatRunState.cancelled ||
+                                  controller.runState == ChatRunState.idle) &&
+                              controller.pendingGoal != null,
+                          onResume: _continuePending,
+                          onStop: _stop,
+                        ),
+                ),
               ),
             ),
             body: Builder(
@@ -370,7 +386,7 @@ class _ChatPageState extends State<ChatPage>
                         child: ScrollAwareJumpStack(
                           messages: controller.messages,
                           atBottom:
-                              !_contentBelow &&
+                              (_followOutput || !_contentBelow) &&
                               !(controller.hasSearchWindow &&
                                   controller.activeConversation.searchHasLater),
                           key: ValueKey(_conversationId),
@@ -669,65 +685,6 @@ class _ChatPageState extends State<ChatPage>
       offset: _textController.text.length,
     );
     _focusNode.requestFocus();
-  }
-
-  Future<void> _send() async {
-    final conversationId = widget.controller.activeConversation.id;
-    final goal = _textController.text.trim();
-    if ((goal.isEmpty &&
-            widget.controller.draftImages.isEmpty &&
-            widget.controller.draftFiles.isEmpty) ||
-        widget.controller.addingImages ||
-        _preparingGoal) {
-      return;
-    }
-    _draftTimer?.cancel();
-    if (widget.controller.activeConversation.kind != ConversationKind.group)
-      _focusNode.unfocus();
-    if (widget.controller.hasSearchWindow) _scrollToBottom();
-    _beforeSentMessageId = widget.controller.messages.lastOrNull?.id;
-    _positionSentMessage =
-        widget.controller.activeConversation.kind != ConversationKind.group;
-    if (!_positionSentMessage) {
-      _sentMessageId = null;
-      _scrollToBottom();
-    }
-    try {
-      final needsSettings = await widget.controller.submitGoal(
-        goal,
-        mentionedRecipients: _mentionedRecipients,
-      );
-      if (needsSettings && mounted) {
-        _preparingGoal = true;
-        await _openSettings(continueAfterSave: true);
-      }
-    } on Object catch (error) {
-      if (widget.controller.activeConversation.id == conversationId)
-        _showRunNotice(error);
-    } finally {
-      _preparingGoal = false;
-      _positionSentMessage = false;
-    }
-  }
-
-  Future<void> _sendQuickReply(AgentMessage message, String key) async {
-    final conversationId = widget.controller.activeConversation.id;
-    try {
-      final needsSettings = await widget.controller.submitQuickReply(
-        message,
-        key,
-      );
-      if (needsSettings && mounted) {
-        _preparingGoal = true;
-        await _openSettings(continueAfterSave: true);
-      }
-    } on Object catch (error) {
-      if (widget.controller.activeConversation.id == conversationId) {
-        _showRunNotice(error);
-      }
-    } finally {
-      _preparingGoal = false;
-    }
   }
 
   Future<void> _continuePending() async {

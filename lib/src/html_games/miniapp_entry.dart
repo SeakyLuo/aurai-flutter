@@ -35,10 +35,7 @@ class MiniappEntry {
   final int? updatedAt;
   final MiniappKind kind;
   final int revision, metadataRevision;
-  bool get canEditMetadata =>
-      draft ||
-      bundled ||
-      (kind == MiniappKind.published && publisherProfile?.id == 'user:local');
+  bool get canEditMetadata => draft || bundled || kind == MiniappKind.published;
 
   MiniappEntry withMetadata(
     String name,

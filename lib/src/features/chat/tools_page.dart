@@ -36,7 +36,7 @@ class _ToolsPageState extends State<ToolsPage> {
               'android.notifications.send' => '通知',
               'android.documents' || 'local.attachments' => '文件与文档',
               'local.history' || 'local.ai_contacts' => '会话与朋友',
-              'model.balance' || 'model.topUp' => '模型账户',
+              'model.settings' || 'model.balance' || 'model.topUp' => '模型账户',
               _ => '设备与其他工具',
             };
       groups.putIfAbsent(name, () => []).add(tool);

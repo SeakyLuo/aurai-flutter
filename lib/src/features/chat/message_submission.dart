@@ -11,6 +11,10 @@ extension MessageSubmission on ChatController {
     String goal,
     List<String>? mentionedRecipients,
   ) async {
+    if (shouldQueuePrivateMessage) {
+      await _enqueuePrivateMessage(goal, fromDraft: true);
+      return false;
+    }
     if (canSendToRunningGroup) {
       await _appendGroupMessage(goal, mentionedRecipients);
       return false;

@@ -1,3 +1,4 @@
+import 'miniapp_release_notes_view.dart';
 import 'miniapp_favorites.dart';
 import '../features/chat/header_action_menu.dart';
 import '../features/chat/attachment_action_icon.dart';
@@ -72,10 +73,14 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
+      final draft = _entry.draft
+          ? _entry
+          : await _library.entryForApp(_entry.id);
+      if (!mounted) return;
       final published = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => MiniappPublishDialog(entry: _entry, store: _library),
+        builder: (_) => MiniappPublishDialog(entry: draft, store: _library),
       );
       if (published == true && mounted) {
         await _reload();
@@ -166,6 +171,12 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
         items: [
           if (_entry.canEditMetadata)
             (value: 'edit', label: '编辑', icon: const TaskActionIcon('edit')),
+          if (!_entry.bundled && _entry.kind != MiniappKind.installed)
+            (
+              value: 'publish',
+              label: _entry.revision == 0 ? '发布' : '发布更新',
+              icon: const TaskActionIcon('edit'),
+            ),
           (
             value: 'forward',
             label: '转发',
@@ -191,6 +202,8 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
           await _edit();
         case 'forward':
           await forwardMiniapp(context, _entry);
+        case 'publish':
+          await _publish();
         case 'favorite':
           if (starred) {
             await favorites.remove(_entry);
@@ -313,6 +326,12 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
                     ).textTheme.bodyMedium?.copyWith(height: 1.6),
                   ),
                 ],
+                if (entry.revision > 0)
+                  MiniappReleaseNotesView(
+                    key: ValueKey('${entry.publicationId}:${entry.revision}'),
+                    database: widget.store.database,
+                    appId: entry.publicationId,
+                  ),
               ],
             ),
           ),
