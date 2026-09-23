@@ -37,6 +37,11 @@ extension MessageQuickReplies on ChatController {
     final sendAsMessage =
         conversation.kind == ConversationKind.direct &&
         source.role == AgentMessageRole.assistant;
+    if (sendAsMessage && shouldQueuePrivateMessage) {
+      await _enqueuePrivateMessage(text, fromDraft: false);
+      QuickReplyRecents.record(key);
+      return false;
+    }
     final own = source.quickReplies
         .where(
           (reply) =>

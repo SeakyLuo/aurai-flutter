@@ -21,6 +21,8 @@ class Conversation {
       Conversation(id: newMessageId(), createdAt: DateTime.now());
 
   final String id;
+  final Map<String, String> pendingQuestionPreviews = {};
+  String? get questionPreview => pendingQuestionPreviews.values.lastOrNull;
   bool isStored = false;
   ConversationKind kind = ConversationKind.direct;
   ConversationMode mode = ConversationMode.normal;
@@ -140,6 +142,7 @@ class Conversation {
   }
 
   String? get preview {
+    if (questionPreview != null) return questionPreview;
     if (draftPreview != null) return draftPreview;
     final latest = _previewMessage;
     if (latest != null)

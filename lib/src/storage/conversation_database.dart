@@ -1,3 +1,4 @@
+import '../html_games/miniapp_release_notes.dart';
 import '../html_games/miniapp_recent_store.dart';
 import '../html_games/miniapp_metadata_store.dart';
 import 'favorites.dart';
@@ -20,7 +21,7 @@ import 'message_quick_reply_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 43,
+  version: 45,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -205,6 +206,8 @@ Future<Database> openConversationDatabase() async => openDatabase(
     }
     if (oldVersion < 39) await migrateMiniappPublications(db);
     if (oldVersion < 40) await migrateFavorites(db);
+    if (oldVersion < 44) await migrateMiniappCreatorCredits(db);
+    if (oldVersion < 45) await db.execute(miniappReleaseNotesSchema);
   },
   onCreate: (db, version) async {
     final batch = db.batch();
@@ -216,6 +219,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
       messageCallbackIndex,
       htmlAppSchema,
       htmlAppIndex,
+      miniappReleaseNotesSchema,
       miniappRecentIndex,
       ...miniappPublicationSchema,
       miniappMetadataSchema,

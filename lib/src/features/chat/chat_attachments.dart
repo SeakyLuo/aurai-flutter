@@ -13,6 +13,14 @@ extension _ChatAttachments on _ChatPageState {
       return;
     final source = await showImageSourceMenu(buttonContext);
     if (source == null || !mounted) return;
+    if (source == AttachmentSource.favorite) {
+      _focusNode.unfocus();
+      final sent = await showSendFavoriteSheet(context, controller);
+      if (mounted && sent == true) {
+        _scrollToBottom();
+      }
+      return;
+    }
     if (source == AttachmentSource.file) {
       if (controller.draftFiles.length == MessageFileStore.maxFiles) {
         _imageNotice('每条消息最多添加 10 个文件');

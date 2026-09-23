@@ -385,15 +385,17 @@ extension ConversationActions on ChatController {
         );
         await txn.delete(
           'app_state',
-          where: 'key IN (?, ?, ?)',
+          where: 'key IN (?, ?, ?, ?)',
           whereArgs: [
             'context_summary:${removed.id}',
             'seen_run:${removed.id}',
             'group_read:${removed.id}',
+            'pending_message_queue:${removed.id}',
           ],
         );
       });
     }
+    _pendingMessageQueues.remove(removed.id);
     _conversations.removeWhere((conversation) => conversation.id == removed.id);
     _updateConversationList();
     _conversationChanged();

@@ -183,11 +183,12 @@ class ConversationStore {
       batch.delete('conversations', where: 'id = ?', whereArgs: [removed.id]);
       batch.delete(
         'app_state',
-        where: 'key IN (?, ?, ?)',
+        where: 'key IN (?, ?, ?, ?)',
         whereArgs: [
           'context_summary:${removed.id}',
           'seen_run:${removed.id}',
           'group_read:${removed.id}',
+          'pending_message_queue:${removed.id}',
         ],
       );
       if (replacement.messageCount > 0) {

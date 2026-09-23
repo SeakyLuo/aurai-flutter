@@ -252,7 +252,9 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: running
+              onTap:
+                  running &&
+                      activity.thoughts.any((text) => text.trim().isNotEmpty)
                   ? () => _openDetails(activity)
                   : activity.sleeping
                   ? () => _openSleepDetails(activity)
@@ -549,9 +551,7 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
                       right: 16,
                       bottom: 8,
                       child: Center(
-                        child: JumpToBottomButton(
-                          onPressed: _jumpToBottom,
-                        ),
+                        child: JumpToBottomButton(onPressed: _jumpToBottom),
                       ),
                     ),
                 ],

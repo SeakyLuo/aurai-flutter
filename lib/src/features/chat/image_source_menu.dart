@@ -1,3 +1,4 @@
+import 'settings_icon.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -5,9 +6,12 @@ import 'package:flutter/material.dart';
 import 'attachment_action_icon.dart';
 import 'glass_surface.dart';
 
-enum AttachmentSource { gallery, camera, file }
+enum AttachmentSource { gallery, camera, file, favorite }
 
-Future<AttachmentSource?> showImageSourceMenu(BuildContext context) {
+Future<AttachmentSource?> showImageSourceMenu(
+  BuildContext context, {
+  bool allowFavorites = true,
+}) {
   final button = context.findRenderObject()! as RenderBox;
   final overlay =
       Navigator.of(
@@ -74,6 +78,12 @@ Future<AttachmentSource?> showImageSourceMenu(BuildContext context) {
                                 label: '文件',
                                 icon: AttachmentActionIconType.file,
                               ),
+                              if (allowFavorites)
+                                _AttachmentSourceItem(
+                                  source: AttachmentSource.favorite,
+                                  label: '收藏',
+                                  icon: AttachmentActionIconType.file,
+                                ),
                             ],
                           ),
                         ),
@@ -111,7 +121,9 @@ class _AttachmentSourceItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         child: Row(
           children: [
-            AttachmentActionIcon(type: icon),
+            source == AttachmentSource.favorite
+                ? const SettingsIcon(type: SettingsIconType.star)
+                : AttachmentActionIcon(type: icon),
             const SizedBox(width: 13),
             Expanded(
               child: Column(

@@ -22,10 +22,11 @@ class ConversationPreviewText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final draft = conversation.draftPreview;
+    final question = conversation.questionPreview;
+    final draft = question == null ? conversation.draftPreview : null;
     final text = MessagePreviewText(
-      text: draft ?? conversation.preview ?? emptyText,
-      literal: draft != null,
+      text: question ?? draft ?? conversation.preview ?? emptyText,
+      literal: draft != null || question != null,
       prefix: [
         if (prefix.isNotEmpty) TextSpan(text: prefix),
         if (draft != null)

@@ -8,6 +8,7 @@ import '../../providers/openrouter_models.dart';
 import 'chat_controller.dart';
 import 'choice_sheet.dart';
 import 'model_settings_sheet.dart';
+import 'model_replacement_page.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 
@@ -37,6 +38,26 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
     );
     if (mounted) setState(() {});
   }
+
+  Future<void> _replaceModels() async {
+    final result = await Navigator.push<ModelReplacementImpact>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ModelReplacementPage(controller: widget.controller),
+      ),
+    );
+    if (!mounted || result == null) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showGlassSnackBar(
+      SnackBar(content: Text('已更换${_replacementSummary(result)}')),
+    );
+  }
+
+  String _replacementSummary(ModelReplacementImpact impact) => [
+    if (impact.aiCount > 0) '${impact.aiCount} 个 AI',
+    for (final purpose in ModelPurpose.values)
+      if (impact.purposes.contains(purpose)) purpose.label,
+  ].join('、');
 
   Future<void> _select(ModelPurpose purpose) async {
     if (purpose == ModelPurpose.imageGeneration) {
@@ -189,6 +210,23 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
               16,
             ),
             children: [
+              Material(
+                color: settingsFieldColor(context),
+                borderRadius: BorderRadius.circular(24),
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 10,
+                  ),
+                  leading: const SettingsIcon(type: SettingsIconType.model),
+                  title: const Text('更换模型'),
+                  subtitle: const Text('批量替换 AI 和默认用途使用的模型'),
+                  trailing: const SettingsIcon(type: SettingsIconType.chevron),
+                  onTap: _loading == null ? _replaceModels : null,
+                ),
+              ),
+              const SizedBox(height: 20),
               for (final purpose in ModelPurpose.values) ...[
                 Material(
                   color: settingsFieldColor(context),

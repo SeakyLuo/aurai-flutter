@@ -213,6 +213,29 @@ extension GlobalTools on ChatController {
           _conversationChanged,
           senderId: senderId,
         ),
+      for (final update in [false, true])
+        DefaultModelTool(
+          update: update,
+          settings: () => modelSettings,
+          imageGeneration: () => imageGeneration,
+          save: (purpose, selection) async {
+            if (purpose != ModelPurpose.imageGeneration) {
+              await saveDefaultModel(purpose, selection);
+              return;
+            }
+            final client = ImageGenerationClient();
+            try {
+              final models = await client.models(modelSettings.profile(selection.service));
+              final model = models.where((m) => m.id == selection.model).firstOrNull;
+              if (model == null) {
+                throw ArgumentError('该供应商可用的生图模型：${models.map((m) => m.id).join(', ')}');
+              }
+              await saveImageGeneration(ImageGenerationConfig(service: selection.service, model: model));
+            } finally {
+              client.close();
+            }
+          },
+        ),
       for (final operation in AiContactTool.operations)
         AiContactTool(
           groupStore,
@@ -233,6 +256,7 @@ extension GlobalTools on ChatController {
               baseUrl: current.baseUrl,
             );
           },
+          modelSettings: () => modelSettings,
           ownerId: senderId,
         ),
       AttachmentTool((call) async {

@@ -4,10 +4,15 @@ extension MiniappPublicationOperations on MiniappLibraryStore {
   Future<void> publish(
     MiniappEntry entry,
     String title,
-    String description,
-  ) async {
+    String description, {
+    required String changeLog,
+  }) async {
     title = title.trim();
     description = description.trim();
+    changeLog = changeLog.trim();
+    if (changeLog.isEmpty || changeLog.length > 2000) {
+      throw ArgumentError('请填写更新日志，最多 2000 字');
+    }
     if (!entry.draft || entry.bundled) throw StateError('只有自己创建的小程序可以发布');
     if (title.isEmpty ||
         title.length > 100 ||
@@ -48,7 +53,7 @@ extension MiniappPublicationOperations on MiniappLibraryStore {
         'app_id': entry.id,
         'title': title,
         'description': description,
-        'publisher_id': MiniappLibraryStore.owner,
+        'publisher_id': app['creator_id'],
         'source_path': snapshot,
         'stateful': app['stateful'],
         'revision': revision + 1,
@@ -56,6 +61,12 @@ extension MiniappPublicationOperations on MiniappLibraryStore {
         'updated_at': DateTime.now().microsecondsSinceEpoch,
       };
       await MiniappMetadataStore.write(txn, entry, title, description);
+      await txn.insert('miniapp_release_notes', {
+        'app_id': entry.id,
+        'revision': revision + 1,
+        'notes': changeLog,
+        'created_at': values['updated_at'],
+      });
       if (old.isEmpty) {
         await txn.insert('miniapp_publications', values);
       } else {

@@ -357,6 +357,7 @@ class ChatComposer extends StatelessWidget {
     required this.onRemoveImage,
     required this.addingImages,
     this.savingEdit = false,
+    this.queueing = false,
     this.quote,
     this.onCancelQuote,
   });
@@ -379,6 +380,7 @@ class ChatComposer extends StatelessWidget {
   final ValueChanged<MessageFile> onRemoveFile;
   final bool addingImages;
   final bool savingEdit;
+  final bool queueing;
   final MessageQuote? quote;
   final VoidCallback? onCancelQuote;
 
@@ -468,6 +470,8 @@ class ChatComposer extends StatelessWidget {
                     ? '正在处理附件'
                     : resume
                     ? '继续任务'
+                    : queueing
+                    ? '加入待发送'
                     : '发送')
               : stopping
               ? '正在停止'

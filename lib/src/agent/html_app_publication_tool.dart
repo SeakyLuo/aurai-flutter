@@ -1,3 +1,4 @@
+import '../html_games/miniapp_release_notes.dart';
 import '../domain/tool_models.dart';
 import '../html_games/miniapp_library_store.dart';
 
@@ -27,7 +28,7 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
       'readHtmlAppPublication' =>
         'Read publication state and revision of a miniapp you created or the local user owns. Resolve appId with listHtmlAppPublications, never ask the user for IDs. Installed copies and bundled apps cannot be published with these tools.',
       'publishHtmlApp' =>
-        'Publish the first version of a miniapp to the local application library on behalf of the user. Use only when the user requests publication, never automatically after creating a message. Snapshots current code without chat history or saved data. This does not publish to the internet. Read publication state first; expectedRevision must be 0.',
+        'Publish the first version of a miniapp to the local application library on behalf of the user. Use only when the user requests publication, never automatically after creating a message. Credits the original creator (AI or local user). Snapshots current code without chat history or saved data. This does not publish to the internet. Read publication state first; expectedRevision must be 0.',
       'updateHtmlAppPublication' =>
         'Publish a new code snapshot of an already published or withdrawn miniapp, only when the user asks. Draft edits do not change the released version. Preserves installed copies and their data; users explicitly update. Read the current revision first.',
       _ =>
@@ -46,6 +47,13 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
         if (name == 'publishHtmlApp' || name == 'updateHtmlAppPublication') ...{
           'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
           'description': {'type': 'string', 'minLength': 1, 'maxLength': 500},
+          'changeLog': {
+            'type': 'string',
+            'minLength': 1,
+            'maxLength': 2000,
+            'description':
+                'User-facing release notes describing actual changes in this version; required for first publication and updates.',
+          },
         },
       },
       'required': [
@@ -56,6 +64,7 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
         if (name == 'publishHtmlApp' || name == 'updateHtmlAppPublication') ...[
           'title',
           'description',
+          'changeLog',
         ],
       ],
       'additionalProperties': false,
@@ -142,10 +151,12 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
             entry,
             call.arguments['title'] as String,
             call.arguments['description'] as String,
+            changeLog: call.arguments['changeLog'] as String,
           );
         }
         entry = await store.refresh(entry);
       }
+      final notes = await readMiniappReleaseNotes(store.database, id, limit: 1);
       return ToolResult(
         callId: call.id,
         toolName: name,
@@ -157,7 +168,9 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
           'revision': entry.revision,
           'published': entry.listed,
           'scope': 'local',
-          'publisherId': 'user:local',
+          'changeLog': notes.firstOrNull?.notes,
+          'changeLogRevision': notes.firstOrNull?.revision,
+          'publisherId': rows.single['creator_id'],
         },
       );
     } on Object catch (error) {

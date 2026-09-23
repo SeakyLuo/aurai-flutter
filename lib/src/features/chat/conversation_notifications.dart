@@ -6,6 +6,7 @@ import 'home_navigation.dart';
 import 'package:flutter/material.dart';
 
 import 'chat_controller.dart';
+import '../../domain/conversation_completion.dart';
 import 'conversation_notification_toast.dart';
 
 class ConversationNotifications extends StatefulWidget {
@@ -40,6 +41,7 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
     widget.controller.openAppPage = (args) =>
         navigateAppPage(context, widget.controller, args);
     widget.controller.completedReplies.addListener(_onCompleted);
+    widget.controller.questionNotifications.addListener(_onQuestion);
     widget.controller.memory.notices.addListener(_onMemoryNotice);
     widget.controller.notificationOpenRequests.addListener(
       _openSystemNotification,
@@ -55,6 +57,7 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
     _hideCompletionToast();
     widget.controller.openAppPage = null;
     widget.controller.completedReplies.removeListener(_onCompleted);
+    widget.controller.questionNotifications.removeListener(_onQuestion);
     widget.controller.memory.notices.removeListener(_onMemoryNotice);
     widget.controller.notificationOpenRequests.removeListener(
       _openSystemNotification,
@@ -109,10 +112,18 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
   }
 
   void _onCompleted() {
-    final completion = widget.controller.completedReplies.value!;
+    _showNotification(widget.controller.completedReplies.value!);
+  }
+
+  void _onQuestion() {
+    _showNotification(widget.controller.questionNotifications.value!);
+  }
+
+  void _showNotification(ConversationCompletion completion) {
     if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed)
       return;
-    if (widget.controller.activeConversation.id == completion.conversationId)
+    if (widget.controller.isConversationDetailVisible &&
+        widget.controller.activeConversation.id == completion.conversationId)
       return;
     _hideCompletionToast();
     final avatar = NotificationAvatar(

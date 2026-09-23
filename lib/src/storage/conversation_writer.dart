@@ -45,6 +45,7 @@ class ConversationWriter {
     bool saveDraft = false,
     bool saveRuntime = false,
     bool saveMessages = true,
+    String? pendingMessageQueue,
     Map<String, List<String>> recipients = const {},
     ({String senderId, bool paused})? participation,
   }) {
@@ -122,6 +123,12 @@ class ConversationWriter {
             if (row['has_interactive'] == 1) row['id'],
         };
         final batch = txn.batch();
+        if (pendingMessageQueue != null) {
+          batch.insert('app_state', {
+            'key': 'pending_message_queue:${conversation.id}',
+            'value': pendingMessageQueue,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+        }
         batch.insert(
           'conversations',
           header,
