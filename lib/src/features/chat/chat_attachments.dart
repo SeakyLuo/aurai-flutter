@@ -15,7 +15,7 @@ extension _ChatAttachments on _ChatPageState {
     if (source == null || !mounted) return;
     if (source == AttachmentSource.favorite) {
       _focusNode.unfocus();
-      final sent = await showSendFavoriteSheet(context, controller);
+      final sent = await showSendFavoritePage(context, controller);
       if (mounted && sent == true) {
         _scrollToBottom();
       }

@@ -10,11 +10,16 @@ extension _MessageItemActions on _MessageItemState {
         !snapshot.isReasoning &&
         (!widget.readOnly || widget.onLocate != null);
     var starred = false;
+    MiniappEntry? miniapp;
     if (allowStar) {
       try {
-        starred = await StarredMessages(
-          ImageActionScope.of(context).groupStore.database,
-        ).contains(snapshot.id);
+        final database = ImageActionScope.of(context).groupStore.database;
+        if (snapshot.htmlGame?.appId case final appId?) {
+          miniapp = await MiniappLibraryStore(database).entryForApp(appId);
+          starred = await MiniappFavorites(database).contains(miniapp);
+        } else {
+          starred = await StarredMessages(database).contains(snapshot.id);
+        }
       } on Object catch (error) {
         if (mounted)
           ScaffoldMessenger.of(
@@ -90,6 +95,21 @@ extension _MessageItemActions on _MessageItemState {
     switch (action) {
       case MessageAction.star:
         try {
+          if (miniapp != null) {
+            final favorites = MiniappFavorites(
+              ImageActionScope.of(context).groupStore.database,
+            );
+            if (starred) {
+              await favorites.remove(miniapp);
+            } else {
+              await favorites.add(miniapp);
+            }
+            if (mounted)
+              ScaffoldMessenger.of(context).showGlassSnackBar(
+                SnackBar(content: Text(starred ? '已取消收藏' : '已收藏小程序')),
+              );
+            return;
+          }
           final store = StarredMessages(
             ImageActionScope.of(context).groupStore.database,
           );

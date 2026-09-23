@@ -69,20 +69,23 @@ class HtmlAppStore {
   static Future<String> code(Map<String, Object?> app) =>
       File(app['source_path'] as String).readAsString();
 
-  Future<List<Map<String, Object?>>> list(String creator, String query) =>
-      database.query(
-        'html_apps',
-        columns: [
-          'id AS appId',
-          '(COALESCE((SELECT title FROM miniapp_metadata WHERE app_id = html_apps.id), title)) AS title',
-          'source_path AS sourcePath',
-          'updated_at',
-        ],
-        where: 'creator_id = ? AND instr(lower(COALESCE((SELECT title FROM miniapp_metadata WHERE app_id = html_apps.id), title)), lower(?)) > 0',
-        whereArgs: [creator, query],
-        orderBy: 'updated_at DESC, id',
-        limit: 50,
-      );
+  Future<List<Map<String, Object?>>> list(
+    String creator,
+    String query,
+  ) => database.query(
+    'html_apps',
+    columns: [
+      'id AS appId',
+      '(COALESCE((SELECT title FROM miniapp_metadata WHERE app_id = html_apps.id), title)) AS title',
+      'source_path AS sourcePath',
+      'updated_at',
+    ],
+    where:
+        'creator_id = ? AND instr(lower(COALESCE((SELECT title FROM miniapp_metadata WHERE app_id = html_apps.id), title)), lower(?)) > 0',
+    whereArgs: [creator, query],
+    orderBy: 'updated_at DESC, id',
+    limit: 50,
+  );
 
   static Future<Map<String, Object?>> reference(
     Map<String, Object?> app,
@@ -150,18 +153,50 @@ class HtmlAppStore {
           whereArgs: [id],
         );
         if (apps.isEmpty) throw StateError('小应用不存在');
+        Map<String, Object?>? session;
         if (messageId == null) {
           if (apps.single['creator_id'] != actor)
             throw StateError('只能访问自己创建的小应用数据');
         } else {
           final refs = await txn.query(
             'html_games',
-            columns: ['app_id'],
+            columns: ['app_id', 'session_data_json', 'version'],
             where:
                 "message_id = ? AND app_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
             whereArgs: [messageId, id],
           );
           if (refs.isEmpty) throw StateError('小应用入口已删除或撤回');
+          if (refs.single['session_data_json'] != null) session = refs.single;
+        }
+        if (session != null) {
+          final documents =
+              (jsonDecode(session['session_data_json'] as String) as Map)
+                  .cast<String, Object?>();
+          final previous =
+              documents[name] as Map? ?? {'revision': 0, 'value': null};
+          if (!write) return previous.cast<String, Object?>();
+          if (expectedRevision != previous['revision'])
+            throw StateError('数据已更新，请重新读取后再保存');
+          final next = {
+            'revision': (previous['revision'] as int) + 1,
+            'value': value,
+          };
+          documents[name] = next;
+          final encoded = jsonEncode(documents);
+          if (utf8.encode(encoded).length > maxDataBytes)
+            throw ArgumentError('本条消息的数据最多 4 MB');
+          await txn.update(
+            'html_games',
+            {
+              'session_data_json': encoded,
+              'version': (session['version'] as int) + 1,
+              'preview': null,
+              'updated_at': DateTime.now().microsecondsSinceEpoch,
+            },
+            where: 'message_id = ?',
+            whereArgs: [messageId],
+          );
+          return next;
         }
         final file = await _dataFile(id, name);
         commit = HtmlDataCommit(file, 'html_data_commit:$id:$name');
@@ -191,7 +226,7 @@ class HtmlAppStore {
         await txn.update(
           'html_games',
           {'version': version, 'preview': null},
-          where: 'app_id = ?',
+          where: 'app_id = ? AND session_data_json IS NULL',
           whereArgs: [id],
         );
         return next;

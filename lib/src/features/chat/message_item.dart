@@ -1,4 +1,6 @@
 import '../../html_games/miniapp_forward.dart';
+import '../../html_games/miniapp_favorites.dart';
+import '../../html_games/miniapp_library_store.dart';
 import 'message_swipe_quote.dart';
 import '../../app/glass_notice.dart';
 import 'remove_favorite.dart';
@@ -140,7 +142,8 @@ class _MessageItemState extends State<MessageItem> {
       : ImageMessageScope(
           messageId: message.id,
           child:
-              widget.onQuote != null &&
+              widget.groupBubble &&
+                  widget.onQuote != null &&
                   !widget.readOnly &&
                   !widget.streaming &&
                   !message.isReasoning &&
@@ -266,23 +269,7 @@ class _MessageItemState extends State<MessageItem> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: widget.replyPart != null
-                      ? const SizedBox.shrink()
-                      : Text(
-                          message.interactive?.systemPresentation == true
-                              ? '系统'
-                              : message.sender!.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                ),
+                const Spacer(),
                 if (!widget.readOnly)
                   Builder(
                     builder: (buttonContext) => Semantics(

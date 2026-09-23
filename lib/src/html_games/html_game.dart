@@ -72,10 +72,12 @@ class HtmlGame {
     required this.height,
     required this.canRetry,
     this.stateful = false,
+    this.sessionScoped = false,
     this.backgroundMode = 'message',
   });
   final Map<String, Object?>? interactionProjection;
   final bool stateful;
+  final bool sessionScoped;
   final String backgroundMode;
   final int? width;
   final int height;
@@ -99,6 +101,7 @@ class HtmlGame {
     messageId: row['message_id'] as String,
     appId: row['app_id'] as String,
     stateful: row['stateful'] == 1,
+    sessionScoped: row['session_data_json'] != null,
     backgroundMode: row['background_mode'] as String,
     width: row['display_width'] as int?,
     height: row['display_height'] as int,

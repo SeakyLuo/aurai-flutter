@@ -6,148 +6,212 @@ import '../../domain/agent_models.dart';
 import '../../domain/error_message.dart';
 import '../../html_games/miniapp_favorites.dart';
 import '../../html_games/miniapp_forward.dart';
+import '../../html_games/miniapp_entry.dart';
+import '../../html_games/miniapp_template.dart';
 import '../../html_games/miniapp_icon.dart';
 import '../../storage/group_message_search.dart';
 import '../../storage/starred_messages.dart';
 import 'chat_controller.dart';
-import 'dialog_action_button.dart';
+import '../../storage/home_conversations.dart';
+import 'image_forward_dialog.dart';
+import 'group_avatar.dart';
+import 'member_avatar.dart';
 import 'starred_message_tile.dart';
-import 'question_icon.dart';
 import 'retained_tab_view.dart';
 import 'search_skeleton.dart';
 import 'search_type_segment.dart';
 import 'settings_appearance.dart';
-import 'settings_icon.dart';
 
-Future<bool?> showSendFavoriteSheet(
+Future<bool?> showSendFavoritePage(
   BuildContext context,
   ChatController controller,
-) {
-  final target = controller.activeConversation;
-  return showModalBottomSheet<bool>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: false,
-    backgroundColor: Theme.of(context).colorScheme.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+) => Navigator.push<bool>(
+  context,
+  MaterialPageRoute(
+    builder: (_) => _SendFavoritePage(
+      controller: controller,
+      target: controller.activeConversation,
     ),
-    clipBehavior: Clip.antiAlias,
-    builder: (_) =>
-        _SendFavoriteSheet(controller: controller, targetId: target.id),
-  );
-}
+  ),
+);
 
-class _SendFavoriteSheet extends StatefulWidget {
-  const _SendFavoriteSheet({required this.controller, required this.targetId});
+class _SendFavoritePage extends StatefulWidget {
+  const _SendFavoritePage({required this.controller, required this.target});
   final ChatController controller;
-  final String targetId;
+  final Conversation target;
   @override
-  State<_SendFavoriteSheet> createState() => _SendFavoriteSheetState();
+  State<_SendFavoritePage> createState() => _SendFavoritePageState();
 }
 
-class _SendFavoriteSheetState extends State<_SendFavoriteSheet> {
-  bool _miniapps = false, _sending = false;
-  AgentMessage? _selected;
+class _SendFavoritePageState extends State<_SendFavoritePage> {
+  bool _miniapps = false, _opening = false;
 
   void _selectTab(bool value) {
-    if (_sending || _miniapps == value) return;
-    setState(() {
-      _miniapps = value;
-      _selected = null;
-    });
+    if (_opening || _miniapps == value) return;
+    setState(() => _miniapps = value);
   }
 
-  Future<void> _send() async {
-    final message = _selected!;
-    setState(() => _sending = true);
+  Future<void> _select(_FavoriteChoice item) async {
+    if (_opening) return;
+    setState(() => _opening = true);
     try {
-      await widget.controller.forwardMessage(widget.targetId, message, '');
-      if (mounted) Navigator.pop(context, true);
+      final target = widget.target;
+      final controller = widget.controller;
+      final Widget avatar;
+      final String recipientName;
+      if (target.kind == ConversationKind.group) {
+        final members = await controller.groupStore.avatarMembers([target.id]);
+        avatar = GroupAvatar(members: members[target.id]!, size: 48);
+        recipientName = '群聊';
+      } else {
+        final senders = await HomeConversations(
+          controller.groupStore,
+        ).senders([target]);
+        final sender = senders[target.defaultSenderId]!;
+        avatar = MemberAvatar(sender: sender, size: 48);
+        recipientName = sender.name;
+      }
+      if (!mounted) return;
+      final miniapp = item.miniapp;
+      final sent = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        isDismissible: false,
+        enableDrag: false,
+        showDragHandle: false,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        builder: (_) => ImageForwardDialog.message(
+          controller: controller,
+          message: item.message,
+          targetId: target.id,
+          kind: target.kind,
+          title: target.title,
+          recipientName: recipientName,
+          avatar: avatar,
+          preview: miniapp == null ? null : _MiniappPreview(entry: miniapp),
+          sendMessage: miniapp == null
+              ? null
+              : (targetId, note) async {
+                  final template = await MiniappTemplate.load(
+                    controller.groupStore.database,
+                    miniapp,
+                  );
+                  await controller.sendMiniappTemplate(
+                    targetId,
+                    template,
+                    note,
+                  );
+                },
+        ),
+      );
+      if (sent == true && mounted) Navigator.pop(context, true);
     } on Object catch (error) {
-      if (mounted) {
-        setState(() => _sending = false);
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
-      }
+    } finally {
+      if (mounted) setState(() => _opening = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: !_sending,
-    child: SizedBox(
-      height: MediaQuery.sizeOf(context).height * .8,
-      child: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                children: [
-                  SettingsGlassAction(
-                    label: '关闭',
-                    icon: Icons.close_rounded,
-                    iconWidget: const QuestionIcon(
-                      type: QuestionIconType.close,
-                    ),
-                    onPressed: _sending ? null : () => Navigator.pop(context),
+  Widget build(BuildContext context) => Scaffold(
+    appBar: SettingsAppBar(title: '发送收藏', onBack: () => Navigator.pop(context)),
+    body: SafeArea(
+      top: false,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: SearchTypeSegment(
+              files: _miniapps,
+              labels: const ['消息', '小程序'],
+              onChanged: _selectTab,
+            ),
+          ),
+          Expanded(
+            child: RetainedTabView(
+              index: _miniapps ? 1 : 0,
+              swipeEnabled: !_opening,
+              onChanged: (index) => _selectTab(index == 1),
+              children: [
+                for (final miniapps in [false, true])
+                  _FavoriteChoices(
+                    controller: widget.controller,
+                    miniapps: miniapps,
+                    enabled: !_opening,
+                    onSelected: _select,
                   ),
-                  Expanded(
-                    child: Center(
-                      child: SearchTypeSegment(
-                        files: _miniapps,
-                        labels: const ['消息', '小程序'],
-                        onChanged: _selectTab,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 48),
-                ],
-              ),
+              ],
             ),
-            Expanded(
-              child: RetainedTabView(
-                index: _miniapps ? 1 : 0,
-                swipeEnabled: !_sending,
-                onChanged: (index) => _selectTab(index == 1),
-                children: [
-                  for (final miniapps in [false, true])
-                    _FavoriteChoices(
-                      controller: widget.controller,
-                      miniapps: miniapps,
-                      selected: _selected?.id,
-                      enabled: !_sending,
-                      onSelected: (message) =>
-                          setState(() => _selected = message),
-                    ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: DialogActionButton(
-                  text: '发送',
-                  loading: _sending,
-                  liquidGlass: true,
-                  onPressed: _selected == null || _sending ? null : _send,
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );
 }
 
+class _MiniappPreview extends StatelessWidget {
+  const _MiniappPreview({required this.entry});
+  final MiniappEntry entry;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: dialogControlColor(context),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Row(
+      children: [
+        MiniappIcon(path: entry.iconPath, asset: entry.iconAsset, size: 48),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                entry.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+              if (entry.description.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  entry.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _FavoriteChoice {
-  const _FavoriteChoice(this.message, this.title, this.subtitle, this.icon);
+  const _FavoriteChoice(
+    this.message,
+    this.title,
+    this.subtitle,
+    this.icon, {
+    this.miniapp,
+  });
+  final MiniappEntry? miniapp;
   final AgentMessage message;
   final String title, subtitle;
   final Widget icon;
@@ -157,14 +221,12 @@ class _FavoriteChoices extends StatefulWidget {
   const _FavoriteChoices({
     required this.controller,
     required this.miniapps,
-    required this.selected,
     required this.enabled,
     required this.onSelected,
   });
   final ChatController controller;
   final bool miniapps, enabled;
-  final String? selected;
-  final ValueChanged<AgentMessage> onSelected;
+  final ValueChanged<_FavoriteChoice> onSelected;
   @override
   State<_FavoriteChoices> createState() => _FavoriteChoicesState();
 }
@@ -216,6 +278,7 @@ class _FavoriteChoicesState extends State<_FavoriteChoices> {
                 asset: entry.iconAsset,
                 size: 36,
               ),
+              miniapp: entry,
             ),
           );
         }
@@ -277,26 +340,6 @@ class _FavoriteChoicesState extends State<_FavoriteChoices> {
     }
   }
 
-  Widget _selectionIndicator(BuildContext context, bool selected) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      width: 24,
-      height: 24,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: selected ? colors.onSurface : Colors.transparent,
-        border: Border.all(
-          color: selected ? colors.onSurface : colors.outline,
-          width: 1.4,
-        ),
-      ),
-      child: selected
-          ? SettingsIcon(type: SettingsIconType.check, color: colors.surface)
-          : null,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_items.isEmpty && _loading)
@@ -331,31 +374,17 @@ class _FavoriteChoicesState extends State<_FavoriteChoices> {
             ),
           );
         final item = _items[index];
-        final selected = widget.selected == item.message.id;
         if (!widget.miniapps) {
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: widget.enabled
-                ? () => widget.onSelected(item.message)
-                : null,
-            child: Stack(
-              children: [
-                IgnorePointer(child: item.icon),
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: _selectionIndicator(context, selected),
-                ),
-              ],
-            ),
+            onTap: widget.enabled ? () => widget.onSelected(item) : null,
+            child: IgnorePointer(child: item.icon),
           );
         }
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Material(
-            color: selected
-                ? Theme.of(context).colorScheme.onSurface.withValues(alpha: .08)
-                : settingsFieldColor(context),
+            color: settingsFieldColor(context),
             borderRadius: BorderRadius.circular(22),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
@@ -374,12 +403,7 @@ class _FavoriteChoicesState extends State<_FavoriteChoices> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              selected: selected,
-              selectedColor: Theme.of(context).colorScheme.onSurface,
-              trailing: _selectionIndicator(context, selected),
-              onTap: widget.enabled
-                  ? () => widget.onSelected(item.message)
-                  : null,
+              onTap: widget.enabled ? () => widget.onSelected(item) : null,
             ),
           ),
         );

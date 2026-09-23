@@ -72,6 +72,38 @@ class MiniappMetadataStore {
     );
   }
 
+  Future<void> saveIcon(MiniappEntry entry, String? iconPath) async {
+    if (!entry.canEditMetadata) throw StateError('只能编辑自己小程序的资料');
+    await database.transaction((txn) async {
+      final rows = await txn.query(
+        'miniapp_metadata',
+        columns: ['revision'],
+        where: 'app_id = ?',
+        whereArgs: [entry.publicationId],
+      );
+      final revision = rows.isEmpty ? 0 : rows.single['revision'] as int;
+      if (revision != entry.metadataRevision) {
+        throw StateError('资料已被修改，请重新读取小程序资料');
+      }
+      if (rows.isEmpty) {
+        await txn.insert('miniapp_metadata', {
+          'app_id': entry.publicationId,
+          'title': entry.title,
+          'description': entry.description,
+          'icon_path': iconPath,
+          'revision': 1,
+        });
+      } else {
+        await txn.update(
+          'miniapp_metadata',
+          {'icon_path': iconPath, 'revision': revision + 1},
+          where: 'app_id = ?',
+          whereArgs: [entry.publicationId],
+        );
+      }
+    });
+  }
+
   static Future<void> write(
     DatabaseExecutor txn,
     MiniappEntry entry,

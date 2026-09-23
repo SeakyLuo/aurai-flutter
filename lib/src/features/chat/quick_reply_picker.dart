@@ -1,25 +1,46 @@
 import 'package:flutter/material.dart';
 import '../../domain/quick_reply_option.dart';
+import '../../storage/quick_reply_recents.dart';
 import 'quick_reply_groups.dart';
 
 Future<QuickReplyOption?> showQuickReplyPicker(
   BuildContext context, {
   Set<String> selectedKeys = const {},
-}) => showModalBottomSheet<QuickReplyOption>(
-  context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  showDragHandle: true,
-  builder: (_) => _QuickReplyPicker(selectedKeys: selectedKeys),
-);
+}) async {
+  final recent = await QuickReplyRecents.load();
+  if (!context.mounted) return null;
+  return showModalBottomSheet<QuickReplyOption>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) =>
+        _QuickReplyPicker(selectedKeys: selectedKeys, recent: recent),
+  );
+}
 
 class _QuickReplyPicker extends StatelessWidget {
-  const _QuickReplyPicker({required this.selectedKeys});
+  const _QuickReplyPicker({required this.selectedKeys, required this.recent});
+  final List<String> recent;
   final Set<String> selectedKeys;
 
   @override
   Widget build(BuildContext context) {
     final options = quickReplyOptionsByKey;
+    final defaults = quickReplyGroups['常用反馈']!;
+    final common = {
+      ...recent.where(options.containsKey),
+      ...defaults,
+    }.take(12).toList();
+    final remainingFeedback = defaults
+        .where((key) => !common.contains(key))
+        .toList();
+    final groups = {
+      '常用反馈': common,
+      if (remainingFeedback.isNotEmpty) '其他反馈': remainingFeedback,
+      for (final group in quickReplyGroups.entries)
+        if (group.key != '常用反馈') group.key: group.value,
+    };
     return ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * .78,
@@ -35,7 +56,7 @@ class _QuickReplyPicker extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                for (final group in quickReplyGroups.entries) ...[
+                for (final group in groups.entries) ...[
                   Padding(
                     padding: const EdgeInsets.only(top: 12, bottom: 8),
                     child: Text(
