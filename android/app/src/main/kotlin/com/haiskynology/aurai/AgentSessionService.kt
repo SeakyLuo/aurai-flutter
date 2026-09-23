@@ -134,7 +134,10 @@ class AgentSessionService : Service() {
                     setContentText(step.substringAfter('\n', ""))
                     setStyle(Notification.BigTextStyle().bigText(step.substringAfter('\n', "")))
                 } else {
-                    setContentTitle(step)
+                    setShowWhen(false)
+                    setContentTitle("Aurai")
+                    setContentText(step)
+                    setStyle(Notification.BigTextStyle().bigText(step))
                 }
             }
             .setContentIntent(openAppIntent())

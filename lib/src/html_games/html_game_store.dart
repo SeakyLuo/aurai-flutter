@@ -79,7 +79,8 @@ class HtmlGameStore {
     return HtmlGame.fromRow({
       ...rows.single,
       'html': await HtmlAppStore.code(app),
-      'state_json': app['state_json'],
+      'state_json': rows.single['session_data_json'] != null
+          ? rows.single['state_json'] : app['state_json'],
       'stateful': app['stateful'],
       'interaction_projection': card?.webViewFor(viewer),
     });
@@ -110,11 +111,15 @@ class HtmlGameStore {
     String? runId,
     bool standalone = false,
     bool groupMessage = true,
+    AgentMessageRole role = AgentMessageRole.assistant,
+    String? messageText,
+    bool newSession = false,
+    String? callbackSenderId,
   }) => database.transaction((txn) async {
     final title = (args['title'] as String).trim();
     final existingId = args['appId'] as String?;
     final existing = existingId == null ? null : await HtmlAppStore.load(txn, existingId);
-    if (existing != null && existing['creator_id'] != creator.id) {
+    if (existing != null && !newSession && existing['creator_id'] != creator.id) {
       throw StateError('只能重新发送自己创建的小应用入口');
     }
     final html = existing == null ? args['html'] as String : await HtmlAppStore.code(existing);
@@ -129,7 +134,7 @@ class HtmlGameStore {
         height > 640 ||
         (width != null && (width < 180 || width > 600)))
       throw ArgumentError('卡片高度需在 180–640 之间，宽度可自适应或设为 180–600');
-    final state = existing == null
+    final state = newSession ? <String, Object?>{} : existing == null
         ? (args['state'] as Map).cast<String, Object?>()
         : (jsonDecode(existing['state_json'] as String) as Map).cast<String, Object?>();
     final participants = List<String>.from(args['participants'] as List);
@@ -167,16 +172,16 @@ class HtmlGameStore {
     final message = AgentMessage(
       interactive: interactive,
       id: newMessageId(),
-      role: AgentMessageRole.assistant,
+      role: role,
       senderId: creator.id,
       sender: creator,
-      text: interactive?.participation['audience'] == null ? title : '私密交互消息',
+      text: messageText ?? (interactive?.participation['audience'] == null ? title : '私密交互消息'),
       createdAt: DateTime.now(),
       isGroupMessage: groupMessage,
       runId: runId,
       htmlGame: HtmlGameCard(
         appId: appId,
-        version: existing?['version'] as int? ?? 0,
+        version: newSession ? 0 : existing?['version'] as int? ?? 0,
         title: title,
         width: width,
         height: height,
@@ -184,7 +189,7 @@ class HtmlGameStore {
         backgroundMode: backgroundMode,
       ),
     );
-    final appVersion = existing?['version'] as int? ?? 0;
+    final appVersion = newSession ? 0 : existing?['version'] as int? ?? 0;
     if (existing == null) {
       final path = await HtmlAppStore.publish(appId, html);
       await txn.insert('html_apps', {
@@ -203,7 +208,7 @@ class HtmlGameStore {
       'message_id': message.id,
       'app_id': appId,
       'conversation_id': conversationId,
-      'creator_id': creator.id,
+      'creator_id': callbackSenderId ?? creator.id,
       'title': title,
       'html': '',
       'display_mode': displayMode,
@@ -211,7 +216,8 @@ class HtmlGameStore {
       'stateful': existing?['stateful'] ?? (args['stateful'] == true ? 1 : 0),
       'display_width': width,
       'display_height': height,
-      'state_json': '{}',
+      'state_json': newSession ? jsonEncode(state) : '{}',
+      if (newSession) 'session_data_json': '{}',
       'version': appVersion,
       'participants_json': jsonEncode(participants),
       'status': 'active',
@@ -325,7 +331,7 @@ class HtmlGameStore {
       'status': status,
     };
     final now = DateTime.now().microsecondsSinceEpoch;
-    await txn.update('html_apps', {
+    if (!game.sessionScoped) await txn.update('html_apps', {
       'state_json': jsonEncode(nextState),
       'version': expected + 1,
       'updated_at': now,
@@ -334,13 +340,14 @@ class HtmlGameStore {
       'html_games',
       {
         'version': expected + 1,
+        if (game.sessionScoped) 'state_json': jsonEncode(nextState),
         'status': status,
         'turn_sender_id': turn,
         'preview': null,
         'updated_at': now,
       },
-      where: 'app_id = ?',
-      whereArgs: [game.appId],
+      where: game.sessionScoped ? 'message_id = ?' : 'app_id = ? AND session_data_json IS NULL',
+      whereArgs: [game.sessionScoped ? messageId : game.appId],
     );
     await txn.insert('html_game_events', {
       'id': eventId,

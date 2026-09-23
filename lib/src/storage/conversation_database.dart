@@ -21,7 +21,7 @@ import 'message_quick_reply_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 45,
+  version: 46,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -208,6 +208,12 @@ Future<Database> openConversationDatabase() async => openDatabase(
     if (oldVersion < 40) await migrateFavorites(db);
     if (oldVersion < 44) await migrateMiniappCreatorCredits(db);
     if (oldVersion < 45) await db.execute(miniappReleaseNotesSchema);
+    if (oldVersion < 46) {
+      final columns = await db.rawQuery('PRAGMA table_info(html_games)');
+      if (!columns.any((column) => column['name'] == 'session_data_json')) {
+        await db.execute('ALTER TABLE html_games ADD COLUMN session_data_json TEXT');
+      }
+    }
   },
   onCreate: (db, version) async {
     final batch = db.batch();

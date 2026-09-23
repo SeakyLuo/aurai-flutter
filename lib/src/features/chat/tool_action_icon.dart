@@ -34,6 +34,16 @@ class ToolActionIcon extends StatelessWidget {
                 type: AttachmentActionIconType.html,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
+              'listHtmlApps' ||
+              'listHtmlAppPublications' ||
+              'readHtmlAppPublication' ||
+              'publishHtmlApp' ||
+              'updateHtmlAppPublication' ||
+              'setHtmlAppIcon' ||
+              'withdrawHtmlApp' => SettingsIcon(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                type: SettingsIconType.miniapps,
+              ),
               'sendInteractiveMessage' ||
               'clickInteractiveMessage' ||
               'retryInteractiveCallback' ||

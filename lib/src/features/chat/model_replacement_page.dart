@@ -7,7 +7,6 @@ import '../../domain/model_provider.dart';
 import '../../providers/image_generation_client.dart';
 import '../../providers/model_catalog.dart';
 import '../../providers/openrouter_models.dart';
-import '../../utils/widget_utils.dart';
 import 'app_confirmation_dialog.dart';
 import 'chat_controller.dart';
 import 'choice_sheet.dart';
@@ -79,9 +78,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
 
   String _purposeLabel(ModelPurpose purpose) => switch (purpose) {
     ModelPurpose.text => '默认文本',
-    ModelPurpose.imageUnderstanding => '图片理解',
     ModelPurpose.imageGeneration => '图片生成',
-    ModelPurpose.videoUnderstanding => '视频理解',
     ModelPurpose.videoGeneration => '视频生成',
   };
 
@@ -266,10 +263,6 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
       final supportsText = info?.supportsText ?? !needsKnownCapabilities;
       final supportedPurposes = <ModelPurpose>{
         if (supportsText) ModelPurpose.text,
-        if (info?.supportsImages == true && supportsText)
-          ModelPurpose.imageUnderstanding,
-        if (info?.inputModalities.contains('video') == true && supportsText)
-          ModelPurpose.videoUnderstanding,
         if (imageModels.containsKey(id)) ModelPurpose.imageGeneration,
         if (info?.outputModalities.contains('video') == true)
           ModelPurpose.videoGeneration,
@@ -371,6 +364,19 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
     appBar: SettingsAppBar(
       title: '更换模型',
       onBack: _replacing ? null : () => Navigator.pop(context),
+      actions: [
+        SettingsGlassAction(
+          label: _from == null ? '全部替换' : '更换模型',
+          icon: Icons.check_rounded,
+          iconWidget: _replacing
+              ? const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const SettingsIcon(type: SettingsIconType.check),
+          onPressed: _canReplace ? _replace : null,
+        ),
+      ],
     ),
     body: SafeArea(
       top: false,
@@ -416,23 +422,6 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
                 ),
               ),
             ],
-          ),
-        ),
-      ),
-    ),
-    bottomNavigationBar: SafeArea(
-      minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Center(
-        heightFactor: 1,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
-          child: WidgetUtils.primaryButton(
-            text: _replacing
-                ? '正在更换…'
-                : _from == null
-                ? '全部替换'
-                : '更换模型',
-            onPressed: _canReplace ? _replace : null,
           ),
         ),
       ),

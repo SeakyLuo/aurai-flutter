@@ -24,11 +24,15 @@ class ImageForwardDialog extends StatefulWidget {
     required this.recipientName,
     required this.avatar,
   }) : image = image,
-       message = null;
+       message = null,
+       sendMessage = null,
+       preview = null;
   const ImageForwardDialog.message({
     super.key,
     required this.controller,
     required AgentMessage message,
+    this.sendMessage,
+    this.preview,
     required this.targetId,
     required this.kind,
     required this.title,
@@ -39,6 +43,8 @@ class ImageForwardDialog extends StatefulWidget {
   final ChatController controller;
   final ImageProvider? image;
   final AgentMessage? message;
+  final Widget? preview;
+  final Future<void> Function(String? targetId, String note)? sendMessage;
   final String? targetId;
   final ConversationKind kind;
   final String title;
@@ -62,7 +68,9 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
     if (_sending) return;
     setState(() => _sending = true);
     try {
-      if (widget.message case final message?) {
+      if (widget.sendMessage case final send?) {
+        await send(widget.targetId, _text.text.trim());
+      } else if (widget.message case final message?) {
         await widget.controller.forwardMessage(
           widget.targetId,
           message,
@@ -161,7 +169,9 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
         ),
       ),
       const SizedBox(height: 20),
-      if (bounded)
+      if (widget.preview != null)
+        widget.preview!
+      else if (bounded)
         Flexible(
           child: MessageForwardPreview(
             message: widget.message!,

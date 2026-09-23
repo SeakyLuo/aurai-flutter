@@ -17,7 +17,7 @@ abstract final class QuickReplyRecents {
           final previous = await _preferences.getStringList(_key) ?? const [];
           await _preferences.setStringList(_key, [
             key,
-            ...previous.where((value) => value != key).take(4),
+            ...previous.where((value) => value != key).take(11),
           ]);
         })
         .catchError((Object error, StackTrace stack) {

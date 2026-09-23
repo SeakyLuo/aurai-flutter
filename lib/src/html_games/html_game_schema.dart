@@ -16,6 +16,7 @@ const htmlGameSchema = [
     measured_scale REAL,
     measured_version INTEGER,
     state_json TEXT NOT NULL,
+    session_data_json TEXT,
     version INTEGER NOT NULL DEFAULT 0,
     participants_json TEXT NOT NULL,
     status TEXT NOT NULL,

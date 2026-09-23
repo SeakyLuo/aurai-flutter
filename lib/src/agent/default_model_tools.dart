@@ -20,8 +20,8 @@ class DefaultModelTool implements AgentTool, RuntimeCapabilityAgentTool {
     capabilityId: 'model.settings',
     safety: update ? ToolSafety.lowRisk : ToolSafety.readOnly,
     description: update
-        ? 'Change one app-wide default model when requested by the user: text, imageUnderstanding, imageGeneration, videoUnderstanding or videoGeneration. Read readDefaultModels first to discover saved providers and models. Use an exact model ID suitable for the requested purpose; savedModels are suggestions, not an allowlist. Other defaults and per-AI model selections are preserved. Provider credentials and URL come from saved settings. Applies to subsequent calls, not the already running request.'
-        : 'Read app-wide default models for text, image understanding/generation and video understanding/generation, plus saved providers and model IDs. Does not expose credentials. A null default means that purpose has no configured model. Use updateDefaultModel for app defaults, updateAiContact for an individual AI model.',
+        ? 'Change one app-wide default model when requested by the user: text, imageGeneration or videoGeneration. Read readDefaultModels first to discover saved providers and models. Use an exact model ID suitable for the requested purpose; savedModels are suggestions, not an allowlist. Other defaults and per-AI model selections are preserved. Provider credentials and URL come from saved settings. Applies to subsequent calls, not the already running request.'
+        : 'Read app-wide default models for text, image generation and video generation, plus saved providers and model IDs. Does not expose credentials. A null default means that purpose has no configured model. Use updateDefaultModel for app defaults, updateAiContact for an individual AI model.',
     inputSchema: {
       'type': 'object',
       'properties': {

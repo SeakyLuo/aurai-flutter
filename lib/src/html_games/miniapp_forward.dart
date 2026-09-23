@@ -8,6 +8,7 @@ import '../features/chat/image_action_scope.dart';
 import '../features/chat/chat_controller.dart';
 import '../features/chat/image_forward_page.dart';
 import 'miniapp_detail_page.dart';
+import 'miniapp_template.dart';
 import 'miniapp_library_store.dart';
 
 String _markdownText(String text) => text.replaceAllMapped(
@@ -34,12 +35,21 @@ AgentMessage miniappForwardMessage(MiniappEntry entry) {
 
 Future<void> forwardMiniapp(BuildContext context, MiniappEntry entry) async {
   final controller = ImageActionScope.of(context);
+  final template = await MiniappTemplate.load(
+    controller.htmlGames.database,
+    entry,
+  );
+  if (!context.mounted) return;
   final message = miniappForwardMessage(entry);
   final sent = await Navigator.push<bool>(
     context,
     MaterialPageRoute(
-      builder: (_) =>
-          ImageForwardPage.message(controller: controller, message: message),
+      builder: (_) => ImageForwardPage.message(
+        controller: controller,
+        message: message,
+        sendMessage: (target, note) =>
+            controller.sendMiniappTemplate(target, template, note),
+      ),
     ),
   );
   if (context.mounted && sent == true) {

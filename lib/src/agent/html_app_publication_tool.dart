@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import '../html_games/miniapp_release_notes.dart';
 import '../domain/tool_models.dart';
+import '../html_games/miniapp_icon_store.dart';
 import '../html_games/miniapp_library_store.dart';
+import '../html_games/miniapp_metadata_store.dart';
 
 class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
   HtmlAppPublicationTool(this.name, this.store, this.actor);
@@ -11,6 +15,7 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
     'readHtmlAppPublication',
     'publishHtmlApp',
     'updateHtmlAppPublication',
+    'setHtmlAppIcon',
     'withdrawHtmlApp',
   ];
 
@@ -31,6 +36,8 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
         'Publish the first version of a miniapp to the local application library on behalf of the user. Use only when the user requests publication, never automatically after creating a message. Credits the original creator (AI or local user). Snapshots current code without chat history or saved data. This does not publish to the internet. Read publication state first; expectedRevision must be 0.',
       'updateHtmlAppPublication' =>
         'Publish a new code snapshot of an already published or withdrawn miniapp, only when the user asks. Draft edits do not change the released version. Preserves installed copies and their data; users explicitly update. Read the current revision first.',
+      'setHtmlAppIcon' =>
+        'Set or remove the display icon of a miniapp without publishing a new code version. To use an AI-generated image, pass the exact local imagePath returned by generateImage; never invent a path. The image is validated and copied into durable miniapp storage. Read the miniapp first and pass its metadataRevision.',
       _ =>
         'Withdraw a miniapp from the local library when requested by the user. Keeps draft code, installed copies and saved data. Read the current revision first.',
     },
@@ -41,9 +48,17 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
           'query': {'type': 'string'}
         else
           'appId': {'type': 'string'},
-        if (name != 'readHtmlAppPublication' &&
+        if (name == 'setHtmlAppIcon')
+          'expectedMetadataRevision': {'type': 'integer', 'minimum': 0}
+        else if (name != 'readHtmlAppPublication' &&
             name != 'listHtmlAppPublications')
           'expectedRevision': {'type': 'integer', 'minimum': 0},
+        if (name == 'setHtmlAppIcon')
+          'iconPath': {
+            'type': ['string', 'null'],
+            'description':
+                'Local imagePath to import as the icon, or null to remove the custom icon.',
+          },
         if (name == 'publishHtmlApp' || name == 'updateHtmlAppPublication') ...{
           'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
           'description': {'type': 'string', 'minLength': 1, 'maxLength': 500},
@@ -58,7 +73,10 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
       },
       'required': [
         if (name == 'listHtmlAppPublications') 'query' else 'appId',
-        if (name != 'readHtmlAppPublication' &&
+        if (name == 'setHtmlAppIcon') ...[
+          'expectedMetadataRevision',
+          'iconPath',
+        ] else if (name != 'readHtmlAppPublication' &&
             name != 'listHtmlAppPublications')
           'expectedRevision',
         if (name == 'publishHtmlApp' || name == 'updateHtmlAppPublication') ...[
@@ -133,8 +151,29 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
         MiniappEntry(id: id, title: '', publisher: '', kind: MiniappKind.draft),
       );
       if (!entry.draft) throw StateError('添加的副本不能作为自己的作品发布');
+      if (name == 'setHtmlAppIcon') {
+        if (call.arguments['expectedMetadataRevision'] !=
+            entry.metadataRevision) {
+          throw StateError('小程序资料已变化，请重新读取');
+        }
+        final sourcePath = call.arguments['iconPath'] as String?;
+        String? importedPath;
+        try {
+          if (sourcePath != null) {
+            importedPath = await MiniappIconStore.import(sourcePath);
+          }
+          await MiniappMetadataStore(
+            store.database,
+          ).saveIcon(entry, importedPath);
+        } on Object {
+          if (importedPath != null) await File(importedPath).delete();
+          rethrow;
+        }
+        entry = await store.refresh(entry);
+      }
       if (name != 'readHtmlAppPublication' &&
-          name != 'listHtmlAppPublications') {
+          name != 'listHtmlAppPublications' &&
+          name != 'setHtmlAppIcon') {
         if (call.arguments['expectedRevision'] != entry.revision) {
           throw StateError('发布版本已变化，请重新读取发布状态');
         }
@@ -166,6 +205,8 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
           'title': entry.publishedTitle ?? entry.title,
           'description': entry.description,
           'revision': entry.revision,
+          'metadataRevision': entry.metadataRevision,
+          'hasCustomIcon': entry.iconPath != null,
           'published': entry.listed,
           'scope': 'local',
           'changeLog': notes.firstOrNull?.notes,

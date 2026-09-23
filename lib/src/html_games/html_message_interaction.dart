@@ -103,7 +103,9 @@ extension HtmlMessageInteraction on HtmlGameStore {
     if (operation != 'readHtmlMessage' && !authored)
       throw StateError('只能更新自己创建的 HTML 消息');
     final app = await HtmlAppStore.load(txn, row['app_id'] as String);
-    final state = jsonDecode(app['state_json'] as String);
+    final sessionScoped = row['session_data_json'] != null;
+    final savedState = sessionScoped ? row['state_json'] : app['state_json'];
+    final state = jsonDecode(savedState as String);
     if (operation == 'readHtmlMessage') {
       final messages = await txn.query(
         'messages',
@@ -127,7 +129,8 @@ extension HtmlMessageInteraction on HtmlGameStore {
         'title': row['title'],
         if (authored || args['includePrivate'] == true) ...{
           'html': await HtmlAppStore.code(app),
-          ...await HtmlAppStore.reference(app),
+          if (!sessionScoped) ...await HtmlAppStore.reference(app)
+          else 'appId': app['id'],
         },
         'backgroundMode': row['background_mode'],
         'displayMode': row['display_mode'],
@@ -148,6 +151,9 @@ extension HtmlMessageInteraction on HtmlGameStore {
     if (args['expectedVersion'] != row['version'])
       throw StateError('消息已更新，请重新读取版本');
     final html = args['html'] as String?;
+    if (html != null && sessionScoped && app['creator_id'] != senderId) {
+      throw StateError('只能修改自己创建的小程序代码');
+    }
     final background = args['backgroundMode'] as String?;
     final title = (args['title'] as String?)?.trim();
     final displayMode = args['displayMode'] as String?;
@@ -172,11 +178,11 @@ extension HtmlMessageInteraction on HtmlGameStore {
         (html.trim().isEmpty || utf8.encode(html).length > HtmlAppStore.maxHtmlBytes))
       throw ArgumentError('HTML 不能为空且最多 4 MB');
     final nextState = args['state'] == null
-        ? app['state_json'] as String
+        ? savedState
         : jsonEncode(args['state']);
     if (utf8.encode(nextState).length > 65536)
       throw ArgumentError('状态最多 64 KB');
-    if (!presentationChanged && nextState == app['state_json'] &&
+    if (!presentationChanged && nextState == savedState &&
         html == null &&
         (background == null || background == row['background_mode'])) {
         if (callbackId != null) await HtmlCallbackState.complete(txn, callbackId);
@@ -185,18 +191,18 @@ extension HtmlMessageInteraction on HtmlGameStore {
     }
     final version = (row['version'] as int) + 1;
     final sourcePath = html == null ? app['source_path'] as String : await HtmlAppStore.publish(app['id'] as String, html);
-    await txn.update('html_apps', {
+    if (!sessionScoped || html != null) await txn.update('html_apps', {
       'source_path': sourcePath,
-      'state_json': nextState,
-      'version': version,
+      if (!sessionScoped) 'state_json': nextState,
+      'version': (app['version'] as int) + 1,
       if (title != null) 'title': title,
       'updated_at': DateTime.now().microsecondsSinceEpoch,
     }, where: 'id = ?', whereArgs: [app['id']]);
     await txn.update(
       'html_games',
-      {'version': version, 'preview': null},
-      where: 'app_id = ?',
-      whereArgs: [app['id']],
+      {'version': version, 'preview': null, if (sessionScoped) 'state_json': nextState},
+      where: sessionScoped ? 'message_id = ?' : 'app_id = ? AND session_data_json IS NULL',
+      whereArgs: [sessionScoped ? id : app['id']],
     );
     if (presentation.isNotEmpty || background != null) {
       await txn.update('html_games', {
@@ -226,6 +232,7 @@ extension HtmlMessageInteraction on HtmlGameStore {
     if (callbackId != null) await HtmlCallbackState.complete(txn, callbackId);
     return {'updated': true, 'version': version,
       if (callbackId != null) 'callbackCompleted': true,
-      ...await HtmlAppStore.reference({...app, 'source_path': sourcePath})};
+      if (!sessionScoped) ...await HtmlAppStore.reference({...app, 'source_path': sourcePath})
+      else 'appId': app['id']};
   });
 }

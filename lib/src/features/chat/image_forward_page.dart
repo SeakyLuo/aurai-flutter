@@ -22,16 +22,19 @@ class ImageForwardPage extends StatefulWidget {
     required this.controller,
     required ImageProvider image,
   }) : image = image,
-       message = null;
+       message = null,
+       sendMessage = null;
   const ImageForwardPage.message({
     super.key,
     required this.controller,
     required AgentMessage message,
+    this.sendMessage,
   }) : message = message,
        image = null;
   final ChatController controller;
   final ImageProvider? image;
   final AgentMessage? message;
+  final Future<void> Function(String? targetId, String note)? sendMessage;
   @override
   State<ImageForwardPage> createState() => _ImageForwardPageState();
 }
@@ -127,6 +130,7 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
           ? ImageForwardDialog.message(
               controller: widget.controller,
               message: widget.message!,
+              sendMessage: widget.sendMessage,
               targetId: item.id,
               kind: item.kind,
               title: item.title,

@@ -265,14 +265,16 @@ class ModelSettings {
     }
     final rawProfiles = (json['profiles']! as Map<Object?, Object?>)
         .cast<String, Object?>();
+    final purposesByName = {
+      for (final purpose in ModelPurpose.values) purpose.name: purpose,
+    };
     return ModelSettings(
       modelDefaults: {
         for (final entry in (json['modelDefaults'] as Map? ?? const {}).entries)
-          ModelPurpose.values.byName(
-            entry.key as String,
-          ): DefaultModelSelection.fromJson(
-            Map<String, dynamic>.from(entry.value as Map),
-          ),
+          if (purposesByName[entry.key] case final purpose?)
+            purpose: DefaultModelSelection.fromJson(
+              Map<String, dynamic>.from(entry.value as Map),
+            ),
       },
       systemPrompt: json['systemPrompt'] as String?,
       customInstructions: json['customInstructions'] as String? ?? '',

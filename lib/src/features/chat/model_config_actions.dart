@@ -152,13 +152,9 @@ extension ModelConfigActions on ChatController {
         model: active.model,
         name: modelDisplayName(active.model),
       ),
-      for (final purpose in [
-        ModelPurpose.imageUnderstanding,
-        ModelPurpose.videoUnderstanding,
-        ModelPurpose.videoGeneration,
-      ])
-        if (modelSettings.modelDefaults[purpose] case final selection?)
-          purpose: selection,
+      if (modelSettings.modelDefaults[ModelPurpose.videoGeneration]
+          case final selection?)
+        ModelPurpose.videoGeneration: selection,
       if (imageGeneration case final selection?)
         ModelPurpose.imageGeneration: DefaultModelSelection(
           service: selection.service,

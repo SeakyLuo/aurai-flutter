@@ -114,10 +114,6 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
               : null;
           final eligible = switch (purpose) {
             ModelPurpose.text => info?.supportsText ?? true,
-            ModelPurpose.imageUnderstanding =>
-              info!.supportsImages && info.supportsText,
-            ModelPurpose.videoUnderstanding =>
-              info!.inputModalities.contains('video') && info.supportsText,
             ModelPurpose.videoGeneration => info!.outputModalities.contains(
               'video',
             ),

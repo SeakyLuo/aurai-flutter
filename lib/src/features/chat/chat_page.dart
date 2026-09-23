@@ -1,4 +1,4 @@
-import 'send_favorite_sheet.dart';
+import 'send_favorite_page.dart';
 import 'pending_message_panel.dart';
 import 'message_jump_arrow.dart';
 import '../../app/global_ui.dart';

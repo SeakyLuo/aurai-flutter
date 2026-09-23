@@ -291,7 +291,17 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
       ])
         entry.publicationId: entry,
     };
-    final entries = byId.values.toList();
+    final entries = byId.values.toList()
+      ..sort((a, b) {
+        final aTime = a.updatedAt;
+        final bTime = b.updatedAt;
+        if (aTime == null && bTime != null) return 1;
+        if (aTime != null && bTime == null) return -1;
+        final timeOrder = aTime == null ? 0 : bTime!.compareTo(aTime);
+        return timeOrder != 0
+            ? timeOrder
+            : a.publicationId.compareTo(b.publicationId);
+      });
     return Scaffold(
       appBar: SettingsAppBar(
         title: '小程序',

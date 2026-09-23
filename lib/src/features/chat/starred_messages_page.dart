@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'retained_tab_view.dart';
 import 'search_skeleton.dart';
 import '../../html_games/miniapp_favorites_list.dart';
@@ -81,17 +82,28 @@ class _StarredMessageListState extends State<_StarredMessageList> {
   );
   final _titles = <String, String>{};
   late final _store = StarredMessages(widget.controller.groupStore.database);
+  StreamSubscription<({String owner, String message, bool starred})>? _changes;
+  bool _reloadPending = false;
   bool _loading = false, _more = true, _failed = false, _opening = false;
 
   @override
   void initState() {
     super.initState();
+    _changes = StarredMessages.changes.stream.listen((event) {
+      if (event.owner != 'user:local') return;
+      if (_loading) {
+        _reloadPending = true;
+      } else {
+        unawaited(_load(reset: true));
+      }
+    });
     _scroll.addListener(_onScroll);
     _load();
   }
 
   @override
   void dispose() {
+    _changes?.cancel();
     _scroll.dispose();
     super.dispose();
   }
@@ -153,7 +165,13 @@ class _StarredMessageListState extends State<_StarredMessageList> {
         _notice(error);
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        if (_reloadPending) {
+          _reloadPending = false;
+          unawaited(_load(reset: true));
+        }
+      }
     }
   }
 
