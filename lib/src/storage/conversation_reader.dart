@@ -232,6 +232,13 @@ class ConversationReader {
       orderBy: 'started_at, id',
     );
     if (runs.isEmpty) return runs;
+    for (final run in runs) {
+      if (run['elapsed_ms'] case final int elapsedMilliseconds) {
+        conversation.unfinishedRunElapsed[run['id']! as String] = Duration(
+          milliseconds: elapsedMilliseconds,
+        );
+      }
+    }
     final ids = runs.map((run) => run['id']).toList();
     final results = await Future.wait([
       database.query(

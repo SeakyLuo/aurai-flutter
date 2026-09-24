@@ -122,9 +122,23 @@ List<ChatTimelineEntry> buildChatTimeline(
           ? null
           : '${entry.runId}:${entry.afterMessageId}:${entry.step.toolName}',
   ]);
+  final elapsedRuns = <String>{};
   for (final group in groups) {
     final entry = liveSteps[group.start];
     final storageId = 'tool:${entry.runId}:${entry.ordinal}';
+    final runElapsed = conversation.unfinishedRunElapsed[entry.runId];
+    if (runElapsed != null &&
+        elapsedRuns.add(entry.runId) &&
+        (entry.runId != conversation.activeRunId || !showElapsed)) {
+      toolsByMessage
+          .putIfAbsent(entry.afterMessageId, () => [])
+          .add(
+            ChatTimelineEntry(
+              'run-elapsed:${entry.runId}',
+              (_) => _StoppedRunElapsed(elapsed: runElapsed),
+            ),
+          );
+    }
     toolsByMessage
         .putIfAbsent(entry.afterMessageId, () => [])
         .add(
@@ -439,6 +453,37 @@ List<ChatTimelineEntry> buildChatTimeline(
         ...?toolsByMessage[message.id],
     ],
   ];
+}
+
+class _StoppedRunElapsed extends StatelessWidget {
+  const _StoppedRunElapsed({required this.elapsed});
+
+  final Duration elapsed;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 18),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 48,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '用时 ${taskDuration(elapsed)}',
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
+        const Divider(height: 1),
+        const SizedBox(height: 12),
+      ],
+    ),
+  );
 }
 
 Map<String, String> chatSummaryOwners(ChatController controller) {
