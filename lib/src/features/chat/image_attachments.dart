@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/message_image.dart';
 import 'image_preview.dart';
-export 'image_source_menu.dart';
+export 'attachment_source_menu.dart';
 
 class DraftImageAttachments extends StatelessWidget {
   const DraftImageAttachments({

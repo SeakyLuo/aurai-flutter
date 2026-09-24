@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../domain/model_provider.dart';
 import 'response_citations.dart';
+import 'provider_error.dart';
 
 Future<Map<String, Object?>> readResponsesStream(
   Stream<List<int>> bytes, {
@@ -74,7 +75,23 @@ Future<Map<String, Object?>> readResponsesStream(
     final payload = data.join('\n');
     data.clear();
     if (payload == '[DONE]') break;
-    final event = (jsonDecode(payload) as Map).cast<String, Object?>();
+    final decoded = jsonDecode(payload);
+    if (decoded is! Map) {
+      throw ModelProviderException(
+        '模型响应格式与 Responses 协议不匹配，请检查请求转换的协议设置',
+        detail: payload,
+      );
+    }
+    final event = decoded.cast<String, Object?>();
+    if (event['error'] != null) {
+      throw providerResponseError(jsonEncode(event['error']));
+    }
+    if (event['type'] is! String || event.containsKey('choices')) {
+      throw ModelProviderException(
+        '模型响应格式与 Responses 协议不匹配，请检查请求转换的协议设置',
+        detail: payload,
+      );
+    }
     switch (event['type']) {
       case 'response.reasoning_text.delta':
       case 'response.reasoning_summary_text.delta':
@@ -133,7 +150,6 @@ Future<Map<String, Object?>> readResponsesStream(
               .join('\n'),
         );
       case 'response.incomplete':
-      case 'response.failed':
       case 'response.completed':
         final response = (event['response']! as Map).cast<String, Object?>();
         final output = response['output'] as List;
@@ -143,9 +159,11 @@ Future<Map<String, Object?>> readResponsesStream(
           readReasoningItem(item, i);
         }
         return response;
+      case 'response.failed':
+        throw providerResponseError(payload);
       case 'error':
-        throw ModelProviderException('模型回复未完成，请重试', detail: payload);
+        throw providerResponseError(payload);
     }
   }
-  throw const ModelProviderException('模型连接中断，回复未完成，请重试');
+  throw const ModelConnectionInterrupted('模型连接已中断，回复未完成');
 }

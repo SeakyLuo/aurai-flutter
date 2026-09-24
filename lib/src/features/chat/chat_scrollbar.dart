@@ -169,7 +169,7 @@ class _ChatScrollbarState extends State<ChatScrollbar> {
                                         ? .8
                                         : scrolling
                                         ? .5
-                                        : .25,
+                                        : 0,
                                   ),
                               borderRadius: BorderRadius.circular(3),
                             ),

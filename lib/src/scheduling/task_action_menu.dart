@@ -12,11 +12,12 @@ import '../features/chat/conversation_icon.dart';
 import 'scheduled_tasks.dart';
 
 class TaskActionIcon extends StatelessWidget {
-  const TaskActionIcon(this.action, {super.key});
+  const TaskActionIcon(this.action, {super.key, this.color});
   final String action;
+  final Color? color;
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.onSurface;
+    final color = this.color ?? Theme.of(context).colorScheme.onSurface;
     if (action == 'edit' || action == 'delete') {
       return ConversationMenuIcon(
         type: action == 'edit'
@@ -51,8 +52,8 @@ class _ActionPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     if (action == 'more') {
-      for (final y in [5.0, 12.0, 19.0]) {
-        canvas.drawCircle(Offset(12, y), 1.4, Paint()..color = color);
+      for (final x in [5.0, 12.0, 19.0]) {
+        canvas.drawCircle(Offset(x, 12), 1.4, Paint()..color = color);
       }
       return;
     }

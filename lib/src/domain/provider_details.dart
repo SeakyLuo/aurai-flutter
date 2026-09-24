@@ -1,3 +1,5 @@
+import 'request_adapter.dart';
+
 enum ProviderProtocol {
   openaiChatCompletions('Chat Completions'),
   responses('Responses');
@@ -12,8 +14,10 @@ class ProviderDetails {
     required this.website,
     required this.protocol,
     this.models = const [],
+    this.requestAdapters = const {},
     this.autoSyncModels = true,
   });
+  final Map<String, RequestAdapter> requestAdapters;
   final String name;
   final String website;
   final ProviderProtocol protocol;
@@ -21,6 +25,9 @@ class ProviderDetails {
   // 热重载保留的旧实例没有此字段；null 表示尚未设置，使用实时同步。
   final bool? autoSyncModels;
   Map<String, Object?> toJson() => {
+    'requestAdapters': {
+      for (final e in requestAdapters.entries) e.key: e.value.toJson(),
+    },
     'name': name,
     'website': website,
     'protocol': protocol.name,
@@ -29,6 +36,12 @@ class ProviderDetails {
   };
   factory ProviderDetails.fromJson(Map<String, dynamic> json) =>
       ProviderDetails(
+        requestAdapters: {
+          for (final e in (json['requestAdapters'] as Map? ?? {}).entries)
+            e.key as String: RequestAdapter.fromJson(
+              Map<String, dynamic>.from(e.value as Map),
+            ),
+        },
         name: json['name'] as String,
         website: json['website'] as String,
         protocol: ProviderProtocol.values.byName(json['protocol'] as String),

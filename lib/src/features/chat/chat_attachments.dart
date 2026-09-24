@@ -11,7 +11,7 @@ extension _ChatAttachments on _ChatPageState {
     final controller = widget.controller;
     if (controller.addingImages || !controller.canEditDraft || _preparingGoal)
       return;
-    final source = await showImageSourceMenu(buttonContext);
+    final source = await showAttachmentSourceMenu(buttonContext);
     if (source == null || !mounted) return;
     if (source == AttachmentSource.favorite) {
       _focusNode.unfocus();

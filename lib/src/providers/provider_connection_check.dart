@@ -1,3 +1,4 @@
+import 'request_adapter_runner.dart';
 import 'dart:convert';
 import 'dart:io';
 import '../domain/model_provider.dart';
@@ -7,35 +8,32 @@ Future<Map<String, Object?>> checkProviderConnection(
   String model,
 ) async {
   if (model.trim().isEmpty) throw ArgumentError('请先选择模型');
+  config = config.copyWith(model: model);
+  final chat =
+      requestProtocol(config) == ProviderProtocol.openaiChatCompletions;
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
   try {
     return await (() async {
       final base = config.baseUrl.replaceFirst(RegExp(r'/$'), '');
+      final transformed = await transformRequest(config, {
+        'model': model,
+        if (chat)
+          'messages': [
+            {'role': 'user', 'content': 'Reply OK'},
+          ]
+        else
+          'input': 'Reply OK',
+        'stream': false,
+        if (chat) 'max_tokens': 16 else 'max_output_tokens': 16,
+      });
       final request = await client.postUrl(
-        Uri.parse(
-          '$base/${config.usesChatCompletions ? 'chat/completions' : 'responses'}',
-        ),
+        Uri.parse('$base/${transformed.path}'),
       );
       request.followRedirects = false;
       request.headers
         ..set(HttpHeaders.authorizationHeader, 'Bearer ${config.apiKey}')
         ..contentType = ContentType.json;
-      request.write(
-        jsonEncode({
-          'model': model,
-          if (config.usesChatCompletions)
-            'messages': [
-              {'role': 'user', 'content': 'Reply OK'},
-            ]
-          else
-            'input': 'Reply OK',
-          'stream': false,
-          if (config.usesChatCompletions)
-            'max_tokens': 16
-          else
-            'max_output_tokens': 16,
-        }),
-      );
+      request.write(jsonEncode(transformed.body));
       final response = await request.close();
       if (response.statusCode != 200) {
         return {
@@ -50,7 +48,7 @@ Future<Map<String, Object?>> checkProviderConnection(
         if (bytes.length > 65536) throw StateError('测试响应超过大小限制');
       }
       final body = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
-      final valid = config.usesChatCompletions
+      final valid = chat
           ? body['choices'] is List && (body['choices'] as List).isNotEmpty
           : body['output'] is List && (body['output'] as List).isNotEmpty;
       return {

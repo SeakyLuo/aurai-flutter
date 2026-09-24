@@ -35,6 +35,7 @@ List<ChatTimelineEntry> buildChatTimeline(
   ValueChanged<String>? onOpenQuote,
   ValueChanged<AgentMessage>? onReeditRecalled,
   Future<void> Function(AgentMessage, String)? onQuickReply,
+  Future<void> Function(AgentMessage)? onRetry,
 }) {
   final conversation = controller.activeConversation;
   final mentionSenders = {
@@ -62,7 +63,10 @@ List<ChatTimelineEntry> buildChatTimeline(
       !isGroup &&
       watch != null &&
       conversation.hasExecutionProcess &&
-      (watch.isRunning || conversation.runState == ChatRunState.failed) &&
+      (watch.isRunning ||
+          conversation.runState == ChatRunState.failed ||
+          conversation.runState == ChatRunState.interrupted ||
+          conversation.runState == ChatRunState.cancelled) &&
       !controller.visibleMessages.any(
         (message) =>
             message.runId == conversation.activeRunId &&
@@ -88,7 +92,7 @@ List<ChatTimelineEntry> buildChatTimeline(
           ordinal: ordinal,
           afterMessageId: entry.afterMessageId,
           step: entry.step,
-          runId: conversation.activeRunId,
+          runId: entry.runId,
           senderName: null as String?,
         )
     else if (!isGroup)
@@ -98,7 +102,7 @@ List<ChatTimelineEntry> buildChatTimeline(
             ordinal: ordinal,
             afterMessageId: entry.afterMessageId,
             step: entry.step,
-            runId: member.activeRunId,
+            runId: entry.runId,
             senderName: member.replyingSenderName,
           ),
   ];
@@ -111,7 +115,10 @@ List<ChatTimelineEntry> buildChatTimeline(
   final liveSources = webSourcesFromSteps(liveSteps.map((entry) => entry.step));
   final groups = toolActivityGroups([
     for (final entry in liveSteps)
-      entry.step.toolName == 'askUser'
+      entry.step.toolName == 'askUser' &&
+              entry.runId == conversation.activeRunId &&
+              (conversation.runState == ChatRunState.running ||
+                  conversation.runState == ChatRunState.stopping)
           ? null
           : '${entry.runId}:${entry.afterMessageId}:${entry.step.toolName}',
   ]);
@@ -217,6 +224,7 @@ List<ChatTimelineEntry> buildChatTimeline(
             .take(end + (beforeMessageId == null ? 0 : 1))
             .indexed) ...[
       if (index > 0 &&
+          (isGroup || message.role != AgentMessageRole.assistant) &&
           (replyParts[message.id]?.first ?? true) &&
           message.createdAt.difference(visibleMessages[index - 1].createdAt) >
               const Duration(minutes: 30))
@@ -313,6 +321,9 @@ List<ChatTimelineEntry> buildChatTimeline(
                     (message.role == AgentMessageRole.assistant ||
                         message.senderId == MessageSender.localUser.id)
                 ? onQuickReply
+                : null,
+            onRetry: onRetry != null && controller.canOfferFailedRetry(message)
+                ? onRetry
                 : null,
             availableSources:
                 memberSources[message.runId] ??

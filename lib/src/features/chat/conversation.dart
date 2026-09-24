@@ -38,7 +38,8 @@ class Conversation {
   bool searchHasLater = false;
   bool loadingSearchPage = false;
   final List<AgentStep> steps = [];
-  final List<({String afterMessageId, AgentStep step})> liveToolSteps = [];
+  final List<({String runId, String afterMessageId, AgentStep step})>
+  liveToolSteps = [];
   bool isPinned = false;
   bool isArchived = false;
   bool isScheduledTask = false;

@@ -20,7 +20,9 @@ extension ConversationSearchNavigation on ChatController {
       );
       return rows.isEmpty ? null : rows.single['target'] as String;
     }
-    if (conversation.activeRunId == null ||
+    if (conversation.runState != ChatRunState.idle ||
+        conversation.pendingGoal != null ||
+        conversation.activeRunId == null ||
         conversation.activeRunId == conversation.seenRunId)
       return null;
     final rows = await _store.database.query(

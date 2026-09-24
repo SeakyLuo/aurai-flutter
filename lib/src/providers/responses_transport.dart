@@ -1,3 +1,5 @@
+import 'request_adapter_runner.dart';
+import 'provider_error.dart';
 import 'openrouter_models.dart';
 import 'model_reasoning_options.dart';
 import 'model_context_limits.dart';
@@ -91,14 +93,8 @@ class ResponsesTransport {
       final base = config.baseUrl.endsWith('/')
           ? config.baseUrl.substring(0, config.baseUrl.length - 1)
           : config.baseUrl;
-      final chat = config.usesChatCompletions;
-      final request = await client.postUrl(
-        Uri.parse('$base/${chat ? 'chat/completions' : 'responses'}'),
-      );
-      checkCancelled();
-      request.headers
-        ..set(HttpHeaders.authorizationHeader, 'Bearer ${config.apiKey}')
-        ..contentType = ContentType.json;
+      final chat =
+          requestProtocol(config) == ProviderProtocol.openaiChatCompletions;
       final info = OpenRouterModels.forConfig(config);
       final configuredBody = {
         if (!body.containsKey('reasoning') &&
@@ -114,7 +110,7 @@ class ResponsesTransport {
               openRouter: config.service == ModelService.openRouter,
             )
           : configuredBody;
-      if (info != null) {
+      if (chat && info != null) {
         final requested = payload['max_tokens'] as int?;
         final budget = ModelContextLimits.forConfig(config).outputTokens;
         if (requested != null && requested > budget)
@@ -131,27 +127,27 @@ class ResponsesTransport {
           });
         }
       }
-      request.write(jsonEncode(payload));
+      final transformed = await transformRequest(config, payload);
+      checkCancelled();
+      final request = await client.postUrl(
+        Uri.parse('$base/${transformed.path}'),
+      );
+      request.followRedirects = false;
+      request.headers
+        ..set(HttpHeaders.authorizationHeader, 'Bearer ${config.apiKey}')
+        ..contentType = ContentType.json;
+      request.write(jsonEncode(transformed.body));
       final response = await request.close().timeout(
         const Duration(seconds: 60),
       );
       checkCancelled();
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final detail = await utf8.decoder.bind(response).join();
-        final error = ModelProviderException(
-          switch (response.statusCode) {
-            401 || 403 => '模型服务认证失败，请检查 API 密钥',
-            402 => '模型服务余额不足，请先充值',
-            429 => '模型服务当前繁忙或额度不足，请稍后重试',
-            >= 500 => '模型服务暂时不可用，请稍后重试',
-            _ => '模型服务请求失败',
-          },
-          detail: detail,
+        final error = providerResponseError(
+          detail,
           statusCode: response.statusCode,
         );
-        final quotaExhausted = RegExp(
-          r'"code"\s*:\s*"(insufficient_quota|billing_hard_limit_reached)"',
-        ).hasMatch(detail);
+        final quotaExhausted = isProviderQuotaError(detail);
         if (!quotaExhausted &&
             (response.statusCode == 408 ||
                 response.statusCode == 429 ||
@@ -179,11 +175,11 @@ class ResponsesTransport {
       return result;
     } on TimeoutException {
       checkCancelled();
-      throw const _RetryableFailure(ModelProviderException('模型响应超时，请重试'));
+      throw const _RetryableFailure(ModelConnectionInterrupted('模型响应超时'));
     } on SocketException catch (error) {
       checkCancelled();
       throw _RetryableFailure(
-        ModelProviderException(
+        ModelConnectionInterrupted(
           '无法连接模型服务，请检查网络：${errorMessage(error)}',
           detail: '$error',
         ),
@@ -191,11 +187,13 @@ class ResponsesTransport {
     } on HttpException catch (error) {
       checkCancelled();
       throw _RetryableFailure(
-        ModelProviderException('模型连接中断，请重试', detail: '$error'),
+        ModelConnectionInterrupted('模型连接已中断', detail: '$error'),
       );
-    } on ModelProviderException catch (error) {
+    } on ModelConnectionInterrupted catch (error) {
       checkCancelled();
-      if (error.message == '模型连接中断，回复未完成，请重试') throw _RetryableFailure(error);
+      throw _RetryableFailure(error);
+    } on ModelProviderException {
+      checkCancelled();
       rethrow;
     } on HandshakeException catch (error) {
       checkCancelled();

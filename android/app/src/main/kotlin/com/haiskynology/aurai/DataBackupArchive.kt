@@ -37,7 +37,7 @@ class DataBackupArchive(private val context: Context) {
             } }
         }
     }
-    fun export(output: OutputStream, legacyModelConfig: String?, decryptModel: (String) -> String): Map<String, Any> {
+    fun export(output: OutputStream, legacyModelConfig: String?): Map<String, Any> {
         var modelConfig = legacyModelConfig
         val snapshot = File(context.cacheDir, "backup-snapshot.sqlite")
         snapshot.delete()
@@ -48,9 +48,9 @@ class DataBackupArchive(private val context: Context) {
             // Device-bound ciphertext must not travel to another Android Keystore.
             SQLiteDatabase.openDatabase(snapshot.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
                 db.query("app_state", arrayOf("value"), "key = ?", arrayOf(ModelConfigPersistence.KEY), null, null, null).use {
-                    if (it.moveToFirst()) modelConfig = decryptModel(it.getString(0))
+                    if (it.moveToFirst()) modelConfig = it.getString(0)
                 }
-                db.delete("app_state", "key = ?", arrayOf(ModelConfigPersistence.KEY))
+                db.delete("app_state", "key = ?", arrayOf(ModelConfigPersistence.LEGACY_KEY))
             }
             val snapshotModelConfig = modelConfig
             val manifest = summary(snapshot).put("format", 1).put("createdAt", System.currentTimeMillis())
@@ -137,7 +137,7 @@ class DataBackupArchive(private val context: Context) {
     }
 
     /** Apply before Flutter/SQLite/preferences are opened; keep rollback data until success. */
-    fun applyPending(encryptModel: (String) -> String) {
+    fun applyPending() {
         val ready = File(stage, "READY")
         val previous = File(root, "backup_previous")
         val journal = File(root, "backup_restore_journal.json")
@@ -155,21 +155,15 @@ class DataBackupArchive(private val context: Context) {
         }
         if (!ready.exists()) { stage.deleteRecursively(); return }
         try {
-            SQLiteDatabase.openDatabase(File(stage, "databases/aurai.sqlite").path, null, SQLiteDatabase.OPEN_READWRITE).use {
-                it.delete("app_state", "key = ?", arrayOf(ModelConfigPersistence.KEY))
-            }
             val model = File(stage, "model-config.json")
-            if (model.exists()) {
-                val prefs = File(stage, "shared_prefs/aurai.xml")
-                prefs.parentFile!!.mkdirs()
-                prefs.outputStream().use { output ->
-                    val xml = android.util.Xml.newSerializer()
-                    xml.setOutput(output, "UTF-8")
-                    xml.startDocument("UTF-8", true)
-                    xml.startTag(null, "map").startTag(null, "string").attribute(null, "name", "model_config")
-                    xml.text(encryptModel(model.readText()))
-                    xml.endTag(null, "string").endTag(null, "map").endDocument()
-                    output.fd.sync()
+            SQLiteDatabase.openDatabase(File(stage, "databases/aurai.sqlite").path, null, SQLiteDatabase.OPEN_READWRITE).use { database ->
+                database.delete("app_state", "key = ?", arrayOf(ModelConfigPersistence.LEGACY_KEY))
+                if (model.exists()) {
+                    val values = android.content.ContentValues().apply {
+                        put("key", ModelConfigPersistence.KEY)
+                        put("value", model.readText())
+                    }
+                    check(database.insertWithOnConflict("app_state", null, values, SQLiteDatabase.CONFLICT_REPLACE) != -1L) { "无法恢复模型配置" }
                 }
             }
             previous.deleteRecursively(); check(previous.mkdirs())
@@ -188,7 +182,7 @@ class DataBackupArchive(private val context: Context) {
             check(journal.delete()) { "无法完成恢复进度" }
         } catch (error: Exception) {
             // The same journal also recovers an interrupted previous cold start.
-            if (journal.exists()) applyPending(encryptModel) else stage.deleteRecursively()
+            if (journal.exists()) applyPending() else stage.deleteRecursively()
             File(root, "backup-status.txt").writeText("恢复失败，已保留原数据：${error.message}")
             return
         }

@@ -16,6 +16,8 @@ extension GlobalTools on ChatController {
   }) {
     final conversationId = conversation.id;
     return <AgentTool>[
+      for (final name in RequestAdapterTool.names)
+        RequestAdapterTool(name, requestAdapterTool),
       for (final name in StarredMessageTool.names)
         StarredMessageTool(
           _store.database,

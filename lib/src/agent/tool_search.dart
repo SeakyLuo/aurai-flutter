@@ -98,7 +98,7 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
       'local.group_chats' =>
         '群聊 群组 发群消息 发送群消息 私聊发群 跨群发送 创建建群 拉群 成员 添加 移除 退群 改名 重命名 group chat send message private cross-group members roster create rename',
       'model.settings' =>
-        '模型设置 默认模型 图片理解 图片生成 视频理解 视频生成 配置 切换 model settings default vision image video generation provider',
+        '请求转换 参数映射 兼容性 JavaScript request adapter transform 模型设置 默认模型 图片理解 图片生成 视频理解 视频生成 配置 切换 model settings default vision image video generation provider',
       'local.ai_contacts' =>
         '好友 加好友 添加好友 私聊 通讯录 联系人 AI 角色 创建 修改 删除 归档 恢复 查询 friends friend private chat ai contact address book persona',
       'android.scheduled_tasks' => '定时 计划 提醒 scheduled schedule task reminder',

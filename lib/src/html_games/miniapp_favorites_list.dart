@@ -175,37 +175,37 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
       color: settingsFieldColor(context),
       borderRadius: BorderRadius.circular(22),
       clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 10,
-        ),
-        leading: MiniappIcon(
-          path: item.entry.iconPath,
-          asset: item.entry.iconAsset,
-        ),
-        title: Text(
-          item.entry.title,
-          style: const TextStyle(fontWeight: FontWeight.w500),
-        ),
-        subtitle: Text(
-          [
-            if (item.entry.description.isNotEmpty) item.entry.description,
-            item.entry.publisher,
-          ].join('\n'),
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-        ),
-        onTap: _opening == null ? () => _open(item) : null,
-        trailing: Builder(
-          builder: (anchor) => IconButton(
-            tooltip: '更多',
-            icon: Icon(
-              Icons.more_horiz_rounded,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            onPressed: () => _menu(anchor, item),
+      child: Builder(
+        builder: (anchor) => ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 10,
           ),
+          leading: MiniappIcon(
+            path: item.entry.iconPath,
+            asset: item.entry.iconAsset,
+            size: 48,
+          ),
+          horizontalTitleGap: 14,
+          titleAlignment: ListTileTitleAlignment.center,
+          title: Text(
+            item.entry.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+          subtitle: item.entry.description.isEmpty
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    item.entry.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+          onTap: _opening == null ? () => _open(item) : null,
+          onLongPress: _opening == null ? () => _menu(anchor, item) : null,
         ),
       ),
     ),

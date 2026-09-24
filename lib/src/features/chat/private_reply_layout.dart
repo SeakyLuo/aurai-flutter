@@ -77,7 +77,7 @@ Map<String, PrivateReplyPart> privateReplyLayout(
     }
     final process = summary == null
         ? null
-          : AgentTaskSummary(
+        : AgentTaskSummary(
             elapsedMilliseconds: summary.elapsedMilliseconds,
             isTask: summary.isTask,
             stopped: summary.stopped,

@@ -43,6 +43,9 @@ class ToolActivityView extends StatefulWidget {
 class _ToolActivityViewState extends State<ToolActivityView> {
   bool _expanded = false;
 
+  bool get _failedQuestion =>
+      widget.toolName == 'askUser' && widget.status == AgentStepStatus.failed;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -52,7 +55,20 @@ class _ToolActivityViewState extends State<ToolActivityView> {
               identifier: 'tool-expanded:${widget.storageId}',
             )
             as bool? ??
-        false;
+        _failedQuestion;
+  }
+
+  @override
+  void didUpdateWidget(ToolActivityView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.status != AgentStepStatus.failed && _failedQuestion) {
+      _expanded = true;
+      PageStorage.of(context).writeState(
+        context,
+        true,
+        identifier: 'tool-expanded:${widget.storageId}',
+      );
+    }
   }
 
   @override
@@ -150,6 +166,14 @@ class _ToolActivityViewState extends State<ToolActivityView> {
         (showStatus
             ? widget.title.replaceFirst(RegExp(r'^(已完成：|未完成：|已停止：)'), '')
             : widget.title);
+    final inlineDetail = toolInlineDetail(
+      legacyName ?? widget.toolName,
+      widget.requestJson,
+      widget.resultJson,
+    );
+    final displayTitle = isQuestion && inlineDetail != null
+        ? '$title · $inlineDetail'
+        : title;
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -199,16 +223,12 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                           ),
                         ),
                       ),
-                      label: waitingForUser ? '等待你操作' : title,
+                      label: waitingForUser ? '等待你操作' : displayTitle,
                       animate: running && !waitingForUser,
                       singleLine: true,
                       detail: isQuestion || waitingForUser
                           ? null
-                          : toolInlineDetail(
-                              legacyName ?? widget.toolName,
-                              widget.requestJson,
-                              widget.resultJson,
-                            ),
+                          : inlineDetail,
                     ),
                   ),
                   if (showStatus &&
@@ -222,6 +242,7 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                             ? AgentStepStatus.cancelled
                             : widget.status,
                         label: isQuestion ? questionLabel : null,
+                        showIcon: !skipped,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -314,7 +335,12 @@ class _ToolActivityViewState extends State<ToolActivityView> {
 }
 
 class _ToolStatusBadge extends StatelessWidget {
-  const _ToolStatusBadge({required this.status, this.label});
+  const _ToolStatusBadge({
+    required this.status,
+    this.label,
+    this.showIcon = true,
+  });
+  final bool showIcon;
   final String? label;
   final AgentStepStatus status;
 
@@ -353,8 +379,10 @@ class _ToolStatusBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 4),
+            if (showIcon) ...[
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+            ],
             Text(
               this.label ?? label,
               style: TextStyle(fontSize: 11, color: color),

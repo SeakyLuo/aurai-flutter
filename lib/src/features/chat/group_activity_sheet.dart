@@ -85,7 +85,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
           _resuming.isNotEmpty;
       return _MemberAction(
         label: '更多',
-        icon: Icons.more_vert_rounded,
+        icon: Icons.more_horiz_rounded,
         onPressed: busy
             ? null
             : () async {

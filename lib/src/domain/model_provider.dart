@@ -405,3 +405,7 @@ class ModelProviderException implements Exception {
   @override
   String toString() => displayMessage;
 }
+
+class ModelConnectionInterrupted extends ModelProviderException {
+  const ModelConnectionInterrupted(super.message, {super.detail});
+}

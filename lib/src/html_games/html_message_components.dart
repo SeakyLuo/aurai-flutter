@@ -14,7 +14,11 @@ const htmlMessageComponentGuide =
     'aria-labelledby and hidden on inactive panels. The host handles tab clicks, arrow/Home/End keys '
     'and resizes after user switching. Use stable input id/name for restoration. '
     'Use a native form and submit event for local validation. Local controls must not call AI '
-    'unless the user deliberately requests it. No CDN or extra UI library is needed. ';
+    'unless the user deliberately requests it. No CDN or extra UI library is needed. '
+    'In chat, the host overlays its More control inside the HTML surface at the top right. '
+    'Keep that corner clear for --aurai-host-menu-width by --aurai-host-menu-height '
+    '(currently 38px by 36px): do not place text, buttons, canvas interaction, or other meaningful content there. '
+    'Reserve only that corner, not a full-width blank row. In fullscreen both variables are 0px, so the page may use the entire top edge. ';
 
 const htmlMessageComponentStyles = r'''
 .aurai-ui{padding:12px 16px;min-width:0;color:var(--aurai-text)}

@@ -8,7 +8,7 @@ import 'glass_surface.dart';
 
 enum AttachmentSource { gallery, camera, file, favorite }
 
-Future<AttachmentSource?> showImageSourceMenu(
+Future<AttachmentSource?> showAttachmentSourceMenu(
   BuildContext context, {
   bool allowFavorites = true,
 }) {
@@ -30,7 +30,7 @@ Future<AttachmentSource?> showImageSourceMenu(
     context: context,
     requestFocus: false,
     barrierDismissible: true,
-    barrierLabel: '关闭图片菜单',
+    barrierLabel: '关闭附件菜单',
     barrierColor: Colors.transparent,
     transitionDuration: const Duration(milliseconds: 180),
     pageBuilder: (context, animation, secondaryAnimation) {
@@ -122,7 +122,12 @@ class _AttachmentSourceItem extends StatelessWidget {
         child: Row(
           children: [
             source == AttachmentSource.favorite
-                ? const SettingsIcon(type: SettingsIconType.star)
+                ? SettingsIcon(
+                    type: SettingsIconType.star,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Colors.black,
+                  )
                 : AttachmentActionIcon(type: icon),
             const SizedBox(width: 13),
             Expanded(

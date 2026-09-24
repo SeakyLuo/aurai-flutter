@@ -68,11 +68,13 @@ extension ChatMessageSubmission on _ChatPageState {
     }
   }
 
-  Future<void> _sendQueuedMessages() async {
+  Future<void> _sendQueuedMessages(String messageId) async {
     final controller = widget.controller;
     final conversationId = controller.activeConversation.id;
     try {
-      final needsSettings = await controller.sendPendingMessages();
+      final needsSettings = await controller.sendPendingMessages(
+        messageId: messageId,
+      );
       if (needsSettings && mounted) {
         final saved = await ModelSettingsSheet.show(
           context,
@@ -82,7 +84,7 @@ extension ChatMessageSubmission on _ChatPageState {
         if (saved &&
             mounted &&
             controller.activeConversation.id == conversationId) {
-          await controller.sendPendingMessages();
+          await controller.sendPendingMessages(messageId: messageId);
         }
       }
     } on Object catch (error) {

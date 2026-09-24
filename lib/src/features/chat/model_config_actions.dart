@@ -52,10 +52,10 @@ extension ModelConfigActions on ChatController {
       responsePreferences: modelSettings.responsePreferences,
       modelDefaults: modelSettings.modelDefaults,
     );
-    final encrypted = await _platform.encryptModelSettings(next);
+    final encoded = jsonEncode(next.toJson());
     await _store.database.rawInsert(
       'INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-      ['encrypted_model_config', encrypted],
+      ['model_config_json', encoded],
     );
     modelSettings = next;
     _conversationChanged();
@@ -80,23 +80,23 @@ extension ModelConfigActions on ChatController {
     ),
   );
 
-  Future<List<UsedModelSelection>> usedModels() async {
-    final rows = await _store.database.query(
-      'ai_profiles',
-      columns: ['provider', 'model', 'COUNT(*) AS count'],
-      where: 'provider IS NOT NULL',
-      groupBy: 'provider, model',
-    );
+  Future<List<UsedModelSelection>> usedModels(ModelPurpose purpose) async {
+    final rows = purpose == ModelPurpose.text
+        ? await _store.database.query(
+            'ai_profiles',
+            columns: ['provider', 'model', 'COUNT(*) AS count'],
+            where: 'provider IS NOT NULL',
+            groupBy: 'provider, model',
+          )
+        : const <Map<String, Object?>>[];
     final selections = <String, DefaultModelSelection>{};
     final aiCounts = <String, int>{};
-    final purposes = <String, Set<ModelPurpose>>{};
     String key(ModelService service, String model) => '${service.name}\n$model';
     void add(
       ModelService service,
       String model, {
       required String name,
       int aiCount = 0,
-      ModelPurpose? purpose,
     }) {
       final id = key(service, model);
       selections[id] = DefaultModelSelection(
@@ -105,7 +105,6 @@ extension ModelConfigActions on ChatController {
         name: name,
       );
       aiCounts[id] = (aiCounts[id] ?? 0) + aiCount;
-      if (purpose != null) purposes.putIfAbsent(id, () => {}).add(purpose);
     }
 
     for (final row in rows) {
@@ -116,21 +115,13 @@ extension ModelConfigActions on ChatController {
         aiCount: row['count']! as int,
       );
     }
-    for (final entry in _effectiveModelSelections().entries) {
-      add(
-        entry.value.service,
-        entry.value.model,
-        name: entry.value.name,
-        purpose: entry.key,
-      );
-    }
     final result = [
       for (final entry in selections.entries)
         UsedModelSelection(
           model: entry.value,
           impact: ModelReplacementImpact(
             aiCount: aiCounts[entry.key] ?? 0,
-            purposes: purposes[entry.key] ?? const {},
+            purposes: const {},
           ),
         ),
     ];
@@ -144,69 +135,50 @@ extension ModelConfigActions on ChatController {
     return result;
   }
 
-  Map<ModelPurpose, DefaultModelSelection> _effectiveModelSelections() {
-    final active = modelSettings.activeConfig;
-    return {
-      ModelPurpose.text: DefaultModelSelection(
-        service: active.service,
-        model: active.model,
-        name: modelDisplayName(active.model),
-      ),
-      if (modelSettings.modelDefaults[ModelPurpose.videoGeneration]
-          case final selection?)
-        ModelPurpose.videoGeneration: selection,
-      if (imageGeneration case final selection?)
-        ModelPurpose.imageGeneration: DefaultModelSelection(
-          service: selection.service,
-          model: selection.model.id,
-          name: selection.model.name,
-        ),
-    };
-  }
-
   Future<ModelReplacementImpact> modelReplacementImpact({
+    required ModelPurpose purpose,
     DefaultModelSelection? from,
     DefaultModelSelection? to,
   }) async {
     if (to != null && _sameModelSelection(from, to)) {
       return const ModelReplacementImpact(aiCount: 0, purposes: {});
     }
-    final rows = await _store.database.query(
-      'ai_profiles',
-      columns: ['COUNT(*) AS count'],
-      where: from == null
-          ? to == null
-                ? 'provider IS NOT NULL'
-                : 'provider IS NOT NULL AND (provider != ? OR model != ?)'
-          : 'provider = ? AND model = ?',
-      whereArgs: from == null
-          ? to == null
-                ? null
-                : [to.service.name, to.model]
-          : [from.service.name, from.model],
-    );
-    final purposes = <ModelPurpose>{};
-    for (final entry in _effectiveModelSelections().entries) {
-      if ((from == null || _sameModelSelection(from, entry.value)) &&
-          (to == null || !_sameModelSelection(entry.value, to))) {
-        purposes.add(entry.key);
-      }
-    }
-    return ModelReplacementImpact(
-      aiCount: rows.single['count']! as int,
-      purposes: purposes,
-    );
+    final aiRows = purpose == ModelPurpose.text
+        ? await _store.database.query(
+            'ai_profiles',
+            columns: ['COUNT(*) AS count'],
+            where: from == null
+                ? to == null
+                      ? 'provider IS NOT NULL'
+                      : 'provider IS NOT NULL AND (provider != ? OR model != ?)'
+                : 'provider = ? AND model = ?',
+            whereArgs: from == null
+                ? to == null
+                      ? null
+                      : [to.service.name, to.model]
+                : [from.service.name, from.model],
+          )
+        : const <Map<String, Object?>>[];
+    final aiCount = purpose == ModelPurpose.text
+        ? aiRows.single['count']! as int
+        : 0;
+    return ModelReplacementImpact(aiCount: aiCount, purposes: const {});
   }
 
   Future<ModelReplacementImpact> replaceModels({
+    required ModelPurpose purpose,
     DefaultModelSelection? from,
     required ModelReplacementTarget to,
   }) => _serializeModelSettings(() async {
     if (_sameModelSelection(from, to.model)) throw StateError('新旧模型不能相同');
     final targetAccount = modelSettings.profile(to.model.service);
     if (!targetAccount.isConfigured) throw StateError('请先配置新模型的供应商');
-    final impact = await modelReplacementImpact(from: from, to: to.model);
-    if (!impact.hasChanges) throw StateError('当前没有使用该模型的 AI 或默认设置');
+    final impact = await modelReplacementImpact(
+      purpose: purpose,
+      from: from,
+      to: to.model,
+    );
+    if (!impact.hasChanges) throw StateError('当前没有 AI 使用该模型');
     if (impact.aiCount > 0 && !to.supportsText) throw StateError('新模型不支持文字回复');
     final unsupported = impact.purposes.difference(to.supportedPurposes);
     if (unsupported.isNotEmpty)
@@ -228,7 +200,7 @@ extension ModelConfigActions on ChatController {
       responsePreferences: modelSettings.responsePreferences,
       modelDefaults: defaults,
     );
-    final encrypted = await _platform.encryptModelSettings(nextSettings);
+    final encoded = jsonEncode(nextSettings.toJson());
     final nextImageGeneration =
         impact.purposes.contains(ModelPurpose.imageGeneration)
         ? ImageGenerationConfig(
@@ -238,37 +210,41 @@ extension ModelConfigActions on ChatController {
         : imageGeneration;
     final now = DateTime.now().microsecondsSinceEpoch;
     final affected = await _store.database.transaction((txn) async {
-      final rows = await txn.query(
-        'ai_profiles',
-        columns: ['sender_id', 'preferences'],
-        where: from == null
-            ? 'provider IS NOT NULL AND (provider != ? OR model != ?)'
-            : 'provider = ? AND model = ?',
-        whereArgs: from == null
-            ? [to.model.service.name, to.model.model]
-            : [from.service.name, from.model],
-      );
-      await txn.update(
-        'ai_profiles',
-        {
-          'provider': to.model.service.name,
-          'model': to.model.model,
-          'base_url': targetAccount.baseUrl,
-          'updated_at': now,
-        },
-        where: from == null
-            ? 'provider IS NOT NULL AND (provider != ? OR model != ?)'
-            : 'provider = ? AND model = ?',
-        whereArgs: from == null
-            ? [to.model.service.name, to.model.model]
-            : [from.service.name, from.model],
-      );
+      final rows = purpose == ModelPurpose.text
+          ? await txn.query(
+              'ai_profiles',
+              columns: ['sender_id', 'preferences'],
+              where: from == null
+                  ? 'provider IS NOT NULL AND (provider != ? OR model != ?)'
+                  : 'provider = ? AND model = ?',
+              whereArgs: from == null
+                  ? [to.model.service.name, to.model.model]
+                  : [from.service.name, from.model],
+            )
+          : const <Map<String, Object?>>[];
+      if (purpose == ModelPurpose.text) {
+        await txn.update(
+          'ai_profiles',
+          {
+            'provider': to.model.service.name,
+            'model': to.model.model,
+            'base_url': targetAccount.baseUrl,
+            'updated_at': now,
+          },
+          where: from == null
+              ? 'provider IS NOT NULL AND (provider != ? OR model != ?)'
+              : 'provider = ? AND model = ?',
+          whereArgs: from == null
+              ? [to.model.service.name, to.model.model]
+              : [from.service.name, from.model],
+        );
+      }
       if (impact.purposes.any(
         (purpose) => purpose != ModelPurpose.imageGeneration,
       )) {
         await txn.rawInsert(
           'INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-          ['encrypted_model_config', encrypted],
+          ['model_config_json', encoded],
         );
       }
       if (impact.purposes.contains(ModelPurpose.imageGeneration)) {
@@ -355,10 +331,10 @@ extension ModelConfigActions on ChatController {
       responsePreferences: modelSettings.responsePreferences,
       modelDefaults: {...modelSettings.modelDefaults, purpose: selection},
     );
-    final encrypted = await _platform.encryptModelSettings(next);
+    final encoded = jsonEncode(next.toJson());
     await _store.database.rawInsert(
       'INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-      ['encrypted_model_config', encrypted],
+      ['model_config_json', encoded],
     );
     modelSettings = next;
     final config = next.activeConfig;
@@ -404,7 +380,7 @@ extension ModelConfigActions on ChatController {
       responsePreferences: modelSettings.responsePreferences,
       modelDefaults: modelSettings.modelDefaults,
     );
-    final encrypted = await _platform.encryptModelSettings(nextSettings);
+    final encoded = jsonEncode(nextSettings.toJson());
     final updatedAi = await _store.database.transaction((txn) async {
       AiProfile? updated;
       if (senderId != null) {
@@ -444,7 +420,7 @@ extension ModelConfigActions on ChatController {
       }
       await txn.rawInsert(
         'INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-        ['encrypted_model_config', encrypted],
+        ['model_config_json', encoded],
       );
       return updated;
     });

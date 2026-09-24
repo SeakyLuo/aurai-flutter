@@ -74,10 +74,25 @@ extension ConversationRun on ChatController {
     final userMessage = callbackEvents.isNotEmpty
         ? _callbackContext(callbackEvents)
         : groupUser ?? history[lastUser];
+    final continuationProtocol = groupParent == null && callbackEvents.isEmpty
+        ? await loadTaskContinuationProtocol(
+            _store.database,
+            runConversation.id,
+            userMessage.id,
+            runConfig,
+          )
+        : const <Map<String, Object?>>[];
+    final previousWatch = runConversation.executionWatch;
+    final continuingElapsed =
+        runConversation.executionUserMessageId == userMessage.id
+        ? runConversation.restoredExecutionElapsed +
+              (previousWatch?.elapsed ?? Duration.zero)
+        : Duration.zero;
     final executionWatch = Stopwatch()..start();
     runConversation.executionWatch = executionWatch;
-    runConversation.restoredExecutionElapsed = Duration.zero;
-    runConversation.hasExecutionProcess = false;
+    runConversation.restoredExecutionElapsed = continuingElapsed;
+    runConversation.hasExecutionProcess =
+        continuingElapsed > Duration.zero || continuationProtocol.isNotEmpty;
     runConversation.executionUserMessageId = userMessage.id;
     final runId = await _store.runs.start(
       runConversation.id,
@@ -92,7 +107,7 @@ extension ConversationRun on ChatController {
     );
     runConversation.activeRunId = runId;
     steps.clear();
-    runConversation.liveToolSteps.clear();
+    final runStepStart = runConversation.liveToolSteps.length;
     runConversation.errorDetail = null;
     if (runConversation.runState != ChatRunState.stopping) {
       runConversation.runState = ChatRunState.running;
@@ -104,7 +119,9 @@ extension ConversationRun on ChatController {
     _notifyMember(runConversation, groupParent);
     var sessionStarted = groupHistory != null || alongsideGroup;
     var outcome = 'failed';
+    var producedFinalAnswer = false;
     String? failureDiagnostic;
+    String? unfinishedFinalMessageId;
     final activities = <AgentTaskActivity>[];
     final runMessageIds = <String>[];
     final observed = List<AgentMessage>.of(history);
@@ -155,9 +172,11 @@ extension ConversationRun on ChatController {
           if (question == null || question.isUserAction) {
             target.pendingQuestionPreviews.remove(runId);
           } else {
-            final heading = question.title?.trim();
-            final preview =
-                '${reply.sender.name}：[问题] ${heading == null || heading.isEmpty ? question.question : heading}';
+            final title = question.title?.trim();
+            final label = title == null || title.isEmpty
+                ? question.question
+                : title;
+            final preview = '${reply.sender.name}：[问题] $label';
             target.pendingQuestionPreviews[runId] = preview;
             questionNotifications.value = ConversationCompletion(
               conversationId: target.id,
@@ -265,6 +284,16 @@ extension ConversationRun on ChatController {
                   if (htmlEvents.isNotEmpty) _htmlEventContext(htmlEvents),
                 ], reply.senderId)),
           if (callbackEvents.isNotEmpty) _callbackContext(callbackEvents),
+          if (continuationProtocol.isNotEmpty)
+            AgentMessage(
+              id: 'continuation:$runId',
+              role: AgentMessageRole.assistant,
+              senderId: reply.senderId,
+              sender: reply.sender,
+              text: '',
+              createdAt: DateTime.now(),
+              responseInput: continuationProtocol,
+            ),
           if (groupParent != null)
             if (_takeGroupReplyDraft(reply.senderId) case final draft?) draft,
         ],
@@ -477,13 +506,20 @@ extension ConversationRun on ChatController {
           final liveSteps = runConversation.liveToolSteps;
           for (var i = 0; i < newSteps.length; i++) {
             final step = newSteps[i];
-            if (i < liveSteps.length && identical(liveSteps[i].step, step))
+            final liveIndex = runStepStart + i;
+            if (liveIndex < liveSteps.length &&
+                identical(liveSteps[liveIndex].step, step))
               continue;
-            if (i == liveSteps.length) {
-              liveSteps.add((afterMessageId: messages.last.id, step: step));
+            if (liveIndex == liveSteps.length) {
+              liveSteps.add((
+                runId: runId,
+                afterMessageId: messages.last.id,
+                step: step,
+              ));
             } else {
-              liveSteps[i] = (
-                afterMessageId: liveSteps[i].afterMessageId,
+              liveSteps[liveIndex] = (
+                runId: runId,
+                afterMessageId: liveSteps[liveIndex].afterMessageId,
                 step: step,
               );
             }
@@ -532,6 +568,12 @@ extension ConversationRun on ChatController {
           (m) => runMessageIds.contains(m.id),
         );
         final answer = messages[answerIndex];
+        final hasFinalAnswer =
+            !answer.isReasoning &&
+            answer.interactive == null &&
+            answer.htmlGame == null &&
+            answer.text.isNotEmpty;
+        producedFinalAnswer = hasFinalAnswer;
         messages[answerIndex] = AgentMessage(
           id: answer.id,
           role: answer.role,
@@ -548,10 +590,12 @@ extension ConversationRun on ChatController {
           htmlGame: answer.htmlGame,
           quote: answer.quote,
           taskSummary: AgentTaskSummary(
-            elapsedMilliseconds: executionWatch.elapsedMilliseconds,
+            elapsedMilliseconds:
+                runConversation.restoredExecutionElapsed.inMilliseconds +
+                executionWatch.elapsedMilliseconds,
             isTask: runConversation.hasExecutionProcess,
             intermediateMessageIds: List.unmodifiable(
-              groupParent == null
+              groupParent == null && hasFinalAnswer
                   ? runMessageIds.where(
                       (id) =>
                           id != answer.id &&
@@ -564,8 +608,8 @@ extension ConversationRun on ChatController {
             activities: List.unmodifiable(
               groupParent != null
                   ? activities.where((a) => a.toolName != null)
-                  : answer.interactive != null || answer.htmlGame != null
-                  ? activities
+                  : !hasFinalAnswer
+                  ? activities.where((a) => a.toolName != null)
                   : activities.take(
                       activities.indexWhere(
                         (activity) => activity.messageId == answer.id,
@@ -586,7 +630,7 @@ extension ConversationRun on ChatController {
             : messages.lastWhere((m) => runMessageIds.contains(m.id)).id,
         isTask: runConversation.hasExecutionProcess,
       );
-      runConversation.liveToolSteps.clear();
+      if (producedFinalAnswer) runConversation.liveToolSteps.clear();
       if (groupHistory == null && _execution.queuedUserMessageId == null)
         runConversation.pendingGoal = null;
       if (runConversation.runState != ChatRunState.stopping) {
@@ -621,79 +665,57 @@ extension ConversationRun on ChatController {
         runConversation.runState = ChatRunState.cancelled;
         outcome = 'cancelled';
         executionWatch.stop();
-        final keepActivity =
-            (groupParent == null && runConversation.hasExecutionProcess) ||
-            messages.last.runId == runId ||
-            activities.any(
-              (activity) => activity.toolName != null || activity.isReasoning,
+        for (
+          var i = runStepStart;
+          i < runConversation.liveToolSteps.length;
+          i++
+        ) {
+          final entry = runConversation.liveToolSteps[i];
+          if (entry.step.status == AgentStepStatus.running) {
+            runConversation.liveToolSteps[i] = (
+              runId: entry.runId,
+              afterMessageId: entry.afterMessageId,
+              step: entry.step.copyWith(status: AgentStepStatus.cancelled),
             );
-        if (keepActivity) {
-          if (messages.last.runId != runId) {
-            messages.add(
-              AgentMessage(
-                id: newMessageId(),
-                role: AgentMessageRole.assistant,
-                senderId: reply.senderId,
-                sender: reply.sender,
-                text: '',
-                runId: runId,
-                createdAt: DateTime.now(),
-              ),
-            );
-            runConversation.messageCount++;
           }
-          final last = messages.last;
-          messages[messages.length - 1] = AgentMessage(
-            id: last.id,
-            role: last.role,
-            isGroupMessage: last.isGroupMessage,
-            isReasoning: last.isReasoning,
-            quote: last.quote,
-            senderId: last.senderId,
-            sender: last.sender,
-            text: last.text,
-            images: last.images,
-            interactive: last.interactive,
-            htmlGame: last.htmlGame,
-            files: last.files,
-            runId: last.runId,
-            modelTurnId: last.modelTurnId,
-            createdAt: last.createdAt,
-            taskSummary:
-                !runConversation.hasExecutionProcess &&
-                    !activities.any((activity) => activity.isReasoning)
-                ? null
-                : AgentTaskSummary(
-                    elapsedMilliseconds: executionWatch.elapsedMilliseconds,
-                    isTask: runConversation.hasExecutionProcess,
-                    stopped: true,
-                    intermediateMessageIds: [
-                      for (final message in messages)
-                        if (message.runId == runId && message.id != last.id)
-                          message.id,
-                    ],
-                    activities: [
-                      for (final activity in activities)
-                        AgentTaskActivity(
-                          text: activity.text,
-                          isReasoning: activity.isReasoning,
-                          messageId: activity.messageId,
-                          toolName: activity.toolName,
-                          requestJson: activity.requestJson,
-                          resultJson: activity.resultJson,
-                          status: activity.status == AgentStepStatus.running
-                              ? AgentStepStatus.cancelled
-                              : activity.status,
-                        ),
-                    ],
-                  ),
-          );
         }
-        runConversation.liveToolSteps.clear();
+        unfinishedFinalMessageId = messages
+            .where((message) => message.runId == runId)
+            .lastOrNull
+            ?.id;
         await _persistMember(runConversation, groupParent);
       } else {
-        runConversation.runState = ChatRunState.failed;
+        final connectionInterrupted = error is ModelConnectionInterrupted;
+        runConversation.runState = connectionInterrupted
+            ? ChatRunState.interrupted
+            : ChatRunState.failed;
+        if (connectionInterrupted) outcome = 'interrupted';
         runConversation.errorDetail = errorMessage(error);
+        _recordRunError(error, (groupParent ?? runConversation).id);
+        executionWatch.stop();
+        for (
+          var i = runStepStart;
+          i < runConversation.liveToolSteps.length;
+          i++
+        ) {
+          final entry = runConversation.liveToolSteps[i];
+          if (entry.step.status == AgentStepStatus.running) {
+            runConversation.liveToolSteps[i] = (
+              runId: entry.runId,
+              afterMessageId: entry.afterMessageId,
+              step: entry.step.copyWith(status: AgentStepStatus.failed),
+            );
+          }
+        }
+        if (groupParent == null) {
+          final answerIndex = messages.lastIndexWhere(
+            (message) => message.runId == runId,
+          );
+          if (answerIndex >= 0) {
+            unfinishedFinalMessageId = messages[answerIndex].id;
+          }
+          await _persistMember(runConversation, groupParent);
+        }
       }
       rethrow;
     } finally {
@@ -707,10 +729,7 @@ extension ConversationRun on ChatController {
             executionWatch.elapsedMilliseconds,
             error: runConversation.errorDetail,
             diagnostic: failureDiagnostic,
-            finalMessageId:
-                outcome == 'cancelled' && messages.last.runId == runId
-                ? messages.last.id
-                : null,
+            finalMessageId: unfinishedFinalMessageId,
             isTask: runConversation.hasExecutionProcess,
           );
         }

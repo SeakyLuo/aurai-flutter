@@ -239,6 +239,7 @@ class ExecutionProgress extends StatelessWidget {
         onRetry: onContinue,
         error: '任务已中断',
         actionLabel: '继续任务',
+        paused: true,
       );
     }
     if (state == ChatRunState.failed) {
@@ -357,6 +358,7 @@ class ChatComposer extends StatelessWidget {
     required this.onRemoveImage,
     required this.addingImages,
     this.savingEdit = false,
+    this.submitting = false,
     this.queueing = false,
     this.quote,
     this.onCancelQuote,
@@ -380,6 +382,7 @@ class ChatComposer extends StatelessWidget {
   final ValueChanged<MessageFile> onRemoveFile;
   final bool addingImages;
   final bool savingEdit;
+  final bool submitting;
   final bool queueing;
   final MessageQuote? quote;
   final VoidCallback? onCancelQuote;
@@ -465,6 +468,8 @@ class ChatComposer extends StatelessWidget {
           inkResponse: false,
           label: savingEdit
               ? '正在保存'
+              : submitting
+              ? '正在发送'
               : enabled
               ? (addingImages
                     ? '正在处理附件'
@@ -478,13 +483,13 @@ class ChatComposer extends StatelessWidget {
               : '停止',
           primary: true,
           compact: true,
-          iconWidget: savingEdit || (addingImages && enabled)
+          iconWidget: savingEdit || submitting || (addingImages && enabled)
               ? const SizedBox.square(
                   dimension: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : null,
-          onPressed: savingEdit
+          onPressed: savingEdit || submitting
               ? null
               : enabled
               ? (addingImages

@@ -461,7 +461,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       ),
                     Builder(
                       builder: (buttonContext) => RoundAction(
-                        icon: Icons.more_vert,
+                        icon: Icons.more_horiz_rounded,
                         iconWidget: const TaskActionIcon('more'),
                         label: '更多',
                         onPressed: _busy

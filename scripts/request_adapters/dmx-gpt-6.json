@@ -1,0 +1,10 @@
+{
+  "gpt-6-luna": {
+    "protocol": "responses",
+    "script": "// DMX Responses：用完整正文和工具记录续接，不引用特定 Azure 资源的对象。\nconst body = request.body;\nbody.store = false;\ndelete body.previous_response_id;\nif (Array.isArray(body.input)) {\n  body.input = body.input.filter(function(item) {\n    // 远端思考对象不具备跨资源可移植性；正文和工具调用仍完整保留。\n    return item.type !== 'reasoning';\n  }).map(function(item) {\n    const copy = Object.assign({}, item);\n    delete copy.id;\n    return copy;\n  });\n}\nreturn { path: request.path, body: body };\n"
+  },
+  "gpt-6-sol": {
+    "protocol": "responses",
+    "script": "// DMX Responses：用完整正文和工具记录续接，不引用特定 Azure 资源的对象。\nconst body = request.body;\nbody.store = false;\ndelete body.previous_response_id;\nif (Array.isArray(body.input)) {\n  body.input = body.input.filter(function(item) {\n    // 远端思考对象不具备跨资源可移植性；正文和工具调用仍完整保留。\n    return item.type !== 'reasoning';\n  }).map(function(item) {\n    const copy = Object.assign({}, item);\n    delete copy.id;\n    return copy;\n  });\n}\nreturn { path: request.path, body: body };\n"
+  }
+}

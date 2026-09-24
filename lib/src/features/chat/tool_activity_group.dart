@@ -36,19 +36,8 @@ class _ToolActivityGroupState extends State<ToolActivityGroup> {
   @override
   Widget build(BuildContext context) {
     final running = widget.statuses.contains(AgentStepStatus.running);
-    final failed = widget.statuses
-        .where((s) => s == AgentStepStatus.failed)
-        .length;
-    final cancelled = widget.statuses
-        .where((s) => s == AgentStepStatus.cancelled)
-        .length;
     final expanded = _expanded;
-    final label = [
-      '${toolTitle(widget.toolName)} · ${widget.statuses.length} 次',
-      if (running) '执行中',
-      if (failed > 0) '$failed 项失败',
-      if (cancelled > 0) '$cancelled 项已停止',
-    ].join(' · ');
+    final label = '${toolTitle(widget.toolName)} · ${widget.statuses.length} 次';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

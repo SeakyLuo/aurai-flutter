@@ -14,9 +14,14 @@ import 'settings_appearance.dart';
 import 'settings_icon.dart';
 
 class ModelReplacementPage extends StatefulWidget {
-  const ModelReplacementPage({super.key, required this.controller});
+  const ModelReplacementPage({
+    super.key,
+    required this.controller,
+    required this.purpose,
+  });
 
   final ChatController controller;
+  final ModelPurpose purpose;
 
   @override
   State<ModelReplacementPage> createState() => _ModelReplacementPageState();
@@ -55,8 +60,8 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
   Future<void> _loadUsedModels() async {
     try {
       final results = await Future.wait<Object>([
-        widget.controller.usedModels(),
-        widget.controller.modelReplacementImpact(),
+        widget.controller.usedModels(widget.purpose),
+        widget.controller.modelReplacementImpact(purpose: widget.purpose),
       ]);
       if (!mounted) return;
       setState(() {
@@ -77,15 +82,24 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
       '${widget.controller.modelSettings.profile(model.service).displayName} · ${model.name}';
 
   String _purposeLabel(ModelPurpose purpose) => switch (purpose) {
-    ModelPurpose.text => '默认文本',
+    ModelPurpose.text => '文本',
     ModelPurpose.imageGeneration => '图片生成',
     ModelPurpose.videoGeneration => '视频生成',
   };
 
+  String get _allModelsLabel => widget.purpose == ModelPurpose.text
+      ? '全部 AI 当前模型'
+      : '全部${_purposeLabel(widget.purpose)}模型';
+
   String _impactSummary(ModelReplacementImpact impact) => [
     if (impact.aiCount > 0) '${impact.aiCount} 个 AI',
     for (final purpose in ModelPurpose.values)
-      if (impact.purposes.contains(purpose)) _purposeLabel(purpose),
+      if (impact.purposes.contains(purpose))
+        switch (purpose) {
+          ModelPurpose.text => '默认文本模型',
+          ModelPurpose.imageGeneration => '默认图片生成模型',
+          ModelPurpose.videoGeneration => '默认视频生成模型',
+        },
   ].join('、');
 
   bool get _sameModel =>
@@ -100,7 +114,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
       title: '当前模型',
       selected: _from == null ? '*' : _key(_from!),
       choices: [
-        (value: '*', label: '全部已使用模型'),
+        (value: '*', label: _allModelsLabel),
         for (final used in _usedModels)
           (
             value: _key(used.model),
@@ -127,7 +141,10 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
     final revision = ++_impactRevision;
     setState(() => _loadingImpact = true);
     try {
-      final scope = await widget.controller.modelReplacementImpact(from: _from);
+      final scope = await widget.controller.modelReplacementImpact(
+        purpose: widget.purpose,
+        from: _from,
+      );
       if (mounted && revision == _impactRevision) {
         setState(() => _scope = scope);
       }
@@ -172,7 +189,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
     try {
       final targets = await _eligibleTargets(
         service: service,
-        scope: scope,
+        purpose: widget.purpose,
         catalog: catalog,
         imageClient: imageClient,
       );
@@ -209,41 +226,26 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
 
   Future<List<ModelReplacementTarget>> _eligibleTargets({
     required ModelService service,
-    required ModelReplacementImpact scope,
+    required ModelPurpose purpose,
     required ModelCatalog catalog,
     required ImageGenerationClient imageClient,
   }) async {
     final account = widget.controller.modelSettings.profile(service);
-    final needsText =
-        scope.aiCount > 0 || scope.purposes.contains(ModelPurpose.text);
-    final needsGeneral =
-        needsText ||
-        scope.purposes.any(
-          (purpose) => purpose != ModelPurpose.imageGeneration,
-        );
-    final needsKnownCapabilities = scope.purposes.any(
-      (purpose) =>
-          purpose != ModelPurpose.text &&
-          purpose != ModelPurpose.imageGeneration,
-    );
-    if (needsKnownCapabilities && service != ModelService.openRouter) {
-      return const [];
-    }
-
     var generalModels = <String>[];
-    if (needsGeneral) {
-      generalModels = needsKnownCapabilities || account.autoSyncModels
+    if (purpose != ModelPurpose.imageGeneration) {
+      generalModels =
+          purpose == ModelPurpose.videoGeneration || account.autoSyncModels
           ? await catalog.load(
               baseUrl: Uri.parse(account.baseUrl),
               apiKey: account.apiKey,
               openRouter: service == ModelService.openRouter,
-              textOnly: service != ModelService.openRouter,
+              textOnly: purpose == ModelPurpose.text,
             )
           : account.savedModels;
     }
 
     final imageModels = <String, ImageGenerationModel>{};
-    if (scope.purposes.contains(ModelPurpose.imageGeneration)) {
+    if (purpose == ModelPurpose.imageGeneration) {
       if (service != ModelService.openRouter && service != ModelService.qwen) {
         return const [];
       }
@@ -252,23 +254,23 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
       }
     }
 
-    final candidateIds = needsGeneral
-        ? generalModels
-        : imageModels.keys.toList();
+    final candidateIds = purpose == ModelPurpose.imageGeneration
+        ? imageModels.keys.toList()
+        : generalModels;
     final targets = <ModelReplacementTarget>[];
     for (final id in candidateIds) {
       final info = service == ModelService.openRouter
           ? OpenRouterModels.lookup(account.baseUrl, id)
           : null;
-      final supportsText = info?.supportsText ?? !needsKnownCapabilities;
+      final supportsText = info?.supportsText ?? true;
       final supportedPurposes = <ModelPurpose>{
         if (supportsText) ModelPurpose.text,
         if (imageModels.containsKey(id)) ModelPurpose.imageGeneration,
-        if (info?.outputModalities.contains('video') == true)
+        if (info?.outputModalities.contains('video') ??
+            purpose == ModelPurpose.videoGeneration)
           ModelPurpose.videoGeneration,
       };
-      if (needsText && !supportsText) continue;
-      if (!supportedPurposes.containsAll(scope.purposes)) continue;
+      if (!supportedPurposes.contains(purpose)) continue;
       targets.add(
         ModelReplacementTarget(
           model: DefaultModelSelection(
@@ -296,6 +298,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
     setState(() => _loadingImpact = true);
     try {
       final impact = await widget.controller.modelReplacementImpact(
+        purpose: widget.purpose,
         from: _from,
         to: to.model,
       );
@@ -320,17 +323,21 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
       context: context,
       barrierColor: Colors.black.withValues(alpha: .24),
       builder: (_) => AppConfirmationDialog(
-        title: all ? '全部替换？' : '更换模型？',
+        title: all ? '批量修改全部 AI 模型？' : '批量修改 AI 模型？',
         description: all
-            ? '将把以下使用位置统一更换为“${_modelLabel(to.model)}”：$summary。原来的模型对应关系无法自动恢复。正在进行的回复不受影响。'
-            : '将把“${_modelLabel(_from!)}”更换为“${_modelLabel(to.model)}”。影响：$summary。正在进行的回复不受影响。',
-        confirmLabel: all ? '全部替换' : '更换模型',
+            ? '将把 $summary 当前使用的模型统一更换为“${_modelLabel(to.model)}”。默认文本模型不变。'
+            : '将把使用“${_modelLabel(_from!)}”的 $summary 更换为“${_modelLabel(to.model)}”。默认文本模型不变。',
+        confirmLabel: all ? '替换全部' : '更换模型',
       ),
     );
     if (!mounted || confirmed != true) return;
     setState(() => _replacing = true);
     try {
-      final result = await widget.controller.replaceModels(from: _from, to: to);
+      final result = await widget.controller.replaceModels(
+        purpose: widget.purpose,
+        from: _from,
+        to: to,
+      );
       if (mounted) Navigator.pop(context, result);
     } on Object catch (error) {
       if (mounted) _notice(errorMessage(error));
@@ -362,11 +369,11 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: SettingsAppBar(
-      title: '更换模型',
+      title: '批量修改 AI 模型',
       onBack: _replacing ? null : () => Navigator.pop(context),
       actions: [
         SettingsGlassAction(
-          label: _from == null ? '全部替换' : '更换模型',
+          label: _from == null ? '替换全部' : '更换模型',
           icon: Icons.check_rounded,
           iconWidget: _replacing
               ? const SizedBox.square(
@@ -388,9 +395,14 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
             children: [
               _label('当前模型'),
               _choice(
-                _from == null ? '全部已使用模型' : _modelLabel(_from!),
-                _loadingUsedModels || _replacing ? null : _selectCurrentModel,
-                subtitle: '不指定时，将替换所有 AI 和默认用途使用的模型',
+                _from == null ? _allModelsLabel : _modelLabel(_from!),
+                _loadingUsedModels ||
+                        _loadingNewModels ||
+                        _loadingImpact ||
+                        _replacing
+                    ? null
+                    : _selectCurrentModel,
+                subtitle: '不指定具体模型时，将修改所有 AI 当前使用的模型',
                 loading: _loadingUsedModels,
               ),
               const SizedBox(height: 16),
@@ -438,19 +450,12 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _from == null
-              ? '没有一个模型同时支持当前所有用途。可以按旧模型分别更换。'
-              : '这个供应商没有支持全部受影响用途的模型，请选择其他供应商或旧模型。',
+          '这个供应商没有可用的${_purposeLabel(widget.purpose)}模型，请选择其他供应商。',
           style: TextStyle(
             height: 1.45,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
-        if (_from == null)
-          TextButton(
-            onPressed: _selectCurrentModel,
-            child: const Text('按旧模型分别替换'),
-          ),
       ],
     ),
   );

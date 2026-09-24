@@ -1,3 +1,6 @@
+import '../../domain/request_adapter.dart';
+import '../../providers/request_adapter_runner.dart';
+import '../../agent/request_adapter_tool.dart';
 import 'pending_message_queue.dart';
 import '../../domain/quick_reply_option.dart';
 import '../../agent/provider_configuration_tool.dart';
@@ -69,6 +72,7 @@ import '../../agent/ai_contact_tools.dart';
 import '../../platform/ai_document_scope.dart';
 import '../../storage/attachment_search.dart';
 import '../../storage/group_chat_store.dart';
+import '../../storage/protocol_history.dart';
 import '../../storage/conversation_tool_history.dart';
 import '../../agent/attachment_tool.dart';
 import 'tool_approval_store.dart';
@@ -154,12 +158,14 @@ part 'message_callback_actions.dart';
 part 'html_game_actions.dart';
 part 'miniapp_template_sending.dart';
 part 'model_config_actions.dart';
+part 'request_adapter_actions.dart';
 part 'provider_configuration_actions.dart';
 part 'image_generation_actions.dart';
 part 'image_forwarding.dart';
 part 'draft_attachment_actions.dart';
 part 'conversation_search_navigation.dart';
 part 'conversation_run.dart';
+part 'conversation_run_failure.dart';
 part 'conversation_run_persistence.dart';
 part 'scheduled_execution.dart';
 part 'message_edit_actions.dart';
@@ -337,6 +343,8 @@ class ChatController extends ChangeNotifier {
     groupActivityChanges.dispose();
     super.dispose();
   }
+
+  bool get isSubmitting => _submitting;
 
   bool get isBusy =>
       _submitting ||
