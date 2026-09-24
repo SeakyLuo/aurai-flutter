@@ -665,6 +665,7 @@ extension ConversationRun on ChatController {
         runConversation.runState = ChatRunState.cancelled;
         outcome = 'cancelled';
         executionWatch.stop();
+        runConversation.unfinishedRunElapsed[runId] = executionWatch.elapsed;
         for (
           var i = runStepStart;
           i < runConversation.liveToolSteps.length;
@@ -693,6 +694,7 @@ extension ConversationRun on ChatController {
         runConversation.errorDetail = errorMessage(error);
         _recordRunError(error, (groupParent ?? runConversation).id);
         executionWatch.stop();
+        runConversation.unfinishedRunElapsed[runId] = executionWatch.elapsed;
         for (
           var i = runStepStart;
           i < runConversation.liveToolSteps.length;

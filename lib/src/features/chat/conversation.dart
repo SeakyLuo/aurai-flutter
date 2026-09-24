@@ -40,6 +40,7 @@ class Conversation {
   final List<AgentStep> steps = [];
   final List<({String runId, String afterMessageId, AgentStep step})>
   liveToolSteps = [];
+  final Map<String, Duration> unfinishedRunElapsed = {};
   bool isPinned = false;
   bool isArchived = false;
   bool isScheduledTask = false;
