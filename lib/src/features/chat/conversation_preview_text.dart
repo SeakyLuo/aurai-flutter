@@ -42,14 +42,12 @@ class ConversationPreviewText extends StatelessWidget {
       maxLines: maxLines,
       style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
     );
-    if (!showFailure ||
-        conversation.kind == ConversationKind.group ||
-        conversation.runState != ChatRunState.failed) {
+    if (!showFailure || !ConversationStatusDot.needsAttention(conversation)) {
       return text;
     }
     return Row(
       children: [
-        Flexible(child: text),
+        Expanded(child: text),
         ConversationStatusDot(conversation: conversation),
       ],
     );

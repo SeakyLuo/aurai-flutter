@@ -57,6 +57,22 @@ extension _ProviderOverview on _ModelProviderDetailState {
         ),
         onTap: _openModelManagement,
       ),
+      _readLabel('请求转换'),
+      _readSurface(
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                (_saved.details?.requestAdapters.isNotEmpty ?? false)
+                    ? '已配置'
+                    : '未设置',
+              ),
+            ),
+            const SettingsIcon(type: SettingsIconType.chevron),
+          ],
+        ),
+        onTap: _openRequestAdapters,
+      ),
       _readValue('思考强度', _saved.reasoning.label),
       if (_saved.isConfigured) ...[
         _readLabel('账户余额'),

@@ -23,8 +23,7 @@ class ConversationListStatus extends StatelessWidget {
     Conversation conversation, {
     bool showUnread = true,
   }) =>
-      (conversation.kind != ConversationKind.group &&
-          conversation.runState == ChatRunState.failed) ||
+      ConversationStatusDot.needsAttention(conversation) ||
       (showUnread && ConversationStatusDot.hasUnreadCompletion(conversation)) ||
       isScheduled(controller, conversation);
 
@@ -64,7 +63,8 @@ class ConversationListStatus extends StatelessWidget {
             ),
           if ((showUnread &&
                   ConversationStatusDot.hasUnreadCompletion(conversation)) ||
-              (showFailure && conversation.runState == ChatRunState.failed))
+              (showFailure &&
+                  ConversationStatusDot.needsAttention(conversation)))
             ConversationStatusDot(conversation: conversation),
         ],
       );

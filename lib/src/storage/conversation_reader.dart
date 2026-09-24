@@ -70,6 +70,7 @@ class ConversationReader {
         _loadDraftQuotes(values),
         _loadListCreationMembers(values),
         loadConversationListPreviews(database, values),
+        loadPendingQuestionPreviews(database, values),
         GroupUnreadMessages(database).load(values),
       ]);
       final drafts = results[0] as List<Map<String, Object?>>;
@@ -191,55 +192,85 @@ class ConversationReader {
         conversation.activeRunId != null) {
       conversation.steps.addAll(await steps(conversation.activeRunId!));
     }
-    if (conversation.kind == ConversationKind.direct &&
-        conversation.runState == ChatRunState.failed &&
-        conversation.activeRunId != null) {
-      final runs = await database.query(
-        'agent_runs',
-        where: 'id = ?',
-        whereArgs: [conversation.activeRunId],
-      );
-      final run = runs.single;
-      final events = await database.query(
-        'run_events',
-        where: 'run_id = ?',
-        whereArgs: [conversation.activeRunId],
-        orderBy: 'id',
-      );
-      final toolRows = await database.query(
-        'tool_calls',
-        where: 'run_id = ?',
-        whereArgs: [conversation.activeRunId],
-      );
-      final tools = {for (final row in toolRows) row['id']: row};
-      var afterMessageId = run['user_message_id'] as String;
-      for (final event in events) {
-        if (event['kind'] == 'message') {
-          afterMessageId = event['message_id'] as String;
-        } else if (event['kind'] == 'tool') {
-          final tool = tools[event['tool_call_id']]!;
-          conversation.liveToolSteps.add((
-            afterMessageId: afterMessageId,
-            step: AgentStep(
-              toolName: tool['name']! as String,
-              title: tool['title']! as String,
-              requestJson: tool['arguments_json'] as String?,
-              resultJson: tool['result_json'] as String?,
-              status: AgentStepStatus.values.byName(tool['status']! as String),
-            ),
-          ));
-        }
-      }
-      if (run['is_task'] == 1) {
+    if (conversation.kind == ConversationKind.direct) {
+      final unfinishedRuns = await _loadUnfinishedToolSteps(conversation);
+      final run = unfinishedRuns
+          .where((row) => row['id'] == conversation.activeRunId)
+          .firstOrNull;
+      final taskRuns = run == null
+          ? const <Map<String, Object?>>[]
+          : unfinishedRuns
+                .where(
+                  (row) =>
+                      row['user_message_id'] == run['user_message_id'] &&
+                      row['elapsed_ms'] != null,
+                )
+                .toList();
+      if (taskRuns.isNotEmpty) {
         conversation.hasExecutionProcess = true;
-        conversation.executionUserMessageId = run['user_message_id'] as String;
+        conversation.executionUserMessageId = run!['user_message_id'] as String;
         conversation.executionWatch = Stopwatch();
         conversation.restoredExecutionElapsed = Duration(
-          milliseconds: run['elapsed_ms'] as int,
+          milliseconds: taskRuns.fold(
+            0,
+            (elapsed, row) => elapsed + (row['elapsed_ms']! as int),
+          ),
         );
       }
     }
     return conversation;
+  }
+
+  Future<List<Map<String, Object?>>> _loadUnfinishedToolSteps(
+    Conversation conversation,
+  ) async {
+    final runs = await database.query(
+      'agent_runs',
+      where:
+          "conversation_id = ? AND (status IN ('failed', 'cancelled', 'interrupted') OR (status = 'completed' AND (final_message_id IS NULL OR final_message_id NOT IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != '')))) AND (id = ? OR id IN (SELECT run_id FROM tool_calls))",
+      whereArgs: [conversation.id, conversation.activeRunId],
+      orderBy: 'started_at, id',
+    );
+    if (runs.isEmpty) return runs;
+    final ids = runs.map((run) => run['id']).toList();
+    final results = await Future.wait([
+      database.query(
+        'run_events',
+        where: 'run_id IN (${_slots(ids.length)})',
+        whereArgs: ids,
+        orderBy: 'id',
+      ),
+      database.query(
+        'tool_calls',
+        where: 'run_id IN (${_slots(ids.length)})',
+        whereArgs: ids,
+      ),
+    ]);
+    final events = results[0];
+    final tools = {for (final row in results[1]) row['id']: row};
+    final afterMessageIds = {
+      for (final run in runs) run['id']!: run['user_message_id']! as String,
+    };
+    for (final event in events) {
+      final runId = event['run_id']! as String;
+      if (event['kind'] == 'message') {
+        afterMessageIds[runId] = event['message_id']! as String;
+      } else if (event['kind'] == 'tool') {
+        final tool = tools[event['tool_call_id']]!;
+        conversation.liveToolSteps.add((
+          runId: runId,
+          afterMessageId: afterMessageIds[runId]!,
+          step: AgentStep(
+            toolName: tool['name']! as String,
+            title: tool['title']! as String,
+            requestJson: tool['arguments_json'] as String?,
+            resultJson: tool['result_json'] as String?,
+            status: AgentStepStatus.values.byName(tool['status']! as String),
+          ),
+        ));
+      }
+    }
+    return runs;
   }
 
   Future<void> _loadSeenRuns(List<Conversation> conversations) async {
@@ -501,7 +532,7 @@ class ConversationReader {
     List<Object?> selectedArgs,
   ) async {
     final runWhere =
-        "final_message_id IN ($selectedMessages) AND elapsed_ms IS NOT NULL AND (is_task = 1 OR id IN (SELECT run_id FROM messages WHERE kind = 'reasoning')) AND conversation_id IN (SELECT id FROM conversations WHERE kind = 'direct')";
+        "status = 'completed' AND final_message_id IN ($selectedMessages) AND final_message_id IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != '') AND elapsed_ms IS NOT NULL AND (is_task = 1 OR id IN (SELECT run_id FROM messages WHERE kind = 'reasoning')) AND conversation_id IN (SELECT id FROM conversations WHERE kind = 'direct')";
     final runs = await database.query(
       'agent_runs',
       where: runWhere,
@@ -531,22 +562,39 @@ class ConversationReader {
           elapsedMilliseconds: run['elapsed_ms']! as int,
           isTask: run['is_task'] == 1,
           stopped: run['status'] == 'cancelled',
-          intermediateMessageIds: [
-            for (final event
-                in events[run['id']] ?? const <Map<String, Object?>>[])
-              if (event['message_id'] != null &&
-                  !const {
-                    'group_message',
-                    'html_game',
-                  }.contains(messages[event['message_id']]!['kind']) &&
-                  messages[event['message_id']]!['interactive_json'] == null &&
-                  event['message_id'] != run['final_message_id'])
-                event['message_id']! as String,
-          ],
+          intermediateMessageIds:
+              run['status'] == 'completed' &&
+                  messages[run['final_message_id']]!['kind'] == 'final' &&
+                  messages[run['final_message_id']]!['interactive_json'] ==
+                      null &&
+                  (messages[run['final_message_id']]!['text'] as String)
+                      .isNotEmpty
+              ? [
+                  for (final event
+                      in events[run['id']] ?? const <Map<String, Object?>>[])
+                    if (event['message_id'] != null &&
+                        !const {
+                          'group_message',
+                          'html_game',
+                        }.contains(messages[event['message_id']]!['kind']) &&
+                        messages[event['message_id']]!['interactive_json'] ==
+                            null &&
+                        event['message_id'] != run['final_message_id'])
+                      event['message_id']! as String,
+                ]
+              : const [],
           activities: [
             for (final event
                 in events[run['id']] ?? const <Map<String, Object?>>[])
-              if ((event['message_id'] == null ||
+              if (((run['status'] == 'completed' &&
+                          messages[run['final_message_id']]!['kind'] ==
+                              'final' &&
+                          messages[run['final_message_id']]!['interactive_json'] ==
+                              null &&
+                          (messages[run['final_message_id']]!['text'] as String)
+                              .isNotEmpty) ||
+                      event['tool_call_id'] != null) &&
+                  (event['message_id'] == null ||
                       messages[event['message_id']]!['kind'] !=
                           'group_message') &&
                   (event['tool_call_id'] == null ||

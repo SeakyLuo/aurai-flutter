@@ -107,6 +107,7 @@ class _ChatPageState extends State<ChatPage>
   Timer? _highlightTimer;
   bool _temporaryExitPending = false;
   bool _temporaryExitReady = false;
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? _runNotice;
   MessageEditSession? _editing;
 
   void _updateEditing(VoidCallback change) => setState(change);
@@ -162,9 +163,18 @@ class _ChatPageState extends State<ChatPage>
   @override
   void didPopNext() => _recordPagePosition();
   @override
-  void didPushNext() => _recordPagePosition();
+  void didPushNext() {
+    _runNotice?.close();
+    _runNotice = null;
+    _recordPagePosition();
+  }
+
   @override
-  void didPop() => _recordPagePosition();
+  void didPop() {
+    _runNotice?.close();
+    _runNotice = null;
+    _recordPagePosition();
+  }
 
   @override
   void dispose() {
@@ -203,6 +213,10 @@ class _ChatPageState extends State<ChatPage>
     final active = controller.activeConversation;
     final conversationId = active.id;
     final isGroup = active.kind == ConversationKind.group;
+    final pendingQuestion =
+        controller.pendingQuestion?.conversationId == conversationId
+        ? controller.pendingQuestion
+        : null;
     final timeline = buildChatTimeline(
       controller,
       onEdit: _beginMessageEdit,
@@ -214,6 +228,7 @@ class _ChatPageState extends State<ChatPage>
           : null,
       onOpenQuote: _openQuotedMessage,
       onQuickReply: _sendQuickReply,
+      onRetry: _retryFailedMessage,
       beforeMessageId: _editing?.message.id,
       highlightedMessageId: _highlightedMessageId,
       allowEditing: _editing == null,
@@ -280,91 +295,110 @@ class _ChatPageState extends State<ChatPage>
                 systemNavigationBarContrastEnforced: false,
               ),
               child: KeyboardInset(
-                child: PendingMessagePanel(
-                  controller: controller,
-                  onSend: _sendQueuedMessages,
-                  child:
-                      controller.pendingQuestion?.conversationId ==
-                          _conversationId
-                      ? UserQuestionCard(
-                          key: ObjectKey(controller.pendingQuestion),
-                          question: controller.pendingQuestion!,
-                        )
-                      : ChatComposer(
-                          controller: _textController,
-                          hintText: _editing != null
-                              ? '编辑消息'
-                              : isGroup
-                              ? ''
-                              : '回复 ${controller.activeAi!.sender.name}',
-                          quote: _editing != null
-                              ? _editing!.message.quote
-                              : controller.activeConversation.draftQuote,
-                          onCancelQuote: _editing == null
-                              ? () => _quoteMessage(null)
-                              : null,
-                          focusNode: _focusNode,
-                          queueing:
-                              !isGroup && controller.shouldQueuePrivateMessage,
-                          savingEdit: _editing?.saving == true,
-                          draftEnabled: _editing != null
-                              ? !_editing!.saving
-                              : controller.canEditDraft && !_preparingGoal,
-                          enabled: isGroup
-                              ? true
-                              : _editing != null
-                              ? !_editing!.saving
-                              : !controller.isBusy ||
-                                    _canSend ||
-                                    controller.draftImages.isNotEmpty ||
-                                    controller.draftFiles.isNotEmpty,
-                          canSend:
-                              !controller.pendingMessageQueue.busy &&
-                              (_canSend ||
-                                  (_editing?.images ?? controller.draftImages)
-                                      .isNotEmpty ||
-                                  (_editing?.files ?? controller.draftFiles)
-                                      .isNotEmpty),
-                          images: _editing?.images ?? controller.draftImages,
-                          files: _editing?.files ?? controller.draftFiles,
-                          onRemoveFile: (file) async {
-                            if (_editing != null) {
-                              _updateEditing(
-                                () => _editing!.files.remove(file),
-                              );
-                              return;
-                            }
-                            try {
-                              await controller.removeDraftFile(file);
-                            } on Object catch (error) {
-                              if (mounted)
-                                _imageNotice(
-                                  '附件移除失败，请重试：${errorMessage(error)}',
+                child: Stack(
+                  alignment: Alignment.bottomCenter,
+                  children: [
+                    ExcludeSemantics(
+                      excluding: pendingQuestion != null,
+                      child: IgnorePointer(
+                        ignoring: pendingQuestion != null,
+                        child: PendingMessagePanel(
+                          controller: controller,
+                          onSend: _sendQueuedMessages,
+                          child: ChatComposer(
+                            controller: _textController,
+                            hintText: _editing != null
+                                ? '编辑消息'
+                                : isGroup
+                                ? ''
+                                : '回复 ${controller.activeAi!.sender.name}',
+                            quote: _editing != null
+                                ? _editing!.message.quote
+                                : controller.activeConversation.draftQuote,
+                            onCancelQuote: _editing == null
+                                ? () => _quoteMessage(null)
+                                : null,
+                            focusNode: _focusNode,
+                            queueing:
+                                !isGroup &&
+                                controller.shouldQueuePrivateMessage,
+                            savingEdit: _editing?.saving == true,
+                            submitting: controller.isSubmitting,
+                            draftEnabled: _editing != null
+                                ? !_editing!.saving
+                                : controller.canEditDraft && !_preparingGoal,
+                            enabled: isGroup
+                                ? true
+                                : _editing != null
+                                ? !_editing!.saving
+                                : !controller.isBusy ||
+                                      _canSend ||
+                                      controller.draftImages.isNotEmpty ||
+                                      controller.draftFiles.isNotEmpty,
+                            canSend:
+                                !controller.pendingMessageQueue.busy &&
+                                (_canSend ||
+                                    (_editing?.images ?? controller.draftImages)
+                                        .isNotEmpty ||
+                                    (_editing?.files ?? controller.draftFiles)
+                                        .isNotEmpty),
+                            images: _editing?.images ?? controller.draftImages,
+                            files: _editing?.files ?? controller.draftFiles,
+                            onRemoveFile: (file) async {
+                              if (_editing != null) {
+                                _updateEditing(
+                                  () => _editing!.files.remove(file),
                                 );
-                            }
-                          },
-                          addingImages:
-                              controller.addingImages ||
-                              _editing?.picking == true,
-                          onAddImages: _editing != null
-                              ? _addEditImages
-                              : _addImages,
-                          onRemoveImage: _editing != null
-                              ? _removeEditImage
-                              : _removeImage,
-                          stopping:
-                              controller.runState == ChatRunState.stopping,
-                          onSend: _editing != null ? _submitMessageEdit : _send,
-                          canResume:
-                              !isGroup &&
-                              _editing == null &&
-                              controller.pendingMessageQueue.messages.isEmpty &&
-                              (controller.runState == ChatRunState.cancelled ||
-                                  controller.runState == ChatRunState.idle) &&
-                              controller.pendingGoal != null,
-                          onResume: _continuePending,
-                          onStop: _stop,
+                                return;
+                              }
+                              try {
+                                await controller.removeDraftFile(file);
+                              } on Object catch (error) {
+                                if (mounted)
+                                  _imageNotice(
+                                    '附件移除失败，请重试：${errorMessage(error)}',
+                                  );
+                              }
+                            },
+                            addingImages:
+                                controller.addingImages ||
+                                _editing?.picking == true,
+                            onAddImages: _editing != null
+                                ? _addEditImages
+                                : _addImages,
+                            onRemoveImage: _editing != null
+                                ? _removeEditImage
+                                : _removeImage,
+                            stopping:
+                                controller.runState == ChatRunState.stopping,
+                            onSend: _editing != null
+                                ? _submitMessageEdit
+                                : _send,
+                            canResume:
+                                !isGroup &&
+                                !_preparingGoal &&
+                                !controller.isBusy &&
+                                _editing == null &&
+                                controller
+                                    .pendingMessageQueue
+                                    .messages
+                                    .isEmpty &&
+                                (controller.runState ==
+                                        ChatRunState.cancelled ||
+                                    controller.runState == ChatRunState.idle) &&
+                                controller.pendingGoal != null,
+                            onResume: _continuePending,
+                            onStop: _stop,
+                          ),
                         ),
+                      ),
+                    ),
+                    if (pendingQuestion != null)
+                      UserQuestionCard(
+                        key: ObjectKey(pendingQuestion),
+                        question: pendingQuestion,
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -385,6 +419,12 @@ class _ChatPageState extends State<ChatPage>
                         constraints: const BoxConstraints(maxWidth: 760),
                         child: ScrollAwareJumpStack(
                           messages: controller.messages,
+                          acknowledgedRunId:
+                              !isGroup &&
+                                  controller.pendingQuestion?.conversationId ==
+                                      _conversationId
+                              ? controller.activeConversation.activeRunId
+                              : null,
                           atBottom:
                               (_followOutput || !_contentBelow) &&
                               !(controller.hasSearchWindow &&

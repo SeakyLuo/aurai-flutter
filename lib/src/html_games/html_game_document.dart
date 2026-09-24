@@ -17,7 +17,7 @@ String htmlGameDocument(
 }) {
   final local = base64Encode(utf8.encode(jsonEncode(localState)));
   final snapshot = base64Encode(utf8.encode(jsonEncode(game.snapshot())));
-  return '''<!doctype html><html data-aurai-display="${fullscreen ? 'fullscreen' : 'inline'}" style="--aurai-host-top-inset:${hostTopInset}px;--aurai-host-safe-top-inset:${hostSafeTopInset}px;--aurai-host-right-inset:${hostRightInset}px"><head><meta charset="utf-8">
+  return '''<!doctype html><html data-aurai-display="${fullscreen ? 'fullscreen' : 'inline'}" style="--aurai-host-top-inset:${hostTopInset}px;--aurai-host-safe-top-inset:${hostSafeTopInset}px;--aurai-host-right-inset:${hostRightInset}px;--aurai-host-menu-width:${fullscreen ? 0 : 38}px;--aurai-host-menu-height:${fullscreen ? 0 : 36}px"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https:; font-src data: https:; media-src data: https:; connect-src https: wss:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <style id="aurai-theme">${htmlMessageTheme(theme)}</style>

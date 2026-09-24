@@ -4,6 +4,27 @@ extension _MessageItemActions on _MessageItemState {
   Future<void> _openActions({bool compactMenu = false}) async {
     final snapshot = message;
     var hasHistory = false;
+    var allowRetry = false;
+    final database = ImageActionScope.of(context).groupStore.database;
+    if (widget.onRetry != null) {
+      try {
+        final runs = await database.query(
+          'agent_runs',
+          columns: ['status'],
+          where: 'id = ?',
+          whereArgs: [snapshot.runId],
+        );
+        allowRetry = runs.isNotEmpty && runs.single['status'] == 'failed';
+      } on Object catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        }
+        return;
+      }
+      if (!mounted) return;
+    }
     final allowStar =
         !widget.streaming &&
         !snapshot.isSystem &&
@@ -13,7 +34,6 @@ extension _MessageItemActions on _MessageItemState {
     MiniappEntry? miniapp;
     if (allowStar) {
       try {
-        final database = ImageActionScope.of(context).groupStore.database;
         if (snapshot.htmlGame?.appId case final appId?) {
           miniapp = await MiniappLibraryStore(database).entryForApp(appId);
           starred = await MiniappFavorites(database).contains(miniapp);
@@ -33,7 +53,7 @@ extension _MessageItemActions on _MessageItemState {
         (!widget.readOnly || widget.onLocate != null)) {
       try {
         hasHistory = await hasInteractiveHistory(
-          ImageActionScope.of(context).groupStore.database,
+          database,
           snapshot.id,
           MessageSender.localUser.id,
         );
@@ -64,6 +84,7 @@ extension _MessageItemActions on _MessageItemState {
       allowHistory: hasHistory,
       allowQuote: !compactMenu && widget.onQuote != null,
       allowRecall: widget.onRecall != null,
+      allowRetry: allowRetry,
       allowForward:
           !widget.streaming &&
           (message.htmlGame != null ||
@@ -93,6 +114,8 @@ extension _MessageItemActions on _MessageItemState {
     }
     final action = (result as MessageActionResult).action;
     switch (action) {
+      case MessageAction.retry:
+        await widget.onRetry?.call(snapshot);
       case MessageAction.star:
         try {
           if (miniapp != null) {

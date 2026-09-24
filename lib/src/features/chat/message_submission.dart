@@ -22,6 +22,7 @@ extension MessageSubmission on ChatController {
     final queueReply = hasRunningTask && !canStartPrivateDuringGroup;
     cancelSearchNavigation();
     _submitting = true;
+    _notifyRun(activeConversation);
     final wasNew =
         activeConversation.kind == ConversationKind.direct &&
         activeConversation.messageCount == 0 &&
@@ -73,7 +74,6 @@ extension MessageSubmission on ChatController {
         _execution.queuedUserMessageId = messageId;
       if (!queueReply) {
         steps.clear();
-        activeConversation.liveToolSteps.clear();
         errorDetail = null;
         runState = ChatRunState.idle;
       }

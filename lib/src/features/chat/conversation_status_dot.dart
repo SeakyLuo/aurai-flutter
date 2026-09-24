@@ -15,18 +15,25 @@ class ConversationStatusDot extends StatelessWidget {
             conversation.seenRunId != conversation.activeRunId &&
             conversation.pendingGoal == null;
 
+  static bool needsAttention(Conversation conversation) =>
+      conversation.kind != ConversationKind.group &&
+      (conversation.runState == ChatRunState.failed ||
+          conversation.runState == ChatRunState.interrupted);
+
   @override
   Widget build(BuildContext context) {
-    final failed =
-        conversation.kind != ConversationKind.group &&
-        conversation.runState == ChatRunState.failed;
+    final attention = needsAttention(conversation);
     final completed = hasUnreadCompletion(conversation);
-    if (!failed && !completed) return const SizedBox.shrink();
+    if (!attention && !completed) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(left: 8),
       child: Semantics(
-        label: failed ? '任务出错' : '有新消息',
-        child: failed
+        label: attention
+            ? conversation.runState == ChatRunState.interrupted
+                  ? '任务已中断'
+                  : '任务出错'
+            : '有新消息',
+        child: attention
             ? const TaskFailureIcon()
             : Container(
                 width: 8,

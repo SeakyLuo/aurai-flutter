@@ -3,6 +3,7 @@ import 'chat_header_background.dart';
 import '../../domain/error_message.dart';
 import 'conversation_more.dart';
 import 'conversation_icon.dart';
+import 'conversation_preview_text.dart';
 import 'conversation_status_dot.dart';
 import 'home_navigation.dart';
 import 'pagination_listener.dart';
@@ -304,6 +305,9 @@ class _HomeDrawerState extends State<HomeDrawer> {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 16),
           ),
+          subtitle: item.questionPreview == null
+              ? null
+              : ConversationPreviewText(conversation: item),
           trailing: ConversationStatusDot(conversation: item),
           onTap: () async {
             final navigator = Navigator.of(context);

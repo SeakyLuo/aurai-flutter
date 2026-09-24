@@ -1,3 +1,4 @@
+import 'request_adapter_page.dart';
 import 'provider_models_page.dart';
 import 'model_provider_icon.dart';
 import 'question_icon.dart';
@@ -44,7 +45,21 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
   late ProviderProtocol _protocol;
   late List<String> _models;
   late bool _autoSyncModels;
+  Future<void> _openRequestAdapters() async {
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RequestAdapterPage(
+          controller: widget.controller,
+          service: _service,
+        ),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
   ProviderDetails get _details => ProviderDetails(
+    requestAdapters: _saved.details?.requestAdapters ?? const {},
     name: _name.text.trim(),
     website: _website.text.trim(),
     protocol: _protocol,

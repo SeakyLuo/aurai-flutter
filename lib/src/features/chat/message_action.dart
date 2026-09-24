@@ -1,6 +1,7 @@
 import '../../domain/quick_reply_option.dart';
 
 enum MessageAction {
+  retry,
   star,
   copy,
   select,

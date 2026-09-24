@@ -30,6 +30,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   bool allowHistory = false,
   bool allowQuote = false,
   bool allowRecall = false,
+  bool allowRetry = false,
   bool allowForward = false,
   bool allowQuickReply = false,
   Set<String> sentQuickReplyKeys = const {},
@@ -59,6 +60,15 @@ Future<MessageMenuResult?> showMessageActionsMenu(
           ? Theme.of(context).colorScheme.onSurfaceVariant
           : const Color(0xff222222);
       final actions = [
+        if (allowRetry)
+          (
+            const MessageActionResult(MessageAction.retry),
+            ConversationMenuIcon(
+              type: ConversationMenuIconType.retry,
+              color: iconColor,
+            ),
+            '重试',
+          ),
         if (allowHistory)
           (
             const MessageActionResult(MessageAction.history),

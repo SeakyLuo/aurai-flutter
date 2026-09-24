@@ -161,6 +161,17 @@ extension ImageForwarding on ChatController {
           document['conversation_id'] as String,
           source.id,
         );
+        if (application.state['_auraiFixedResult'] == true) {
+          return await _sendMiniappTemplate(
+            target.id,
+            MiniappTemplate(application.appId, application.title, {
+              'width': application.width, 'height': application.height,
+              'backgroundMode': application.backgroundMode,
+            }), note,
+            fixedResult: {...application.state, 'revealAt': 0},
+            fixedHtml: application.html,
+          );
+        }
         final bytes = utf8.encode(application.html);
         final file = File('${_imageStore.directory}/${newMessageId()}.html');
         copies.add(file);
@@ -315,11 +326,7 @@ extension ImageForwarding on ChatController {
     try {
       if (target.kind == ConversationKind.direct &&
           !(await _directReplyContext(target)).config.isConfigured) {
-        if (_execution.queuedUserMessageId == queuedAtStart)
-          _execution.queuedUserMessageId = null;
-        target.runState = ChatRunState.idle;
-        await _persistRun(target);
-        return;
+        throw StateError('请先为这个 AI 配置模型，再重试回复');
       }
       await _executeConversation(target);
     } on Object catch (error) {

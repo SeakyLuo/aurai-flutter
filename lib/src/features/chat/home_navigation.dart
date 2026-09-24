@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'chat_controller.dart';
 import 'chat_page.dart';
 import 'home_page.dart';
-import 'ai_contacts_page.dart';
 
 List<Route<dynamic>> initialHomeRoutes(ChatController controller, Widget root) {
   final conversation = controller.activeConversation;
@@ -17,12 +16,7 @@ List<Route<dynamic>> initialHomeRoutes(ChatController controller, Widget root) {
       settings: const RouteSettings(name: '/'),
       builder: (_) => root,
     ),
-    if (controller.startsWithoutConversations)
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            AiContactsPage(controller: controller, selectForConversation: true),
-      )
-    else if (restore)
+    if (controller.startsWithoutConversations || restore)
       MaterialPageRoute<void>(
         builder: (_) => ChatPage(controller: controller, stacked: true),
       ),

@@ -24,13 +24,17 @@ class UserQuestion {
     required this.conversationId,
     required this.question,
     required this.options,
+    required this.allowCustomAnswer,
     this.title,
+    this.customAnswerPlaceholder,
     this.isUserAction = false,
   });
   final String conversationId;
   final String? title;
   final String question;
   final List<Object> options;
+  final bool allowCustomAnswer;
+  final String? customAnswerPlaceholder;
   final bool isUserAction;
   UserQuestionOption optionAt(int index) =>
       UserQuestionOption.fromValue(options[index]);
@@ -77,6 +81,7 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
       conversationId: conversationId,
       question: instruction,
       options: const ['已完成', '取消'],
+      allowCustomAnswer: true,
       isUserAction: true,
     );
     _pending = question;
@@ -97,7 +102,7 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
     name: 'askUser',
     waitsForUser: true,
     description:
-        'Ask one concise question when a user preference or missing information is needed. title is an optional short heading shown instead of the generic question label. Present up to four options, or no options for a free-text question. Each option may be plain text or an object with a short title and supporting content. Set an option title to null for content only; avoid repeating the option title in its content. The user may select one, write their own answer, or skip. waitForResponse=true or null waits for the answer. Set false only when independent work can continue without it: returns pending immediately and the actual answer arrives as a user update on a later model turn. Do not perform answer-dependent work or claim a final outcome while pending. Never infer an answer from skipping. Do not repeat the question in prose before calling. Incorporate later answers or skips before finalizing; a skip is not consent. For skipped optional details, use a reasonable stated assumption; otherwise explain what is still needed. Do not use this for device permission approval.',
+        'Ask one concise question when a user preference or missing information is needed. title is an optional short heading shown instead of the generic question label. Present up to four options, or no options for a free-text question. Each option may be plain text or an object with a short title and supporting content. Set an option title to null for content only; avoid repeating the option title in its content. Set allowCustomAnswer=true only when the user may need to write an answer outside the provided options. A question with no options always accepts free text. customAnswerPlaceholder optionally provides a concise hint for that input; omit it to use the app default. The user may answer or skip. waitForResponse=true or null waits for the answer. Set false only when independent work can continue without it: returns pending immediately and the actual answer arrives as a user update on a later model turn. Do not perform answer-dependent work or claim a final outcome while pending. Never infer an answer from skipping. Do not repeat the question in prose before calling. Incorporate later answers or skips before finalizing; a skip is not consent. For skipped optional details, use a reasonable stated assumption; otherwise explain what is still needed. Do not use this for device permission approval.',
     inputSchema: {
       'type': 'object',
       'properties': {
@@ -107,6 +112,18 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
               'true or null: wait for an answer (default). false: continue independent work while the question remains open.',
         },
         'question': {'type': 'string', 'minLength': 1, 'maxLength': 600},
+        'allowCustomAnswer': {
+          'type': 'boolean',
+          'description':
+              'Whether to show a free-text answer field alongside the options. Set true for questions without options.',
+        },
+        'customAnswerPlaceholder': {
+          'type': 'string',
+          'minLength': 1,
+          'maxLength': 60,
+          'description':
+              'Optional concise placeholder for the free-text answer field. Omit to use the app default.',
+        },
         'title': {
           'type': 'string',
           'minLength': 1,
@@ -140,7 +157,12 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
           'maxItems': 4,
         },
       },
-      'required': ['question', 'options', 'waitForResponse'],
+      'required': [
+        'question',
+        'options',
+        'allowCustomAnswer',
+        'waitForResponse',
+      ],
       'additionalProperties': false,
     },
     safety: ToolSafety.lowRisk,
@@ -167,8 +189,13 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
     final question = UserQuestion(
       conversationId: conversationId,
       title: call.arguments['title'] as String?,
+      customAnswerPlaceholder:
+          call.arguments['customAnswerPlaceholder'] as String?,
       question: call.arguments['question'] as String,
       options: List<Object>.from(call.arguments['options'] as List),
+      allowCustomAnswer:
+          (call.arguments['options'] as List).isEmpty ||
+          call.arguments['allowCustomAnswer'] == true,
     );
     _pending = question;
     onQuestion(question);

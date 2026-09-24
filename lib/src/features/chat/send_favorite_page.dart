@@ -123,35 +123,30 @@ class _SendFavoritePageState extends State<_SendFavoritePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: SettingsAppBar(title: '发送收藏', onBack: () => Navigator.pop(context)),
+    appBar: SettingsAppBar(
+      title: '发送收藏',
+      titleWidget: SearchTypeSegment(
+        files: _miniapps,
+        labels: const ['消息', '小程序'],
+        onChanged: _selectTab,
+      ),
+      gradientBackground: true,
+      onBack: () => Navigator.pop(context),
+    ),
     body: SafeArea(
       top: false,
-      child: Column(
+      child: RetainedTabView(
+        index: _miniapps ? 1 : 0,
+        swipeEnabled: !_opening,
+        onChanged: (index) => _selectTab(index == 1),
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: SearchTypeSegment(
-              files: _miniapps,
-              labels: const ['消息', '小程序'],
-              onChanged: _selectTab,
+          for (final miniapps in [false, true])
+            _FavoriteChoices(
+              controller: widget.controller,
+              miniapps: miniapps,
+              enabled: !_opening,
+              onSelected: _select,
             ),
-          ),
-          Expanded(
-            child: RetainedTabView(
-              index: _miniapps ? 1 : 0,
-              swipeEnabled: !_opening,
-              onChanged: (index) => _selectTab(index == 1),
-              children: [
-                for (final miniapps in [false, true])
-                  _FavoriteChoices(
-                    controller: widget.controller,
-                    miniapps: miniapps,
-                    enabled: !_opening,
-                    onSelected: _select,
-                  ),
-              ],
-            ),
-          ),
         ],
       ),
     ),
@@ -312,6 +307,9 @@ class _FavoriteChoicesState extends State<_FavoriteChoices> {
               '',
               StarredMessageTile(
                 result: result,
+                starredAt: DateTime.fromMicrosecondsSinceEpoch(
+                  rows[index]['starred_at'] as int,
+                ),
                 conversationId: rows[index]['conversation_id'] as String,
                 conversationTitle: '',
                 controller: widget.controller,
@@ -358,7 +356,7 @@ class _FavoriteChoicesState extends State<_FavoriteChoices> {
       );
     return ListView.builder(
       controller: _scroll,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       itemCount: _items.length + ((_loading || _more || _failed) ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == _items.length)

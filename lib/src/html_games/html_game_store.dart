@@ -1,4 +1,5 @@
 import 'html_app_store.dart';
+import 'miniapp_send_action.dart';
 import '../domain/interactive_message.dart';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -78,7 +79,8 @@ class HtmlGameStore {
     final app = await HtmlAppStore.load(db, rows.single['app_id'] as String);
     return HtmlGame.fromRow({
       ...rows.single,
-      'html': await HtmlAppStore.code(app),
+      'html': (rows.single['html'] as String).isNotEmpty
+          ? rows.single['html'] : await HtmlAppStore.code(app),
       'state_json': rows.single['session_data_json'] != null
           ? rows.single['state_json'] : app['state_json'],
       'stateful': app['stateful'],
@@ -114,7 +116,10 @@ class HtmlGameStore {
     AgentMessageRole role = AgentMessageRole.assistant,
     String? messageText,
     bool newSession = false,
+    Map<String, Object?>? forwardedResult,
+    String? forwardedHtml,
     String? callbackSenderId,
+    Future<void> Function(Transaction txn, AgentMessage message)? onCreated,
   }) => database.transaction((txn) async {
     final title = (args['title'] as String).trim();
     final existingId = args['appId'] as String?;
@@ -122,11 +127,11 @@ class HtmlGameStore {
     if (existing != null && !newSession && existing['creator_id'] != creator.id) {
       throw StateError('只能重新发送自己创建的小应用入口');
     }
-    final html = existing == null ? args['html'] as String : await HtmlAppStore.code(existing);
+    final html = forwardedHtml ?? (existing == null ? args['html'] as String : await HtmlAppStore.code(existing));
     final width = args['width'] as int?;
     final height = args['height'] as int? ?? 320;
     final displayMode = args['displayMode'] as String? ?? 'hybrid';
-    final backgroundMode = args['backgroundMode'] as String? ?? 'message';
+    final backgroundMode = miniappSendAction(html)['backgroundMode'] as String? ?? args['backgroundMode'] as String? ?? 'message';
     if (!['message', 'transparent'].contains(backgroundMode)) {
       throw ArgumentError('backgroundMode 必须为 message 或 transparent');
     }
@@ -134,7 +139,7 @@ class HtmlGameStore {
         height > 640 ||
         (width != null && (width < 180 || width > 600)))
       throw ArgumentError('卡片高度需在 180–640 之间，宽度可自适应或设为 180–600');
-    final state = newSession ? <String, Object?>{} : existing == null
+    final state = newSession ? (forwardedResult ?? initializeMiniappMessage(html)) : existing == null
         ? (args['state'] as Map).cast<String, Object?>()
         : (jsonDecode(existing['state_json'] as String) as Map).cast<String, Object?>();
     final participants = List<String>.from(args['participants'] as List);
@@ -210,7 +215,7 @@ class HtmlGameStore {
       'conversation_id': conversationId,
       'creator_id': callbackSenderId ?? creator.id,
       'title': title,
-      'html': '',
+      'html': state['_auraiFixedResult'] == true ? html : '',
       'display_mode': displayMode,
       'background_mode': backgroundMode,
       'stateful': existing?['stateful'] ?? (args['stateful'] == true ? 1 : 0),
@@ -253,6 +258,7 @@ class HtmlGameStore {
         'sender_id': turn,
       });
     }
+    if (onCreated != null) await onCreated(txn, message);
     return message;
   });
 
@@ -264,6 +270,7 @@ class HtmlGameStore {
     Map<String, Object?> args,
   ) => database.transaction((txn) async {
     final game = await _load(txn, conversationId, messageId);
+    if (game.state['_auraiFixedResult'] == true) throw StateError('这条消息的结果已固定');
     final eventId = args['eventId'] as String;
     final expected = args['expectedVersion'] as int;
     final nextState = (args['state'] as Map).cast<String, Object?>();

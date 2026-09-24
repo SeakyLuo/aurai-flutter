@@ -128,7 +128,7 @@ extension HtmlMessageInteraction on HtmlGameStore {
         'version': row['version'],
         'title': row['title'],
         if (authored || args['includePrivate'] == true) ...{
-          'html': await HtmlAppStore.code(app),
+          'html': (row['html'] as String).isNotEmpty ? row['html'] : await HtmlAppStore.code(app),
           if (!sessionScoped) ...await HtmlAppStore.reference(app)
           else 'appId': app['id'],
         },
@@ -140,6 +140,7 @@ extension HtmlMessageInteraction on HtmlGameStore {
         'privateContentIncluded': authored || args['includePrivate'] == true,
       };
     }
+    if ((state as Map)['_auraiFixedResult'] == true) throw StateError('这条消息的结果已固定');
     final callbackId = args['callbackEventId'] as String?;
     if (callbackId != null) {
       final event = await HtmlCallbackState.requireEvent(txn, id, callbackId, senderId);

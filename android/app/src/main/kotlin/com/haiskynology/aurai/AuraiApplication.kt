@@ -67,12 +67,12 @@ class AuraiApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         if (java.io.File("/proc/self/cmdline").readText().trimEnd('\u0000').let { it.endsWith(":device_script") || it.endsWith(":documents") }) return
-        DataBackupArchive(this).applyPending(::encryptModelConfig)
+        DataBackupArchive(this).applyPending()
         FlutterInjector.instance().flutterLoader().startInitialization(this)
         FlutterInjector.instance().flutterLoader().ensureInitializationComplete(this, null)
         flutterEngine = FlutterEngine(this)
         GeneratedPluginRegistrant.registerWith(flutterEngine)
-        DataManagementAccess(this, flutterEngine.dartExecutor.binaryMessenger, ::loadModelConfig, ::decryptModelConfig)
+        DataManagementAccess(this, flutterEngine.dartExecutor.binaryMessenger, ::loadModelConfig)
         flutterEngine.platformViewsController.registry.registerViewFactory(
             "aurai/html_game", HtmlGameViewFactory(flutterEngine.dartExecutor.binaryMessenger),
         )
@@ -102,6 +102,15 @@ class AuraiApplication : Application() {
 
     private fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "transformModelRequest" -> Thread {
+                try {
+                    val output = ModelRequestTransform.run(call.argument<String>("script")!!, call.argument<String>("input")!!)
+                    android.os.Handler(android.os.Looper.getMainLooper()).post { result.success(output) }
+                } catch (error: Exception) {
+                    android.os.Handler(android.os.Looper.getMainLooper()).post { result.error("request_transform", error.message, null) }
+                }
+            }.start()
+
             "inspectAndroidApi" -> result.success(AndroidApiInspector.inspect(
                 call.argument<String>("className")!!,
                 call.argument<String>("filter")!!,
@@ -184,13 +193,6 @@ class AuraiApplication : Application() {
                 result.success(null)
             }
             "loadModelConfig" -> result.success(loadModelConfig())
-            "encryptModelConfig" -> {
-                try {
-                    result.success(encryptModelConfig(call.argument<String>("config")!!))
-                } catch (error: Exception) {
-                    result.error("secure_storage_error", "无法安全保存模型配置", null)
-                }
-            }
             "saveModelConfig" -> {
                 try {
                     saveModelConfig(call.argument<String>("config")!!)
@@ -515,22 +517,17 @@ class AuraiApplication : Application() {
     private fun preferences() = getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
     private fun saveModelConfig(config: String) {
-        ModelConfigPersistence.write(this, encryptModelConfig(config))
-    }
-
-    private fun encryptModelConfig(config: String): String {
-        val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey())
-        val encrypted = cipher.doFinal(config.toByteArray(Charsets.UTF_8))
-        return Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + "." +
-            Base64.encodeToString(encrypted, Base64.NO_WRAP)
+        ModelConfigPersistence.write(this, config)
     }
 
     private fun loadModelConfig(): String? {
         // Preferences are read only for configurations saved before database storage.
-        val payload = ModelConfigPersistence.read(this)
+        ModelConfigPersistence.read(this)?.let { return it }
+        val payload = ModelConfigPersistence.read(this, ModelConfigPersistence.LEGACY_KEY)
             ?: preferences().getString(MODEL_CONFIG_KEY, null) ?: return null
-        return decryptModelConfig(payload)
+        val config = decryptModelConfig(payload)
+        ModelConfigPersistence.write(this, config)
+        return config
     }
 
     private fun decryptModelConfig(payload: String): String {

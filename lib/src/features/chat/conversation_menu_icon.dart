@@ -5,6 +5,7 @@ enum ConversationMenuIconType {
   unpin,
   rename,
   recall,
+  retry,
   archive,
   unarchive,
   delete,
@@ -93,6 +94,18 @@ class _MenuIconPainter extends CustomPainter {
             ..lineTo(14, 9)
             ..cubicTo(22, 9, 22, 19.5, 14, 19.5)
             ..lineTo(10, 19.5),
+          pen,
+        );
+      case ConversationMenuIconType.retry:
+        canvas.drawPath(
+          Path()
+            ..moveTo(7.5, 5)
+            ..lineTo(4, 8.5)
+            ..lineTo(7.5, 12)
+            ..moveTo(4, 8.5)
+            ..lineTo(13, 8.5)
+            ..cubicTo(21, 8.5, 21, 19.5, 13, 19.5)
+            ..lineTo(9.5, 19.5),
           pen,
         );
       case ConversationMenuIconType.archive:

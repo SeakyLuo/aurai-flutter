@@ -148,26 +148,30 @@ class _UserQuestionCardState extends State<UserQuestionCard> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    MessageComposer(
-                      embedded: true,
-                      controller: _text,
-                      focusNode: _focus,
-                      enabled: !_submitted,
-                      hintText: question.isUserAction ? '说明遇到的问题' : '或自行撰写回复',
-                      onChanged: (value) => setState(() {
-                        question.draft = value;
-                        question.selected = null;
-                      }),
-                      action: RoundAction(
-                        label: '发送回答',
-                        inkResponse: false,
-                        primary: true,
-                        compact: true,
-                        icon: Icons.arrow_upward_rounded,
-                        onPressed: canSend ? _submit : null,
+                    if (question.allowCustomAnswer) ...[
+                      const SizedBox(height: 8),
+                      MessageComposer(
+                        embedded: true,
+                        controller: _text,
+                        focusNode: _focus,
+                        enabled: !_submitted,
+                        hintText:
+                            question.customAnswerPlaceholder ??
+                            (question.isUserAction ? '说明遇到的问题' : '或自行撰写回复'),
+                        onChanged: (value) => setState(() {
+                          question.draft = value;
+                          question.selected = null;
+                        }),
+                        action: RoundAction(
+                          label: '发送回答',
+                          inkResponse: false,
+                          primary: true,
+                          compact: true,
+                          icon: Icons.arrow_upward_rounded,
+                          onPressed: canSend ? _submit : null,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),

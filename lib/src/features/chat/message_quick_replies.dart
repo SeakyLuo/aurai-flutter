@@ -122,7 +122,6 @@ extension MessageQuickReplies on ChatController {
         _execution.queuedUserMessageId = message.id;
       if (!queueReply) {
         conversation.steps.clear();
-        conversation.liveToolSteps.clear();
         conversation.errorDetail = null;
         conversation.runState = ChatRunState.idle;
       }

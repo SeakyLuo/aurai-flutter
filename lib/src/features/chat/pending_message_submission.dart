@@ -147,15 +147,23 @@ extension PendingMessageSubmission on ChatController {
     return true;
   }
 
-  Future<bool> sendPendingMessages() => _inConversation(
+  Future<bool> sendPendingMessages({String? messageId}) => _inConversation(
     activeConversation,
-    () => _dispatchPendingMessages(stopRunning: true),
+    () => _dispatchPendingMessages(stopRunning: true, messageId: messageId),
   );
 
-  Future<bool> _dispatchPendingMessages({required bool stopRunning}) async {
+  Future<bool> _dispatchPendingMessages({
+    required bool stopRunning,
+    String? messageId,
+  }) async {
     final conversation = activeConversation;
     final queue = pendingMessageQueue;
     if (queue.busy || queue.messages.isEmpty) return false;
+    final batch = queue.messages
+        .where((message) => messageId == null || message.id == messageId)
+        .toList();
+    if (batch.isEmpty) return false;
+    final remainingPaused = queue.paused;
     queue.busy = true;
     queue.paused = true;
     _notifyRun(conversation);
@@ -180,8 +188,8 @@ extension PendingMessageSubmission on ChatController {
       previousError = conversation.errorDetail;
       cancelSearchNavigation();
       final now = DateTime.now();
-      for (var i = 0; i < queue.messages.length; i++) {
-        final message = queue.messages[i];
+      for (var i = 0; i < batch.length; i++) {
+        final message = batch[i];
         sent.add(
           AgentMessage(
             id: message.id,
@@ -200,17 +208,23 @@ extension PendingMessageSubmission on ChatController {
       conversation.messages.addAll(sent);
       conversation.messageCount += sent.length;
       conversation.pendingGoal = sent.map((message) => message.text).join('\n');
+      final sentIds = sent.map((message) => message.id).toSet();
+      final remaining = queue.messages
+          .where((message) => !sentIds.contains(message.id))
+          .toList();
       await _store.writer.save(
         conversation,
         makeActive: false,
         saveRuntime: true,
-        pendingMessageQueue: '{"paused":false,"messages":[]}',
+        pendingMessageQueue: jsonEncode({
+          'paused': remainingPaused,
+          'messages': remaining.map((message) => message.toJson()).toList(),
+        }),
       );
       committed = true;
       conversation.steps.clear();
-      conversation.liveToolSteps.clear();
-      queue.messages.clear();
-      queue.paused = false;
+      queue.messages.removeWhere((message) => sentIds.contains(message.id));
+      queue.paused = remainingPaused;
       queue.error = null;
       queue.busy = false;
       _updateConversationList(conversation);

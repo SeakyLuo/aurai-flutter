@@ -252,9 +252,9 @@ class _StarredMessageListState extends State<_StarredMessageList> {
             ),
           ),
           padding: EdgeInsets.fromLTRB(
+            0,
             16,
-            16,
-            16,
+            0,
             MediaQuery.paddingOf(context).bottom + 24,
           ),
           children:
@@ -287,11 +287,18 @@ class _StarredMessageListState extends State<_StarredMessageList> {
                       return StarredMessageTile(
                         key: ValueKey(row['id']),
                         result: _messages[row['id']]!,
+                        starredAt: DateTime.fromMicrosecondsSinceEpoch(
+                          row['starred_at'] as int,
+                        ),
                         conversationId: row['conversation_id'] as String,
                         conversationTitle: _titles[row['conversation_id']]!,
                         controller: widget.controller,
                         onLocate: () => _open(row),
                         onRemove: () => _remove(row),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                       );
                     },
                   ).indexed

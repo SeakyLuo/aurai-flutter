@@ -1,0 +1,21 @@
+<script type="application/json" id="aurai-send-action">{"type":"random-choice","backgroundMode":"transparent","choices":["rock","scissors","paper"]}</script>
+<main><span id="hand" role="img"></span><p id="hint"></p></main>
+<style>
+html,body,main{background:transparent}
+main{padding:18px;text-align:center}#hand{display:block;font-size:72px;line-height:1.3}#hint{margin:8px 0 0;color:var(--aurai-muted);font-size:13px}
+html[data-aurai-display="fullscreen"] main{padding-top:calc(var(--aurai-host-top-inset,0px) + 12px)}
+</style>
+<script>
+(()=>{
+ const hands={rock:['✊','石头'],scissors:['✌️','剪刀'],paper:['✋','布']};
+ const state=AuraiHTML.messageState, hand=document.getElementById('hand'),hint=document.getElementById('hint');
+ if(!state._auraiFixedResult){hand.textContent='✊ ✌️ ✋';hand.style.fontSize='48px';hint.textContent='从会话的收藏里发送，每次随机出拳';return;}
+ const show=key=>{hand.textContent=hands[key][0];hand.setAttribute('aria-label',hands[key][1]);};
+ const finish=()=>{show(state.result);hint.textContent=hands[state.result][1];};
+ const remaining=state.revealAt-Date.now();
+ if(remaining<=0){finish();return;}
+ let index=0;const keys=Object.keys(hands);show(keys[0]);
+ const timer=setInterval(()=>show(keys[++index%keys.length]),90);
+ setTimeout(()=>{clearInterval(timer);finish();},Math.min(remaining,900));
+})();
+</script>

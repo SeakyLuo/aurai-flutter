@@ -56,6 +56,7 @@ class ConversationStore {
         where:
             "key = 'active_conversation' AND value IN (SELECT id FROM conversations WHERE mode != 'normal')",
       );
+      final interruptedAt = DateTime.now().microsecondsSinceEpoch;
       await database.transaction((txn) async {
         final batch = txn.batch();
         batch.update(
@@ -64,11 +65,12 @@ class ConversationStore {
           where: 'run_state IN (?, ?)',
           whereArgs: ['running', 'stopping'],
         );
-        batch.update(
-          'agent_runs',
-          {'status': 'interrupted'},
-          where: 'status = ?',
-          whereArgs: ['running'],
+        batch.rawUpdate(
+          'UPDATE agent_runs SET status = ?, finished_at = ?, elapsed_ms = (? - started_at) / 1000 WHERE status = ?',
+          ['interrupted', interruptedAt, interruptedAt, 'running'],
+        );
+        batch.rawUpdate(
+          "UPDATE agent_runs SET final_message_id = (SELECT id FROM messages WHERE run_id = agent_runs.id AND kind NOT IN ('system', 'quick_reply') ORDER BY created_at DESC, id DESC LIMIT 1) WHERE status IN ('failed', 'interrupted') AND final_message_id IS NULL",
         );
         batch.update(
           'model_turns',

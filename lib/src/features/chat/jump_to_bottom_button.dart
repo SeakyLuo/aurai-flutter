@@ -97,11 +97,13 @@ class ScrollAwareJumpStack extends StatefulWidget {
     this.fit = StackFit.loose,
     this.messages = const [],
     this.atBottom = false,
+    this.acknowledgedRunId,
   });
   final List<Widget> children;
   final StackFit fit;
   final List<AgentMessage> messages;
   final bool atBottom;
+  final String? acknowledgedRunId;
 
   @override
   State<ScrollAwareJumpStack> createState() => _ScrollAwareJumpStackState();
@@ -130,10 +132,15 @@ class _ScrollAwareJumpStackState extends State<ScrollAwareJumpStack> {
           !(message.interactive?.canView(MessageSender.localUser.id) ?? true)) {
         continue;
       }
+      final acknowledged =
+          widget.acknowledgedRunId != null &&
+          message.runId == widget.acknowledgedRunId;
+      if (acknowledged) _unread.remove(message.id);
       if (!initial &&
           previous != null &&
           message.createdAt.isAfter(previous) &&
-          !widget.atBottom) {
+          !widget.atBottom &&
+          !acknowledged) {
         _unread.add(message.id);
       }
       if (_latest == null || message.createdAt.isAfter(_latest!)) {

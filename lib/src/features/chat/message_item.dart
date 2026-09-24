@@ -43,6 +43,7 @@ import 'image_attachments.dart';
 import 'task_summary_view.dart';
 import 'reasoning_message_view.dart';
 import 'message_actions_menu.dart';
+import 'html_message_more_button.dart';
 import 'source_citation_syntax.dart';
 import 'source_citation_view.dart';
 
@@ -67,6 +68,7 @@ class MessageItem extends StatefulWidget {
     this.onOpenQuote,
     this.onOpenMember,
     this.onQuickReply,
+    this.onRetry,
     this.availableSources = const {},
     this.mentionMembers = const {},
     this.excludedActivityMessageId,
@@ -87,6 +89,7 @@ class MessageItem extends StatefulWidget {
   final ValueChanged<String>? onOpenQuote;
   final ValueChanged<String>? onOpenMember;
   final Future<void> Function(AgentMessage message, String key)? onQuickReply;
+  final Future<void> Function(AgentMessage message)? onRetry;
   final String? excludedActivityMessageId;
   final bool streaming;
   final bool readOnly;
@@ -108,6 +111,14 @@ class _MessageItemState extends State<MessageItem> {
   String? _selectedText;
   final _bubbleKey = GlobalKey();
   Timer? _copyResetTimer;
+
+  bool get _hasReplyContent =>
+      widget.replyPart?.copyText.isNotEmpty ??
+      (message.text.isNotEmpty ||
+          message.images.isNotEmpty ||
+          message.files.isNotEmpty ||
+          message.interactive != null ||
+          message.htmlGame != null);
 
   @override
   void dispose() {
@@ -188,25 +199,23 @@ class _MessageItemState extends State<MessageItem> {
                 summary: widget.replyPart?.summary ?? message.taskSummary!,
                 onOpenLink: (href) => _openLink(context, href),
               ),
-            if (widget.groupBubble ||
-                widget.replyPart != null ||
-                message.taskSummary?.stopped != true)
-              KeyedSubtree(
-                key: const ValueKey('message-content'),
-                child: _selectableContent(),
-              ),
+            KeyedSubtree(
+              key: const ValueKey('message-content'),
+              child: _selectableContent(),
+            ),
             if (message.quickReplies.isNotEmpty)
               this._buildQuickReplies(context),
             if (!widget.readOnly &&
                 !widget.groupBubble &&
                 (message.htmlGame == null || widget.replyPart != null) &&
                 !widget.streaming &&
-                (widget.replyPart?.last ?? true) &&
-                (widget.replyPart != null ||
-                    message.taskSummary?.stopped != true))
+                _hasReplyContent &&
+                (widget.replyPart?.last ?? true))
               MessageReplyFooter(
                 copied: _copied,
-                onMore: () => _openActions(compactMenu: true),
+                onMore: message.htmlGame == null
+                    ? () => _openActions(compactMenu: true)
+                    : null,
                 onCopy: () =>
                     _copy(context, _selectedText ?? widget.replyPart?.copyText),
                 onQuote: widget.onQuote == null
@@ -262,40 +271,8 @@ class _MessageItemState extends State<MessageItem> {
         padding: widget.groupBubble
             ? EdgeInsets.zero
             : const EdgeInsets.symmetric(horizontal: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
+        child: Stack(
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Spacer(),
-                if (!widget.readOnly)
-                  Builder(
-                    builder: (buttonContext) => Semantics(
-                      button: true,
-                      label: '消息菜单',
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () =>
-                            _openActions(compactMenu: !widget.groupBubble),
-                        child: SizedBox(
-                          width: 32,
-                          height: 18,
-                          child: Icon(
-                            Icons.more_horiz_rounded,
-                            size: 20,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 6),
             if (widget.onLocate case final locate?)
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -304,6 +281,15 @@ class _MessageItemState extends State<MessageItem> {
               )
             else
               widget.htmlGameView!,
+            if (!widget.readOnly)
+              Positioned(
+                top: HtmlMessageMoreButton.top,
+                right: HtmlMessageMoreButton.right,
+                child: HtmlMessageMoreButton(
+                  onPressed: () =>
+                      _openActions(compactMenu: !widget.groupBubble),
+                ),
+              ),
           ],
         ),
       );

@@ -35,7 +35,7 @@ extension ProviderConfigurationActions on ChatController {
       responsePreferences: modelSettings.responsePreferences,
       modelDefaults: modelSettings.modelDefaults,
     );
-    final encrypted = await _platform.encryptModelSettings(next);
+    final encoded = jsonEncode(next.toJson());
     await _store.database.transaction((txn) async {
       final profiles = await txn.query(
         'ai_profiles',
@@ -56,7 +56,7 @@ extension ProviderConfigurationActions on ChatController {
       if (runs.isNotEmpty) throw StateError('该供应商仍有任务执行中，请结束任务后再删除');
       await txn.rawInsert(
         'INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-        ['encrypted_model_config', encrypted],
+        ['model_config_json', encoded],
       );
     });
     modelSettings = next;
@@ -136,6 +136,7 @@ extension ProviderConfigurationActions on ChatController {
             ? modelSettings.profile(service)
             : modelSettings.profiles[service];
         final details = ProviderDetails(
+          requestAdapters: old?.details?.requestAdapters ?? const {},
           name: name,
           website: (args['website'] as String? ?? old?.website ?? '').trim(),
           protocol: ProviderProtocol.values.byName(args['protocol'] as String),

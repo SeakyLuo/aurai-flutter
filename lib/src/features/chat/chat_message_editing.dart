@@ -87,7 +87,7 @@ extension _ChatMessageEditing on _ChatPageState {
     if (session.saving || session.picking) return;
     _updateEditing(() => session.picking = true);
     try {
-      final source = await showImageSourceMenu(
+      final source = await showAttachmentSourceMenu(
         buttonContext,
         allowFavorites: false,
       );

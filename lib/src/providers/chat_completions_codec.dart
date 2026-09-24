@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'provider_error.dart';
 
 import '../domain/model_provider.dart';
 
@@ -155,19 +156,41 @@ Future<Map<String, Object?>> readChatCompletionsStream(
     final payload = data.join('\n');
     data.clear();
     if (payload == '[DONE]') return;
-    final event = jsonDecode(payload) as Map;
-    if (event['error'] != null) {
+    final event = jsonDecode(payload);
+    if (event is! Map) {
       throw ModelProviderException(
-        '模型服务请求失败',
-        detail: jsonEncode(event['error']),
+        '模型响应格式与 Chat Completions 协议不匹配，请检查请求转换的协议设置',
+        detail: payload,
       );
     }
-    id = event['id'] as String? ?? id;
+    if (event['error'] != null) {
+      throw providerResponseError(jsonEncode(event['error']));
+    }
+    final choices = event['choices'];
+    if (choices is! List) {
+      throw ModelProviderException(
+        '模型响应格式与 Chat Completions 协议不匹配，请检查请求转换的协议设置',
+        detail: payload,
+      );
+    }
+    final eventId = event['id'] as String?;
+    // Filter annotations carry an empty ID and are not new responses.
+    if (eventId != null && eventId.isNotEmpty) id = eventId;
     usage = event['usage'] as Map? ?? usage;
-    for (final choice in (event['choices'] as List).cast<Map>()) {
+    for (final choice in choices.cast<Map>()) {
       if (choice['index'] != 0) continue;
       finish = choice['finish_reason'] as String? ?? finish;
-      final delta = choice['delta'] as Map;
+      final delta = choice['delta'] as Map?;
+      // Some compatible providers send a finish-only chunk with a null delta.
+      if (delta == null) {
+        if (choice['finish_reason'] != null) continue;
+        // DMX also emits content-filter annotations separately from text.
+        if (choice.containsKey('content_filter_results') ||
+            choice.containsKey('content_filter_offsets')) {
+          continue;
+        }
+        throw ModelProviderException('模型服务返回了无效的消息片段', detail: payload);
+      }
       if (!processing && delta['tool_calls'] != null) {
         processing = true;
         onProcessingStarted?.call();
@@ -224,7 +247,7 @@ Future<Map<String, Object?>> readChatCompletionsStream(
   }
   consume();
   if (finish == null || id == null) {
-    throw const ModelProviderException('模型连接中断，回复未完成，请重试');
+    throw const ModelConnectionInterrupted('模型连接已中断，回复未完成');
   }
   final completed = finish == 'stop' || finish == 'tool_calls';
   if (completed) {

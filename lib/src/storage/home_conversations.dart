@@ -78,6 +78,7 @@ class HomeConversations {
         limit: pageSize,
       ),
       loadConversationListPreviews(store.database, items),
+      loadPendingQuestionPreviews(store.database, items),
       store.database.query(
         'attachments',
         columns: ['conversation_id', 'kind', 'display_name'],
@@ -89,7 +90,7 @@ class HomeConversations {
       GroupUnreadMessages(store.database).load(items),
     ]);
     final attachments = <String, Set<String>>{};
-    for (final row in results[2] as List<Map<String, Object?>>) {
+    for (final row in results[3] as List<Map<String, Object?>>) {
       attachments
           .putIfAbsent(row['conversation_id'] as String, () => {})
           .add(row['kind'] == 'image' ? '[图片]' : '[文件] ${row['display_name']}');

@@ -1,8 +1,36 @@
 import '../domain/message_summary.dart';
+import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
 import '../features/chat/conversation.dart';
 import '../domain/message_sender.dart';
+
+Future<void> loadPendingQuestionPreviews(
+  Database database,
+  List<Conversation> conversations,
+) async {
+  if (conversations.isEmpty) return;
+  final byId = {
+    for (final conversation in conversations) conversation.id: conversation,
+  };
+  for (final conversation in conversations) {
+    conversation.pendingQuestionPreviews.clear();
+  }
+  final rows = await database.rawQuery(
+    "SELECT conversation_id, run_id, arguments_json, (SELECT name FROM message_senders WHERE id = (SELECT sender_id FROM agent_runs WHERE id = tool_calls.run_id)) AS sender_name FROM tool_calls WHERE conversation_id IN (${_slots(byId.length)}) AND name = 'askUser' AND status = 'running' ORDER BY started_at, id",
+    byId.keys.toList(),
+  );
+  for (final row in rows) {
+    final arguments = jsonDecode(row['arguments_json']! as String) as Map;
+    final title = (arguments['title'] as String?)?.trim();
+    final label = title == null || title.isEmpty
+        ? arguments['question']
+        : title;
+    byId[row['conversation_id']]!.pendingQuestionPreviews[row['run_id']!
+            as String] =
+        '${row['sender_name']}：[问题] $label';
+  }
+}
 
 /// Resolve the latest visible message for the current page, not cached names.
 Future<void> loadConversationListPreviews(

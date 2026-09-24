@@ -69,9 +69,7 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
     if (!widget.summary.isTask) {
       return widget.summary.stopped ? '思考已停止' : '思考过程';
     }
-    return widget.summary.stopped
-        ? '用时 $_duration · 已停止'
-        : '用时 $_duration';
+    return widget.summary.stopped ? '用时 $_duration · 已停止' : '用时 $_duration';
   }
 
   @override
