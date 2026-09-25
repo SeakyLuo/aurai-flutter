@@ -7,6 +7,7 @@ class ThinkingIndicator extends StatefulWidget {
     this.animate = true,
     this.detail,
     this.leading,
+    this.suffix,
     this.singleLine = false,
     this.fontSize = 15,
   });
@@ -15,6 +16,7 @@ class ThinkingIndicator extends StatefulWidget {
   final bool animate;
   final String? detail;
   final Widget? leading;
+  final Widget? suffix;
   final bool singleLine;
   final double fontSize;
 
@@ -98,6 +100,7 @@ class _ThinkingIndicatorState extends State<ThinkingIndicator>
                 ),
               ),
             ),
+            if (widget.suffix != null) widget.suffix!,
           ],
         ),
         builder: (context, child) =>

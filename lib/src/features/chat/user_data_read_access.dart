@@ -46,7 +46,7 @@ extension UserDataReadAccess on ChatController {
           user,
           conversation,
         );
-        return htmlGames.updateMessage(operation, target.id, user, args);
+        return htmlStore.updateMessage(operation, target.id, user, args);
       }),
       _ => HistoryMessageTool(
         _store.database,

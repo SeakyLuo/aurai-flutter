@@ -121,11 +121,9 @@ class ResponsesContext {
       }
       var cut = 0;
       size += summaryReserve;
-      // Keep twenty recent messages if they fit; never summarize the current request.
+      // Leave room below the trigger for subsequent turns; keep the current request.
       while (cut < lastUser &&
-          ((force && _dialogue.length - cut > 20) ||
-              size > budget ||
-              (size > target && _dialogue.length - cut > 20))) {
+          ((force && _dialogue.length - cut > 20) || size > target)) {
         size -= await estimateTokens(_dialogue[cut].input);
         cut++;
       }
@@ -145,11 +143,10 @@ class ResponsesContext {
         compacted = true;
       }
       size = await estimateTokens(input) + overhead;
-      if (size > budget && _rounds.isNotEmpty) {
+      if (size > target && _rounds.isNotEmpty) {
         var count = 0;
         size += summaryReserve;
-        while (count < _rounds.length &&
-            (size > budget || (size > target && _rounds.length - count > 2))) {
+        while (count < _rounds.length && size > target) {
           size -= await estimateTokens(_rounds[count]);
           count++;
         }

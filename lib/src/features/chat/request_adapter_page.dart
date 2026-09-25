@@ -121,6 +121,7 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
       final config = old.copyWith(
         model: _key.isEmpty ? old.model : _key,
         details: ProviderDetails(
+          modelContextOverrides: old.details?.modelContextOverrides ?? const {},
           name: old.displayName,
           website: old.website,
           protocol: old.protocol,

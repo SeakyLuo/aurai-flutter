@@ -61,7 +61,7 @@ extension GlobalTools on ChatController {
             senderId,
             conversation,
           );
-          final result = await htmlGames.updateMessage(
+          final result = await htmlStore.updateMessage(
             operation,
             target.id,
             senderId,
@@ -131,7 +131,7 @@ extension GlobalTools on ChatController {
             throw const AgentCancelled();
         }
         final profile = await groupStore.loadAi(senderId);
-        final message = await htmlGames.create(
+        final message = await htmlStore.create(
           conversationId: target.id,
           creator: profile.sender,
           runId:
@@ -150,7 +150,7 @@ extension GlobalTools on ChatController {
         );
         _publishInteractiveChange(target.id, message, source: target);
         HtmlGameSignals.changes.add(message.id);
-        final app = await htmlGames.load(target.id, message.id);
+        final app = await htmlStore.load(target.id, message.id);
         final ref = await HtmlAppStore.load(_store.database, app.appId);
         return {
           'sent': true,
@@ -159,14 +159,6 @@ extension GlobalTools on ChatController {
           ...await HtmlAppStore.reference(ref),
         };
       }),
-      if (HtmlGameFeature.enabled &&
-          conversation.kind == ConversationKind.group)
-        for (final name in HtmlGameTool.names)
-          HtmlGameTool(
-            name,
-            (operation, args) =>
-                _htmlGameTool(operation, args, conversation, senderId),
-          ),
       for (final name in InteractiveMessageTool.names)
         InteractiveMessageTool(
           name,

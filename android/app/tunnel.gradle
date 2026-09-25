@@ -34,7 +34,8 @@ def buildTunnel = tasks.register('buildTunnel', Exec) {
     inputs.dir(file('../native'))
     outputs.dir(nativeLibraries)
     doFirst {
-        commandLine new File(android.ndkDirectory, 'ndk-build').absolutePath,
+        def ndkBuild = System.getProperty('os.name').startsWith('Windows') ? 'ndk-build.cmd' : 'ndk-build'
+        commandLine new File(android.ndkDirectory, ndkBuild).absolutePath,
             '-j4', 'NDK_PROJECT_PATH=null',
             "APP_BUILD_SCRIPT=${file('../native/Android.mk').absolutePath}",
             "AURAI_TUNNEL_PATH=${tunnelRoot.get().asFile.absolutePath}",

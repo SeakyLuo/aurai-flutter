@@ -268,12 +268,11 @@ class ConversationsDrawer extends StatelessWidget {
                                                 ),
                                                 if (conversation.messageCount ==
                                                         0 &&
-                                                    conversation
-                                                        .draft
-                                                        .isNotEmpty) ...[
+                                                    conversation.draftPreview !=
+                                                        null) ...[
                                                   const SizedBox(height: 5),
                                                   Text(
-                                                    conversation.draft,
+                                                    conversation.draftPreview!,
                                                     maxLines: 1,
                                                     overflow:
                                                         TextOverflow.ellipsis,

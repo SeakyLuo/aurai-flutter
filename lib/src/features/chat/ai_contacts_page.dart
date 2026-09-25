@@ -426,7 +426,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
                   child: SafeArea(
                     top: false,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      padding: const EdgeInsets.symmetric(vertical: 20),
                       child: Text(
                         _archived ? '共 $_count 位已归档朋友' : '共 $_count 位朋友',
                         textAlign: TextAlign.center,

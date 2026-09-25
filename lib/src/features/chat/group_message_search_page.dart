@@ -296,7 +296,7 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
             key: PageStorageKey('${type.name}:$_query'),
             results: page.results,
             conversationId: widget.conversationId,
-            htmlGames: widget.controller.htmlGames,
+            htmlStore: widget.controller.htmlStore,
             type: type,
             query: _query,
             scroll: page.scroll,

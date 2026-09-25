@@ -8,7 +8,7 @@ import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
 import 'html_game.dart';
 import 'html_game_session.dart';
-import 'html_game_store.dart';
+import 'html_store.dart';
 import 'html_game_surface.dart';
 import 'html_route_observer.dart';
 
@@ -16,7 +16,7 @@ import 'html_route_observer.dart';
 class MiniappRunPage extends StatefulWidget {
   const MiniappRunPage({super.key, required this.game, required this.store});
   final HtmlGame game;
-  final HtmlGameStore store;
+  final HtmlStore store;
 
   @override
   State<MiniappRunPage> createState() => _MiniappRunPageState();

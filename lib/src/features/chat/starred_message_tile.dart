@@ -11,7 +11,7 @@ import 'html_message_more_button.dart';
 import 'package:flutter/material.dart';
 import '../../domain/agent_models.dart';
 import '../../html_games/html_game_icon.dart';
-import '../../html_games/html_game_view.dart';
+import '../../html_games/html_view.dart';
 import '../../storage/group_message_search.dart';
 import 'attachment_action_icon.dart';
 import 'chat_controller.dart';
@@ -89,9 +89,9 @@ class StarredMessageTile extends StatelessWidget {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final entry = await MiniappLibraryStore(
-        controller.htmlGames.database,
+        controller.htmlStore.database,
       ).entryForApp(card.appId!);
-      final favorites = MiniappFavorites(controller.htmlGames.database);
+      final favorites = MiniappFavorites(controller.htmlStore.database);
       final starred = await favorites.contains(entry);
       if (!context.mounted) return;
       final action = await showHeaderActionMenu(
@@ -125,11 +125,11 @@ class StarredMessageTile extends StatelessWidget {
       );
       if (!context.mounted) return;
       if (action == 'fullscreen') {
-        await HtmlGameView(
+        await HtmlView(
           card: card,
           messageId: result.id,
           conversationId: conversationId,
-          store: controller.htmlGames,
+          store: controller.htmlStore,
           backLabel: '返回收藏',
         ).openFullscreen(context);
       }
@@ -223,12 +223,12 @@ class StarredMessageTile extends StatelessWidget {
                   Stack(
                     children: [
                       IgnorePointer(
-                        child: HtmlGameView(
+                        child: HtmlView(
                           key: ValueKey(result.id),
                           card: card,
                           messageId: result.id,
                           conversationId: conversationId,
-                          store: controller.htmlGames,
+                          store: controller.htmlStore,
                         ),
                       ),
                       if (!selectionMode)

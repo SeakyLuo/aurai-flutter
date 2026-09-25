@@ -489,9 +489,9 @@ class GroupChatStore {
       final memberIds = [MessageSender.localUser.id, ...allIds];
       final senders = await _senders(txn, memberIds);
       if (title.isEmpty) {
-        conversation.storedTitle = memberIds
-            .map((id) => senders[id]!.name)
-            .join('、');
+        conversation.storedTitle = _defaultGroupTitle([
+          for (final id in memberIds) senders[id]!.name,
+        ]);
       }
       conversation.creationUserName = senders[MessageSender.localUser.id]!.name;
       conversation.creationMemberIds = allIds;
@@ -742,3 +742,22 @@ class GroupChatStore {
 }
 
 String _slots(int count) => List.filled(count, '?').join(',');
+
+String _defaultGroupTitle(List<String> names) {
+  final title = StringBuffer();
+  var length = 0;
+  var included = 0;
+  for (final name in names) {
+    if (included > 0) {
+      title.write('、');
+      length++;
+    }
+    title.write(name);
+    length += name.runes.length;
+    included++;
+    if (length > 20) break;
+  }
+  final remaining = names.length - included;
+  if (remaining > 0) title.write('等$remaining人');
+  return title.toString();
+}

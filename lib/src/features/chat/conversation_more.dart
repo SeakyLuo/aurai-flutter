@@ -3,6 +3,7 @@ import '../../domain/error_message.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'chat_controller.dart';
 import 'ai_contact_page.dart';
@@ -10,6 +11,7 @@ import 'group_members_page.dart';
 import 'group_info_page.dart';
 import 'sidebar_action_icon.dart';
 import 'conversation_task_navigation.dart';
+import 'copy_icon.dart';
 import 'settings_icon.dart';
 import 'archive_confirmation_dialog.dart';
 import 'conversation_menu_icon.dart';
@@ -230,7 +232,7 @@ class _ConversationMoreState extends State<ConversationMore> {
             ? 202.0
             : 264.0) +
         (hasTask ? 54 : 0) +
-        54;
+        108;
     final anchor =
         position ??
         Offset(
@@ -342,6 +344,14 @@ class _ConversationMoreState extends State<ConversationMore> {
                                 _MoreAction.rename,
                               ),
                             ),
+                            _GlassMenuItem(
+                              iconWidget: const CopyIcon(),
+                              label: '复制会话 ID',
+                              onTap: () => Navigator.pop(
+                                menuContext,
+                                _MoreAction.copyId,
+                              ),
+                            ),
                             if (!_conversation.isTemporary)
                               _GlassMenuItem(
                                 icon: _conversation.isArchived
@@ -420,6 +430,13 @@ class _ConversationMoreState extends State<ConversationMore> {
         );
       case _MoreAction.save:
         await _saveChat();
+      case _MoreAction.copyId:
+        try {
+          await Clipboard.setData(ClipboardData(text: targetId));
+          _notice('已复制会话 ID');
+        } on Object {
+          _notice('复制失败，请重试');
+        }
       case _MoreAction.archive:
         await _archive();
       case _MoreAction.delete:
@@ -427,7 +444,9 @@ class _ConversationMoreState extends State<ConversationMore> {
       case null:
         break;
     }
-    if (action != null) widget.onChanged?.call();
+    if (action != null && action != _MoreAction.copyId) {
+      widget.onChanged?.call();
+    }
   }
 
   @override
@@ -448,7 +467,17 @@ class _ConversationMoreState extends State<ConversationMore> {
         );
 }
 
-enum _MoreAction { profile, task, members, pin, rename, archive, delete, save }
+enum _MoreAction {
+  profile,
+  task,
+  members,
+  pin,
+  rename,
+  copyId,
+  archive,
+  delete,
+  save,
+}
 
 class _GlassMenuItem extends StatelessWidget {
   const _GlassMenuItem({

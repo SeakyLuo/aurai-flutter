@@ -51,7 +51,8 @@ extension MessageSubmission on ChatController {
       activeConversation.draft = '';
       activeConversation.draftMentions.clear();
       activeConversation.draftQuote = null;
-      if (activeConversation.messageCount == 0 && previousTitle == '新会话') {
+      if (activeConversation.messageCount == 0 &&
+          (previousTitle == '新会话' || previousTitle == '未发送的草稿')) {
         activeConversation.storedTitle = null;
       }
       messages.add(

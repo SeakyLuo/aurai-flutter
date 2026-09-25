@@ -157,7 +157,7 @@ extension ImageForwarding on ChatController {
         );
         if (rows.isEmpty) throw StateError('原 HTML 消息已删除或撤回，无法转发');
         final document = rows.single;
-        final application = await htmlGames.load(
+        final application = await htmlStore.load(
           document['conversation_id'] as String,
           source.id,
         );

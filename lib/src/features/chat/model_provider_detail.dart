@@ -1,4 +1,5 @@
 import 'request_adapter_page.dart';
+import 'model_context_page.dart';
 import 'provider_models_page.dart';
 import 'model_provider_icon.dart';
 import 'question_icon.dart';
@@ -8,6 +9,7 @@ import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import '../../domain/model_provider.dart';
+import '../../providers/model_context_limits.dart';
 import 'chat_controller.dart';
 import 'choice_sheet.dart';
 import 'delete_confirmation_dialog.dart';
@@ -58,8 +60,20 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _openModelContext() async {
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            ModelContextPage(controller: widget.controller, service: _service),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
   ProviderDetails get _details => ProviderDetails(
     requestAdapters: _saved.details?.requestAdapters ?? const {},
+    modelContextOverrides: _saved.details?.modelContextOverrides ?? const {},
     name: _name.text.trim(),
     website: _website.text.trim(),
     protocol: _protocol,

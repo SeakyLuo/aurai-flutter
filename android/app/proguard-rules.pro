@@ -6,6 +6,6 @@
 -dontwarn com.gemalto.jp2.JP2Decoder
 
 # HTML games expose only the annotated event bridge to JavaScript.
--keepclassmembers class com.haiskynology.aurai.HtmlGameView$* {
+-keepclassmembers class com.haiskynology.aurai.HtmlView$* {
     @android.webkit.JavascriptInterface <methods>;
 }

@@ -168,7 +168,10 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
       overflowWidth = math.max(26.0, painter.width + 12);
       painter.dispose();
     }
-    final pileBudget = budget - (remaining > 0 ? overflowWidth + 4 : 0);
+    final overflowExtension = remaining > 0
+        ? (overflowWidth - _avatarSize) / 2
+        : 0.0;
+    final pileBudget = budget - overflowExtension;
     final stride = count > 1
         ? math.min(_avatarStride, (pileBudget - _avatarSize) / (count - 1))
         : _avatarStride;
@@ -182,41 +185,37 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
         onTap: widget.onPressed,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (shown.isNotEmpty)
-                SizedBox(
-                  width: pileWidth,
-                  height: 40,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      for (var i = 0; i < shown.length; i++)
-                        Positioned(
-                          key: ValueKey(shown[i].runId),
-                          left: i * stride,
-                          top: 7,
-                          child: _buildAvatar(shown[i], i),
-                        ),
-                    ],
+          child: SizedBox(
+            width: pileWidth + overflowExtension,
+            height: 40,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (var i = 0; i < shown.length; i++)
+                  Positioned(
+                    key: ValueKey(shown[i].runId),
+                    left: i * stride,
+                    top: 7,
+                    child: _buildAvatar(shown[i], i),
                   ),
-                ),
-              if (remaining > 0) ...[
-                if (shown.isNotEmpty) const SizedBox(width: 4),
-                Container(
-                  width: overflowWidth,
-                  height: 26,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: colors.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(13),
-                    border: Border.all(color: colors.surface),
+                if (remaining > 0)
+                  Positioned(
+                    left: (count - 1) * stride - overflowExtension,
+                    top: 7,
+                    child: Container(
+                      width: overflowWidth,
+                      height: _avatarSize,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: colors.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(_avatarSize / 2),
+                        border: Border.all(color: colors.surface),
+                      ),
+                      child: Text('+$remaining', style: countStyle),
+                    ),
                   ),
-                  child: Text('+$remaining', style: countStyle),
-                ),
               ],
-            ],
+            ),
           ),
         ),
       ),

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/agent_models.dart';
-import '../../html_games/html_game_store.dart';
-import '../../html_games/html_game_view.dart';
+import '../../html_games/html_store.dart';
+import '../../html_games/html_view.dart';
 import '../../storage/group_message_search.dart';
 import 'group_message_heading.dart';
 import 'message_item.dart';
@@ -12,7 +12,7 @@ class GroupSearchMessageTile extends StatelessWidget {
     super.key,
     required this.result,
     required this.conversationId,
-    required this.htmlGames,
+    required this.htmlStore,
     required this.time,
     required this.onLocate,
     required this.onOpenProfile,
@@ -20,7 +20,7 @@ class GroupSearchMessageTile extends StatelessWidget {
 
   final GroupMessageSearchResult result;
   final String conversationId, time;
-  final HtmlGameStore htmlGames;
+  final HtmlStore htmlStore;
   final VoidCallback onLocate;
   final VoidCallback onOpenProfile;
 
@@ -49,13 +49,13 @@ class GroupSearchMessageTile extends StatelessWidget {
         onLocate();
         return null;
       },
-      htmlGameView: result.html == null
+      htmlView: result.html == null
           ? null
-          : HtmlGameView(
+          : HtmlView(
               card: result.html!,
               messageId: result.id,
               conversationId: conversationId,
-              store: htmlGames,
+              store: htmlStore,
             ),
     );
     return Padding(

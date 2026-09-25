@@ -9,7 +9,7 @@ import '../features/chat/glass_surface.dart';
 import '../features/chat/sidebar_action_icon.dart';
 import '../scheduling/task_action_menu.dart';
 import '../features/chat/settings_icon.dart';
-import 'html_game_store.dart';
+import 'html_store.dart';
 import 'miniapp_favorites.dart';
 import 'miniapp_library_store.dart';
 
@@ -22,7 +22,7 @@ class MiniappFavoriteAction extends StatefulWidget {
   });
   final String? appId;
   final VoidCallback onClose;
-  final HtmlGameStore store;
+  final HtmlStore store;
 
   @override
   State<MiniappFavoriteAction> createState() => _MiniappFavoriteActionState();

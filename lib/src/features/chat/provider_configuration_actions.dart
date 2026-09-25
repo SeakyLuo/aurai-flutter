@@ -137,6 +137,8 @@ extension ProviderConfigurationActions on ChatController {
             : modelSettings.profiles[service];
         final details = ProviderDetails(
           requestAdapters: old?.details?.requestAdapters ?? const {},
+          modelContextOverrides:
+              old?.details?.modelContextOverrides ?? const {},
           name: name,
           website: (args['website'] as String? ?? old?.website ?? '').trim(),
           protocol: ProviderProtocol.values.byName(args['protocol'] as String),

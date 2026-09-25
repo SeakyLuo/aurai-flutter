@@ -131,9 +131,6 @@ class ToolActionIcon extends StatelessWidget {
                 type: SettingsIconType.tasks,
               ),
               'askUser' => const QuestionIcon(type: QuestionIconType.question),
-              'createHtmlGame' ||
-              'readHtmlGame' ||
-              'actHtmlGame' => const SkillIcon('game'),
               'searchTools' ||
               'searchWeb' ||
               'searchConversations' ||

@@ -43,10 +43,8 @@ import '../../agent/execution_log_tool.dart';
 import '../../diagnostics/execution_log.dart';
 import '../../agent/html_message_tool.dart';
 import '../../html_games/html_game.dart';
-import '../../html_games/html_game_store.dart';
-import '../../html_games/html_game_tool.dart';
+import '../../html_games/html_store.dart';
 import '../../html_games/html_game_session.dart';
-import '../../html_games/html_game_event_pump.dart';
 import '../../domain/interactive_message.dart';
 import '../../storage/interactive_message_store.dart';
 import '../../agent/interactive_message_tool.dart';
@@ -155,7 +153,7 @@ part 'app_assistance_actions.dart';
 part 'peer_conversations.dart';
 part 'interactive_message_actions.dart';
 part 'message_callback_actions.dart';
-part 'html_game_actions.dart';
+part 'html_actions.dart';
 part 'miniapp_template_sending.dart';
 part 'model_config_actions.dart';
 part 'request_adapter_actions.dart';
@@ -227,7 +225,6 @@ class ChatController extends ChangeNotifier {
   final questionNotifications = ValueNotifier<ConversationCompletion?>(null);
   final completedReplies = ValueNotifier<ConversationCompletion?>(null);
   final _store = ConversationStore();
-  HtmlGameEventPump? _htmlGameEvents;
   StreamSubscription<void>? _callbackChanges;
   StreamSubscription<List<CallbackCardUpdate>>? _callbackCardChanges;
   bool _drainingCallbacks = false;
@@ -330,7 +327,6 @@ class ChatController extends ChangeNotifier {
     }
     scheduledTasks.dispose();
     _groupSleeps.dispose();
-    _htmlGameEvents?.dispose();
     _callbacksDisposed = true;
     _callbackChanges?.cancel();
     _callbackCardChanges?.cancel();
@@ -402,22 +398,15 @@ class ChatController extends ChangeNotifier {
     await _migrateAiSettings();
     await skills.initialize(_store.database);
     _newConversation = await _newDraftStore.load(_imageStore.directory);
-    if (await _store.hasMessages(_newConversation.id)) {
+    if (await _store.hasConversation(_newConversation.id)) {
       await _newDraftStore.clear();
       _newConversation = Conversation.empty();
     }
-    hasRestoredConversation = activeId != null;
     _activeConversation = activeId == null
         ? _newConversation
         : await _store.load(activeId);
-    if (activeId != null &&
-        activeConversation.kind == ConversationKind.direct &&
-        activeConversation.defaultSenderId == MessageSender.aurai.id &&
-        activeConversation.messageCount == 0) {
-      _newConversation = activeConversation;
-      await _newDraftStore.save(_newConversation);
-      await _store.removeDraftConversation(activeId);
-    }
+    await _storeNewDraft();
+    hasRestoredConversation = activeId != null || activeConversation.isStored;
     startsWithoutConversations = (await _store.database.query(
       'conversations',
       columns: ['id'],
@@ -452,14 +441,6 @@ class ChatController extends ChangeNotifier {
     });
     addListener(_drainMessageCallbacks);
     _drainMessageCallbacks();
-    if (HtmlGameFeature.enabled) {
-      _htmlGameEvents = HtmlGameEventPump(
-        htmlGames,
-        () => changingConversation,
-        (id, members) =>
-            _recoverGroupSleep(id, members, requireDueSleep: false),
-      )..start();
-    }
     notifyListeners();
   }
 
@@ -526,7 +507,9 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<void> createConversation() async {
-    if (identical(activeConversation, _newConversation)) return;
+    if (identical(activeConversation, _newConversation) &&
+        activeConversation.isEmpty)
+      return;
     await _switchConversation(null);
   }
 
@@ -612,7 +595,50 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<void> saveDraft() async {
-    await _persist();
+    if (identical(activeConversation, _newConversation) &&
+        !activeConversation.isEmpty) {
+      await _storeNewDraft();
+    } else {
+      await _persist();
+    }
+    await _removeEmptyDraft();
+    _conversationChanged();
+  }
+
+  Future<void> _storeNewDraft() async {
+    final draft = _newConversation;
+    if (draft.isEmpty && !draft.isStored) return;
+    if (!draft.isStored) {
+      draft.isStored = true;
+      try {
+        await _store.writer.save(
+          draft,
+          makeActive: identical(_viewConversation, draft),
+          saveDraft: true,
+          saveMessages: false,
+        );
+      } on Object {
+        draft.isStored = false;
+        rethrow;
+      }
+    }
+    await _newDraftStore.clear(senderId: draft.defaultSenderId);
+    _newConversation = Conversation.empty();
+    _updateConversationList(draft);
+    _conversationChanged();
+  }
+
+  Future<void> _removeEmptyDraft() async {
+    final draft = activeConversation;
+    if (draft.kind != ConversationKind.direct ||
+        draft.messageCount != 0 ||
+        !draft.isStored ||
+        !draft.isEmpty)
+      return;
+    await _store.removeDraftConversation(draft.id);
+    _conversations.removeWhere((conversation) => conversation.id == draft.id);
+    if (identical(_viewConversation, draft))
+      _activeConversation = _newConversation;
     _conversationChanged();
   }
 

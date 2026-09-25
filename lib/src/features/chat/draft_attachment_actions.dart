@@ -29,6 +29,9 @@ extension DraftAttachmentActions on ChatController {
           saveDraft: true,
           saveMessages: false,
         );
+        if (identical(activeConversation, _newConversation)) {
+          await _storeNewDraft();
+        }
       } on Object {
         draftImages.removeWhere(images.contains);
         await _imageStore.remove(images);
@@ -44,28 +47,30 @@ extension DraftAttachmentActions on ChatController {
   Future<void> removeDraftImage(MessageImage image) =>
       _inConversation(activeConversation, () => _removeDraftImage(image));
 
-  Future<void> _removeDraftImage(MessageImage image) =>
-      DraftAttachmentCleanup(_store.database, _imageStore.directory).remove(
-        image.path,
-        activeConversation.defaultSenderId,
-        () async {
-          final index = draftImages.indexOf(image);
-          draftImages.removeAt(index);
+  Future<void> _removeDraftImage(MessageImage image) async {
+    await DraftAttachmentCleanup(_store.database, _imageStore.directory).remove(
+      image.path,
+      activeConversation.defaultSenderId,
+      () async {
+        final index = draftImages.indexOf(image);
+        draftImages.removeAt(index);
+        notifyListeners();
+        try {
+          await _store.writer.save(
+            activeConversation,
+            makeActive: false,
+            saveDraft: true,
+            saveMessages: false,
+          );
+        } on Object {
+          draftImages.insert(index, image);
           notifyListeners();
-          try {
-            await _store.writer.save(
-              activeConversation,
-              makeActive: false,
-              saveDraft: true,
-              saveMessages: false,
-            );
-          } on Object {
-            draftImages.insert(index, image);
-            notifyListeners();
-            rethrow;
-          }
-        },
-      );
+          rethrow;
+        }
+      },
+    );
+    await _removeEmptyDraft();
+  }
 
   Future<List<MessageFile>> pickFiles(int remaining) =>
       MessageFileStore.pick(_imageStore.directory, remaining);
@@ -93,6 +98,9 @@ extension DraftAttachmentActions on ChatController {
           saveDraft: true,
           saveMessages: false,
         );
+        if (identical(activeConversation, _newConversation)) {
+          await _storeNewDraft();
+        }
       } on Object {
         draftFiles.removeWhere(files.contains);
         await MessageFileStore.remove(files);
@@ -108,26 +116,28 @@ extension DraftAttachmentActions on ChatController {
   Future<void> removeDraftFile(MessageFile file) =>
       _inConversation(activeConversation, () => _removeDraftFile(file));
 
-  Future<void> _removeDraftFile(MessageFile file) =>
-      DraftAttachmentCleanup(_store.database, _imageStore.directory).remove(
-        file.path,
-        activeConversation.defaultSenderId,
-        () async {
-          final index = draftFiles.indexOf(file);
-          draftFiles.removeAt(index);
+  Future<void> _removeDraftFile(MessageFile file) async {
+    await DraftAttachmentCleanup(_store.database, _imageStore.directory).remove(
+      file.path,
+      activeConversation.defaultSenderId,
+      () async {
+        final index = draftFiles.indexOf(file);
+        draftFiles.removeAt(index);
+        notifyListeners();
+        try {
+          await _store.writer.save(
+            activeConversation,
+            makeActive: false,
+            saveDraft: true,
+            saveMessages: false,
+          );
+        } on Object {
+          draftFiles.insert(index, file);
           notifyListeners();
-          try {
-            await _store.writer.save(
-              activeConversation,
-              makeActive: false,
-              saveDraft: true,
-              saveMessages: false,
-            );
-          } on Object {
-            draftFiles.insert(index, file);
-            notifyListeners();
-            rethrow;
-          }
-        },
-      );
+          rethrow;
+        }
+      },
+    );
+    await _removeEmptyDraft();
+  }
 }

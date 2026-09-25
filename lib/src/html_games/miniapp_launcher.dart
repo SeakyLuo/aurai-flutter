@@ -1,14 +1,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'html_game_store.dart';
-import 'html_game_view.dart';
+import 'html_store.dart';
+import 'html_view.dart';
 import 'miniapp_library_store.dart';
 import 'miniapp_run_page.dart';
 
 Future<void> openMiniapp(
   BuildContext context,
   MiniappEntry entry,
-  HtmlGameStore store, {
+  HtmlStore store, {
   VoidCallback? onReady,
 }) async {
   final library = MiniappLibraryStore(store.database);
@@ -35,7 +35,7 @@ Future<void> openMiniapp(
     final card = await store.card(messageId);
     // Validate the original entry before navigating to its existing runtime.
     await store.load(conversationId, messageId);
-    page = HtmlGameView(
+    page = HtmlView(
       card: card,
       messageId: messageId,
       conversationId: conversationId,

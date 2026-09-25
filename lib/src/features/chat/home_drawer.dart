@@ -229,7 +229,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                                         Expanded(
                                           child: Text(
                                             controller.memory.nickname.isEmpty
-                                                ? '个人信息'
+                                                ? '设置昵称'
                                                 : controller.memory.nickname,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,

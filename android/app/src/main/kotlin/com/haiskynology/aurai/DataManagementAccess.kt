@@ -44,8 +44,8 @@ class DataManagementAccess(private val context: Context, messenger: BinaryMessen
                 try {
                     activity.startActivityForResult(Intent(if (export) Intent.ACTION_CREATE_DOCUMENT else Intent.ACTION_OPEN_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
-                        type = if (export) "application/octet-stream" else "*/*"
-                        if (export) putExtra(Intent.EXTRA_TITLE, "Aurai-${SimpleDateFormat("yyyy-MM-dd-HHmmss", Locale.ROOT).format(Date())}.aurai")
+                        type = if (export) "application/zip" else "*/*"
+                        if (export) putExtra(Intent.EXTRA_TITLE, "Aurai-${SimpleDateFormat("yyyy-MM-dd-HHmmss", Locale.ROOT).format(Date())}.zip")
                     }, REQUEST)
                 } catch (error: Exception) { clearPicker(); fail(result, error) }
             }
