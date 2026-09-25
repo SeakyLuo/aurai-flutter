@@ -1,6 +1,6 @@
 import '../domain/agent_models.dart';
 import 'html_game.dart';
-import 'html_game_store.dart';
+import 'html_store.dart';
 
 /// Small display-only cache. Tool reads continue to use the canonical store.
 class HtmlGameDisplayCache {
@@ -18,7 +18,7 @@ class HtmlGameDisplayCache {
   }
 
   static Future<HtmlGame> load(
-    HtmlGameStore store,
+    HtmlStore store,
     String conversationId,
     String messageId,
   ) async {

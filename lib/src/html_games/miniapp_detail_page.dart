@@ -17,7 +17,7 @@ import '../features/chat/member_avatar.dart';
 import '../features/chat/dialog_action_button.dart';
 import '../scheduling/task_action_menu.dart';
 import 'miniapp_metadata_editor.dart';
-import 'html_game_store.dart';
+import 'html_store.dart';
 import 'miniapp_library_store.dart';
 import 'miniapp_publish_dialog.dart';
 
@@ -28,7 +28,7 @@ class MiniappDetailPage extends StatefulWidget {
     required this.store,
   });
   final MiniappEntry entry;
-  final HtmlGameStore store;
+  final HtmlStore store;
 
   @override
   State<MiniappDetailPage> createState() => _MiniappDetailPageState();

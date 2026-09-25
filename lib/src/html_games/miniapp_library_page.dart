@@ -23,7 +23,7 @@ class MiniappLibraryPage extends StatefulWidget {
 }
 
 class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
-  late final _store = MiniappLibraryStore(widget.controller.htmlGames.database);
+  late final _store = MiniappLibraryStore(widget.controller.htmlStore.database);
   final _search = TextEditingController();
   List<MiniappEntry> _bundled = [], _apps = [], _recent = [], _locals = [];
   bool _localMore = false, _opening = false;
@@ -113,7 +113,7 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
     if (_opening) return;
     setState(() => _opening = true);
     try {
-      await openMiniapp(context, entry, widget.controller.htmlGames);
+      await openMiniapp(context, entry, widget.controller.htmlStore);
       if (mounted) await _loadRecent();
     } on Object catch (error) {
       if (mounted)
@@ -147,7 +147,7 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => MiniappRecentPage(
-                          store: widget.controller.htmlGames,
+                          store: widget.controller.htmlStore,
                         ),
                       ),
                     );
@@ -268,7 +268,7 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
                 MaterialPageRoute(
                   builder: (_) => MiniappDetailPage(
                     entry: entry,
-                    store: widget.controller.htmlGames,
+                    store: widget.controller.htmlStore,
                   ),
                 ),
               );

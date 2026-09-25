@@ -1,7 +1,7 @@
 import 'private_reply_layout.dart';
 import 'interactive_message_paging.dart';
 import 'recalled_message_notice.dart';
-import '../../html_games/html_game_view.dart';
+import '../../html_games/html_view.dart';
 import '../../domain/tool_activity_groups.dart';
 import 'tool_activity_group.dart';
 import 'task_elapsed.dart';
@@ -286,13 +286,13 @@ List<ChatTimelineEntry> buildChatTimeline(
             message: message,
             replyPart: replyParts[message.id],
             mentionMembers: mentionMembers,
-            htmlGameView: message.htmlGame == null
+            htmlView: message.htmlGame == null
                 ? null
-                : HtmlGameView(
+                : HtmlView(
                     card: message.htmlGame!,
                     messageId: message.id,
                     conversationId: conversation.id,
-                    store: controller.htmlGames,
+                    store: controller.htmlStore,
                   ),
             onInteractiveRetry: (eventId) =>
                 controller.retryInteractiveCallback(message.id, eventId),

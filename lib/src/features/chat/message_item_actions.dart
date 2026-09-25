@@ -168,12 +168,12 @@ extension _MessageItemActions on _MessageItemState {
           messageId: snapshot.id,
         );
       case MessageAction.fullscreen:
-        await (widget.htmlGameView! as HtmlGameView).openFullscreen(context);
+        await (widget.htmlView! as HtmlView).openFullscreen(context);
       case MessageAction.forward:
         var htmlCard = snapshot.htmlGame;
         if (htmlCard != null) {
           try {
-            htmlCard = await (widget.htmlGameView! as HtmlGameView)
+            htmlCard = await (widget.htmlView! as HtmlView)
                 .captureForwardPreview();
           } on Object catch (error) {
             if (mounted) {

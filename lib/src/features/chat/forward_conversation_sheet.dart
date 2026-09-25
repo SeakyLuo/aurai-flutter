@@ -161,7 +161,7 @@ class _ForwardConversationSheetState extends State<ForwardConversationSheet> {
                         readOnly: true,
                         onEdit: null,
                         onInteractiveClick: (_, _, _, {value}) async => null,
-                        htmlGameView: message.htmlGame == null
+                        htmlView: message.htmlGame == null
                             ? null
                             : HtmlMessagePreview(
                                 title: message.htmlGame!.title,

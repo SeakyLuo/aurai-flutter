@@ -370,9 +370,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
                 icon: Icons.filter_list_rounded,
                 iconWidget: SettingsIcon(
                   type: SettingsIconType.filter,
-                  color: _includeReasoning
-                      ? colors.primary
-                      : colors.onSurfaceVariant,
+                  color: _includeReasoning ? colors.primary : null,
                 ),
                 onPressed: () async {
                   final box = anchor.findRenderObject()! as RenderBox;

@@ -15,7 +15,7 @@ import '../../domain/message_sender.dart';
 import 'interactive_history_page.dart';
 import '../../domain/interactive_message.dart';
 import 'interactive_statistics_sheet.dart';
-import '../../html_games/html_game_view.dart';
+import '../../html_games/html_view.dart';
 import '../../domain/error_message.dart';
 import 'image_forward_page.dart';
 import 'group_mention_text.dart';
@@ -63,7 +63,7 @@ class MessageItem extends StatefulWidget {
     this.onRecall,
     this.onInteractiveClick,
     this.onInteractiveRetry,
-    this.htmlGameView,
+    this.htmlView,
     this.onLocate,
     this.onOpenQuote,
     this.onOpenMember,
@@ -94,7 +94,7 @@ class MessageItem extends StatefulWidget {
   final bool streaming;
   final bool readOnly;
   final bool groupBubble;
-  final Widget? htmlGameView;
+  final Widget? htmlView;
   final VoidCallback? onLocate;
   final Map<String, SourceReference> availableSources;
   final Future<void> Function(AgentMessage)? onEdit;
@@ -277,10 +277,10 @@ class _MessageItemState extends State<MessageItem> {
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: locate,
-                child: IgnorePointer(child: widget.htmlGameView!),
+                child: IgnorePointer(child: widget.htmlView!),
               )
             else
-              widget.htmlGameView!,
+              widget.htmlView!,
             if (!widget.readOnly)
               Positioned(
                 top: HtmlMessageMoreButton.top,
@@ -431,7 +431,7 @@ class _MessageItemState extends State<MessageItem> {
             ),
           ),
         if (message.htmlGame != null)
-          widget.htmlGameView!
+          widget.htmlView!
         else if (message.interactive != null)
           IgnorePointer(
             ignoring: widget.readOnly && widget.onLocate != null,

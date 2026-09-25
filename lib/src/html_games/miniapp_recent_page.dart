@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
 import '../features/chat/settings_appearance.dart';
-import 'html_game_store.dart';
+import 'html_store.dart';
 import 'miniapp_icon.dart';
 import 'miniapp_launcher.dart';
 import 'miniapp_library_store.dart';
 
 class MiniappRecentPage extends StatefulWidget {
   const MiniappRecentPage({super.key, required this.store});
-  final HtmlGameStore store;
+  final HtmlStore store;
   @override
   State<MiniappRecentPage> createState() => _MiniappRecentPageState();
 }

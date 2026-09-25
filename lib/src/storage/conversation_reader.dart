@@ -1,5 +1,5 @@
 import 'group_unread_messages.dart';
-import '../html_games/html_game_store.dart';
+import '../html_games/html_store.dart';
 import '../html_games/html_game.dart';
 import '../domain/interactive_message.dart';
 import '../domain/draft_mention.dart';
@@ -373,7 +373,7 @@ class ConversationReader {
     final previews = gameIds.isEmpty || forModel
         ? <Map<String, Object?>>[]
         : await database.rawQuery(
-            'SELECT message_id, app_id, title, preview, background_mode, display_mode, display_width, display_height, measured_width, measured_height, measured_scale, measured_version, version, status, ${HtmlGameStore.retryColumn} FROM html_games WHERE message_id IN (${_slots(gameIds.length)})',
+            'SELECT message_id, app_id, title, preview, background_mode, display_mode, display_width, display_height, measured_width, measured_height, measured_scale, measured_version, version, status, ${HtmlStore.retryColumn} FROM html_games WHERE message_id IN (${_slots(gameIds.length)})',
             gameIds,
           );
     final gameCards = {

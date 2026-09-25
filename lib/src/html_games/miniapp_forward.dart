@@ -36,7 +36,7 @@ AgentMessage miniappForwardMessage(MiniappEntry entry) {
 Future<void> forwardMiniapp(BuildContext context, MiniappEntry entry) async {
   final controller = ImageActionScope.of(context);
   final template = await MiniappTemplate.load(
-    controller.htmlGames.database,
+    controller.htmlStore.database,
     entry,
   );
   if (!context.mounted) return;
@@ -68,7 +68,7 @@ Future<void> openMiniappLink(BuildContext context, Uri uri) async {
       throw StateError('小程序链接无效');
     }
     final controller = ImageActionScope.of(context);
-    final library = MiniappLibraryStore(controller.htmlGames.database);
+    final library = MiniappLibraryStore(controller.htmlStore.database);
     final id = uri.pathSegments[1];
     final builtins = await library.bundled();
     final builtin = builtins.where((entry) => entry.id == id).firstOrNull;
@@ -83,7 +83,7 @@ Future<void> openMiniappLink(BuildContext context, Uri uri) async {
       context,
       MaterialPageRoute(
         builder: (_) =>
-            MiniappDetailPage(entry: entry, store: controller.htmlGames),
+            MiniappDetailPage(entry: entry, store: controller.htmlStore),
       ),
     );
   } on Object catch (error) {

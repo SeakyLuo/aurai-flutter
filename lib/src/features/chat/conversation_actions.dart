@@ -22,6 +22,10 @@ extension ConversationActions on ChatController {
     try {
       await archiveTemporaryConversation(activeConversation);
       await _persist();
+      await _removeEmptyDraft();
+      if (identical(activeConversation, _newConversation)) {
+        await _storeNewDraft();
+      }
       _loadedMessageCounts[activeConversation.id] = messages.length;
       final conversation = id == null
           ? _newConversation
@@ -146,8 +150,7 @@ extension ConversationActions on ChatController {
 
   void _updateConversationList([Conversation? value]) {
     final conversation = value ?? activeConversation;
-    if (conversation.kind == ConversationKind.direct &&
-        conversation.messageCount == 0)
+    if (conversation.kind == ConversationKind.direct && conversation.isEmpty)
       return;
     final index = _conversations.indexWhere(
       (item) => item.id == conversation.id,

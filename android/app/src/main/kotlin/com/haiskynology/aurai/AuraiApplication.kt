@@ -74,7 +74,7 @@ class AuraiApplication : Application() {
         GeneratedPluginRegistrant.registerWith(flutterEngine)
         DataManagementAccess(this, flutterEngine.dartExecutor.binaryMessenger, ::loadModelConfig)
         flutterEngine.platformViewsController.registry.registerViewFactory(
-            "aurai/html_game", HtmlGameViewFactory(flutterEngine.dartExecutor.binaryMessenger),
+            "aurai/html_game", HtmlViewFactory(flutterEngine.dartExecutor.binaryMessenger),
         )
         ScheduledTasks.initialize(this, flutterEngine.dartExecutor.binaryMessenger)
         agentBridge = AndroidAgentBridge(this)

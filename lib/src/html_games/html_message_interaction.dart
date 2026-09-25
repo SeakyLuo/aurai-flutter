@@ -5,9 +5,9 @@ import '../storage/interactive_message_store.dart';
 import '../domain/message_sender.dart';
 import 'dart:convert';
 import '../storage/message_callbacks.dart';
-import 'html_game_store.dart';
+import 'html_store.dart';
 
-extension HtmlMessageInteraction on HtmlGameStore {
+extension HtmlMessageInteraction on HtmlStore {
   Future<Map<String, Object?>> submitInteraction(
     String conversationId,
     String messageId,

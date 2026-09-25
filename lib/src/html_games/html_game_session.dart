@@ -17,7 +17,7 @@ import 'package:flutter/services.dart';
 import '../domain/message_sender.dart';
 import 'html_game.dart';
 import 'html_game_document.dart';
-import 'html_game_store.dart';
+import 'html_store.dart';
 
 abstract final class HtmlGameSignals {
   static final callbackChanges = HtmlCallbackState.changes;
@@ -81,7 +81,7 @@ class HtmlGameSession extends ChangeNotifier {
   List<Rect> gestureRegions = const [];
   bool failed = false;
   HtmlGame game;
-  final HtmlGameStore store;
+  final HtmlStore store;
   late final StreamSubscription<String> _updates;
   late final StreamSubscription<String> _callbackUpdates;
   late final StreamSubscription<String> _appUpdates;

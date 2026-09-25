@@ -27,7 +27,7 @@ extension MiniappTemplateSending on ChatController {
     final participants = target.kind == ConversationKind.group
         ? (await groupStore.members(target.id)).map((m) => m.sender.id).toList()
         : [MessageSender.localUser.id, target.defaultSenderId];
-    final message = await htmlGames.create(
+    final message = await htmlStore.create(
       onCreated: (txn, message) async {
         await txn.rawUpdate(
           'UPDATE conversations SET message_count = (SELECT COUNT(*) FROM messages WHERE conversation_id = ?), preview = ?, updated_at = MAX(updated_at, ?)${target.kind == ConversationKind.direct ? ', pending_goal = ?' : ''} WHERE id = ?',

@@ -98,7 +98,7 @@ class MePage extends StatelessWidget {
                             const SizedBox(height: 14),
                             Text(
                               memory.nickname.isEmpty
-                                  ? '个人信息'
+                                  ? '设置昵称'
                                   : memory.nickname,
                               textAlign: TextAlign.center,
                               maxLines: 2,

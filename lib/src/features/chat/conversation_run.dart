@@ -49,10 +49,6 @@ extension ConversationRun on ChatController {
       _store.database,
     ).pending(runConversation.id, reply.senderId);
     if (callbacksOnly && callbackEvents.isEmpty) return;
-    final htmlEvents = await _pendingHtmlEvents(
-      runConversation,
-      reply.senderId,
-    );
     await _persistMember(runConversation, groupParent);
     final history =
         groupHistory ??
@@ -281,7 +277,6 @@ extension ConversationRun on ChatController {
               ? List.unmodifiable(history.take(lastUser + 1))
               : _groupHistory([
                   ...history,
-                  if (htmlEvents.isNotEmpty) _htmlEventContext(htmlEvents),
                 ], reply.senderId)),
           if (callbackEvents.isNotEmpty) _callbackContext(callbackEvents),
           if (continuationProtocol.isNotEmpty)
@@ -767,19 +762,6 @@ extension ConversationRun on ChatController {
         await MessageCallbacks(
           _store.database,
         ).finish(callbackEvents, outcome == 'completed');
-        if (htmlEvents.isNotEmpty) {
-          await htmlGames.finishEvents(
-            reply.senderId,
-            htmlEvents.map((e) => e['id'] as String).toList(),
-            success: outcome == 'completed',
-          );
-          for (final id
-              in htmlEvents
-                  .map((event) => event['message_id'] as String)
-                  .toSet()) {
-            HtmlGameSignals.changes.add(id);
-          }
-        }
         if (callbackEvents.isEmpty &&
             outcome == 'completed' &&
             (groupParent == null || runMessageIds.isNotEmpty)) {

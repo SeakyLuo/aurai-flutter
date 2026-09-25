@@ -23,7 +23,7 @@ class MiniappFavoritesList extends StatefulWidget {
 }
 
 class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
-  late final _store = MiniappFavorites(widget.controller.htmlGames.database);
+  late final _store = MiniappFavorites(widget.controller.htmlStore.database);
   final _scroll = ScrollController();
   final _items = <MiniappFavorite>[];
   bool _loading = false, _more = true, _failed = false;
@@ -79,7 +79,7 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
     setState(() => _opening = _store.key(item.entry));
     try {
       final entry = await MiniappLibraryStore(
-        widget.controller.htmlGames.database,
+        widget.controller.htmlStore.database,
       ).refresh(item.entry);
       if (!mounted) return;
       await Navigator.push<void>(
@@ -87,7 +87,7 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
         MaterialPageRoute(
           builder: (_) => MiniappDetailPage(
             entry: entry,
-            store: widget.controller.htmlGames,
+            store: widget.controller.htmlStore,
           ),
         ),
       );

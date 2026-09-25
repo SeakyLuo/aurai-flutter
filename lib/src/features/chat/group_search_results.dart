@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../storage/group_message_search.dart';
-import '../../html_games/html_game_store.dart';
+import '../../html_games/html_store.dart';
 import 'group_search_message_tile.dart';
 import 'attachment_action_icon.dart';
 import 'file_attachments.dart';
@@ -20,10 +20,10 @@ class GroupSearchResults extends StatelessWidget {
     required this.onLocate,
     required this.onOpenProfile,
     required this.conversationId,
-    required this.htmlGames,
+    required this.htmlStore,
   });
   final String conversationId;
-  final HtmlGameStore htmlGames;
+  final HtmlStore htmlStore;
   final List<GroupMessageSearchResult> results;
   final GroupSearchType type;
   final String query;
@@ -170,7 +170,7 @@ class GroupSearchResults extends StatelessWidget {
                   key: ValueKey(r.id),
                   result: r,
                   conversationId: conversationId,
-                  htmlGames: htmlGames,
+                  htmlStore: htmlStore,
                   time: _date(r.createdAt),
                   onLocate: () => onLocate(r),
                   onOpenProfile: () => onOpenProfile(r),

@@ -344,6 +344,10 @@ class _SkillsPageState extends State<SkillsPage> {
                                       _ => '暂无已启用技能',
                                     }
                                   : '暂无技能',
+                              style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme.onSurfaceVariant,
+                              ),
                             ),
                             if (query.isEmpty && scope == 'installed') ...[
                               const SizedBox(height: 8),

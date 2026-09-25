@@ -131,6 +131,14 @@ class ConversationStore {
     limit: 1,
   )).isNotEmpty;
 
+  Future<bool> hasConversation(String id) async => (await database.query(
+    'conversations',
+    columns: ['id'],
+    where: 'id = ?',
+    whereArgs: [id],
+    limit: 1,
+  )).isNotEmpty;
+
   Future<void> removeDraftConversation(String id) async {
     await writer.flush();
     await database.delete(
@@ -138,7 +146,11 @@ class ConversationStore {
       where: "id = ? AND kind = 'direct' AND message_count = 0",
       whereArgs: [id],
     );
-    await selectNewConversation();
+    await database.delete(
+      'app_state',
+      where: 'key = ? AND value = ?',
+      whereArgs: ['active_conversation', id],
+    );
   }
 
   Future<Conversation> load(

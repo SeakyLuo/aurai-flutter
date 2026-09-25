@@ -284,7 +284,14 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                 MediaQuery.paddingOf(context).bottom + 24,
               ),
               empty: widget.groupsOnly
-                  ? const Center(child: Text('暂无群聊'))
+                  ? Center(
+                      child: Text(
+                        '暂无群聊',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    )
                   : Padding(
                       padding: EdgeInsets.fromLTRB(
                         12,
@@ -335,7 +342,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                 if (widget.groupsOnly && _items.isNotEmpty)
                   Padding(
                     key: const ValueKey('group-count'),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 20),
                     child: Text(
                       '共 $_groupCount 个群聊',
                       textAlign: TextAlign.center,

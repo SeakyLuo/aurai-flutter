@@ -6,10 +6,10 @@ import 'task_failure_card.dart';
 import 'reconnect_indicator.dart';
 import 'package:flutter/material.dart';
 
-import 'welcome_icon.dart';
 import 'welcome_logo.dart';
 import 'settings_icon.dart';
 import 'sidebar_action_icon.dart';
+import 'question_icon.dart';
 
 import '../../domain/agent_models.dart';
 import 'chat_controller.dart';
@@ -56,16 +56,16 @@ class EmptyConversation extends StatelessWidget {
             const SizedBox(height: 10),
             for (final example in const [
               (
-                WelcomeIcon(type: WelcomeIconType.network),
-                '排查网络问题',
-                '帮我检查并解决网络连接问题',
-                '帮我检查并解决手机的网络连接问题。',
+                SettingsIcon(type: SettingsIconType.miniapps),
+                '做个小程序',
+                '在会话里玩贪吃蛇',
+                '帮我做一个可以在会话里玩的贪吃蛇小程序，支持触屏操作、计分和重新开始。',
               ),
               (
-                SettingsIcon(type: SettingsIconType.device),
-                '了解手机状态',
-                '查看电量、存储和系统信息',
-                '帮我看看手机的电量、存储和系统信息。',
+                QuestionIcon(type: QuestionIconType.question),
+                '来道互动问答',
+                '直接点击选项参与',
+                '给我出一道有趣的四选一知识题，用会话里的可点击选项让我作答，答完再揭晓答案。',
               ),
               (
                 SidebarActionIcon(type: SidebarActionIconType.settings),

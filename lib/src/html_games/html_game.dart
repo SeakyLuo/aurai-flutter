@@ -1,11 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-/// Intentionally not exposed to AI until the HTML message rollout is enabled.
-abstract final class HtmlGameFeature {
-  static const enabled = false;
-}
-
 class HtmlGameCard {
   const HtmlGameCard({
     required this.title,

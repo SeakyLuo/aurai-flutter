@@ -11,6 +11,7 @@ extension RequestAdapterActions on ChatController {
     return old.copyWith(
       model: sampleModel,
       details: ProviderDetails(
+        modelContextOverrides: old.details?.modelContextOverrides ?? const {},
         name: old.displayName,
         website: old.website,
         protocol: old.protocol,
@@ -41,6 +42,7 @@ extension RequestAdapterActions on ChatController {
     await _saveConfig(
       old.copyWith(
         details: ProviderDetails(
+          modelContextOverrides: old.details?.modelContextOverrides ?? const {},
           name: old.displayName,
           website: old.website,
           protocol: old.protocol,
@@ -78,6 +80,7 @@ extension RequestAdapterActions on ChatController {
     await _saveConfig(
       old.copyWith(
         details: ProviderDetails(
+          modelContextOverrides: old.details?.modelContextOverrides ?? const {},
           name: old.displayName,
           website: old.website,
           protocol: old.protocol,
