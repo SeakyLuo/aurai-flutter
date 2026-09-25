@@ -135,13 +135,14 @@ class _ScrollAwareJumpStackState extends State<ScrollAwareJumpStack> {
       final acknowledged =
           widget.acknowledgedRunId != null &&
           message.runId == widget.acknowledgedRunId;
-      if (acknowledged) _unread.remove(message.id);
+      final unreadKey = message.runId ?? message.id;
+      if (acknowledged) _unread.remove(unreadKey);
       if (!initial &&
           previous != null &&
           message.createdAt.isAfter(previous) &&
           !widget.atBottom &&
           !acknowledged) {
-        _unread.add(message.id);
+        _unread.add(unreadKey);
       }
       if (_latest == null || message.createdAt.isAfter(_latest!)) {
         _latest = message.createdAt;

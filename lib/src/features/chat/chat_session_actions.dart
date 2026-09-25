@@ -38,9 +38,8 @@ extension _ChatSessionActions on _ChatPageState {
           conversation.searchHasLater ||
           !conversation.needsGroupReadCheckpoint)
         return;
-    } else if (conversation.runState != ChatRunState.idle ||
-        conversation.activeRunId == null ||
-        conversation.pendingGoal != null ||
+    } else if (conversation.activeRunId == null ||
+        !_hasVisibleActiveRunContent(conversation) ||
         conversation.seenRunId == conversation.activeRunId) {
       return;
     }
@@ -56,7 +55,7 @@ extension _ChatSessionActions on _ChatPageState {
             (conversation.kind == ConversationKind.group &&
                 (_contentBelow || conversation.searchHasLater)) ||
             (conversation.kind != ConversationKind.group &&
-                conversation.runState != ChatRunState.idle))
+                !_hasVisibleActiveRunContent(conversation)))
           return;
         await widget.controller.markActiveConversationRead();
       } on Object catch (caughtError) {
@@ -66,6 +65,17 @@ extension _ChatSessionActions on _ChatPageState {
       }
     });
   }
+
+  bool _hasVisibleActiveRunContent(Conversation conversation) =>
+      conversation.messages.any(
+        (message) =>
+            message.runId == conversation.activeRunId &&
+            message.role == AgentMessageRole.assistant,
+      ) ||
+      conversation.liveToolSteps.any(
+        (entry) => entry.runId == conversation.activeRunId,
+      ) ||
+      widget.controller.pendingQuestion?.conversationId == conversation.id;
 
   bool _beforeDeleteConversation() {
     if (_imageOperationPending()) return false;
