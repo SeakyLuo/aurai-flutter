@@ -1,5 +1,6 @@
 import 'provider_key_dialog.dart';
 import 'image_generation_settings_page.dart';
+import 'music_generation_settings_page.dart';
 import 'package:flutter/material.dart';
 import '../../skills/skills_page.dart';
 import '../../scheduling/tasks_page.dart';
@@ -72,6 +73,7 @@ Future<void> navigateAppPage(
   }
   final page = switch (args['page']) {
     'imageGeneration' => ImageGenerationSettingsPage(controller: controller),
+    'musicGeneration' => MusicGenerationSettingsPage(controller: controller),
     'contact' => AiContactPage(
       controller: controller,
       senderId: args['contactId'] as String,
