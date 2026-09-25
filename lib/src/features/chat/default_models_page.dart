@@ -12,6 +12,7 @@ import 'choice_sheet.dart';
 import 'model_replacement_page.dart';
 import 'model_provider_icon.dart';
 import 'model_settings_sheet.dart';
+import 'music_generation_settings_page.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 
@@ -365,6 +366,50 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
                 ),
                 const SizedBox(height: 14),
               ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 4, 8, 2),
+                child: Text(
+                  '音乐生成',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              Material(
+                color: settingsFieldColor(context),
+                borderRadius: BorderRadius.circular(24),
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 10,
+                  ),
+                  leading: const SizedBox.square(
+                    dimension: 44,
+                    child: Center(
+                      child: SettingsIcon(type: SettingsIconType.modelProvider),
+                    ),
+                  ),
+                  title: Text(
+                    widget.controller.musicGeneration?.apiKey.isNotEmpty == true
+                        ? 'Suno API 平台（第三方）'
+                        : '未设置',
+                  ),
+                  trailing: const SettingsIcon(type: SettingsIconType.chevron),
+                  onTap: () async {
+                    await Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MusicGenerationSettingsPage(
+                          controller: widget.controller,
+                        ),
+                      ),
+                    );
+                    if (mounted) setState(() {});
+                  },
+                ),
+              ),
             ],
           ),
         ),

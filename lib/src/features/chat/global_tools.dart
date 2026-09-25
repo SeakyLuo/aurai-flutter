@@ -270,6 +270,10 @@ extension GlobalTools on ChatController {
       SourceDatesTool(webSources),
       ImageSearchTool(),
       ImageGenerationTool(_generateImage, configuration: () => imageGeneration),
+      MusicGenerationTool(
+        (args, client) => _generateMusic(args, client, conversation, senderId),
+        configured: () => musicGeneration?.apiKey.isNotEmpty ?? false,
+      ),
       WebTool('readWebPage', webSources),
       if (scheduledTasks.supported)
         for (final operation in ScheduleTaskTool.operations)

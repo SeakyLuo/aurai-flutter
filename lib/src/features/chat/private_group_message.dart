@@ -31,6 +31,7 @@ extension PrivateGroupMessage on ChatController {
       return _changePrivateGroupParticipation(arguments, senderId);
     }
     final images = item['_images'] as List<MessageImage>;
+    final files = item['_files'] as List<MessageFile>? ?? const <MessageFile>[];
     final text = (item['text'] as String).trim();
     if (text.length > 20000) throw ArgumentError('消息文字不能超过 20000 字');
     final mentions = List<String>.from(item['mentionIds'] as List).toSet();
@@ -82,6 +83,7 @@ extension PrivateGroupMessage on ChatController {
         });
     if (!isGroup &&
         roster.every((m) => m.sender.kind == MessageSenderKind.agent)) {
+      if (files.isNotEmpty) throw StateError('当前私聊不支持发送音频附件');
       return _sendPeerMessage(id, senderId, text, images: images, quote: quote);
     }
     final target = await _forwardTarget(id);
@@ -98,6 +100,7 @@ extension PrivateGroupMessage on ChatController {
       isRichReply: inlineRunId != null,
       text: [...prefixes, if (text.isNotEmpty) text].join(' '),
       images: images,
+      files: files,
       quote: quote,
       createdAt: DateTime.now(),
     );

@@ -390,6 +390,7 @@ String _defaultToolTitle(String name) => switch (name) {
   'readAttachment' => '读取附件',
   'searchImages' => '搜索图片',
   'generateImage' => '生成图片',
+  'generateMusic' => '生成音乐',
   'searchWeb' => '搜索网页',
   'setSourceDates' => '补充来源时间',
   'searchTools' => '搜索工具',

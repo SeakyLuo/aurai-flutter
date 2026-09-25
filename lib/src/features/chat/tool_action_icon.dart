@@ -141,6 +141,10 @@ class ToolActionIcon extends StatelessWidget {
               'searchImages' || 'generateImage' => const ToolSemanticIcon(
                 type: ToolSemanticIconType.imageSearch,
               ),
+              'generateMusic' => AttachmentActionIcon(
+                type: AttachmentActionIconType.audio,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               'findApps' => const ToolSemanticIcon(
                 type: ToolSemanticIconType.appSearch,
               ),
