@@ -622,6 +622,7 @@ class _ChatPageState extends State<ChatPage>
       _canSend = conversation.draft.trim().isNotEmpty;
     }
     setState(() {});
+    _scheduleMarkRead();
     if (!widget.fromTask &&
         widget.controller.accessibilityRequestPending &&
         !_accessibilitySheetShowing) {

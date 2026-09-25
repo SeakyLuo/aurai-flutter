@@ -187,9 +187,7 @@ extension ConversationActions on ChatController {
       _conversationChanged();
       return;
     }
-    if (conversation.runState != ChatRunState.idle ||
-        conversation.pendingGoal != null ||
-        conversation.activeRunId == null ||
+    if (conversation.activeRunId == null ||
         conversation.seenRunId == conversation.activeRunId)
       return;
     final previous = conversation.seenRunId;
