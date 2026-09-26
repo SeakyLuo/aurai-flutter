@@ -63,7 +63,6 @@ class _GroupContactPickerState extends State<GroupContactPicker> {
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
-      gradientBackground: true,
       title: '从通讯录选择',
       onBack: () => Navigator.pop(context),
       actions: [
@@ -80,9 +79,7 @@ class _GroupContactPickerState extends State<GroupContactPicker> {
       child: ListView(
         padding: EdgeInsets.fromLTRB(
           16,
-          View.of(context).padding.top / View.of(context).devicePixelRatio +
-              76 +
-              16,
+          settingsHeaderHeight(context) + 16,
           16,
           16,
         ),

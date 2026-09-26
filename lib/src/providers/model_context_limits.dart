@@ -39,7 +39,7 @@ class ModelContextLimits {
   }
 
   static ModelContextLimits previewForConfig(ModelConfig config) {
-    final info = config.service == ModelService.openRouter
+    final info = config.service.usesOpenRouterCatalog
         ? OpenRouterModels.lookup(config.baseUrl, config.model)
         : null;
     final base = info == null ? forModel(config.model) : _forOpenRouter(info);
@@ -59,16 +59,17 @@ class ModelContextLimits {
     ModelContextLimits base,
     ModelConfig config,
   ) {
+    final defaults = config.details?.modelContextOverrides[''];
     final override = config.details?.modelContextOverrides[config.model];
-    if (override == null) return base;
-    final window = override.contextWindow ?? base.contextWindow;
+    final window = override?.contextWindow ?? base.contextWindow;
     return ModelContextLimits(
       contextWindow: window,
-      outputTokens: override.contextWindow == null
+      outputTokens: override?.contextWindow == null
           ? base.outputTokens
           : math.min(base.outputTokens, window ~/ 4),
-      compactPercent: override.compactPercent ?? 80,
-      isEstimated: override.contextWindow == null && base.isEstimated,
+      compactPercent:
+          override?.compactPercent ?? defaults?.compactPercent ?? 80,
+      isEstimated: override?.contextWindow == null && base.isEstimated,
     );
   }
 

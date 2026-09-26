@@ -1,7 +1,7 @@
 part of 'chat_controller.dart';
 
 extension MusicGenerationActions on ChatController {
-  Future<void> _loadMusicGeneration() async {
+  Future<void> _migrateMusicGeneration() async {
     final rows = await _store.database.query(
       'app_state',
       columns: ['value'],
@@ -9,22 +9,43 @@ extension MusicGenerationActions on ChatController {
       whereArgs: ['music_generation'],
       limit: 1,
     );
-    if (rows.isNotEmpty) {
-      musicGeneration = MusicGenerationConfig.fromJson(
-        jsonDecode(rows.single['value'] as String) as Map<String, dynamic>,
+    if (rows.isEmpty) return;
+    final old =
+        jsonDecode(rows.single['value'] as String) as Map<String, dynamic>;
+    final musicService = ModelService.values.firstWhere(
+      (service) => service.defaultProtocol.defaultModelPurposes.contains(
+        ModelPurpose.musicGeneration,
+      ),
+    );
+    final account = modelSettings.profile(musicService);
+    var next = modelSettings;
+    if (!account.isConfigured) {
+      next = ModelSettings(
+        activeService: modelSettings.activeService,
+        profiles: {
+          ...modelSettings.profiles,
+          musicService: account.copyWith(apiKey: old['apiKey'] as String),
+        },
+        systemPrompt: modelSettings.systemPrompt,
+        customInstructions: modelSettings.customInstructions,
+        responsePreferences: modelSettings.responsePreferences,
+        modelDefaults: modelSettings.modelDefaults,
       );
     }
-  }
-
-  Future<void> saveMusicGeneration(MusicGenerationConfig value) async {
-    await _store.writer.mutate(() async {
-      await _store.database.rawInsert(
-        'INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-        ['music_generation', jsonEncode(value.toJson())],
+    await _store.database.transaction((txn) async {
+      if (!account.isConfigured) {
+        await txn.rawInsert(
+          'INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          ['model_config_json', jsonEncode(next.toJson())],
+        );
+      }
+      await txn.delete(
+        'app_state',
+        where: 'key = ?',
+        whereArgs: ['music_generation'],
       );
-      musicGeneration = value;
     });
-    _conversationChanged();
+    modelSettings = next;
   }
 
   Future<Map<String, Object?>> _generateMusic(
@@ -33,16 +54,17 @@ extension MusicGenerationActions on ChatController {
     Conversation conversation,
     String senderId,
   ) async {
-    final config = musicGeneration;
-    if (config == null || config.apiKey.isEmpty) {
+    final selection = modelSettings.firstAvailableMusicModel;
+    if (selection == null) {
       final navigate = openAppPage;
       if (navigate != null) await navigate({'page': 'musicGeneration'});
       return {
         'generated': false,
         'needsConfiguration': true,
-        'instruction': '请用户在模型设置 → 音乐生成中配置第三方 Suno API 密钥，完成前不要重复调用。',
+        'instruction': '请用户配置支持音乐生成的供应商和可用模型，完成前不要重复调用。',
       };
     }
+    final config = selection.config;
     final prompt = (args['prompt'] as String).trim();
     final title = (args['title'] as String).trim();
     if (prompt.isEmpty || prompt.length > 1000)
@@ -51,6 +73,8 @@ extension MusicGenerationActions on ChatController {
       throw ArgumentError('歌曲名称需为 1–100 字');
     final generated = await client.generate(
       key: config.apiKey,
+      baseUrl: config.baseUrl,
+      model: selection.model,
       prompt: prompt,
       title: title,
       instrumental: args['instrumental'] as bool,

@@ -25,11 +25,7 @@ class _PersonalityTraitsPageState extends State<PersonalityTraitsPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
-    appBar: SettingsAppBar(
-      gradientBackground: true,
-      title: '特征',
-      onBack: () => Navigator.pop(context),
-    ),
+    appBar: SettingsAppBar(title: '特征', onBack: () => Navigator.pop(context)),
     body: SafeArea(
       top: false,
       child: Center(
@@ -38,9 +34,7 @@ class _PersonalityTraitsPageState extends State<PersonalityTraitsPage> {
           child: ListView(
             padding: EdgeInsets.fromLTRB(
               16,
-              View.of(context).padding.top / View.of(context).devicePixelRatio +
-                  76 +
-                  8,
+              settingsHeaderHeight(context) + 8,
               16,
               32,
             ),

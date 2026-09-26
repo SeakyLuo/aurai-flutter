@@ -26,11 +26,14 @@ class _ImageGenerationSettingsPageState
   late final _initial = widget.controller.imageGeneration;
   late ModelService _service =
       _initial?.service ??
-      (widget.controller.modelSettings
-              .profile(ModelService.openRouter)
-              .isConfigured
-          ? ModelService.openRouter
-          : ModelService.qwen);
+      ModelService.values.firstWhere(
+        (service) =>
+            service.supportsImageGeneration &&
+            widget.controller.modelSettings.profile(service).isConfigured,
+        orElse: () => ModelService.values.firstWhere(
+          (service) => service.supportsImageGeneration,
+        ),
+      );
   late ImageGenerationModel? _model = _initial?.model;
   bool _loading = false;
   bool _saving = false;
@@ -94,8 +97,14 @@ class _ImageGenerationSettingsPageState
       title: '生图服务商',
       selected: _service,
       choices: [
-        for (final service in [ModelService.openRouter, ModelService.qwen])
-          (value: service, label: widget.controller.modelSettings.profile(service).displayName),
+        for (final service in ModelService.values)
+          if (service.supportsImageGeneration)
+            (
+              value: service,
+              label: widget.controller.modelSettings
+                  .profile(service)
+                  .displayName,
+            ),
       ],
     );
     if (!mounted || value == null || value == _service) return;
@@ -170,6 +179,7 @@ class _ImageGenerationSettingsPageState
       if (!didPop) _back();
     },
     child: Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: '图片生成',
         onBack: _locked ? null : _back,
@@ -187,53 +197,62 @@ class _ImageGenerationSettingsPageState
           ),
         ],
       ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              children: [
-                _row(
-                  title: '服务商',
-                  subtitle: widget.controller.modelSettings.profile(_service).displayName,
-                  leading: ModelProviderIcon(service: _service),
-                  onTap: _locked ? null : _chooseService,
+      body: SettingsPageBody(
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: ListView(
+                padding: settingsPagePadding(
+                  context,
+                  const EdgeInsets.fromLTRB(16, 16, 16, 32),
                 ),
-                const SizedBox(height: 12),
-                _row(
-                  title: '生图模型',
-                  subtitle: _model?.name ?? '选择模型',
-                  loading: _loading,
-                  onTap: _locked ? null : _chooseModel,
-                ),
-                const SizedBox(height: 12),
-                _row(
-                  title: '服务商配置',
-                  subtitle: _account.isConfigured
-                      ? '使用已保存的密钥和服务地址'
-                      : '配置密钥和服务地址',
-                  onTap: _locked ? null : _configure,
-                ),
-                const SizedBox(height: 18),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    '所有 AI 共用此生图模型，聊天模型保持不变。生成的图片会保存为文件，可用于后续编辑或发送。'
-                    '${_model == null
-                        ? ''
-                        : _model!.supportsReference
-                        ? '\n支持文字生成和参考图编辑。'
-                        : '\n此模型支持文字生成，不支持参考图编辑。'}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.5,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                children: [
+                  _row(
+                    title: '服务商',
+                    subtitle: widget.controller.modelSettings
+                        .profile(_service)
+                        .displayName,
+                    leading: ModelProviderIcon(
+                      config: widget.controller.modelSettings.profile(_service),
+                    ),
+                    onTap: _locked ? null : _chooseService,
+                  ),
+                  const SizedBox(height: 12),
+                  _row(
+                    title: '生图模型',
+                    subtitle: _model?.name ?? '选择模型',
+                    loading: _loading,
+                    onTap: _locked ? null : _chooseModel,
+                  ),
+                  const SizedBox(height: 12),
+                  _row(
+                    title: '服务商配置',
+                    subtitle: _account.isConfigured
+                        ? '使用已保存的密钥和服务地址'
+                        : '配置密钥和服务地址',
+                    onTap: _locked ? null : _configure,
+                  ),
+                  const SizedBox(height: 18),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      '所有 AI 共用此生图模型，聊天模型保持不变。生成的图片会保存为文件，可用于后续编辑或发送。'
+                      '${_model == null
+                          ? ''
+                          : _model!.supportsReference
+                          ? '\n支持文字生成和参考图编辑。'
+                          : '\n此模型支持文字生成，不支持参考图编辑。'}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.5,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

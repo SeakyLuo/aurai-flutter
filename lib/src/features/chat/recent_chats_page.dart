@@ -186,7 +186,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
     extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
       title: widget.groupsOnly ? '群聊' : '会话',
-      gradientBackground: true,
+
       onBack: widget.groupsOnly ? () => Navigator.pop(context) : null,
       root: !widget.groupsOnly,
       leadingAction: widget.groupsOnly
@@ -277,6 +277,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
             hasMore: _more,
             loadMore: _load,
             child: AnimatedEntryList(
+              animateChanges: false,
               padding: EdgeInsets.fromLTRB(
                 12,
                 MediaQuery.paddingOf(context).top + 76 + 8,

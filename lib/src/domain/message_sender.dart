@@ -17,11 +17,25 @@ class MessageSender {
   final String? avatarPath;
   final bool archived;
 
-  static const localUser = MessageSender(
+  static MessageSender _localUser = const MessageSender(
     id: 'user:local',
     name: '你',
     kind: MessageSenderKind.user,
   );
+  static MessageSender get localUser => _localUser;
+
+  static void setLocalUserName(String name) {
+    _localUser = MessageSender(
+      id: _localUser.id,
+      name: name.isEmpty ? '你' : name,
+      kind: _localUser.kind,
+      avatarIcon: _localUser.avatarIcon,
+      avatarColor: _localUser.avatarColor,
+      avatarPath: _localUser.avatarPath,
+      archived: _localUser.archived,
+    );
+  }
+
   static const aurai = MessageSender(
     id: 'agent:aurai',
     name: 'Aurai',

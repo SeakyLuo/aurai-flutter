@@ -5,9 +5,7 @@ import 'package:markdown/markdown.dart' as md;
 import '../../app/global_ui.dart';
 
 TextStyle groupMentionStyle(BuildContext context) => TextStyle(
-  color: Theme.of(context).brightness == Brightness.dark
-      ? GlobalUI.primaryLight
-      : GlobalUI.onPrimary,
+  color: GlobalUI.highlightTextColor(context),
   decoration: TextDecoration.none,
 );
 
@@ -55,6 +53,8 @@ class GroupMentionText extends StatefulWidget {
     required this.style,
     required this.members,
     this.onOpen,
+    this.bareNames = false,
+    this.textAlign,
     this.maxLines,
     this.overflow,
   });
@@ -62,6 +62,8 @@ class GroupMentionText extends StatefulWidget {
   final TextStyle style;
   final Map<String, String> members;
   final ValueChanged<String>? onOpen;
+  final bool bareNames;
+  final TextAlign? textAlign;
   final int? maxLines;
   final TextOverflow? overflow;
   @override
@@ -92,7 +94,10 @@ class _GroupMentionTextState extends State<GroupMentionText> {
       r'\[((?:\\.|[^\]])+)\]\(aurai://member/([^)]+)\)|@所有人' +
           (names.isEmpty
               ? ''
-              : '|@(?:${names.map(RegExp.escape).join('|')})(?![a-zA-Z0-9_])'),
+              : '|@(?:${names.map(RegExp.escape).join('|')})(?![a-zA-Z0-9_])') +
+          (widget.bareNames && names.isNotEmpty
+              ? '|(?:${names.map(RegExp.escape).join('|')})'
+              : ''),
     );
     final spans = <InlineSpan>[];
     var cursor = 0;
@@ -102,7 +107,10 @@ class _GroupMentionTextState extends State<GroupMentionText> {
           match.group(1)?.replaceAllMapped(RegExp(r'\\(.)'), (m) => m[1]!) ??
           match[0]!;
       final id = match.group(2) == null
-          ? widget.members[label.substring(1)]
+          ? widget.members[label] ??
+                (label.startsWith('@')
+                    ? widget.members[label.substring(1)]
+                    : null)
           : Uri.decodeComponent(match.group(2)!);
       TapGestureRecognizer? recognizer;
       if (id != null && widget.onOpen != null) {
@@ -122,6 +130,7 @@ class _GroupMentionTextState extends State<GroupMentionText> {
     return Text.rich(
       TextSpan(children: spans),
       style: widget.style,
+      textAlign: widget.textAlign,
       maxLines: widget.maxLines,
       overflow: widget.overflow,
     );

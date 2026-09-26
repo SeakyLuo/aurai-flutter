@@ -45,8 +45,9 @@ class _AiContactPageState extends State<AiContactPage> {
     _reload();
   }
 
-  void _notice(String text) =>
-      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text) => ScaffoldMessenger.of(
+    context,
+  ).showGlassSnackBar(SnackBar(content: Text(text)));
   Future<void> _reload() async {
     try {
       final ai = await widget.controller.groupStore.loadAi(widget.senderId);
@@ -148,7 +149,7 @@ class _AiContactPageState extends State<AiContactPage> {
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: '朋友',
-        gradientBackground: true,
+
         onBack: () => Navigator.pop(context),
         actions: [
           if (ai != null)
@@ -205,10 +206,7 @@ class _AiContactPageState extends State<AiContactPage> {
           : ListView(
               padding: EdgeInsets.fromLTRB(
                 16,
-                View.of(context).padding.top /
-                        View.of(context).devicePixelRatio +
-                    76 +
-                    12,
+                settingsHeaderHeight(context) + 12,
                 16,
                 32,
               ),

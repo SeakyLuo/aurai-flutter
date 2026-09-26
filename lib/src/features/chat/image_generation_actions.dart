@@ -39,7 +39,7 @@ extension ImageGenerationActions on ChatController {
         'generated': false,
         'needsConfiguration': true,
         'opened': navigate != null,
-        'instruction': '请用户在设置 → 模型设置 → 图片生成中配置，完成前不要重复调用。',
+        'instruction': '请用户在设置 → 默认模型 → 默认图片生成模型中配置，完成前不要重复调用。',
       };
     }
     final account = modelSettings.profile(selection.service);

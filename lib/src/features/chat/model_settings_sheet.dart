@@ -55,13 +55,41 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
   List<ModelService>? _pendingOrder;
   bool _sorting = false;
 
+  List<ModelService> get _visibleServices => widget
+      .controller
+      .modelSettings
+      .profiles
+      .keys
+      .where(
+        (service) =>
+            widget.accountOnly ||
+            widget.controller.modelSettings
+                .profile(service)
+                .protocol
+                .supportsChatModels,
+      )
+      .toList();
+
   Future<void> _reorder(int oldIndex, int newIndex) async {
     if (oldIndex == newIndex) return;
-    final order = widget.controller.modelSettings.profiles.keys.toList();
+    final order = _visibleServices;
     order.insert(newIndex, order.removeAt(oldIndex));
     setState(() => _pendingOrder = order);
     try {
-      await widget.controller.reorderModelProviders(order);
+      final all = widget.controller.modelSettings.profiles.keys.toList();
+      var visibleIndex = 0;
+      final savedOrder = widget.accountOnly
+          ? order
+          : [
+              for (final service in all)
+                widget.controller.modelSettings
+                        .profile(service)
+                        .protocol
+                        .supportsChatModels
+                    ? order[visibleIndex++]
+                    : service,
+            ];
+      await widget.controller.reorderModelProviders(savedOrder);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showGlassSnackBar(
@@ -232,7 +260,6 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
           child: Scaffold(
             extendBodyBehindAppBar: true,
             appBar: SettingsAppBar(
-              gradientBackground: true,
               title: _sorting
                   ? '供应商排序'
                   : widget.accountOnly
@@ -274,20 +301,14 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                       proxyDecorator: (child, index, animation) => child,
                       padding: EdgeInsets.fromLTRB(
                         16,
-                        View.of(context).padding.top /
-                                View.of(context).devicePixelRatio +
-                            76 +
-                            16,
+                        settingsHeaderHeight(context) + 16,
                         16,
                         32,
                       ),
-                      itemCount:
-                          widget.controller.modelSettings.profiles.length,
+                      itemCount: _visibleServices.length,
                       itemBuilder: (context, index) {
                         final service =
-                            (_pendingOrder ??
-                            widget.controller.modelSettings.profiles.keys
-                                .toList())[index];
+                            (_pendingOrder ?? _visibleServices)[index];
                         final settings = widget.controller.modelSettings;
                         final profile = settings.profile(service);
                         return Padding(
@@ -303,7 +324,7 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                                   horizontal: 16,
                                   vertical: 10,
                                 ),
-                                leading: ModelProviderIcon(service: service),
+                                leading: ModelProviderIcon(config: profile),
                                 title: Text(profile.displayName),
                                 subtitle: Text(
                                   profile.isConfigured

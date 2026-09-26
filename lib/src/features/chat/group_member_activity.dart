@@ -39,6 +39,22 @@ class _GroupMemberThoughts {
 }
 
 extension GroupMemberActivities on ChatController {
+  Future<void> stopAllGroupReplies(String conversationId) async {
+    final current = groupActivitiesFor(
+      conversationId,
+      includeThoughts: false,
+    ).where((activity) => !activity.stopping).toList();
+    await Future.wait([
+      for (final activity in current)
+        stopGroupMember(
+          conversationId: conversationId,
+          senderId: activity.sender.id,
+          runId: activity.runId,
+          currentOnly: true,
+        ),
+    ]);
+  }
+
   Future<void> resumeGroupAutoReply(String groupId, String senderId) async {
     await GroupParticipation(_store.database).set(groupId, senderId, false);
     await _applyPrivateGroupParticipation(groupId, senderId, false);
@@ -176,6 +192,7 @@ extension GroupMemberActivities on ChatController {
     required String conversationId,
     required String senderId,
     required String runId,
+    bool currentOnly = false,
   }) async {
     final state = _executionStates[conversationId];
     final member = state?.groupRuns[senderId];
@@ -192,7 +209,7 @@ extension GroupMemberActivities on ChatController {
       final runtime = _groupRuntimes[senderId];
       member.runState = ChatRunState.stopping;
       _execution.groupReplyDrafts.remove(senderId);
-      _groupDispatcher?.interrupt(senderId);
+      if (!currentOnly) _groupDispatcher?.interrupt(senderId);
       final confirming = _confirmingSenderId == senderId;
       if (confirming && pendingConfirmation != null) resolveConfirmation(false);
       if (runtime?.activeToolName == 'requestAccessibilityAccess') {
@@ -204,7 +221,7 @@ extension GroupMemberActivities on ChatController {
       notifyListeners();
       await Future.wait([
         if (runtime != null) runtime.cancel(),
-        _groupSleeps.remove(conversationId, senderId),
+        if (!currentOnly) _groupSleeps.remove(conversationId, senderId),
         if (confirming && _groupToolQueue.isOwnedBy(_execution))
           _platform.cancelPendingInteraction(),
       ]);

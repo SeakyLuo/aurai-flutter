@@ -36,6 +36,7 @@ class _SkillVisibilityPickerState extends State<SkillVisibilityPicker> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
       title: '可见范围',
       onBack: () => Navigator.pop(context),
@@ -56,57 +57,59 @@ class _SkillVisibilityPickerState extends State<SkillVisibilityPicker> {
         ),
       ],
     ),
-    body: SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          for (final value in ['private', 'public', 'selected'])
-            ListTile(
-              title: Text(skillVisibilityLabel(value)),
-              subtitle: Text(switch (value) {
-                'public' => '所有人和 AI 可查看、安装、修改和删除',
-                'selected' => '选中的人和 AI 可查看、安装，内容由你维护',
-                _ => '只有自己可查看、安装和维护',
-              }),
-              trailing: _visibility == value
-                  ? const SettingsIcon(type: SettingsIconType.check)
-                  : null,
-              onTap: () => setState(() => _visibility = value),
-            ),
-          if (_visibility == 'selected') ...[
-            const SizedBox(height: 16),
-            TextField(
-              controller: _search,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                hintText: '搜索联系人',
-                filled: true,
-                fillColor: settingsFieldColor(context),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(26),
-                  borderSide: BorderSide.none,
+    body: SettingsPageBody(
+      child: SafeArea(
+        child: ListView(
+          padding: settingsPagePadding(context, const EdgeInsets.all(16)),
+          children: [
+            for (final value in ['private', 'public', 'selected'])
+              ListTile(
+                title: Text(skillVisibilityLabel(value)),
+                subtitle: Text(switch (value) {
+                  'public' => '所有人和 AI 可查看、安装、修改和删除',
+                  'selected' => '选中的人和 AI 可查看、安装，内容由你维护',
+                  _ => '只有自己可查看、安装和维护',
+                }),
+                trailing: _visibility == value
+                    ? const SettingsIcon(type: SettingsIconType.check)
+                    : null,
+                onTap: () => setState(() => _visibility = value),
+              ),
+            if (_visibility == 'selected') ...[
+              const SizedBox(height: 16),
+              TextField(
+                controller: _search,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: '搜索联系人',
+                  filled: true,
+                  fillColor: settingsFieldColor(context),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(26),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            for (final member in widget.store.members.where(
-              (m) =>
-                  m.id != widget.store.ownerId &&
-                  m.name.toLowerCase().contains(
-                    _search.text.trim().toLowerCase(),
-                  ),
-            ))
-              CheckboxListTile(
-                title: Text(member.name),
-                value: _selected.contains(member.id),
-                onChanged: (value) => setState(() {
-                  value!
-                      ? _selected.add(member.id)
-                      : _selected.remove(member.id);
-                }),
-              ),
+              const SizedBox(height: 8),
+              for (final member in widget.store.members.where(
+                (m) =>
+                    m.id != widget.store.ownerId &&
+                    m.name.toLowerCase().contains(
+                      _search.text.trim().toLowerCase(),
+                    ),
+              ))
+                CheckboxListTile(
+                  title: Text(member.name),
+                  value: _selected.contains(member.id),
+                  onChanged: (value) => setState(() {
+                    value!
+                        ? _selected.add(member.id)
+                        : _selected.remove(member.id);
+                  }),
+                ),
+            ],
           ],
-        ],
+        ),
       ),
     ),
   );

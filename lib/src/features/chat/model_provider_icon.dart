@@ -1,44 +1,72 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../../domain/model_provider.dart';
 
 class ModelProviderIcon extends StatelessWidget {
-  const ModelProviderIcon({super.key, required this.service});
-  final ModelService service;
+  const ModelProviderIcon({super.key, required this.config});
+  final ModelConfig config;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = config.icon;
+    if (selected != null && selected.startsWith('file:')) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.file(
+          File(selected.substring(5)),
+          width: 44,
+          height: 44,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+    return ProviderIconPreview(
+      icon: selected == null
+          ? config.service.defaultIcon
+          : ProviderIcon.values.byName(selected),
+      label: config.service.defaultIconText ?? config.displayName,
+    );
+  }
+}
+
+class ProviderIconPreview extends StatelessWidget {
+  const ProviderIconPreview({
+    super.key,
+    required this.icon,
+    required this.label,
+  });
+  final ProviderIcon icon;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
-    final asset = switch (service) {
-      ModelService.openAi => 'openai',
-      ModelService.deepSeek => 'deepseek-color',
-      ModelService.qwen => 'qwen-color',
-      ModelService.kimi => 'kimi-color',
-      ModelService.glm => 'zhipu-color',
-      ModelService.openRouter => 'openrouter-grape',
-      _ => null,
-    };
+    final asset = icon.asset;
     return Container(
       width: 44,
       height: 44,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: service == ModelService.kimi
+        color: icon == ProviderIcon.kimi
             ? const Color(0xFF16191E)
             : dark
             ? theme.colorScheme.surfaceContainerHigh
             : Colors.white,
         borderRadius: BorderRadius.circular(14),
       ),
-      child: asset == null
+      child: asset.isEmpty
           ? Center(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.center,
                 child: Text(
-                  service == ModelService.dmxapi
-                      ? 'DMX'
-                      : service.label.characters.first.toUpperCase(),
+                  label.isEmpty
+                      ? 'A'
+                      : label.characters.length <= 3
+                      ? label.toUpperCase()
+                      : label.characters.first.toUpperCase(),
                   maxLines: 1,
                   softWrap: false,
                   textAlign: TextAlign.center,
@@ -58,9 +86,7 @@ class ModelProviderIcon extends StatelessWidget {
               fit: BoxFit.contain,
               cacheWidth: 112,
               excludeFromSemantics: true,
-              color: service == ModelService.openAi
-                  ? theme.colorScheme.onSurface
-                  : null,
+              color: icon.monochrome ? theme.colorScheme.onSurface : null,
               colorBlendMode: BlendMode.srcIn,
             ),
     );

@@ -197,7 +197,6 @@ class _DataManagementPageState extends State<DataManagementPage> {
       child: Scaffold(
         extendBodyBehindAppBar: true,
         appBar: SettingsAppBar(
-          gradientBackground: true,
           title: '数据管理',
           onBack: _busy == null ? () => Navigator.maybePop(context) : null,
         ),
@@ -209,10 +208,7 @@ class _DataManagementPageState extends State<DataManagementPage> {
               child: ListView(
                 padding: EdgeInsets.fromLTRB(
                   16,
-                  View.of(context).padding.top /
-                          View.of(context).devicePixelRatio +
-                      76 +
-                      16,
+                  settingsHeaderHeight(context) + 16,
                   16,
                   16,
                 ),

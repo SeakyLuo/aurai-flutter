@@ -11,7 +11,7 @@ class GetModelBalanceTool implements AgentTool, RuntimeCapabilityAgentTool {
   ToolDefinition get definition => const ToolDefinition(
     name: 'getModelBalance',
     description:
-        'Query the real remaining account balance using the saved provider credentials. Currently supports official DeepSeek and Kimi accounts; other providers and custom gateways return an explicit error. No API key is exposed to the model. Return currency, available total, remaining top-up funds, remaining grants, and observation time. Total already includes grants: do not add them again. Preserve currencies, never infer initial recharge, spending or future call counts from this snapshot. This is account-wide balance, not Aurai-only usage. Query fresh when asked.',
+        'Query the real remaining account balance using the saved provider credentials and its configured balance API. Providers without a balance configuration return an explicit error. No API key is exposed to the model. Return currency, available total, remaining top-up funds, remaining grants, and observation time. Total already includes grants: do not add them again. Preserve currencies, never infer initial recharge, spending or future call counts from this snapshot. This is account-wide balance, not Aurai-only usage. Query fresh when asked.',
     inputSchema: {
       'type': 'object',
       'properties': {

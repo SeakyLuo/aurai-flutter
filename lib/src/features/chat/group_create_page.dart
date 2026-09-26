@@ -49,8 +49,9 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
     super.dispose();
   }
 
-  void _notice(String text) =>
-      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text) => ScaffoldMessenger.of(
+    context,
+  ).showGlassSnackBar(SnackBar(content: Text(text)));
   Future<void> _load() async {
     try {
       final saved = await _draft.load();
@@ -365,6 +366,7 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
       if (!didPop) _leave();
     },
     child: Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: _count == 0 ? '新建群聊' : '新建群聊（$_count 人）',
         onBack: _enabled ? _leave : null,
@@ -376,110 +378,115 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
           ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              top: false,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 640),
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    children: [
-                      TextField(
-                        controller: _name,
-                        enabled: _enabled,
-                        maxLength: 80,
-                        onChanged: (_) => _changedName(),
-                        style: const TextStyle(fontSize: 16),
-                        decoration: InputDecoration(
-                          hintText: '群名称（选填）',
-                          counterText: '',
-                          contentPadding: const EdgeInsets.all(18),
-                          filled: true,
-                          fillColor: settingsFieldColor(context),
-                          border: OutlineInputBorder(
-                            borderSide: BorderSide.none,
-                            borderRadius: BorderRadius.circular(26),
+      body: SettingsPageBody(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : SafeArea(
+                top: false,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 640),
+                    child: ListView(
+                      padding: settingsPagePadding(
+                        context,
+                        const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                      ),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      children: [
+                        TextField(
+                          controller: _name,
+                          enabled: _enabled,
+                          maxLength: 80,
+                          onChanged: (_) => _changedName(),
+                          style: const TextStyle(fontSize: 16),
+                          decoration: InputDecoration(
+                            hintText: '群名称（选填）',
+                            counterText: '',
+                            contentPadding: const EdgeInsets.all(18),
+                            filled: true,
+                            fillColor: settingsFieldColor(context),
+                            border: OutlineInputBorder(
+                              borderSide: BorderSide.none,
+                              borderRadius: BorderRadius.circular(26),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                '选择成员',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
+                        const SizedBox(height: 24),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '选择成员',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
                               ),
-                            ),
-                            IconButton(
-                              tooltip: '随机添加成员',
-                              onPressed:
-                                  _enabled &&
-                                      _count < GroupChatStore.maxAiMembers
-                                  ? _roll
-                                  : null,
-                              icon: SettingsIcon(
-                                type: SettingsIconType.add,
-                                color:
+                              IconButton(
+                                tooltip: '随机添加成员',
+                                onPressed:
                                     _enabled &&
                                         _count < GroupChatStore.maxAiMembers
-                                    ? Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant
-                                    : Theme.of(context).disabledColor,
+                                    ? _roll
+                                    : null,
+                                icon: SettingsIcon(
+                                  type: SettingsIconType.add,
+                                  color:
+                                      _enabled &&
+                                          _count < GroupChatStore.maxAiMembers
+                                      ? Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant
+                                      : Theme.of(context).disabledColor,
+                                ),
                               ),
+                            ],
+                          ),
+                        ),
+                        for (final ai in _members) _member(ai),
+                        for (final ai in [
+                          ..._contacts.where(
+                            (selected) => !_directory.any(
+                              (p) => p.sender.id == selected.sender.id,
                             ),
-                          ],
-                        ),
-                      ),
-                      for (final ai in _members) _member(ai),
-                      for (final ai in [
-                        ..._contacts.where(
-                          (selected) => !_directory.any(
-                            (p) => p.sender.id == selected.sender.id,
                           ),
-                        ),
-                        ..._directory,
-                      ])
-                        GroupMemberChoice(
-                          selected: _contacts.any(
-                            (p) => p.sender.id == ai.sender.id,
+                          ..._directory,
+                        ])
+                          GroupMemberChoice(
+                            selected: _contacts.any(
+                              (p) => p.sender.id == ai.sender.id,
+                            ),
+                            sender: ai.sender,
+                            onTap: _enabled ? () => _toggle(ai) : null,
                           ),
-                          sender: ai.sender,
-                          onTap: _enabled ? () => _toggle(ai) : null,
-                        ),
-                      if (_directoryLoading)
-                        const Center(child: CircularProgressIndicator()),
-                      if (!_directoryLoading && _directoryMore)
-                        TextButton(
-                          onPressed: _loadDirectory,
-                          child: Text(_directoryFailed ? '重试' : '加载更多朋友'),
-                        ),
-                      if (!_directoryLoading &&
-                          !_directoryFailed &&
-                          _directory.isEmpty &&
-                          _contacts.isEmpty &&
-                          _members.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Text('暂无成员，点击右上方＋添加'),
-                        ),
-                    ],
+                        if (_directoryLoading)
+                          const Center(child: CircularProgressIndicator()),
+                        if (!_directoryLoading && _directoryMore)
+                          TextButton(
+                            onPressed: _loadDirectory,
+                            child: Text(_directoryFailed ? '重试' : '加载更多朋友'),
+                          ),
+                        if (!_directoryLoading &&
+                            !_directoryFailed &&
+                            _directory.isEmpty &&
+                            _contacts.isEmpty &&
+                            _members.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Text('暂无成员，点击右上方＋添加'),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
+      ),
     ),
   );
   Widget _member(AiProfile ai) => GroupMemberChoice(

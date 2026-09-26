@@ -127,6 +127,7 @@ class _ImagePreviewState extends State<ImagePreview> {
               dark: true,
               tintOpacity: .6,
               radius: 24,
+              shadowOpacity: .8,
               child: RoundAction(
                 icon: Icons.close_rounded,
                 iconWidget: const Icon(

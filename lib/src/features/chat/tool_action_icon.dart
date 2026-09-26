@@ -64,6 +64,14 @@ class ToolActionIcon extends StatelessWidget {
               'sleepGroupChat' ||
               'listGroupChats' ||
               'readGroupChat' ||
+              'readGroupPinnedMessage' ||
+              'pinGroupMessage' ||
+              'unpinGroupMessage' ||
+              'listGroupFavorites' ||
+              'addGroupFavorite' ||
+              'removeGroupFavorite' ||
+              'readGroupAnnouncement' ||
+              'updateGroupAnnouncement' ||
               'readGroupMessages' ||
               'sendGroupMessage' ||
               'createGroupChat' ||

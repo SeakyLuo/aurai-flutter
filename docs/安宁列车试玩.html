@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>安宁列车</title>
+<style>
+:root{color-scheme:light dark;font-family:system-ui,-apple-system,"Noto Sans SC",sans-serif;background:#f5f0e5;color:#273b32}
+*{box-sizing:border-box}body{margin:0;background:#f5f0e5;color:#273b32}button{font:inherit;cursor:pointer}button:disabled{opacity:.45;cursor:default}
+.app{max-width:780px;margin:auto;padding:calc(var(--aurai-host-top-inset,0px) + 16px) 14px 28px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding-right:104px}.eyebrow{font-size:11px;font-weight:800;letter-spacing:.18em;color:#78887d}.title{font-size:28px;font-weight:850;margin:3px 0 0}.sub{font-size:13px;color:#64786a;margin:6px 0 0;line-height:1.5}
+.badge{display:inline-block;background:#dcebd8;color:#316044;padding:6px 10px;border-radius:99px;font-size:12px;font-weight:700;white-space:nowrap}
+.card{background:#fffdf8;border:1px solid #e4dfd1;border-radius:20px;padding:16px;margin-top:14px;box-shadow:0 5px 20px #243a2d0a}.card h2{font-size:17px;margin:0 0 9px}.card p{margin:7px 0;line-height:1.55}.small{font-size:13px;color:#687a6c;line-height:1.55}.hero{background:linear-gradient(120deg,#28513e,#557b52);color:white;padding:22px}.hero .small{color:#dce9dd}
+.primary{background:#315e43;color:white;border:0;border-radius:13px;padding:12px 16px;font-weight:750}.secondary{background:#edf3e9;color:#315e43;border:1px solid #c8daca;border-radius:13px;padding:10px 13px;font-weight:700}.ghost{background:transparent;color:#54715b;border:0;padding:9px 4px}.buttons{display:flex;flex-wrap:wrap;gap:8px}.row{display:flex;justify-content:space-between;gap:12px;align-items:center}.rules{padding-left:20px;line-height:1.7;font-size:14px}
+.crew{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.animal{border:1px solid #dfdfd1;border-radius:13px;padding:10px;background:#faf8f1;font-size:12px}.animal b{display:block;font-size:14px;margin-bottom:3px}.animal.active{background:#e3f0db;border-color:#80ab79}
+.status{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:14px}.stat{background:#e7eee1;border-radius:12px;padding:9px;text-align:center}.stat b{display:block;font-size:17px}.stat span{font-size:11px;color:#59715f}
+.mapscroll{overflow:auto;max-height:390px;border:1px solid #d8d9c8;border-radius:13px;background:#c8d7c3;touch-action:pan-x pan-y}.map{display:grid;grid-template-columns:repeat(20,30px);width:max-content}.cell{width:30px;height:30px;border:1px solid #c8d0c0;background:#f2f1e6;padding:0;border-radius:0;position:relative;font-size:18px;line-height:28px;text-align:center}.cell.wall{background:#46604f;border-color:#46604f}.cell.seat{background:#9fbc9a}.cell.water{background:#b4dfd9}.cell.crate{background:#b78959}.cell.site{background:#f8e5a9}.cell.reach{box-shadow:inset 0 0 0 2px #4b9e66}.cell .token{display:block;position:absolute;inset:1px;background:#fff9e6;border:1px solid #5d765e;border-radius:50%;font-size:18px;line-height:25px;box-shadow:0 1px 3px #0003}.cell .stack{position:absolute;right:0;bottom:-5px;font-size:10px;background:#315e43;color:white;border-radius:9px;line-height:12px;padding:0 2px}.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:11px;color:#607265}.legend span{white-space:nowrap}
+.log{max-height:160px;overflow:auto;padding-left:19px;font-size:13px;line-height:1.5;color:#536657}.log li{margin:5px 0}.clues{display:grid;gap:7px}.clue{padding:9px 11px;border-radius:11px;background:#f3f4eb;font-size:13px}.unread{color:#809084}
+.action{width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:8px;background:#f1f5ec;border:1px solid #d2dfd0;color:#304b39;border-radius:13px;padding:12px;margin:7px 0}.action b{font-size:14px}.action span{font-size:12px;color:#6b7d6d}.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#283e32;color:#fff;padding:10px 16px;border-radius:12px;box-shadow:0 6px 20px #0003;font-size:13px;z-index:5;max-width:90vw}.hidden{display:none}details summary{cursor:pointer;font-weight:750}details p{font-size:13px}.footer{margin-top:20px;text-align:center;font-size:12px;color:#879789}
+.turnbar{position:sticky;top:calc(var(--aurai-host-top-inset,0px) + 2px);z-index:3;box-shadow:0 6px 20px #243a2d22}.secret{display:none;background:#f2eee0;border-radius:12px;padding:10px;margin-top:10px}.secret.visible{display:block}.reveal{touch-action:none;user-select:none}
+@media(max-width:440px){.top{display:block}.badge{margin-top:9px}.crew{grid-template-columns:repeat(2,1fr)}.app{padding-left:10px;padding-right:10px}.card{padding:13px}}
+@media(prefers-color-scheme:dark){:root,body{background:#18281f;color:#e6ede2}.card{background:#22382b;border-color:#38513d}.hero{background:linear-gradient(120deg,#244d39,#425e3b)}.small,.sub{color:#b9cbbb}.animal,.clue{background:#294232;border-color:#48654b}.stat{background:#30513c}.stat span,.legend,.log{color:#b7c9b8}.secondary,.action{background:#31513a;color:#e8f0e7;border-color:#55755a}.ghost{color:#bdd8bd}.mapscroll{background:#36523b}.cell{background:#617b5e;border-color:#698064}.cell.wall{background:#20382b}.cell.seat{background:#41634a}.cell.water{background:#387b7b}.cell.crate{background:#946b43}.cell.site{background:#b79752}.cell .token{background:#fff8df}.unread{color:#9cab9d}}
+</style>
+</head>
+<body><div id="app" class="app"></div><div id="toast" class="toast hidden"></div>
+<script>
+(()=>{
+const W=20,H=12, app=document.getElementById('app'), host=AuraiHTML;
+const animals=[
+ {name:'猎豹',emoji:'🐆',power:'每次掷骰后，移动上限 +2。'},
+ {name:'仓鼠',emoji:'🐹',power:'每轮第一次领取道具不花行动；背包可装 4 件。'},
+ {name:'海獭',emoji:'🦦',power:'经过湿滑地板只花 1 步。'},
+ {name:'山羊',emoji:'🐐',power:'可以翻过货箱，每格花 2 步。'},
+ {name:'浣熊',emoji:'🦝',power:'隔 2 格也能调查。'},
+ {name:'猫头鹰',emoji:'🦉',power:'每轮首次调查不花行动。'}
+];
+const sites=[
+ {id:'scale',x:3,y:2,name:'货物磅秤',icon:'⚖️'},
+ {id:'porter',x:7,y:9,name:'鸭子乘务员',icon:'🦆'},
+ {id:'joint',x:16,y:2,name:'车厢连接处',icon:'🔩'},
+ {id:'supply',x:4,y:8,name:'工具架',icon:'🧰'},
+ {id:'cargo',x:9,y:5,name:'滑动的货箱',icon:'📦'},
+ {id:'fix',x:17,y:6,name:'检修台',icon:'🛠️'}
+];
+const causes=[
+ {name:'货物偏载',repair:'重新配重',truth:'转弯时货箱滑向右侧。松开的固定带让偏载越来越明显。',clues:{scale:'右侧比左侧重了不少。',porter:'鸭子说：刚才有几只羊把货箱全推到右边，说这样方便拍照。',joint:'连接处没有松动，车轮的摆动与货箱滑动同步。'}},
+ {name:'连接扣松动',repair:'锁紧连接扣',truth:'车厢连接扣松了。货箱跟着摇，但不是最初的原因。',clues:{scale:'左右重量基本相同。',porter:'鸭子说：刚才听见车厢前端「哐当」一声，随后才开始摇。',joint:'连接扣旁的标记错开了一截，能看到新鲜的擦痕。'}},
+ {name:'稳定器卡住',repair:'清理稳定器',truth:'一只松脱的行李轮卡住了车底稳定器。货箱只是受害者。',clues:{scale:'左右重量基本相同。',porter:'鸭子说：有个行李箱少了一只轮子；先是车底尖叫，后来货箱才动。',joint:'连接扣完好，但稳定器的拉杆动不了。'}}
+];
+const tools=['绳索','防滑垫','扳手'];
+let s=host.state, noticeTimer,revealTimer,mapX=0,mapY=0,saving=false;
+const key=(x,y)=>`${x},${y}`;
+const location=site=>site.id==='cargo'?{...site,x:s.blockX-1}:site;
+const siteAt=(x,y)=>sites.map(location).find(v=>v.x===x&&v.y===y);
+const dist=(a,b)=>Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
+function blocked(x,y,actor){
+ if(x<0||y<0||x>=W||y>=H||y===0||y===H-1)return true;
+ if((y===2||y===9)&&x>0&&x<19&&!siteAt(x,y))return true;
+ if(x===s.blockX&&(y===5||y===6)&&actor!==3)return true;
+ return false;
+}
+function cost(x,y,actor){
+ if(x===s.blockX&&(y===5||y===6))return 2;
+ if(x>=12&&x<=14&&(y===5||y===6)&&actor!==2&&!s.mat)return 2;
+ return 1;
+}
+function paths(){
+ const actor=s.active,p=s.positions[actor], start=key(p.x,p.y), costs={[start]:0}, queue=[p];
+ while(queue.length){
+  queue.sort((a,b)=>costs[key(a.x,a.y)]-costs[key(b.x,b.y)]);
+  const current=queue.shift(),base=costs[key(current.x,current.y)];
+  for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+   const x=current.x+dx,y=current.y+dy,k=key(x,y);
+   if(blocked(x,y,actor))continue;
+   const next=base+cost(x,y,actor);
+   if(next>s.left||next>=(costs[k]??Infinity))continue;
+   costs[k]=next;queue.push({x,y});
+  }
+ }
+ return costs;
+}
+function nearby(site){return dist(s.positions[s.active],location(site))<=((s.active===4&&['scale','porter','joint'].includes(site.id))?2:1)}
+function log(text){s.log.unshift(text);s.log=s.log.slice(0,18)}
+async function save(){saving=true;try{await host.saveState(s);render()}finally{saving=false}}
+function toast(text){const e=document.getElementById('toast');e.textContent=text;e.classList.remove('hidden');clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>e.classList.add('hidden'),2200)}
+function start(){
+ const cause=Math.floor(Math.random()*causes.length);
+ s={phase:'play',cause,round:1,active:0,rolled:0,left:0,acted:false,owlRound:0,hamsterRound:0,blockX:10,mat:false,
+  positions:[{x:2,y:5},{x:2,y:6},{x:3,y:5},{x:3,y:6},{x:4,y:5},{x:4,y:6}],
+  bags:[[],[],[],[],[],[]],clues:[],secured:false,repaired:false,
+  log:['鸭子乘务员广播：货厢在摇晃，请各位乘客先不要给货箱鼓掌。']};
+ save();
+}
+function roll(){s.rolled=1+Math.floor(Math.random()*6);s.left=s.rolled+(s.active===0?2:0);log(`${animals[s.active].name}掷出 ${s.rolled}，最多移动 ${s.left} 格。`);save()}
+function move(x,y){
+ if(!s.rolled){toast('先掷骰子');return}
+ const amount=paths()[key(x,y)];
+ if(amount===undefined){toast('这里走不到，或剩余步数不够');return}
+ s.positions[s.active]={x,y};s.left-=amount;
+ log(`${animals[s.active].name}移动 ${amount} 步。`);save();
+}
+function canAct(){if(!s.rolled){toast('先掷骰子');return false}if(s.acted){toast('本回合已经行动过');return false}return true}
+function useAction(text){s.acted=true;log(text)}
+function investigate(id){
+ if(!canAct())return;
+ const site=sites.find(v=>v.id===id);
+ if(!nearby(site)){toast('走近后才能调查');return}
+ const first=!s.clues.includes(id);
+ if(first)s.clues.push(id);
+ if(!(s.active===5&&s.owlRound!==s.round)){useAction(`${animals[s.active].name}调查了${site.name}。`)}
+ else{s.owlRound=s.round;log('猫头鹰第一次调查不花行动。')}
+ if(!first)toast('这条线索已经记下了');
+ save();
+}
+function collect(tool){
+ if(!s.rolled){toast('先掷骰子');return}
+ if(!nearby(sites[3])){toast('走到工具架旁领取');return}
+ const bag=s.bags[s.active],limit=s.active===1?4:3;
+ if(bag.length>=limit){toast('背包装满了');return}
+ const free=s.active===1&&s.hamsterRound!==s.round;
+ if(!free&&s.acted){toast('本回合已经行动过');return}
+ bag.push(tool);
+ if(free){s.hamsterRound=s.round;log('仓鼠把道具塞进颊囊，没有花行动。')}
+ else useAction(`${animals[s.active].name}领取了${tool}。`);
+ save();
+}
+function secure(){
+ if(!canAct())return;
+ const bag=s.bags[s.active],distance=dist(s.positions[s.active],location(sites[4])),rope=bag.indexOf('绳索');
+ if(distance>1&&(rope<0||distance>3)){toast('靠近货箱，或在 3 格内用绳索');return}
+ if(distance>1)bag.splice(rope,1);
+ s.secured=true;useAction(`${animals[s.active].name}${distance>1?'抛出绳索':'借助车厢固定带'}稳住了货箱。`);finishCheck();save();
+}
+function placeMat(){
+ if(!canAct())return;
+ const bag=s.bags[s.active],index=bag.indexOf('防滑垫');
+ if(index<0){toast('背包里没有防滑垫');return}
+ const p=s.positions[s.active],nearWater=(p.x>=11&&p.x<=15&&p.y>=4&&p.y<=7);
+ if(!nearWater){toast('走近湿滑地板再铺');return}
+ bag.splice(index,1);s.mat=true;useAction(`${animals[s.active].name}铺开防滑垫，所有动物经过湿滑地板只花 1 步。`);save();
+}
+function repair(option){
+ if(!canAct())return;
+ if(!nearby(sites[5])){toast('到检修台旁再操作');return}
+ const cause=causes[s.cause],bag=s.bags[s.active],tool=bag.indexOf('扳手');
+ if(s.clues.length<2&&tool<0){toast('先取得两条线索，或带扳手冒险尝试');return}
+ if(s.clues.length<2)bag.splice(tool,1);
+ if(option===cause.repair){
+  s.repaired=true;useAction(`${animals[s.active].name}完成了「${option}」；车厢的异常摆动停了下来。`);
+  finishCheck();
+ }else{
+  useAction(`${animals[s.active].name}尝试「${option}」，车厢仍在摇晃。`);
+ }
+ save();
+}
+function finishCheck(){if(s.secured&&s.repaired){s.phase='won';log(`安宁列车恢复平稳。真相：${causes[s.cause].truth}`)}}
+function endTurn(){
+ if(!s.rolled){toast('先掷骰子');return}
+ const name=animals[s.active].name;
+ s.active=(s.active+1)%animals.length;
+ if(s.active===0){
+  s.round++;
+  if(!s.secured&&s.blockX<13){s.blockX++;log('列车又转过一个弯，没固定的货箱朝车头滑动了 1 格。')}
+  else if(s.secured)log('列车转弯，固定好的货箱没有再滑动。');
+ }
+ s.rolled=0;s.left=0;s.acted=false;log(`${name}结束回合。轮到${animals[s.active].name}。`);save();
+}
+function reset(){s={};save()}
+function header(label){return `<header class="top"><div><div class="eyebrow">ANIMALINE · PLAYABLE PROTOTYPE</div><h1 class="title">安宁列车</h1><p class="sub">货厢晃动事件 · 一节车厢试玩</p></div><span class="badge">${label}</span></header>`}
+function intro(){
+ app.innerHTML=header('单设备桌面试玩')+`<section class="card hero"><h2>车厢忽然开始左右摇晃。</h2><p>六位动物乘客决定帮忙。先稳住滑动的货箱，再查出让车厢摇晃的原因。</p><p class="small">约 10–20 分钟。一台设备由 DM 代操作棋盘，六位玩家围着同一屏讨论。当前版本没有多设备联机。</p><button class="primary" data-do="start">开始这趟列车</button></section><section class="card"><h2>这局怎么玩</h2><ol class="rules"><li>每位动物轮流掷 D6，点地图移动；点数是本回合移动上限，可以提前停下。</li><li>本回合还可以做一次行动：调查、取道具、稳住货箱或处理故障。行动可在移动前后进行。</li><li>至少调查两处，判断原因；稳住货箱并在检修台做出正确处理，即可通关。</li><li>地图上的障碍与湿滑地板会改变路线。主持人可扮演鸭子乘务员，并接受玩家提出的其他合理办法。</li></ol></section><section class="card"><h2>本局乘客</h2><div class="crew">${animals.map(a=>`<div class="animal"><b>${a.emoji} ${a.name}</b>${a.power}</div>`).join('')}</div></section>`;
+}
+function board(){
+ const reach=s.rolled?paths():{};
+ let html='';
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  const site=siteAt(x,y), people=s.positions.map((p,i)=>p.x===x&&p.y===y?i:-1).filter(i=>i>=0);
+  const wall=y===0||y===H-1,seat=(y===2||y===9)&&x>0&&x<19&&!site;
+  const crate=x===s.blockX&&(y===5||y===6),water=x>=12&&x<=14&&(y===5||y===6);
+  const kind=wall?'wall':seat?'seat':crate?'crate':water?'water':site?'site':'';
+  const icon=site?.icon||(crate?'📦':water?'≈':seat?'▰':'');
+  html+=`<button class="cell ${kind} ${reach[key(x,y)]!==undefined?'reach':''}" data-x="${x}" data-y="${y}" title="${site?.name||''}" aria-label="${site?.name||`第${x+1}列第${y+1}行`}">${icon}${people.length?`<span class="token">${animals[people[0]].emoji}</span>${people.length>1?`<span class="stack">${people.length}</span>`:''}`:''}</button>`;
+ }
+ const target=document.getElementById('board');target.innerHTML=`<div class="mapscroll"><div class="map">${html}</div></div><div class="legend"><span>🟩 可到达</span><span>▰ 座位</span><span>📦 货箱</span><span>≈ 湿滑地板</span><span>⚖️ 🦆 🔩 线索</span><span>🧰 道具</span><span>🛠️ 检修</span></div>`;
+ const view=target.querySelector('.mapscroll');view.scrollLeft=mapX;view.scrollTop=mapY;
+}
+function active(){
+ const a=animals[s.active],bag=s.bags[s.active],clueNames={scale:'货物磅秤',porter:'鸭子乘务员',joint:'车厢连接处'};
+ app.innerHTML=header(`第 ${s.round} 轮`)+`<div class="status"><div class="stat"><b>${s.secured?'已稳住':'未固定'}</b><span>滑动的货箱</span></div><div class="stat"><b>${s.clues.length}/3</b><span>已发现线索</span></div><div class="stat"><b>${s.repaired?'已排除':'待处理'}</b><span>摇晃原因</span></div></div><section class="card turnbar"><div class="row"><div><h2>${a.emoji} ${a.name}的回合</h2><p class="small">${a.power}</p></div><span class="badge">${s.rolled?`还可走 ${s.left} 步`:'待掷骰'}</span></div><div class="buttons">${s.rolled?'':`<button class="primary" data-do="roll">掷 D6</button>`}<button class="secondary" data-do="end" ${s.rolled?'':'disabled'}>结束回合</button></div><p class="small">行动：${s.acted?'已使用':'可使用'} · 背包 ${bag.length}/${s.active===1?4:3} 件：${bag.join('、')||'空'}</p></section><section class="card"><h2>货厢地图</h2><p class="small">绿色描边是这回合能到达的位置；点格子移动，可分段走。</p><div id="board"></div></section><section class="card"><h2>附近可以做</h2><div id="actions"></div></section><section class="card"><h2>大家找到的线索</h2><div class="clues">${['scale','porter','joint'].map(id=>`<div class="clue ${s.clues.includes(id)?'':'unread'}"><b>${clueNames[id]}</b> · ${s.clues.includes(id)?causes[s.cause].clues[id]:'尚未调查'}</div>`).join('')}</div></section><section class="card"><h2>六位乘客</h2><div class="crew">${animals.map((v,i)=>`<div class="animal ${i===s.active?'active':''}"><b>${v.emoji} ${v.name}</b>${v.power}</div>`).join('')}</div></section><section class="card"><h2>列车纪事</h2><ol class="log">${s.log.map(v=>`<li>${v}</li>`).join('')}</ol></section><section class="card"><button class="secondary reveal" id="reveal">按住查看主持人手册</button><div class="secret" id="secret"><p>本局真正原因：<b>${causes[s.cause].name}</b>。${causes[s.cause].truth}</p><p>鸭子乘务员嘴上反复说「列车一切正常」，但只要玩家询问，就照乘务员线索回答。玩家提出其他处理办法时，可把它对照成「稳住货箱」或「${causes[s.cause].repair}」；明显没有针对原因的尝试只能改变现场，不能直接通关。</p><p>本试玩的固定通关条件：取得至少两条线索、稳住货箱、在检修台选择正确处理。主持人负责描述过程，不用临时决定按钮结果。</p></div></section><div class="footer">单设备规则原型 · 一场事故</div>`;
+ board();renderActions();
+}
+function renderActions(){
+ const options=[],bag=s.bags[s.active];
+ for(const site of sites.slice(0,3))if(nearby(site))options.push({label:`调查 · ${site.name}`,hint:'获得一条线索',do:'investigate',id:site.id});
+ if(nearby(sites[3]))for(const tool of tools)options.push({label:`领取 · ${tool}`,hint:'放进背包，占 1 件',do:'collect',id:tool});
+ if((nearby(sites[4])||(bag.includes('绳索')&&dist(s.positions[s.active],location(sites[4]))<=3))&&!s.secured)options.push({label:'稳住滑动的货箱',hint:'靠近后借用固定带；绳索可从 3 格外使用',do:'secure'});
+ if(!s.mat&&bag.includes('防滑垫'))options.push({label:'铺设防滑垫',hint:'在湿滑地板附近使用，所有动物经过只花 1 步',do:'mat'});
+ if(nearby(sites[5])&&!s.repaired)for(const cause of causes)options.push({label:cause.repair,hint:'检修台 · 根据线索选择',do:'repair',id:cause.repair});
+ document.getElementById('actions').innerHTML=options.length?options.map(o=>`<button class="action" data-do="${o.do}" ${o.id?`data-id="${o.id}"`:''} ${!s.rolled||s.acted?'disabled':''}><b>${o.label}</b><span>${o.hint}</span></button>`).join(''):'<p class="small">走到黄色标记旁，可调查、取道具或处理事故。</p>';
+}
+function won(){app.innerHTML=header('抵站成功')+`<section class="card hero"><h2>列车终于安静了。</h2><p>货箱固定妥当，真正的故障也排除了。鸭子乘务员宣布：「刚才的晃动属于免费游乐项目。」</p><p class="small">事故真相：${causes[s.cause].truth}</p><button class="primary" data-do="start">再开一局 · 随机新原因</button></section><section class="card"><h2>这趟列车的纪事</h2><ol class="log">${s.log.map(v=>`<li>${v}</li>`).join('')}</ol></section><button class="ghost" data-do="reset">返回介绍</button>`}
+function render(){const old=document.querySelector('.mapscroll');if(old){mapX=old.scrollLeft;mapY=old.scrollTop}if(s.phase==='play')active();else if(s.phase==='won')won();else intro()}
+app.addEventListener('pointerdown',e=>{if(e.target.id==='reveal')revealTimer=setTimeout(()=>document.getElementById('secret')?.classList.add('visible'),650)});
+for(const event of ['pointerup','pointercancel','pointerleave'])app.addEventListener(event,()=>{clearTimeout(revealTimer);document.getElementById('secret')?.classList.remove('visible')});
+app.addEventListener('click',e=>{
+ const button=e.target.closest('button');if(!button||button.disabled||saving)return;
+ if(button.dataset.x!==undefined){move(Number(button.dataset.x),Number(button.dataset.y));return}
+ const id=button.dataset.id;
+ switch(button.dataset.do){case 'start':start();break;case 'roll':roll();break;case 'end':endTurn();break;case 'investigate':investigate(id);break;case 'collect':collect(id);break;case 'secure':secure();break;case 'mat':placeMat();break;case 'repair':repair(id);break;case 'reset':reset()}
+});
+render();
+})();
+</script>
+</body></html>

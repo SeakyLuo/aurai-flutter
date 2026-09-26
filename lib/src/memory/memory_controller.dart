@@ -7,7 +7,9 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import '../domain/agent_models.dart';
 import '../domain/model_provider.dart';
+import '../domain/message_sender.dart';
 import '../providers/responses_transport.dart';
+import '../storage/group_system_notice.dart';
 import 'memory_plan.dart';
 export 'memory_plan.dart';
 part 'memory_planning.dart';
@@ -62,6 +64,7 @@ class MemoryController extends ChangeNotifier {
     ]);
     final settings = results.first.single;
     nickname = settings['nickname'] as String;
+    MessageSender.setLocalUserName(nickname);
     occupation = settings['occupation'] as String;
     about = settings['about'] as String;
     entries = results[1];
@@ -135,9 +138,16 @@ ${jsonEncode({'nickname': nickname, 'occupation': occupation, 'about': about, 'm
         where: 'id = ?',
         whereArgs: ['user:local'],
       );
+      await refreshGroupNoticeName(
+        txn,
+        'user:local',
+        nickname.isEmpty ? '你' : nickname,
+        name.isEmpty ? '你' : name,
+      );
     });
     if (avatar != null) this.avatar = avatar;
     nickname = name;
+    MessageSender.setLocalUserName(name);
     occupation = job;
     about = info;
     notifyListeners();

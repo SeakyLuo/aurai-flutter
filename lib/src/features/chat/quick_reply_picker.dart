@@ -21,23 +21,15 @@ Future<QuickReplyOption?> showQuickReplyPicker(
 
 class _QuickReplyPicker extends StatelessWidget {
   const _QuickReplyPicker({required this.selectedKeys, required this.recent});
-  final List<String> recent;
   final Set<String> selectedKeys;
+  final List<String> recent;
 
   @override
   Widget build(BuildContext context) {
     final options = quickReplyOptionsByKey;
-    final defaults = quickReplyGroups['常用反馈']!;
-    final common = {
-      ...recent.where(options.containsKey),
-      ...defaults,
-    }.take(12).toList();
-    final remainingFeedback = defaults
-        .where((key) => !common.contains(key))
-        .toList();
+    final visibleKeys = recentQuickReplyKeys(recent, 12);
     final groups = {
-      '常用反馈': common,
-      if (remainingFeedback.isNotEmpty) '其他反馈': remainingFeedback,
+      '最近使用': visibleKeys,
       for (final group in quickReplyGroups.entries)
         if (group.key != '常用反馈') group.key: group.value,
     };

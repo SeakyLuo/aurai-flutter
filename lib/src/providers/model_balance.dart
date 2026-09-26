@@ -28,7 +28,7 @@ class CurrencyBalance {
 class ModelBalance {
   const ModelBalance({
     required this.available,
-    this.service = ModelService.deepSeek,
+    required this.service,
     required this.balances,
     required this.checkedAt,
   });
@@ -50,33 +50,15 @@ class ModelBalanceClient {
   HttpClient? _client;
 
   static bool supports(ModelConfig config) {
-    final base = Uri.tryParse(config.baseUrl);
-    final host = switch (config.service) {
-      ModelService.deepSeek => 'api.deepseek.com',
-      ModelService.kimi => 'api.moonshot.cn',
-      _ => null,
-    };
-    return host != null &&
-        base != null &&
-        base.scheme == 'https' &&
-        base.host == host &&
-        base.port == 443 &&
-        base.userInfo.isEmpty &&
-        !base.hasQuery &&
-        !base.hasFragment &&
-        const {'', '/', '/v1', '/v1/'}.contains(base.path);
+    return config.balanceConfig != null;
   }
 
   Future<ModelBalance> load(ModelConfig config) async {
-    if (config.service != ModelService.deepSeek &&
-        config.service != ModelService.kimi) {
+    if (config.balanceConfig == null) {
       throw const ModelProviderException('暂未接入该模型服务的余额查询');
     }
     if (!config.isConfigured) {
       throw ModelProviderException('请先在模型设置中配置 ${config.displayName} 密钥');
-    }
-    if (!supports(config)) {
-      throw const ModelProviderException('当前为自定义服务地址，尚未接入该服务的余额查询');
     }
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 10);
@@ -114,12 +96,8 @@ class ModelBalanceClient {
   }
 
   Future<ModelBalance> _load(HttpClient client, ModelConfig config) async {
-    final kimi = config.service == ModelService.kimi;
-    final request = await client.getUrl(
-      kimi
-          ? Uri.https('api.moonshot.cn', '/v1/users/me/balance')
-          : Uri.https('api.deepseek.com', '/user/balance'),
-    );
+    final balanceConfig = config.balanceConfig!;
+    final request = await client.getUrl(Uri.parse(balanceConfig.url));
     request.followRedirects = false;
     request.headers.set(
       HttpHeaders.authorizationHeader,
@@ -134,39 +112,44 @@ class ModelBalanceClient {
       });
     }
     final json = jsonDecode(await utf8.decoder.bind(response).join()) as Map;
-    if (kimi) {
-      if (json['status'] != true) {
-        throw const ModelProviderException('Kimi 余额查询失败，请稍后重试');
-      }
-      final data = json['data'] as Map;
-      return ModelBalance(
-        service: config.service,
-        available: (data['available_balance'] as num) > 0,
-        checkedAt: DateTime.now(),
-        balances: [
-          CurrencyBalance(
-            currency: 'CNY',
-            total: (data['available_balance'] as num).toString(),
-            toppedUp: (data['cash_balance'] as num).toString(),
-            granted: (data['voucher_balance'] as num).toString(),
-          ),
-        ],
-      );
+    if (balanceConfig.successPath.isNotEmpty &&
+        _valueAt(json, balanceConfig.successPath).toString() !=
+            balanceConfig.successValue) {
+      throw ModelProviderException('${config.displayName} 余额查询失败，请稍后重试');
     }
+    final items = balanceConfig.itemsPath.isEmpty
+        ? [json]
+        : _valueAt(json, balanceConfig.itemsPath) as List;
+    final balances = [
+      for (final item in items)
+        CurrencyBalance(
+          currency: balanceConfig.currencyPath.isEmpty
+              ? balanceConfig.currency
+              : (_valueAt(item as Map, balanceConfig.currencyPath) as String),
+          total: (_valueAt(item as Map, balanceConfig.totalPath) as Object)
+              .toString(),
+          toppedUp: (_valueAt(item, balanceConfig.toppedUpPath) as Object)
+              .toString(),
+          granted: (_valueAt(item, balanceConfig.grantedPath) as Object)
+              .toString(),
+        ),
+    ];
     return ModelBalance(
-      available: json['is_available'] as bool,
+      service: config.service,
+      available: balanceConfig.availablePath.isEmpty
+          ? balances.any((balance) => num.parse(balance.total) > 0)
+          : _valueAt(json, balanceConfig.availablePath) as bool,
       checkedAt: DateTime.now(),
-      balances: (json['balance_infos'] as List)
-          .map(
-            (item) => CurrencyBalance(
-              currency: item['currency'] as String,
-              total: item['total_balance'] as String,
-              toppedUp: item['topped_up_balance'] as String,
-              granted: item['granted_balance'] as String,
-            ),
-          )
-          .toList(),
+      balances: balances,
     );
+  }
+
+  Object? _valueAt(Map json, String path) {
+    Object? value = json;
+    for (final field in path.split('.')) {
+      value = (value as Map)[field];
+    }
+    return value;
   }
 
   void close() => _client?.close(force: true);

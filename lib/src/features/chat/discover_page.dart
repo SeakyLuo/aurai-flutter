@@ -48,45 +48,51 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: const SettingsAppBar(title: '发现', root: true, onBack: null),
-    body: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640),
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            16,
-            16,
-            MediaQuery.paddingOf(context).bottom + 16,
+    body: SettingsPageBody(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: ListView(
+            padding: settingsPagePadding(
+              context,
+              EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                MediaQuery.paddingOf(context).bottom + 16,
+              ),
+            ),
+            children: [
+              _entry(
+                '小程序',
+                SettingsIconType.miniapps,
+                () => Navigator.push<void>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        MiniappLibraryPage(controller: widget.controller),
+                  ),
+                ),
+              ),
+              _entry(
+                '技能',
+                SettingsIconType.skills,
+                _openingSkills ? null : _skills,
+              ),
+              _entry(
+                '工具',
+                SettingsIconType.tools,
+                () => Navigator.push<void>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ToolsPage(controller: widget.controller),
+                  ),
+                ),
+              ),
+            ],
           ),
-          children: [
-            _entry(
-              '小程序',
-              SettingsIconType.miniapps,
-              () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      MiniappLibraryPage(controller: widget.controller),
-                ),
-              ),
-            ),
-            _entry(
-              '技能',
-              SettingsIconType.skills,
-              _openingSkills ? null : _skills,
-            ),
-            _entry(
-              '工具',
-              SettingsIconType.tools,
-              () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ToolsPage(controller: widget.controller),
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     ),

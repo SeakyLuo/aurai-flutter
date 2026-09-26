@@ -98,7 +98,7 @@ class SettingsPage extends StatelessWidget {
     extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
       title: '设置',
-      gradientBackground: true,
+
       root: root,
       onBack: () => Navigator.maybePop(context),
     ),
@@ -136,10 +136,7 @@ class SettingsPage extends StatelessWidget {
               child: ListView(
                 padding: EdgeInsets.fromLTRB(
                   16,
-                  View.of(context).padding.top /
-                          View.of(context).devicePixelRatio +
-                      76 +
-                      16,
+                  settingsHeaderHeight(context) + 16,
                   16,
                   MediaQuery.paddingOf(context).bottom + 16,
                 ),
@@ -152,7 +149,7 @@ class SettingsPage extends StatelessWidget {
                       leading: const SettingsIcon(
                         type: SettingsIconType.modelSettings,
                       ),
-                      title: const Text('模型设置'),
+                      title: const Text('默认模型'),
                       subtitle: Text(
                         controller.modelSettings.activeConfig.isConfigured
                             ? modelDisplayName(

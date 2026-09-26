@@ -15,6 +15,7 @@ import '../../html_games/html_view.dart';
 import '../../storage/group_message_search.dart';
 import 'attachment_action_icon.dart';
 import 'chat_controller.dart';
+import 'conversation_menu_icon.dart';
 import 'member_avatar.dart';
 import 'message_item.dart';
 import 'message_time.dart';
@@ -32,6 +33,10 @@ class StarredMessageTile extends StatelessWidget {
     required this.onRemove,
     this.contentPadding = const EdgeInsets.symmetric(vertical: 14),
     this.selectionMode = false,
+    this.removeMenuIconType,
+    this.removeMenuLabel = '取消收藏',
+    this.backLabel = '返回收藏',
+    this.sourceLabel,
   });
   final GroupMessageSearchResult result;
   final DateTime starredAt;
@@ -40,6 +45,10 @@ class StarredMessageTile extends StatelessWidget {
   final VoidCallback onLocate, onRemove;
   final EdgeInsetsGeometry contentPadding;
   final bool selectionMode;
+  final ConversationMenuIconType? removeMenuIconType;
+  final String removeMenuLabel;
+  final String backLabel;
+  final Widget? sourceLabel;
 
   void _openProfile(BuildContext context) {
     Navigator.of(context).push<void>(
@@ -57,6 +66,9 @@ class StarredMessageTile extends StatelessWidget {
         : Colors.black;
     final action = await showHeaderActionMenu(
       context,
+      preserveIconColors: removeMenuIconType == null
+          ? const {'remove'}
+          : const {},
       items: [
         (
           value: 'locate',
@@ -68,11 +80,16 @@ class StarredMessageTile extends StatelessWidget {
         ),
         (
           value: 'remove',
-          label: '取消收藏',
-          icon: const SettingsIcon(
-            type: SettingsIconType.starFilled,
-            color: Color(0xffe5ad24),
-          ),
+          label: removeMenuLabel,
+          icon: removeMenuIconType == null
+              ? const SettingsIcon(
+                  type: SettingsIconType.starFilled,
+                  color: Color(0xffe5ad24),
+                )
+              : ConversationMenuIcon(
+                  type: removeMenuIconType!,
+                  color: iconColor,
+                ),
         ),
       ],
     );
@@ -96,6 +113,7 @@ class StarredMessageTile extends StatelessWidget {
       if (!context.mounted) return;
       final action = await showHeaderActionMenu(
         context,
+        preserveIconColors: starred ? const {'favorite'} : const {},
         items: [
           if (card.displayMode != 'inline')
             (
@@ -130,7 +148,7 @@ class StarredMessageTile extends StatelessWidget {
           messageId: result.id,
           conversationId: conversationId,
           store: controller.htmlStore,
-          backLabel: '返回收藏',
+          backLabel: backLabel,
         ).openFullscreen(context);
       }
       if (action == 'forward') await forwardMiniapp(context, entry);
@@ -194,7 +212,9 @@ class StarredMessageTile extends StatelessWidget {
                               color: colors.onSurface,
                             ),
                           ),
-                          if (conversationTitle.isNotEmpty)
+                          if (sourceLabel != null)
+                            sourceLabel!
+                          else if (conversationTitle.isNotEmpty)
                             Text(
                               conversationTitle,
                               maxLines: 1,

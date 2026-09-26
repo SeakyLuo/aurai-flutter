@@ -110,7 +110,6 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        gradientBackground: true,
         title: '已归档',
         titleWidget: SearchTypeSegment(
           files: _friends,

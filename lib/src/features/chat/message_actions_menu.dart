@@ -2,6 +2,7 @@ import '../../storage/quick_reply_recents.dart';
 import 'message_action.dart';
 export 'message_action.dart';
 import '../../domain/quick_reply_option.dart';
+import 'quick_reply_groups.dart';
 import 'quick_reply_picker.dart';
 import 'sidebar_action_icon.dart';
 import '../../html_games/html_game_icon.dart';
@@ -22,6 +23,9 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   BuildContext context, {
   required AgentMessage message,
   bool allowStar = false,
+  bool allowGroupMarks = false,
+  bool pinned = false,
+  bool groupFavorite = false,
   bool allowCopy = true,
   bool allowSelect = true,
   bool starred = false,
@@ -40,10 +44,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
       : const <String>[];
   if (!context.mounted) return null;
   final options = quickReplyOptionsByKey;
-  final visibleKeys = {
-    ...recent.where(options.containsKey),
-    ...quickReplyOptions.take(5).map((option) => option.key),
-  }.take(5);
+  final visibleKeys = recentQuickReplyKeys(recent, 5);
   return showModalBottomSheet<MessageMenuResult>(
     context: context,
     isScrollControlled: true,
@@ -120,6 +121,28 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             ),
             starred ? '取消收藏' : '收藏',
           ),
+        if (allowGroupMarks) ...[
+          (
+            const MessageActionResult(MessageAction.pin),
+            ConversationMenuIcon(
+              type: pinned
+                  ? ConversationMenuIconType.removeTop
+                  : ConversationMenuIconType.toTop,
+              color: iconColor,
+            ),
+            pinned ? '取消置顶' : '置顶消息',
+          ),
+          (
+            const MessageActionResult(MessageAction.groupFavorite),
+            ConversationMenuIcon(
+              type: groupFavorite
+                  ? ConversationMenuIconType.unmark
+                  : ConversationMenuIconType.mark,
+              color: iconColor,
+            ),
+            groupFavorite ? '取消群标记' : '添加群标记',
+          ),
+        ],
         if (allowSelect && message.text.isNotEmpty)
           (
             const MessageActionResult(MessageAction.select),
@@ -296,27 +319,33 @@ class _MessageTextSelectionPageState extends State<MessageTextSelectionPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
       title: '选择文本',
       onBack: () => Navigator.maybePop(context),
     ),
-    body: SafeArea(
-      top: false,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-        child: TextField(
-          controller: _text,
-          focusNode: _focus,
-          readOnly: true,
-          showCursor: false,
-          maxLines: null,
-          style: const TextStyle(fontSize: 16, height: 1.65),
-          decoration: const InputDecoration(
-            filled: false,
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            contentPadding: EdgeInsets.zero,
+    body: SettingsPageBody(
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: settingsPagePadding(
+            context,
+            const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          ),
+          child: TextField(
+            controller: _text,
+            focusNode: _focus,
+            readOnly: true,
+            showCursor: false,
+            maxLines: null,
+            style: const TextStyle(fontSize: 16, height: 1.65),
+            decoration: const InputDecoration(
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+            ),
           ),
         ),
       ),

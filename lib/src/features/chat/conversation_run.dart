@@ -136,20 +136,19 @@ extension ConversationRun on ChatController {
       await refreshCapabilities();
       if (runConversation.runState == ChatRunState.stopping)
         throw AgentCancelled();
-      final provider = switch (runConfig.service) {
-        ModelService.openAi => OpenAiResponsesProvider(
-          runConfig,
-          systemPrompt: systemPrompt,
-          summaryConfig: modelSettings.activeConfig,
-          sharedContext: groupParent?.sharedContext,
-        ),
-        _ => DeepSeekResponsesProvider(
-          runConfig,
-          systemPrompt: systemPrompt,
-          summaryConfig: modelSettings.activeConfig,
-          sharedContext: groupParent?.sharedContext,
-        ),
-      };
+      final provider = runConfig.service.useOpenAiTransport
+          ? OpenAiResponsesProvider(
+              runConfig,
+              systemPrompt: systemPrompt,
+              summaryConfig: modelSettings.activeConfig,
+              sharedContext: groupParent?.sharedContext,
+            )
+          : DeepSeekResponsesProvider(
+              runConfig,
+              systemPrompt: systemPrompt,
+              summaryConfig: modelSettings.activeConfig,
+              sharedContext: groupParent?.sharedContext,
+            );
       final webSources = WebSourceRegistry();
       final tools = _createTools(
         conversation: groupParent ?? runConversation,
@@ -275,9 +274,7 @@ extension ConversationRun on ChatController {
         conversation: [
           ...(groupHistory == null
               ? List.unmodifiable(history.take(lastUser + 1))
-              : _groupHistory([
-                  ...history,
-                ], reply.senderId)),
+              : _groupHistory([...history], reply.senderId)),
           if (callbackEvents.isNotEmpty) _callbackContext(callbackEvents),
           if (continuationProtocol.isNotEmpty)
             AgentMessage(
@@ -304,6 +301,10 @@ extension ConversationRun on ChatController {
           if (runConversation.isTemporary) '当前为临时会话，不得将本次内容写入长期记忆。',
           if (alongsideGroup) '群聊正在后台进行；当前私聊仍可使用完整工具集。共享手机界面和用户交互由执行器互斥协调。',
           if (groupParent != null) '当前群成员：${jsonEncode((awaitedRoster))}',
+          if (groupParent != null)
+            await GroupAnnouncementStore(
+              groupStore,
+            ).context(groupParent.id, reply.senderId),
         ].join('\n\n'),
         onContextSummary: (summary) async {
           final owner = groupParent ?? runConversation;
@@ -661,6 +662,9 @@ extension ConversationRun on ChatController {
         outcome = 'cancelled';
         executionWatch.stop();
         runConversation.unfinishedRunElapsed[runId] = executionWatch.elapsed;
+        runConversation.cancelledRunMessages[runId] =
+            callbackEvents.lastOrNull?['message_id'] as String? ??
+            userMessage.id;
         for (
           var i = runStepStart;
           i < runConversation.liveToolSteps.length;

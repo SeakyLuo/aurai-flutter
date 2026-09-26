@@ -21,7 +21,7 @@ abstract final class HtmlMessageSource {
   }) async {
     if (args['appId'] != null) {
       if (args['html'] != null || args['sourcePath'] != null) {
-        throw ArgumentError('重新打开小应用时不要同时提供源码');
+        throw ArgumentError('重新打开小程序时不要同时提供源码');
       }
       return args;
     }

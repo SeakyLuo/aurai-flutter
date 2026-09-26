@@ -33,7 +33,11 @@ class ModelReasoningField extends StatelessWidget {
       if (!providerDefault) ModelReasoning.inherit,
       ...supported,
     ];
-    final title = options.contains(ModelReasoning.enabled) ? '深度思考' : '思考强度';
+    final title = providerDefault
+        ? '供应商默认思考强度'
+        : options.contains(ModelReasoning.enabled)
+        ? '深度思考'
+        : '思考强度';
     String label(ModelReasoning option) =>
         option == ModelReasoning.inherit && inheritedValue != null
         ? '跟随供应商（${inheritedValue!.label}）'

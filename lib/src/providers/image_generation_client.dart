@@ -49,7 +49,7 @@ class ImageGenerationClient {
   }
 
   Future<List<ImageGenerationModel>> models(ModelConfig account) async {
-    if (account.service == ModelService.qwen) return qwenModels;
+    if (account.service.staticImageModelIds.isNotEmpty) return qwenModels;
     final json =
         await _json(
           _endpoint(account, 'images/models'),
@@ -113,7 +113,7 @@ class ImageGenerationClient {
     }
     final Uri endpoint;
     final Map<String, Object?> body;
-    if (selection.service == ModelService.openRouter) {
+    if (selection.service.usesOpenRouterCatalog) {
       endpoint = _endpoint(account, 'images');
       body = {
         'model': selection.model.id,
@@ -170,7 +170,7 @@ class ImageGenerationClient {
       };
     }
     final json = await _json(endpoint, account.apiKey, body: body);
-    if (selection.service == ModelService.openRouter) {
+    if (selection.service.usesOpenRouterCatalog) {
       final results = json['data'] as List;
       if (results.isEmpty) throw const ModelProviderException('服务未返回图片');
       final bytes = base64Decode(results.first['b64_json'] as String);

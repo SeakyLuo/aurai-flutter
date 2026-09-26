@@ -152,6 +152,22 @@ class ConversationReader {
     ];
   }
 
+  Future<void> _loadNoticeMembers(Conversation conversation) async {
+    if (conversation.kind != ConversationKind.group) return;
+    final rows = await database.query(
+      'message_senders',
+      where:
+          'id IN (SELECT sender_id FROM conversation_members WHERE conversation_id = ?)',
+      whereArgs: [conversation.id],
+    );
+    conversation.noticeMembers.addEntries(
+      rows.map((row) {
+        final sender = MessageSender.fromRow(row);
+        return MapEntry(sender.id, sender);
+      }),
+    );
+  }
+
   Future<Conversation> load(
     String id, {
     int messageLimit = messagePageSize,
@@ -173,6 +189,7 @@ class ConversationReader {
       _loadSeenRuns([conversation]),
       _loadDraftQuotes([conversation]),
       _loadCreationMembers(conversation),
+      _loadNoticeMembers(conversation),
       GroupUnreadMessages(database).load([conversation]),
     ]);
     conversation.messages.addAll(results[0] as List<AgentMessage>);
@@ -227,7 +244,7 @@ class ConversationReader {
     final runs = await database.query(
       'agent_runs',
       where:
-          "conversation_id = ? AND (status IN ('failed', 'cancelled', 'interrupted') OR (status = 'completed' AND (final_message_id IS NULL OR final_message_id NOT IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != '')))) AND (id = ? OR id IN (SELECT run_id FROM tool_calls))",
+          "conversation_id = ? AND (status IN ('failed', 'cancelled', 'interrupted') OR (status = 'completed' AND (final_message_id IS NULL OR final_message_id NOT IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != '')))) AND (status = 'cancelled' OR id = ? OR id IN (SELECT run_id FROM tool_calls))",
       whereArgs: [conversation.id, conversation.activeRunId],
       orderBy: 'started_at, id',
     );
@@ -237,6 +254,10 @@ class ConversationReader {
         conversation.unfinishedRunElapsed[run['id']! as String] = Duration(
           milliseconds: elapsedMilliseconds,
         );
+        if (run['status'] == 'cancelled') {
+          conversation.cancelledRunMessages[run['id']! as String] =
+              run['user_message_id']! as String;
+        }
       }
     }
     final ids = runs.map((run) => run['id']).toList();

@@ -12,6 +12,10 @@ extension RequestAdapterActions on ChatController {
       model: sampleModel,
       details: ProviderDetails(
         modelContextOverrides: old.details?.modelContextOverrides ?? const {},
+        modelPurposes: old.details?.modelPurposes ?? const {},
+        modelReasoning: old.details?.modelReasoning ?? const {},
+        balance: old.details?.balance,
+        icon: old.details?.icon,
         name: old.displayName,
         website: old.website,
         protocol: old.protocol,
@@ -43,6 +47,10 @@ extension RequestAdapterActions on ChatController {
       old.copyWith(
         details: ProviderDetails(
           modelContextOverrides: old.details?.modelContextOverrides ?? const {},
+          modelPurposes: old.details?.modelPurposes ?? const {},
+          modelReasoning: old.details?.modelReasoning ?? const {},
+          balance: old.details?.balance,
+          icon: old.details?.icon,
           name: old.displayName,
           website: old.website,
           protocol: old.protocol,
@@ -81,6 +89,10 @@ extension RequestAdapterActions on ChatController {
       old.copyWith(
         details: ProviderDetails(
           modelContextOverrides: old.details?.modelContextOverrides ?? const {},
+          modelPurposes: old.details?.modelPurposes ?? const {},
+          modelReasoning: old.details?.modelReasoning ?? const {},
+          balance: old.details?.balance,
+          icon: old.details?.icon,
           name: old.displayName,
           website: old.website,
           protocol: old.protocol,

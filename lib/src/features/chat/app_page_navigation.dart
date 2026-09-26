@@ -1,6 +1,5 @@
 import 'provider_key_dialog.dart';
 import 'image_generation_settings_page.dart';
-import 'music_generation_settings_page.dart';
 import 'package:flutter/material.dart';
 import '../../skills/skills_page.dart';
 import '../../scheduling/tasks_page.dart';
@@ -11,6 +10,7 @@ import 'settings_page.dart';
 import 'ai_model_page.dart';
 import 'model_settings_sheet.dart';
 import '../../domain/model_provider.dart';
+import '../../domain/music_model_selection.dart';
 
 Future<void> navigateAppPage(
   BuildContext context,
@@ -73,7 +73,13 @@ Future<void> navigateAppPage(
   }
   final page = switch (args['page']) {
     'imageGeneration' => ImageGenerationSettingsPage(controller: controller),
-    'musicGeneration' => MusicGenerationSettingsPage(controller: controller),
+    'musicGeneration' => ModelSettingsSheet(
+      controller: controller,
+      continueAfterSave: false,
+      accountOnly: true,
+      initialService:
+          controller.modelSettings.firstAvailableMusicModel?.config.service,
+    ),
     'contact' => AiContactPage(
       controller: controller,
       senderId: args['contactId'] as String,

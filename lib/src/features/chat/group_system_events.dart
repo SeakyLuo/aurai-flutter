@@ -35,6 +35,12 @@ extension GroupSystemEvents on ChatController {
     AgentMessage notice,
   ) async {
     final target = await _forwardTarget(groupId);
+    if (notice.text.contains('加入群聊') || notice.text.contains('离开群聊')) {
+      final members = await groupStore.noticeMembers(groupId);
+      target.noticeMembers
+        ..clear()
+        ..addEntries(members.map((sender) => MapEntry(sender.id, sender)));
+    }
     await _inConversation(target, () => _receiveGroupNoticeIn(groupId, notice));
   }
 

@@ -13,6 +13,7 @@ class GroupStatusBuilder extends StatefulWidget {
     required this.controller,
     required this.conversationId,
     required this.builder,
+    this.onMemberCount,
     this.includeThoughts = true,
     this.includeInactive = false,
   });
@@ -21,6 +22,7 @@ class GroupStatusBuilder extends StatefulWidget {
   final bool includeThoughts;
   final bool includeInactive;
   final Widget Function(BuildContext, List<GroupMemberActivity>) builder;
+  final ValueChanged<int>? onMemberCount;
 
   @override
   State<GroupStatusBuilder> createState() => _GroupStatusBuilderState();
@@ -66,6 +68,7 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
           _loaded = true;
           _failed = false;
         });
+      if (mounted) widget.onMemberCount?.call(members.length);
     } on Object catch (error) {
       if (mounted) {
         setState(() => _failed = true);
@@ -116,8 +119,8 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
       final bySender = {for (final a in activities) a.sender.id: a};
       return widget.builder(context, [
         if (!widget.includeInactive) ...activities,
-        for (final member in _members.values)
-          if (member.kind == MessageSenderKind.agent)
+        for (final member in _members.values) ...[
+          if (member.kind == MessageSenderKind.agent) ...[
             if (widget.includeInactive && active.contains(member.id))
               bySender[member.id]!
             else if (!active.contains(member.id) &&
@@ -137,6 +140,15 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
                     ? '睡眠中'
                     : '等待新消息',
               ),
+          ] else if (widget.includeInactive)
+            GroupMemberActivity(
+              sender: member,
+              runId: 'member:${member.id}',
+              elapsed: Duration.zero,
+              description: '群成员',
+              idle: true,
+            ),
+        ],
       ]);
     },
   );

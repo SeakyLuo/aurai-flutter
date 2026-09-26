@@ -243,6 +243,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
   Widget build(BuildContext context) => widget.embedded
       ? _body()
       : Scaffold(
+          extendBodyBehindAppBar: true,
           appBar: SettingsAppBar(
             title: widget.selectForConversation
                 ? switch (widget.conversationMode) {
@@ -265,7 +266,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
                 ),
             ],
           ),
-          body: _body(),
+          body: SettingsPageBody(avoidHeader: true, child: _body()),
         );
 
   Widget _body() => Column(

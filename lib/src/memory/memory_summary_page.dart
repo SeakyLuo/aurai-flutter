@@ -197,7 +197,7 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
           bottomNavigationBar: _group ? null : KeyboardInset(child: _footer()),
           appBar: SettingsAppBar(
             title: widget.title,
-            gradientBackground: true,
+
             titleWidget: widget.groupMemories == null
                 ? null
                 : SearchTypeSegment(
@@ -216,7 +216,8 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
           ),
           body: RetainedTabView(
             index: _group ? 1 : 0,
-            swipeEnabled: !_saving && !_planning && widget.groupMemories != null,
+            swipeEnabled:
+                !_saving && !_planning && widget.groupMemories != null,
             onChanged: (index) {
               _focus.unfocus();
               setState(() {

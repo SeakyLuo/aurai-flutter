@@ -9,6 +9,19 @@ import '../domain/model_provider.dart';
 class ModelCatalog {
   final _client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
 
+  Future<List<String>> loadFor(ModelConfig config, {bool textOnly = false}) {
+    final models = config.protocol.modelCatalog;
+    if (models.isNotEmpty) {
+      return Future.value([for (final model in models) model.id]);
+    }
+    return load(
+      baseUrl: Uri.parse(config.baseUrl),
+      apiKey: config.apiKey,
+      openRouter: config.service.usesOpenRouterCatalog,
+      textOnly: textOnly,
+    );
+  }
+
   Future<List<String>> load({
     required Uri baseUrl,
     required String apiKey,
@@ -48,7 +61,14 @@ class ModelCatalog {
     final path = baseUrl.path.endsWith('/')
         ? '${baseUrl.path}models'
         : '${baseUrl.path}/models';
-    final request = await _client.getUrl(baseUrl.replace(path: path));
+    final request = await _client.getUrl(
+      baseUrl.replace(
+        path: path,
+        queryParameters: openRouter && !textOnly
+            ? {'output_modalities': 'all'}
+            : null,
+      ),
+    );
     request.followRedirects = false;
     request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $apiKey');
     final response = await request.close();

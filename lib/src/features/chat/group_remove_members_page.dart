@@ -29,8 +29,9 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
       .toList();
   final _selected = <String>{};
   bool _saving = false;
-  void _notice(String text) =>
-      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text) => ScaffoldMessenger.of(
+    context,
+  ).showGlassSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _remove() async {
     if (_saving || _selected.isEmpty) return;
@@ -71,7 +72,6 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
     child: Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        gradientBackground: true,
         title: '移除成员',
         onBack: _saving ? null : () => Navigator.pop(context),
         actions: [
@@ -93,9 +93,7 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
         child: ListView(
           padding: EdgeInsets.fromLTRB(
             16,
-            View.of(context).padding.top / View.of(context).devicePixelRatio +
-                76 +
-                8,
+            settingsHeaderHeight(context) + 8,
             16,
             24,
           ),

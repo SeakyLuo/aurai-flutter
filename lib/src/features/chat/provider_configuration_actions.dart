@@ -1,6 +1,52 @@
 part of 'chat_controller.dart';
 
 extension ProviderConfigurationActions on ChatController {
+  Future<void> saveProviderIcon(ModelService service, String? icon) =>
+      _serializeModelSettings(() async {
+        final old = modelSettings.profile(service);
+        final details = ProviderDetails(
+          name: old.displayName,
+          website: old.website,
+          protocol: old.protocol,
+          models: old.savedModels,
+          autoSyncModels: old.autoSyncModels,
+          requestAdapters: old.details?.requestAdapters ?? const {},
+          modelContextOverrides: old.details?.modelContextOverrides ?? const {},
+          modelPurposes: old.details?.modelPurposes ?? const {},
+          modelReasoning: old.details?.modelReasoning ?? const {},
+          balance: old.details?.balance,
+          icon: icon,
+        );
+        await _saveConfig(
+          old.copyWith(details: details),
+          defaultService: modelSettings.activeService,
+        );
+      });
+
+  Future<void> saveProviderBalanceConfig(
+    ModelService service,
+    ProviderBalanceConfig? balance,
+  ) => _serializeModelSettings(() async {
+    final old = modelSettings.profile(service);
+    final details = ProviderDetails(
+      name: old.displayName,
+      website: old.website,
+      protocol: old.protocol,
+      models: old.savedModels,
+      autoSyncModels: old.autoSyncModels,
+      requestAdapters: old.details?.requestAdapters ?? const {},
+      modelContextOverrides: old.details?.modelContextOverrides ?? const {},
+      modelPurposes: old.details?.modelPurposes ?? const {},
+      modelReasoning: old.details?.modelReasoning ?? const {},
+      balance: balance,
+      icon: old.details?.icon,
+    );
+    await _saveConfig(
+      old.copyWith(details: details),
+      defaultService: modelSettings.activeService,
+    );
+  });
+
   Future<void> removeProviderConfiguration(
     ModelService service, {
     required bool delete,
@@ -71,6 +117,7 @@ extension ProviderConfigurationActions on ChatController {
     ProviderProtocol protocol = ProviderProtocol.openaiChatCompletions,
     List<String> models = const [],
     bool autoSyncModels = true,
+    String? icon,
     String model = '',
   }) => _serializeModelSettings(() async {
     final details = ProviderDetails(
@@ -79,6 +126,7 @@ extension ProviderConfigurationActions on ChatController {
       protocol: protocol,
       models: models,
       autoSyncModels: autoSyncModels,
+      icon: icon,
     );
     validateProviderDetails(details, baseUrl);
     await _saveConfig(
@@ -102,6 +150,13 @@ extension ProviderConfigurationActions on ChatController {
     'model': config.model,
     'configured': config.isConfigured,
     'protocol': config.protocol.name,
+    'icon': config.icon == null
+        ? 'default'
+        : config.icon!.startsWith('file:')
+        ? 'customImage'
+        : config.icon,
+    'balance': config.balanceConfig?.toJson(),
+    'rechargeUrl': config.rechargeUrl,
   };
 
   Future<Map<String, Object?>> _configureProvider(
@@ -127,6 +182,7 @@ extension ProviderConfigurationActions on ChatController {
             : modelSettings.profiles.values
                       .where(
                         (p) =>
+                            p.protocol.supportsChatModels &&
                             p.displayName.toLowerCase() == name.toLowerCase(),
                       )
                       .firstOrNull
@@ -137,8 +193,12 @@ extension ProviderConfigurationActions on ChatController {
             : modelSettings.profiles[service];
         final details = ProviderDetails(
           requestAdapters: old?.details?.requestAdapters ?? const {},
+          modelPurposes: old?.details?.modelPurposes ?? const {},
+          modelReasoning: old?.details?.modelReasoning ?? const {},
           modelContextOverrides:
               old?.details?.modelContextOverrides ?? const {},
+          balance: old?.details?.balance,
+          icon: old?.details?.icon,
           name: name,
           website: (args['website'] as String? ?? old?.website ?? '').trim(),
           protocol: ProviderProtocol.values.byName(args['protocol'] as String),
@@ -148,6 +208,9 @@ extension ProviderConfigurationActions on ChatController {
               ? old?.savedModels ?? const []
               : List<String>.from(args['models'] as List),
         );
+        if (!details.protocol.supportsChatModels) {
+          throw ArgumentError('该协议不提供聊天模型');
+        }
         validateProviderDetails(details, url);
         saved = ModelConfig(
           service: service,
@@ -161,8 +224,38 @@ extension ProviderConfigurationActions on ChatController {
       });
       return {..._providerSummary(saved), 'saved': true};
     }
+    if (operation == 'configureProviderBalance') {
+      final service = ModelService.byName(args['provider'] as String);
+      final balance = args['balance'] == null
+          ? null
+          : ProviderBalanceConfig.fromJson(
+              Map<String, dynamic>.from(args['balance'] as Map),
+            );
+      if (cancelled.value) throw StateError('操作已取消');
+      await saveProviderBalanceConfig(service, balance);
+      return {
+        ..._providerSummary(modelSettings.profile(service)),
+        'saved': true,
+      };
+    }
+    if (operation == 'configureProviderIcon') {
+      final service = ModelService.byName(args['provider'] as String);
+      if (cancelled.value) throw StateError('操作已取消');
+      final source = args['imagePath'] as String?;
+      final icon = source == null
+          ? null
+          : 'file:${await ProviderIconStore.import(source)}';
+      await saveProviderIcon(service, icon);
+      return {
+        ..._providerSummary(modelSettings.profile(service)),
+        'saved': true,
+      };
+    }
     final service = ModelService.byName(args['provider'] as String);
     final config = modelSettings.profile(service);
+    if (!config.protocol.supportsChatModels) {
+      throw ArgumentError('该协议不提供聊天模型');
+    }
     if (operation == 'requestModelProviderKey') {
       final navigate = openAppPage;
       if (navigate == null) throw StateError('请先回到 Aurai 再填写密钥');
@@ -185,11 +278,7 @@ extension ProviderConfigurationActions on ChatController {
     if (operation == 'listProviderModels') {
       final catalog = ModelCatalog();
       try {
-        final models = await catalog.load(
-          baseUrl: Uri.parse(config.baseUrl),
-          apiKey: config.apiKey,
-          openRouter: service == ModelService.openRouter,
-        );
+        final models = await catalog.loadFor(config, textOnly: true);
         return {
           'provider': service.name,
           'models': models,

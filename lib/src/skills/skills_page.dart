@@ -230,6 +230,7 @@ class _SkillsPageState extends State<SkillsPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
       title: widget.library ? '技能库' : '技能',
       titleWidget: widget.library
@@ -250,174 +251,179 @@ class _SkillsPageState extends State<SkillsPage> {
         ),
       ],
     ),
-    body: SafeArea(
-      top: false,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: TextField(
-                  controller: _search,
-                  onChanged: (_) => setState(() {}),
-                  onTapOutside: (_) =>
-                      FocusManager.instance.primaryFocus?.unfocus(),
-                  decoration: InputDecoration(
-                    hintText: '搜索技能',
-                    suffixIcon: _filter != 'installed'
-                        ? null
-                        : Builder(
-                            builder: (anchor) => IconButton(
-                              tooltip: switch (_status) {
-                                'enabled' => '筛选：已启用',
-                                'disabled' => '筛选：已停用',
-                                _ => '筛选：已启用',
-                              },
-                              onPressed: () => _chooseStatus(anchor),
-                              icon: Badge(
-                                isLabelVisible: _status == 'disabled',
-                                child: SettingsIcon(
-                                  type: SettingsIconType.filter,
-                                  color: _status == 'enabled'
-                                      ? Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant
-                                      : Theme.of(context).colorScheme.primary,
+    body: SettingsPageBody(
+      avoidHeader: true,
+      child: SafeArea(
+        top: false,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: TextField(
+                    controller: _search,
+                    onChanged: (_) => setState(() {}),
+                    onTapOutside: (_) =>
+                        FocusManager.instance.primaryFocus?.unfocus(),
+                    decoration: InputDecoration(
+                      hintText: '搜索技能',
+                      suffixIcon: _filter != 'installed'
+                          ? null
+                          : Builder(
+                              builder: (anchor) => IconButton(
+                                tooltip: switch (_status) {
+                                  'enabled' => '筛选：已启用',
+                                  'disabled' => '筛选：已停用',
+                                  _ => '筛选：已启用',
+                                },
+                                onPressed: () => _chooseStatus(anchor),
+                                icon: Badge(
+                                  isLabelVisible: _status == 'disabled',
+                                  child: SettingsIcon(
+                                    type: SettingsIconType.filter,
+                                    color: _status == 'enabled'
+                                        ? Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant
+                                        : Theme.of(context).colorScheme.primary,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                    filled: true,
-                    fillColor: settingsFieldColor(context),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(26),
-                      borderSide: BorderSide.none,
-                    ),
-                    prefixIcon: const Padding(
-                      padding: EdgeInsets.all(13),
-                      child: SidebarActionIcon(
-                        type: SidebarActionIconType.search,
+                      filled: true,
+                      fillColor: settingsFieldColor(context),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(26),
+                        borderSide: BorderSide.none,
+                      ),
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.all(13),
+                        child: SidebarActionIcon(
+                          type: SidebarActionIconType.search,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: ListenableBuilder(
-                  listenable: widget.store,
-                  builder: (context, _) {
-                    if (_loading)
-                      return const Center(child: CircularProgressIndicator());
-                    final scope = widget.library ? 'library' : _filter;
-                    final query = _search.text.trim().toLowerCase();
-                    final items =
-                        widget.store.library
-                            .where(
-                              (s) =>
-                                  (scope != 'installed' ||
-                                      widget.store.isInstalled(s.id)) &&
-                                  (scope != 'installed' ||
-                                      s.enabled == (_status == 'enabled')) &&
-                                  (scope != 'created' ||
-                                      s.ownerId == widget.store.ownerId) &&
-                                  (s.name.toLowerCase().contains(query) ||
-                                      s.description.toLowerCase().contains(
-                                        query,
-                                      )),
-                            )
-                            .toList()
-                          ..sort(widget.store.compareSkills);
-                    if (items.isEmpty)
-                      return Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              query.isNotEmpty
-                                  ? '没有匹配的技能'
-                                  : scope == 'installed'
-                                  ? switch (_status) {
-                                      'enabled' => '暂无已启用技能',
-                                      'disabled' => '暂无已停用技能',
-                                      _ => '暂无已启用技能',
-                                    }
-                                  : '暂无技能',
-                              style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            if (query.isEmpty && scope == 'installed') ...[
-                              const SizedBox(height: 8),
-                              TextButton(
-                                onPressed: _status == 'enabled'
-                                    ? _install
-                                    : () => setState(() => _status = 'enabled'),
-                                child: Text(
-                                  _status == 'enabled' ? '去安装' : '查看已启用技能',
+                Expanded(
+                  child: ListenableBuilder(
+                    listenable: widget.store,
+                    builder: (context, _) {
+                      if (_loading)
+                        return const Center(child: CircularProgressIndicator());
+                      final scope = widget.library ? 'library' : _filter;
+                      final query = _search.text.trim().toLowerCase();
+                      final items =
+                          widget.store.library
+                              .where(
+                                (s) =>
+                                    (scope != 'installed' ||
+                                        widget.store.isInstalled(s.id)) &&
+                                    (scope != 'installed' ||
+                                        s.enabled == (_status == 'enabled')) &&
+                                    (scope != 'created' ||
+                                        s.ownerId == widget.store.ownerId) &&
+                                    (s.name.toLowerCase().contains(query) ||
+                                        s.description.toLowerCase().contains(
+                                          query,
+                                        )),
+                              )
+                              .toList()
+                            ..sort(widget.store.compareSkills);
+                      if (items.isEmpty)
+                        return Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                query.isNotEmpty
+                                    ? '没有匹配的技能'
+                                    : scope == 'installed'
+                                    ? switch (_status) {
+                                        'enabled' => '暂无已启用技能',
+                                        'disabled' => '暂无已停用技能',
+                                        _ => '暂无已启用技能',
+                                      }
+                                    : '暂无技能',
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                               ),
+                              if (query.isEmpty && scope == 'installed') ...[
+                                const SizedBox(height: 8),
+                                TextButton(
+                                  onPressed: _status == 'enabled'
+                                      ? _install
+                                      : () =>
+                                            setState(() => _status = 'enabled'),
+                                  child: Text(
+                                    _status == 'enabled' ? '去安装' : '查看已启用技能',
+                                  ),
+                                ),
+                              ],
                             ],
-                          ],
-                        ),
-                      );
-                    return ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      itemCount: items.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final skill = items[index];
-                        final creator = widget.store.members
-                            .where((member) => member.id == skill.ownerId)
-                            .firstOrNull;
-                        return SkillListTile(
-                          skill: skill,
-                          onLongPressStart: (details) =>
-                              _skillMenu(skill, details.globalPosition),
-                          footer: !widget.library
-                              ? null
-                              : Row(
-                                  children: [
-                                    if (creator != null) ...[
-                                      MemberAvatar(sender: creator, size: 24),
-                                      const SizedBox(width: 8),
-                                    ],
-                                    Expanded(
-                                      child: Text(
-                                        widget.store.ownerName(skill),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 13),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      skillVisibilityLabel(skill.visibility),
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute<void>(
-                              builder: (_) => SkillDetailPage(
-                                controller: widget.controller,
-                                store: widget.store,
-                                skillId: skill.id,
-                              ),
-                            ),
                           ),
                         );
-                      },
-                    );
-                  },
+                      return ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        itemCount: items.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final skill = items[index];
+                          final creator = widget.store.members
+                              .where((member) => member.id == skill.ownerId)
+                              .firstOrNull;
+                          return SkillListTile(
+                            skill: skill,
+                            onLongPressStart: (details) =>
+                                _skillMenu(skill, details.globalPosition),
+                            footer: !widget.library
+                                ? null
+                                : Row(
+                                    children: [
+                                      if (creator != null) ...[
+                                        MemberAvatar(sender: creator, size: 24),
+                                        const SizedBox(width: 8),
+                                      ],
+                                      Expanded(
+                                        child: Text(
+                                          widget.store.ownerName(skill),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        skillVisibilityLabel(skill.visibility),
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute<void>(
+                                builder: (_) => SkillDetailPage(
+                                  controller: widget.controller,
+                                  store: widget.store,
+                                  skillId: skill.id,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

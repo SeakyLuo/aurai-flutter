@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum QuestionIconType { question, close, userAction, play, pause }
+enum QuestionIconType { question, close, userAction, play, pause, stop }
 
 class QuestionIcon extends StatelessWidget {
   const QuestionIcon({super.key, required this.type});
@@ -33,6 +33,14 @@ class _QuestionPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case QuestionIconType.stop:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(5, 5, 14, 14),
+            const Radius.circular(2),
+          ),
+          pen,
+        );
       case QuestionIconType.pause:
         canvas.drawLine(const Offset(7.5, 5), const Offset(7.5, 19), pen);
         canvas.drawLine(const Offset(16.5, 5), const Offset(16.5, 19), pen);

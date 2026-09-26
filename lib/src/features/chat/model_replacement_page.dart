@@ -85,6 +85,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
     ModelPurpose.text => '文本',
     ModelPurpose.imageGeneration => '图片生成',
     ModelPurpose.videoGeneration => '视频生成',
+    ModelPurpose.musicGeneration => '音乐生成',
   };
 
   String get _allModelsLabel => widget.purpose == ModelPurpose.text
@@ -99,6 +100,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
           ModelPurpose.text => '默认文本模型',
           ModelPurpose.imageGeneration => '默认图片生成模型',
           ModelPurpose.videoGeneration => '默认视频生成模型',
+          ModelPurpose.musicGeneration => '默认音乐生成模型',
         },
   ].join('、');
 
@@ -161,7 +163,10 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
     final scope = _scope;
     if (scope == null || !scope.hasChanges) return;
     final accounts = widget.controller.modelSettings.profiles.values
-        .where((profile) => profile.isConfigured)
+        .where(
+          (profile) =>
+              profile.isConfigured && profile.protocol.supportsChatModels,
+        )
         .toList();
     if (accounts.isEmpty) {
       _notice('请先配置可用的模型供应商');
@@ -235,10 +240,8 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
     if (purpose != ModelPurpose.imageGeneration) {
       generalModels =
           purpose == ModelPurpose.videoGeneration || account.autoSyncModels
-          ? await catalog.load(
-              baseUrl: Uri.parse(account.baseUrl),
-              apiKey: account.apiKey,
-              openRouter: service == ModelService.openRouter,
+          ? await catalog.loadFor(
+              account,
               textOnly: purpose == ModelPurpose.text,
             )
           : account.savedModels;
@@ -246,7 +249,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
 
     final imageModels = <String, ImageGenerationModel>{};
     if (purpose == ModelPurpose.imageGeneration) {
-      if (service != ModelService.openRouter && service != ModelService.qwen) {
+      if (!service.supportsImageGeneration) {
         return const [];
       }
       for (final model in await imageClient.models(account)) {
@@ -259,7 +262,10 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
         : generalModels;
     final targets = <ModelReplacementTarget>[];
     for (final id in candidateIds) {
-      final info = service == ModelService.openRouter
+      final configuredPurposes = account.details?.modelPurposes[id];
+      if (configuredPurposes != null && !configuredPurposes.contains(purpose))
+        continue;
+      final info = service.usesOpenRouterCatalog
           ? OpenRouterModels.lookup(account.baseUrl, id)
           : null;
       final supportsText = info?.supportsText ?? true;
@@ -270,6 +276,11 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
             purpose == ModelPurpose.videoGeneration)
           ModelPurpose.videoGeneration,
       };
+      if (configuredPurposes != null) {
+        supportedPurposes.removeWhere(
+          (candidate) => !configuredPurposes.contains(candidate),
+        );
+      }
       if (!supportedPurposes.contains(purpose)) continue;
       targets.add(
         ModelReplacementTarget(
@@ -368,6 +379,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
       title: '批量修改 AI 模型',
       onBack: _replacing ? null : () => Navigator.pop(context),
@@ -385,55 +397,60 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
         ),
       ],
     ),
-    body: SafeArea(
-      top: false,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-            children: [
-              _label('当前模型'),
-              _choice(
-                _from == null ? _allModelsLabel : _modelLabel(_from!),
-                _loadingUsedModels ||
-                        _loadingNewModels ||
-                        _loadingImpact ||
-                        _replacing
-                    ? null
-                    : _selectCurrentModel,
-                subtitle: '不指定具体模型时，将修改所有 AI 当前使用的模型',
-                loading: _loadingUsedModels,
+    body: SettingsPageBody(
+      child: SafeArea(
+        top: false,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: ListView(
+              padding: settingsPagePadding(
+                context,
+                const EdgeInsets.fromLTRB(16, 8, 16, 32),
               ),
-              const SizedBox(height: 16),
-              _label('新模型'),
-              _choice(
-                _to == null ? '选择新模型' : _modelLabel(_to!.model),
-                _loadingNewModels ||
-                        _loadingUsedModels ||
-                        _loadingImpact ||
-                        _replacing
-                    ? null
-                    : _selectNewModel,
-                loading: _loadingNewModels,
-              ),
-              if (_noCandidates) ...[
-                const SizedBox(height: 12),
-                _noCandidatesNotice(),
-              ],
-              const SizedBox(height: 24),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                child: Text(
-                  _impactText,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              children: [
+                _label('当前模型'),
+                _choice(
+                  _from == null ? _allModelsLabel : _modelLabel(_from!),
+                  _loadingUsedModels ||
+                          _loadingNewModels ||
+                          _loadingImpact ||
+                          _replacing
+                      ? null
+                      : _selectCurrentModel,
+                  subtitle: '不指定具体模型时，将修改所有 AI 当前使用的模型',
+                  loading: _loadingUsedModels,
+                ),
+                const SizedBox(height: 16),
+                _label('新模型'),
+                _choice(
+                  _to == null ? '选择新模型' : _modelLabel(_to!.model),
+                  _loadingNewModels ||
+                          _loadingUsedModels ||
+                          _loadingImpact ||
+                          _replacing
+                      ? null
+                      : _selectNewModel,
+                  loading: _loadingNewModels,
+                ),
+                if (_noCandidates) ...[
+                  const SizedBox(height: 12),
+                  _noCandidatesNotice(),
+                ],
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: Text(
+                    _impactText,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

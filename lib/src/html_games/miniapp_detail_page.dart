@@ -10,7 +10,6 @@ import 'package:flutter/material.dart';
 
 import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
-import '../features/chat/app_confirmation_dialog.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
 import '../features/chat/member_avatar.dart';
@@ -19,7 +18,6 @@ import '../scheduling/task_action_menu.dart';
 import 'miniapp_metadata_editor.dart';
 import 'html_store.dart';
 import 'miniapp_library_store.dart';
-import 'miniapp_publish_dialog.dart';
 
 class MiniappDetailPage extends StatefulWidget {
   const MiniappDetailPage({
@@ -68,53 +66,6 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
   void _notice(String text) => ScaffoldMessenger.of(
     context,
   ).showGlassSnackBar(SnackBar(content: Text(text)));
-
-  Future<void> _publish() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      final draft = _entry.draft
-          ? _entry
-          : await _library.entryForApp(_entry.id);
-      if (!mounted) return;
-      final published = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => MiniappPublishDialog(entry: draft, store: _library),
-      );
-      if (published == true && mounted) {
-        await _reload();
-        if (mounted) _notice('已发布');
-      }
-    } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _withdraw() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      final yes = await showDialog<bool>(
-        context: context,
-        builder: (_) => const AppConfirmationDialog(
-          title: '撤下小程序？',
-          description: '撤下后不再公开展示。已经添加的版本和存档仍会保留，你也可以重新发布。',
-          confirmLabel: '撤下',
-        ),
-      );
-      if (yes != true) return;
-      await _library.withdraw(_entry);
-      await _reload();
-      if (mounted) _notice('已撤下');
-    } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
 
   Future<void> _open() async {
     if (_busy) return;
@@ -171,12 +122,6 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
         items: [
           if (_entry.canEditMetadata)
             (value: 'edit', label: '编辑', icon: const TaskActionIcon('edit')),
-          if (!_entry.bundled && _entry.kind != MiniappKind.installed)
-            (
-              value: 'publish',
-              label: _entry.revision == 0 ? '发布' : '发布更新',
-              icon: const TaskActionIcon('edit'),
-            ),
           (
             value: 'forward',
             label: '转发',
@@ -202,8 +147,6 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
           await _edit();
         case 'forward':
           await forwardMiniapp(context, _entry);
-        case 'publish':
-          await _publish();
         case 'favorite':
           if (starred) {
             await favorites.remove(_entry);
@@ -219,18 +162,12 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
     }
   }
 
-  Widget _action(String title, VoidCallback action) => ListTile(
-    contentPadding: EdgeInsets.zero,
-    title: Text(title),
-    trailing: const SettingsIcon(type: SettingsIconType.chevron),
-    onTap: _busy ? null : action,
-  );
-
   @override
   Widget build(BuildContext context) {
     final entry = _entry;
     final canOpen = entry.draft || entry.installedId != null || entry.listed;
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: '小程序详情',
         onBack: () => Navigator.pop(context),
@@ -265,74 +202,79 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
           ),
         ),
       ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-              children: [
-                Center(
-                  child: Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      color: settingsFieldColor(context),
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    alignment: Alignment.center,
-                    child: MiniappIcon(
-                      path: entry.iconPath,
-                      asset: entry.iconAsset,
-                      size: entry.iconPath == null && entry.iconAsset == null
-                          ? 36
-                          : 96,
-                    ),
-                  ),
+      body: SettingsPageBody(
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: ListView(
+                padding: settingsPagePadding(
+                  context,
+                  const EdgeInsets.fromLTRB(24, 24, 24, 32),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  entry.title,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (entry.publisherProfile != null) ...[
-                      MemberAvatar(sender: entry.publisherProfile!, size: 24),
-                      const SizedBox(width: 8),
-                    ],
-                    Flexible(
-                      child: Text(
-                        entry.publisher,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        color: settingsFieldColor(context),
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      alignment: Alignment.center,
+                      child: MiniappIcon(
+                        path: entry.iconPath,
+                        asset: entry.iconAsset,
+                        size: entry.iconPath == null && entry.iconAsset == null
+                            ? 36
+                            : 96,
                       ),
                     ),
-                  ],
-                ),
-                if (entry.description.isNotEmpty) ...[
-                  const SizedBox(height: 32),
+                  ),
+                  const SizedBox(height: 16),
                   Text(
-                    entry.description,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(height: 1.6),
+                    entry.title,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (entry.publisherProfile != null) ...[
+                        MemberAvatar(sender: entry.publisherProfile!, size: 24),
+                        const SizedBox(width: 8),
+                      ],
+                      Flexible(
+                        child: Text(
+                          entry.publisher,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (entry.description.isNotEmpty) ...[
+                    const SizedBox(height: 32),
+                    Text(
+                      entry.description,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(height: 1.6),
+                    ),
+                  ],
+                  if (entry.revision > 0)
+                    MiniappReleaseNotesView(
+                      key: ValueKey('${entry.publicationId}:${entry.revision}'),
+                      database: widget.store.database,
+                      appId: entry.publicationId,
+                    ),
                 ],
-                if (entry.revision > 0)
-                  MiniappReleaseNotesView(
-                    key: ValueKey('${entry.publicationId}:${entry.revision}'),
-                    database: widget.store.database,
-                    appId: entry.publicationId,
-                  ),
-              ],
+              ),
             ),
           ),
         ),

@@ -125,7 +125,7 @@ class HtmlStore {
     final existingId = args['appId'] as String?;
     final existing = existingId == null ? null : await HtmlAppStore.load(txn, existingId);
     if (existing != null && !newSession && existing['creator_id'] != creator.id) {
-      throw StateError('只能重新发送自己创建的小应用入口');
+      throw StateError('只能重新发送自己创建的小程序入口');
     }
     final html = forwardedHtml ?? (existing == null ? args['html'] as String : await HtmlAppStore.code(existing));
     final width = args['width'] as int?;

@@ -7,6 +7,8 @@ import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../scheduling/task_unsaved_dialog.dart';
 import 'chat_controller.dart';
+import 'glass_surface.dart';
+import 'question_icon.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'choice_sheet.dart';
@@ -16,9 +18,13 @@ class RequestAdapterPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.service,
+    this.initialModel,
+    this.readOnly = false,
   });
   final ChatController controller;
   final ModelService service;
+  final String? initialModel;
+  final bool readOnly;
   @override
   State<RequestAdapterPage> createState() => _RequestAdapterPageState();
 }
@@ -33,7 +39,7 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
   late final Map<String, RequestAdapter> _drafts = Map.of(_initial);
   final _script = TextEditingController();
   final _model = TextEditingController();
-  String _scope = '';
+  late String _scope = widget.initialModel ?? '';
   ProviderProtocol? _protocol;
   bool _custom = false, _busy = false, _allowPop = false;
   Map<String, Object?>? _preview;
@@ -48,7 +54,7 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
   @override
   void initState() {
     super.initState();
-    _load('');
+    _load(_scope);
   }
 
   @override
@@ -109,6 +115,88 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
     });
   }
 
+  Future<void> _protocolPicker() async {
+    final choice = await showChoiceSheet<String>(
+      context,
+      title: '接口协议',
+      selected: _protocol?.name ?? '',
+      choices: [
+        (value: '', label: '跟随供应商'),
+        for (final protocol in ProviderProtocol.values)
+          (value: protocol.name, label: protocol.label),
+      ],
+    );
+    if (choice != null && mounted) {
+      setState(() {
+        _protocol = choice.isEmpty
+            ? null
+            : ProviderProtocol.values.byName(choice);
+        _capture();
+      });
+    }
+  }
+
+  Widget _label(String text) => Padding(
+    padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 15,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    ),
+  );
+
+  InputDecoration _fieldDecoration(String hint) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(26),
+      borderSide: BorderSide.none,
+    );
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(
+        fontSize: 15,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+      filled: true,
+      fillColor: settingsFieldColor(context),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+      border: border,
+      enabledBorder: border,
+      focusedBorder: border,
+    );
+  }
+
+  Widget _choice(String label, VoidCallback onTap) => Material(
+    color: settingsFieldColor(context),
+    borderRadius: BorderRadius.circular(26),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(26),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+        child: Row(
+          children: [
+            Expanded(child: Text(label, style: const TextStyle(fontSize: 16))),
+            const SizedBox(width: 12),
+            const SettingsIcon(type: SettingsIconType.chevron),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _note(String text) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 18),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 14,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    ),
+  );
+
   Future<void> _try() async {
     _capture();
     if (_custom && _key.isEmpty) {
@@ -122,6 +210,10 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
         model: _key.isEmpty ? old.model : _key,
         details: ProviderDetails(
           modelContextOverrides: old.details?.modelContextOverrides ?? const {},
+          modelPurposes: old.details?.modelPurposes ?? const {},
+          modelReasoning: old.details?.modelReasoning ?? const {},
+          balance: old.details?.balance,
+          icon: old.details?.icon,
           name: old.displayName,
           website: old.website,
           protocol: old.protocol,
@@ -184,119 +276,204 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
   }
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: _allowPop,
-    onPopInvokedWithResult: (didPop, _) {
-      if (!didPop && !_busy) _leave();
-    },
-    child: Scaffold(
-      appBar: SettingsAppBar(
-        title: '请求转换',
-        onBack: _busy ? null : _leave,
-        actions: [
-          SettingsGlassAction(
-            label: '保存',
-            icon: Icons.check_rounded,
-            iconWidget: const SettingsIcon(type: SettingsIconType.check),
-            onPressed: _busy ? null : _save,
-          ),
-        ],
-      ),
-      body: AbsorbPointer(
-        absorbing: _busy,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('适用范围'),
-              subtitle: Text(
-                _custom
-                    ? '其他模型名称'
-                    : _scope.isEmpty
-                    ? '供应商默认'
-                    : _scope,
-              ),
-              trailing: const SettingsIcon(type: SettingsIconType.chevron),
-              onTap: _scopePicker,
-            ),
-            if (_custom)
-              TextField(
-                controller: _model,
-                decoration: const InputDecoration(labelText: '模型名称'),
-                onChanged: (_) => setState(() => _preview = null),
-              ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('接口协议'),
-              subtitle: Text(_protocol?.label ?? '跟随供应商'),
-              trailing: const SettingsIcon(type: SettingsIconType.chevron),
-              onTap: () async {
-                final choice = await showChoiceSheet<String>(
+  Widget build(BuildContext context) {
+    if (widget.readOnly) {
+      final adapter = _drafts[widget.initialModel ?? ''] ?? _drafts[''];
+      return Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: SettingsAppBar(
+          title: '请求转换',
+          onBack: () => Navigator.pop(context),
+        ),
+        body: SettingsPageBody(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: ListView(
+                padding: settingsPagePadding(
                   context,
-                  title: '接口协议',
-                  selected: _protocol?.name ?? '',
-                  choices: [
-                    (value: '', label: '跟随供应商'),
-                    for (final p in ProviderProtocol.values)
-                      (value: p.name, label: p.label),
-                  ],
-                );
-                if (choice != null && mounted)
-                  setState(() {
-                    _protocol = choice.isEmpty
-                        ? null
-                        : ProviderProtocol.values.byName(choice);
-                    _capture();
-                  });
-              },
-            ),
-            const Text(
-              '模型配置覆盖供应商默认配置。脚本留空且协议跟随供应商时，移除该覆盖并恢复继承。只选择协议时，不执行供应商脚本。',
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _script,
-              minLines: 8,
-              maxLines: 20,
-              autocorrect: false,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-              decoration: InputDecoration(
-                labelText: 'JavaScript 请求转换',
-                hintText:
-                    'request.body.max_completion_tokens = request.body.max_tokens;\ndelete request.body.max_tokens;\nreturn request;',
-                filled: true,
-                fillColor: settingsFieldColor(context),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide.none,
+                  const EdgeInsets.fromLTRB(12, 12, 12, 32),
                 ),
-              ),
-              onChanged: (_) => setState(_capture),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              '输入 request 包含 model、path、body，返回 {path, body}。无密钥、网络或文件访问。切换协议请使用上方选项，不要仅修改路径。',
-            ),
-            const SizedBox(height: 12),
-            TextButton(onPressed: _try, child: const Text('本地试运行')),
-            const Text('试运行使用模拟请求，不调用模型，不代表供应商兼容性验证通过。'),
-            if (_preview != null)
-              ExpansionTile(
-                title: const Text('查看转换结果'),
                 children: [
-                  SelectableText(
-                    const JsonEncoder.withIndent('  ').convert(_preview),
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 13,
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    title: const Text('接口协议'),
+                    subtitle: Text(adapter?.protocol?.label ?? '跟随供应商'),
+                  ),
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    title: const Text('JavaScript 请求转换'),
+                    subtitle: SelectableText(
+                      adapter?.script.isNotEmpty == true
+                          ? adapter!.script
+                          : '未设置',
                     ),
                   ),
                 ],
               ),
+            ),
+          ),
+        ),
+      );
+    }
+    return PopScope(
+      canPop: _allowPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !_busy) _leave();
+      },
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: SettingsAppBar(
+          title: '请求转换',
+          onBack: _busy ? null : _leave,
+          actions: [
+            SettingsGlassActionSurface(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RoundAction(
+                    label: '本地试运行',
+                    icon: Icons.play_arrow_rounded,
+                    iconWidget: const QuestionIcon(type: QuestionIconType.play),
+                    onPressed: _busy ? null : _try,
+                  ),
+                  SizedBox(
+                    height: 18,
+                    child: VerticalDivider(
+                      width: 1,
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  RoundAction(
+                    label: '保存',
+                    icon: Icons.check_rounded,
+                    iconWidget: const SettingsIcon(
+                      type: SettingsIconType.check,
+                    ),
+                    onPressed: _busy ? null : _save,
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
+        body: SettingsPageBody(
+          child: AbsorbPointer(
+            absorbing: _busy,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: settingsPagePadding(
+                    context,
+                    const EdgeInsets.fromLTRB(16, 20, 16, 32),
+                  ),
+                  children: [
+                    if (widget.initialModel == null) ...[
+                      _label('适用范围'),
+                      _choice(
+                        _custom
+                            ? '其他模型名称'
+                            : _scope.isEmpty
+                            ? '供应商默认'
+                            : _scope,
+                        _scopePicker,
+                      ),
+                    ],
+                    if (_custom) ...[
+                      const SizedBox(height: 24),
+                      _label('模型名称'),
+                      TextField(
+                        controller: _model,
+                        maxLength: 200,
+                        style: const TextStyle(fontSize: 16),
+                        decoration: _fieldDecoration('输入模型名称'),
+                        onChanged: (_) => setState(() => _preview = null),
+                      ),
+                    ],
+                    if (widget.initialModel == null || _custom)
+                      const SizedBox(height: 24),
+                    _label('接口协议'),
+                    _choice(_protocol?.label ?? '跟随供应商', _protocolPicker),
+                    const SizedBox(height: 24),
+                    _label('JavaScript 请求转换'),
+                    TextField(
+                      controller: _script,
+                      minLines: 8,
+                      maxLines: 20,
+                      autocorrect: false,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 14,
+                      ),
+                      decoration: _fieldDecoration(
+                        'request.body.max_completion_tokens = request.body.max_tokens;\ndelete request.body.max_tokens;\nreturn request;',
+                      ),
+                      onChanged: (_) => setState(_capture),
+                    ),
+                    const SizedBox(height: 16),
+                    _note(
+                      widget.initialModel == ''
+                          ? '这里的转换会作为供应商默认值，未单独配置请求转换的模型会继承它。'
+                          : '模型配置会覆盖供应商默认配置。留空脚本并选择跟随供应商，可移除当前模型的覆盖。',
+                    ),
+                    if (widget.initialModel?.isNotEmpty == true) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: () => setState(() {
+                            _script.clear();
+                            _protocol = null;
+                            _capture();
+                          }),
+                          child: const Text('恢复继承'),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    _note(
+                      '脚本接收包含 model、path、body 的 request，返回 {path, body}；不能访问密钥、网络或文件。',
+                    ),
+                    const SizedBox(height: 12),
+                    _note('试运行使用模拟请求，不会调用模型。'),
+                    if (_preview != null) ...[
+                      const SizedBox(height: 24),
+                      Material(
+                        color: settingsFieldColor(context),
+                        borderRadius: BorderRadius.circular(26),
+                        clipBehavior: Clip.antiAlias,
+                        child: ExpansionTile(
+                          title: const Text('查看转换结果'),
+                          childrenPadding: const EdgeInsets.fromLTRB(
+                            18,
+                            0,
+                            18,
+                            18,
+                          ),
+                          children: [
+                            SelectableText(
+                              const JsonEncoder.withIndent(
+                                '  ',
+                              ).convert(_preview),
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

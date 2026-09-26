@@ -24,6 +24,7 @@ class _CustomAvatarPageState extends State<CustomAvatarPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
       title: '自定义头像',
       onBack: () => Navigator.pop(context),
@@ -35,46 +36,53 @@ class _CustomAvatarPageState extends State<CustomAvatarPage> {
         ),
       ],
     ),
-    body: SafeArea(
-      top: false,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Center(
-              child: ProfileAvatar(style: _style, name: widget.name, size: 104),
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-              children: [
-                const Text('图案', style: TextStyle(fontSize: 15)),
-                const SizedBox(height: 12),
-                _grid([
-                  for (final entry in avatarSymbols.entries)
-                    _choice(
-                      entry.value,
-                      _icon == entry.key,
-                      () => setState(() => _icon = entry.key),
-                      ProfileAvatar(
-                        style: AvatarStyle(icon: entry.key, color: _color),
-                        name: widget.name,
-                        size: 40,
-                      ),
-                    ),
-                ]),
-                const SizedBox(height: 24),
-                AvatarColorLibrary(
-                  selected: _color,
-                  icon: _icon,
+    body: SettingsPageBody(
+      avoidHeader: true,
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: ProfileAvatar(
+                  style: _style,
                   name: widget.name,
-                  onSelected: (color) => setState(() => _color = color),
+                  size: 104,
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                children: [
+                  const Text('图案', style: TextStyle(fontSize: 15)),
+                  const SizedBox(height: 12),
+                  _grid([
+                    for (final entry in avatarSymbols.entries)
+                      _choice(
+                        entry.value,
+                        _icon == entry.key,
+                        () => setState(() => _icon = entry.key),
+                        ProfileAvatar(
+                          style: AvatarStyle(icon: entry.key, color: _color),
+                          name: widget.name,
+                          size: 40,
+                        ),
+                      ),
+                  ]),
+                  const SizedBox(height: 24),
+                  AvatarColorLibrary(
+                    selected: _color,
+                    icon: _icon,
+                    name: widget.name,
+                    onSelected: (color) => setState(() => _color = color),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );

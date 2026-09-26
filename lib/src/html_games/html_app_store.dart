@@ -49,7 +49,7 @@ class HtmlAppStore {
     String id,
   ) async {
     final rows = await db.query('html_apps', where: 'id = ?', whereArgs: [id]);
-    if (rows.isEmpty) throw StateError('小应用不存在');
+    if (rows.isEmpty) throw StateError('小程序不存在');
     var app = Map<String, Object?>.from(rows.single);
     // Legacy code moves only when this application is opened. A failed file
     // write leaves the database copy intact and does not block other apps.
@@ -110,12 +110,12 @@ class HtmlAppStore {
     final expected =
         '$workspace${Platform.pathSeparator}miniapps${Platform.pathSeparator}$id';
     if (!root.startsWith('$expected${Platform.pathSeparator}')) {
-      throw StateError('小应用数据目录不可指向外部');
+      throw StateError('小程序数据目录不可指向外部');
     }
     final file = File('$root/$name');
     if (await FileSystemEntity.type(file.path, followLinks: false) ==
         FileSystemEntityType.link) {
-      throw StateError('小应用数据文件不可使用符号链接');
+      throw StateError('小程序数据文件不可使用符号链接');
     }
     return file;
   }
@@ -152,11 +152,11 @@ class HtmlAppStore {
           where: 'id = ?',
           whereArgs: [id],
         );
-        if (apps.isEmpty) throw StateError('小应用不存在');
+        if (apps.isEmpty) throw StateError('小程序不存在');
         Map<String, Object?>? session;
         if (messageId == null) {
           if (apps.single['creator_id'] != actor)
-            throw StateError('只能访问自己创建的小应用数据');
+            throw StateError('只能访问自己创建的小程序数据');
         } else {
           final refs = await txn.query(
             'html_games',
@@ -165,7 +165,7 @@ class HtmlAppStore {
                 "message_id = ? AND app_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
             whereArgs: [messageId, id],
           );
-          if (refs.isEmpty) throw StateError('小应用入口已删除或撤回');
+          if (refs.isEmpty) throw StateError('小程序入口已删除或撤回');
           if (refs.single['session_data_json'] != null) session = refs.single;
         }
         if (session != null) {

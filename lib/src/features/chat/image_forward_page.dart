@@ -171,74 +171,78 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
       title: widget.message == null ? '转发图片' : '转发消息',
       onBack: () => Navigator.pop(context),
     ),
-    body: Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: TextField(
-            controller: _search,
-            decoration: InputDecoration(
-              hintText: '搜索会话',
-              filled: true,
-              fillColor: settingsFieldColor(context),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(24),
-                borderSide: BorderSide.none,
+    body: SettingsPageBody(
+      avoidHeader: true,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              controller: _search,
+              decoration: InputDecoration(
+                hintText: '搜索会话',
+                filled: true,
+                fillColor: settingsFieldColor(context),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide.none,
+                ),
               ),
+              onChanged: (_) {
+                _generation++;
+                _debounce?.cancel();
+                _debounce = Timer(
+                  const Duration(milliseconds: 250),
+                  () => _load(reset: true),
+                );
+              },
             ),
-            onChanged: (_) {
-              _generation++;
-              _debounce?.cancel();
-              _debounce = Timer(
-                const Duration(milliseconds: 250),
-                () => _load(reset: true),
-              );
-            },
           ),
-        ),
-        Expanded(
-          child: ListView(
-            controller: _scroll,
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-            children: [
-              if (widget.message == null)
-                _row(
-                  '其他应用',
-                  const AttachmentActionIcon(
-                    type: AttachmentActionIconType.forward,
+          Expanded(
+            child: ListView(
+              controller: _scroll,
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+              children: [
+                if (widget.message == null)
+                  _row(
+                    '其他应用',
+                    const AttachmentActionIcon(
+                      type: AttachmentActionIconType.forward,
+                    ),
+                    _sharing ? null : _external,
                   ),
-                  _sharing ? null : _external,
-                ),
-              for (final item in _items)
-                _row(
-                  item.title,
-                  _avatar(item),
-                  () => _select(item),
-                  preview: item.preview,
-                ),
-              if (_loading)
-                const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Center(
-                    child: SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                for (final item in _items)
+                  _row(
+                    item.title,
+                    _avatar(item),
+                    () => _select(item),
+                    preview: item.preview,
+                  ),
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Center(
+                      child: SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                     ),
                   ),
-                ),
-              if (!_loading && _items.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: Text('没有找到会话')),
-                ),
-            ],
+                if (!_loading && _items.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: Text('没有找到会话')),
+                  ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
   Widget _avatar(Conversation item) {

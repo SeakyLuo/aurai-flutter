@@ -89,7 +89,7 @@ class HtmlMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         creating: true,
       );
       if (args['appId'] != null && ['interaction', 'buttons', 'participation', 'stateful'].any(args.containsKey)) {
-        throw ArgumentError('重新打开小应用时只提供应用引用和入口展示参数');
+        throw ArgumentError('重新打开小程序时只提供应用引用和入口展示参数');
       }
       if (args['interaction'] != null && args['buttons'] is! List) {
         throw ArgumentError('共享交互需要提供 buttons，输入收集也需要声明提交端点');

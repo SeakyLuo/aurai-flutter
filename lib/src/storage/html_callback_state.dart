@@ -60,7 +60,7 @@ abstract final class HtmlCallbackState {
       final refs = await txn.query('html_games', columns: ['creator_id', 'conversation_id'],
         where: "message_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
         whereArgs: [messageId], limit: 1);
-      if (refs.isEmpty) throw StateError('小应用入口已删除或撤回');
+      if (refs.isEmpty) throw StateError('小程序入口已删除或撤回');
       final ref = refs.single;
       final event = await requireEvent(txn, messageId, eventId, ref['creator_id'] as String);
       if (event['status'] != 'failed') throw StateError('只有失败或中断的操作可以重试');

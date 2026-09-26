@@ -84,66 +84,69 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(title: '交互消息', onBack: () => Navigator.pop(context)),
-    body: _loading || _card == null
-        ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-        : ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              Text(
-                widget.result.sender.name,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+    body: SettingsPageBody(
+      child: _loading || _card == null
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+          : ListView(
+              padding: settingsPagePadding(context, const EdgeInsets.all(20)),
+              children: [
+                Text(
+                  widget.result.sender.name,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              GestureDetector(
-                onLongPress: () => showInteractiveStatistics(
-                  context,
-                  database: widget.controller.groupStore.database,
-                  messageId: widget.result.id,
+                const SizedBox(height: 16),
+                GestureDetector(
+                  onLongPress: () => showInteractiveStatistics(
+                    context,
+                    database: widget.controller.groupStore.database,
+                    messageId: widget.result.id,
+                  ),
+                  child: InteractiveMessageView(
+                    card: _card!,
+                    onRetry: (eventId) => widget.controller
+                        .retryInteractiveCallback(widget.result.id, eventId),
+                    onClick:
+                        (button, revision, participantRevision, {value}) async {
+                          final result = await widget.controller
+                              .clickInteractiveMessage(
+                                widget.result.id,
+                                button,
+                                revision,
+                                participantRevision,
+                                value: value,
+                              );
+                          return result;
+                        },
+                    onOpenLink: (url) async {
+                      try {
+                        await AuraiPlatform.instance.startIntent({
+                          'action': 'android.intent.action.VIEW',
+                          'data': url,
+                        });
+                      } on Object catch (error) {
+                        if (context.mounted)
+                          ScaffoldMessenger.of(context).showGlassSnackBar(
+                            SnackBar(content: Text(errorMessage(error))),
+                          );
+                      }
+                    },
+                  ),
                 ),
-                child: InteractiveMessageView(
-                  card: _card!,
-                  onRetry: (eventId) => widget.controller
-                      .retryInteractiveCallback(widget.result.id, eventId),
-                  onClick:
-                      (button, revision, participantRevision, {value}) async {
-                        final result = await widget.controller
-                            .clickInteractiveMessage(
-                              widget.result.id,
-                              button,
-                              revision,
-                              participantRevision,
-                              value: value,
-                            );
-                        return result;
-                      },
-                  onOpenLink: (url) async {
-                    try {
-                      await AuraiPlatform.instance.startIntent({
-                        'action': 'android.intent.action.VIEW',
-                        'data': url,
-                      });
-                    } on Object catch (error) {
-                      if (context.mounted)
-                        ScaffoldMessenger.of(context).showGlassSnackBar(
-                          SnackBar(content: Text(errorMessage(error))),
-                        );
-                    }
-                  },
+                const SizedBox(height: 24),
+                TextButton.icon(
+                  onPressed: widget.onLocate,
+                  icon: const AttachmentActionIcon(
+                    type: AttachmentActionIconType.locate,
+                  ),
+                  label: const Text('定位原消息'),
                 ),
-              ),
-              const SizedBox(height: 24),
-              TextButton.icon(
-                onPressed: widget.onLocate,
-                icon: const AttachmentActionIcon(
-                  type: AttachmentActionIconType.locate,
-                ),
-                label: const Text('定位原消息'),
-              ),
-            ],
-          ),
+              ],
+            ),
+    ),
   );
 }

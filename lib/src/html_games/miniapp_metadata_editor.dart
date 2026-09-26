@@ -212,6 +212,7 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
       if (!didPop) _close();
     },
     child: Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: '编辑小程序',
         onBack: _close,
@@ -227,51 +228,57 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
           ),
         ],
       ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              children: [
-                MiniappIconEditor(
-                  path: _iconPath,
-                  asset: _saved.iconAsset,
-                  onPick: _busy ? null : _pickIcon,
-                  onRemove: _busy
-                      ? null
-                      : () => setState(() => _iconPath = null),
+      body: SettingsPageBody(
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: ListView(
+                padding: settingsPagePadding(
+                  context,
+                  const EdgeInsets.fromLTRB(16, 16, 16, 32),
                 ),
-                _field('名称', _name, 100),
-                _field('简介', _description, 500, multiline: true),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
-                  child: Text(
-                    '创建人',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                children: [
+                  MiniappIconEditor(
+                    path: _iconPath,
+                    asset: _saved.iconAsset,
+                    onPick: _busy ? null : _pickIcon,
+                    onRemove: _busy
+                        ? null
+                        : () => setState(() => _iconPath = null),
+                  ),
+                  _field('名称', _name, 100),
+                  _field('简介', _description, 500, multiline: true),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+                    child: Text(
+                      '创建人',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: Row(
-                    children: [
-                      if (_saved.publisherProfile != null) ...[
-                        MemberAvatar(
-                          sender: _saved.publisherProfile!,
-                          size: 32,
-                        ),
-                        const SizedBox(width: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: Row(
+                      children: [
+                        if (_saved.publisherProfile != null) ...[
+                          MemberAvatar(
+                            sender: _saved.publisherProfile!,
+                            size: 32,
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                        Expanded(child: Text(_saved.publisher)),
                       ],
-                      Expanded(child: Text(_saved.publisher)),
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

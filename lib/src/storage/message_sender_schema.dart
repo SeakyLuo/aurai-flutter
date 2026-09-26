@@ -9,7 +9,7 @@ const messageSenderSchema = [
     kind TEXT NOT NULL
   )''',
   "INSERT INTO message_senders VALUES ('user:local', '你', 'user')",
-  "INSERT INTO message_senders VALUES ('agent:aurai', 'Aurai', 'agent')",
+  "INSERT INTO message_senders VALUES ('agent:aurai', '阿睿', 'agent')",
 ];
 
 Future<void> migrateMessageSenders(Database db) async {

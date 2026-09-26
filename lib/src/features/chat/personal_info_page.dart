@@ -159,8 +159,9 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
     }
   }
 
-  void _notice(String text) =>
-      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text) => ScaffoldMessenger.of(
+    context,
+  ).showGlassSnackBar(SnackBar(content: Text(text)));
 
   Widget _profileField(
     String label,
@@ -216,6 +217,7 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
       if (!didPop && !_saving && !_picking) _leave();
     },
     child: Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: '个人信息',
         onBack: _saving ? null : () => Navigator.maybePop(context),
@@ -233,32 +235,38 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
           ),
         ],
       ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              children: [
-                ProfileAvatarEditor(
-                  style: _avatar,
-                  name: _name.text,
-                  onSelected: _saving || _picking ? null : _pickAvatar,
+      body: SettingsPageBody(
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: ListView(
+                padding: settingsPagePadding(
+                  context,
+                  const EdgeInsets.fromLTRB(16, 16, 16, 32),
                 ),
-                _profileField('你的昵称', _name, '希望 Aurai 怎么称呼你', 80),
-                const SizedBox(height: 16),
-                _profileField('你的职业', _job, '你从事什么工作', 120),
-                const SizedBox(height: 16),
-                _profileField(
-                  '关于你的更多信息',
-                  _about,
-                  '要记住的兴趣、价值观或偏好',
-                  2000,
-                  multiline: true,
-                ),
-              ],
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                children: [
+                  ProfileAvatarEditor(
+                    style: _avatar,
+                    name: _name.text,
+                    onSelected: _saving || _picking ? null : _pickAvatar,
+                  ),
+                  _profileField('你的昵称', _name, '希望 Aurai 怎么称呼你', 80),
+                  const SizedBox(height: 16),
+                  _profileField('你的职业', _job, '你从事什么工作', 120),
+                  const SizedBox(height: 16),
+                  _profileField(
+                    '关于你的更多信息',
+                    _about,
+                    '要记住的兴趣、价值观或偏好',
+                    2000,
+                    multiline: true,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

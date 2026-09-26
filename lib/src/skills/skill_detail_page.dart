@@ -34,8 +34,9 @@ class SkillDetailPage extends StatefulWidget {
 
 class _SkillDetailPageState extends State<SkillDetailPage> {
   bool _busy = false;
-  void _notice(String text) =>
-      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text) => ScaffoldMessenger.of(
+    context,
+  ).showGlassSnackBar(SnackBar(content: Text(text)));
   Future<void> _copyName(String name) async {
     await Clipboard.setData(ClipboardData(text: name));
     if (mounted) _notice('技能名称已复制');
@@ -123,14 +124,18 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
           .firstOrNull;
       if (skill == null) {
         return Scaffold(
+          extendBodyBehindAppBar: true,
           appBar: SettingsAppBar(
             title: '技能详情',
             onBack: () => Navigator.pop(context),
           ),
-          body: Center(
-            child: TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('返回技能列表'),
+          body: SettingsPageBody(
+            avoidHeader: true,
+            child: Center(
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('返回技能列表'),
+              ),
             ),
           ),
         );
@@ -140,6 +145,7 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
           .where((member) => member.id == skill.ownerId)
           .firstOrNull;
       return Scaffold(
+        extendBodyBehindAppBar: true,
         appBar: SettingsAppBar(
           title: '技能详情',
           onBack: () => Navigator.pop(context),
@@ -156,126 +162,135 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
               ),
           ],
         ),
-        body: SafeArea(
-          top: false,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  Row(
-                    children: [
-                      SkillIcon(skill.icon),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onLongPress: () => _copyName(skill.name),
-                          child: Text(
-                            skill.name,
-                            style: Theme.of(context).textTheme.titleLarge,
+        body: SettingsPageBody(
+          child: SafeArea(
+            top: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: ListView(
+                  padding: settingsPagePadding(
+                    context,
+                    const EdgeInsets.all(20),
+                  ),
+                  children: [
+                    Row(
+                      children: [
+                        SkillIcon(skill.icon),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onLongPress: () => _copyName(skill.name),
+                            child: Text(
+                              skill.name,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(skill.description),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      if (creator != null) ...[
-                        Material(
-                          color: Colors.transparent,
-                          shape: const CircleBorder(),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: creator.kind != MessageSenderKind.agent
-                                ? null
-                                : () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => AiContactPage(
-                                        controller: widget.controller,
-                                        senderId: creator.id,
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(skill.description),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        if (creator != null) ...[
+                          Material(
+                            color: Colors.transparent,
+                            shape: const CircleBorder(),
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: creator.kind != MessageSenderKind.agent
+                                  ? null
+                                  : () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => AiContactPage(
+                                          controller: widget.controller,
+                                          senderId: creator.id,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(3),
-                              child: MemberAvatar(sender: creator, size: 32),
+                              child: Padding(
+                                padding: const EdgeInsets.all(3),
+                                child: MemberAvatar(sender: creator, size: 32),
+                              ),
                             ),
                           ),
+                          const SizedBox(width: 10),
+                        ],
+                        Expanded(
+                          child: Text(
+                            widget.store.ownerName(skill),
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 12),
+                        Text(
+                          skillVisibilityLabel(skill.visibility),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                       ],
-                      Expanded(
-                        child: Text(
-                          widget.store.ownerName(skill),
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
+                    ),
+                    const SizedBox(height: 20),
+                    if (widget.store.usesInstallations && !installed)
+                      DialogActionButton(
+                        text: '安装技能',
+                        role: DialogActionRole.primary,
+                        onPressed: _busy
+                            ? null
+                            : () => _act(
+                                () => widget.store.install(skill.id),
+                                '技能已安装',
+                              ),
                       ),
-                      const SizedBox(width: 12),
-                      Text(
-                        skillVisibilityLabel(skill.visibility),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    if (widget.store.usesInstallations && installed) ...[
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('调用权限'),
+                        subtitle: Text(
+                          widget.store.permissionFor(skill.id).label,
                         ),
+                        trailing: const SettingsIcon(
+                          type: SettingsIconType.chevron,
+                        ),
+                        onTap: _busy
+                            ? null
+                            : () async {
+                                final choice = await showSkillPermissionPicker(
+                                  context,
+                                  widget.store.permissionOverrideFor(
+                                        skill.id,
+                                      ) ??
+                                      widget.store.defaultPermission,
+                                );
+                                if (mounted && choice != null)
+                                  await _act(
+                                    () => widget.store.setPermission(
+                                      skill.id,
+                                      choice.permission,
+                                    ),
+                                    '权限已保存',
+                                  );
+                              },
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 20),
-                  if (widget.store.usesInstallations && !installed)
-                    DialogActionButton(
-                      text: '安装技能',
-                      role: DialogActionRole.primary,
-                      onPressed: _busy
-                          ? null
-                          : () => _act(
-                              () => widget.store.install(skill.id),
-                              '技能已安装',
-                            ),
-                    ),
-                  if (widget.store.usesInstallations && installed) ...[
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('调用权限'),
-                      subtitle: Text(
-                        widget.store.permissionFor(skill.id).label,
-                      ),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: _busy
-                          ? null
-                          : () async {
-                              final choice = await showSkillPermissionPicker(
-                                context,
-                                widget.store.permissionOverrideFor(skill.id) ??
-                                    widget.store.defaultPermission,
-                              );
-                              if (mounted && choice != null)
-                                await _act(
-                                  () => widget.store.setPermission(
-                                    skill.id,
-                                    choice.permission,
-                                  ),
-                                  '权限已保存',
-                                );
-                            },
-                    ),
+                    _section('使用说明', skill.instructions),
+                    if (skill.script.isNotEmpty) _section('执行脚本', skill.script),
+                    if (skill.dependencyIds.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Text('依赖技能'),
+                      for (final id in skill.dependencyIds) _dependency(id),
+                    ],
                   ],
-                  _section('使用说明', skill.instructions),
-                  if (skill.script.isNotEmpty) _section('执行脚本', skill.script),
-                  if (skill.dependencyIds.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    const Text('依赖技能'),
-                    for (final id in skill.dependencyIds) _dependency(id),
-                  ],
-                ],
+                ),
               ),
             ),
           ),

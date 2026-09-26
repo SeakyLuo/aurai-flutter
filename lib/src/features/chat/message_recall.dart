@@ -187,6 +187,16 @@ extension MessageRecall on ChatController {
             whereArgs: [message.id, conversation.id],
           );
           await txn.delete(
+            'group_pinned_messages',
+            where: 'message_id = ?',
+            whereArgs: [message.id],
+          );
+          await txn.delete(
+            'group_favorite_messages',
+            where: 'message_id = ?',
+            whereArgs: [message.id],
+          );
+          await txn.delete(
             'attachments',
             where: 'message_id = ?',
             whereArgs: [message.id],
@@ -241,6 +251,7 @@ extension MessageRecall on ChatController {
         saveDraft: true,
         saveMessages: false,
       );
+      GroupMessageMarks.changes.add(conversation.id);
       HtmlGameSignals.changes.add(message.id);
       if (message.interactive != null)
         InteractiveMessageStore.changes.add(message.id);

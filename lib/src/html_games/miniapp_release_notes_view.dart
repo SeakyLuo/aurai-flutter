@@ -57,55 +57,51 @@ class _MiniappReleaseNotesViewState extends State<MiniappReleaseNotesView> {
   }
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const SizedBox(height: 28),
-      Text(
-        '更新日志',
-        style: Theme.of(
-          context,
-        ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-      ),
-      const SizedBox(height: 12),
-      if (!_loading && !_failed && _notes.isEmpty)
+  Widget build(BuildContext context) {
+    if (_notes.isEmpty && !_failed) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 28),
         Text(
-          '暂无更新日志',
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+          '更新日志',
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
-      for (final note in _notes)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '第 ${note.revision} 版 · ${note.createdAt.year}.${note.createdAt.month.toString().padLeft(2, '0')}.${note.createdAt.day.toString().padLeft(2, '0')}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+        const SizedBox(height: 12),
+        for (final note in _notes)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '第 ${note.revision} 版 · ${note.createdAt.year}.${note.createdAt.month.toString().padLeft(2, '0')}.${note.createdAt.day.toString().padLeft(2, '0')}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                note.notes,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(height: 1.6),
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  note.notes,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(height: 1.6),
+                ),
+              ],
+            ),
           ),
-        ),
-      if (_loading)
-        const Center(
-          child: Padding(
-            padding: EdgeInsets.all(12),
-            child: CircularProgressIndicator(strokeWidth: 2),
+        if (_loading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
           ),
-        ),
-      if (!_loading && (_more || _failed))
-        TextButton(onPressed: _load, child: Text(_failed ? '重试' : '更早版本')),
-    ],
-  );
+        if (!_loading && (_more || _failed))
+          TextButton(onPressed: _load, child: Text(_failed ? '重试' : '更早版本')),
+      ],
+    );
+  }
 }

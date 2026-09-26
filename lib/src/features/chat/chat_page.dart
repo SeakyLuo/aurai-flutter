@@ -1,3 +1,4 @@
+import 'group_announcement_banner.dart';
 import 'send_favorite_page.dart';
 import 'pending_message_panel.dart';
 import 'message_jump_arrow.dart';
@@ -402,12 +403,15 @@ class _ChatPageState extends State<ChatPage>
                 ),
               ),
             ),
-            body: Builder(
-              builder: (context) {
+            body: GroupAnnouncementBanner(
+              controller: controller,
+              groupId: isGroup ? _conversationId : null,
+              onLocate: _locateSearchMessage,
+              builder: (context, announcementHeight) {
                 final top = isGroup
                     ? View.of(context).padding.top /
                               View.of(context).devicePixelRatio +
-                          76
+                          76 + announcementHeight
                     : MediaQuery.paddingOf(context).top;
                 final bottom = MediaQuery.paddingOf(context).bottom;
                 return Stack(

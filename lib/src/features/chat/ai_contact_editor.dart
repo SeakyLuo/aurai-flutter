@@ -257,13 +257,11 @@ class _AiContactEditorState extends State<AiContactEditor> {
     child: Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        gradientBackground: true,
         title: widget.profile == null ? '新建朋友' : '个人资料',
         onBack: () => Navigator.maybePop(context),
         actions: [
           if (widget.profile == null)
-            GlassSurface(
-              radius: 28,
+            SettingsGlassActionSurface(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -308,9 +306,7 @@ class _AiContactEditorState extends State<AiContactEditor> {
       body: ListView(
         padding: EdgeInsets.fromLTRB(
           16,
-          View.of(context).padding.top / View.of(context).devicePixelRatio +
-              76 +
-              12,
+          settingsHeaderHeight(context) + 12,
           16,
           32,
         ),

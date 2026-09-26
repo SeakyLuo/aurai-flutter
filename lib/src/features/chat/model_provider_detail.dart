@@ -1,7 +1,11 @@
-import 'request_adapter_page.dart';
-import 'model_context_page.dart';
 import 'provider_models_page.dart';
+import 'provider_model_management_page.dart';
+import 'default_model_settings_page.dart';
 import 'model_provider_icon.dart';
+import 'provider_icon_store.dart';
+import 'attachment_action_icon.dart';
+import 'header_action_menu.dart';
+import 'package:image_picker/image_picker.dart';
 import 'question_icon.dart';
 import 'conversation_menu_icon.dart';
 import '../../platform/aurai_platform.dart';
@@ -9,14 +13,13 @@ import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
 import '../../domain/model_provider.dart';
-import '../../providers/model_context_limits.dart';
 import 'chat_controller.dart';
 import 'choice_sheet.dart';
 import 'delete_confirmation_dialog.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'model_balance_tile.dart';
-import 'model_reasoning_field.dart';
+import 'provider_balance_settings_page.dart';
 
 part 'model_provider_model_actions.dart';
 part 'model_provider_overview.dart';
@@ -47,33 +50,61 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
   late ProviderProtocol _protocol;
   late List<String> _models;
   late bool _autoSyncModels;
-  Future<void> _openRequestAdapters() async {
-    await Navigator.push<bool>(
+  String? _icon;
+  Future<void> _openModelSettings(Widget page) async {
+    final wasEditing = _editing;
+    if (_editing && _dirty) {
+      await _save();
+      if (!mounted || _editing) return;
+    }
+    if (wasEditing && !_editing) setState(() => _editing = true);
+    await Navigator.push<void>(
       context,
-      MaterialPageRoute(
-        builder: (_) => RequestAdapterPage(
-          controller: widget.controller,
-          service: _service,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => page),
     );
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {
+        _models = [..._saved.savedModels];
+        _autoSyncModels = _saved.autoSyncModels;
+        _model = _saved.model;
+        _reasoning = _saved.reasoning;
+        _initialReasoning = _reasoning;
+      });
+    }
   }
 
-  Future<void> _openModelContext() async {
-    await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            ModelContextPage(controller: widget.controller, service: _service),
+  Future<void> _openManagedModels() async {
+    await _openModelSettings(
+      ProviderModelManagementPage(
+        controller: widget.controller,
+        service: _service,
+        readOnly: !_editing,
       ),
     );
-    if (mounted) setState(() {});
   }
+
+  Future<void> _openDefaultModelSettings() => _openModelSettings(
+    DefaultModelSettingsPage(
+      controller: widget.controller,
+      service: _service,
+      readOnly: !_editing,
+    ),
+  );
+
+  Future<void> _openBalanceSettings() => _openModelSettings(
+    ProviderBalanceSettingsPage(
+      controller: widget.controller,
+      service: _service,
+    ),
+  );
 
   ProviderDetails get _details => ProviderDetails(
     requestAdapters: _saved.details?.requestAdapters ?? const {},
     modelContextOverrides: _saved.details?.modelContextOverrides ?? const {},
+    modelPurposes: _saved.details?.modelPurposes ?? const {},
+    modelReasoning: _saved.details?.modelReasoning ?? const {},
+    balance: _saved.details?.balance,
+    icon: _icon,
     name: _name.text.trim(),
     website: _website.text.trim(),
     protocol: _protocol,
@@ -87,6 +118,12 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     baseUrl: _address.text.trim(),
     reasoning: _reasoning,
     details: _details,
+  );
+  Widget _overviewValue(String value, {bool unset = false}) => Text(
+    value,
+    style: unset
+        ? TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)
+        : null,
   );
 
   final _key = TextEditingController();
@@ -111,6 +148,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
       _name.text != (widget.creating ? '' : _saved.displayName) ||
       _website.text != _saved.website ||
       _protocol != _saved.protocol ||
+      _icon != _saved.details?.icon ||
       _autoSyncModels != _saved.autoSyncModels ||
       _models.join('\n') != _saved.savedModels.join('\n') ||
       _apiKey != _saved.apiKey ||
@@ -129,6 +167,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     _name.text = widget.creating ? '' : _saved.displayName;
     _website.text = _saved.website;
     _protocol = _saved.protocol;
+    _icon = _saved.details?.icon;
     _models = [..._saved.savedModels];
     _autoSyncModels = _saved.autoSyncModels;
     _website.addListener(_changed);
@@ -146,6 +185,9 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
   void _updateModelSelection(bool useAll, List<String> models) => setState(() {
     _autoSyncModels = useAll;
     _models = models;
+    if (!useAll && models.isNotEmpty && !models.contains(_model)) {
+      _model = models.first;
+    }
   });
   @override
   void dispose() {
@@ -156,33 +198,11 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     super.dispose();
   }
 
-  void _restoreSaved() {
-    _name.text = _saved.displayName;
-    _website.text = _saved.website;
-    _address.text = _saved.baseUrl;
-    _key.clear();
-    _protocol = _saved.protocol;
-    _models = [..._saved.savedModels];
-    _autoSyncModels = _saved.autoSyncModels;
-    _model = _saved.model;
-    _reasoning = _saved.reasoning;
-    _initialReasoning = _reasoning;
-    _defaultService = _originalDefault;
-    _obscure = true;
-  }
-
   Future<void> _back() async {
     if (_locked) return;
     if (_dirty && !await _discardChanges()) return;
     if (!mounted) return;
     FocusScope.of(context).unfocus();
-    if (_editing && !widget.creating) {
-      setState(() {
-        _restoreSaved();
-        _editing = false;
-      });
-      return;
-    }
     setState(() => _allowPop = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) Navigator.pop(context, _hasSaved);
@@ -196,12 +216,13 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
       if (!didPop) _back();
     },
     child: Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: widget.creating ? '添加供应商' : '供应商详情',
         onBack: _back,
         leadingAction: _editing
             ? SettingsGlassAction(
-                label: '退出编辑',
+                label: '返回上一级',
                 icon: Icons.close_rounded,
                 iconWidget: const QuestionIcon(type: QuestionIconType.close),
                 onPressed: _locked ? null : _back,
@@ -242,163 +263,233 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
           ),
         ],
       ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: !_editing
-                ? _overview()
-                : ListView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-                    children: [
-                      ...[
-                        const _Label('供应商名称'),
-                        TextField(
-                          controller: _name,
-                          enabled: !_locked,
-                          maxLength: 60,
-                          style: const TextStyle(fontSize: 16),
-                          decoration: _fieldDecoration(hint: '例如：我的模型服务'),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                      const _Label('官网地址'),
-                      TextField(
-                        controller: _website,
-                        enabled: !_locked,
-                        keyboardType: TextInputType.url,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        decoration: _fieldDecoration(
-                          hint: '选填，例如 https://example.com',
-                          suffixIcon: IconButton(
-                            tooltip: '打开官网',
-                            onPressed: _locked || _website.text.trim().isEmpty
-                                ? null
-                                : _openWebsite,
-                            icon: const SettingsIcon(
-                              type: SettingsIconType.chevron,
-                            ),
-                          ),
-                        ),
+      body: SettingsPageBody(
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: !_editing
+                  ? _overview()
+                  : ListView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: settingsPagePadding(
+                        context,
+                        const EdgeInsets.fromLTRB(16, 20, 16, 32),
                       ),
-                      const SizedBox(height: 24),
-                      const _Label('接口协议'),
-                      _ModelChoice(
-                        label: _protocol.label,
-                        onTap: _locked
-                            ? null
-                            : () async {
-                                final value =
-                                    await showChoiceSheet<ProviderProtocol>(
-                                      context,
-                                      title: '接口协议',
-                                      selected: _protocol,
-                                      choices: [
-                                        for (final protocol
-                                            in ProviderProtocol.values)
-                                          (
-                                            value: protocol,
-                                            label: protocol.label,
+                      children: [
+                        ...[
+                          const _Label('供应商名称'),
+                          TextField(
+                            controller: _name,
+                            enabled: !_locked,
+                            maxLength: 60,
+                            style: const TextStyle(fontSize: 16),
+                            decoration: _fieldDecoration(
+                              hint: '例如：我的模型服务',
+                              prefixIcon: Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 6,
+                                  right: 4,
+                                ),
+                                child: Tooltip(
+                                  message: '选择供应商图标',
+                                  child: Builder(
+                                    builder: (anchor) => Material(
+                                      color: Colors.transparent,
+                                      borderRadius: BorderRadius.circular(24),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(24),
+                                        onTap: _locked
+                                            ? null
+                                            : () => _chooseIcon(anchor),
+                                        child: SizedBox.square(
+                                          dimension: 48,
+                                          child: Center(
+                                            child: ModelProviderIcon(
+                                              config: _draft,
+                                            ),
                                           ),
-                                      ],
-                                    );
-                                if (mounted && value != null)
-                                  setState(() {
-                                    _protocol = value;
-                                    _reasoning = ModelReasoning.automatic;
-                                  });
-                              },
-                      ),
-                      const SizedBox(height: 24),
-                      const _Label('API 密钥'),
-                      TextField(
-                        controller: _key,
-                        enabled: !_locked,
-                        obscureText: _obscure,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        style: const TextStyle(fontSize: 16),
-                        decoration: _fieldDecoration(
-                          hint:
-                              _saved.isConfigured &&
-                                  _address.text.trim() == _saved.baseUrl
-                              ? '已保存密钥 · 留空保持不变'
-                              : '粘贴 API 密钥',
-                          suffixIcon: Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Center(
-                              widthFactor: 1,
-                              heightFactor: 1,
-                              child: SizedBox.square(
-                                dimension: 40,
-                                child: IconButton(
-                                  style: IconButton.styleFrom(
-                                    shape: const CircleBorder(),
-                                    padding: const EdgeInsets.all(8),
-                                  ),
-                                  onPressed: _locked
-                                      ? null
-                                      : () => setState(
-                                          () => _obscure = !_obscure,
                                         ),
-                                  tooltip: _obscure ? '显示密钥' : '隐藏密钥',
-                                  icon: SettingsIcon(
-                                    type: _obscure
-                                        ? SettingsIconType.eye
-                                        : SettingsIconType.eyeOff,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
+                          const SizedBox(height: 20),
+                        ],
+                        const _Label('接口协议'),
+                        _ModelChoice(
+                          label: _protocol.label,
+                          onTap: _locked
+                              ? null
+                              : () async {
+                                  final value =
+                                      await showChoiceSheet<ProviderProtocol>(
+                                        context,
+                                        title: '接口协议',
+                                        selected: _protocol,
+                                        choices: [
+                                          for (final protocol
+                                              in ProviderProtocol.values)
+                                            (
+                                              value: protocol,
+                                              label: protocol.label,
+                                            ),
+                                        ],
+                                      );
+                                  if (mounted && value != null)
+                                    setState(() {
+                                      if (_protocol.supportsChatModels !=
+                                          value.supportsChatModels) {
+                                        _models = [];
+                                        _autoSyncModels = true;
+                                        _model = value.modelCatalog.isNotEmpty
+                                            ? value.modelCatalog.first.id
+                                            : _service
+                                                  .defaultProtocol
+                                                  .supportsChatModels
+                                            ? _service.defaultModel
+                                            : '';
+                                      }
+                                      _protocol = value;
+                                      _reasoning = ModelReasoning.automatic;
+                                    });
+                                },
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                      const _Label('服务地址'),
-                      TextField(
-                        controller: _address,
-                        onChanged: (_) => setState(() {}),
-                        enabled: !_locked,
-                        keyboardType: TextInputType.url,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        style: const TextStyle(fontSize: 16),
-                        decoration: _fieldDecoration(
-                          hint: widget.creating
-                              ? 'https://example.com/v1'
-                              : _service.defaultBaseUrl,
+                        const SizedBox(height: 24),
+                        const _Label('API 密钥'),
+                        _apiKeyField(),
+                        const SizedBox(height: 32),
+                        const _Label('服务地址'),
+                        TextField(
+                          controller: _address,
+                          onChanged: (_) => setState(() {}),
+                          enabled: !_locked,
+                          keyboardType: TextInputType.url,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          style: const TextStyle(fontSize: 16),
+                          decoration: _fieldDecoration(
+                            hint: widget.creating
+                                ? 'https://example.com/v1'
+                                : _service.defaultBaseUrl,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      const _Label('模型'),
-                      _ModelChoice(
-                        label: _autoSyncModels
-                            ? '全部模型'
-                            : '已选 ${_models.length} 个模型',
-                        onTap: _locked ? null : _openModelManagement,
-                      ),
-                      ModelReasoningField(
-                        service: _service,
-                        model: _model,
-                        baseUrl: _address.text.trim(),
-                        value: _reasoning,
-                        providerDefault: true,
-                        onChanged: _locked
-                            ? null
-                            : (value) => setState(() => _reasoning = value),
-                      ),
-                    ],
-                  ),
+                        if (_apiKey.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          const _Label('模型管理'),
+                          if (widget.creating)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                              ),
+                              child: Text(
+                                '保存供应商后配置模型',
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            )
+                          else
+                            _ModelChoice(
+                              label: _autoSyncModels
+                                  ? '全部模型'
+                                  : '已选 ${_models.length} 个模型',
+                              onTap: _locked ? null : _openManagedModels,
+                            ),
+                        ],
+                        if (!widget.creating) ...[
+                          const SizedBox(height: 24),
+                          const _Label('默认模型设置'),
+                          _ModelChoice(
+                            label: '配置默认设置',
+                            onTap: _locked ? null : _openDefaultModelSettings,
+                          ),
+                        ],
+                        const SizedBox(height: 24),
+                        const _Label('官网地址'),
+                        TextField(
+                          controller: _website,
+                          enabled: !_locked,
+                          keyboardType: TextInputType.url,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          decoration: _fieldDecoration(
+                            hint: '选填，例如 https://example.com',
+                          ),
+                        ),
+                        if (!widget.creating) ...[
+                          const SizedBox(height: 24),
+                          const _Label('账户余额'),
+                          _ModelChoice(
+                            label: '查询与充值设置',
+                            onTap: _locked ? null : _openBalanceSettings,
+                          ),
+                        ],
+                      ],
+                    ),
+            ),
           ),
         ),
       ),
     ),
   );
-  InputDecoration _fieldDecoration({required String hint, Widget? suffixIcon}) {
+  Future<void> _chooseIcon(BuildContext anchor) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final choice = await showHeaderActionMenu(
+      anchor,
+      items: [
+        (
+          value: 'pick',
+          label: _icon == null ? '选择图片' : '更换图片',
+          icon: const AttachmentActionIcon(
+            type: AttachmentActionIconType.gallery,
+          ),
+        ),
+        (
+          value: 'reset',
+          label: '恢复默认图标',
+          icon: const SettingsIcon(type: SettingsIconType.reset),
+        ),
+      ],
+    );
+    if (!mounted) return;
+    if (choice == 'reset') {
+      if (_icon == null) {
+        _notice('当前已是默认图标');
+      } else {
+        setState(() => _icon = null);
+        _notice('已恢复默认图标，点击右上角保存');
+      }
+    } else if (choice == 'pick') {
+      try {
+        final image = await ImagePicker().pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 512,
+          maxHeight: 512,
+          imageQuality: 90,
+        );
+        if (image == null) return;
+        final path = await ProviderIconStore.import(image.path);
+        if (mounted) setState(() => _icon = 'file:$path');
+      } on Object catch (error) {
+        if (mounted) _notice('无法选择图标：${errorMessage(error)}');
+      }
+    }
+  }
+
+  InputDecoration _fieldDecoration({
+    required String hint,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+  }) {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(26),
       borderSide: BorderSide.none,
@@ -412,6 +503,10 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
       filled: true,
       fillColor: settingsFieldColor(context),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+      prefixIcon: prefixIcon,
+      prefixIconConstraints: prefixIcon == null
+          ? null
+          : const BoxConstraints(minWidth: 60, minHeight: 48),
       border: border,
       enabledBorder: border,
       focusedBorder: border,
@@ -419,6 +514,43 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
       suffixIcon: suffixIcon,
     );
   }
+
+  Widget _apiKeyField() => TextField(
+    controller: _key,
+    enabled: !_locked,
+    obscureText: _obscure,
+    autocorrect: false,
+    enableSuggestions: false,
+    style: const TextStyle(fontSize: 16),
+    decoration: _fieldDecoration(
+      hint: _saved.isConfigured && _address.text.trim() == _saved.baseUrl
+          ? '已保存密钥 · 留空保持不变'
+          : '粘贴 API 密钥',
+      suffixIcon: Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: Center(
+          widthFactor: 1,
+          heightFactor: 1,
+          child: SizedBox.square(
+            dimension: 40,
+            child: IconButton(
+              style: IconButton.styleFrom(
+                shape: const CircleBorder(),
+                padding: const EdgeInsets.all(8),
+              ),
+              onPressed: _locked
+                  ? null
+                  : () => setState(() => _obscure = !_obscure),
+              tooltip: _obscure ? '显示密钥' : '隐藏密钥',
+              icon: SettingsIcon(
+                type: _obscure ? SettingsIconType.eye : SettingsIconType.eyeOff,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 
   Future<bool> _discardChanges() async =>
       await showDialog<bool>(
@@ -472,6 +604,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
           protocol: _protocol,
           models: _models,
           autoSyncModels: _autoSyncModels,
+          icon: _icon,
           model: _model,
         );
       } else {
@@ -507,6 +640,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
         _key.clear();
         setState(() {
           _protocol = _saved.protocol;
+          _icon = _saved.details?.icon;
           _models = [..._saved.savedModels];
           _autoSyncModels = _saved.autoSyncModels;
           _model = _saved.model;

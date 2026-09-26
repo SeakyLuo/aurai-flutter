@@ -62,16 +62,13 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        gradientBackground: true,
         title: '工具授权',
         onBack: () => Navigator.pop(context),
       ),
       body: ListView(
         padding: EdgeInsets.fromLTRB(
           18,
-          View.of(context).padding.top / View.of(context).devicePixelRatio +
-              76 +
-              0,
+          settingsHeaderHeight(context) + 0,
           18,
           0,
         ),

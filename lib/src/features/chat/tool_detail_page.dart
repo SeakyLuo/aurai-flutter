@@ -156,6 +156,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
         if (!didPop) _back();
       },
       child: Scaffold(
+        extendBodyBehindAppBar: true,
         appBar: SettingsAppBar(
           title: '工具详情',
           onBack: _back,
@@ -185,80 +186,85 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
             ),
           ],
         ),
-        body: SafeArea(
-          top: false,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
-                    child: Text(
-                      '名称',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        body: SettingsPageBody(
+          child: SafeArea(
+            top: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: ListView(
+                  padding: settingsPagePadding(
+                    context,
+                    const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                  ),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+                      child: Text(
+                        '名称',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
-                  ),
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onLongPress: _editing ? null : _copyName,
-                    child: AbsorbPointer(
-                      absorbing: !_editing,
-                      child: TextField(
-                        controller: _name,
-                        readOnly: !_editing,
-                        enabled: !_saving,
-                        style: const TextStyle(fontSize: 16),
-                        onChanged: (_) => setState(() {}),
-                        onTapOutside: (_) =>
-                            FocusManager.instance.primaryFocus?.unfocus(),
-                        decoration: InputDecoration(
-                          prefixIcon: Padding(
-                            padding: const EdgeInsets.only(left: 6, right: 4),
-                            child: Tooltip(
-                              message: '选择工具图标',
-                              child: Material(
-                                color: Colors.transparent,
-                                borderRadius: BorderRadius.circular(24),
-                                clipBehavior: Clip.antiAlias,
-                                child: InkWell(
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onLongPress: _editing ? null : _copyName,
+                      child: AbsorbPointer(
+                        absorbing: !_editing,
+                        child: TextField(
+                          controller: _name,
+                          readOnly: !_editing,
+                          enabled: !_saving,
+                          style: const TextStyle(fontSize: 16),
+                          onChanged: (_) => setState(() {}),
+                          onTapOutside: (_) =>
+                              FocusManager.instance.primaryFocus?.unfocus(),
+                          decoration: InputDecoration(
+                            prefixIcon: Padding(
+                              padding: const EdgeInsets.only(left: 6, right: 4),
+                              child: Tooltip(
+                                message: '选择工具图标',
+                                child: Material(
+                                  color: Colors.transparent,
                                   borderRadius: BorderRadius.circular(24),
-                                  onTap: !_editing || _saving
-                                      ? null
-                                      : () async {
-                                          FocusManager.instance.primaryFocus
-                                              ?.unfocus();
-                                          final icon =
-                                              await showSkillIconPicker(
-                                                context,
-                                                _icon.startsWith('skill:')
-                                                    ? _icon.substring(6)
-                                                    : '',
-                                                title: '选择工具图标',
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(24),
+                                    onTap: !_editing || _saving
+                                        ? null
+                                        : () async {
+                                            FocusManager.instance.primaryFocus
+                                                ?.unfocus();
+                                            final icon =
+                                                await showSkillIconPicker(
+                                                  context,
+                                                  _icon.startsWith('skill:')
+                                                      ? _icon.substring(6)
+                                                      : '',
+                                                  title: '选择工具图标',
+                                                );
+                                            if (mounted && icon != null) {
+                                              setState(
+                                                () => _icon = 'skill:$icon',
                                               );
-                                          if (mounted && icon != null) {
-                                            setState(
-                                              () => _icon = 'skill:$icon',
-                                            );
-                                          }
-                                        },
-                                  child: SizedBox.square(
-                                    dimension: 48,
-                                    child: Center(
-                                      child: ColorFiltered(
-                                        colorFilter: ColorFilter.mode(
-                                          Theme.of(
-                                            context,
-                                          ).colorScheme.onSurface,
-                                          BlendMode.srcIn,
-                                        ),
-                                        child: ToolActionIcon(
-                                          toolName: _tool.name,
-                                          iconName: _icon,
+                                            }
+                                          },
+                                    child: SizedBox.square(
+                                      dimension: 48,
+                                      child: Center(
+                                        child: ColorFiltered(
+                                          colorFilter: ColorFilter.mode(
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
+                                            BlendMode.srcIn,
+                                          ),
+                                          child: ToolActionIcon(
+                                            toolName: _tool.name,
+                                            iconName: _icon,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -266,49 +272,49 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
                                 ),
                               ),
                             ),
-                          ),
-                          prefixIconConstraints: const BoxConstraints(
-                            minWidth: 60,
-                            minHeight: 48,
-                          ),
-                          filled: true,
-                          fillColor: settingsFieldColor(context),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 20,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(26),
-                            borderSide: BorderSide.none,
+                            prefixIconConstraints: const BoxConstraints(
+                              minWidth: 60,
+                              minHeight: 48,
+                            ),
+                            filled: true,
+                            fillColor: settingsFieldColor(context),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 20,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(26),
+                              borderSide: BorderSide.none,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  _label('使用说明'),
-                  _editing
-                      ? _editor(_description)
-                      : _surface(
-                          SelectableText(
-                            _tool.description,
-                            style: const TextStyle(fontSize: 15, height: 1.5),
+                    _label('使用说明'),
+                    _editing
+                        ? _editor(_description)
+                        : _surface(
+                            SelectableText(
+                              _tool.description,
+                              style: const TextStyle(fontSize: 15, height: 1.5),
+                            ),
                           ),
+                    if (_editing) ...[
+                      _label('调用参数'),
+                      _editor(_parameters, code: true),
+                    ] else
+                      ToolPayloadSection(
+                        title: '调用参数',
+                        headerPadding: const EdgeInsets.fromLTRB(18, 14, 8, 2),
+                        titleStyle: TextStyle(
+                          fontSize: 15,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
-                  if (_editing) ...[
-                    _label('调用参数'),
-                    _editor(_parameters, code: true),
-                  ] else
-                    ToolPayloadSection(
-                      title: '调用参数',
-                      headerPadding: const EdgeInsets.fromLTRB(18, 14, 8, 2),
-                      titleStyle: TextStyle(
-                        fontSize: 15,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        json: jsonEncode(_tool.modelInputSchema),
+                        missing: '无参数',
                       ),
-                      json: jsonEncode(_tool.modelInputSchema),
-                      missing: '无参数',
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

@@ -102,6 +102,7 @@ class _ForwardConversationSheetState extends State<ForwardConversationSheet> {
               children: [
                 GlassSurface(
                   radius: 28,
+                  shadowOpacity: .8,
                   child: RoundAction(
                     icon: Icons.arrow_back_rounded,
                     label: '返回',
