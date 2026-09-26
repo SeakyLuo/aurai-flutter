@@ -11,6 +11,9 @@ import 'jump_to_bottom_button.dart';
 import 'question_icon.dart';
 import 'settings_appearance.dart';
 import 'thinking_indicator.dart';
+import '../../app/ui_action.dart';
+import '../../domain/message_sender.dart';
+import 'settings_icon.dart';
 
 Future<void> showGroupActivitySheet(
   BuildContext context, {
@@ -49,10 +52,24 @@ class GroupActivityPage extends StatefulWidget {
 
 class _GroupActivitySheetState extends State<GroupActivityPage> {
   final _waking = <String>{};
+  int? _memberCount;
 
   bool _wakingAll = false;
 
   bool _resumingAll = false;
+  bool _stoppingAll = false;
+
+  Future<void> _stopAll() async {
+    setState(() => _stoppingAll = true);
+    try {
+      await runUiAction(
+        context,
+        () => widget.controller.stopAllGroupReplies(widget.conversationId),
+      );
+    } finally {
+      if (mounted) setState(() => _stoppingAll = false);
+    }
+  }
 
   Future<void> _resumeAll() async {
     setState(() => _resumingAll = true);
@@ -79,19 +96,26 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
   Widget _batchActions() => Builder(
     builder: (buttonContext) {
       final busy =
+          _stoppingAll ||
           _wakingAll ||
           _resumingAll ||
           _waking.isNotEmpty ||
           _resuming.isNotEmpty;
-      return _MemberAction(
+      return SettingsGlassAction(
         label: '更多',
         icon: Icons.more_horiz_rounded,
+        iconWidget: const SettingsIcon(type: SettingsIconType.more),
         onPressed: busy
             ? null
             : () async {
                 final action = await showHeaderActionMenu(
                   buttonContext,
                   items: const [
+                    (
+                      value: 'stop',
+                      label: '停止当前回复',
+                      icon: QuestionIcon(type: QuestionIconType.stop),
+                    ),
                     (
                       value: 'wake',
                       label: '全部唤醒',
@@ -105,6 +129,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                   ],
                 );
                 if (!mounted) return;
+                if (action == 'stop') await _stopAll();
                 if (action == 'wake') await _wakeAll();
                 if (action == 'resume') await _resumeAll();
               },
@@ -215,22 +240,26 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
     }
   }
 
-  Widget _avatar(GroupMemberActivity activity) => Semantics(
-    button: true,
-    label: '查看${activity.sender.name}的资料',
-    child: GestureDetector(
-      onTap: () => Navigator.of(context).push<void>(
-        MaterialPageRoute(
-          builder: (_) => AiContactPage(
-            controller: widget.controller,
-            senderId: activity.sender.id,
-            groupId: widget.conversationId,
+  Widget _avatar(GroupMemberActivity activity) {
+    final avatar = MemberAvatar(sender: activity.sender, size: 40);
+    if (activity.sender.kind != MessageSenderKind.agent) return avatar;
+    return Semantics(
+      button: true,
+      label: '查看${activity.sender.name}的资料',
+      child: GestureDetector(
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) => AiContactPage(
+              controller: widget.controller,
+              senderId: activity.sender.id,
+              groupId: widget.conversationId,
+            ),
           ),
         ),
+        child: avatar,
       ),
-      child: MemberAvatar(sender: activity.sender, size: 40),
-    ),
-  );
+    );
+  }
 
   Widget _row(GroupMemberActivity activity) {
     final running = !activity.idle && !activity.sleeping;
@@ -359,6 +388,13 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       controller: widget.controller,
       conversationId: widget.conversationId,
       includeInactive: !widget._asSheet,
+      onMemberCount: widget._asSheet
+          ? null
+          : (count) {
+              if (mounted && _memberCount != count) {
+                setState(() => _memberCount = count);
+              }
+            },
       builder: (context, activities) {
         final visible = widget._asSheet
             ? activities.where((a) => !a.stopping && !a.waitingForUser).toList()
@@ -373,7 +409,12 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                 ),
               )
             : ListView(
-                padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
+                padding: widget._asSheet
+                    ? const EdgeInsets.fromLTRB(18, 4, 18, 24)
+                    : settingsPagePadding(
+                        context,
+                        const EdgeInsets.fromLTRB(18, 4, 18, 24),
+                      ),
                 children: [for (final activity in visible) _row(activity)],
               );
       },
@@ -393,12 +434,13 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       );
     }
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        title: '群成员状态',
+        title: _memberCount == null ? '群成员' : '群成员（$_memberCount）',
         actions: [_batchActions()],
         onBack: () => Navigator.pop(context),
       ),
-      body: SafeArea(top: false, child: content),
+      body: SettingsPageBody(child: SafeArea(top: false, child: content)),
     );
   }
 }
@@ -636,32 +678,6 @@ class _StopMemberButtonState extends State<_StopMemberButton> {
       ),
     );
   }
-}
-
-class _MemberAction extends StatelessWidget {
-  const _MemberAction({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) => IconButton(
-    tooltip: label,
-    onPressed: onPressed,
-    icon: Icon(icon, size: 24),
-    color: Theme.of(context).colorScheme.onSurfaceVariant,
-    style: IconButton.styleFrom(
-      fixedSize: const Size.square(40),
-      minimumSize: const Size.square(40),
-      padding: const EdgeInsets.all(8),
-      shape: const CircleBorder(),
-    ),
-  );
 }
 
 class _ActivitySheetHeader extends StatelessWidget {

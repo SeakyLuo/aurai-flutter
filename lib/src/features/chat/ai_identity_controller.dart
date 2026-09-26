@@ -1,6 +1,66 @@
 part of 'chat_controller.dart';
 
 extension AiIdentityController on ChatController {
+  void _onLocalProfileChanged() {
+    final sender = MessageSender.localUser;
+    final name = sender.name;
+    _renameLoadedGroupNotices(MessageSender.localUser.id, _lastLocalName, name);
+    final conversations = {
+      ..._conversations,
+      _activeConversation,
+      _runningConversation,
+      _privateConversation,
+      ..._groupRuns.values,
+    };
+    final histories = [
+      for (final conversation in conversations)
+        if (conversation != null) ...[
+          conversation.messages,
+          if (conversation.searchMessages != null) conversation.searchMessages!,
+        ],
+      if (_groupDispatcher != null) _groupDispatcher!.history,
+    ];
+    for (final messages in histories) {
+      for (var i = 0; i < messages.length; i++) {
+        var message = messages[i];
+        if (message.senderId == sender.id && message.sender != null) {
+          message = message.withSender(sender);
+        }
+        if (message.quote?.senderId == sender.id) {
+          message.quote!.senderName = name;
+        }
+        if (message.quickReplies.any((reply) => reply.senderId == sender.id)) {
+          message = message.withQuickReplies([
+            for (final reply in message.quickReplies)
+              reply.senderId == sender.id
+                  ? MessageQuickReply(
+                      id: reply.id,
+                      senderId: reply.senderId,
+                      senderName: name,
+                      key: reply.key,
+                      createdAt: reply.createdAt,
+                    )
+                  : reply,
+          ]);
+        }
+        messages[i] = message;
+      }
+    }
+    for (final conversation in conversations) {
+      if (conversation == null) continue;
+      conversation.creationUserName = name;
+      conversation.creationMembers = [
+        for (final member in conversation.creationMembers)
+          member.id == sender.id ? sender : member,
+      ];
+      if (conversation.draftQuote?.senderId == sender.id) {
+        conversation.draftQuote!.senderName = name;
+      }
+    }
+    _lastLocalName = name;
+    _conversationChanged();
+  }
+
   Future<void> _migrateAiSettings() async {
     final config = modelSettings.activeConfig;
     groupStore.defaultSelection = AiModelSelection(
@@ -51,7 +111,9 @@ extension AiIdentityController on ChatController {
       baseUrl: modelSettings.profile(selection.provider).baseUrl,
       apiKey: modelSettings.profile(selection.provider).apiKey,
       reasoning: ai.preferences.reasoning == ModelReasoning.inherit
-          ? modelSettings.profile(selection.provider).reasoning
+          ? modelSettings
+                .profile(selection.provider)
+                .reasoningFor(selection.model)
           : ai.preferences.reasoning,
     );
   }
@@ -128,15 +190,22 @@ extension AiIdentityController on ChatController {
     bool create = false,
     bool addToMyContacts = true,
   }) async {
+    String? previousName;
     if (create) {
       await groupStore.createAi(ai);
     } else {
-      await groupStore.updateAi(ai, addToMyContacts: addToMyContacts);
+      previousName = await groupStore.updateAi(
+        ai,
+        addToMyContacts: addToMyContacts,
+      );
     }
-    _applySavedAi(ai);
+    _applySavedAi(ai, previousName: previousName);
   }
 
-  void _applySavedAi(AiProfile ai) {
+  void _applySavedAi(AiProfile ai, {String? previousName}) {
+    if (previousName != null) {
+      _renameLoadedGroupNotices(ai.sender.id, previousName, ai.sender.name);
+    }
     if (_activeAi?.sender.id == ai.sender.id) _activeAi = ai;
     for (final state in {_execution, ..._executionStates.values}) {
       if (state.groupReplies.containsKey(ai.sender.id)) {
@@ -178,6 +247,73 @@ extension AiIdentityController on ChatController {
     for (final store in [memory, ..._aiMemories.values]) {
       if (store.ownerId == ai.sender.id) {
         store.modelConfig = () => aiConfig(ai);
+      }
+    }
+    _conversationChanged();
+  }
+
+  void _renameLoadedGroupNotices(
+    String senderId,
+    String previousName,
+    String nextName,
+  ) {
+    if (previousName == nextName) return;
+    for (final conversation in {
+      ..._conversations,
+      _activeConversation,
+      _runningConversation,
+      _privateConversation,
+      ..._groupRuns.values,
+    }) {
+      if (conversation == null || conversation.kind != ConversationKind.group) {
+        continue;
+      }
+      if (conversation.storedPreviewIsSystem &&
+          conversation.storedPreview != null) {
+        conversation.storedPreview = conversation.storedPreview!.replaceAll(
+          previousName,
+          nextName,
+        );
+      }
+      if (!conversation.noticeMembers.containsKey(senderId)) continue;
+      final sender = conversation.noticeMembers[senderId]!;
+      conversation.noticeMembers[senderId] = MessageSender(
+        id: sender.id,
+        name: nextName,
+        kind: sender.kind,
+        avatarIcon: sender.avatarIcon,
+        avatarColor: sender.avatarColor,
+        avatarPath: sender.avatarPath,
+        archived: sender.archived,
+      );
+      void rename(List<AgentMessage> messages) {
+        for (var i = 0; i < messages.length; i++) {
+          final message = messages[i];
+          if (message.isSystem && message.text.contains(previousName)) {
+            messages[i] = message.withText(
+              message.text.replaceAll(previousName, nextName),
+            );
+          }
+        }
+      }
+
+      rename(conversation.messages);
+      if (conversation.searchMessages != null) {
+        rename(conversation.searchMessages!);
+      }
+      if (senderId == MessageSender.localUser.id) {
+        conversation.creationUserName = nextName;
+      }
+    }
+    final history = _groupDispatcher?.history;
+    if (history != null) {
+      for (var i = 0; i < history.length; i++) {
+        final message = history[i];
+        if (message.isSystem && message.text.contains(previousName)) {
+          history[i] = message.withText(
+            message.text.replaceAll(previousName, nextName),
+          );
+        }
       }
     }
     _conversationChanged();

@@ -21,6 +21,11 @@ extension _ProviderModelActions on _ModelProviderDetailState {
   }
 
   Future<void> _openModelManagement() async {
+    final config = _editing ? _draft : _saved;
+    if (config.apiKey.isEmpty) {
+      _notice(_editing ? '请先填写 API 密钥' : '请先编辑供应商并填写 API 密钥');
+      return;
+    }
     final selection =
         await showModalBottomSheet<({bool useAll, List<String> models})>(
           context: context,
@@ -28,7 +33,8 @@ extension _ProviderModelActions on _ModelProviderDetailState {
           useSafeArea: true,
           showDragHandle: false,
           builder: (_) => ProviderModelsPage(
-            config: _editing ? _draft : _saved,
+            controller: widget.controller,
+            config: config,
             selectable: _editing,
           ),
         );

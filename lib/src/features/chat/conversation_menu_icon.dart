@@ -1,8 +1,21 @@
 import 'package:flutter/material.dart';
 
+import 'copy_icon.dart';
+import 'settings_icon.dart';
+import 'sidebar_action_icon.dart';
+
 enum ConversationMenuIconType {
+  profile,
+  members,
+  task,
+  copy,
+  announcement,
   pin,
   unpin,
+  mark,
+  unmark,
+  toTop,
+  removeTop,
   rename,
   recall,
   retry,
@@ -12,20 +25,34 @@ enum ConversationMenuIconType {
 }
 
 class ConversationMenuIcon extends StatelessWidget {
-  const ConversationMenuIcon({
-    super.key,
-    required this.type,
-    required this.color,
-  });
+  const ConversationMenuIcon({super.key, required this.type, this.color});
 
   final ConversationMenuIconType type;
-  final Color color;
+  final Color? color;
 
   @override
-  Widget build(BuildContext context) => CustomPaint(
-    size: const Size.square(21),
-    painter: _MenuIconPainter(type, color),
-  );
+  Widget build(BuildContext context) {
+    final iconColor = color ?? Theme.of(context).colorScheme.onSurface;
+    return switch (type) {
+      ConversationMenuIconType.profile => SettingsIcon(
+        type: SettingsIconType.personalInfo,
+        color: iconColor,
+      ),
+      ConversationMenuIconType.members => SidebarActionIcon(
+        type: SidebarActionIconType.group,
+        color: iconColor,
+      ),
+      ConversationMenuIconType.task => SettingsIcon(
+        type: SettingsIconType.tasks,
+        color: iconColor,
+      ),
+      ConversationMenuIconType.copy => CopyIcon(color: iconColor),
+      _ => CustomPaint(
+        size: const Size.square(21),
+        painter: _MenuIconPainter(type, iconColor),
+      ),
+    };
+  }
 }
 
 class _MenuIconPainter extends CustomPainter {
@@ -44,6 +71,65 @@ class _MenuIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case ConversationMenuIconType.profile:
+      case ConversationMenuIconType.members:
+      case ConversationMenuIconType.task:
+      case ConversationMenuIconType.copy:
+        break;
+      case ConversationMenuIconType.mark:
+      case ConversationMenuIconType.unmark:
+        canvas.drawPath(
+          Path()
+            ..moveTo(7.5, 3.5)
+            ..lineTo(16.5, 3.5)
+            ..quadraticBezierTo(18, 3.5, 18, 5)
+            ..lineTo(18, 20.5)
+            ..lineTo(12, 16)
+            ..lineTo(6, 20.5)
+            ..lineTo(6, 5)
+            ..quadraticBezierTo(6, 3.5, 7.5, 3.5)
+            ..close(),
+          pen,
+        );
+        if (type == ConversationMenuIconType.unmark) {
+          canvas.drawLine(const Offset(9, 9), const Offset(15, 9), pen);
+        }
+      case ConversationMenuIconType.toTop:
+      case ConversationMenuIconType.removeTop:
+        canvas.drawPath(
+          Path()
+            ..moveTo(5, 4)
+            ..lineTo(19, 4)
+            ..moveTo(6.5, 13)
+            ..lineTo(12, 7.5)
+            ..lineTo(17.5, 13)
+            ..moveTo(12, 7.5)
+            ..lineTo(12, 21),
+          pen,
+        );
+        if (type == ConversationMenuIconType.removeTop) {
+          canvas.drawLine(const Offset(4, 5), const Offset(20, 21), pen);
+        }
+      case ConversationMenuIconType.announcement:
+        canvas.drawPath(
+          Path()
+            ..moveTo(4, 9)
+            ..lineTo(10, 9)
+            ..lineTo(19, 4)
+            ..lineTo(19, 20)
+            ..lineTo(10, 15)
+            ..lineTo(4, 15)
+            ..quadraticBezierTo(2.5, 15, 2.5, 13.5)
+            ..lineTo(2.5, 10.5)
+            ..quadraticBezierTo(2.5, 9, 4, 9)
+            ..moveTo(10, 9)
+            ..lineTo(10, 15)
+            ..moveTo(6, 15)
+            ..lineTo(7.5, 20)
+            ..lineTo(11, 20)
+            ..lineTo(9.5, 15),
+          pen,
+        );
       case ConversationMenuIconType.pin:
       case ConversationMenuIconType.unpin:
         canvas.save();

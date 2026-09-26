@@ -132,20 +132,19 @@ extension PeerConversations on ChatController {
     final skills = await aiSkills(senderId);
     final documents = AiDocumentScope(_store.database, senderId);
     await documents.initialize();
-    final provider = switch (config.service) {
-      ModelService.openAi => OpenAiResponsesProvider(
-        config,
-        systemPrompt: prompt,
-        summaryConfig: modelSettings.activeConfig,
-        sharedContext: conversation.sharedContext,
-      ),
-      _ => DeepSeekResponsesProvider(
-        config,
-        systemPrompt: prompt,
-        summaryConfig: modelSettings.activeConfig,
-        sharedContext: conversation.sharedContext,
-      ),
-    };
+    final provider = config.service.useOpenAiTransport
+        ? OpenAiResponsesProvider(
+            config,
+            systemPrompt: prompt,
+            summaryConfig: modelSettings.activeConfig,
+            sharedContext: conversation.sharedContext,
+          )
+        : DeepSeekResponsesProvider(
+            config,
+            systemPrompt: prompt,
+            summaryConfig: modelSettings.activeConfig,
+            sharedContext: conversation.sharedContext,
+          );
     final runId = await _store.runs.start(
       conversation.id,
       snapshot.last.id,

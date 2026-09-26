@@ -125,7 +125,6 @@ class AiGroupPicker extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
-      gradientBackground: true,
       title: joined ? '选择群聊记忆' : '加入群聊',
       onBack: () => Navigator.pop(context),
     ),

@@ -7,12 +7,10 @@ import 'package:flutter/services.dart';
 
 import 'chat_controller.dart';
 import 'ai_contact_page.dart';
-import 'group_members_page.dart';
+import 'group_activity_sheet.dart';
 import 'group_info_page.dart';
-import 'sidebar_action_icon.dart';
 import 'conversation_task_navigation.dart';
-import 'copy_icon.dart';
-import 'settings_icon.dart';
+import 'header_action_menu.dart';
 import 'archive_confirmation_dialog.dart';
 import 'conversation_menu_icon.dart';
 import 'glass_surface.dart';
@@ -276,12 +274,9 @@ class _ConversationMoreState extends State<ConversationMore> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (!isGroup)
-                              _GlassMenuItem(
-                                iconWidget: SettingsIcon(
-                                  type: SettingsIconType.personalInfo,
-                                  color: Theme.of(
-                                    menuContext,
-                                  ).colorScheme.onSurface,
+                              GlassMenuItem(
+                                icon: const ConversationMenuIcon(
+                                  type: ConversationMenuIconType.profile,
                                 ),
                                 label: '查看资料',
                                 onTap: () => Navigator.pop(
@@ -290,12 +285,9 @@ class _ConversationMoreState extends State<ConversationMore> {
                                 ),
                               ),
                             if (isGroup)
-                              _GlassMenuItem(
-                                iconWidget: SidebarActionIcon(
-                                  type: SidebarActionIconType.group,
-                                  color: Theme.of(
-                                    menuContext,
-                                  ).colorScheme.onSurface,
+                              GlassMenuItem(
+                                icon: const ConversationMenuIcon(
+                                  type: ConversationMenuIconType.members,
                                 ),
                                 label: '群成员',
                                 onTap: () => Navigator.pop(
@@ -304,8 +296,10 @@ class _ConversationMoreState extends State<ConversationMore> {
                                 ),
                               ),
                             if (_conversation.isTemporary)
-                              _GlassMenuItem(
-                                icon: ConversationMenuIconType.unarchive,
+                              GlassMenuItem(
+                                icon: const ConversationMenuIcon(
+                                  type: ConversationMenuIconType.unarchive,
+                                ),
                                 label: '保存此聊天',
                                 onTap: () => Navigator.pop(
                                   menuContext,
@@ -313,12 +307,9 @@ class _ConversationMoreState extends State<ConversationMore> {
                                 ),
                               ),
                             if (hasTask)
-                              _GlassMenuItem(
-                                iconWidget: SettingsIcon(
-                                  type: SettingsIconType.tasks,
-                                  color: Theme.of(
-                                    menuContext,
-                                  ).colorScheme.onSurface,
+                              GlassMenuItem(
+                                icon: const ConversationMenuIcon(
+                                  type: ConversationMenuIconType.task,
                                 ),
                                 label: '查看任务',
                                 onTap: () => Navigator.pop(
@@ -328,24 +319,30 @@ class _ConversationMoreState extends State<ConversationMore> {
                               ),
                             if (!_conversation.isArchived &&
                                 !_conversation.isTemporary)
-                              _GlassMenuItem(
-                                icon: pinned
-                                    ? ConversationMenuIconType.unpin
-                                    : ConversationMenuIconType.pin,
+                              GlassMenuItem(
+                                icon: ConversationMenuIcon(
+                                  type: pinned
+                                      ? ConversationMenuIconType.unpin
+                                      : ConversationMenuIconType.pin,
+                                ),
                                 label: pinned ? '取消置顶' : '置顶',
                                 onTap: () =>
                                     Navigator.pop(menuContext, _MoreAction.pin),
                               ),
-                            _GlassMenuItem(
-                              icon: ConversationMenuIconType.rename,
+                            GlassMenuItem(
+                              icon: const ConversationMenuIcon(
+                                type: ConversationMenuIconType.rename,
+                              ),
                               label: '重命名',
                               onTap: () => Navigator.pop(
                                 menuContext,
                                 _MoreAction.rename,
                               ),
                             ),
-                            _GlassMenuItem(
-                              iconWidget: const CopyIcon(),
+                            GlassMenuItem(
+                              icon: const ConversationMenuIcon(
+                                type: ConversationMenuIconType.copy,
+                              ),
                               label: '复制会话 ID',
                               onTap: () => Navigator.pop(
                                 menuContext,
@@ -353,18 +350,22 @@ class _ConversationMoreState extends State<ConversationMore> {
                               ),
                             ),
                             if (!_conversation.isTemporary)
-                              _GlassMenuItem(
-                                icon: _conversation.isArchived
-                                    ? ConversationMenuIconType.unarchive
-                                    : ConversationMenuIconType.archive,
+                              GlassMenuItem(
+                                icon: ConversationMenuIcon(
+                                  type: _conversation.isArchived
+                                      ? ConversationMenuIconType.unarchive
+                                      : ConversationMenuIconType.archive,
+                                ),
                                 label: _conversation.isArchived ? '取消归档' : '归档',
                                 onTap: () => Navigator.pop(
                                   menuContext,
                                   _MoreAction.archive,
                                 ),
                               ),
-                            _GlassMenuItem(
-                              icon: ConversationMenuIconType.delete,
+                            GlassMenuItem(
+                              icon: const ConversationMenuIcon(
+                                type: ConversationMenuIconType.delete,
+                              ),
                               label: '删除会话',
                               destructive: true,
                               onTap: () => Navigator.pop(
@@ -411,7 +412,7 @@ class _ConversationMoreState extends State<ConversationMore> {
         await Navigator.push<void>(
           context,
           MaterialPageRoute(
-            builder: (_) => GroupMembersPage(
+            builder: (_) => GroupActivityPage(
               controller: widget.controller,
               conversationId: targetId,
             ),
@@ -459,6 +460,7 @@ class _ConversationMoreState extends State<ConversationMore> {
         )
       : GlassSurface(
           radius: 28,
+          shadowOpacity: .8,
           child: RoundAction(
             icon: Icons.more_horiz_rounded,
             label: '更多',
@@ -477,57 +479,4 @@ enum _MoreAction {
   archive,
   delete,
   save,
-}
-
-class _GlassMenuItem extends StatelessWidget {
-  const _GlassMenuItem({
-    this.icon,
-    this.iconWidget,
-    required this.label,
-    required this.onTap,
-    this.destructive = false,
-  });
-
-  final ConversationMenuIconType? icon;
-  final Widget? iconWidget;
-  final String label;
-  final VoidCallback onTap;
-  final bool destructive;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = destructive
-        ? Theme.of(context).colorScheme.error
-        : Theme.of(context).colorScheme.onSurface;
-    return Semantics(
-      button: true,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(17),
-        hoverColor: const Color(0x0c695383),
-        highlightColor: const Color(0x14695383),
-        splashColor: const Color(0x14695383),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          child: Row(
-            children: [
-              iconWidget ?? ConversationMenuIcon(type: icon!, color: color),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 15,
-                    height: 1.3,
-                    fontWeight: FontWeight.w500,
-                    color: color,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

@@ -105,7 +105,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        gradientBackground: true,
         title: '群聊',
         onBack: () => Navigator.pop(context),
         actions: [
@@ -158,10 +157,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     child: ListView.builder(
                       padding: EdgeInsets.fromLTRB(
                         16,
-                        View.of(context).padding.top /
-                                View.of(context).devicePixelRatio +
-                            76 +
-                            12,
+                        settingsHeaderHeight(context) + 12,
                         16,
                         24,
                       ),

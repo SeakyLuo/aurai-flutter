@@ -15,6 +15,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'chat_header_background.dart';
 
 import '../../storage/conversation_reader.dart';
 
@@ -342,6 +343,9 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         forceMaterialTransparency: true,
+        flexibleSpace: const ChatHeaderBackground(),
+        elevation: 0,
+        scrolledUnderElevation: 0,
         toolbarHeight: 64,
         leadingWidth: 74,
         leading: Padding(
@@ -350,7 +354,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
             alignment: Alignment.centerLeft,
             child: GlassSurface(
               radius: 28,
-              shadowOpacity: .65,
+              shadowOpacity: .55,
               child: RoundAction(
                 icon: Icons.arrow_back_rounded,
                 label: '返回',
@@ -487,6 +491,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
                     GlassSurface(
                       radius: 28,
                       dark: Theme.of(context).brightness == Brightness.dark,
+                      shadowOpacity: .8,
                       child: Padding(
                         padding: const EdgeInsets.all(2),
                         child: RoundAction(

@@ -303,91 +303,96 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
             : a.publicationId.compareTo(b.publicationId);
       });
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: '小程序',
         onBack: () => Navigator.pop(context),
       ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  child: TextField(
-                    controller: _search,
-                    onChanged: _queryChanged,
-                    onTapOutside: (_) =>
-                        FocusManager.instance.primaryFocus?.unfocus(),
-                    decoration: InputDecoration(
-                      hintText: '搜索小程序',
-                      filled: true,
-                      fillColor: settingsFieldColor(context),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(26),
-                        borderSide: BorderSide.none,
-                      ),
-                      prefixIcon: const Padding(
-                        padding: EdgeInsets.all(13),
-                        child: SidebarActionIcon(
-                          type: SidebarActionIconType.search,
+      body: SettingsPageBody(
+        avoidHeader: true,
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: TextField(
+                      controller: _search,
+                      onChanged: _queryChanged,
+                      onTapOutside: (_) =>
+                          FocusManager.instance.primaryFocus?.unfocus(),
+                      decoration: InputDecoration(
+                        hintText: '搜索小程序',
+                        filled: true,
+                        fillColor: settingsFieldColor(context),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(26),
+                          borderSide: BorderSide.none,
+                        ),
+                        prefixIcon: const Padding(
+                          padding: EdgeInsets.all(13),
+                          child: SidebarActionIcon(
+                            type: SidebarActionIconType.search,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    children: [
-                      if (query.isEmpty && _recent.isNotEmpty) _recentSection(),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
-                        child: Text(
-                          query.isEmpty ? '发现小程序' : '搜索结果',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      if (_loading && entries.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.all(32),
-                          child: Center(child: CircularProgressIndicator()),
-                        ),
-                      if (!_loading && entries.isEmpty)
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.all(16),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      children: [
+                        if (query.isEmpty && _recent.isNotEmpty)
+                          _recentSection(),
                         Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Center(
-                            child: Text(
-                              query.isEmpty ? '暂无已发布的小程序' : '没有匹配的小程序',
+                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
+                          child: Text(
+                            query.isEmpty ? '发现小程序' : '搜索结果',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
-                      for (final entry in entries)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _tile(entry),
-                        ),
-                      if (_more || _localMore)
-                        TextButton(
-                          onPressed: _loading
-                              ? null
-                              : () => _load(reset: false),
-                          child: Text(_loading ? '正在加载' : '加载更多'),
-                        ),
-                    ],
+                        if (_loading && entries.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.all(32),
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                        if (!_loading && entries.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Center(
+                              child: Text(
+                                query.isEmpty ? '暂无已发布的小程序' : '没有匹配的小程序',
+                              ),
+                            ),
+                          ),
+                        for (final entry in entries)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _tile(entry),
+                          ),
+                        if (_more || _localMore)
+                          TextButton(
+                            onPressed: _loading
+                                ? null
+                                : () => _load(reset: false),
+                            child: Text(_loading ? '正在加载' : '加载更多'),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

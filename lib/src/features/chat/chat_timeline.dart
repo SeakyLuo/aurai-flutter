@@ -13,6 +13,8 @@ import 'chat_controller.dart';
 import 'message_item.dart';
 import 'group_message_heading.dart';
 import 'ai_contact_page.dart';
+import 'personal_info_page.dart';
+import 'group_mention_text.dart';
 import '../../domain/message_sender.dart';
 import 'message_time.dart';
 import 'tool_activity_view.dart';
@@ -55,6 +57,30 @@ List<ChatTimelineEntry> buildChatTimeline(
   }
   mentionMembers.removeWhere((name, _) => ambiguousNames.contains(name));
   final isGroup = conversation.kind == ConversationKind.group;
+  final noticeNameIds = <String, String>{};
+  final ambiguousNoticeNames = <String>{};
+  for (final sender in conversation.noticeMembers.values) {
+    if (noticeNameIds.containsKey(sender.name)) {
+      ambiguousNoticeNames.add(sender.name);
+    }
+    noticeNameIds[sender.name] = sender.id;
+  }
+  noticeNameIds.removeWhere((name, _) => ambiguousNoticeNames.contains(name));
+  void openNoticeMember(BuildContext context, String id) {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => id == MessageSender.localUser.id
+            ? PersonalInfoPage(memory: controller.memory)
+            : AiContactPage(
+                controller: controller,
+                senderId: id,
+                groupId: conversation.id,
+              ),
+      ),
+    );
+  }
+
   final richRuns = isGroup
       ? <String>{}
       : richReplyRuns(controller.visibleMessages);
@@ -65,8 +91,7 @@ List<ChatTimelineEntry> buildChatTimeline(
       conversation.hasExecutionProcess &&
       (watch.isRunning ||
           conversation.runState == ChatRunState.failed ||
-          conversation.runState == ChatRunState.interrupted ||
-          conversation.runState == ChatRunState.cancelled) &&
+          conversation.runState == ChatRunState.interrupted) &&
       !controller.visibleMessages.any(
         (message) =>
             message.runId == conversation.activeRunId &&
@@ -123,6 +148,22 @@ List<ChatTimelineEntry> buildChatTimeline(
           : '${entry.runId}:${entry.afterMessageId}:${entry.step.toolName}',
   ]);
   final elapsedRuns = <String>{};
+  if (!isGroup) {
+    for (final entry in conversation.cancelledRunMessages.entries) {
+      elapsedRuns.add(entry.key);
+      toolsByMessage
+          .putIfAbsent(entry.value, () => [])
+          .add(
+            ChatTimelineEntry(
+              'run-elapsed:${entry.key}',
+              (_) => _StoppedRunElapsed(
+                elapsed: conversation.unfinishedRunElapsed[entry.key]!,
+                cancelled: true,
+              ),
+            ),
+          );
+    }
+  }
   for (final group in groups) {
     final entry = liveSteps[group.start];
     final storageId = 'tool:${entry.runId}:${entry.ordinal}';
@@ -219,9 +260,12 @@ List<ChatTimelineEntry> buildChatTimeline(
                     (m) => m.id == 'group-created:${conversation.id}',
                   )) ...[
                 const SizedBox(height: 24),
-                Text(
-                  conversation.creationMessage!,
+                GroupMentionText(
+                  text: conversation.creationMessage!,
+                  members: noticeNameIds,
+                  bareNames: true,
                   textAlign: TextAlign.center,
+                  onOpen: (id) => openNoticeMember(context, id),
                   style: TextStyle(
                     fontSize: 12,
                     height: 1.6,
@@ -245,7 +289,7 @@ List<ChatTimelineEntry> buildChatTimeline(
         ChatTimelineEntry(
           'time:${message.id}',
           (context) => Padding(
-            padding: const EdgeInsets.fromLTRB(18, 24, 18, 12),
+            padding: EdgeInsets.fromLTRB(18, 24, 18, isGroup ? 6 : 12),
             child: Center(
               child: Text(
                 messageTime(message.createdAt),
@@ -262,16 +306,15 @@ List<ChatTimelineEntry> buildChatTimeline(
         ChatTimelineEntry(message.id, (context) {
           if (message.isSystem) {
             return Padding(
-              padding: EdgeInsets.fromLTRB(
-                28,
-                12,
-                28,
-                conversation.kind == ConversationKind.group ? 0 : 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
               child: RecalledMessageNotice(
                 message: message,
                 onEdit: onReeditRecalled,
                 onOpenSource: onOpenQuote,
+                memberNames: isGroup ? noticeNameIds : const {},
+                onOpenMember: isGroup
+                    ? (id) => openNoticeMember(context, id)
+                    : null,
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.6,
@@ -417,7 +460,7 @@ List<ChatTimelineEntry> buildChatTimeline(
                 );
           final item = conversation.kind == ConversationKind.group
               ? Padding(
-                  padding: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
                   child: pagedBody,
                 )
               : pagedBody;
@@ -456,9 +499,10 @@ List<ChatTimelineEntry> buildChatTimeline(
 }
 
 class _StoppedRunElapsed extends StatelessWidget {
-  const _StoppedRunElapsed({required this.elapsed});
+  const _StoppedRunElapsed({required this.elapsed, this.cancelled = false});
 
   final Duration elapsed;
+  final bool cancelled;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -471,7 +515,9 @@ class _StoppedRunElapsed extends StatelessWidget {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              '用时 ${taskDuration(elapsed)}',
+              cancelled
+                  ? '你在 ${taskDuration(elapsed)}后停止了'
+                  : '用时 ${taskDuration(elapsed)}',
               style: TextStyle(
                 fontSize: 14,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,

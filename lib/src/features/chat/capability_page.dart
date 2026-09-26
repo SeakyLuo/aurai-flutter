@@ -84,7 +84,6 @@ class _CapabilityPageState extends State<CapabilityPage>
     child: Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        gradientBackground: true,
         title: '设备能力',
         onBack: () => Navigator.maybePop(context),
       ),

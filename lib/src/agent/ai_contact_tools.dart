@@ -110,6 +110,12 @@ class AiContactTool
               'provider': {
                 'type': 'string',
                 'enum': modelSettings().profiles.keys
+                    .where(
+                      (service) => modelSettings()
+                          .profile(service)
+                          .protocol
+                          .supportsChatModels,
+                    )
                     .map((s) => s.name)
                     .toList(),
               },
@@ -191,13 +197,14 @@ class AiContactTool
               'provider': old.modelSelection?.provider.name,
               'availableProviders': [
                 for (final config in modelSettings().profiles.values)
-                  {
-                    'provider': config.service.name,
-                    'name': config.displayName,
-                    'configured': config.isConfigured,
-                    'savedModels': config.savedModels,
-                    'model': config.model,
-                  },
+                  if (config.protocol.supportsChatModels)
+                    {
+                      'provider': config.service.name,
+                      'name': config.displayName,
+                      'configured': config.isConfigured,
+                      'savedModels': config.savedModels,
+                      'model': config.model,
+                    },
               ],
             },
           };
@@ -218,7 +225,8 @@ class AiContactTool
               requested['provider'] as String,
             );
             final config = modelSettings().profiles[provider];
-            if (config == null) throw ArgumentError('供应商不存在');
+            if (config == null || !config.protocol.supportsChatModels)
+              throw ArgumentError('供应商不存在');
             final model = (requested['model'] as String).trim();
             if (model.isEmpty) throw ArgumentError('模型名称不能为空');
             selection = AiModelSelection(

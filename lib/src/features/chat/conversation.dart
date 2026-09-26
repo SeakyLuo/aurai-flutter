@@ -41,6 +41,7 @@ class Conversation {
   final List<({String runId, String afterMessageId, AgentStep step})>
   liveToolSteps = [];
   final Map<String, Duration> unfinishedRunElapsed = {};
+  final Map<String, String> cancelledRunMessages = {};
   bool isPinned = false;
   bool isArchived = false;
   bool isScheduledTask = false;
@@ -48,6 +49,7 @@ class Conversation {
   String? storedTitle;
   List<String> creationMemberIds = [];
   List<MessageSender> creationMembers = [];
+  final Map<String, MessageSender> noticeMembers = {};
   String creationUserName = MessageSender.localUser.name;
   String? storedPreview;
   bool storedPreviewIsSystem = false;

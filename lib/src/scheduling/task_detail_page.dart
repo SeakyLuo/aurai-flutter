@@ -81,8 +81,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     super.dispose();
   }
 
-  void _notice(String text) =>
-      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text) => ScaffoldMessenger.of(
+    context,
+  ).showGlassSnackBar(SnackBar(content: Text(text)));
 
   Future<bool> _save() async {
     if (_title.text.trim().isEmpty || _prompt.text.trim().isEmpty) {
@@ -415,22 +416,12 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           if (!didPop) _close();
         },
         child: Scaffold(
-          appBar: AppBar(
-            toolbarHeight: 76,
-            leadingWidth: 72,
-            leading: Padding(
-              padding: const EdgeInsets.only(left: 16),
-              child: Center(
-                child: SettingsGlassAction(
-                  label: '返回',
-                  icon: Icons.arrow_back_rounded,
-                  onPressed: _busy ? null : _close,
-                ),
-              ),
-            ),
+          extendBodyBehindAppBar: true,
+          appBar: SettingsAppBar(
+            title: '',
+            onBack: _busy ? null : _close,
             actions: [
-              GlassSurface(
-                radius: 28,
+              SettingsGlassActionSurface(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -485,118 +476,129 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
             ],
           ),
-          body: SafeArea(
-            top: false,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-                  children: [
-                    _group([
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(minHeight: 60),
-                        child: Center(
+          body: SettingsPageBody(
+            child: SafeArea(
+              top: false,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: ListView(
+                    padding: settingsPagePadding(
+                      context,
+                      const EdgeInsets.fromLTRB(16, 20, 16, 24),
+                    ),
+                    children: [
+                      _group([
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 60),
+                          child: Center(
+                            child: TextField(
+                              controller: _title,
+                              onTapOutside: (_) =>
+                                  FocusManager.instance.primaryFocus?.unfocus(),
+                              focusNode: _titleFocus,
+                              textAlignVertical: TextAlignVertical.center,
+                              enabled: enabled,
+                              maxLength: 80,
+                              style: _taskTextStyle,
+                              onChanged: (_) => setState(() {}),
+                              decoration: const InputDecoration(
+                                hintText: '任务标题',
+                                isDense: true,
+                                counterText: '',
+                                filled: false,
+                                contentPadding: EdgeInsets.fromLTRB(
+                                  20,
+                                  0,
+                                  14,
+                                  0,
+                                ),
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Divider(
+                          height: 2,
+                          thickness: 2,
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                        ),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight: MediaQuery.sizeOf(context).height * .4,
+                          ),
                           child: TextField(
-                            controller: _title,
+                            controller: _prompt,
                             onTapOutside: (_) =>
                                 FocusManager.instance.primaryFocus?.unfocus(),
-                            focusNode: _titleFocus,
-                            textAlignVertical: TextAlignVertical.center,
                             enabled: enabled,
-                            maxLength: 80,
+                            minLines: 1,
+                            maxLines: null,
+                            maxLength: 4000,
                             style: _taskTextStyle,
                             onChanged: (_) => setState(() {}),
                             decoration: const InputDecoration(
-                              hintText: '任务标题',
-                              isDense: true,
+                              hintText: '任务内容',
                               counterText: '',
                               filled: false,
-                              contentPadding: EdgeInsets.fromLTRB(20, 0, 14, 0),
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              disabledBorder: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 20,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      Divider(
-                        height: 2,
-                        thickness: 2,
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                      ),
-                      ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxHeight: MediaQuery.sizeOf(context).height * .4,
-                        ),
-                        child: TextField(
-                          controller: _prompt,
-                          onTapOutside: (_) =>
-                              FocusManager.instance.primaryFocus?.unfocus(),
-                          enabled: enabled,
-                          minLines: 1,
-                          maxLines: null,
-                          maxLength: 4000,
-                          style: _taskTextStyle,
-                          onChanged: (_) => setState(() {}),
-                          decoration: const InputDecoration(
-                            hintText: '任务内容',
-                            counterText: '',
-                            filled: false,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 20,
-                            ),
+                      ]),
+                      const SizedBox(height: 24),
+                      _group([
+                        SizedBox(
+                          key: _repeatKey,
+                          child: _row(
+                            '重复',
+                            _repeat,
+                            enabled ? _repeatPicker : null,
+                            expanded: _repeatMenuOpen,
+                            dropdown: true,
                           ),
                         ),
-                      ),
-                    ]),
-                    const SizedBox(height: 24),
-                    _group([
-                      SizedBox(
-                        key: _repeatKey,
-                        child: _row(
-                          '重复',
-                          _repeat,
-                          enabled ? _repeatPicker : null,
-                          expanded: _repeatMenuOpen,
-                          dropdown: true,
+                        Divider(
+                          height: 2,
+                          thickness: 2,
+                          color: Theme.of(context).scaffoldBackgroundColor,
                         ),
-                      ),
-                      Divider(
-                        height: 2,
-                        thickness: 2,
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                      ),
-                      _row(
-                        '执行',
-                        _rule.isEmpty
-                            ? '${_at.year}/${_at.month}/${_at.day}'
-                            : _recurrence?.executionLabel ??
-                                  _saved['scheduleLabel'] as String,
-                        enabled ? _schedulePicker : null,
-                      ),
-                      Divider(
-                        height: 2,
-                        thickness: 2,
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                      ),
-                      _row(
-                        _saved['timezone'] == tasks.timezone ? '时间' : '时间（本机）',
-                        TimeOfDay.fromDateTime(_at).format(context),
-                        enabled ? _timePicker : null,
-                      ),
-                    ]),
-                    if (task['lastError'] != null)
-                      TextButton(
-                        onPressed: () => _notice(task['lastError'] as String),
-                        child: const Text('查看未完成原因'),
-                      ),
-                  ],
+                        _row(
+                          '执行',
+                          _rule.isEmpty
+                              ? '${_at.year}/${_at.month}/${_at.day}'
+                              : _recurrence?.executionLabel ??
+                                    _saved['scheduleLabel'] as String,
+                          enabled ? _schedulePicker : null,
+                        ),
+                        Divider(
+                          height: 2,
+                          thickness: 2,
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                        ),
+                        _row(
+                          _saved['timezone'] == tasks.timezone
+                              ? '时间'
+                              : '时间（本机）',
+                          TimeOfDay.fromDateTime(_at).format(context),
+                          enabled ? _timePicker : null,
+                        ),
+                      ]),
+                      if (task['lastError'] != null)
+                        TextButton(
+                          onPressed: () => _notice(task['lastError'] as String),
+                          child: const Text('查看未完成原因'),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),

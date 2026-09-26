@@ -324,6 +324,7 @@ class ConversationsDrawer extends StatelessWidget {
                           const SizedBox(width: 16),
                           GlassSurface(
                             radius: 24,
+                            shadowOpacity: .8,
                             child: RoundAction(
                               icon: Icons.settings_outlined,
                               iconWidget: const SidebarActionIcon(

@@ -55,8 +55,9 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
     super.dispose();
   }
 
-  void _notice(String text) =>
-      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text) => ScaffoldMessenger.of(
+    context,
+  ).showGlassSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _load({bool reset = false}) async {
     if (!reset && (_loading || !_hasMore)) return;
@@ -190,6 +191,7 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
   Widget build(BuildContext context) => PopScope(
     canPop: !_saving && !_creating,
     child: Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: '邀请朋友',
         onBack: _saving || _creating ? null : () => Navigator.pop(context),
@@ -209,155 +211,160 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
           ),
         ],
       ),
-      body: SafeArea(
-        top: false,
-        child: AbsorbPointer(
-          absorbing: _saving || _creating,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: TextField(
-                  controller: _search,
-                  decoration: InputDecoration(
-                    hintText: '搜索通讯录',
-                    filled: true,
-                    fillColor: settingsFieldColor(context),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(26),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  onChanged: (_) {
-                    _debounce?.cancel();
-                    _debounce = Timer(
-                      const Duration(milliseconds: 250),
-                      () => _load(reset: true),
-                    );
-                  },
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '已选择 ${_selected.length} 位',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+      body: SettingsPageBody(
+        avoidHeader: true,
+        child: SafeArea(
+          top: false,
+          child: AbsorbPointer(
+            absorbing: _saving || _creating,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: TextField(
+                    controller: _search,
+                    decoration: InputDecoration(
+                      hintText: '搜索通讯录',
+                      filled: true,
+                      fillColor: settingsFieldColor(context),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(26),
+                        borderSide: BorderSide.none,
                       ),
                     ),
-                    IconButton(
-                      tooltip: '随机添加成员',
-                      onPressed:
-                          !_creating &&
-                              _joined.length + _selected.length <
-                                  GroupChatStore.maxAiMembers
-                          ? _create
-                          : null,
-                      icon: SettingsIcon(
-                        type: SettingsIconType.add,
-                        color:
+                    onChanged: (_) {
+                      _debounce?.cancel();
+                      _debounce = Timer(
+                        const Duration(milliseconds: 250),
+                        () => _load(reset: true),
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '已选择 ${_selected.length} 位',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: '随机添加成员',
+                        onPressed:
                             !_creating &&
                                 _joined.length + _selected.length <
                                     GroupChatStore.maxAiMembers
-                            ? Theme.of(context).colorScheme.onSurfaceVariant
-                            : Theme.of(context).disabledColor,
+                            ? _create
+                            : null,
+                        icon: SettingsIcon(
+                          type: SettingsIconType.add,
+                          color:
+                              !_creating &&
+                                  _joined.length + _selected.length <
+                                      GroupChatStore.maxAiMembers
+                              ? Theme.of(context).colorScheme.onSurfaceVariant
+                              : Theme.of(context).disabledColor,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: PaginationListener(
-                  hasMore: _hasMore && !_failed,
-                  loadMore: _load,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                    children: [
-                      for (final ai in [
-                        ..._created.where(
-                          (ai) => ai.sender.name.toLowerCase().contains(
-                            _search.text.trim().toLowerCase(),
-                          ),
-                        ),
-                        ..._profiles,
-                      ])
-                        _joined.contains(ai.sender.id)
-                            ? Row(
-                                children: [
-                                  Expanded(
-                                    child: GroupMemberChoice(
-                                      selected: true,
-                                      sender: ai.sender,
-                                      onTap: null,
-                                    ),
-                                  ),
-                                  Text(
-                                    '已加入',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : GroupMemberChoice(
-                                selected: _selected.contains(ai.sender.id),
-                                sender: ai.sender,
-                                onEdit:
-                                    _created.any(
-                                      (member) =>
-                                          member.sender.id == ai.sender.id,
-                                    )
-                                    ? () => _edit(ai)
-                                    : null,
-                                onTap: () {
-                                  if (!_selected.contains(ai.sender.id) &&
-                                      _joined.length + _selected.length >=
-                                          GroupChatStore.maxAiMembers) {
-                                    _notice('群聊最多可加入 32 位 AI');
-                                    return;
-                                  }
-                                  setState(() {
-                                    if (!_selected.remove(ai.sender.id))
-                                      _selected.add(ai.sender.id);
-                                  });
-                                },
-                              ),
-                      if (_loading)
-                        const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Center(child: CircularProgressIndicator()),
-                        ),
-                      if (_failed)
-                        TextButton(
-                          onPressed: () => _load(reset: _profiles.isEmpty),
-                          child: const Text('重试'),
-                        ),
-                      if (!_loading &&
-                          !_failed &&
-                          _profiles.isEmpty &&
-                          _created.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Text(
-                            _search.text.trim().isEmpty
-                                ? '暂无成员，点击右上方＋添加'
-                                : '没有找到匹配的 AI',
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
                     ],
                   ),
                 ),
-              ),
-            ],
+                Expanded(
+                  child: PaginationListener(
+                    hasMore: _hasMore && !_failed,
+                    loadMore: _load,
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      children: [
+                        for (final ai in [
+                          ..._created.where(
+                            (ai) => ai.sender.name.toLowerCase().contains(
+                              _search.text.trim().toLowerCase(),
+                            ),
+                          ),
+                          ..._profiles,
+                        ])
+                          _joined.contains(ai.sender.id)
+                              ? Row(
+                                  children: [
+                                    Expanded(
+                                      child: GroupMemberChoice(
+                                        selected: true,
+                                        sender: ai.sender,
+                                        onTap: null,
+                                      ),
+                                    ),
+                                    Text(
+                                      '已加入',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : GroupMemberChoice(
+                                  selected: _selected.contains(ai.sender.id),
+                                  sender: ai.sender,
+                                  onEdit:
+                                      _created.any(
+                                        (member) =>
+                                            member.sender.id == ai.sender.id,
+                                      )
+                                      ? () => _edit(ai)
+                                      : null,
+                                  onTap: () {
+                                    if (!_selected.contains(ai.sender.id) &&
+                                        _joined.length + _selected.length >=
+                                            GroupChatStore.maxAiMembers) {
+                                      _notice('群聊最多可加入 32 位 AI');
+                                      return;
+                                    }
+                                    setState(() {
+                                      if (!_selected.remove(ai.sender.id))
+                                        _selected.add(ai.sender.id);
+                                    });
+                                  },
+                                ),
+                        if (_loading)
+                          const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                        if (_failed)
+                          TextButton(
+                            onPressed: () => _load(reset: _profiles.isEmpty),
+                            child: const Text('重试'),
+                          ),
+                        if (!_loading &&
+                            !_failed &&
+                            _profiles.isEmpty &&
+                            _created.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Text(
+                              _search.text.trim().isEmpty
+                                  ? '暂无成员，点击右上方＋添加'
+                                  : '没有找到匹配的 AI',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

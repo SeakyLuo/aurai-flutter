@@ -13,7 +13,7 @@ class OpenModelTopUpTool implements AgentTool, RuntimeCapabilityAgentTool {
   ToolDefinition get definition => const ToolDefinition(
     name: 'openModelTopUp',
     description:
-        'Open the official recharge page for a saved model provider in the phone browser. Currently supports official DeepSeek only. This only opens a page: it does not select an amount, create an order, authenticate, or pay. Use only for a user-requested recharge. For assisted preparation, first clarify the exact amount and currency and query getModelBalance. The browser login may belong to a different account from the API key: ask the user to confirm they match before selecting amounts. Then observe using screen tools and prepare only the requested amount. The user must complete login, payment and any codes themselves. Do not click pay/submit-order/confirm-purchase or use code/shell to perform payment. Cancellation ends the recharge flow; never retry a payment. After the user reports payment, query the new balance and report the snapshot without asserting a specific order settled. Use blocking askUser for missing amount/currency, never assume defaults. Have the user return to Aurai and report paid/cancelled with askUser(waitForResponse=true). After paid feedback query balance once; on query failure never recommend paying again. When model funds are exhausted, the manual recharge entry remains under Model settings > DeepSeek > Account balance and recharge.',
+        'Open the configured recharge page for a saved model provider in the phone browser. This only opens a page: it does not select an amount, create an order, authenticate, or pay. Use only for a user-requested recharge. For assisted preparation, first clarify the exact amount and currency and query getModelBalance. The browser login may belong to a different account from the API key: ask the user to confirm they match before selecting amounts. Then observe using screen tools and prepare only the requested amount. The user must complete login, payment and any codes themselves. Do not click pay/submit-order/confirm-purchase or use code/shell to perform payment. Cancellation ends the recharge flow; never retry a payment. After the user reports payment, query the new balance and report the snapshot without asserting a specific order settled. Use blocking askUser for missing amount/currency, never assume defaults. Have the user return to Aurai and report paid/cancelled with askUser(waitForResponse=true). After paid feedback query balance once; on query failure never recommend paying again. The manual recharge entry is under the provider account balance.',
     inputSchema: {
       'type': 'object',
       'properties': {
@@ -46,7 +46,7 @@ class OpenModelTopUpTool implements AgentTool, RuntimeCapabilityAgentTool {
         output: {
           'provider': service.label,
           'pageOpened': true,
-          'url': ModelTopUp.deepSeekUrl,
+          'url': settings.profile(service).rechargeUrl,
           'amountSelected': false,
           'orderCreated': false,
           'paymentPerformed': false,

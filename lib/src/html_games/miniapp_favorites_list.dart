@@ -11,7 +11,6 @@ import '../features/chat/settings_icon.dart';
 import 'miniapp_detail_page.dart';
 import 'miniapp_favorites.dart';
 import 'miniapp_icon.dart';
-import 'miniapp_library_page.dart';
 import 'miniapp_library_store.dart';
 
 class MiniappFavoritesList extends StatefulWidget {
@@ -158,16 +157,6 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
     if (mounted && selected == 'remove') await _remove(item);
   }
 
-  Future<void> _library() async {
-    await Navigator.push<void>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MiniappLibraryPage(controller: widget.controller),
-      ),
-    );
-    if (mounted) await _load(reset: true);
-  }
-
   Widget _tile(MiniappFavorite item) => Padding(
     key: ValueKey(_store.key(item.entry)),
     padding: const EdgeInsets.only(bottom: 12),
@@ -213,16 +202,20 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
 
   @override
   Widget build(BuildContext context) => _loading && _items.isEmpty
-      ? const SingleChildScrollView(
-          physics: NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.all(20),
-          child: SearchSkeleton(label: '正在加载收藏小程序', avatarSize: 40, rowGap: 40),
+      ? SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: settingsPagePadding(context, const EdgeInsets.all(20)),
+          child: const SearchSkeleton(
+            label: '正在加载收藏小程序',
+            avatarSize: 40,
+            rowGap: 40,
+          ),
         )
       : AnimatedEntryList(
           controller: _scroll,
           padding: EdgeInsets.fromLTRB(
             16,
-            16,
+            settingsHeaderHeight(context) + 16,
             16,
             MediaQuery.paddingOf(context).bottom + 24,
           ),

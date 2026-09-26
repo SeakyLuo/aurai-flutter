@@ -295,7 +295,7 @@ extension ModelConfigActions on ChatController {
         baseUrl: targetAccount.baseUrl,
         details: targetAccount.details,
         reasoning: reasoning == ModelReasoning.inherit
-            ? targetAccount.reasoning
+            ? targetAccount.reasoningFor(to.model.model)
             : reasoning,
       );
     }
@@ -321,6 +321,19 @@ extension ModelConfigActions on ChatController {
     ModelPurpose purpose,
     DefaultModelSelection selection,
   ) async {
+    final account = modelSettings.profile(selection.service);
+    final protocol = account.protocol;
+    if (purpose == ModelPurpose.musicGeneration
+        ? !protocol.defaultModelPurposes.contains(purpose)
+        : !protocol.supportsChatModels) {
+      throw ArgumentError('该供应商不提供此类模型');
+    }
+    if (purpose == ModelPurpose.musicGeneration &&
+        (!protocol.modelCatalog.any((model) => model.id == selection.model) ||
+            (!account.autoSyncModels &&
+                !account.savedModels.contains(selection.model)))) {
+      throw ArgumentError('请选择该供应商的可用音乐模型');
+    }
     final next = ModelSettings(
       activeService: purpose == ModelPurpose.text
           ? selection.service

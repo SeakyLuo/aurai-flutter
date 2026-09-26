@@ -14,9 +14,13 @@ class ProviderConfigurationTool
   final _cancelled = ValueNotifier(false);
   static const descriptions = {
     'listModelProviders':
-        'List saved model providers without API keys. Use returned provider references internally, never ask the user to type an ID.',
+        'List saved model providers and their balance and recharge configuration without API keys. Use returned provider references internally, never ask the user to type an ID.',
     'configureModelProvider':
         'Create or update a named OpenAI-compatible provider after consulting official documentation. Protocols openaiChatCompletions and responses are supported. Supply provider from listModelProviders to update or rename an existing provider without changing its identity. Website is a public homepage, separate from API base URL. Models is the saved model list; removing a name only removes it from suggestions, not existing AI selections. Supply the API base URL (usually ending /v1), not /chat/completions or /responses. Does not choose the default model or change any AI model. A changed endpoint clears its saved key. Never put credentials in arguments or URLs. Name matching an existing account updates it when provider is omitted.',
+    'configureProviderBalance':
+        'Create or update a saved provider balance query configuration. Read listModelProviders first, and consult the provider official API documentation for its HTTPS balance URL and JSON fields. Supply null balance to restore the built-in preset or remove a custom configuration. itemsPath points to an array; leave it empty for one balance object. totalPath, toppedUpPath, grantedPath and currencyPath are dot-separated keys relative to each item; availablePath and successPath are relative to the root. successValue is the expected value of successPath, such as true or 0. When availablePath is empty, availability is derived from positive total. currency is used when currencyPath is empty. topUpUrl is an optional HTTPS browser page and does not make a payment. Never put credentials in arguments or URLs.',
+    'configureProviderIcon':
+        'Set a saved provider icon from an existing local image file accessible to Aurai. Read listModelProviders first. Supply null imagePath to restore the provider default. This works for all provider protocols. Do not ask the user to type a provider reference.',
     'requestModelProviderKey':
         'Open a private masked API key dialog for a saved provider and wait for the user to save or cancel. Keys never enter the model context. Do not ask for keys in chat, read the clipboard, or repeat after cancellation. This tool already waits; no extra userAction handoff.',
     'listProviderModels':
@@ -40,6 +44,9 @@ class ProviderConfigurationTool
     confirmationDescriptionBuilder: (args) => switch (name) {
       'configureModelProvider' =>
         '是否保存供应商“${args['name']}”？\n${args['baseUrl']}\n更换地址会清除原密钥。',
+      'configureProviderBalance' =>
+        '是否保存余额查询配置？\n${(args['balance'] as Map?)?['url'] ?? '恢复供应商预设'}',
+      'configureProviderIcon' => '是否更改供应商图标？',
       'requestModelProviderKey' => '是否打开供应商密钥填写弹框？密钥不会发送给 AI。',
       'checkModelProvider' => '是否向该供应商发送一条连接测试消息？可能产生少量费用。',
       _ => '是否使用已保存的密钥获取该供应商的模型列表？',
@@ -69,6 +76,34 @@ class ProviderConfigurationTool
             'description':
                 'Default model name for this account, or empty string until models are fetched.',
           },
+        } else if (name == 'configureProviderIcon') ...{
+          'provider': {'type': 'string'},
+          'imagePath': {
+            'type': ['string', 'null'],
+            'description':
+                'Existing image file path accessible to Aurai, or null to restore the original icon.',
+          },
+        } else if (name == 'configureProviderBalance') ...{
+          'provider': {'type': 'string'},
+          'balance': {
+            'type': ['object', 'null'],
+            'properties': {
+              'url': {'type': 'string'},
+              'itemsPath': {'type': 'string'},
+              'availablePath': {'type': 'string'},
+              'successPath': {'type': 'string'},
+              'successValue': {'type': 'string'},
+              'currencyPath': {'type': 'string'},
+              'currency': {'type': 'string'},
+              'totalPath': {'type': 'string'},
+              'toppedUpPath': {'type': 'string'},
+              'grantedPath': {'type': 'string'},
+              'grantedLabel': {'type': 'string'},
+              'topUpUrl': {'type': 'string'},
+            },
+            'required': ['url', 'totalPath', 'toppedUpPath', 'grantedPath'],
+            'additionalProperties': false,
+          },
         } else if (name != 'listModelProviders')
           'provider': {'type': 'string'},
         if (name == 'checkModelProvider') 'model': {'type': 'string'},
@@ -79,6 +114,12 @@ class ProviderConfigurationTool
           'baseUrl',
           'protocol',
           'model',
+        ] else if (name == 'configureProviderIcon') ...[
+          'provider',
+          'imagePath',
+        ] else if (name == 'configureProviderBalance') ...[
+          'provider',
+          'balance',
         ] else if (name != 'listModelProviders')
           'provider',
         if (name == 'checkModelProvider') 'model',

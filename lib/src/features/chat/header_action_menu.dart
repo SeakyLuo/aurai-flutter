@@ -8,6 +8,7 @@ Future<String?> showHeaderActionMenu(
   BuildContext context, {
   required List<HeaderMenuItem> items,
   Set<String> destructiveValues = const {},
+  Set<String> preserveIconColors = const {},
 }) {
   final button = context.findRenderObject()! as RenderBox;
   final overlay =
@@ -56,36 +57,15 @@ Future<String?> showHeaderActionMenu(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           for (final item in items)
-                            InkWell(
-                              borderRadius: BorderRadius.circular(17),
+                            GlassMenuItem(
+                              icon: item.icon,
+                              label: item.label,
                               onTap: () => Navigator.pop(context, item.value),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 15,
-                                ),
-                                child: Row(
-                                  children: [
-                                    item.icon,
-                                    const SizedBox(width: 13),
-                                    Expanded(
-                                      child: Text(
-                                        item.label,
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          color:
-                                              destructiveValues.contains(
-                                                item.value,
-                                              )
-                                              ? Theme.of(
-                                                  context,
-                                                ).colorScheme.error
-                                              : null,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              destructive: destructiveValues.contains(
+                                item.value,
+                              ),
+                              preserveIconColor: preserveIconColors.contains(
+                                item.value,
                               ),
                             ),
                         ],
@@ -101,6 +81,64 @@ Future<String?> showHeaderActionMenu(
     },
     transitionBuilder: (_, _, _, child) => child,
   );
+}
+
+class GlassMenuItem extends StatelessWidget {
+  const GlassMenuItem({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.destructive = false,
+    this.preserveIconColor = false,
+  });
+
+  final Widget icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool destructive;
+  final bool preserveIconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final color = destructive ? colors.error : colors.onSurface;
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(17),
+        hoverColor: const Color(0x0c695383),
+        highlightColor: const Color(0x14695383),
+        splashColor: const Color(0x14695383),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              preserveIconColor
+                  ? icon
+                  : ColorFiltered(
+                      colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                      child: icon,
+                    ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.3,
+                    fontWeight: FontWeight.w500,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _MenuPosition extends SingleChildLayoutDelegate {

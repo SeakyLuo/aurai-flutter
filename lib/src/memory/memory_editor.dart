@@ -86,6 +86,7 @@ class MemoryEditorState extends State<MemoryEditor> {
         if (!didPop) _leave();
       },
       child: Scaffold(
+        extendBodyBehindAppBar: true,
         appBar: SettingsAppBar(
           title: widget.entry == null ? '添加记忆' : '编辑记忆',
           onBack: busy ? null : _leave,
@@ -113,50 +114,55 @@ class MemoryEditorState extends State<MemoryEditor> {
             ),
           ],
         ),
-        body: SafeArea(
-          top: false,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                children: [
-                  TextField(
-                    controller: text,
-                    autofocus: widget.entry == null,
-                    enabled: !busy,
-                    minLines: 5,
-                    maxLines: null,
-                    maxLength: 300,
-                    onChanged: (_) => setState(() {}),
-                    style: TextStyle(
-                      fontSize: 16,
-                      height: 1.6,
-                      fontWeight: FontWeight.w400,
-                      color: colors.onSurface,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: '想让 Aurai 记住什么？',
-                      hintStyle: TextStyle(
-                        color: colors.onSurfaceVariant,
-                        fontWeight: FontWeight.w400,
-                      ),
-                      filled: true,
-                      fillColor: settingsFieldColor(context),
-                      contentPadding: const EdgeInsets.all(16),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      counterStyle: TextStyle(
-                        fontSize: 12,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
+        body: SettingsPageBody(
+          child: SafeArea(
+            top: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: ListView(
+                  padding: settingsPagePadding(
+                    context,
+                    const EdgeInsets.fromLTRB(16, 12, 16, 24),
                   ),
-                ],
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  children: [
+                    TextField(
+                      controller: text,
+                      autofocus: widget.entry == null,
+                      enabled: !busy,
+                      minLines: 5,
+                      maxLines: null,
+                      maxLength: 300,
+                      onChanged: (_) => setState(() {}),
+                      style: TextStyle(
+                        fontSize: 16,
+                        height: 1.6,
+                        fontWeight: FontWeight.w400,
+                        color: colors.onSurface,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '想让 Aurai 记住什么？',
+                        hintStyle: TextStyle(
+                          color: colors.onSurfaceVariant,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        filled: true,
+                        fillColor: settingsFieldColor(context),
+                        contentPadding: const EdgeInsets.all(16),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        counterStyle: TextStyle(
+                          fontSize: 12,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

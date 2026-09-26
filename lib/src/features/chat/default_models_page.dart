@@ -4,6 +4,7 @@ import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../domain/image_generation_config.dart';
 import '../../domain/model_provider.dart';
+import '../../domain/music_model_selection.dart';
 import '../../providers/image_generation_client.dart';
 import '../../providers/model_catalog.dart';
 import '../../providers/openrouter_models.dart';
@@ -12,7 +13,6 @@ import 'choice_sheet.dart';
 import 'model_replacement_page.dart';
 import 'model_provider_icon.dart';
 import 'model_settings_sheet.dart';
-import 'music_generation_settings_page.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 
@@ -89,6 +89,14 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
           widget.controller.modelSettings.activeService,
     ModelPurpose.videoGeneration =>
       widget.controller.modelSettings.modelDefaults[purpose]?.service,
+    ModelPurpose.musicGeneration =>
+      widget.controller.modelSettings.modelDefaults[purpose]?.service ??
+          widget
+              .controller
+              .modelSettings
+              .firstAvailableMusicModel
+              ?.config
+              .service,
   };
 
   List<ModelConfig> _accounts(ModelPurpose purpose) => widget
@@ -101,10 +109,14 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
             profile.isConfigured &&
             switch (purpose) {
               ModelPurpose.imageGeneration =>
-                profile.service == ModelService.openRouter ||
-                    profile.service == ModelService.qwen,
-              ModelPurpose.videoGeneration => true,
-              ModelPurpose.text => true,
+                profile.service.supportsImageGeneration,
+              ModelPurpose.videoGeneration =>
+                profile.protocol.supportsChatModels,
+              ModelPurpose.text => profile.protocol.supportsChatModels,
+              ModelPurpose.musicGeneration =>
+                profile.protocol.defaultModelPurposes.contains(
+                  ModelPurpose.musicGeneration,
+                ),
             },
       )
       .toList();
@@ -143,17 +155,18 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
     try {
       final catalog = ModelCatalog();
       _catalog = catalog;
-      final models = purpose == ModelPurpose.text && !account.autoSyncModels
+      final models = !account.autoSyncModels
           ? account.savedModels
-          : await catalog.load(
-              baseUrl: Uri.parse(account.baseUrl),
-              apiKey: account.apiKey,
-              openRouter: service == ModelService.openRouter,
+          : await catalog.loadFor(
+              account,
               textOnly: purpose == ModelPurpose.text,
             );
       final choices = <DefaultModelSelection>[];
       for (final model in models) {
-        final info = service == ModelService.openRouter
+        final configuredPurposes = account.details?.modelPurposes[model];
+        if (configuredPurposes != null && !configuredPurposes.contains(purpose))
+          continue;
+        final info = service.usesOpenRouterCatalog
             ? OpenRouterModels.lookup(account.baseUrl, model)
             : null;
         final eligible = switch (purpose) {
@@ -161,13 +174,19 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
           ModelPurpose.videoGeneration =>
             info?.outputModalities.contains('video') ?? true,
           ModelPurpose.imageGeneration => false,
+          ModelPurpose.musicGeneration =>
+            account.protocol.defaultModelPurposes.contains(
+              ModelPurpose.musicGeneration,
+            ),
         };
         if (eligible) {
           choices.add(
             DefaultModelSelection(
               service: service,
               model: model,
-              name: info?.name ?? modelDisplayName(model),
+              name:
+                  info?.name ??
+                  modelDisplayName(account.protocol.displayModel(model)),
             ),
           );
         }
@@ -175,13 +194,15 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
       if (!mounted) return;
       if (choices.isEmpty) {
         throw StateError(
-          '该供应商当前没有可用于${purpose.label.replaceFirst('模型', '')}的模型',
+          '没有可用于${purpose.label.replaceFirst('模型', '')}的模型，请到供应商的模型管理中设置用途',
         );
       }
       final currentModel =
           widget.controller.modelSettings.modelDefaults[purpose]?.model ??
           (purpose == ModelPurpose.text
               ? widget.controller.modelSettings.activeConfig.model
+              : purpose == ModelPurpose.musicGeneration
+              ? widget.controller.modelSettings.firstAvailableMusicModel?.model
               : null);
       final choice = await showChoiceSheet<String?>(
         context,
@@ -212,11 +233,19 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
     final client = ImageGenerationClient();
     _imageClient = client;
     try {
-      final models = await client.models(
-        widget.controller.modelSettings.profile(service),
-      );
+      final account = widget.controller.modelSettings.profile(service);
+      final models = [
+        for (final model in await client.models(account))
+          if (account.details?.modelPurposes[model.id]?.contains(
+                ModelPurpose.imageGeneration,
+              ) ??
+              true)
+            model,
+      ];
       if (!mounted) return;
-      if (models.isEmpty) throw StateError('该供应商当前没有可用的图片生成模型');
+      if (models.isEmpty) {
+        throw StateError('没有可用的图片生成模型，请到供应商的模型管理中设置用途');
+      }
       final selected = await showChoiceSheet<String?>(
         context,
         title: ModelPurpose.imageGeneration.label,
@@ -260,6 +289,12 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
       final config = settings.activeConfig;
       return config.isConfigured ? modelDisplayName(config.model) : '未设置';
     }
+    if (purpose == ModelPurpose.musicGeneration) {
+      final selection = settings.firstAvailableMusicModel;
+      return selection == null
+          ? '未设置'
+          : selection.config.protocol.displayModel(selection.model);
+    }
     return '未设置';
   }
 
@@ -272,6 +307,9 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
     if (selected != null) {
       return settings.profile(selected.service).isConfigured;
     }
+    if (purpose == ModelPurpose.musicGeneration) {
+      return settings.firstAvailableMusicModel != null;
+    }
     return purpose == ModelPurpose.text && settings.activeConfig.isConfigured;
   }
 
@@ -279,16 +317,13 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
     ModelPurpose.text => '默认文本模型',
     ModelPurpose.imageGeneration => '默认图片生成模型',
     ModelPurpose.videoGeneration => '默认视频生成模型',
+    ModelPurpose.musicGeneration => '默认音乐生成模型',
   };
 
   @override
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
-    appBar: SettingsAppBar(
-      gradientBackground: true,
-      title: '模型设置',
-      onBack: () => Navigator.pop(context),
-    ),
+    appBar: SettingsAppBar(title: '默认模型', onBack: () => Navigator.pop(context)),
     body: SafeArea(
       top: false,
       child: Center(
@@ -297,9 +332,7 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
           child: ListView(
             padding: EdgeInsets.fromLTRB(
               16,
-              View.of(context).padding.top / View.of(context).devicePixelRatio +
-                  76 +
-                  8,
+              settingsHeaderHeight(context) + 8,
               16,
               32,
             ),
@@ -366,50 +399,6 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
                 ),
                 const SizedBox(height: 14),
               ],
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 4, 8, 2),
-                child: Text(
-                  '音乐生成',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              Material(
-                color: settingsFieldColor(context),
-                borderRadius: BorderRadius.circular(24),
-                clipBehavior: Clip.antiAlias,
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 10,
-                  ),
-                  leading: const SizedBox.square(
-                    dimension: 44,
-                    child: Center(
-                      child: SettingsIcon(type: SettingsIconType.modelProvider),
-                    ),
-                  ),
-                  title: Text(
-                    widget.controller.musicGeneration?.apiKey.isNotEmpty == true
-                        ? 'Suno API 平台（第三方）'
-                        : '未设置',
-                  ),
-                  trailing: const SettingsIcon(type: SettingsIconType.chevron),
-                  onTap: () async {
-                    await Navigator.push<void>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => MusicGenerationSettingsPage(
-                          controller: widget.controller,
-                        ),
-                      ),
-                    );
-                    if (mounted) setState(() {});
-                  },
-                ),
-              ),
             ],
           ),
         ),
@@ -432,7 +421,9 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
                   child: SettingsIcon(type: SettingsIconType.modelProvider),
                 ),
               )
-            : ModelProviderIcon(service: service),
+            : ModelProviderIcon(
+                config: widget.controller.modelSettings.profile(service),
+              ),
       ),
     );
   }

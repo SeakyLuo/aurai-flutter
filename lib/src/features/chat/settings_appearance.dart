@@ -5,6 +5,39 @@ import 'package:flutter/cupertino.dart';
 
 import 'glass_surface.dart';
 
+// Read the window inset: Scaffold's body padding already includes the app bar.
+double settingsHeaderHeight(BuildContext context) =>
+    View.of(context).padding.top / View.of(context).devicePixelRatio +
+    SettingsAppBar.toolbarHeight;
+
+EdgeInsets settingsPagePadding(BuildContext context, EdgeInsets padding) =>
+    padding.copyWith(top: settingsHeaderHeight(context) + padding.top);
+
+class SettingsPageBody extends StatelessWidget {
+  const SettingsPageBody({
+    super.key,
+    required this.child,
+    this.avoidHeader = false,
+  });
+
+  final Widget child;
+  // Fixed forms and search controls stay below the header. Scrollable pages
+  // instead use settingsPagePadding inside their outermost scroll view.
+  final bool avoidHeader;
+
+  @override
+  Widget build(BuildContext context) => MediaQuery.removePadding(
+    context: context,
+    removeTop: true,
+    child: avoidHeader
+        ? Padding(
+            padding: EdgeInsets.only(top: settingsHeaderHeight(context)),
+            child: child,
+          )
+        : child,
+  );
+}
+
 Color settingsFieldColor(BuildContext context) =>
     GlobalUI.controlBackground(Theme.of(context));
 
@@ -14,6 +47,11 @@ Color dialogControlColor(BuildContext context) =>
     : settingsFieldColor(context);
 
 class SettingsGlassAction extends StatelessWidget {
+  static Color foregroundColor(BuildContext context, {required bool enabled}) {
+    final color = Theme.of(context).colorScheme.onSurface;
+    return enabled ? color : color.withValues(alpha: 0.3);
+  }
+
   const SettingsGlassAction({
     super.key,
     required this.label,
@@ -28,9 +66,7 @@ class SettingsGlassAction extends StatelessWidget {
   final Widget? iconWidget;
 
   @override
-  Widget build(BuildContext context) => GlassSurface(
-    radius: 28,
-    shadowOpacity: .65,
+  Widget build(BuildContext context) => SettingsGlassActionSurface(
     child: RoundAction(
       label: label,
       icon: icon,
@@ -40,12 +76,20 @@ class SettingsGlassAction extends StatelessWidget {
           Icon(
             icon,
             size: 25,
-            color: onPressed == null
-                ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)
-                : Theme.of(context).colorScheme.onSurface,
+            color: foregroundColor(context, enabled: onPressed != null),
           ),
     ),
   );
+}
+
+class SettingsGlassActionSurface extends StatelessWidget {
+  const SettingsGlassActionSurface({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) =>
+      GlassSurface(radius: 28, shadowOpacity: .55, child: child);
 }
 
 class SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -57,31 +101,31 @@ class SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.titleWidget,
     this.leadingAction,
     this.root = false,
-    this.gradientBackground = false,
   });
 
   final String title;
   final bool root;
-  final bool gradientBackground;
   final Widget? titleWidget;
   final Widget? leadingAction;
   final VoidCallback? onBack;
   final List<Widget> actions;
 
+  static const double toolbarHeight = 76;
+
   @override
-  Size get preferredSize => const Size.fromHeight(76);
+  Size get preferredSize => const Size.fromHeight(toolbarHeight);
 
   @override
   Widget build(BuildContext context) => AppBar(
-    backgroundColor: gradientBackground ? Colors.transparent : null,
-    surfaceTintColor: gradientBackground ? Colors.transparent : null,
-    shadowColor: gradientBackground ? Colors.transparent : null,
-    elevation: gradientBackground ? 0 : null,
-    scrolledUnderElevation: gradientBackground ? 0 : null,
-    forceMaterialTransparency: gradientBackground,
-    flexibleSpace: gradientBackground ? const ChatHeaderBackground() : null,
+    backgroundColor: Colors.transparent,
+    surfaceTintColor: Colors.transparent,
+    shadowColor: Colors.transparent,
+    elevation: 0,
+    scrolledUnderElevation: 0,
+    forceMaterialTransparency: true,
+    flexibleSpace: const ChatHeaderBackground(),
     centerTitle: true,
-    toolbarHeight: 76,
+    toolbarHeight: toolbarHeight,
     leadingWidth: 64,
     title: titleWidget ?? Text(title),
     automaticallyImplyLeading: false,

@@ -179,90 +179,94 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: '查找聊天记录',
         onBack: () => Navigator.pop(context),
       ),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: TextField(
-                controller: _input,
-                focusNode: _focus,
-                onChanged: _changed,
-                textInputAction: TextInputAction.search,
-                onSubmitted: (_) {
-                  final pending = _debounce?.isActive == true;
-                  _debounce?.cancel();
-                  _focus.unfocus();
-                  if (pending) {
-                    _page.loading = false;
-                    _load();
-                  }
-                },
-                decoration: InputDecoration(
-                  hintText: '搜索群消息和文件名',
-                  filled: true,
-                  fillColor: settingsFieldColor(context),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
-                  ),
-                  suffixIcon: _input.text.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: '清空',
-                          onPressed: () {
-                            _input.clear();
-                            _changed('');
-                            _focus.requestFocus();
-                          },
-                          icon: const QuestionIcon(
-                            type: QuestionIconType.close,
+      body: SettingsPageBody(
+        avoidHeader: true,
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: TextField(
+                  controller: _input,
+                  focusNode: _focus,
+                  onChanged: _changed,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) {
+                    final pending = _debounce?.isActive == true;
+                    _debounce?.cancel();
+                    _focus.unfocus();
+                    if (pending) {
+                      _page.loading = false;
+                      _load();
+                    }
+                  },
+                  decoration: InputDecoration(
+                    hintText: '搜索群消息和文件名',
+                    filled: true,
+                    fillColor: settingsFieldColor(context),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    suffixIcon: _input.text.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: '清空',
+                            onPressed: () {
+                              _input.clear();
+                              _changed('');
+                              _focus.requestFocus();
+                            },
+                            icon: const QuestionIcon(
+                              type: QuestionIconType.close,
+                            ),
                           ),
-                        ),
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: GroupSearchTypeSegment(value: _type, onChanged: _select),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: RetainedTabView(
-                index: _type.index,
-                onChanged: (index) => _select(GroupSearchType.values[index]),
-                children: [
-                  for (final type in GroupSearchType.values)
-                    TickerMode(
-                      enabled: type == _type,
-                      child:
-                          type == _type ||
-                              _pages[type]!.loaded ||
-                              _pages[type]!.loading
-                          ? _results(context, type)
-                          : const SizedBox.expand(),
-                    ),
-                ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: GroupSearchTypeSegment(value: _type, onChanged: _select),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Expanded(
+                child: RetainedTabView(
+                  index: _type.index,
+                  onChanged: (index) => _select(GroupSearchType.values[index]),
+                  children: [
+                    for (final type in GroupSearchType.values)
+                      TickerMode(
+                        enabled: type == _type,
+                        child:
+                            type == _type ||
+                                _pages[type]!.loaded ||
+                                _pages[type]!.loading
+                            ? _results(context, type)
+                            : const SizedBox.expand(),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

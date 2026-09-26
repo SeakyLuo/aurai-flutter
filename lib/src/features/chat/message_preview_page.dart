@@ -12,55 +12,61 @@ class MessagePreviewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(title: '预览消息', onBack: () => Navigator.pop(context)),
-    body: SafeArea(
-      top: false,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        children: [
-          if (message.htmlGame case final html?) ...[
-            Text(html.title, style: Theme.of(context).textTheme.titleMedium),
-            if (html.preview case final preview?) ...[
-              const SizedBox(height: 12),
-              Image.memory(preview),
-            ],
-          ],
-          if (message.text.isNotEmpty)
-            MarkdownBody(
-              data: message.text,
-              selectable: true,
-              inlineSyntaxes: [CjkStrongSyntax()],
-            ),
-          if (message.interactive case final card?) ...[
-            Text(card.title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            MarkdownBody(
-              data: card.body,
-              selectable: true,
-              inlineSyntaxes: [CjkStrongSyntax()],
-            ),
-          ],
-          if (message.images.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final image in message.images)
-                  ImageAttachment(
-                    image: image,
-                    gallery: message.images,
-                    size: 160,
-                  ),
+    body: SettingsPageBody(
+      child: SafeArea(
+        top: false,
+        child: ListView(
+          padding: settingsPagePadding(
+            context,
+            const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          ),
+          children: [
+            if (message.htmlGame case final html?) ...[
+              Text(html.title, style: Theme.of(context).textTheme.titleMedium),
+              if (html.preview case final preview?) ...[
+                const SizedBox(height: 12),
+                Image.memory(preview),
               ],
-            ),
+            ],
+            if (message.text.isNotEmpty)
+              MarkdownBody(
+                data: message.text,
+                selectable: true,
+                inlineSyntaxes: [CjkStrongSyntax()],
+              ),
+            if (message.interactive case final card?) ...[
+              Text(card.title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              MarkdownBody(
+                data: card.body,
+                selectable: true,
+                inlineSyntaxes: [CjkStrongSyntax()],
+              ),
+            ],
+            if (message.images.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final image in message.images)
+                    ImageAttachment(
+                      image: image,
+                      gallery: message.images,
+                      size: 160,
+                    ),
+                ],
+              ),
+            ],
+            for (final file in message.files)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: FileAttachmentCard(file: file),
+              ),
           ],
-          for (final file in message.files)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: FileAttachmentCard(file: file),
-            ),
-        ],
+        ),
       ),
     ),
   );

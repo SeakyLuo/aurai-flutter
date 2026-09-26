@@ -1,141 +1,85 @@
 part of 'model_provider_detail.dart';
 
+const _providerTileShape = RoundedRectangleBorder(
+  borderRadius: BorderRadius.all(Radius.circular(20)),
+);
+
 extension _ProviderOverview on _ModelProviderDetailState {
   Widget _overview() {
-    final limits = _saved.model.isEmpty
-        ? null
-        : ModelContextLimits.previewForConfig(_saved);
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      padding: settingsPagePadding(
+        context,
+        const EdgeInsets.fromLTRB(12, 12, 12, 32),
+      ),
       children: [
-        _readLabel('供应商名称', first: true),
-        _readSurface(
-          Row(
-            children: [
-              ModelProviderIcon(service: _service),
-              const SizedBox(width: 12),
-              Expanded(
-                child: SelectableText(
-                  _saved.displayName,
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
-            ],
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          leading: ModelProviderIcon(config: _saved),
+          title: const Text('供应商名称'),
+          subtitle: Text(_saved.displayName),
+        ),
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          title: const Text('接口协议'),
+          subtitle: Text(_saved.protocol.label),
+        ),
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          title: const Text('API 密钥'),
+          subtitle: _overviewValue(
+            _saved.apiKey.isEmpty ? '未配置' : '已配置',
+            unset: _saved.apiKey.isEmpty,
           ),
         ),
-        _readLabel('官网地址'),
-        _readSurface(
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _saved.website.isEmpty ? '未设置' : _saved.website,
-                  style: const TextStyle(fontSize: 15, height: 1.5),
-                ),
-              ),
-              if (_saved.website.isNotEmpty) ...[
-                const SizedBox(width: 12),
-                const SettingsIcon(type: SettingsIconType.chevron),
-              ],
-            ],
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          title: const Text('服务地址'),
+          subtitle: SelectableText(_saved.baseUrl),
+        ),
+        if (_saved.isConfigured)
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+            title: const Text('可用模型'),
+            shape: _providerTileShape,
+            subtitle: Text(
+              _saved.autoSyncModels
+                  ? '默认全部'
+                  : '已选 ${_saved.savedModels.length} 个模型',
+            ),
+            trailing: const SettingsIcon(type: SettingsIconType.chevron),
+            onTap: _openModelManagement,
           ),
+        ListTile(
+          minVerticalPadding: 0,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          title: const Text('默认模型设置'),
+          shape: _providerTileShape,
+          subtitle: const Text('此供应商下的模型默认继承，可单独覆盖'),
+          trailing: const SettingsIcon(type: SettingsIconType.chevron),
+          onTap: _openDefaultModelSettings,
+        ),
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          title: const Text('官网地址'),
+          shape: _providerTileShape,
+          subtitle: _overviewValue(
+            _saved.website.isEmpty ? '未设置' : _saved.website,
+            unset: _saved.website.isEmpty,
+          ),
+          trailing: _saved.website.isEmpty
+              ? null
+              : const SettingsIcon(type: SettingsIconType.chevron),
           onTap: _saved.website.isEmpty ? null : _openWebsite,
         ),
-        _readValue('接口协议', _saved.protocol.label),
-        _readValue('API 密钥', _saved.apiKey.isEmpty ? '未配置' : '已配置'),
-        _readValue('服务地址', _saved.baseUrl),
-        _readLabel('可用模型'),
-        _readSurface(
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _saved.autoSyncModels
-                      ? '默认全部'
-                      : '${_saved.savedModels.length} 个模型',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
-              const SettingsIcon(type: SettingsIconType.chevron),
-            ],
-          ),
-          onTap: _openModelManagement,
-        ),
-        _readLabel('请求转换'),
-        _readSurface(
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  (_saved.details?.requestAdapters.isNotEmpty ?? false)
-                      ? '已配置'
-                      : '未设置',
-                ),
-              ),
-              const SettingsIcon(type: SettingsIconType.chevron),
-            ],
-          ),
-          onTap: _openRequestAdapters,
-        ),
-        _readLabel('上下文压缩'),
-        _readSurface(
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  limits == null
-                      ? '选择模型后配置'
-                      : '默认模型：${limits.compactPercent}% · '
-                            '约 ${limits.compactThreshold} token',
-                ),
-              ),
-              const SettingsIcon(type: SettingsIconType.chevron),
-            ],
-          ),
-          onTap: _openModelContext,
-        ),
-        _readValue('思考强度', _saved.reasoning.label),
         if (_saved.isConfigured) ...[
-          _readLabel('账户余额'),
-          ModelBalanceTile(key: ValueKey(_service), config: _saved),
+          const SizedBox(height: 12),
+          ModelBalanceTile(
+            key: ValueKey(_service),
+            config: _saved,
+            overview: true,
+          ),
         ],
       ],
     );
   }
-
-  Widget _readLabel(String title, {bool first = false}) => Padding(
-    padding: EdgeInsets.fromLTRB(18, first ? 8 : 24, 18, 12),
-    child: Text(
-      title,
-      style: TextStyle(
-        fontSize: 15,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-    ),
-  );
-
-  Widget _readValue(String title, String value) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      _readLabel(title),
-      _readSurface(
-        SelectableText(
-          value,
-          style: const TextStyle(fontSize: 15, height: 1.5),
-        ),
-      ),
-    ],
-  );
-
-  Widget _readSurface(Widget child, {VoidCallback? onTap}) => Material(
-    color: settingsFieldColor(context),
-    borderRadius: BorderRadius.circular(26),
-    clipBehavior: Clip.antiAlias,
-    child: onTap == null
-        ? Padding(padding: const EdgeInsets.all(18), child: child)
-        : InkWell(
-            onTap: onTap,
-            child: Padding(padding: const EdgeInsets.all(18), child: child),
-          ),
-  );
 }

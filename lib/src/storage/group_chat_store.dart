@@ -378,7 +378,7 @@ class GroupChatStore {
           await ContactRelationships.befriend(txn, ownerId, profile.sender.id);
       });
 
-  Future<void> updateAi(
+  Future<String> updateAi(
     AiProfile profile, {
     bool addToMyContacts = false,
   }) => database.transaction((txn) async {
@@ -388,6 +388,14 @@ class GroupChatStore {
     }
     if (profile.sender.kind != MessageSenderKind.agent)
       throw ArgumentError('AI 配置必须属于 AI 身份');
+    final previousSender = (await txn.query(
+      'message_senders',
+      columns: ['name'],
+      where: 'id = ?',
+      whereArgs: [profile.sender.id],
+      limit: 1,
+    )).single;
+    final previousName = previousSender['name'] as String;
     final count = await txn.update(
       'ai_profiles',
       {..._profileRow(profile)..remove('created_at')},
@@ -404,6 +412,12 @@ class GroupChatStore {
       where: 'id = ? AND kind = ?',
       whereArgs: [profile.sender.id, 'agent'],
     );
+    await refreshGroupNoticeName(
+      txn,
+      profile.sender.id,
+      previousName,
+      profile.sender.name,
+    );
     if (addToMyContacts && !profile.isTemporary && !profile.sender.archived) {
       await ContactRelationships.befriend(
         txn,
@@ -411,6 +425,7 @@ class GroupChatStore {
         profile.sender.id,
       );
     }
+    return previousName;
   });
 
   // Archive an identity rather than deleting the author of historical messages.
@@ -496,6 +511,7 @@ class GroupChatStore {
       conversation.creationUserName = senders[MessageSender.localUser.id]!.name;
       conversation.creationMemberIds = allIds;
       conversation.creationMembers = [for (final id in allIds) senders[id]!];
+      conversation.noticeMembers.addAll(senders);
       await txn.insert('conversations', conversationRow(conversation));
       final batch = txn.batch();
       for (final (position, senderId) in [
@@ -555,6 +571,16 @@ class GroupChatStore {
               : DateTime.fromMicrosecondsSinceEpoch(row['left_at'] as int),
         ),
     ];
+  }
+
+  Future<List<MessageSender>> noticeMembers(String conversationId) async {
+    final rows = await database.query(
+      'message_senders',
+      where:
+          'id IN (SELECT sender_id FROM conversation_members WHERE conversation_id = ?)',
+      whereArgs: [conversationId],
+    );
+    return rows.map(MessageSender.fromRow).toList();
   }
 
   Future<void> updateMembers(

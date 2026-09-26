@@ -18,6 +18,13 @@ abstract final class GlobalUI {
   static const Color primaryBackground = Color(0xfff4effb);
   static const Color onPrimaryBackground = Color(0xff493365);
   static const Color onPrimary = Color(0xff493365);
+
+  /// 可点击人名、@ 提及等文字的强调色，区别于 primary 背景色。
+  static Color highlightTextColor(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? primaryLight
+      : onPrimary;
+
   static TextStyle linkStyle(BuildContext context) {
     final color = Theme.of(context).colorScheme.onSurface;
     return TextStyle(color: color, decoration: TextDecoration.none);

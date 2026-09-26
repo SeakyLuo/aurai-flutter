@@ -8,6 +8,39 @@ extension UserDataReadAccess on ChatController {
     String? groupId,
   ) {
     final name = tool.definition.name;
+    if (tool is GroupMessageMarksTool || tool is GroupAnnouncementTool) {
+      final user = MessageSender.localUser.id;
+      final AgentTool delegated = tool is GroupMessageMarksTool
+          ? GroupMessageMarksTool(
+              GroupMessageMarks(
+                groupStore,
+                actorId: senderId,
+                accessActorId: user,
+              ),
+              name,
+              tool.currentGroupId,
+              () => _store.writer.flush(),
+            )
+          : GroupAnnouncementTool(
+              GroupAnnouncementStore(groupStore),
+              senderId,
+              groupId ?? conversation.id,
+              write: (tool as GroupAnnouncementTool).write,
+              accessActorId: user,
+            );
+      return GroupAccessTool(
+        original: tool,
+        delegated: delegated,
+        resolve: (call) => _resolveGroupAccess(
+          call,
+          senderId,
+          groupId ??
+              (conversation.kind == ConversationKind.group
+                  ? conversation.id
+                  : null),
+        ),
+      );
+    }
     if (!const {
       'readGroupChat',
       'readGroupMessages',
@@ -63,6 +96,65 @@ extension UserDataReadAccess on ChatController {
     );
   }
 
+  Future<({bool useUserScope, String title, String preview})>
+  _resolveGroupAccess(ToolCall call, String senderId, String? groupId) async {
+    final scope = await _resolveDataReadAccess(call, senderId, groupId);
+    var preview = '';
+    final messageId = call.arguments['messageId'] as String?;
+    if (scope.useUserScope && messageId != null) {
+      final (rows, attachments, apps) = await (
+        _store.database.query(
+          'messages',
+          columns: ['text', 'interactive_json'],
+          where: 'id = ? AND conversation_id = ?',
+          whereArgs: [
+            messageId,
+            call.arguments['groupId'] as String? ?? groupId,
+          ],
+        ),
+        _store.database.query(
+          'attachments',
+          columns: ['kind', 'display_name'],
+          where: 'message_id = ?',
+          whereArgs: [messageId],
+          orderBy: 'position',
+          limit: 3,
+        ),
+        _store.database.query(
+          'html_games',
+          columns: ['title'],
+          where: 'message_id = ?',
+          whereArgs: [messageId],
+        ),
+      ).wait;
+      if (rows.isNotEmpty) {
+        final raw = rows.single['interactive_json'] as String?;
+        if (raw == null) {
+          preview = [
+            rows.single['text'] as String,
+            if (apps.isNotEmpty) '[小程序] ${apps.single['title']}',
+            for (final attachment in attachments)
+              attachment['kind'] == 'image'
+                  ? '[图片]'
+                  : '[文件] ${attachment['display_name']}',
+          ].where((text) => text.isNotEmpty).join(' ');
+        } else {
+          final card = InteractiveMessage.fromJson(
+            jsonDecode(raw) as Map<String, dynamic>,
+          );
+          card.requireViewer(MessageSender.localUser.id);
+          final view = card.viewFor(MessageSender.localUser.id);
+          preview = '${view.title}\n${view.body}';
+        }
+      }
+    }
+    return (
+      useUserScope: scope.useUserScope,
+      title: scope.title,
+      preview: preview,
+    );
+  }
+
   Future<({bool useUserScope, String title})> _resolveDataReadAccess(
     ToolCall call,
     String senderId,
@@ -70,7 +162,11 @@ extension UserDataReadAccess on ChatController {
   ) async {
     final args = call.arguments;
     final isGroup =
-        call.name == 'readGroupMessages' || call.name == 'readGroupChat';
+        call.name == 'readGroupMessages' ||
+        call.name == 'readGroupChat' ||
+        call.name == 'readGroupAnnouncement' ||
+        call.name == 'updateGroupAnnouncement' ||
+        GroupMessageMarksTool.names.contains(call.name);
     if (call.name == 'readGroupChat' && !args.containsKey('id')) {
       return (useUserScope: false, title: '');
     }

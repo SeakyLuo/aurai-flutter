@@ -8,12 +8,14 @@ class AnimatedEntryList extends StatefulWidget {
     required this.padding,
     this.controller,
     this.empty,
+    this.animateChanges = true,
   });
 
   final List<Widget> children;
   final EdgeInsetsGeometry padding;
   final ScrollController? controller;
   final Widget? empty;
+  final bool animateChanges;
 
   @override
   State<AnimatedEntryList> createState() => _AnimatedEntryListState();
@@ -28,6 +30,7 @@ class _AnimatedEntryListState extends State<AnimatedEntryList> {
   @override
   void didUpdateWidget(AnimatedEntryList oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!widget.animateChanges) return;
     final keys = widget.children.map((child) => child.key).toSet();
     for (var i = _entries.length - 1; i >= 0; i--) {
       if (!keys.contains(_entries[i].key)) _remove(i);
@@ -71,15 +74,25 @@ class _AnimatedEntryListState extends State<AnimatedEntryList> {
   @override
   Widget build(BuildContext context) => Stack(
     children: [
-      AnimatedList(
-        key: _list,
-        controller: widget.controller,
-        padding: widget.padding,
-        initialItemCount: _entries.length,
-        itemBuilder: (context, index, animation) =>
-            _transition(_entries[index], animation),
-      ),
-      if (_entries.isEmpty && _departing == 0 && widget.empty != null)
+      if (!widget.animateChanges)
+        ListView(
+          controller: widget.controller,
+          padding: widget.padding,
+          children: widget.children,
+        )
+      else
+        AnimatedList(
+          key: _list,
+          controller: widget.controller,
+          padding: widget.padding,
+          initialItemCount: _entries.length,
+          itemBuilder: (context, index, animation) =>
+              _transition(_entries[index], animation),
+        ),
+      if ((widget.animateChanges
+              ? _entries.isEmpty && _departing == 0
+              : widget.children.isEmpty) &&
+          widget.empty != null)
         Positioned.fill(child: widget.empty!),
     ],
   );

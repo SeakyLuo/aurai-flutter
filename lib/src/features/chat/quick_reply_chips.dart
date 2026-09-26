@@ -123,7 +123,9 @@ class QuickReplyChips extends StatelessWidget {
                           ),
                           Flexible(
                             child: Text(
-                              group.first.senderName,
+                              group.first.senderId == MessageSender.localUser.id
+                                  ? MessageSender.localUser.name
+                                  : group.first.senderName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),

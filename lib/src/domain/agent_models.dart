@@ -93,6 +93,37 @@ class AgentMessage {
     quickReplies: value,
   );
 
+  AgentMessage withText(String value) => AgentMessage(
+    id: id,
+    role: role,
+    senderId: senderId,
+    sender: sender,
+    text: value,
+    createdAt: createdAt,
+    images: images,
+    files: files,
+    taskSummary: taskSummary,
+    runId: runId,
+    modelTurnId: modelTurnId,
+    responseInput: responseInput,
+    isSystem: isSystem,
+    isFailure: isFailure,
+    isGroupMessage: isGroupMessage,
+    isReasoning: isReasoning,
+    isRichReply: isRichReply,
+    quote: quote,
+    interactive: interactive != null && interactive!.title == text
+        ? InteractiveMessage.fromJson({
+            ...interactive!.toJson(includeParticipants: true),
+            'title': value,
+          })
+        : interactive,
+    htmlGame: htmlGame,
+    quickReplyToId: quickReplyToId,
+    quickReplyKey: quickReplyKey,
+    quickReplies: quickReplies,
+  );
+
   final HtmlGameCard? htmlGame;
   final InteractiveMessage? interactive;
   final MessageQuote? quote;
@@ -327,9 +358,9 @@ String toolTitle(String name) =>
 String _defaultToolTitle(String name) => switch (name) {
   'readMyProfile' => '读取自己的资料',
   'updateMyProfile' => '更新自己的资料',
-  'listHtmlApps' => '查找小应用',
-  'readHtmlAppData' => '读取小应用数据',
-  'writeHtmlAppData' => '保存小应用数据',
+  'listHtmlApps' => '查找小程序',
+  'readHtmlAppData' => '读取小程序数据',
+  'writeHtmlAppData' => '保存小程序数据',
   'sendHtmlMessage' => '发送 HTML 消息',
   'readHtmlMessage' => '读取 HTML 消息',
   'updateHtmlMessage' => '更新 HTML 消息',
@@ -378,6 +409,14 @@ String _defaultToolTitle(String name) => switch (name) {
   'readMessageAttachment' => '读取历史附件',
   'readGroupMessages' => '读取群历史消息',
   'readGroupChat' => '读取群聊',
+  'readGroupPinnedMessage' => '读取置顶消息',
+  'pinGroupMessage' => '置顶群消息',
+  'unpinGroupMessage' => '取消群消息置顶',
+  'listGroupFavorites' => '读取群标记',
+  'addGroupFavorite' => '添加群标记',
+  'removeGroupFavorite' => '取消群标记',
+  'readGroupAnnouncement' => '读取群公告',
+  'updateGroupAnnouncement' => '更新群公告',
   'createGroupChat' => '创建群聊',
   'renameGroupChat' => '重命名群聊',
   'updateGroupChatMembers' => '调整群成员',

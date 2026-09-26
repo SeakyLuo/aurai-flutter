@@ -131,7 +131,6 @@ class _AiConversationsPageState extends State<AiConversationsPage>
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
-      gradientBackground: true,
       title: widget.profile.sender.name,
       onBack: () => Navigator.pop(context),
       titleWidget: InkWell(
@@ -178,10 +177,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
             child: ListView.builder(
               padding: EdgeInsets.fromLTRB(
                 16,
-                View.of(context).padding.top /
-                        View.of(context).devicePixelRatio +
-                    76 +
-                    8,
+                settingsHeaderHeight(context) + 8,
                 16,
                 24,
               ),

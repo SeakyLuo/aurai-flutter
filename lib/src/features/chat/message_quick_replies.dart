@@ -53,7 +53,8 @@ extension MessageQuickReplies on ChatController {
       _notifyRun(conversation);
       return false;
     }
-    if (source.senderId == MessageSender.localUser.id) {
+    if (source.senderId == MessageSender.localUser.id &&
+        conversation.kind != ConversationKind.group) {
       final message = _quickReplyMessage(source, key, text);
       _attachQuickReply(
         conversation,
@@ -127,14 +128,7 @@ extension MessageQuickReplies on ChatController {
       }
       _notifyRun(conversation);
       try {
-        await _store.writer.save(
-          conversation,
-          recipients: conversation.kind == ConversationKind.group
-              ? {
-                  message.id: [source.senderId],
-                }
-              : const {},
-        );
+        await _store.writer.save(conversation);
       } on Object {
         if (!sendAsMessage)
           _detachQuickReply(conversation, source.id, message.id);
@@ -155,7 +149,7 @@ extension MessageQuickReplies on ChatController {
       if (needsReplyConfiguration) return true;
       _submitting = false;
       if (conversation.kind == ConversationKind.group) {
-        await _continueTargetedGroupQuickReply({source.senderId});
+        await _continueGroupQuickReply();
       } else {
         await continuePending();
       }
@@ -189,14 +183,13 @@ extension MessageQuickReplies on ChatController {
     conversation.messages.add(message);
     conversation.messageCount++;
     try {
-      await _store.writer.save(
-        conversation,
-        makeActive: false,
-        recipients: {
-          message.id: [source.senderId],
-        },
+      await _store.writer.save(conversation, makeActive: false);
+      dispatcher.receive(
+        [message],
+        mentions: source.senderId == MessageSender.localUser.id
+            ? const {}
+            : {source.senderId},
       );
-      dispatcher.receiveTargeted([message], {source.senderId});
       _notifyRun(conversation);
     } on Object {
       _detachQuickReply(conversation, source.id, message.id);
@@ -410,12 +403,12 @@ extension MessageQuickReplies on ChatController {
     return {'sent': true, 'messageId': message.id};
   }
 
-  Future<void> _continueTargetedGroupQuickReply(Set<String> recipients) async {
+  Future<void> _continueGroupQuickReply() async {
     final conversation = activeConversation;
     _runningConversation = conversation;
     _notifyRun(conversation);
     try {
-      await _executeGroupChat(conversation, wakeMembers: recipients);
+      await _executeGroupChat(conversation);
     } finally {
       _runningConversation = null;
       _resumeForwardedReply();

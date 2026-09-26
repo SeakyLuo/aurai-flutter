@@ -30,6 +30,7 @@ class _StarredMessagesPageState extends State<StarredMessagesPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
       title: '收藏',
       titleWidget: SearchTypeSegment(
@@ -40,27 +41,29 @@ class _StarredMessagesPageState extends State<StarredMessagesPage> {
           if (value) _miniappsOpened = true;
         }),
       ),
-      gradientBackground: true,
+
       onBack: () => Navigator.maybePop(context),
     ),
-    body: RetainedTabView(
-      index: _miniapps ? 1 : 0,
-      onChanged: (index) => setState(() {
-        _miniapps = index == 1;
-        _miniappsOpened |= _miniapps;
-      }),
-      children: [
-        TickerMode(
-          enabled: !_miniapps,
-          child: _StarredMessageList(controller: widget.controller),
-        ),
-        TickerMode(
-          enabled: _miniapps,
-          child: _miniappsOpened
-              ? MiniappFavoritesList(controller: widget.controller)
-              : const SizedBox.expand(),
-        ),
-      ],
+    body: SettingsPageBody(
+      child: RetainedTabView(
+        index: _miniapps ? 1 : 0,
+        onChanged: (index) => setState(() {
+          _miniapps = index == 1;
+          _miniappsOpened |= _miniapps;
+        }),
+        children: [
+          TickerMode(
+            enabled: !_miniapps,
+            child: _StarredMessageList(controller: widget.controller),
+          ),
+          TickerMode(
+            enabled: _miniapps,
+            child: _miniappsOpened
+                ? MiniappFavoritesList(controller: widget.controller)
+                : const SizedBox.expand(),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -230,10 +233,10 @@ class _StarredMessageListState extends State<_StarredMessageList> {
 
   @override
   Widget build(BuildContext context) => _loading && _rows.isEmpty
-      ? const SingleChildScrollView(
-          physics: NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.all(16),
-          child: SearchSkeleton(
+      ? SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: settingsPagePadding(context, const EdgeInsets.all(16)),
+          child: const SearchSkeleton(
             label: '正在加载收藏消息',
             avatarSize: 32,
             contentHeight: 96,
@@ -253,7 +256,7 @@ class _StarredMessageListState extends State<_StarredMessageList> {
           ),
           padding: EdgeInsets.fromLTRB(
             0,
-            16,
+            settingsHeaderHeight(context) + 16,
             0,
             MediaQuery.paddingOf(context).bottom + 24,
           ),

@@ -58,8 +58,9 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
     if (mounted) setState(() => _loading = false);
   }
 
-  void _notice(String text) =>
-      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text) => ScaffoldMessenger.of(
+    context,
+  ).showGlassSnackBar(SnackBar(content: Text(text)));
   Future<void> _permission() async {
     try {
       await tasks.permission();
@@ -151,7 +152,6 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
           ),
         ),
         appBar: SettingsAppBar(
-          gradientBackground: true,
           title: '任务',
           onBack: () => Navigator.pop(context),
           actions: [

@@ -108,6 +108,7 @@ class _AiModelPageState extends State<AiModelPage> {
       if (!didPop && !_saving) _leave();
     },
     child: Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: '模型',
         onBack: () => Navigator.maybePop(context),
@@ -120,79 +121,90 @@ class _AiModelPageState extends State<AiModelPage> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _label('供应商'),
-          _choice(
-            widget.controller.modelSettings.profile(_service).displayName,
-            _saving || _loading
-                ? null
-                : () async {
-                    final value = await showChoiceSheet<ModelService>(
-                      context,
-                      title: '供应商',
-                      selected: _service,
-                      choices: [
-                        for (final service
-                            in widget.controller.modelSettings.profiles.keys)
-                          (
-                            value: service,
-                            label: widget.controller.modelSettings
-                                .profile(service)
-                                .displayName,
-                          ),
-                      ],
-                    );
-                    if (!mounted || value == null || value == _service) return;
-                    setState(() {
-                      _service = value;
-                      _reasoning = ModelReasoning.inherit;
-                      _changed = true;
-                      _model.clear();
-                      _url.text = widget.controller.modelSettings
-                          .profile(value)
-                          .baseUrl;
-                    });
-                  },
-          ),
-          const SizedBox(height: 16),
-          _label('模型名称'),
-          _choice(
-            _model.text.isEmpty ? '选择模型' : modelDisplayName(_model.text),
-            _saving || _loading ? null : _selectModel,
-            loading: _loading,
-          ),
-          ModelReasoningField(
-            service: _service,
-            model: _model.text,
-            baseUrl: _url.text,
-            value: _reasoning,
-            inheritedValue: widget.controller.modelSettings
-                .profile(_service)
-                .reasoning,
-            onChanged: _saving || _loading
-                ? null
-                : (value) => setState(() {
-                    _reasoning = value;
-                    _changed = true;
-                  }),
-          ),
-          const SizedBox(height: 16),
-          _label('账户余额'),
-          ModelBalanceTile(
-            key: ValueKey((_service, _url.text)),
-            config: ModelConfig(
+      body: SettingsPageBody(
+        child: ListView(
+          padding: settingsPagePadding(context, const EdgeInsets.all(16)),
+          children: [
+            _label('供应商'),
+            _choice(
+              widget.controller.modelSettings.profile(_service).displayName,
+              _saving || _loading
+                  ? null
+                  : () async {
+                      final value = await showChoiceSheet<ModelService>(
+                        context,
+                        title: '供应商',
+                        selected: _service,
+                        choices: [
+                          for (final service
+                              in widget.controller.modelSettings.profiles.keys
+                                  .where(
+                                    (service) => widget.controller.modelSettings
+                                        .profile(service)
+                                        .protocol
+                                        .supportsChatModels,
+                                  ))
+                            (
+                              value: service,
+                              label: widget.controller.modelSettings
+                                  .profile(service)
+                                  .displayName,
+                            ),
+                        ],
+                      );
+                      if (!mounted || value == null || value == _service)
+                        return;
+                      setState(() {
+                        _service = value;
+                        _reasoning = ModelReasoning.inherit;
+                        _changed = true;
+                        _model.clear();
+                        _url.text = widget.controller.modelSettings
+                            .profile(value)
+                            .baseUrl;
+                      });
+                    },
+            ),
+            const SizedBox(height: 16),
+            _label('模型名称'),
+            _choice(
+              _model.text.isEmpty ? '选择模型' : modelDisplayName(_model.text),
+              _saving || _loading ? null : _selectModel,
+              loading: _loading,
+            ),
+            ModelReasoningField(
               service: _service,
-              details: widget.controller.modelSettings
-                  .profile(_service)
-                  .details,
-              apiKey: widget.controller.modelSettings.profile(_service).apiKey,
               model: _model.text,
               baseUrl: _url.text,
+              value: _reasoning,
+              inheritedValue: widget.controller.modelSettings
+                  .profile(_service)
+                  .reasoningFor(_model.text),
+              onChanged: _saving || _loading
+                  ? null
+                  : (value) => setState(() {
+                      _reasoning = value;
+                      _changed = true;
+                    }),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            _label('账户余额'),
+            ModelBalanceTile(
+              key: ValueKey((_service, _url.text)),
+              config: ModelConfig(
+                service: _service,
+                details: widget.controller.modelSettings
+                    .profile(_service)
+                    .details,
+                apiKey: widget.controller.modelSettings
+                    .profile(_service)
+                    .apiKey,
+                model: _model.text,
+                baseUrl: _url.text,
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -219,16 +231,20 @@ class _AiModelPageState extends State<AiModelPage> {
         profile = widget.controller.modelSettings.profile(_service);
         if (profile.apiKey.isEmpty) return;
       }
-      final models = profile.autoSyncModels
-          ? await catalog.load(
-              baseUrl: Uri.parse(profile.baseUrl),
-              apiKey: profile.apiKey,
-              openRouter: _service == ModelService.openRouter,
-            )
+      final availableModels = profile.autoSyncModels
+          ? await catalog.loadFor(profile, textOnly: true)
           : profile.savedModels;
+      final models = [
+        for (final model in availableModels)
+          if (profile.details?.modelPurposes[model]?.contains(
+                ModelPurpose.text,
+              ) ??
+              true)
+            model,
+      ];
       if (!mounted) return;
       if (models.isEmpty) {
-        _notice('供应商没有返回可用模型');
+        _notice('没有可用的文本模型，请到供应商的模型管理中设置用途');
         return;
       }
       final value = await showChoiceSheet<String>(

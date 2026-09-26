@@ -63,7 +63,7 @@ abstract final class OpenRouterModels {
   }
 
   static OpenRouterModelInfo? forConfig(ModelConfig config) {
-    if (config.service != ModelService.openRouter) return null;
+    if (!config.service.usesOpenRouterCatalog) return null;
     final info = lookup(config.baseUrl, config.model);
     if (info == null)
       throw const ModelProviderException('请在 OpenRouter 设置中重新选择模型并保存，以获取模型能力');

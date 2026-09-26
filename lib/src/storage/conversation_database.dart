@@ -1,7 +1,9 @@
+import 'group_message_marks.dart';
 import '../html_games/miniapp_release_notes.dart';
 import '../html_games/miniapp_recent_store.dart';
 import '../html_games/miniapp_metadata_store.dart';
 import 'favorites.dart';
+import 'group_announcement_store.dart';
 import '../html_games/miniapp_publication_schema.dart';
 import '../html_games/html_app_store.dart';
 import 'interactive_action_history.dart';
@@ -21,12 +23,23 @@ import 'message_quick_reply_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 46,
+  version: 49,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion == 48) {
+      await db.execute(
+        'ALTER TABLE group_favorite_messages ADD COLUMN marked_by TEXT',
+      );
+    }
+    if (oldVersion < 48) {
+      for (final statement in groupMessageMarksSchema) {
+        await db.execute(statement);
+      }
+    }
+    if (oldVersion < 47) await db.execute(groupAnnouncementSchema);
     if (oldVersion < 42) await migrateMiniappMetadata(db);
     if (oldVersion >= 33 && oldVersion < 35) {
       await migrateMultipleQuickReplies(db);
@@ -211,7 +224,9 @@ Future<Database> openConversationDatabase() async => openDatabase(
     if (oldVersion < 46) {
       final columns = await db.rawQuery('PRAGMA table_info(html_games)');
       if (!columns.any((column) => column['name'] == 'session_data_json')) {
-        await db.execute('ALTER TABLE html_games ADD COLUMN session_data_json TEXT');
+        await db.execute(
+          'ALTER TABLE html_games ADD COLUMN session_data_json TEXT',
+        );
       }
     }
   },
@@ -232,6 +247,8 @@ Future<Database> openConversationDatabase() async => openDatabase(
       ...htmlGameSchema,
       'CREATE INDEX html_games_app ON html_games(app_id)',
       ...groupChatTables,
+      groupAnnouncementSchema,
+      ...groupMessageMarksSchema,
       groupParticipationSchema,
       temporaryAiColumn,
       ...contactRelationshipSchema,

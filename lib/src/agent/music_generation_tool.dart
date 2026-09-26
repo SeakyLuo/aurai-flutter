@@ -20,7 +20,7 @@ class MusicGenerationTool implements AgentTool, RuntimeCapabilityAgentTool {
     executionTimeout: const Duration(minutes: 8),
     description:
         '${configured() ? '' : 'Music generation is not configured. Open the music settings and wait for the user to enter a separate API key. '}'
-        'Generate two songs with the user-configured third-party Suno API service. '
+        'Generate two songs with the first available user-configured music API model. '
         'This operation may incur provider charges and can take several minutes. '
         'Completed MP3 files are sent directly to the current conversation as playable-by-device attachments. '
         'Use this only when the user asks for music. Never retry automatically after timeout, cancellation or failure; the provider may have charged.',

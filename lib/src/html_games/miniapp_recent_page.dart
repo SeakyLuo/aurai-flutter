@@ -37,7 +37,10 @@ class _MiniappRecentPageState extends State<MiniappRecentPage> {
       if (!mounted) return;
       setState(() {
         if (reset) _entries.clear();
-        _entries.addAll(result.entries);
+        final ids = _entries.map((entry) => entry.id).toSet();
+        _entries.addAll(
+          result.entries.where((entry) => ids.add(entry.id)),
+        );
         _more = result.more;
         _time = result.time;
         _id = result.id;
@@ -71,11 +74,7 @@ class _MiniappRecentPageState extends State<MiniappRecentPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
-    appBar: SettingsAppBar(
-      title: '最近使用',
-      gradientBackground: true,
-      onBack: () => Navigator.pop(context),
-    ),
+    appBar: SettingsAppBar(title: '最近使用', onBack: () => Navigator.pop(context)),
     body: SafeArea(
       top: false,
       child: Center(

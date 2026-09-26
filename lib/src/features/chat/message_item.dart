@@ -1,3 +1,6 @@
+import '../../storage/group_message_marks.dart';
+import 'group_favorite_marker.dart';
+import '../../app/ui_action.dart';
 import '../../html_games/miniapp_forward.dart';
 import '../../html_games/miniapp_favorites.dart';
 import '../../html_games/miniapp_library_store.dart';
@@ -265,32 +268,43 @@ class _MessageItemState extends State<MessageItem> {
   Widget _withActions(Widget child) =>
       GestureDetector(onLongPress: this._openActions, child: child);
 
+  Widget _withGroupFavorite(Widget child) =>
+      widget.groupBubble && !widget.readOnly && !message.isSystem
+      ? GroupFavoriteMarker(
+          messageId: message.id,
+          isOwnMessage: message.role == AgentMessageRole.user,
+          child: child,
+        )
+      : child;
+
   Widget _buildContent(BuildContext context) {
     if (message.htmlGame != null) {
       return Padding(
         padding: widget.groupBubble
             ? EdgeInsets.zero
             : const EdgeInsets.symmetric(horizontal: 18),
-        child: Stack(
-          children: [
-            if (widget.onLocate case final locate?)
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: locate,
-                child: IgnorePointer(child: widget.htmlView!),
-              )
-            else
-              widget.htmlView!,
-            if (!widget.readOnly)
-              Positioned(
-                top: HtmlMessageMoreButton.top,
-                right: HtmlMessageMoreButton.right,
-                child: HtmlMessageMoreButton(
-                  onPressed: () =>
-                      _openActions(compactMenu: !widget.groupBubble),
+        child: _withGroupFavorite(
+          Stack(
+            children: [
+              if (widget.onLocate case final locate?)
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: locate,
+                  child: IgnorePointer(child: widget.htmlView!),
+                )
+              else
+                widget.htmlView!,
+              if (!widget.readOnly)
+                Positioned(
+                  top: HtmlMessageMoreButton.top,
+                  right: HtmlMessageMoreButton.right,
+                  child: HtmlMessageMoreButton(
+                    onPressed: () =>
+                        _openActions(compactMenu: !widget.groupBubble),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -310,80 +324,83 @@ class _MessageItemState extends State<MessageItem> {
               widget.groupBubble ? 18 : 16,
               widget.groupBubble ? 0 : 24,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (message.quote != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: MessageQuoteView(
-                      quote: message.quote!,
-                      onTap: () =>
-                          widget.onOpenQuote?.call(message.quote!.messageId),
+            child: _withGroupFavorite(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (message.quote != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: MessageQuoteView(
+                        quote: message.quote!,
+                        onTap: () =>
+                            widget.onOpenQuote?.call(message.quote!.messageId),
+                      ),
                     ),
-                  ),
-                for (final file in message.files)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: FileAttachmentCard(file: file),
-                  ),
-                if (message.images.isNotEmpty)
-                  Wrap(
-                    alignment: WrapAlignment.end,
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final image in message.images)
-                        ImageAttachment(
-                          image: image,
-                          gallery: message.images,
-                          size: message.images.length == 1
-                              ? ((constraints.maxWidth - 32) * 0.72).clamp(
-                                  80.0,
-                                  260.0,
-                                )
-                              : ((constraints.maxWidth - 32) * 0.82 - 8) / 2,
-                        ),
-                    ],
-                  ),
-                if (message.htmlGame == null && message.interactive != null)
-                  ForwardedInteractiveMessage(card: message.interactive!),
-                if (message.images.isNotEmpty && message.text.isNotEmpty)
-                  const SizedBox(height: 8),
-                if (message.text.isNotEmpty)
-                  Material(
-                    key: _bubbleKey,
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? const Color(0xff51406c)
-                        : GlobalUI.userMessageBackground,
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      onLongPress: _openActions,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 14,
-                        ),
-                        child: GroupMentionText(
-                          text: message.text,
-                          members: widget.groupBubble
-                              ? widget.mentionMembers
-                              : const {},
-                          onOpen: widget.onOpenMember,
-                          style: TextStyle(
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? const Color(0xffeee8f7)
-                                : const Color(0xff352b43),
-                            fontSize: widget.groupBubble ? 15 : 16,
-                            height: widget.groupBubble ? 1.4 : 1.55,
+                  for (final file in message.files)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: FileAttachmentCard(file: file),
+                    ),
+                  if (message.images.isNotEmpty)
+                    Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final image in message.images)
+                          ImageAttachment(
+                            image: image,
+                            gallery: message.images,
+                            size: message.images.length == 1
+                                ? ((constraints.maxWidth - 32) * 0.72).clamp(
+                                    80.0,
+                                    260.0,
+                                  )
+                                : ((constraints.maxWidth - 32) * 0.82 - 8) / 2,
+                          ),
+                      ],
+                    ),
+                  if (message.htmlGame == null && message.interactive != null)
+                    ForwardedInteractiveMessage(card: message.interactive!),
+                  if (message.images.isNotEmpty && message.text.isNotEmpty)
+                    const SizedBox(height: 8),
+                  if (message.text.isNotEmpty)
+                    Material(
+                      key: _bubbleKey,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xff51406c)
+                          : GlobalUI.userMessageBackground,
+                      borderRadius: BorderRadius.circular(26),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onLongPress: _openActions,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 14,
+                          ),
+                          child: GroupMentionText(
+                            text: message.text,
+                            members: widget.groupBubble
+                                ? widget.mentionMembers
+                                : const {},
+                            onOpen: widget.onOpenMember,
+                            style: TextStyle(
+                              color:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? const Color(0xffeee8f7)
+                                  : const Color(0xff352b43),
+                              fontSize: widget.groupBubble ? 15 : 16,
+                              height: widget.groupBubble ? 1.4 : 1.55,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -578,17 +595,22 @@ class _MessageItemState extends State<MessageItem> {
             : BoxConstraints(
                 maxWidth: message.htmlGame!.width!.toDouble() + 32,
               ),
-        child: Material(
-          key: _bubbleKey,
-          color: GlobalUI.messageBackground(Theme.of(context)),
-          borderRadius: BorderRadius.circular(22),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: message.interactive != null ? widget.onLocate : null,
-            onLongPress: _openActions,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: content,
+        child: _withGroupFavorite(
+          Material(
+            key: _bubbleKey,
+            color: GlobalUI.messageBackground(Theme.of(context)),
+            borderRadius: BorderRadius.circular(22),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: message.interactive != null ? widget.onLocate : null,
+              onLongPress: _openActions,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: content,
+              ),
             ),
           ),
         ),

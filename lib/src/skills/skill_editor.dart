@@ -216,12 +216,12 @@ class _SkillEditorState extends State<SkillEditor> {
       if (!didPop) _close();
     },
     child: Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: _saved.id.isEmpty ? '新建技能' : '编辑技能',
         onBack: _close,
         actions: [
-          GlassSurface(
-            radius: 28,
+          SettingsGlassActionSurface(
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -239,150 +239,157 @@ class _SkillEditorState extends State<SkillEditor> {
           ),
         ],
       ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              children: [
-                _field(
-                  '名称',
-                  _name,
-                  60,
-                  prefixIcon: Padding(
-                    padding: const EdgeInsets.only(left: 6, right: 4),
-                    child: Tooltip(
-                      message: '选择技能图标',
-                      child: Material(
-                        color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(24),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
+      body: SettingsPageBody(
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: ListView(
+                padding: settingsPagePadding(
+                  context,
+                  const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                ),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                children: [
+                  _field(
+                    '名称',
+                    _name,
+                    60,
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.only(left: 6, right: 4),
+                      child: Tooltip(
+                        message: '选择技能图标',
+                        child: Material(
+                          color: Colors.transparent,
                           borderRadius: BorderRadius.circular(24),
-                          onTap: _busy
-                              ? null
-                              : () async {
-                                  FocusManager.instance.primaryFocus?.unfocus();
-                                  final icon = await showSkillIconPicker(
-                                    context,
-                                    _icon,
-                                  );
-                                  if (mounted && icon != null)
-                                    setState(() => _icon = icon);
-                                },
-                          child: SizedBox.square(
-                            dimension: 48,
-                            child: Center(child: SkillIcon(_icon)),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(24),
+                            onTap: _busy
+                                ? null
+                                : () async {
+                                    FocusManager.instance.primaryFocus
+                                        ?.unfocus();
+                                    final icon = await showSkillIconPicker(
+                                      context,
+                                      _icon,
+                                    );
+                                    if (mounted && icon != null)
+                                      setState(() => _icon = icon);
+                                  },
+                            child: SizedBox.square(
+                              dimension: 48,
+                              child: Center(child: SkillIcon(_icon)),
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                _field('简介', _description, 300, multiline: true),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
-                  child: Text(
-                    '可见范围',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  _field('简介', _description, 300, multiline: true),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+                    child: Text(
+                      '可见范围',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 8,
-                      ),
-                      leading: SettingsIcon(
-                        type: _visibility == 'private'
-                            ? SettingsIconType.eyeOff
-                            : SettingsIconType.eye,
-                      ),
-                      title: Text(
-                        skillVisibilityLabel(_visibility),
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap:
-                          _busy ||
-                              (_saved.id.isNotEmpty &&
-                                  !widget.store.canManageVisibility(_saved))
-                          ? null
-                          : () async {
-                              final value =
-                                  await Navigator.push<(String, Set<String>)>(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => SkillVisibilityPicker(
-                                        store: widget.store,
-                                        visibility: _visibility,
-                                        selected: _visibleTo,
-                                      ),
-                                    ),
-                                  );
-                              if (mounted && value != null)
-                                setState(() {
-                                  _visibility = value.$1;
-                                  _visibleTo = value.$2;
-                                });
-                            },
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
-                  child: Text(
-                    '依赖技能',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 8,
-                      ),
-                      title: ListenableBuilder(
-                        listenable: widget.store,
-                        builder: (_, _) => Text(
-                          _dependencyLabel(),
-                          style: const TextStyle(fontSize: 16),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Material(
+                      color: settingsFieldColor(context),
+                      borderRadius: BorderRadius.circular(26),
+                      clipBehavior: Clip.antiAlias,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 8,
                         ),
+                        leading: SettingsIcon(
+                          type: _visibility == 'private'
+                              ? SettingsIconType.eyeOff
+                              : SettingsIconType.eye,
+                        ),
+                        title: Text(
+                          skillVisibilityLabel(_visibility),
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                        trailing: const SettingsIcon(
+                          type: SettingsIconType.chevron,
+                        ),
+                        onTap:
+                            _busy ||
+                                (_saved.id.isNotEmpty &&
+                                    !widget.store.canManageVisibility(_saved))
+                            ? null
+                            : () async {
+                                final value =
+                                    await Navigator.push<(String, Set<String>)>(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => SkillVisibilityPicker(
+                                          store: widget.store,
+                                          visibility: _visibility,
+                                          selected: _visibleTo,
+                                        ),
+                                      ),
+                                    );
+                                if (mounted && value != null)
+                                  setState(() {
+                                    _visibility = value.$1;
+                                    _visibleTo = value.$2;
+                                  });
+                              },
                       ),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: _busy ? null : _chooseDependencies,
                     ),
                   ),
-                ),
-                _field('使用说明', _instructions, 10000, multiline: true),
-                _field('执行脚本（可选）', _script, 50000, multiline: true),
-                SkillStatisticsView(store: widget.store, skillId: _saved.id),
-              ],
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+                    child: Text(
+                      '依赖技能',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Material(
+                      color: settingsFieldColor(context),
+                      borderRadius: BorderRadius.circular(26),
+                      clipBehavior: Clip.antiAlias,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 8,
+                        ),
+                        title: ListenableBuilder(
+                          listenable: widget.store,
+                          builder: (_, _) => Text(
+                            _dependencyLabel(),
+                            style: const TextStyle(fontSize: 16),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        trailing: const SettingsIcon(
+                          type: SettingsIconType.chevron,
+                        ),
+                        onTap: _busy ? null : _chooseDependencies,
+                      ),
+                    ),
+                  ),
+                  _field('使用说明', _instructions, 10000, multiline: true),
+                  _field('执行脚本（可选）', _script, 50000, multiline: true),
+                  SkillStatisticsView(store: widget.store, skillId: _saved.id),
+                ],
+              ),
             ),
           ),
         ),

@@ -25,10 +25,12 @@ enum SettingsIconType {
   chevron,
   back,
   check,
+  reset,
   tasks,
   filter,
   sort,
   drag,
+  more,
   eye,
   eyeOff,
 }
@@ -68,6 +70,11 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.more:
+        pen.style = PaintingStyle.fill;
+        for (final x in [5.0, 12.0, 19.0]) {
+          canvas.drawCircle(Offset(x, 12), 1.5, pen);
+        }
       case SettingsIconType.discover:
         canvas.drawCircle(const Offset(12, 12), 9, pen);
         canvas.drawPath(
@@ -263,6 +270,19 @@ class _SettingsIconPainter extends CustomPainter {
             ..moveTo(5, 12)
             ..lineTo(10, 17)
             ..lineTo(19, 7),
+          pen,
+        );
+      case SettingsIconType.reset:
+        canvas.drawPath(
+          Path()
+            ..moveTo(5, 9)
+            ..cubicTo(6.2, 6, 8.8, 4.5, 12, 4.5)
+            ..cubicTo(16.3, 4.5, 19.5, 7.8, 19.5, 12)
+            ..cubicTo(19.5, 16.3, 16.3, 19.5, 12, 19.5)
+            ..cubicTo(8.5, 19.5, 5.7, 17.3, 4.8, 14)
+            ..moveTo(5, 4.5)
+            ..lineTo(5, 9)
+            ..lineTo(9.5, 9),
           pen,
         );
       case SettingsIconType.balance:

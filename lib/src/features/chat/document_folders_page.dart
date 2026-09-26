@@ -43,8 +43,9 @@ class _DocumentFoldersPageState extends State<DocumentFoldersPage>
     if (state == AppLifecycleState.resumed && !_busy) _perform(_load);
   }
 
-  void _notice(String message) =>
-      _messenger.currentState!.showGlassSnackBar(SnackBar(content: Text(message)));
+  void _notice(String message) => _messenger.currentState!.showGlassSnackBar(
+    SnackBar(content: Text(message)),
+  );
   Future<void> _perform(Future<void> Function() action) async {
     setState(() => _busy = true);
     try {
@@ -135,7 +136,6 @@ class _DocumentFoldersPageState extends State<DocumentFoldersPage>
       child: Scaffold(
         extendBodyBehindAppBar: true,
         appBar: SettingsAppBar(
-          gradientBackground: true,
           title: '授权文件夹',
           onBack: () => Navigator.maybePop(context),
           actions: [
@@ -190,10 +190,7 @@ class _DocumentFoldersPageState extends State<DocumentFoldersPage>
                   : ListView.separated(
                       padding: EdgeInsets.fromLTRB(
                         16,
-                        View.of(context).padding.top /
-                                View.of(context).devicePixelRatio +
-                            76 +
-                            16,
+                        settingsHeaderHeight(context) + 16,
                         16,
                         24,
                       ),

@@ -1,3 +1,5 @@
+import '../../domain/quick_reply_option.dart';
+
 const quickReplyGroups = {
   '常用反馈': [
     'plus_one',
@@ -221,3 +223,10 @@ const quickReplyGroups = {
     'high_heel',
   ],
 };
+
+List<String> recentQuickReplyKeys(List<String> recent, int count) => [
+  ...{
+    ...recent.where(quickReplyOptionsByKey.containsKey),
+    ...quickReplyGroups['常用反馈']!,
+  }.take(count),
+];

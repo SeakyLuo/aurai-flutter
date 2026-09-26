@@ -67,10 +67,22 @@ extension _MessageItemActions on _MessageItemState {
       }
       if (!mounted) return;
     }
+    GroupMessageMarkStatus? groupMark;
+    if (allowStar) {
+      final loaded = await runUiAction(context, () async {
+        groupMark = await GroupMessageMarks(
+          ImageActionScope.of(context).groupStore,
+        ).status(snapshot.id);
+      });
+      if (!loaded || !mounted) return;
+    }
     final result = await showMessageActionsMenu(
       context,
       message: snapshot,
       allowStar: allowStar,
+      allowGroupMarks: groupMark != null,
+      pinned: groupMark?.pinned ?? false,
+      groupFavorite: groupMark?.favorite ?? false,
       allowCopy: !compactMenu,
       allowSelect: !compactMenu,
       starred: starred,
@@ -114,6 +126,19 @@ extension _MessageItemActions on _MessageItemState {
     }
     final action = (result as MessageActionResult).action;
     switch (action) {
+      case MessageAction.pin:
+      case MessageAction.groupFavorite:
+        final mark = groupMark!;
+        await runUiAction(context, () async {
+          final store = GroupMessageMarks(
+            ImageActionScope.of(context).groupStore,
+          );
+          if (action == MessageAction.pin) {
+            await store.pin(mark.groupId, snapshot.id, !mark.pinned);
+          } else {
+            await store.favorite(mark.groupId, snapshot.id, !mark.favorite);
+          }
+        });
       case MessageAction.retry:
         await widget.onRetry?.call(snapshot);
       case MessageAction.star:

@@ -168,7 +168,13 @@ extension GroupConversationRun on ChatController {
       );
       _groupDispatcher = dispatcher;
       final sleeps = _groupSleeps.forGroup(conversation.id);
-      final mentioned = _groupNoticeMentions([user]);
+      final mentioned = {
+        ..._groupNoticeMentions([user]),
+        if (user.quickReplyToId != null &&
+            user.quote?.senderId != null &&
+            user.quote!.senderId != MessageSender.localUser.id)
+          user.quote!.senderId,
+      };
       if (wakeMembers == null && !user.isSystem) {
         sleeps.removeWhere((id, _) => mentioned.contains(id));
       }

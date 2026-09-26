@@ -123,6 +123,7 @@ class _SendFavoritePageState extends State<_SendFavoritePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
       title: '发送收藏',
       titleWidget: SearchTypeSegment(
@@ -130,24 +131,26 @@ class _SendFavoritePageState extends State<_SendFavoritePage> {
         labels: const ['消息', '小程序'],
         onChanged: _selectTab,
       ),
-      gradientBackground: true,
+
       onBack: () => Navigator.pop(context),
     ),
-    body: SafeArea(
-      top: false,
-      child: RetainedTabView(
-        index: _miniapps ? 1 : 0,
-        swipeEnabled: !_opening,
-        onChanged: (index) => _selectTab(index == 1),
-        children: [
-          for (final miniapps in [false, true])
-            _FavoriteChoices(
-              controller: widget.controller,
-              miniapps: miniapps,
-              enabled: !_opening,
-              onSelected: _select,
-            ),
-        ],
+    body: SettingsPageBody(
+      child: SafeArea(
+        top: false,
+        child: RetainedTabView(
+          index: _miniapps ? 1 : 0,
+          swipeEnabled: !_opening,
+          onChanged: (index) => _selectTab(index == 1),
+          children: [
+            for (final miniapps in [false, true])
+              _FavoriteChoices(
+                controller: widget.controller,
+                miniapps: miniapps,
+                enabled: !_opening,
+                onSelected: _select,
+              ),
+          ],
+        ),
       ),
     ),
   );
@@ -341,9 +344,9 @@ class _FavoriteChoicesState extends State<_FavoriteChoices> {
   @override
   Widget build(BuildContext context) {
     if (_items.isEmpty && _loading)
-      return const SingleChildScrollView(
-        padding: EdgeInsets.all(24),
-        child: SearchSkeleton(label: '正在加载收藏', avatarSize: 36),
+      return SingleChildScrollView(
+        padding: settingsPagePadding(context, const EdgeInsets.all(24)),
+        child: const SearchSkeleton(label: '正在加载收藏', avatarSize: 36),
       );
     if (_items.isEmpty && !_failed)
       return Center(
@@ -356,7 +359,10 @@ class _FavoriteChoicesState extends State<_FavoriteChoices> {
       );
     return ListView.builder(
       controller: _scroll,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: settingsPagePadding(
+        context,
+        const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      ),
       itemCount: _items.length + ((_loading || _more || _failed) ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == _items.length)

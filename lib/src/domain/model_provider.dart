@@ -14,29 +14,183 @@ import 'capability.dart';
 import 'tool_models.dart';
 
 class ModelService {
-  const ModelService._(this.name);
+  const ModelService._(
+    this.name,
+    this.defaultProtocol, {
+    this.presetLabel,
+    this.defaultModel = '',
+    this.defaultBaseUrl = '',
+    this.defaultWebsite = '',
+    this.defaultBalance,
+    this.defaultConsoleUrl = '',
+    this.defaultIcon = ProviderIcon.letter,
+    this.defaultIconText,
+    this.supportsImageGeneration = false,
+    this.usesOpenRouterCatalog = false,
+    this.defaultModelPurposes = const {},
+    this.staticImageModelIds = const {},
+    this.useOpenAiTransport = false,
+    this.disableReasoningForSummary = false,
+  });
   final String name;
-  static const openAi = ModelService._('openAi');
-  static const deepSeek = ModelService._('deepSeek');
-  static const qwen = ModelService._('qwen');
-  static const kimi = ModelService._('kimi');
-  static const glm = ModelService._('glm');
-  static const openRouter = ModelService._('openRouter');
-  static const dmxapi = ModelService._('dmxapi');
-  static const values = [openAi, deepSeek, qwen, kimi, glm, openRouter, dmxapi];
+  final ProviderProtocol defaultProtocol;
+  final String? presetLabel;
+  final String defaultModel;
+  final String defaultBaseUrl;
+  final String defaultWebsite;
+  final ProviderBalanceConfig? defaultBalance;
+  final String defaultConsoleUrl;
+  final ProviderIcon defaultIcon;
+  final String? defaultIconText;
+  final bool supportsImageGeneration;
+  final bool usesOpenRouterCatalog;
+  final Set<ModelPurpose> defaultModelPurposes;
+  final Set<String> staticImageModelIds;
+  final bool useOpenAiTransport;
+  final bool disableReasoningForSummary;
+  static const openAi = ModelService._(
+    'openAi',
+    ProviderProtocol.responses,
+    presetLabel: 'OpenAI',
+    defaultModel: 'gpt-5.4-mini',
+    defaultBaseUrl: 'https://api.openai.com/v1',
+    defaultWebsite: 'https://openai.com',
+    defaultIcon: ProviderIcon.openAi,
+    useOpenAiTransport: true,
+    defaultConsoleUrl:
+        'https://platform.openai.com/settings/organization/billing/overview',
+  );
+  static const deepSeek = ModelService._(
+    'deepSeek',
+    ProviderProtocol.responses,
+    presetLabel: 'DeepSeek',
+    defaultModel: 'deepseek-flash',
+    defaultBaseUrl: 'https://api.deepseek.com',
+    defaultWebsite: 'https://www.deepseek.com',
+    defaultIcon: ProviderIcon.deepSeek,
+    defaultModelPurposes: {ModelPurpose.text},
+    disableReasoningForSummary: true,
+    defaultConsoleUrl: 'https://platform.deepseek.com/top_up',
+    defaultBalance: ProviderBalanceConfig(
+      url: 'https://api.deepseek.com/user/balance',
+      itemsPath: 'balance_infos',
+      availablePath: 'is_available',
+      currencyPath: 'currency',
+      totalPath: 'total_balance',
+      toppedUpPath: 'topped_up_balance',
+      grantedPath: 'granted_balance',
+      topUpUrl: 'https://platform.deepseek.com/top_up',
+    ),
+  );
+  static const qwen = ModelService._(
+    'qwen',
+    ProviderProtocol.openaiChatCompletions,
+    presetLabel: '千问',
+    defaultModel: 'qwen-plus',
+    defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    defaultWebsite: 'https://bailian.console.aliyun.com',
+    defaultIcon: ProviderIcon.qwen,
+    supportsImageGeneration: true,
+    staticImageModelIds: {
+      'qwen-image-3.0-pro',
+      'qwen-image-3.0',
+      'qwen-image-max',
+    },
+    defaultConsoleUrl:
+        'https://bailian.console.aliyun.com/cn-beijing/costing-balance/overview',
+  );
+  static const kimi = ModelService._(
+    'kimi',
+    ProviderProtocol.openaiChatCompletions,
+    presetLabel: 'Kimi',
+    defaultModel: 'kimi-k2.6',
+    defaultBaseUrl: 'https://api.moonshot.cn/v1',
+    defaultWebsite: 'https://platform.moonshot.cn',
+    defaultIcon: ProviderIcon.kimi,
+    defaultModelPurposes: {ModelPurpose.text},
+    defaultConsoleUrl: 'https://platform.kimi.com',
+    defaultBalance: ProviderBalanceConfig(
+      url: 'https://api.moonshot.cn/v1/users/me/balance',
+      successPath: 'status',
+      currency: 'CNY',
+      totalPath: 'data.available_balance',
+      toppedUpPath: 'data.cash_balance',
+      grantedPath: 'data.voucher_balance',
+      grantedLabel: '代金券',
+    ),
+  );
+  static const glm = ModelService._(
+    'glm',
+    ProviderProtocol.openaiChatCompletions,
+    presetLabel: 'GLM',
+    defaultModel: 'glm-4.7',
+    defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    defaultWebsite: 'https://open.bigmodel.cn',
+    defaultIcon: ProviderIcon.glm,
+    defaultModelPurposes: {ModelPurpose.text},
+    defaultConsoleUrl: 'https://open.bigmodel.cn/finance/overview',
+  );
+  static const openRouter = ModelService._(
+    'openRouter',
+    ProviderProtocol.openaiChatCompletions,
+    presetLabel: 'OpenRouter',
+    defaultModel: 'openai/gpt-5.6-sol',
+    defaultBaseUrl: 'https://openrouter.ai/api/v1',
+    defaultWebsite: 'https://openrouter.ai',
+    defaultIcon: ProviderIcon.openRouter,
+    supportsImageGeneration: true,
+    usesOpenRouterCatalog: true,
+    defaultConsoleUrl: 'https://openrouter.ai/settings/credits',
+  );
+  static const dmxapi = ModelService._(
+    'dmxapi',
+    ProviderProtocol.openaiChatCompletions,
+    presetLabel: 'DMXAPI',
+    defaultModel: 'gpt-4o-mini',
+    defaultBaseUrl: 'https://www.dmxapi.cn/v1',
+    defaultWebsite: 'https://www.dmxapi.cn',
+    defaultIconText: 'DMX',
+    defaultConsoleUrl: 'https://www.dmxapi.cn',
+  );
+  static const suno = ModelService._(
+    'suno',
+    ProviderProtocol.suno,
+    presetLabel: 'Suno',
+    defaultModel: 'chirp-hawk',
+    defaultBaseUrl: 'https://open.suno.cn/api/v1',
+    defaultWebsite: 'https://open.suno.cn',
+    defaultIcon: ProviderIcon.suno,
+    defaultConsoleUrl: 'https://open.suno.cn',
+  );
+  static const values = [
+    openAi,
+    suno,
+    deepSeek,
+    qwen,
+    kimi,
+    glm,
+    openRouter,
+    dmxapi,
+  ];
 
   factory ModelService.custom(String label) {
     if (label.trim().isEmpty || label.length > 60) {
       throw ArgumentError('供应商名称需为 1–60 字');
     }
-    return ModelService._('custom:${label.trim()}');
+    return ModelService._(
+      'custom:${label.trim()}',
+      ProviderProtocol.openaiChatCompletions,
+    );
   }
   factory ModelService.create() => ModelService._(
     'provider:${List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16).padLeft(2, "0")).join()}',
+    ProviderProtocol.openaiChatCompletions,
   );
 
   static ModelService byName(String name) {
-    if (name.startsWith('provider:')) return ModelService._(name);
+    if (name.startsWith('provider:')) {
+      return ModelService._(name, ProviderProtocol.openaiChatCompletions);
+    }
     if (name.startsWith('custom:'))
       return ModelService.custom(name.substring(7));
     return values.firstWhere((service) => service.name == name);
@@ -51,45 +205,9 @@ class ModelService {
 }
 
 extension ModelServiceDetails on ModelService {
-  bool get usesChatCompletions =>
-      isCustom ||
-      this == ModelService.dmxapi ||
-      this == ModelService.openRouter ||
-      this == ModelService.qwen ||
-      this == ModelService.kimi ||
-      this == ModelService.glm;
-  String get label => switch (this) {
-    ModelService.openAi => 'OpenAI',
-    ModelService.deepSeek => 'DeepSeek',
-    ModelService.qwen => '千问',
-    ModelService.kimi => 'Kimi',
-    ModelService.glm => 'GLM',
-    ModelService.openRouter => 'OpenRouter',
-    ModelService.dmxapi => 'DMXAPI',
-    _ => name.startsWith('custom:') ? name.substring(7) : '自定义供应商',
-  };
-
-  String get defaultModel => switch (this) {
-    ModelService.openAi => 'gpt-5.4-mini',
-    ModelService.deepSeek => 'deepseek-flash',
-    ModelService.qwen => 'qwen-plus',
-    ModelService.kimi => 'kimi-k2.6',
-    ModelService.glm => 'glm-4.7',
-    ModelService.openRouter => 'openai/gpt-5.6-sol',
-    ModelService.dmxapi => 'gpt-4o-mini',
-    _ => '',
-  };
-
-  String get defaultBaseUrl => switch (this) {
-    ModelService.openAi => 'https://api.openai.com/v1',
-    ModelService.deepSeek => 'https://api.deepseek.com',
-    ModelService.qwen => 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    ModelService.kimi => 'https://api.moonshot.cn/v1',
-    ModelService.glm => 'https://open.bigmodel.cn/api/paas/v4',
-    ModelService.openRouter => 'https://openrouter.ai/api/v1',
-    ModelService.dmxapi => 'https://www.dmxapi.cn/v1',
-    _ => '',
-  };
+  String get label =>
+      presetLabel ??
+      (name.startsWith('custom:') ? name.substring(7) : '自定义供应商');
 }
 
 class ModelConfig {
@@ -117,27 +235,40 @@ class ModelConfig {
   final ModelReasoning reasoning;
   final ProviderDetails? details;
   String get displayName => details?.name ?? service.label;
-  String get website =>
-      details?.website ??
-      switch (service) {
-        ModelService.openAi => 'https://openai.com',
-        ModelService.deepSeek => 'https://www.deepseek.com',
-        ModelService.qwen => 'https://bailian.console.aliyun.com',
-        ModelService.kimi => 'https://platform.moonshot.cn',
-        ModelService.glm => 'https://open.bigmodel.cn',
-        ModelService.openRouter => 'https://openrouter.ai',
-        ModelService.dmxapi => 'https://www.dmxapi.cn',
-        _ => '',
-      };
-  ProviderProtocol get protocol =>
-      details?.protocol ??
-      (service.usesChatCompletions
-          ? ProviderProtocol.openaiChatCompletions
-          : ProviderProtocol.responses);
+  String? get icon => details?.icon;
+  String get website => details?.website ?? service.defaultWebsite;
+  ProviderProtocol get protocol => details?.protocol ?? service.defaultProtocol;
+  ProviderBalanceConfig? get balanceConfig {
+    if (details?.balance case final configured?) return configured;
+    final preset = service.defaultBalance;
+    if (preset == null) return null;
+    final base = Uri.parse(baseUrl);
+    final official = Uri.parse(service.defaultBaseUrl);
+    return base.scheme == 'https' &&
+            base.host == official.host &&
+            base.port == official.port &&
+            const {'', '/', '/v1', '/v1/'}.contains(base.path) &&
+            base.userInfo.isEmpty &&
+            !base.hasQuery &&
+            !base.hasFragment
+        ? preset
+        : null;
+  }
+
+  String get rechargeUrl {
+    final topUp = balanceConfig?.topUpUrl;
+    if (topUp != null && topUp.isNotEmpty) return topUp;
+    return service.defaultConsoleUrl.isNotEmpty
+        ? service.defaultConsoleUrl
+        : website;
+  }
+
   bool get usesChatCompletions =>
       protocol == ProviderProtocol.openaiChatCompletions;
   bool get autoSyncModels => details?.autoSyncModels ?? true;
   List<String> get savedModels => details?.models ?? const [];
+  ModelReasoning reasoningFor(String model) =>
+      details?.modelReasoning[model] ?? reasoning;
   ModelConfig copyWith({
     String? apiKey,
     String? model,
@@ -212,7 +343,12 @@ class ModelSettings {
   final ResponsePreferences responsePreferences;
 
   ModelConfig get activeConfig =>
-      configFor(ModelPurpose.text) ?? profiles[activeService]!;
+      configFor(ModelPurpose.text) ??
+      profiles[activeService]!.copyWith(
+        reasoning: profiles[activeService]!.reasoningFor(
+          profiles[activeService]!.model,
+        ),
+      );
 
   ModelConfig? configFor(ModelPurpose purpose) {
     final selection = modelDefaults[purpose];
@@ -223,7 +359,7 @@ class ModelSettings {
       apiKey: account.apiKey,
       model: selection.model,
       baseUrl: account.baseUrl,
-      reasoning: account.reasoning,
+      reasoning: account.reasoningFor(selection.model),
       details: account.details,
     );
   }
@@ -265,6 +401,16 @@ class ModelSettings {
     }
     final rawProfiles = (json['profiles']! as Map<Object?, Object?>)
         .cast<String, Object?>();
+    final savedServices = rawProfiles.keys.map(ModelService.byName).toList();
+    for (var index = 0; index < ModelService.values.length; index++) {
+      final service = ModelService.values[index];
+      if (!savedServices.contains(service)) {
+        savedServices.insert(
+          index < savedServices.length ? index : savedServices.length,
+          service,
+        );
+      }
+    }
     final purposesByName = {
       for (final purpose in ModelPurpose.values) purpose.name: purpose,
     };
@@ -285,10 +431,7 @@ class ModelSettings {
             ),
       activeService: ModelService.byName(json['activeService']! as String),
       profiles: <ModelService, ModelConfig>{
-        for (final service in {
-          ...rawProfiles.keys.map(ModelService.byName),
-          ...ModelService.values,
-        })
+        for (final service in savedServices)
           service: !rawProfiles.containsKey(service.name)
               ? ModelConfig.defaults(service)
               : ModelConfig.fromJson(

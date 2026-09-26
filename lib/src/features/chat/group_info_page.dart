@@ -1,11 +1,13 @@
+import 'group_pinned_message_entry.dart';
+import 'group_favorites_page.dart';
 import '../../app/glass_notice.dart';
-import 'group_activity_sheet.dart';
 import '../../domain/error_message.dart';
 import 'dart:math' as math;
 import 'dialog_action_button.dart';
 import 'group_invite_page.dart';
 import 'group_remove_members_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../domain/ai_profile.dart';
 import '../../domain/message_sender.dart';
@@ -14,7 +16,10 @@ import 'ai_contact_page.dart';
 import 'chat_controller.dart';
 import 'conversation_rename_dialog.dart';
 import 'conversation_task_navigation.dart';
-import 'group_members_page.dart';
+import 'group_activity_sheet.dart';
+import 'group_announcement_page.dart';
+import 'markdown_preview_text.dart';
+import '../../storage/group_announcement_store.dart';
 import 'group_message_search_page.dart';
 import 'member_avatar.dart';
 import 'settings_appearance.dart';
@@ -45,6 +50,7 @@ class GroupInfoPage extends StatefulWidget {
 class _GroupInfoPageState extends State<GroupInfoPage> {
   late Conversation _conversation = widget.conversation;
   List<ConversationMember> _members = [];
+  GroupAnnouncement? _announcement;
   bool _loading = true;
   bool _failed = false;
   bool _busy = false;
@@ -64,6 +70,9 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
           whereArgs: [widget.conversation.id],
         ),
         widget.controller.groupStore.members(widget.conversation.id),
+        GroupAnnouncementStore(widget.controller.groupStore)
+            .read(widget.conversation.id, MessageSender.localUser.id)
+            .then((value) => <GroupAnnouncement>[if (value != null) value]),
       ]);
       if (!mounted) return;
       final rows = results[0] as List<Map<String, Object?>>;
@@ -74,6 +83,7 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
       setState(() {
         _conversation = conversationFromRow(rows.single);
         _members = results[1] as List<ConversationMember>;
+        _announcement = (results[2] as List<GroupAnnouncement>).firstOrNull;
         _failed = false;
       });
     } on Object catch (error) {
@@ -122,12 +132,21 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
     ),
   );
 
+  Future<void> _copyConversationId() async {
+    await Clipboard.setData(ClipboardData(text: _conversation.id));
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showGlassSnackBar(const SnackBar(content: Text('已复制会话 ID')));
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return PopScope(
       canPop: !_busy,
       child: Scaffold(
+        extendBodyBehindAppBar: true,
         appBar: SettingsAppBar(
           title: '群聊详情',
           onBack: _busy ? null : () => Navigator.pop(context),
@@ -146,7 +165,12 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
               : AbsorbPointer(
                   absorbing: _busy,
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      settingsHeaderHeight(context) + 8,
+                      16,
+                      32,
+                    ),
                     children: [
                       _surface(
                         Column(
@@ -177,7 +201,7 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                                 ],
                               ),
                               onTap: () => _open(
-                                GroupMembersPage(
+                                GroupActivityPage(
                                   controller: widget.controller,
                                   conversationId: _conversation.id,
                                 ),
@@ -189,6 +213,7 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                               ),
                               child: LayoutBuilder(
                                 builder: (context, constraints) => GridView(
+                                  padding: EdgeInsets.zero,
                                   gridDelegate:
                                       SliverGridDelegateWithFixedCrossAxisCount(
                                         crossAxisCount:
@@ -204,8 +229,17 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
                                   children: [
-                                    for (final member in _members.take(10))
-                                      _member(member.sender),
+                                    for (
+                                      var index = 0;
+                                      index < math.min(_members.length, 5);
+                                      index++
+                                    )
+                                      _member(
+                                        _members[index].sender,
+                                        remaining: index == 4
+                                            ? _members.length - 5
+                                            : 0,
+                                      ),
                                     _memberAction(
                                       '邀请',
                                       SettingsIcon(
@@ -278,6 +312,52 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                       ),
                       const SizedBox(height: 12),
                       _surface(
+                        ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                          ),
+                          minTileHeight: 60,
+                          title: const Text(
+                            '群公告',
+                            style: TextStyle(fontSize: 15),
+                          ),
+                          subtitle: Text(
+                            _announcement == null
+                                ? '未设置'
+                                : markdownPreviewText(_announcement!.content),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: const SettingsIcon(
+                            type: SettingsIconType.chevron,
+                          ),
+                          onTap: () => _open(
+                            GroupAnnouncementPage(
+                              controller: widget.controller,
+                              groupId: _conversation.id,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      GroupPinnedMessageEntry(
+                        controller: widget.controller,
+                        groupId: _conversation.id,
+                      ),
+                      _surface(
+                        _row(
+                          '群标记',
+                          () => _open(
+                            GroupFavoritesPage(
+                              controller: widget.controller,
+                              groupId: _conversation.id,
+                              groupTitle: _conversation.title,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _surface(
                         _row(
                           '查找聊天记录',
                           () => _open(
@@ -288,30 +368,8 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      _surface(
-                        ListTile(
-                          minTileHeight: 60,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                          ),
-                          title: const Text(
-                            '群成员状态',
-                            style: TextStyle(fontSize: 15),
-                          ),
-                          trailing: const SettingsIcon(
-                            type: SettingsIconType.chevron,
-                          ),
-                          onTap: () => _open(
-                            GroupActivityPage(
-                              controller: widget.controller,
-                              conversationId: _conversation.id,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
                       if (!_conversation.isArchived) ...[
+                        const SizedBox(height: 12),
                         _surface(
                           SwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
@@ -326,6 +384,12 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 12),
+                      DialogActionButton(
+                        text: '复制会话 ID',
+                        role: DialogActionRole.secondary,
+                        onPressed: _busy ? null : _copyConversationId,
+                      ),
                       if (conversationTasks(
                         widget.controller,
                         _conversation.id,
@@ -418,11 +482,18 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
         ),
       );
 
-  Widget _member(MessageSender sender) => Material(
+  Widget _member(MessageSender sender, {int remaining = 0}) => Material(
     color: Colors.transparent,
     child: InkWell(
       borderRadius: BorderRadius.circular(14),
-      onTap: sender.kind == MessageSenderKind.agent
+      onTap: remaining > 0
+          ? () => _open(
+              GroupActivityPage(
+                controller: widget.controller,
+                conversationId: _conversation.id,
+              ),
+            )
+          : sender.kind == MessageSenderKind.agent
           ? () => _open(
               AiContactPage(
                 controller: widget.controller,
@@ -433,10 +504,33 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
           : null,
       child: Column(
         children: [
-          MemberAvatar(sender: sender, size: 48),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              MemberAvatar(sender: sender, size: 48),
+              if (remaining > 0)
+                Container(
+                  width: 48,
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: .48),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '+$remaining',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 7),
           Text(
-            sender.name,
+            remaining > 0 ? '更多成员' : sender.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(

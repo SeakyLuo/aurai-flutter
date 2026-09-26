@@ -61,39 +61,45 @@ class _InteractiveHistoryPageState extends State<InteractiveHistoryPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(title: '查看历史', onBack: () => Navigator.pop(context)),
-    body: SafeArea(
-      top: false,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-        children: [
-          if (_events.isNotEmpty)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: Text('每次点按前的卡片', style: TextStyle(fontSize: 14)),
-            ),
-          for (final event in _events)
-            InteractiveHistoryTile(
-              database: widget.database,
-              messageId: widget.messageId,
-              actorId: MessageSender.localUser.id,
-              event: event,
-            ),
-          if (_loading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: CircularProgressIndicator(strokeWidth: 2),
+    body: SettingsPageBody(
+      child: SafeArea(
+        top: false,
+        child: ListView(
+          padding: settingsPagePadding(
+            context,
+            const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          ),
+          children: [
+            if (_events.isNotEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text('每次点按前的卡片', style: TextStyle(fontSize: 14)),
               ),
-            ),
-          if (!_loading && _events.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 32),
-              child: Center(child: Text('还没有点按记录')),
-            ),
-          if (!_loading && _events.isNotEmpty && _more)
-            TextButton(onPressed: _load, child: const Text('查看更早记录')),
-        ],
+            for (final event in _events)
+              InteractiveHistoryTile(
+                database: widget.database,
+                messageId: widget.messageId,
+                actorId: MessageSender.localUser.id,
+                event: event,
+              ),
+            if (_loading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            if (!_loading && _events.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(child: Text('还没有点按记录')),
+              ),
+            if (!_loading && _events.isNotEmpty && _more)
+              TextButton(onPressed: _load, child: const Text('查看更早记录')),
+          ],
+        ),
       ),
     ),
   );
@@ -145,32 +151,38 @@ class InteractiveHistoryTile extends StatelessWidget {
         context,
         MaterialPageRoute(
           builder: (pageContext) => Scaffold(
+            extendBodyBehindAppBar: true,
             appBar: SettingsAppBar(
               title: '点按前的卡片',
               onBack: () => Navigator.pop(pageContext),
             ),
-            body: SafeArea(
-              top: false,
-              child: ListView(
-                padding: const EdgeInsets.all(24),
-                children: [
-                  Text(
-                    '${messageTime(DateTime.fromMicrosecondsSinceEpoch(event['created_at'] as int))} · 点按“${event['label']}”之前',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+            body: SettingsPageBody(
+              child: SafeArea(
+                top: false,
+                child: ListView(
+                  padding: settingsPagePadding(
+                    context,
+                    const EdgeInsets.all(24),
+                  ),
+                  children: [
+                    Text(
+                      '${messageTime(DateTime.fromMicrosecondsSinceEpoch(event['created_at'] as int))} · 点按“${event['label']}”之前',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  InteractiveMessageView(
-                    card: card,
-                    actorId: actorId,
-                    readOnly: true,
-                    historical: true,
-                    onClick: (_, _, _, {value}) async => null,
-                    onOpenLink: (_) async {},
-                  ),
-                ],
+                    const SizedBox(height: 20),
+                    InteractiveMessageView(
+                      card: card,
+                      actorId: actorId,
+                      readOnly: true,
+                      historical: true,
+                      onClick: (_, _, _, {value}) async => null,
+                      onOpenLink: (_) async {},
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

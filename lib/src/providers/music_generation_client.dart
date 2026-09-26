@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import '../domain/music_generation_config.dart';
-
 class GeneratedMusic {
   const GeneratedMusic({required this.audioUrl});
   final Uri audioUrl;
@@ -52,11 +50,13 @@ class MusicGenerationClient {
 
   Future<MusicGenerationResult> generate({
     required String key,
+    required String baseUrl,
+    required String model,
     required String prompt,
     required String title,
     required bool instrumental,
   }) async {
-    final base = Uri.parse(MusicGenerationConfig.baseUrl);
+    final base = Uri.parse(baseUrl);
     final submitted = await _json(
       'POST',
       base.replace(path: '${base.path}/music/generate'),
@@ -64,7 +64,7 @@ class MusicGenerationClient {
       {
         'gpt_description_prompt': prompt,
         'make_instrumental': instrumental,
-        'mv': 'chirp-hawk',
+        'mv': model,
         'title': title,
       },
     );

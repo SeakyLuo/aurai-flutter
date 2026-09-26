@@ -38,6 +38,24 @@ Widget? sharedSkillIcon(BuildContext context, String name) {
     'unarchive': ConversationMenuIconType.unarchive,
     'delete': ConversationMenuIconType.delete,
   };
+  if (name == 'text') {
+    return SizedBox.square(
+      dimension: 24,
+      child: Center(
+        child: Text(
+          'Aa',
+          textScaler: TextScaler.noScaling,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+            letterSpacing: -1.4,
+            height: 1,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
   final settingsType = settings[name];
   if (settingsType != null) return SettingsIcon(type: settingsType);
   final menuType = menu[name];
