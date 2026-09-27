@@ -24,8 +24,17 @@ class GroupRemoveMembersPage extends StatefulWidget {
 }
 
 class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
+  late final _localRole = widget.members
+      .firstWhere((member) => member.sender.id == MessageSender.localUser.id)
+      .role;
   late final _members = widget.members
-      .where((member) => member.sender.kind == MessageSenderKind.agent)
+      .where(
+        (member) =>
+            member.sender.kind == MessageSenderKind.agent &&
+            member.role != GroupMemberRole.owner &&
+            (_localRole == GroupMemberRole.owner ||
+                member.role == GroupMemberRole.member),
+      )
       .toList();
   final _selected = <String>{};
   bool _saving = false;

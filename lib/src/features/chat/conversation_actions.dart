@@ -258,24 +258,38 @@ extension ConversationActions on ChatController {
     }
   }
 
-  Future<void> renameConversation(String id, String title) async {
+  Future<void> renameConversation(
+    String id,
+    String title, {
+    String actorId = 'user:local',
+  }) async {
     final name = title.trim();
     if (name.isEmpty) throw ArgumentError('请输入会话名称');
     final conversation = await _targetConversation(id);
     final previous = conversation.storedTitle;
     if (previous == name) return;
     if (conversation.kind == ConversationKind.group) {
-      final notice = AgentMessage(
-        id: newMessageId(),
-        role: AgentMessageRole.user,
-        senderId: MessageSender.localUser.id,
-        isSystem: true,
-        text:
-            '${memory.nickname.isEmpty ? MessageSender.localUser.name : memory.nickname}将群名改为“$name”',
-        createdAt: DateTime.now(),
-      );
+      await groupStore.requireRenamePermission(_store.database, id, actorId);
       await _store.writer.flush();
+      late AgentMessage notice;
       await _store.database.transaction((txn) async {
+        final actor =
+            (await txn.query(
+                  'message_senders',
+                  columns: ['name'],
+                  where: 'id = ?',
+                  whereArgs: [actorId],
+                  limit: 1,
+                )).single['name']
+                as String;
+        notice = AgentMessage(
+          id: newMessageId(),
+          role: AgentMessageRole.user,
+          senderId: actorId,
+          isSystem: true,
+          text: '$actor将群名改为“$name”',
+          createdAt: DateTime.now(),
+        );
         await txn.update(
           'conversations',
           {
@@ -354,6 +368,39 @@ extension ConversationActions on ChatController {
       if (values.containsKey('mode'))
         copy.mode = ConversationMode.values.byName(values['mode'] as String);
     }
+  }
+
+  Future<void> leaveGroup(String id) async {
+    final removed = await _targetConversation(id);
+    if (removed.kind != ConversationKind.group) {
+      throw StateError('该会话不是群聊');
+    }
+    final isActive = removed.id == activeConversation.id;
+    if (_liveConversation(removed.id) != null ||
+        changingConversation ||
+        (isActive && (isBusy || addingImages))) {
+      throw StateError('请等待当前操作完成，再退出群聊');
+    }
+    await groupStore.leaveGroup(removed.id);
+    if (isActive) {
+      _activeConversation = _newConversation;
+      _activeAi = await groupStore.loadAi(_newConversation.defaultSenderId);
+      _store.writer.retain([
+        ..._newConversation.messages,
+        if (_runningConversation != null &&
+            _runningConversation != _newConversation)
+          ..._runningConversation!.messages,
+      ]);
+    }
+    _pendingMessageQueues.remove(removed.id);
+    _conversations.removeWhere((conversation) => conversation.id == removed.id);
+    _updateConversationList();
+    _conversationChanged();
+  }
+
+  Future<void> dissolveGroup(String id, {String actorId = 'user:local'}) async {
+    await groupStore.requireOwner(_store.database, id, actorId);
+    await deleteConversation(id);
   }
 
   Future<void> deleteConversation([String? id]) async {

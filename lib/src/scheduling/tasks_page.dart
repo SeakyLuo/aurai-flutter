@@ -11,6 +11,7 @@ import 'task_filter_menu.dart';
 import '../features/chat/glass_surface.dart';
 import '../features/chat/message_composer.dart';
 import '../features/chat/keyboard_inset.dart';
+import '../features/chat/menu_press_highlight.dart';
 import 'scheduled_tasks.dart';
 import 'task_detail_page.dart';
 import 'task_action_menu.dart';
@@ -176,7 +177,8 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
                     Padding(
                       padding: EdgeInsets.fromLTRB(
                         16,
-                        MediaQuery.paddingOf(context).top + 76,
+                        MediaQuery.paddingOf(context).top +
+                            SettingsAppBar.toolbarHeight,
                         16,
                         8,
                       ),
@@ -216,7 +218,9 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
                               16,
                               (!tasks.allowed && tasks.supported)
                                   ? 12
-                                  : MediaQuery.paddingOf(context).top + 76 + 12,
+                                  : MediaQuery.paddingOf(context).top +
+                                        SettingsAppBar.toolbarHeight +
+                                        12,
                               16,
                               MediaQuery.paddingOf(context).bottom + 20,
                             ),
@@ -225,9 +229,10 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
                               final task = filtered[index];
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 18),
-                                child: GestureDetector(
+                                child: MenuPressHighlight(
                                   onLongPressStart: (details) =>
                                       _taskMenu(task, details.globalPosition),
+                                  borderRadius: BorderRadius.circular(28),
                                   child: Material(
                                     color:
                                         Theme.of(context).brightness ==

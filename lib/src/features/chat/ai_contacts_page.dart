@@ -16,6 +16,7 @@ import 'ai_contact_editor.dart';
 import 'ai_contact_page.dart';
 import 'profile_avatar.dart';
 import 'settings_appearance.dart';
+import 'menu_press_highlight.dart';
 import 'settings_icon.dart';
 import 'pagination_listener.dart';
 import 'recent_chats_page.dart';
@@ -29,6 +30,7 @@ class AiContactsPage extends StatefulWidget {
     this.root = false,
     this.embedded = false,
     this.selectForConversation = false,
+    this.returnSelection = false,
     this.conversationMode = ConversationMode.normal,
   });
   final ChatController controller;
@@ -36,6 +38,7 @@ class AiContactsPage extends StatefulWidget {
   final bool root;
   final bool embedded;
   final bool selectForConversation;
+  final bool returnSelection;
   final ConversationMode conversationMode;
   @override
   State<AiContactsPage> createState() => _AiContactsPageState();
@@ -125,6 +128,10 @@ class _AiContactsPageState extends State<AiContactsPage> {
   bool _openingConversation = false;
 
   Future<void> _startConversation(AiProfile ai) async {
+    if (widget.returnSelection) {
+      Navigator.pop(context, ai);
+      return;
+    }
     if (_openingConversation) return;
     _openingConversation = true;
     try {
@@ -382,41 +389,44 @@ class _AiContactsPageState extends State<AiContactsPage> {
                     itemBuilder: (context, index) {
                       final ai = _items[index];
                       return Builder(
-                        builder: (anchorContext) => ListTile(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 0,
-                          ),
-                          horizontalTitleGap: 12,
-                          leading: ProfileAvatar(
-                            style: AvatarStyle(
-                              icon: ai.sender.avatarIcon,
-                              color: ai.sender.avatarColor,
-                              path: ai.sender.avatarPath,
+                        builder: (anchorContext) => MenuPressHighlight(
+                          onLongPressStart: widget.selectForConversation
+                              ? null
+                              : (_) => _menu(ai, anchorContext),
+                          borderRadius: BorderRadius.circular(22),
+                          child: ListTile(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(22),
                             ),
-                            name: ai.sender.name,
-                            size: 44,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 0,
+                            ),
+                            horizontalTitleGap: 12,
+                            leading: ProfileAvatar(
+                              style: AvatarStyle(
+                                icon: ai.sender.avatarIcon,
+                                color: ai.sender.avatarColor,
+                                path: ai.sender.avatarPath,
+                              ),
+                              name: ai.sender.name,
+                              size: 44,
+                            ),
+                            title: Text(
+                              ai.sender.name,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                            subtitle: ai.description.isEmpty
+                                ? null
+                                : Text(
+                                    ai.description,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                            onTap: () => widget.selectForConversation
+                                ? _startConversation(ai)
+                                : _open(ai.sender.id),
                           ),
-                          title: Text(
-                            ai.sender.name,
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                          subtitle: ai.description.isEmpty
-                              ? null
-                              : Text(
-                                  ai.description,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                          onTap: () => widget.selectForConversation
-                              ? _startConversation(ai)
-                              : _open(ai.sender.id),
-                          onLongPress: widget.selectForConversation
-                              ? null
-                              : () => _menu(ai, anchorContext),
                         ),
                       );
                     },

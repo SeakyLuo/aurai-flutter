@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../features/chat/menu_press_highlight.dart';
+
 class MemoryEntryTile extends StatefulWidget {
   const MemoryEntryTile({
     super.key,
@@ -11,7 +13,7 @@ class MemoryEntryTile extends StatefulWidget {
   final String text;
   final bool enabled;
   final VoidCallback onEdit;
-  final ValueChanged<Offset> onMenu;
+  final Future<void> Function(Offset) onMenu;
 
   @override
   State<MemoryEntryTile> createState() => _MemoryEntryTileState();
@@ -34,34 +36,36 @@ class _MemoryEntryTileState extends State<MemoryEntryTile> {
       scale: _pressed ? .985 : 1,
       duration: const Duration(milliseconds: 140),
       curve: Curves.easeOutCubic,
-      child: Material(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xff242424)
-            : const Color(0xfff7f7f7),
+      child: MenuPressHighlight(
         borderRadius: BorderRadius.circular(18),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
+        onLongPressStart: !widget.enabled
+            ? null
+            : (_) {
+                final box = context.findRenderObject()! as RenderBox;
+                return widget.onMenu(
+                  box.localToGlobal(
+                    Offset(box.size.width / 2, box.size.height),
+                  ),
+                );
+              },
+        child: Material(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xff242424)
+              : const Color(0xfff7f7f7),
           borderRadius: BorderRadius.circular(18),
-          onHighlightChanged: (pressed) => setState(() => _pressed = pressed),
-          onTap: widget.enabled ? widget.onEdit : null,
-          onLongPress: !widget.enabled
-              ? null
-              : () {
-                  setState(() => _pressed = false);
-                  final box = context.findRenderObject()! as RenderBox;
-                  widget.onMenu(
-                    box.localToGlobal(
-                      Offset(box.size.width / 2, box.size.height),
-                    ),
-                  );
-                },
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 48),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                widget.text,
-                style: const TextStyle(fontSize: 16, height: 1.8),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onHighlightChanged: (pressed) => setState(() => _pressed = pressed),
+            onTap: widget.enabled ? widget.onEdit : null,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  widget.text,
+                  style: const TextStyle(fontSize: 16, height: 1.8),
+                ),
               ),
             ),
           ),

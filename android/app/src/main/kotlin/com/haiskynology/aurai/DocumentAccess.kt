@@ -13,6 +13,10 @@ class DocumentAccess(private val context: Context) {
     private val worker = DocumentWorker(context)
     private var pickerTaskId: String? = null
     private var pickerReply: MethodChannel.Result? = null
+    private var projectFilesReply: MethodChannel.Result? = null
+    private var projectFilesRoot: String? = null
+    private val projectExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     fun handle(call: MethodCall, result: MethodChannel.Result): Boolean {
         return try { handleCall(call, result) }
@@ -30,26 +34,40 @@ class DocumentAccess(private val context: Context) {
             "getDocumentFolders" -> result.success(mapOf("folders" to folders.list()))
             "shareFile" -> share(call, result)
             "requestDocumentFolder" -> request(call.argument<String>("uri"), call.argument<String>("callId"), result)
-            "removeDocumentFolder" -> { folders.remove(call.argument<String>("uri")!!); result.success(null) }
-            "renameDocumentFolder" -> { folders.rename(call.argument<String>("uri")!!, call.argument<String>("name")!!); result.success(null) }
-            "openDocumentFolder" -> {
-                val value = call.argument<String>("uri")!!
-                val uri = DocumentUris.authorized(context, value)
-                worker.execute("open-folder", "describeDocument", mapOf("uri" to value)) { output ->
-                    if (output.containsKey("error")) {
-                        if (output["missing"] == true) folders.invalidate(value)
-                        result.error("folder_open", output["error"] as String, null)
-                    } else try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, Docs.Document.MIME_TYPE_DIR)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION))
-                        result.success(null)
-                    } catch (_: android.content.ActivityNotFoundException) {
-                        result.error("no_file_app", "手机上没有支持打开文件夹的应用", null)
-                    } catch (_: SecurityException) {
-                        result.error("folder_open", "无法打开此文件夹，请重新授权", null)
-                    }
+            "createManagedProject" -> result.success(ManagedWorkspace.create(
+                context,
+                call.argument<String>("id")!!,
+                call.argument<String>("name")!!
+            ))
+            "removeManagedProject" -> {
+                ManagedWorkspace.remove(context, call.argument<String>("id")!!)
+                result.success(null)
+            }
+            "listProjectFiles" -> result.success(mapOf(
+                "files" to ProjectFileAccess.list(context, call.argument<String>("uri")!!)
+            ))
+            "importProjectFiles" -> requestProjectFiles(call.argument<String>("uri")!!, result)
+            "getGitConfiguration" -> result.success(GitConfiguration.read(context))
+            "setGitConfiguration" -> result.success(
+                GitConfiguration.write(context, call.argument<Map<String, Any?>>("configuration")!!)
+            )
+            "projectDevelopmentOperation" -> projectDevelopment(call, result)
+            "cancelProjectDevelopmentOperation" -> {
+                ProjectDevelopment.cancel(call.argument<String>("callId")!!)
+                result.success(null)
+            }
+            "openProjectFolder" -> {
+                val uri = call.argument<String>("uri")!!
+                if (uri.startsWith("aurai://")) {
+                    ProjectFileAccess.open(context, uri)
+                    result.success(null)
+                } else {
+                    openFolder(uri, result)
                 }
             }
+            "removeDocumentFolder" -> { folders.remove(call.argument<String>("uri")!!); result.success(null) }
+            "renameDocumentFolder" -> { folders.rename(call.argument<String>("uri")!!, call.argument<String>("name")!!); result.success(null) }
+            "openDocumentFolder" -> openFolder(call.argument<String>("uri")!!, result)
             "documentOperation" -> {
                 val args = call.argument<Map<String, Any?>>("arguments")!!
                 worker.execute(call.argument<String>("callId")!!, call.argument<String>("operation")!!, args, result::success)
@@ -62,6 +80,73 @@ class DocumentAccess(private val context: Context) {
             else -> return false
         }
         return true
+    }
+
+    private fun projectDevelopment(call: MethodCall, result: MethodChannel.Result) {
+        val projectId = call.argument<String>("projectId")!!
+        val operation = call.argument<String>("operation")!!
+        val callId = call.argument<String>("callId") ?: "$projectId:$operation"
+        val arguments = call.argument<Map<String, Any?>>("arguments")!!
+        projectExecutor.execute {
+            try {
+                val output = ProjectDevelopment.execute(context, callId, projectId, operation, arguments)
+                mainHandler.post { result.success(output) }
+            } catch (error: Exception) {
+                mainHandler.post {
+                    result.error("project_development", error.message ?: "项目操作失败", null)
+                }
+            }
+        }
+    }
+
+    private fun openFolder(value: String, result: MethodChannel.Result) {
+        val uri = DocumentUris.authorized(context, value)
+        worker.execute("open-folder", "describeDocument", mapOf("uri" to value)) { output ->
+            if (output.containsKey("error")) {
+                if (output["missing"] == true) folders.invalidate(value)
+                result.error("folder_open", output["error"] as String, null)
+            } else try {
+                context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, Docs.Document.MIME_TYPE_DIR)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                result.success(null)
+            } catch (_: android.content.ActivityNotFoundException) {
+                result.error("no_file_app", "手机上没有支持打开文件夹的应用", null)
+            } catch (_: SecurityException) {
+                result.error("folder_open", "无法打开此文件夹，请重新授权", null)
+            }
+        }
+    }
+
+    private fun requestProjectFiles(root: String, result: MethodChannel.Result) {
+        if (projectFilesReply != null) { result.error("busy", "正在选择项目资料", null); return }
+        val activity = MainActivity.current
+        if (activity == null || !MainActivity.isResumed) { result.error("foreground_required", "请回到 Aurai 后添加项目资料", null); return }
+        projectFilesReply = result
+        projectFilesRoot = root
+        projectFilesPicker = this
+        activity.startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            type = "*/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }, PROJECT_FILES_REQUEST)
+    }
+
+    fun selectedProjectFiles(data: Intent?) {
+        val reply = projectFilesReply ?: return
+        projectFilesReply = null
+        projectFilesPicker = null
+        val root = projectFilesRoot!!
+        projectFilesRoot = null
+        if (data == null) { reply.success(mapOf("cancelled" to true)); return }
+        val uris = data.clipData?.let { clip ->
+            (0 until clip.itemCount).map { clip.getItemAt(it).uri }
+        } ?: listOfNotNull(data.data)
+        try {
+            reply.success(mapOf("files" to ProjectFileAccess.importFiles(context, root, uris)))
+        } catch (error: Exception) {
+            reply.error("project_files", error.message ?: "无法添加项目资料", null)
+        }
     }
 
     fun cancelTasks() {
@@ -166,7 +251,10 @@ class DocumentAccess(private val context: Context) {
 
     companion object {
         const val REQUEST = 1501
+        const val PROJECT_FILES_REQUEST = 1502
         var picker: DocumentAccess? = null
+            private set
+        var projectFilesPicker: DocumentAccess? = null
             private set
     }
 }

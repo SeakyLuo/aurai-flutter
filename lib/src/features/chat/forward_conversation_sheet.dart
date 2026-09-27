@@ -10,6 +10,7 @@ import 'html_message_preview.dart';
 import 'message_item.dart';
 import 'glass_surface.dart';
 import 'chat_header_background.dart';
+import 'chat_header.dart';
 
 class ForwardConversationSheet extends StatefulWidget {
   const ForwardConversationSheet({
@@ -90,7 +91,7 @@ class _ForwardConversationSheetState extends State<ForwardConversationSheet> {
           appBar: AppBar(
             automaticallyImplyLeading: false,
             primary: false,
-            toolbarHeight: 76,
+            toolbarHeight: ChatHeader.toolbarHeight,
             titleSpacing: 18,
             backgroundColor: Colors.transparent,
             surfaceTintColor: Colors.transparent,
@@ -139,7 +140,10 @@ class _ForwardConversationSheetState extends State<ForwardConversationSheet> {
                 : ListView.builder(
                     controller: _scroll,
                     reverse: true,
-                    padding: const EdgeInsets.only(top: 88, bottom: 16),
+                    padding: const EdgeInsets.only(
+                      top: ChatHeader.toolbarHeight + 12,
+                      bottom: 16,
+                    ),
                     itemCount: _messages.length + (_loading ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (index == _messages.length)

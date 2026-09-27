@@ -36,7 +36,12 @@ class DocumentOperations(private val context: Context) {
     }
 
     fun execute(operation: String, args: JSONObject, created: (String) -> Unit): Map<String, Any?> {
-        val uri = DocumentUris.authorized(context, args.getString("uri"), operation in setOf("createTextFile", "prepareTextFile"))
+        if (operation == "copyDocument" || operation == "moveDocument") {
+            return DocumentTransfer(context).execute(operation, args)
+        }
+        if (args.getString("uri").startsWith("aurai://")) return ManagedWorkspace(context).execute(operation, args)
+        val uri = DocumentUris.authorized(context, args.getString("uri"), operation in setOf(
+            "createTextFile", "prepareTextFile", "writeTextFile", "replaceText", "createFolder", "renameDocument", "deleteDocument"))
         return when (operation) {
             "describeDocument" -> metadata(uri)
             "prepareTextFile" -> {
@@ -49,10 +54,63 @@ class DocumentOperations(private val context: Context) {
                     folder["name"] else "${folder["name"]} / ${info["title"]}")
             }
             "listFiles", "searchFiles" -> list(uri, args, operation == "searchFiles")
+            "listProjectTree" -> tree(uri, args)
+            "searchProjectText" -> searchText(uri, args)
             "readDocument" -> read(uri, args)
             "createTextFile" -> write(uri, args, created)
+            "writeTextFile" -> overwrite(uri, args)
+            "replaceText" -> replaceText(uri, args)
+            "createFolder" -> createFolder(uri, args)
+            "renameDocument" -> rename(uri, args)
+            "deleteDocument" -> delete(uri)
             else -> error("不支持的文件操作")
         }
+    }
+
+    private fun overwrite(uri: Uri, args: JSONObject): Map<String, Any?> {
+        val info = metadata(uri)
+        require(info["directory"] == false) { "请选择文件，不能覆盖文件夹" }
+        val content = args.getString("content")
+        require(content.length <= MAX_WRITE_CHARACTERS) { "单次最多写入 $MAX_WRITE_CHARACTERS 字" }
+        resolver.openOutputStream(uri, "wt")!!.use { it.write(content.toByteArray(Charsets.UTF_8)) }
+        return metadata(uri) + mapOf("written" to true, "encoding" to "UTF-8")
+    }
+
+    private fun replaceText(uri: Uri, args: JSONObject): Map<String, Any?> {
+        val bytes = resolver.openInputStream(uri)!!.use { LimitedInput(it).readBytes() }
+        val text = bytes.toString(Charsets.UTF_8)
+        val old = args.getString("oldText")
+        val first = text.indexOf(old)
+        require(first >= 0) { "没有找到要替换的内容" }
+        require(text.indexOf(old, first + old.length) < 0) { "要替换的内容出现了多次，请提供更多上下文" }
+        val updated = text.replaceRange(first, first + old.length, args.getString("newText"))
+        require(updated.length <= MAX_WRITE_CHARACTERS) { "修改后的文件超过单次写入上限" }
+        resolver.openOutputStream(uri, "wt")!!.use { it.write(updated.toByteArray(Charsets.UTF_8)) }
+        return metadata(uri) + mapOf("written" to true, "encoding" to "UTF-8")
+    }
+
+    private fun createFolder(uri: Uri, args: JSONObject): Map<String, Any?> {
+        val folder = Docs.createDocument(resolver, uri, Docs.Document.MIME_TYPE_DIR, validName(args.getString("name")))
+            ?: error("文件提供者未能创建文件夹")
+        return metadata(folder) + mapOf("created" to true)
+    }
+
+    private fun rename(uri: Uri, args: JSONObject): Map<String, Any?> {
+        val renamed = Docs.renameDocument(resolver, uri, validName(args.getString("name")))
+            ?: error("文件提供者不支持重命名")
+        return metadata(renamed) + mapOf("renamed" to true)
+    }
+
+    private fun delete(uri: Uri): Map<String, Any?> {
+        require(Docs.getDocumentId(uri) != Docs.getTreeDocumentId(uri)) { "不能删除项目根目录" }
+        require(Docs.deleteDocument(resolver, uri)) { "文件提供者未能删除此文件" }
+        return mapOf("deleted" to true)
+    }
+
+    private fun validName(value: String): String {
+        require(value.isNotBlank() && value.length <= 120 && value !in setOf(".", "..") &&
+            value.none { it == '/' || it == '\\' || it.code < 32 }) { "名称无效" }
+        return value
     }
 
     private fun list(uri: Uri, args: JSONObject, search: Boolean): Map<String, Any?> {
@@ -69,7 +127,9 @@ class DocumentOperations(private val context: Context) {
             cursor.moveToPosition(offset - 1)
             while (scanned < 2000 && results.size < limit && cursor.moveToNext()) {
                 scanned++
-                if (cursor.getString(1).contains(query, ignoreCase = true)) results.add(row(cursor, uri))
+                if (cursor.getString(1).contains(query, ignoreCase = true)) {
+                    results.add(row(cursor, uri) + mapOf("parentUrl" to uri.toString()))
+                }
             }
             more = cursor.moveToNext()
         }
@@ -79,6 +139,71 @@ class DocumentOperations(private val context: Context) {
             "partial" to more, "scanLimitReached" to scanLimitReached,
             "scanned" to scanned, "scope" to "仅当前文件夹，不递归搜索子文件夹。分页期间文件夹发生变化可能影响结果顺序。scanLimitReached 为 true 时已达扫描上限，不能继续分页，也不能认定已搜索全部文件。")
     }
+
+    private data class WalkEntry(val uri: Uri, val path: String, val info: Map<String, Any?>, val depth: Int)
+
+    private fun walk(root: Uri, maxDepth: Int, maxFiles: Int): Pair<List<WalkEntry>, Boolean> {
+        val queue = java.util.ArrayDeque<WalkEntry>()
+        queue.add(WalkEntry(root, "", metadata(root), 0))
+        val results = mutableListOf<WalkEntry>()
+        while (queue.isNotEmpty() && results.size <= maxFiles) {
+            val folder = queue.removeFirst()
+            val children = Docs.buildChildDocumentsUriUsingTree(folder.uri, Docs.getDocumentId(folder.uri))
+            resolver.query(children, projection, null, null, null)!!.use { cursor ->
+                while (cursor.moveToNext() && results.size <= maxFiles) {
+                    val title = cursor.getString(1)
+                    if (title == ".git") continue
+                    val info = row(cursor, root)
+                    val path = if (folder.path.isEmpty()) title else "${folder.path}/$title"
+                    val entry = WalkEntry(Uri.parse(info["url"] as String), path, info, folder.depth + 1)
+                    results.add(entry)
+                    if (info["directory"] == true && entry.depth < maxDepth) queue.add(entry)
+                }
+            }
+        }
+        return results.take(maxFiles) to (results.size > maxFiles || queue.isNotEmpty())
+    }
+
+    private fun tree(uri: Uri, args: JSONObject): Map<String, Any?> {
+        val offset = args.getInt("offset")
+        val limit = args.getInt("limit")
+        val (entries, limited) = walk(uri, args.getInt("maxDepth"), MAX_TREE_ENTRIES)
+        val page = entries.drop(offset).take(limit).map { it.info + mapOf("path" to it.path) }
+        val more = offset + page.size < entries.size
+        return mapOf("results" to page, "nextOffset" to if (more) offset + page.size else null,
+            "partial" to (more || limited), "scanLimitReached" to limited)
+    }
+
+    private fun searchText(uri: Uri, args: JSONObject): Map<String, Any?> {
+        val query = args.getString("query")
+        val offset = args.getInt("offset")
+        val limit = args.getInt("limit")
+        val matchCap = offset + limit + 1
+        val (entries, limited) = walk(uri, args.getInt("maxDepth"), MAX_SEARCH_FILES)
+        val matches = mutableListOf<Map<String, Any?>>()
+        var scanned = 0
+        for (entry in entries) {
+            if (entry.info["directory"] == true || !searchable(entry.path)) continue
+            val size = entry.info["size"] as Long?
+            if (size != null && size > MAX_SEARCH_BYTES) continue
+            scanned++
+            resolver.openInputStream(entry.uri)!!.bufferedReader(Charsets.UTF_8).useLines { lines ->
+                lines.forEachIndexed { index, line -> if (matches.size < matchCap && line.contains(query, true)) {
+                    matches.add(entry.info + mapOf("path" to entry.path, "line" to index + 1,
+                        "preview" to line.take(500)))
+                } }
+            }
+        }
+        val page = matches.drop(offset).take(limit)
+        val more = offset + page.size < matches.size
+        return mapOf("results" to page, "nextOffset" to if (more) offset + page.size else null,
+            "partial" to (more || limited), "scanLimitReached" to limited, "scannedFiles" to scanned)
+    }
+
+    private fun searchable(name: String): Boolean = name.substringAfterLast('.', "").lowercase() in setOf(
+        "txt", "md", "csv", "tsv", "log", "json", "yaml", "yml", "xml", "html", "css", "scss",
+        "kt", "kts", "dart", "java", "py", "js", "jsx", "ts", "tsx", "c", "cc", "cpp", "h", "hpp",
+        "swift", "gradle", "properties", "toml", "sh", "sql")
 
     private fun read(uri: Uri, args: JSONObject): Map<String, Any?> {
         val info = metadata(uri)
@@ -91,7 +216,7 @@ class DocumentOperations(private val context: Context) {
         } else {
             val extension = (info["title"] as String).substringAfterLast('.', "").lowercase()
             require(mime.startsWith("text/") || mime in setOf("application/json", "application/xml") ||
-                extension in setOf("txt", "md", "csv", "tsv", "log", "json", "yaml", "yml", "xml", "html", "kt", "dart", "java", "py", "js", "css")) {
+                extension in setOf("txt", "md", "csv", "tsv", "log", "json", "yaml", "yml", "xml", "html", "kt", "kts", "dart", "java", "py", "js", "jsx", "ts", "tsx", "css", "scss", "c", "cc", "cpp", "h", "hpp", "swift", "gradle", "properties", "toml", "sh")) {
                 "暂时支持文本文件和 PDF，不支持直接读取此格式"
             }
             val offset = args.getInt("offset")
@@ -176,7 +301,7 @@ class DocumentOperations(private val context: Context) {
         require(name.isNotBlank() && name.length <= 120 && name !in setOf(".", "..") &&
             name.none { it == '/' || it == '\\' || it.code < 32 }) { "请提供有效的文件名，不要包含路径" }
         val content = args.getString("content")
-        require(content.length <= 20000) { "单次最多保存 20000 字" }
+        require(content.length <= MAX_WRITE_CHARACTERS) { "单次最多保存 $MAX_WRITE_CHARACTERS 字" }
         return when (name.substringAfterLast('.', "").lowercase()) {
             "md" -> "text/markdown"; "csv" -> "text/csv"; "json" -> "application/json"
             "txt", "log", "yaml", "yml", "xml", "html", "tsv" -> "text/plain"
@@ -206,5 +331,11 @@ class DocumentOperations(private val context: Context) {
         override fun flush() = Unit
         override fun close() = Unit
     }
-    companion object { private const val MAX_BYTES = 10 * 1024 * 1024 }
+    companion object {
+        private const val MAX_BYTES = 10 * 1024 * 1024
+        private const val MAX_WRITE_CHARACTERS = 500000
+        private const val MAX_TREE_ENTRIES = 5000
+        private const val MAX_SEARCH_FILES = 2000
+        private const val MAX_SEARCH_BYTES = 2 * 1024 * 1024L
+    }
 }

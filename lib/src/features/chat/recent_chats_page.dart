@@ -10,6 +10,9 @@ import 'ai_contacts_page.dart';
 import 'temporary_conversation_dialog.dart';
 import 'conversation_icon.dart';
 import 'header_action_menu.dart';
+import 'file_tool_icon.dart';
+import 'glass_surface.dart';
+import 'projects_page.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../domain/avatar_style.dart';
@@ -192,77 +195,111 @@ class RecentChatsPageState extends State<RecentChatsPage> {
       leadingAction: widget.groupsOnly
           ? null
           : SettingsGlassAction(
-              label: '搜索会话',
-              icon: Icons.search_rounded,
-              iconWidget: const SidebarActionIcon(
-                type: SidebarActionIconType.search,
+              label: '项目',
+              icon: Icons.folder_outlined,
+              iconWidget: FileToolIcon(
+                type: FileToolIconType.folder,
+                color: SettingsGlassAction.foregroundColor(
+                  context,
+                  enabled: true,
+                ),
               ),
               onPressed: () => Navigator.push<void>(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ConversationSearchPage(
-                    controller: widget.controller,
-                    preparingGoal: () => false,
-                  ),
+                  builder: (_) => ProjectsPage(controller: widget.controller),
                 ),
               ),
             ),
       actions: [
         if (!widget.groupsOnly)
-          Builder(
-            builder: (buttonContext) => SettingsGlassAction(
-              label: '添加',
-              icon: Icons.add_rounded,
-              iconWidget: const SidebarActionIcon(
-                type: SidebarActionIconType.add,
-              ),
-              onPressed: () async {
-                final iconColor =
-                    Theme.of(buttonContext).brightness == Brightness.dark
-                    ? Theme.of(buttonContext).colorScheme.onSurfaceVariant
-                    : const Color(0xff222222);
-                final action = await showHeaderActionMenu(
-                  buttonContext,
-                  items: [
-                    (
-                      value: 'conversation',
-                      label: '发起会话',
-                      icon: ConversationIcon(color: iconColor),
-                    ),
-                    (
-                      value: 'temporary',
-                      label: '发起临时会话',
-                      icon: ConversationIcon(temporary: true, color: iconColor),
-                    ),
-                    (
-                      value: 'group',
-                      label: '发起群聊',
-                      icon: SidebarActionIcon(
-                        type: SidebarActionIconType.group,
-                        color: iconColor,
+          SettingsGlassActionSurface(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RoundAction(
+                  label: '搜索会话',
+                  icon: Icons.search_rounded,
+                  iconWidget: const SidebarActionIcon(
+                    type: SidebarActionIconType.search,
+                  ),
+                  onPressed: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ConversationSearchPage(
+                        controller: widget.controller,
+                        preparingGoal: () => false,
                       ),
                     ),
-                    (
-                      value: 'tasks',
-                      label: '定时任务',
-                      icon: SettingsIcon(
-                        type: SettingsIconType.tasks,
-                        color: iconColor,
-                      ),
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 20,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: .12),
+                ),
+                Builder(
+                  builder: (buttonContext) => RoundAction(
+                    label: '添加',
+                    icon: Icons.add_rounded,
+                    iconWidget: const SidebarActionIcon(
+                      type: SidebarActionIconType.add,
                     ),
-                  ],
-                );
-                if (!mounted) return;
-                if (action == 'conversation') {
-                  await _newConversation();
-                } else if (action == 'temporary') {
-                  await _temporaryConversation();
-                } else if (action == 'group') {
-                  await _group();
-                } else if (action == 'tasks') {
-                  await openScheduledTasks(context, widget.controller);
-                }
-              },
+                    onPressed: () async {
+                      final iconColor =
+                          Theme.of(buttonContext).brightness == Brightness.dark
+                          ? Theme.of(buttonContext).colorScheme.onSurfaceVariant
+                          : const Color(0xff222222);
+                      final action = await showHeaderActionMenu(
+                        buttonContext,
+                        items: [
+                          (
+                            value: 'conversation',
+                            label: '发起会话',
+                            icon: ConversationIcon(color: iconColor),
+                          ),
+                          (
+                            value: 'temporary',
+                            label: '发起临时会话',
+                            icon: ConversationIcon(
+                              temporary: true,
+                              color: iconColor,
+                            ),
+                          ),
+                          (
+                            value: 'group',
+                            label: '发起群聊',
+                            icon: SidebarActionIcon(
+                              type: SidebarActionIconType.group,
+                              color: iconColor,
+                            ),
+                          ),
+                          (
+                            value: 'tasks',
+                            label: '定时任务',
+                            icon: SettingsIcon(
+                              type: SettingsIconType.tasks,
+                              color: iconColor,
+                            ),
+                          ),
+                        ],
+                      );
+                      if (!mounted) return;
+                      if (action == 'conversation') {
+                        await _newConversation();
+                      } else if (action == 'temporary') {
+                        await _temporaryConversation();
+                      } else if (action == 'group') {
+                        await _group();
+                      } else if (action == 'tasks') {
+                        await openScheduledTasks(context, widget.controller);
+                      }
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
       ],
@@ -280,7 +317,9 @@ class RecentChatsPageState extends State<RecentChatsPage> {
               animateChanges: false,
               padding: EdgeInsets.fromLTRB(
                 12,
-                MediaQuery.paddingOf(context).top + 76 + 8,
+                MediaQuery.paddingOf(context).top +
+                    SettingsAppBar.toolbarHeight +
+                    8,
                 12,
                 MediaQuery.paddingOf(context).bottom + 24,
               ),
@@ -296,7 +335,9 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                   : Padding(
                       padding: EdgeInsets.fromLTRB(
                         12,
-                        MediaQuery.paddingOf(context).top + 84,
+                        MediaQuery.paddingOf(context).top +
+                            SettingsAppBar.toolbarHeight +
+                            8,
                         12,
                         0,
                       ),

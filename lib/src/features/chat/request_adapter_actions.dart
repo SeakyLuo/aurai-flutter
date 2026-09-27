@@ -13,6 +13,8 @@ extension RequestAdapterActions on ChatController {
       details: ProviderDetails(
         modelContextOverrides: old.details?.modelContextOverrides ?? const {},
         modelPurposes: old.details?.modelPurposes ?? const {},
+        modelPurposeField: old.details?.modelPurposeField ?? '',
+        modelTypeMappings: old.details?.modelTypeMappings ?? const {},
         modelReasoning: old.details?.modelReasoning ?? const {},
         balance: old.details?.balance,
         icon: old.details?.icon,
@@ -48,6 +50,8 @@ extension RequestAdapterActions on ChatController {
         details: ProviderDetails(
           modelContextOverrides: old.details?.modelContextOverrides ?? const {},
           modelPurposes: old.details?.modelPurposes ?? const {},
+          modelPurposeField: old.details?.modelPurposeField ?? '',
+          modelTypeMappings: old.details?.modelTypeMappings ?? const {},
           modelReasoning: old.details?.modelReasoning ?? const {},
           balance: old.details?.balance,
           icon: old.details?.icon,
@@ -90,6 +94,8 @@ extension RequestAdapterActions on ChatController {
         details: ProviderDetails(
           modelContextOverrides: old.details?.modelContextOverrides ?? const {},
           modelPurposes: old.details?.modelPurposes ?? const {},
+          modelPurposeField: old.details?.modelPurposeField ?? '',
+          modelTypeMappings: old.details?.modelTypeMappings ?? const {},
           modelReasoning: old.details?.modelReasoning ?? const {},
           balance: old.details?.balance,
           icon: old.details?.icon,

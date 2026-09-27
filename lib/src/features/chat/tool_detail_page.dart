@@ -122,7 +122,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
       FocusScope.of(context).unfocus();
       setState(() {
         _tool = ToolCustomizations.apply(_tool);
-        _savedTitle = customization.title;
+        _savedTitle = customization.title!;
         _savedIcon = _icon;
         _name.text = _savedTitle;
         _parameters.text = _encode(_tool.inputSchema);
@@ -240,9 +240,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
                                             final icon =
                                                 await showSkillIconPicker(
                                                   context,
-                                                  _icon.startsWith('skill:')
-                                                      ? _icon.substring(6)
-                                                      : '',
+                                                  _icon.substring(6),
                                                   title: '选择工具图标',
                                                 );
                                             if (mounted && icon != null) {

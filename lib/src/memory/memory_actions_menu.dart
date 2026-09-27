@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../features/chat/glass_surface.dart';
 import '../features/chat/conversation_menu_icon.dart';
+import '../features/chat/menu_press_highlight.dart';
 
 enum MemoryAction { edit, delete }
 
@@ -106,4 +107,4 @@ Future<MemoryAction?> showMemoryActionsMenu(
       ],
     );
   },
-);
+).whenComplete(MenuPressHighlight.dismissActive);

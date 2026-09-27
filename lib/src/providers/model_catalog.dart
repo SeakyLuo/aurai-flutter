@@ -1,4 +1,6 @@
+import 'model_type_recognition.dart';
 import 'openrouter_models.dart';
+import 'model_purpose_catalog.dart';
 import '../domain/error_message.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -15,6 +17,7 @@ class ModelCatalog {
       return Future.value([for (final model in models) model.id]);
     }
     return load(
+      config: config,
       baseUrl: Uri.parse(config.baseUrl),
       apiKey: config.apiKey,
       openRouter: config.service.usesOpenRouterCatalog,
@@ -23,6 +26,7 @@ class ModelCatalog {
   }
 
   Future<List<String>> load({
+    ModelConfig? config,
     required Uri baseUrl,
     required String apiKey,
     bool openRouter = false,
@@ -30,6 +34,7 @@ class ModelCatalog {
   }) async {
     try {
       return await _load(
+        config,
         baseUrl,
         apiKey,
         openRouter,
@@ -53,6 +58,53 @@ class ModelCatalog {
   }
 
   Future<List<String>> _load(
+    ModelConfig? config,
+    Uri baseUrl,
+    String apiKey,
+    bool openRouter,
+    bool textOnly,
+  ) async {
+    final entries = await _fetchEntries(baseUrl, apiKey, openRouter, textOnly);
+    if (openRouter) await OpenRouterModels.save(baseUrl.toString(), entries);
+    final detected = <String, Set<ModelPurpose>>{};
+    for (final entry in entries) {
+      final purposes = ModelTypeRecognition.purposes(
+        entry,
+        config?.details?.modelPurposeField ?? '',
+        config?.details?.modelTypeMappings ?? const {},
+      );
+      if (purposes.isNotEmpty) detected[entry['id'] as String] = purposes;
+    }
+    await DetectedModelPurposes.save(baseUrl.toString(), detected);
+    final models =
+        entries
+            .where(
+              (entry) =>
+                  !openRouter ||
+                  !textOnly ||
+                  OpenRouterModelInfo(entry).supportsText,
+            )
+            .where((entry) {
+              if (!textOnly || openRouter) return true;
+              final purposes = detected[entry['id'] as String];
+              return purposes == null || purposes.contains(ModelPurpose.text);
+            })
+            .map((entry) => entry['id'] as String)
+            .toSet()
+            .toList()
+          ..sort();
+    return models;
+  }
+
+  Future<List<Map<String, dynamic>>> loadEntries(ModelConfig config) =>
+      _fetchEntries(
+        Uri.parse(config.baseUrl),
+        config.apiKey,
+        config.service.usesOpenRouterCatalog,
+        false,
+      ).timeout(const Duration(seconds: 20));
+
+  Future<List<Map<String, dynamic>>> _fetchEntries(
     Uri baseUrl,
     String apiKey,
     bool openRouter,
@@ -85,20 +137,7 @@ class ModelCatalog {
     final entries = (json['data'] as List)
         .map((item) => Map<String, dynamic>.from(item as Map))
         .toList();
-    if (openRouter) await OpenRouterModels.save(baseUrl.toString(), entries);
-    final models =
-        entries
-            .where(
-              (entry) =>
-                  !openRouter ||
-                  !textOnly ||
-                  OpenRouterModelInfo(entry).supportsText,
-            )
-            .map((entry) => entry['id'] as String)
-            .toSet()
-            .toList()
-          ..sort();
-    return models;
+    return entries;
   }
 
   void close() => _client.close(force: true);

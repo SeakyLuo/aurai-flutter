@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 
 import 'glass_surface.dart';
 import 'image_actions_menu.dart';
+import 'menu_press_highlight.dart';
 import '../../platform/preview_image_actions.dart';
 
 Future<Size> loadPreviewImageSize(
@@ -327,14 +328,16 @@ class _PreviewPageState extends State<_PreviewPage> {
                             imagePreviewFlight(widget.image, animation),
                     child: SizedBox.fromSize(
                       size: fitted,
-                      child: GestureDetector(
-                        onTap: () => Navigator.pop(context),
+                      child: MenuPressHighlight(
                         onLongPressStart: _showActions,
-                        child: Image(
-                          image: widget.image,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, _, _) =>
-                              const UnavailableImage(dark: true),
+                        child: GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Image(
+                            image: widget.image,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, _, _) =>
+                                const UnavailableImage(dark: true),
+                          ),
                         ),
                       ),
                     ),

@@ -32,6 +32,7 @@ const groupChatTables = [
     position INTEGER NOT NULL,
     joined_at INTEGER NOT NULL,
     left_at INTEGER,
+    role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
     PRIMARY KEY (conversation_id, sender_id)
   )''',
   '''CREATE TABLE message_recipients (
@@ -47,11 +48,34 @@ const groupChatTables = [
   '''CREATE TRIGGER direct_conversation_members AFTER INSERT ON conversations
     WHEN NEW.kind = 'direct'
     BEGIN
-      INSERT INTO conversation_members VALUES
-        (NEW.id, 'user:local', 0, NEW.created_at, NULL),
-        (NEW.id, NEW.default_sender_id, 1, NEW.created_at, NULL);
+      INSERT INTO conversation_members
+        (conversation_id, sender_id, position, joined_at, left_at, role)
+      VALUES
+        (NEW.id, 'user:local', 0, NEW.created_at, NULL, 'member'),
+        (NEW.id, NEW.default_sender_id, 1, NEW.created_at, NULL, 'member');
     END''',
 ];
+
+Future<void> migrateGroupRoles(Database db) async {
+  await db.execute(
+    "ALTER TABLE conversation_members ADD COLUMN role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member'))",
+  );
+  await db.rawUpdate(
+    "UPDATE conversation_members SET role = 'owner' WHERE sender_id = 'user:local' AND left_at IS NULL AND conversation_id IN (SELECT id FROM conversations WHERE kind = 'group')",
+  );
+  await db.execute('DROP TRIGGER direct_conversation_members');
+  await db.execute(
+    '''CREATE TRIGGER direct_conversation_members AFTER INSERT ON conversations
+    WHEN NEW.kind = 'direct'
+    BEGIN
+      INSERT INTO conversation_members
+        (conversation_id, sender_id, position, joined_at, left_at, role)
+      VALUES
+        (NEW.id, 'user:local', 0, NEW.created_at, NULL, 'member'),
+        (NEW.id, NEW.default_sender_id, 1, NEW.created_at, NULL, 'member');
+    END''',
+  );
+}
 
 Future<void> migrateGroupChats(Database db) async {
   final batch = db.batch();
@@ -75,8 +99,8 @@ Future<void> migrateGroupChats(Database db) async {
   }
   batch.execute(
     '''INSERT INTO conversation_members
-    SELECT id, 'user:local', 0, created_at, NULL FROM conversations
-    UNION ALL SELECT id, 'agent:aurai', 1, created_at, NULL FROM conversations''',
+    SELECT id, 'user:local', 0, created_at, NULL, 'member' FROM conversations
+    UNION ALL SELECT id, 'agent:aurai', 1, created_at, NULL, 'member' FROM conversations''',
   );
   batch.execute('''INSERT INTO message_recipients
     SELECT id, 'agent:aurai' FROM messages WHERE role = 'user' ''');

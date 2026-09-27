@@ -42,7 +42,11 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
       final result = await Navigator.push<AvatarStyle>(
         context,
         MaterialPageRoute(
-          builder: (_) => CustomAvatarPage(initial: _avatar, name: _name.text),
+          builder: (_) => CustomAvatarPage(
+            initial: _avatar,
+            name: _name.text,
+            database: widget.memory.database,
+          ),
         ),
       );
       if (mounted && result != null) setState(() => _avatar = result);

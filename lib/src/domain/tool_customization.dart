@@ -1,58 +1,65 @@
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:sqflite/sqflite.dart';
+
 import 'tool_models.dart';
 
 class ToolCustomization {
   const ToolCustomization({
-    required this.title,
+    this.title,
     required this.icon,
-    required this.description,
-    required this.inputSchema,
+    this.description,
+    this.inputSchema,
   });
-  final String title, icon, description;
-  final Map<String, Object?> inputSchema;
 
-  Map<String, Object?> toJson() => {
+  final String? title;
+  final String icon;
+  final String? description;
+  final Map<String, Object?>? inputSchema;
+
+  factory ToolCustomization.fromRow(Map<String, Object?> row) =>
+      ToolCustomization(
+        title: row['title'] as String?,
+        icon: row['icon']! as String,
+        description: row['description'] as String?,
+        inputSchema: row['input_schema_json'] == null
+            ? null
+            : (jsonDecode(row['input_schema_json']! as String) as Map)
+                  .cast<String, Object?>(),
+      );
+
+  Map<String, Object?> toRow(String name) => {
+    'name': name,
     'title': title,
     'icon': icon,
     'description': description,
-    'inputSchema': inputSchema,
+    'input_schema_json': inputSchema == null ? null : jsonEncode(inputSchema),
   };
-
-  factory ToolCustomization.fromJson(Map<String, Object?> json) =>
-      ToolCustomization(
-        title: json['title'] as String,
-        icon: json['icon'] as String,
-        description: json['description'] as String,
-        inputSchema: (json['inputSchema'] as Map).cast<String, Object?>(),
-      );
 }
 
 abstract final class ToolCustomizations {
   static final values = <String, ToolCustomization>{};
-  static Future<void> initialize() async {
-    final preferences = await SharedPreferences.getInstance();
-    final saved = preferences.getString('tool_customizations');
-    values.clear();
-    if (saved != null) {
-      (jsonDecode(saved) as Map).forEach((key, value) {
-        values[key as String] = ToolCustomization.fromJson(
-          (value as Map).cast<String, Object?>(),
-        );
-      });
-    }
+  static late Database _database;
+
+  static Future<void> initialize(Database database) async {
+    _database = database;
+    final rows = await database.query('tool_customizations');
+    values
+      ..clear()
+      ..addEntries(
+        rows.map(
+          (row) =>
+              MapEntry(row['name']! as String, ToolCustomization.fromRow(row)),
+        ),
+      );
   }
 
   static Future<void> save(String name, ToolCustomization value) async {
-    final next = {...values, name: value};
-    final preferences = await SharedPreferences.getInstance();
-    if (!await preferences.setString(
+    await _database.insert(
       'tool_customizations',
-      jsonEncode({
-        for (final entry in next.entries) entry.key: entry.value.toJson(),
-      }),
-    ))
-      throw StateError('保存工具失败');
+      value.toRow(name),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
     values[name] = value;
   }
 
@@ -61,8 +68,8 @@ abstract final class ToolCustomizations {
     if (value == null) return tool;
     return ToolDefinition(
       name: tool.name,
-      description: value.description,
-      inputSchema: value.inputSchema,
+      description: value.description ?? tool.description,
+      inputSchema: value.inputSchema ?? tool.inputSchema,
       safety: tool.safety,
       capabilityId: tool.capabilityId,
       actionArgument: tool.actionArgument,

@@ -18,6 +18,7 @@ import 'ai_contact_page.dart';
 import 'personal_info_page.dart';
 import 'app_dialog.dart';
 import 'dialog_action_button.dart';
+import 'chat_header.dart';
 
 /// Reserves space below the chat header so the announcement cannot cover messages.
 class GroupAnnouncementBanner extends StatefulWidget {
@@ -216,7 +217,7 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
             top:
                 View.of(context).padding.top /
                     View.of(context).devicePixelRatio +
-                76,
+                ChatHeader.toolbarHeight,
             left: 0,
             right: 0,
             child: Center(

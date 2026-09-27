@@ -26,11 +26,13 @@ class MemorySummaryPage extends StatefulWidget {
     this.title = '记忆',
     this.groupMemories,
     this.initialGroup = false,
+    this.actions = const [],
   });
   final MemoryController memory;
   final String title;
   final Widget? groupMemories;
   final bool initialGroup;
+  final List<Widget> actions;
 
   @override
   State<MemorySummaryPage> createState() => _MemorySummaryPageState();
@@ -197,6 +199,7 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
           bottomNavigationBar: _group ? null : KeyboardInset(child: _footer()),
           appBar: SettingsAppBar(
             title: widget.title,
+            actions: widget.actions,
 
             titleWidget: widget.groupMemories == null
                 ? null
@@ -252,8 +255,12 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
                               ),
                               child: Text(
                                 memory.entries.isEmpty
-                                    ? (memory.scope.isEmpty
+                                    ? (memory.projectShared
+                                          ? '这里会记录项目中所有 AI 共享的背景与约定。你可以在下方补充信息。'
+                                          : memory.scope.isEmpty
                                           ? '这里会逐渐记录对你的了解。你可以在下方补充希望记住的信息。'
+                                          : memory.projectOnly
+                                          ? '这里会记录仅在这个项目中使用的记忆。你可以在下方补充信息。'
                                           : '这里会记录在这个群聊中形成的记忆。你可以在下方补充信息。')
                                     : '以下是对话中形成、或主动保存的记忆。',
                                 style: const TextStyle(
@@ -287,7 +294,9 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
               if (_groupVisited)
                 Padding(
                   padding: EdgeInsets.only(
-                    top: MediaQuery.paddingOf(context).top + 76,
+                    top:
+                        MediaQuery.paddingOf(context).top +
+                        SettingsAppBar.toolbarHeight,
                   ),
                   child: MediaQuery.removePadding(
                     context: context,

@@ -320,7 +320,7 @@ List<Map<String, Object?>> retainedRequestInput(ModelRequest request) => [
         'status': result.status.name,
         'result': result.toolName == 'getNotifications'
             ? {'contentRetention': 'task_only'}
-            : result.output,
+            : result.modelOutput,
       }),
     },
   for (final update in request.userUpdates) {'role': 'user', 'content': update},

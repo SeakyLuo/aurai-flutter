@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'glass_surface.dart';
+import 'menu_press_highlight.dart';
 
 typedef HeaderMenuItem = ({String value, String label, Widget icon});
 
@@ -80,7 +81,7 @@ Future<String?> showHeaderActionMenu(
       );
     },
     transitionBuilder: (_, _, _, child) => child,
-  );
+  ).whenComplete(MenuPressHighlight.dismissActive);
 }
 
 class GlassMenuItem extends StatelessWidget {

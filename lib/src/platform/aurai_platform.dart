@@ -101,6 +101,9 @@ class AuraiPlatform {
     if (name != null) 'name': name,
   });
 
+  Future<void> openProjectFolder(String uri) =>
+      _channel.invokeMethod<void>('openProjectFolder', {'uri': uri});
+
   Future<Map<String, Object?>> deviceExtension(
     String operation, [
     Map<String, Object?> arguments = const {},

@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
+import 'model_type_recognition_page.dart';
 import 'provider_models_page.dart';
-import 'provider_model_management_page.dart';
 import 'default_model_settings_page.dart';
+import 'provider_model_management_page.dart';
 import 'model_provider_icon.dart';
 import 'provider_icon_store.dart';
 import 'attachment_action_icon.dart';
@@ -47,6 +49,8 @@ class ModelProviderDetail extends StatefulWidget {
 class _ModelProviderDetailState extends State<ModelProviderDetail> {
   final _name = TextEditingController();
   final _website = TextEditingController();
+  final _modelPurposeField = TextEditingController();
+  late Map<String, ModelPurpose> _modelTypeMappings;
   late ProviderProtocol _protocol;
   late List<String> _models;
   late bool _autoSyncModels;
@@ -79,17 +83,10 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
         controller: widget.controller,
         service: _service,
         readOnly: !_editing,
+        onConfigureTypes: _configureModelTypes,
       ),
     );
   }
-
-  Future<void> _openDefaultModelSettings() => _openModelSettings(
-    DefaultModelSettingsPage(
-      controller: widget.controller,
-      service: _service,
-      readOnly: !_editing,
-    ),
-  );
 
   Future<void> _openBalanceSettings() => _openModelSettings(
     ProviderBalanceSettingsPage(
@@ -102,6 +99,8 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     requestAdapters: _saved.details?.requestAdapters ?? const {},
     modelContextOverrides: _saved.details?.modelContextOverrides ?? const {},
     modelPurposes: _saved.details?.modelPurposes ?? const {},
+    modelPurposeField: _modelPurposeField.text.trim(),
+    modelTypeMappings: _modelTypeMappings,
     modelReasoning: _saved.details?.modelReasoning ?? const {},
     balance: _saved.details?.balance,
     icon: _icon,
@@ -145,9 +144,14 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
       : widget.controller.modelSettings.profile(_service);
   bool get _locked => _saving;
   bool get _currentDirty =>
+      !mapEquals(
+        _modelTypeMappings,
+        _saved.details?.modelTypeMappings ?? const {},
+      ) ||
       _name.text != (widget.creating ? '' : _saved.displayName) ||
       _website.text != _saved.website ||
       _protocol != _saved.protocol ||
+      _modelPurposeField.text != (_saved.details?.modelPurposeField ?? '') ||
       _icon != _saved.details?.icon ||
       _autoSyncModels != _saved.autoSyncModels ||
       _models.join('\n') != _saved.savedModels.join('\n') ||
@@ -167,6 +171,8 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     _name.text = widget.creating ? '' : _saved.displayName;
     _website.text = _saved.website;
     _protocol = _saved.protocol;
+    _modelPurposeField.text = _saved.details?.modelPurposeField ?? '';
+    _modelTypeMappings = {...?_saved.details?.modelTypeMappings};
     _icon = _saved.details?.icon;
     _models = [..._saved.savedModels];
     _autoSyncModels = _saved.autoSyncModels;
@@ -179,22 +185,17 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     _name.addListener(_changed);
     _key.addListener(_changed);
     _address.addListener(_changed);
+    _modelPurposeField.addListener(_changed);
   }
 
   void _changed() => setState(() {});
-  void _updateModelSelection(bool useAll, List<String> models) => setState(() {
-    _autoSyncModels = useAll;
-    _models = models;
-    if (!useAll && models.isNotEmpty && !models.contains(_model)) {
-      _model = models.first;
-    }
-  });
   @override
   void dispose() {
     _name.dispose();
     _website.dispose();
     _key.dispose();
     _address.dispose();
+    _modelPurposeField.dispose();
     super.dispose();
   }
 
@@ -380,7 +381,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
                                 : _service.defaultBaseUrl,
                           ),
                         ),
-                        if (_apiKey.isNotEmpty) ...[
+                        if (!widget.creating || _apiKey.isNotEmpty) ...[
                           const SizedBox(height: 24),
                           const _Label('模型管理'),
                           if (widget.creating)
@@ -404,14 +405,6 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
                                   : '已选 ${_models.length} 个模型',
                               onTap: _locked ? null : _openManagedModels,
                             ),
-                        ],
-                        if (!widget.creating) ...[
-                          const SizedBox(height: 24),
-                          const _Label('默认模型设置'),
-                          _ModelChoice(
-                            label: '配置默认设置',
-                            onTap: _locked ? null : _openDefaultModelSettings,
-                          ),
                         ],
                         const SizedBox(height: 24),
                         const _Label('官网地址'),
@@ -604,6 +597,8 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
           protocol: _protocol,
           models: _models,
           autoSyncModels: _autoSyncModels,
+          modelPurposeField: _modelPurposeField.text.trim(),
+          modelTypeMappings: _modelTypeMappings,
           icon: _icon,
           model: _model,
         );
@@ -637,6 +632,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
         _name.text = _saved.displayName;
         _website.text = _saved.website;
         _address.text = _saved.baseUrl;
+        _modelPurposeField.text = _saved.details?.modelPurposeField ?? '';
         _key.clear();
         setState(() {
           _protocol = _saved.protocol;

@@ -4,6 +4,8 @@ import 'chat_scroll_anchor.dart';
 import 'thinking_indicator.dart';
 import 'tool_action_icon.dart';
 import 'tool_expand_arrow.dart';
+import '../../domain/workspace_file_changes.dart';
+import 'workspace_changes_view.dart';
 
 class ToolActivityGroup extends StatefulWidget {
   const ToolActivityGroup({
@@ -12,11 +14,13 @@ class ToolActivityGroup extends StatefulWidget {
     required this.toolName,
     required this.statuses,
     required this.children,
+    this.fileResults = const [],
   });
   final String storageId;
   final String toolName;
   final List<AgentStepStatus> statuses;
   final List<Widget> children;
+  final List<String?> fileResults;
   @override
   State<ToolActivityGroup> createState() => _ToolActivityGroupState();
 }
@@ -80,6 +84,10 @@ class _ToolActivityGroupState extends State<ToolActivityGroup> {
             ),
           ),
         ),
+        if (widget.fileResults.isNotEmpty)
+          WorkspaceChangesView(
+            changes: WorkspaceFileChanges.fromResults(widget.fileResults),
+          ),
         if (expanded) ...widget.children,
       ],
     );

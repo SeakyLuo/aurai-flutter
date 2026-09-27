@@ -27,6 +27,7 @@ class NewConversationDraft {
         createdAt: DateTime.parse(data['createdAt']! as String),
       )
       ..defaultSenderId = owner
+      ..projectId = data['projectId'] as String?
       ..storedTitle = data['title'] as String?
       ..draft = data['text']! as String
       ..draftQuote = data['quote'] == null
@@ -64,6 +65,7 @@ class NewConversationDraft {
       'createdAt': conversation.createdAt.toIso8601String(),
       'text': conversation.draft,
       'title': conversation.storedTitle,
+      'projectId': conversation.projectId,
       'quote': conversation.draftQuote?.toJson(),
       'mentions': conversation.draftMentions
           .map((item) => item.toJson())

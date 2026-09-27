@@ -13,6 +13,8 @@ extension ProviderConfigurationActions on ChatController {
           requestAdapters: old.details?.requestAdapters ?? const {},
           modelContextOverrides: old.details?.modelContextOverrides ?? const {},
           modelPurposes: old.details?.modelPurposes ?? const {},
+          modelPurposeField: old.details?.modelPurposeField ?? '',
+          modelTypeMappings: old.details?.modelTypeMappings ?? const {},
           modelReasoning: old.details?.modelReasoning ?? const {},
           balance: old.details?.balance,
           icon: icon,
@@ -37,6 +39,8 @@ extension ProviderConfigurationActions on ChatController {
       requestAdapters: old.details?.requestAdapters ?? const {},
       modelContextOverrides: old.details?.modelContextOverrides ?? const {},
       modelPurposes: old.details?.modelPurposes ?? const {},
+      modelPurposeField: old.details?.modelPurposeField ?? '',
+      modelTypeMappings: old.details?.modelTypeMappings ?? const {},
       modelReasoning: old.details?.modelReasoning ?? const {},
       balance: balance,
       icon: old.details?.icon,
@@ -117,6 +121,8 @@ extension ProviderConfigurationActions on ChatController {
     ProviderProtocol protocol = ProviderProtocol.openaiChatCompletions,
     List<String> models = const [],
     bool autoSyncModels = true,
+    String modelPurposeField = '',
+    Map<String, ModelPurpose> modelTypeMappings = const {},
     String? icon,
     String model = '',
   }) => _serializeModelSettings(() async {
@@ -126,6 +132,8 @@ extension ProviderConfigurationActions on ChatController {
       protocol: protocol,
       models: models,
       autoSyncModels: autoSyncModels,
+      modelPurposeField: modelPurposeField,
+      modelTypeMappings: modelTypeMappings,
       icon: icon,
     );
     validateProviderDetails(details, baseUrl);
@@ -150,6 +158,7 @@ extension ProviderConfigurationActions on ChatController {
     'model': config.model,
     'configured': config.isConfigured,
     'protocol': config.protocol.name,
+    'modelPurposeField': config.details?.modelPurposeField ?? '',
     'icon': config.icon == null
         ? 'default'
         : config.icon!.startsWith('file:')
@@ -194,6 +203,12 @@ extension ProviderConfigurationActions on ChatController {
         final details = ProviderDetails(
           requestAdapters: old?.details?.requestAdapters ?? const {},
           modelPurposes: old?.details?.modelPurposes ?? const {},
+          modelTypeMappings: old?.details?.modelTypeMappings ?? const {},
+          modelPurposeField:
+              (args['modelPurposeField'] as String? ??
+                      old?.details?.modelPurposeField ??
+                      '')
+                  .trim(),
           modelReasoning: old?.details?.modelReasoning ?? const {},
           modelContextOverrides:
               old?.details?.modelContextOverrides ?? const {},
@@ -282,6 +297,14 @@ extension ProviderConfigurationActions on ChatController {
         return {
           'provider': service.name,
           'models': models,
+          'modelPurposes': {
+            for (final model in models)
+              if (modelPurposesFor(config, model).isNotEmpty)
+                model: [
+                  for (final purpose in modelPurposesFor(config, model))
+                    purpose.name,
+                ],
+          },
           'chatVerified': false,
         };
       } finally {
@@ -310,6 +333,7 @@ extension ProviderConfigurationActions on ChatController {
         baseUrl: old.baseUrl,
         model: old.model,
         reasoning: old.reasoning,
+        details: old.details,
       ),
       defaultService: modelSettings.activeService,
     );

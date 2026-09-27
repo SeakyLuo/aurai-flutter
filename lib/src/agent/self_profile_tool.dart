@@ -35,10 +35,10 @@ class SelfProfileTool implements AgentTool, RuntimeCapabilityAgentTool {
             key: {
               'type': ['string', 'null'],
               'maxLength': key == 'name'
-                  ? 100
+                  ? AiProfile.nameMaxLength
                   : key == 'description'
-                  ? 300
-                  : 10000,
+                  ? AiProfile.descriptionMaxLength
+                  : AiProfile.instructionsMaxLength,
             },
           'avatarIcon': {
             'type': ['string', 'null'],
@@ -64,14 +64,18 @@ class SelfProfileTool implements AgentTool, RuntimeCapabilityAgentTool {
       if (update) {
         final args = call.arguments;
         final name = (args['name'] as String? ?? profile.sender.name).trim();
-        if (name.isEmpty || name.length > 100)
-          throw ArgumentError('名字需要 1–100 个字符');
+        if (name.isEmpty || name.length > AiProfile.nameMaxLength) {
+          throw ArgumentError('名字需要 1–${AiProfile.nameMaxLength} 个字符');
+        }
         final description =
             args['description'] as String? ?? profile.description;
         final instructions =
             args['instructions'] as String? ?? profile.instructions;
-        if (description.length > 300 || instructions.length > 10000) {
-          throw ArgumentError('简介最多 300 字，自定义指令最多 10000 字');
+        if (description.length > AiProfile.descriptionMaxLength ||
+            instructions.length > AiProfile.instructionsMaxLength) {
+          throw ArgumentError(
+            '简介最多 ${AiProfile.descriptionMaxLength} 字，自定义指令最多 ${AiProfile.instructionsMaxLength} 字',
+          );
         }
         final icon = args['avatarIcon'] as String?;
         final color = args['avatarColor'] as String?;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../features/chat/settings_appearance.dart';
+import '../features/chat/menu_press_highlight.dart';
 import 'skill_icon.dart';
 import 'skill_store.dart';
 
@@ -19,12 +20,13 @@ class SkillListTile extends StatelessWidget {
   final Widget? footer;
   final VoidCallback onTap;
   final Widget? titleTrailing;
-  final GestureLongPressStartCallback? onLongPressStart;
+  final Future<void> Function(LongPressStartDetails)? onLongPressStart;
   final bool showDisabled;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  Widget build(BuildContext context) => MenuPressHighlight(
     onLongPressStart: onLongPressStart,
+    borderRadius: BorderRadius.circular(22),
     child: Material(
       color: settingsFieldColor(context),
       borderRadius: BorderRadius.circular(22),

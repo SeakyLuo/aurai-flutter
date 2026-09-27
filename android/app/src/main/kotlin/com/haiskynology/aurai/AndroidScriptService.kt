@@ -33,6 +33,7 @@ class AndroidScriptService : Service() {
                     val scope = cx.initStandardObjects()
                     ScriptableObject.putProperty(scope, "app", Context.javaToJS(applicationContext, scope))
                     ScriptableObject.putProperty(scope, "conversationId", conversationId)
+                    ScriptableObject.putProperty(scope, "workspace", Context.javaToJS(ScriptWorkspace(applicationContext, conversationId), scope))
                     Context.toString(cx.evaluateString(
                         scope,
                         "JSON.stringify((function(){\n$script\n})())",

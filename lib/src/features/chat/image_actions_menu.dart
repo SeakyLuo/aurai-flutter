@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'glass_surface.dart';
 import 'attachment_action_icon.dart';
+import 'menu_press_highlight.dart';
 
 Future<String?> showImageActionsMenu(
   BuildContext context,
@@ -77,4 +78,4 @@ Future<String?> showImageActionsMenu(
       ],
     );
   },
-);
+).whenComplete(MenuPressHighlight.dismissActive);

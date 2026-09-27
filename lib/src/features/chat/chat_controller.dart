@@ -1,4 +1,6 @@
 import '../../agent/group_access_tool.dart';
+import '../../agent/deliver_file_tool.dart';
+import '../../platform/generated_file_store.dart';
 import '../../agent/group_message_marks_tool.dart';
 import '../../storage/group_message_marks.dart';
 import '../../domain/request_adapter.dart';
@@ -22,6 +24,7 @@ import '../../providers/music_generation_client.dart';
 import '../../agent/image_generation_tool.dart';
 import '../../agent/music_generation_tool.dart';
 import '../../providers/openrouter_models.dart';
+import '../../providers/model_purpose_catalog.dart';
 import '../../storage/draft_attachment_cleanup.dart';
 import '../../storage/quick_reply_recents.dart';
 import '../../agent/quick_reply_tool.dart';
@@ -31,6 +34,8 @@ import '../../agent/html_app_publication_tool.dart';
 import '../../html_games/miniapp_library_store.dart';
 import '../../html_games/miniapp_template.dart';
 import '../../html_games/html_app_store.dart';
+import '../../html_games/html_app_edit.dart';
+import '../../agent/html_app_edit_tool.dart';
 import '../../storage/interactive_callback_result.dart';
 import '../../storage/interactive_callback_state.dart';
 import '../../storage/conversation_navigation_state.dart';
@@ -71,6 +76,7 @@ import '../../agent/group_sleep_tool.dart';
 import '../../storage/group_participation.dart';
 import 'group_dispatcher.dart';
 import '../../agent/group_chat_tools.dart';
+import '../../agent/project_tools.dart';
 import '../../agent/group_announcement_tool.dart';
 import '../../storage/group_announcement_store.dart';
 import '../../agent/ai_contact_tools.dart';
@@ -84,6 +90,7 @@ import 'tool_approval_store.dart';
 import '../../domain/message_file.dart';
 import '../../platform/message_file_store.dart';
 import '../../platform/document_tools.dart';
+import '../../platform/project_development_tools.dart';
 import '../../platform/wait_for_ui_tool.dart';
 import '../../platform/device_extension_tools.dart';
 import '../../agent/image_search_tool.dart';
@@ -137,6 +144,7 @@ import '../../storage/conversation_message_edit.dart';
 import '../../storage/new_conversation_draft.dart';
 import '../../storage/conversation_reader.dart';
 import '../../storage/conversation_rows.dart';
+import '../../storage/development_projects.dart';
 
 export 'conversation.dart';
 
@@ -146,6 +154,7 @@ part 'message_recall.dart';
 part 'message_submission.dart';
 part 'message_quick_replies.dart';
 part 'global_tools.dart';
+part 'generated_file_actions.dart';
 part 'group_reply_context.dart';
 part 'group_reply_draft.dart';
 part 'ai_identity_controller.dart';
@@ -391,8 +400,8 @@ class ChatController extends ChangeNotifier {
     await _imageStore.initialize();
     await toolApprovals.initialize();
     await navigationState.initialize();
-    await ToolCustomizations.initialize();
     await OpenRouterModels.initialize();
+    await DetectedModelPurposes.initialize();
     modelSettings = await _platform.loadModelSettings();
     await refreshCapabilities();
     final activeId = await _store.initialize(
@@ -400,6 +409,7 @@ class ChatController extends ChangeNotifier {
       _platform.loadLegacyAppState,
       _platform.clearLegacyAppState,
     );
+    await ToolCustomizations.initialize(_store.database);
     await _loadPendingMessageQueues();
     await _loadImageGeneration();
     await _migrateMusicGeneration();
@@ -527,6 +537,193 @@ class ChatController extends ChangeNotifier {
         activeConversation.isEmpty)
       return;
     await _switchConversation(null);
+  }
+
+  Future<void> createProjectConversation(
+    DevelopmentProject project, {
+    required String senderId,
+  }) async {
+    await createConversation();
+    activeConversation.projectId = project.id;
+    activeConversation.storedTitle = null;
+    activeConversation.defaultSenderId = senderId;
+    _activeAi = await groupStore.loadAi(senderId);
+    await _newDraftStore.save(activeConversation);
+    _conversationChanged();
+  }
+
+  Future<void> setActiveDraftSender(String senderId) async {
+    activeConversation.defaultSenderId = senderId;
+    _activeAi = await groupStore.loadAi(senderId);
+    await _persist();
+    _conversationChanged();
+  }
+
+  DevelopmentProjects get projects => DevelopmentProjects(_store.database);
+
+  Future<DevelopmentProject> createManagedProject(
+    String name,
+    String icon,
+    String iconColor, {
+    String description = '',
+    String gitRemoteUrl = '',
+  }) async {
+    validateProjectName(name);
+    final id = newMessageId();
+    final output = await _platform.deviceExtension('createManagedProject', {
+      'id': id,
+      'name': name,
+    });
+    if (gitRemoteUrl.isNotEmpty) {
+      await _platform.deviceExtension('projectDevelopmentOperation', {
+        'projectId': id,
+        'operation': 'initializeProjectGit',
+        'arguments': <String, Object?>{},
+      });
+      await _platform.deviceExtension('projectDevelopmentOperation', {
+        'projectId': id,
+        'operation': 'setProjectGitRemote',
+        'arguments': {'url': gitRemoteUrl},
+      });
+    }
+    final now = DateTime.now();
+    final project = DevelopmentProject(
+      id: id,
+      name: name,
+      description: description,
+      icon: icon,
+      iconColor: iconColor,
+      rootUri: output['uri'] as String,
+      location: ProjectLocation.managed,
+      createdAt: now,
+      updatedAt: now,
+      gitRemoteUrl: gitRemoteUrl,
+    );
+    await projects.create(project);
+    notifyListeners();
+    return project;
+  }
+
+  Future<DevelopmentProject> createExternalProject(
+    String name,
+    String icon,
+    String iconColor,
+    String rootUri, {
+    String description = '',
+    String gitRemoteUrl = '',
+  }) async {
+    validateProjectName(name);
+    final now = DateTime.now();
+    final project = DevelopmentProject(
+      id: newMessageId(),
+      name: name,
+      description: description,
+      icon: icon,
+      iconColor: iconColor,
+      rootUri: rootUri,
+      location: ProjectLocation.external,
+      createdAt: now,
+      updatedAt: now,
+      gitRemoteUrl: gitRemoteUrl,
+    );
+    await projects.create(project);
+    notifyListeners();
+    return project;
+  }
+
+  Future<void> setConversationProject(
+    Conversation conversation,
+    String? projectId, {
+    String actorId = 'user:local',
+  }) async {
+    await projects.assignConversation(
+      conversation.id,
+      projectId,
+      actorId: actorId,
+    );
+    conversation.projectId = projectId;
+    if (activeConversation.id == conversation.id) {
+      activeConversation.projectId = projectId;
+    }
+    notifyListeners();
+  }
+
+  Future<DevelopmentProject> updateProjectProfile(
+    DevelopmentProject project, {
+    required String name,
+    required String description,
+    required String icon,
+    required String iconColor,
+    required String gitRemoteUrl,
+  }) async {
+    validateProjectName(name);
+    if (project.location == ProjectLocation.managed &&
+        project.gitRemoteUrl != gitRemoteUrl) {
+      await _platform.deviceExtension('projectDevelopmentOperation', {
+        'projectId': project.id,
+        'operation': 'initializeProjectGit',
+        'arguments': <String, Object?>{},
+      });
+      await _platform.deviceExtension('projectDevelopmentOperation', {
+        'projectId': project.id,
+        'operation': 'setProjectGitRemote',
+        'arguments': {'url': gitRemoteUrl},
+      });
+    }
+    await projects.updateProfile(
+      project.id,
+      name: name,
+      description: description,
+      icon: icon,
+      iconColor: iconColor,
+      gitRemoteUrl: gitRemoteUrl,
+    );
+    notifyListeners();
+    return projects.read(project.id);
+  }
+
+  Future<DevelopmentProject> setProjectPinned(
+    DevelopmentProject project,
+    bool pinned,
+  ) async {
+    await projects.setPinned(project.id, pinned);
+    notifyListeners();
+    return projects.read(project.id);
+  }
+
+  Future<DevelopmentProject> setProjectMemoryMode(
+    DevelopmentProject project,
+    ProjectMemoryMode mode,
+  ) async {
+    await projects.setMemoryMode(project.id, mode);
+    notifyListeners();
+    return projects.read(project.id);
+  }
+
+  Future<DevelopmentProject> setProjectDefaultSender(
+    DevelopmentProject project,
+    String senderId,
+  ) async {
+    await projects.setDefaultSender(project.id, senderId);
+    notifyListeners();
+    return projects.read(project.id);
+  }
+
+  Future<void> removeProject(DevelopmentProject project) async {
+    if (project.location == ProjectLocation.managed) {
+      await _platform.deviceExtension('removeManagedProject', {
+        'id': project.id,
+      });
+    }
+    await projects.remove(project.id);
+    await _reloadConversations();
+    notifyListeners();
+  }
+
+  Future<void> markProjectRead(DevelopmentProject project) async {
+    await projects.markAllRead(project.id);
+    await _reloadConversations();
+    notifyListeners();
   }
 
   Future<void> selectConversation(String id) => _switchConversation(id);

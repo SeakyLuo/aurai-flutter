@@ -21,9 +21,11 @@ class GroupMessageSearchPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.conversationId,
+    this.group = true,
   });
   final ChatController controller;
   final String conversationId;
+  final bool group;
   @override
   State<GroupMessageSearchPage> createState() => _GroupMessageSearchPageState();
 }
@@ -143,7 +145,7 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
             : AiContactPage(
                 controller: widget.controller,
                 senderId: result.sender.id,
-                groupId: widget.conversationId,
+                groupId: widget.group ? widget.conversationId : null,
               ),
       ),
     );
@@ -207,7 +209,7 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
                     }
                   },
                   decoration: InputDecoration(
-                    hintText: '搜索群消息和文件名',
+                    hintText: widget.group ? '搜索群消息和文件名' : '搜索聊天消息和文件名',
                     filled: true,
                     fillColor: settingsFieldColor(context),
                     contentPadding: const EdgeInsets.symmetric(

@@ -2,29 +2,33 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 const avatarColors = <String, (String, Color)>{
-  'slate': ('灰绿', Color(0xff7c9291)),
-  'violet': ('紫色', Color(0xff9279c3)),
-  'blue': ('蓝色', Color(0xff618dc5)),
-  'green': ('绿色', Color(0xff599b80)),
-  'rose': ('玫瑰', Color(0xffbd7d99)),
-  'orange': ('橙色', Color(0xffc18d59)),
-  'red': ('珊瑚', Color(0xffbf7471)),
-  'ink': ('深灰', Color(0xff636978)),
+  'red': ('红色', Color(0xffc85f63)),
+  'rose': ('玫瑰', Color(0xffc66d9b)),
+  'orange': ('橙色', Color(0xffd18442)),
+  'yellow': ('黄色', Color(0xffbea02d)),
+  'cream': ('奶油', Color(0xffdec690)),
+  'green': ('绿色', Color(0xff3e9a69)),
+  'cyan': ('青色', Color(0xff279ca5)),
+  'blue': ('蓝色', Color(0xff468dcc)),
+  'indigo': ('靛蓝', Color(0xff6171bd)),
+  'violet': ('紫色', Color(0xff9067c6)),
+  'slate': ('灰绿', Color(0xff718d89)),
+  'ink': ('黑色', Color(0xff555d6d)),
 };
 
 const avatarGradients = <String, (String, Color, Color)>{
-  'aurora': ('极光', Color(0xff53b9a5), Color(0xff6367ba)),
-  'iris': ('鸢尾', Color(0xffa78cda), Color(0xff5968b5)),
-  'ocean': ('海风', Color(0xff66c5ce), Color(0xff4873b5)),
-  'forest': ('森林', Color(0xff9bbd7e), Color(0xff377c76)),
-  'peach': ('蜜桃', Color(0xffeab18c), Color(0xffcc728d)),
-  'sunset': ('落日', Color(0xffe2a658), Color(0xffc76677)),
-  'berry': ('莓果', Color(0xffd886b3), Color(0xff895cad)),
-  'dusk': ('暮色', Color(0xffae9cc6), Color(0xff596c96)),
-  'lagoon': ('青湾', Color(0xff78c8ad), Color(0xff347f95)),
-  'sand': ('暖砂', Color(0xffcdb087), Color(0xff9e7879)),
-  'flame': ('丹霞', Color(0xffed9678), Color(0xffba596b)),
-  'night': ('夜空', Color(0xff7383a9), Color(0xff404767)),
+  'flame': ('丹霞', Color(0xfff06b5f), Color(0xffbd3f62)),
+  'peach': ('蜜桃', Color(0xfff2a15f), Color(0xffdf6f8c)),
+  'sunset': ('落日', Color(0xfff0bd45), Color(0xffdd684f)),
+  'sand': ('暖砂', Color(0xffdfc477), Color(0xff9c746d)),
+  'forest': ('森林', Color(0xff9bcb69), Color(0xff2f8068)),
+  'aurora': ('极光', Color(0xff42b998), Color(0xff6265c5)),
+  'lagoon': ('青湾', Color(0xff68c9a3), Color(0xff208b9e)),
+  'ocean': ('海风', Color(0xff4fc4d4), Color(0xff416fca)),
+  'dusk': ('暮色', Color(0xff809dcc), Color(0xff51578e)),
+  'iris': ('鸢尾', Color(0xffb07adb), Color(0xff5664c6)),
+  'berry': ('莓果', Color(0xffdd6fac), Color(0xff8350b0)),
+  'night': ('夜空', Color(0xff66799f), Color(0xff2d344f)),
 };
 
 class AvatarBackground {

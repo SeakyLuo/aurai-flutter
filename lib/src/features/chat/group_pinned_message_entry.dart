@@ -18,9 +18,11 @@ class GroupPinnedMessageEntry extends StatefulWidget {
     super.key,
     required this.controller,
     required this.groupId,
+    this.embedded = false,
   });
   final ChatController controller;
   final String groupId;
+  final bool embedded;
   @override
   State<GroupPinnedMessageEntry> createState() =>
       _GroupPinnedMessageEntryState();
@@ -116,6 +118,19 @@ class _GroupPinnedMessageEntryState extends State<GroupPinnedMessageEntry> {
   Widget build(BuildContext context) {
     final message = _message;
     if (message == null) return const SizedBox.shrink();
+    final tile = ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      minTileHeight: 60,
+      title: const Text('置顶消息', style: TextStyle(fontSize: 15)),
+      subtitle: Text(
+        groupSavedMessagePreview(message),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: () => _menu(context, message),
+      trailing: const SettingsIcon(type: SettingsIconType.chevron),
+    );
+    if (widget.embedded) return tile;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
@@ -124,18 +139,7 @@ class _GroupPinnedMessageEntryState extends State<GroupPinnedMessageEntry> {
             : Colors.white,
         borderRadius: BorderRadius.circular(26),
         clipBehavior: Clip.antiAlias,
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          minTileHeight: 60,
-          title: const Text('置顶消息', style: TextStyle(fontSize: 15)),
-          subtitle: Text(
-            groupSavedMessagePreview(message),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          onTap: () => _menu(context, message),
-          trailing: const SettingsIcon(type: SettingsIconType.chevron),
-        ),
+        child: tile,
       ),
     );
   }

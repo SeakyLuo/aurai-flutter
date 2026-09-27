@@ -13,7 +13,10 @@ class SkillIcon extends StatelessWidget {
   Widget build(BuildContext context) =>
       sharedSkillIcon(context, name) ??
       (name == 'settings'
-          ? const SidebarActionIcon(type: SidebarActionIconType.settings)
+          ? SidebarActionIcon(
+              type: SidebarActionIconType.settings,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            )
           : ExtraSkillIcon.names.contains(name)
           ? ExtraSkillIcon(name)
           : name == 'code'

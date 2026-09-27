@@ -2,6 +2,8 @@
 -keep class com.haiskynology.aurai.PrivilegedShellService { *; }
 # JNI entry points use these names.
 -keep class com.haiskynology.aurai.TunnelEngine { *; }
+# Rhino exposes the workspace helper through Java reflection.
+-keep class com.haiskynology.aurai.ScriptWorkspace { public *; }
 # PDF text extraction does not use the optional JPEG 2000 image decoder.
 -dontwarn com.gemalto.jp2.JP2Decoder
 

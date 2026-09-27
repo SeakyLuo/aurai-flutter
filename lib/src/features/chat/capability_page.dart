@@ -95,7 +95,9 @@ class _CapabilityPageState extends State<CapabilityPage>
             child: ListView(
               padding: EdgeInsets.fromLTRB(
                 16,
-                MediaQuery.paddingOf(context).top + 76 + 16,
+                MediaQuery.paddingOf(context).top +
+                    SettingsAppBar.toolbarHeight +
+                    16,
                 16,
                 24,
               ),

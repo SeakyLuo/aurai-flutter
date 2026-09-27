@@ -1,0 +1,158 @@
+import 'package:flutter/material.dart';
+
+import '../../app/glass_notice.dart';
+import '../../domain/error_message.dart';
+import '../../platform/aurai_platform.dart';
+import '../../storage/development_projects.dart';
+import 'file_tool_icon.dart';
+import 'settings_appearance.dart';
+import 'settings_icon.dart';
+
+class ProjectFilesPage extends StatefulWidget {
+  const ProjectFilesPage({super.key, required this.project});
+
+  final DevelopmentProject project;
+
+  @override
+  State<ProjectFilesPage> createState() => _ProjectFilesPageState();
+}
+
+class _ProjectFilesPageState extends State<ProjectFilesPage> {
+  final _platform = AuraiPlatform.instance;
+  List<Map<String, Object?>>? _files;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  void _notice(String text) => ScaffoldMessenger.of(
+    context,
+  ).showGlassSnackBar(SnackBar(content: Text(text)));
+
+  Future<void> _load() async {
+    try {
+      final result = await _platform.deviceExtension('listProjectFiles', {
+        'uri': widget.project.rootUri,
+      });
+      if (mounted) {
+        setState(
+          () => _files = (result['files'] as List)
+              .map((value) => (value as Map).cast<String, Object?>())
+              .toList(),
+        );
+      }
+    } on Object catch (error) {
+      if (mounted) _notice('项目资料读取失败：${errorMessage(error)}');
+    }
+  }
+
+  Future<void> _add() async {
+    setState(() => _busy = true);
+    try {
+      final result = await _platform.deviceExtension('importProjectFiles', {
+        'uri': widget.project.rootUri,
+      });
+      if (result['cancelled'] != true) await _load();
+    } on Object catch (error) {
+      if (mounted) _notice('项目资料添加失败：${errorMessage(error)}');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final files = _files;
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: SettingsAppBar(
+        title: '项目文件',
+        onBack: _busy ? null : () => Navigator.pop(context),
+        actions: [
+          SettingsGlassAction(
+            label: '添加资料',
+            icon: Icons.add_rounded,
+            iconWidget: const SettingsIcon(type: SettingsIconType.add),
+            onPressed: _busy ? null : _add,
+          ),
+        ],
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: files == null
+              ? const SizedBox.shrink()
+              : files.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const FileToolIcon(type: FileToolIconType.document),
+                        const SizedBox(height: 14),
+                        const Text(
+                          '还没有项目文件',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '添加文档、图片或其他素材，AI 可以从项目工作目录中读取。',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.5,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding: settingsPagePadding(
+                    context,
+                    const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                  ),
+                  itemCount: files.length,
+                  itemBuilder: (context, index) {
+                    final file = files[index];
+                    final directory = file['directory'] == true;
+                    return ListTile(
+                      minTileHeight: 56,
+                      leading: FileToolIcon(
+                        type: directory
+                            ? FileToolIconType.folder
+                            : FileToolIconType.document,
+                      ),
+                      title: Text(
+                        file['name'] as String,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: directory
+                          ? const Text('文件夹')
+                          : Text(_size(file['size'] as int?)),
+                    );
+                  },
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+String _size(int? bytes) {
+  if (bytes == null) return '';
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+}

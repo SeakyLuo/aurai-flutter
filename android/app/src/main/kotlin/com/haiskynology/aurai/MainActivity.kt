@@ -76,6 +76,7 @@ class MainActivity : FlutterActivity() {
         if (requestCode == PreviewImageAccess.REQUEST) PreviewImageAccess.picker?.selected(if (resultCode == RESULT_OK) data?.data else null)
         if (requestCode == ChatFileAccess.REQUEST) ChatFileAccess.picker?.selected(if (resultCode == RESULT_OK) data else null)
         if (requestCode == DocumentAccess.REQUEST) DocumentAccess.picker?.selected(if (resultCode == RESULT_OK) data else null)
+        if (requestCode == DocumentAccess.PROJECT_FILES_REQUEST) DocumentAccess.projectFilesPicker?.selectedProjectFiles(if (resultCode == RESULT_OK) data else null)
         if (requestCode == DataManagementAccess.REQUEST) DataManagementAccess.picker?.selected(if (resultCode == RESULT_OK) data?.data else null)
         if (requestCode == 1402) NetworkCaptureAccess.consent(this, resultCode == RESULT_OK)
     }

@@ -59,6 +59,7 @@ extension UserDataReadAccess on ChatController {
         conversation.id,
         (tool as GroupChatTool).rename,
         tool.updateMembers,
+        tool.dissolve,
         tool.changed,
         senderId: user,
       ),

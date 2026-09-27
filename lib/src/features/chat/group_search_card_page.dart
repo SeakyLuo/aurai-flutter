@@ -12,6 +12,7 @@ import 'attachment_action_icon.dart';
 import 'chat_controller.dart';
 import 'interactive_message_view.dart';
 import 'settings_appearance.dart';
+import 'menu_press_highlight.dart';
 
 class GroupSearchCardPage extends StatefulWidget {
   const GroupSearchCardPage({
@@ -100,8 +101,8 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                GestureDetector(
-                  onLongPress: () => showInteractiveStatistics(
+                MenuPressHighlight(
+                  onLongPressStart: (_) => showInteractiveStatistics(
                     context,
                     database: widget.controller.groupStore.database,
                     messageId: widget.result.id,

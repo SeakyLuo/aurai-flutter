@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
 import '../../domain/avatar_style.dart';
+import '../../storage/avatar_symbol_recents.dart';
 import 'avatar_color_library.dart';
 import 'avatar_symbol.dart';
+import 'avatar_symbol_picker.dart';
 import 'profile_avatar.dart';
 import 'settings_appearance.dart';
 
@@ -10,9 +13,11 @@ class CustomAvatarPage extends StatefulWidget {
     super.key,
     required this.initial,
     required this.name,
+    required this.database,
   });
   final AvatarStyle initial;
   final String name;
+  final Database database;
   @override
   State<CustomAvatarPage> createState() => _CustomAvatarPageState();
 }
@@ -20,7 +25,60 @@ class CustomAvatarPage extends StatefulWidget {
 class _CustomAvatarPageState extends State<CustomAvatarPage> {
   late String _icon = widget.initial.icon;
   late String _color = widget.initial.color;
+  List<String> _recentSymbols = const [];
   AvatarStyle get _style => AvatarStyle(icon: _icon, color: _color);
+
+  @override
+  void initState() {
+    super.initState();
+    AvatarSymbolRecents.load(widget.database).then((values) {
+      if (mounted) setState(() => _recentSymbols = values);
+    });
+  }
+
+  List<MapEntry<String, String>> get _visibleSymbols {
+    final entries = avatarSymbols.entries.toList();
+    final fixed = entries.take(2).toList();
+    final labels = avatarSymbols;
+    final recent = [
+      for (final value in _recentSymbols)
+        if (!fixed.any((entry) => entry.key == value))
+          MapEntry(value, labels[value] ?? 'Emoji'),
+    ];
+    final used = {
+      ...fixed.map((entry) => entry.key),
+      ...recent.map((e) => e.key),
+    };
+    return [
+      ...fixed,
+      ...recent,
+      for (final entry in entries)
+        if (!used.contains(entry.key)) entry,
+    ].take(24).toList();
+  }
+
+  Future<void> _selectSymbol(String value) async {
+    final fixed = avatarSymbols.keys.take(2);
+    final recent = fixed.contains(value)
+        ? _recentSymbols
+        : await AvatarSymbolRecents.record(widget.database, value);
+    if (mounted) {
+      setState(() {
+        _icon = value;
+        _recentSymbols = recent;
+      });
+    }
+  }
+
+  Future<void> _showAllSymbols() async {
+    final icon = await showAvatarSymbolPicker(
+      context,
+      selected: _icon,
+      color: _color,
+      name: widget.name,
+    );
+    if (icon != null && mounted) await _selectSymbol(icon);
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -56,14 +114,28 @@ class _CustomAvatarPageState extends State<CustomAvatarPage> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
                 children: [
-                  const Text('图案', style: TextStyle(fontSize: 15)),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('图案', style: TextStyle(fontSize: 15)),
+                      ),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.only(left: 16),
+                          alignment: Alignment.centerRight,
+                        ),
+                        onPressed: _showAllSymbols,
+                        child: const Text('查看全部'),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 12),
                   _grid([
-                    for (final entry in avatarSymbols.entries)
+                    for (final entry in _visibleSymbols)
                       _choice(
                         entry.value,
                         _icon == entry.key,
-                        () => setState(() => _icon = entry.key),
+                        () => _selectSymbol(entry.key),
                         ProfileAvatar(
                           style: AvatarStyle(icon: entry.key, color: _color),
                           name: widget.name,

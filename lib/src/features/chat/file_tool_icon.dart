@@ -3,15 +3,16 @@ import 'package:flutter/material.dart';
 enum FileToolIconType { folder, read, document }
 
 class FileToolIcon extends StatelessWidget {
-  const FileToolIcon({super.key, required this.type});
+  const FileToolIcon({super.key, required this.type, this.color});
   final FileToolIconType type;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: const Size.square(24),
     painter: _FileToolPainter(
       type,
-      Theme.of(context).colorScheme.onSurfaceVariant,
+      color ?? Theme.of(context).colorScheme.onSurfaceVariant,
     ),
   );
 }

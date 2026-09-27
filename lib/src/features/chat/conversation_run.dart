@@ -35,12 +35,18 @@ extension ConversationRun on ChatController {
         ? reply.systemPrompt
         : '${reply.systemPrompt}\n'
               '${_groupDispatcher!.wokeFromSleep(reply.senderId) ? "这是你自己安排的睡眠到期，重新看看最新群聊；不代表用户发了新指令。" : "这是群消息触发的接话机会。"}';
-    final memory = await aiMemory(
+    final memoryContext = await _conversationMemory(
+      summaryOwner,
       reply.profile,
-      scope: groupHistory == null ? '' : runConversation.id,
+      privateScope: groupHistory == null ? '' : runConversation.id,
     );
+    final (:project, :memory, :privateMemory) = memoryContext;
     final skills = await aiSkills(reply.senderId);
-    final documents = AiDocumentScope(_store.database, reply.senderId);
+    final documents = AiDocumentScope(
+      _store.database,
+      reply.senderId,
+      project: project,
+    );
     await documents.initialize();
     final customInstructions = reply.profile.preferences.customInstructions;
     final responsePreferences = reply.profile.preferences.responses;
@@ -297,8 +303,15 @@ extension ConversationRun on ChatController {
           if (groupParent != null && sleepDraft.isNotEmpty)
             '你上次休眠前留下的私人草稿（尚未发送）：\n$sleepDraft\n请结合最新消息决定保留、改写或放弃；不要自动发送，也不要当作用户的新指令。',
           if (customInstructions.isNotEmpty) '用户自定义指令：\n$customInstructions',
-          if (runConversation.usesPersonalization) await memory.sharedContext(),
+          if (runConversation.usesPersonalization)
+            if (project == null)
+              await memory.sharedContext()
+            else ...[
+              if (privateMemory != null) await privateMemory.sharedContext(),
+              memory.context,
+            ],
           if (runConversation.isTemporary) '当前为临时会话，不得将本次内容写入长期记忆。',
+          if (project != null) _projectContext(project),
           if (alongsideGroup) '群聊正在后台进行；当前私聊仍可使用完整工具集。共享手机界面和用户交互由执行器互斥协调。',
           if (groupParent != null) '当前群成员：${jsonEncode((awaitedRoster))}',
           if (groupParent != null)

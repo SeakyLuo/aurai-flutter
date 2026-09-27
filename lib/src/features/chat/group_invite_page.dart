@@ -100,7 +100,7 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
     try {
       final color = await RandomContact.savedAvatarColor();
       if (!mounted) return;
-      final rolled = RandomContact.roll(avatarColor: color);
+      final rolled = await RandomContact.roll(avatarColor: color);
       final now = DateTime.now();
       final config = widget.controller.modelSettings.activeConfig;
       final ai = AiProfile(

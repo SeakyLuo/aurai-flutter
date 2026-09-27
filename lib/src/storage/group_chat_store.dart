@@ -1,3 +1,4 @@
+import 'group_member_details.dart';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'contact_relationships.dart';
@@ -9,6 +10,8 @@ import '../domain/ai_profile.dart';
 import '../domain/message_sender.dart';
 import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
+
+part 'group_management_store.dart';
 
 class GroupChatStore {
   GroupChatStore(this.database);
@@ -33,6 +36,7 @@ class GroupChatStore {
   late AiModelSelection defaultSelection;
   static const pageSize = 50;
   static const maxAiMembers = 32;
+  static const maxAdministrators = 3;
 
   Future<Map<String, List<MessageSender>>> avatarMembers(
     List<String> groupIds,
@@ -117,9 +121,11 @@ class GroupChatStore {
 
   Future<void> removeMembers(
     String conversationId,
-    List<String> ids,
-  ) => database
+    List<String> ids, {
+    String actorId = 'user:local',
+  }) => database
       .transaction((txn) async {
+        await requireManager(txn, conversationId, actorId);
         if (ids.isEmpty ||
             ids.length > maxAiMembers ||
             ids.contains(MessageSender.localUser.id)) {
@@ -127,13 +133,32 @@ class GroupChatStore {
         }
         final members = await txn.query(
           'conversation_members',
-          columns: ['sender_id'],
+          columns: ['sender_id', 'role'],
           where: 'conversation_id = ? AND left_at IS NULL AND sender_id != ?',
           whereArgs: [conversationId, MessageSender.localUser.id],
           limit: maxAiMembers,
         );
         if (members.every((row) => ids.contains(row['sender_id']))) {
           throw StateError('群聊至少保留一位 AI');
+        }
+        final actorRole = GroupMemberRole.values.byName(
+          (await txn.query(
+                'conversation_members',
+                columns: ['role'],
+                where: 'conversation_id = ? AND sender_id = ?',
+                whereArgs: [conversationId, actorId],
+                limit: 1,
+              )).single['role']
+              as String,
+        );
+        if (members.any(
+          (row) =>
+              ids.contains(row['sender_id']) &&
+              (row['role'] == GroupMemberRole.owner.name ||
+                  (actorRole != GroupMemberRole.owner &&
+                      row['role'] == GroupMemberRole.admin.name)),
+        )) {
+          throw StateError('群管理员不能移除群主或其他管理员');
         }
         final now = DateTime.now().microsecondsSinceEpoch;
         final changed = await txn.update(
@@ -161,8 +186,10 @@ class GroupChatStore {
     String conversationId,
     List<String> existingIds, {
     List<AiProfile> newMembers = const [],
+    String actorId = 'user:local',
   }) => database
       .transaction((txn) async {
+        await requireInvitePermission(txn, conversationId, actorId);
         if (existingIds.isNotEmpty) await _validateMembers(txn, existingIds);
         final ids = [...existingIds, ...newMembers.map((ai) => ai.sender.id)];
         if (ids.isEmpty ||
@@ -523,6 +550,9 @@ class GroupChatStore {
           'sender_id': senderId,
           'position': position,
           'joined_at': conversation.createdAt.microsecondsSinceEpoch,
+          'role': senderId == MessageSender.localUser.id
+              ? GroupMemberRole.owner.name
+              : GroupMemberRole.member.name,
         });
       }
       await batch.commit(noResult: true);
@@ -554,10 +584,13 @@ class GroupChatStore {
       offset: offset,
     );
     if (rows.isEmpty) return [];
-    final senders = await _senders(
+    final baseSenders = await _senders(
       database,
       rows.map((row) => row['sender_id'] as String).toList(),
     );
+    final senders = await GroupMemberDetailsStore(
+      database,
+    ).applyNames(conversationId, baseSenders);
     return [
       for (final row in rows)
         ConversationMember(
@@ -566,6 +599,7 @@ class GroupChatStore {
           joinedAt: DateTime.fromMicrosecondsSinceEpoch(
             row['joined_at'] as int,
           ),
+          role: GroupMemberRole.values.byName(row['role'] as String),
           leftAt: row['left_at'] == null
               ? null
               : DateTime.fromMicrosecondsSinceEpoch(row['left_at'] as int),
@@ -582,70 +616,6 @@ class GroupChatStore {
     );
     return rows.map(MessageSender.fromRow).toList();
   }
-
-  Future<void> updateMembers(
-    String conversationId,
-    List<String> aiIds,
-  ) => database
-      .transaction((txn) async {
-        await _validateMembers(txn, aiIds, conversationId: conversationId);
-        final changed = await txn.update(
-          'conversations',
-          {'updated_at': DateTime.now().microsecondsSinceEpoch},
-          where: "id = ? AND kind = 'group'",
-          whereArgs: [conversationId],
-        );
-        if (changed != 1) throw StateError('群聊已不存在');
-        final active = await txn.query(
-          'conversation_members',
-          columns: ['sender_id'],
-          where: 'conversation_id = ? AND left_at IS NULL',
-          whereArgs: [conversationId],
-          limit: maxAiMembers + 1,
-        );
-        final activeIds = active
-            .map((row) => row['sender_id'] as String)
-            .toSet();
-        final now = DateTime.now().microsecondsSinceEpoch;
-        final batch = txn.batch();
-        batch.update(
-          'conversation_members',
-          {'left_at': now},
-          where:
-              'conversation_id = ? AND left_at IS NULL AND sender_id NOT IN (${_slots(aiIds.length + 1)})',
-          whereArgs: [conversationId, MessageSender.localUser.id, ...aiIds],
-        );
-        for (final (index, id) in aiIds.indexed) {
-          if (activeIds.contains(id)) {
-            batch.update(
-              'conversation_members',
-              {'position': index + 1},
-              where: 'conversation_id = ? AND sender_id = ?',
-              whereArgs: [conversationId, id],
-            );
-          } else {
-            batch.rawInsert(
-              '''INSERT INTO conversation_members
-          (conversation_id, sender_id, position, joined_at, left_at) VALUES (?, ?, ?, ?, NULL)
-          ON CONFLICT(conversation_id, sender_id) DO UPDATE SET
-          position = excluded.position, joined_at = excluded.joined_at, left_at = NULL''',
-              [conversationId, id, index + 1, now],
-            );
-          }
-        }
-        await batch.commit(noResult: true);
-        return writeGroupMemberNotice(
-          txn,
-          conversationId,
-          aiIds.where((id) => !activeIds.contains(id)).toList(),
-          activeIds
-              .where(
-                (id) => id != MessageSender.localUser.id && !aiIds.contains(id),
-              )
-              .toList(),
-        );
-      })
-      .then((notice) => _notifySystem(conversationId, notice));
 
   // Capture the resolved @ targets once; later roster changes do not rewrite them.
   Future<void> recordRecipients(

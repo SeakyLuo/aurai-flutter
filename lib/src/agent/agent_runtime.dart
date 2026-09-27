@@ -235,7 +235,6 @@ class AgentRuntime {
           if (result.output.containsKey('userAction'))
             userHandoffOccurred = true;
           await onToolCompleted?.call(result);
-          _throwIfCancelled();
           final status =
               result.output['pending'] == true &&
                   result.output['newQuestionShown'] != false
@@ -255,6 +254,7 @@ class AgentRuntime {
             ),
           );
           onStepsChanged(List.unmodifiable(steps));
+          _throwIfCancelled();
           nextResults.add(result);
           if (endsRun?.call(result) == true) {
             return AgentRunResult(answer: '', steps: List.unmodifiable(steps));

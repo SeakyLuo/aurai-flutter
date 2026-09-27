@@ -7,6 +7,7 @@ enum SettingsIconType {
   star,
   starFilled,
   tools,
+  permission,
   data,
   contacts,
   add,
@@ -14,6 +15,7 @@ enum SettingsIconType {
   skills,
   personalization,
   personalInfo,
+  info,
   balance,
   appearance,
   language,
@@ -31,6 +33,8 @@ enum SettingsIconType {
   sort,
   drag,
   more,
+  field,
+  play,
   eye,
   eyeOff,
 }
@@ -70,6 +74,32 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.play:
+        canvas.drawPath(
+          Path()
+            ..moveTo(8, 5)
+            ..lineTo(19, 12)
+            ..lineTo(8, 19)
+            ..close(),
+          pen,
+        );
+      case SettingsIconType.field:
+        canvas.drawPath(
+          Path()
+            ..moveTo(8, 5)
+            ..lineTo(4, 5)
+            ..lineTo(4, 19)
+            ..lineTo(8, 19)
+            ..moveTo(16, 5)
+            ..lineTo(20, 5)
+            ..lineTo(20, 19)
+            ..lineTo(16, 19)
+            ..moveTo(9, 10)
+            ..lineTo(15, 10)
+            ..moveTo(9, 14)
+            ..lineTo(13, 14),
+          pen,
+        );
       case SettingsIconType.more:
         pen.style = PaintingStyle.fill;
         for (final x in [5.0, 12.0, 19.0]) {
@@ -156,6 +186,25 @@ class _SettingsIconPainter extends CustomPainter {
           canvas.drawLine(const Offset(4, 4), const Offset(20, 20), pen);
         }
 
+      case SettingsIconType.permission:
+        canvas.drawPath(
+          Path()
+            ..moveTo(12, 2.5)
+            ..lineTo(20, 6)
+            ..lineTo(20, 12)
+            ..quadraticBezierTo(19, 18, 12, 21.5)
+            ..quadraticBezierTo(5, 18, 4, 12)
+            ..lineTo(4, 6)
+            ..close(),
+          pen,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(8, 11.5)
+            ..lineTo(11, 14.5)
+            ..lineTo(16, 9.5),
+          pen,
+        );
       case SettingsIconType.tools:
         WrenchPainter(color).paint(canvas, const Size.square(24));
       case SettingsIconType.contacts:
@@ -208,6 +257,10 @@ class _SettingsIconPainter extends CustomPainter {
             ..cubicTo(4, 11, 20, 11, 20, 20),
           pen,
         );
+      case SettingsIconType.info:
+        canvas.drawCircle(const Offset(12, 12), 9, pen);
+        canvas.drawLine(const Offset(12, 10.5), const Offset(12, 17), pen);
+        canvas.drawCircle(const Offset(12, 7), .9, Paint()..color = color);
       case SettingsIconType.personalization:
         canvas.drawRRect(
           RRect.fromRectAndRadius(

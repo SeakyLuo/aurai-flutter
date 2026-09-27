@@ -6,6 +6,7 @@ import '../../domain/quick_reply_option.dart';
 import '../../domain/message_sender.dart';
 import '../../domain/error_message.dart';
 import 'member_avatar.dart';
+import 'menu_press_highlight.dart';
 
 class QuickReplyChips extends StatelessWidget {
   const QuickReplyChips({
@@ -84,54 +85,58 @@ class QuickReplyChips extends StatelessWidget {
               (r) => r.senderId == MessageSender.localUser.id,
             );
             final colors = Theme.of(context).colorScheme;
-            return Material(
-              color: own
-                  ? colors.primaryContainer
-                  : colors.surfaceContainerHighest,
+            return MenuPressHighlight(
+              onLongPressStart: (_) => _showPeople(context),
               borderRadius: BorderRadius.circular(16),
-              child: InkWell(
+              child: Material(
+                color: own
+                    ? colors.primaryContainer
+                    : colors.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(16),
-                onTap: onTap != null ? () => onTap!(key) : null,
-                onLongPress: () => _showPeople(context),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 240),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    child: DefaultTextStyle(
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: own
-                            ? colors.onPrimaryContainer
-                            : colors.onSurfaceVariant,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: onTap != null ? () => onTap!(key) : null,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 240),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(quickReplyOptionsByKey[key]!.emoji),
-                          Container(
-                            width: .5,
-                            height: 10,
-                            margin: const EdgeInsets.symmetric(horizontal: 6),
-                            color:
-                                (own
-                                        ? colors.onPrimaryContainer
-                                        : colors.onSurfaceVariant)
-                                    .withValues(alpha: .2),
-                          ),
-                          Flexible(
-                            child: Text(
-                              group.first.senderId == MessageSender.localUser.id
-                                  ? MessageSender.localUser.name
-                                  : group.first.senderName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                      child: DefaultTextStyle(
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: own
+                              ? colors.onPrimaryContainer
+                              : colors.onSurfaceVariant,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(quickReplyOptionsByKey[key]!.emoji),
+                            Container(
+                              width: .5,
+                              height: 10,
+                              margin: const EdgeInsets.symmetric(horizontal: 6),
+                              color:
+                                  (own
+                                          ? colors.onPrimaryContainer
+                                          : colors.onSurfaceVariant)
+                                      .withValues(alpha: .2),
                             ),
-                          ),
-                          if (group.length > 1) Text('等 ${group.length} 人'),
-                        ],
+                            Flexible(
+                              child: Text(
+                                group.first.senderId ==
+                                        MessageSender.localUser.id
+                                    ? MessageSender.localUser.name
+                                    : group.first.senderName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (group.length > 1) Text('等 ${group.length} 人'),
+                          ],
+                        ),
                       ),
                     ),
                   ),

@@ -9,8 +9,11 @@ import '../features/chat/attachment_action_icon.dart';
 import '../features/chat/file_tool_icon.dart';
 import '../features/chat/sidebar_action_icon.dart';
 import '../features/chat/tool_semantic_icon.dart';
+import '../features/chat/message_quote_view.dart';
+import '../features/chat/text_selection_icon.dart';
 
 Widget? sharedSkillIcon(BuildContext context, String name) {
+  final color = Theme.of(context).colorScheme.onSurfaceVariant;
   const settings = {
     'discover': SettingsIconType.discover,
     'miniapp': SettingsIconType.miniapps,
@@ -29,6 +32,8 @@ Widget? sharedSkillIcon(BuildContext context, String name) {
     'back': SettingsIconType.back,
     'check': SettingsIconType.check,
     'filter': SettingsIconType.filter,
+    'star': SettingsIconType.star,
+    'permission': SettingsIconType.permission,
   };
   const menu = {
     'pin': ConversationMenuIconType.pin,
@@ -37,6 +42,11 @@ Widget? sharedSkillIcon(BuildContext context, String name) {
     'archive': ConversationMenuIconType.archive,
     'unarchive': ConversationMenuIconType.unarchive,
     'delete': ConversationMenuIconType.delete,
+    'mark': ConversationMenuIconType.mark,
+    'copy': ConversationMenuIconType.copy,
+    'announcement': ConversationMenuIconType.announcement,
+    'recall': ConversationMenuIconType.recall,
+    'retry': ConversationMenuIconType.retry,
   };
   if (name == 'text') {
     return SizedBox.square(
@@ -57,7 +67,8 @@ Widget? sharedSkillIcon(BuildContext context, String name) {
     );
   }
   final settingsType = settings[name];
-  if (settingsType != null) return SettingsIcon(type: settingsType);
+  if (settingsType != null)
+    return SettingsIcon(type: settingsType, color: color);
   final menuType = menu[name];
   if (menuType != null)
     return SizedBox.square(
@@ -71,21 +82,41 @@ Widget? sharedSkillIcon(BuildContext context, String name) {
     );
   return switch (name) {
     'conversation' => const ConversationIcon(),
+    'quote' => const SizedBox.square(
+      dimension: 24,
+      child: FittedBox(child: QuoteIcon()),
+    ),
+    'select-text' => const SizedBox.square(
+      dimension: 24,
+      child: FittedBox(child: TextSelectionIcon()),
+    ),
     'game' => const HtmlGameIcon(HtmlGameIconType.game),
-    'compose' => const ComposeIcon(),
+    'compose' => ComposeIcon(color: color),
     'question' => const QuestionIcon(type: QuestionIconType.question),
     'close' => const QuestionIcon(type: QuestionIconType.close),
-    'gallery' => const AttachmentActionIcon(
+    'gallery' => AttachmentActionIcon(
+      color: color,
       type: AttachmentActionIconType.gallery,
     ),
     'document' => const FileToolIcon(type: FileToolIconType.read),
-    'audio' => const AttachmentActionIcon(type: AttachmentActionIconType.audio),
-    'video' => const AttachmentActionIcon(type: AttachmentActionIconType.video),
-    'pdf' => const AttachmentActionIcon(type: AttachmentActionIconType.pdf),
-    'presentation' => const AttachmentActionIcon(
+    'audio' => AttachmentActionIcon(
+      color: color,
+      type: AttachmentActionIconType.audio,
+    ),
+    'video' => AttachmentActionIcon(
+      color: color,
+      type: AttachmentActionIconType.video,
+    ),
+    'pdf' => AttachmentActionIcon(
+      color: color,
+      type: AttachmentActionIconType.pdf,
+    ),
+    'presentation' => AttachmentActionIcon(
+      color: color,
       type: AttachmentActionIconType.presentation,
     ),
-    'package' => const AttachmentActionIcon(
+    'package' => AttachmentActionIcon(
+      color: color,
       type: AttachmentActionIconType.package,
     ),
     'image-search' => const ToolSemanticIcon(
@@ -97,7 +128,29 @@ Widget? sharedSkillIcon(BuildContext context, String name) {
     'create-file' => const ToolSemanticIcon(
       type: ToolSemanticIconType.createFile,
     ),
-    'group' => const SidebarActionIcon(type: SidebarActionIconType.group),
+    'group' => SidebarActionIcon(
+      type: SidebarActionIconType.group,
+      color: color,
+    ),
+    'forward' => AttachmentActionIcon(
+      color: color,
+      type: AttachmentActionIconType.forward,
+    ),
+    'word' => AttachmentActionIcon(
+      color: color,
+      type: AttachmentActionIconType.word,
+    ),
+    'excel' => AttachmentActionIcon(
+      color: color,
+      type: AttachmentActionIconType.excel,
+    ),
+    'ebook' => AttachmentActionIcon(
+      color: color,
+      type: AttachmentActionIconType.ebook,
+    ),
+    'share-file' => const ToolSemanticIcon(
+      type: ToolSemanticIconType.shareFile,
+    ),
     _ => null,
   };
 }

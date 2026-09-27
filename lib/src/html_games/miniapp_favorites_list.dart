@@ -6,6 +6,7 @@ import '../domain/error_message.dart';
 import '../features/chat/animated_entry_list.dart';
 import '../features/chat/chat_controller.dart';
 import '../features/chat/header_action_menu.dart';
+import '../features/chat/menu_press_highlight.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
 import 'miniapp_detail_page.dart';
@@ -165,36 +166,41 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
       borderRadius: BorderRadius.circular(22),
       clipBehavior: Clip.antiAlias,
       child: Builder(
-        builder: (anchor) => ListTile(
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 18,
-            vertical: 10,
-          ),
-          leading: MiniappIcon(
-            path: item.entry.iconPath,
-            asset: item.entry.iconAsset,
-            size: 48,
-          ),
-          horizontalTitleGap: 14,
-          titleAlignment: ListTileTitleAlignment.center,
-          title: Text(
-            item.entry.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w500),
-          ),
-          subtitle: item.entry.description.isEmpty
-              ? null
-              : Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    item.entry.description,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+        builder: (anchor) => MenuPressHighlight(
+          onLongPressStart: _opening == null
+              ? (_) => _menu(anchor, item)
+              : null,
+          borderRadius: BorderRadius.circular(22),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 10,
+            ),
+            leading: MiniappIcon(
+              path: item.entry.iconPath,
+              asset: item.entry.iconAsset,
+              size: 48,
+            ),
+            horizontalTitleGap: 14,
+            titleAlignment: ListTileTitleAlignment.center,
+            title: Text(
+              item.entry.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            subtitle: item.entry.description.isEmpty
+                ? null
+                : Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      item.entry.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-          onTap: _opening == null ? () => _open(item) : null,
-          onLongPress: _opening == null ? () => _menu(anchor, item) : null,
+            onTap: _opening == null ? () => _open(item) : null,
+          ),
         ),
       ),
     ),

@@ -51,7 +51,7 @@ class _ToolsPageState extends State<ToolsPage> {
       body: ListView(
         padding: EdgeInsets.fromLTRB(
           18,
-          MediaQuery.paddingOf(context).top + 76 + 12,
+          MediaQuery.paddingOf(context).top + SettingsAppBar.toolbarHeight + 12,
           18,
           MediaQuery.paddingOf(context).bottom + 32,
         ),
@@ -62,9 +62,15 @@ class _ToolsPageState extends State<ToolsPage> {
             clipBehavior: Clip.antiAlias,
             child: ListTile(
               contentPadding: const EdgeInsets.only(left: 16, right: 8),
-              leading: const SettingsIcon(type: SettingsIconType.tools),
+              leading: SettingsIcon(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                type: SettingsIconType.permission,
+              ),
               title: const Text('工具授权'),
-              trailing: const SettingsIcon(type: SettingsIconType.chevron),
+              trailing: SettingsIcon(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                type: SettingsIconType.chevron,
+              ),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute<void>(
@@ -95,7 +101,8 @@ class _ToolsPageState extends State<ToolsPage> {
                       contentPadding: const EdgeInsets.only(left: 16, right: 8),
                       leading: ToolActionIcon(toolName: tool.name),
                       title: Text(toolTitle(tool.name)),
-                      trailing: const SettingsIcon(
+                      trailing: SettingsIcon(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         type: SettingsIconType.chevron,
                       ),
                       onTap: () async {

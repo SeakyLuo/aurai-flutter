@@ -110,7 +110,7 @@ class SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onBack;
   final List<Widget> actions;
 
-  static const double toolbarHeight = 76;
+  static const double toolbarHeight = GlobalUI.appBarHeight;
 
   @override
   Size get preferredSize => const Size.fromHeight(toolbarHeight);

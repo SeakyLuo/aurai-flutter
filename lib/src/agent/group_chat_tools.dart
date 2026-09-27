@@ -9,6 +9,7 @@ class GroupChatTool
     this.currentConversationId,
     this.rename,
     this.updateMembers,
+    this.dissolve,
     this.changed, {
     required this.senderId,
   });
@@ -18,6 +19,9 @@ class GroupChatTool
     'create',
     'rename',
     'updateMembers',
+    'setAdministrators',
+    'transferOwnership',
+    'dissolve',
   ];
   final GroupChatStore store;
   final String senderId;
@@ -25,6 +29,7 @@ class GroupChatTool
   final String currentConversationId;
   final Future<void> Function(String id, String title) rename;
   final Future<void> Function(String id, List<String> members) updateMembers;
+  final Future<void> Function(String id, String actorId) dissolve;
   final void Function() changed;
   String _groupTitle = '';
   @override
@@ -62,18 +67,37 @@ class GroupChatTool
 
   @override
   ToolDefinition get definition => ToolDefinition(
-    name: operation == 'updateMembers'
-        ? 'updateGroupChatMembers'
-        : '${operation}GroupChat${operation == 'list' ? 's' : ''}',
+    name: switch (operation) {
+      'updateMembers' => 'updateGroupChatMembers',
+      'setAdministrators' => 'setGroupAdministrators',
+      'transferOwnership' => 'transferGroupOwnership',
+      'dissolve' => 'dissolveGroupChat',
+      _ => '${operation}GroupChat${operation == 'list' ? 's' : ''}',
+    },
     capabilityId: 'local.group_chats',
     safety: ['list', 'read'].contains(operation)
         ? ToolSafety.readOnly
-        : operation == 'updateMembers'
+        : {
+            'updateMembers',
+            'setAdministrators',
+            'transferOwnership',
+          }.contains(operation)
         ? ToolSafety.sensitive
+        : operation == 'dissolve'
+        ? ToolSafety.destructive
         : ToolSafety.lowRisk,
-    singleUseConfirmation: operation == 'updateMembers',
-    confirmationDescriptionBuilder: (_) =>
-        '是否允许调整“$_groupTitle”的成员？移除成员会停止其当前任务，新成员可以参与群聊。',
+    singleUseConfirmation: {
+      'updateMembers',
+      'setAdministrators',
+      'transferOwnership',
+      'dissolve',
+    }.contains(operation),
+    confirmationDescriptionBuilder: (_) => switch (operation) {
+      'setAdministrators' => '是否允许调整“$_groupTitle”的群管理员？',
+      'transferOwnership' => '是否允许转让“$_groupTitle”的群主？',
+      'dissolve' => '是否允许解散“$_groupTitle”？所有本地聊天记录将被删除且无法恢复。',
+      _ => '是否允许调整“$_groupTitle”的成员？移除成员会停止其当前任务，新成员可以参与群聊。',
+    },
     description: switch (operation) {
       'list' =>
         'Search saved Aurai group chats by title with offset pagination, at most 50. Returns internal IDs; never ask the user to enter IDs. Does not search messages; use readGroupMessages for group message contents.',
@@ -83,6 +107,12 @@ class GroupChatTool
         'Create a group chat only when requested. Discover AI member IDs with listAiContacts. Include 1–32 distinct AI members; the local user is added automatically. Records a group-created system event. Active members may naturally respond after a random delay; a reply is not guaranteed.',
       'rename' =>
         'Rename a group chat requested by the user. Read or search the group first; null id means the current group. Records a rename system event that active members may respond to.',
+      'setAdministrators' =>
+        'Replace the group administrator list. Only the current group owner may do this. Supply up to 3 current non-owner member IDs.',
+      'transferOwnership' =>
+        'Transfer group ownership to one current member. Only the current owner may do this. The previous owner becomes a regular member.',
+      'dissolve' =>
+        'Permanently dissolve a group owned by the current AI. This deletes the local conversation and all of its messages and attachments.',
       _ =>
         'Replace the current AI member roster of a group after reading it. Supply the complete desired list of 1–32 distinct AI IDs, preserving members the user did not ask to remove. User membership is retained. History is preserved. Changes take effect immediately. Removing a member stops the removed member active task and retains its messages; other members continue. Records actual membership changes as a system event. Current active members, including new members, may choose to respond. Paused members remain silent.',
     },
@@ -109,12 +139,22 @@ class GroupChatTool
             'maxItems': 32,
             'uniqueItems': true,
           },
+        if (operation == 'setAdministrators')
+          'administratorIds': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'maxItems': GroupChatStore.maxAdministrators,
+            'uniqueItems': true,
+          },
+        if (operation == 'transferOwnership') 'newOwnerId': {'type': 'string'},
       },
       'required': [
         if (operation == 'list') ...['query', 'offset'],
         if (!['list', 'create'].contains(operation)) 'id',
         if (['create', 'rename'].contains(operation)) 'title',
         if (['create', 'updateMembers'].contains(operation)) 'aiIds',
+        if (operation == 'setAdministrators') 'administratorIds',
+        if (operation == 'transferOwnership') 'newOwnerId',
       ],
       'additionalProperties': false,
     },
@@ -177,6 +217,7 @@ class GroupChatTool
                   'id': m.sender.id,
                   'name': m.sender.name,
                   'kind': m.sender.kind.name,
+                  'role': m.role.name,
                   'archived': m.sender.archived,
                 },
             ],
@@ -184,6 +225,20 @@ class GroupChatTool
         } else {
           if (operation == 'rename') {
             await rename(id, a['title'] as String);
+          } else if (operation == 'setAdministrators') {
+            await store.setAdministrators(
+              id,
+              List<String>.from(a['administratorIds'] as List),
+              actorId: senderId,
+            );
+          } else if (operation == 'transferOwnership') {
+            await store.transferOwnership(
+              id,
+              a['newOwnerId'] as String,
+              actorId: senderId,
+            );
+          } else if (operation == 'dissolve') {
+            await dissolve(id, senderId);
           } else {
             await updateMembers(id, List<String>.from(a['aiIds'] as List));
           }

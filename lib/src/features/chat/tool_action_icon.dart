@@ -28,6 +28,23 @@ class ToolActionIcon extends StatelessWidget {
       child: _icon?.startsWith('skill:') == true
           ? SkillIcon(_icon!.substring(6))
           : switch (_icon) {
+              'forwardMessage' => const SkillIcon('forward'),
+              'recallMessage' => const SkillIcon('recall'),
+              'createConversation' => const SkillIcon('compose'),
+              'renameConversation' => const SkillIcon('rename'),
+              'setConversationPinned' => const SkillIcon('pin'),
+              'setConversationArchived' => const SkillIcon('archive'),
+              'deleteConversation' => const SkillIcon('delete'),
+              'renameGroupChat' => const SkillIcon('rename'),
+              'readGroupPinnedMessage' => const SkillIcon('pin'),
+              'pinGroupMessage' => const SkillIcon('pin'),
+              'unpinGroupMessage' => const SkillIcon('unpin'),
+              'listGroupFavorites' => const SkillIcon('star'),
+              'addGroupFavorite' => const SkillIcon('star'),
+              'removeGroupFavorite' => const SkillIcon('star'),
+              'readGroupAnnouncement' => const SkillIcon('announcement'),
+              'updateGroupAnnouncement' => const SkillIcon('announcement'),
+
               'sendHtmlMessage' ||
               'readHtmlMessage' ||
               'updateHtmlMessage' => AttachmentActionIcon(
@@ -35,6 +52,8 @@ class ToolActionIcon extends StatelessWidget {
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               'listHtmlApps' ||
+              'readHtmlApp' ||
+              'updateHtmlApp' ||
               'listHtmlAppPublications' ||
               'readHtmlAppPublication' ||
               'publishHtmlApp' ||
@@ -49,33 +68,17 @@ class ToolActionIcon extends StatelessWidget {
               'retryInteractiveCallback' ||
               'readInteractiveMessage' ||
               'updateInteractiveMessage' ||
-              'createConversation' ||
-              'renameConversation' ||
-              'setConversationPinned' ||
-              'setConversationArchived' ||
-              'deleteConversation' ||
               'sendConversationMessage' ||
               'readMessage' ||
               'locateMessage' ||
-              'forwardMessage' ||
-              'sendQuickReply' ||
-              'recallMessage' => const ConversationIcon(),
+              'sendQuickReply' => const ConversationIcon(),
               'wakeGroupMember' ||
               'sleepGroupChat' ||
               'listGroupChats' ||
               'readGroupChat' ||
-              'readGroupPinnedMessage' ||
-              'pinGroupMessage' ||
-              'unpinGroupMessage' ||
-              'listGroupFavorites' ||
-              'addGroupFavorite' ||
-              'removeGroupFavorite' ||
-              'readGroupAnnouncement' ||
-              'updateGroupAnnouncement' ||
               'readGroupMessages' ||
               'sendGroupMessage' ||
               'createGroupChat' ||
-              'renameGroupChat' ||
               'updateGroupChatMembers' => SidebarActionIcon(
                 type: SidebarActionIconType.group,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -163,6 +166,13 @@ class ToolActionIcon extends StatelessWidget {
               'listDirectory' => const FileToolIcon(
                 type: FileToolIconType.folder,
               ),
+              'listProjects' ||
+              'createProject' ||
+              'renameProject' ||
+              'setProjectIcon' ||
+              'setProjectPinned' ||
+              'setProjectMemoryMode' ||
+              'setCurrentConversationProject' => const SkillIcon('file'),
               'readWebPage' => const SkillIcon('browser'),
               'setSourceDates' => const SkillIcon('calendar'),
               'readAttachment' ||
@@ -178,7 +188,7 @@ class ToolActionIcon extends StatelessWidget {
               'createTextFile' => const ToolSemanticIcon(
                 type: ToolSemanticIconType.createFile,
               ),
-              'shareFile' => const ToolSemanticIcon(
+              'shareFile' || 'deliverFile' => const ToolSemanticIcon(
                 type: ToolSemanticIconType.shareFile,
               ),
               'inspectAndroidApi' => const SkillIcon('code'),

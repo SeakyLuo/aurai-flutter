@@ -1,5 +1,6 @@
 import '../storage/html_callback_state.dart';
 import 'html_app_store.dart';
+import 'html_code_changes.dart';
 import '../domain/interactive_message.dart';
 import '../storage/interactive_message_store.dart';
 import '../domain/message_sender.dart';
@@ -191,6 +192,10 @@ extension HtmlMessageInteraction on HtmlStore {
           if (callbackId != null) 'callbackCompleted': true};
     }
     final version = (row['version'] as int) + 1;
+    final codeChanges = html == null
+        ? const <String, Object?>{}
+        : htmlCodeChanges(app['id'] as String, title ?? app['title'] as String,
+            await HtmlAppStore.code(app), html);
     final sourcePath = html == null ? app['source_path'] as String : await HtmlAppStore.publish(app['id'] as String, html);
     if (!sessionScoped || html != null) await txn.update('html_apps', {
       'source_path': sourcePath,
@@ -232,6 +237,7 @@ extension HtmlMessageInteraction on HtmlStore {
     }
     if (callbackId != null) await HtmlCallbackState.complete(txn, callbackId);
     return {'updated': true, 'version': version,
+      ...codeChanges,
       if (callbackId != null) 'callbackCompleted': true,
       if (!sessionScoped) ...await HtmlAppStore.reference({...app, 'source_path': sourcePath})
       else 'appId': app['id']};

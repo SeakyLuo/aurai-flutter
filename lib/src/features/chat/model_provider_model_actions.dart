@@ -20,25 +20,41 @@ extension _ProviderModelActions on _ModelProviderDetailState {
     }
   }
 
+  Future<bool> _configureModelTypes() async {
+    final result = await Navigator.push<ModelTypeSettings>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            ModelTypeRecognitionPage(config: _draft, readOnly: !_editing),
+      ),
+    );
+    if (!mounted || result == null) return false;
+    _modelTypeMappings = result.mappings;
+    _modelPurposeField.text = result.path;
+    _changed();
+    return true;
+  }
+
   Future<void> _openModelManagement() async {
-    final config = _editing ? _draft : _saved;
-    if (config.apiKey.isEmpty) {
-      _notice(_editing ? '请先填写 API 密钥' : '请先编辑供应商并填写 API 密钥');
-      return;
-    }
-    final selection =
-        await showModalBottomSheet<({bool useAll, List<String> models})>(
-          context: context,
-          isScrollControlled: true,
-          useSafeArea: true,
-          showDragHandle: false,
-          builder: (_) => ProviderModelsPage(
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: false,
+      builder: (_) => ProviderModelsPage(
+        controller: widget.controller,
+        config: _saved,
+        onConfigureTypes: _saved.protocol.supportsChatModels
+            ? _configureModelTypes
+            : null,
+        onDefaultSettings: () => _openModelSettings(
+          DefaultModelSettingsPage(
             controller: widget.controller,
-            config: config,
-            selectable: _editing,
+            service: _service,
+            readOnly: true,
           ),
-        );
-    if (!mounted || selection == null) return;
-    _updateModelSelection(selection.useAll, selection.models);
+        ),
+      ),
+    );
   }
 }

@@ -1,3 +1,4 @@
+import 'group_nickname_visibility.dart';
 import 'task_failure_icon.dart';
 import 'interactive_message_paging.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ class GroupMessageHeading extends StatelessWidget {
     required this.onOpenProfile,
     this.onMention,
     this.showName = true,
+    this.groupId,
     this.isFailure = false,
   });
   static const leftInset = 12.0;
@@ -21,6 +23,7 @@ class GroupMessageHeading extends StatelessWidget {
   static const contentInset = leftInset + avatarSize + avatarGap + rightInset;
 
   final bool showName;
+  final String? groupId;
   final bool isFailure;
   final MessageSender sender;
   final Widget child;
@@ -28,7 +31,14 @@ class GroupMessageHeading extends StatelessWidget {
   final VoidCallback? onMention;
 
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context) => groupId == null
+      ? _build(context, showName)
+      : GroupNicknameVisibility(
+          groupId: groupId!,
+          builder: (context, visible) => _build(context, showName && visible),
+        );
+
+  Widget _build(BuildContext context, bool nameVisible) => Padding(
     padding: const EdgeInsets.fromLTRB(leftInset, 0, rightInset, 0),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,19 +58,25 @@ class GroupMessageHeading extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (showName)
+              if (nameVisible ||
+                  isFailure ||
+                  InteractivePageScope.of(context)?.control != null)
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        sender.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                      child: !nameVisible
+                          ? const SizedBox.shrink()
+                          : Text(
+                              sender.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
                     ),
                     if (isFailure) ...[
                       const SizedBox(width: 8),

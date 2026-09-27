@@ -3,9 +3,10 @@ part of 'chat_controller.dart';
 extension GroupConversationRun on ChatController {
   Future<void> updateGroupMembers(
     String conversationId,
-    List<String> aiIds,
-  ) async {
-    await groupStore.updateMembers(conversationId, aiIds);
+    List<String> aiIds, {
+    String actorId = 'user:local',
+  }) async {
+    await groupStore.updateMembers(conversationId, aiIds, actorId: actorId);
     _conversationChanged();
   }
 

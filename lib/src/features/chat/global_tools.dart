@@ -16,6 +16,10 @@ extension GlobalTools on ChatController {
   }) {
     final conversationId = conversation.id;
     return <AgentTool>[
+          DeliverFileTool(
+            (args, cancelled) =>
+                _deliverFile(args, conversation, senderId, cancelled),
+          ),
           for (final name in RequestAdapterTool.names)
             RequestAdapterTool(name, requestAdapterTool),
           for (final name in StarredMessageTool.names)
@@ -34,11 +38,25 @@ extension GlobalTools on ChatController {
               MiniappLibraryStore(_store.database),
               senderId,
             ),
+          for (final name in HtmlAppEditTool.names)
+            HtmlAppEditTool(name, (operation, args) async {
+              await _store.writer.flush();
+              final result = await HtmlAppStore(
+                _store.database,
+              ).edit(operation, senderId, args);
+              if (result['updated'] == true) {
+                HtmlGameSignals.appChanges.add(result['appId'] as String);
+                _conversationChanged();
+              }
+              return result;
+            }),
           for (final name in HtmlAppDataTool.names)
             HtmlAppDataTool(name, (operation, args) async {
               final apps = HtmlAppStore(_store.database);
               if (operation == 'listHtmlApps') {
-                return {'apps': await apps.list(senderId, args['query'] as String)};
+                return {
+                  'apps': await apps.list(senderId, args['query'] as String),
+                };
               }
               final appId = args['appId'] as String;
               final result = await apps.data(
@@ -217,10 +235,30 @@ extension GlobalTools on ChatController {
               groupStore,
               operation,
               conversationId,
-              renameConversation,
-              updateGroupMembers,
+              (id, title) => renameConversation(id, title, actorId: senderId),
+              (id, members) =>
+                  updateGroupMembers(id, members, actorId: senderId),
+              (id, actorId) => dissolveGroup(id, actorId: actorId),
               _conversationChanged,
               senderId: senderId,
+            ),
+          for (final operation in ProjectTool.operations)
+            ProjectTool(
+              operation: operation,
+              projects: projects,
+              conversation: conversation,
+              createManaged: createManagedProject,
+              setConversationProject: (target, projectId) async {
+                await setConversationProject(
+                  target,
+                  projectId,
+                  actorId: senderId,
+                );
+                documents.project = projectId == null
+                    ? null
+                    : await projects.read(projectId);
+              },
+              changed: _conversationChanged,
             ),
           for (final name in GroupMessageMarksTool.names)
             GroupMessageMarksTool(
@@ -388,6 +426,10 @@ extension GlobalTools on ChatController {
           AppShellTool(_platform),
           for (final name in DocumentTool.names)
             DocumentTool(_platform, name, access: documents),
+          if (documents.project case final project?
+              when project.location == ProjectLocation.managed)
+            for (final name in ProjectDevelopmentTool.names)
+              ProjectDevelopmentTool(_platform, project, name),
           for (final name in DeviceExtensionTool.names)
             DeviceExtensionTool(_platform, name),
         ]

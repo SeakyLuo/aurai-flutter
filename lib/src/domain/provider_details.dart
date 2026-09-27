@@ -84,6 +84,8 @@ class ProviderDetails {
     this.requestAdapters = const {},
     this.modelContextOverrides = const {},
     this.modelPurposes = const {},
+    this.modelPurposeField = '',
+    this.modelTypeMappings = const {},
     this.modelReasoning = const {},
     this.autoSyncModels = true,
     this.balance,
@@ -92,6 +94,8 @@ class ProviderDetails {
   final Map<String, RequestAdapter> requestAdapters;
   final Map<String, ModelContextOverride> modelContextOverrides;
   final Map<String, Set<ModelPurpose>> modelPurposes;
+  final String modelPurposeField;
+  final Map<String, ModelPurpose> modelTypeMappings;
   final Map<String, ModelReasoning> modelReasoning;
   final String name;
   final String website;
@@ -111,6 +115,11 @@ class ProviderDetails {
     'modelPurposes': {
       for (final e in modelPurposes.entries)
         e.key: [for (final purpose in e.value) purpose.name],
+    },
+    'modelPurposeField': modelPurposeField,
+    'modelTypeMappings': {
+      for (final entry in modelTypeMappings.entries)
+        entry.key: entry.value.name,
     },
     'modelReasoning': {
       for (final e in modelReasoning.entries) e.key: e.value.name,
@@ -143,6 +152,13 @@ class ProviderDetails {
               for (final name in e.value as List)
                 ModelPurpose.values.byName(name as String),
             },
+        },
+        modelPurposeField: json['modelPurposeField'] as String? ?? '',
+        modelTypeMappings: {
+          for (final entry in (json['modelTypeMappings'] as Map? ?? {}).entries)
+            entry.key as String: ModelPurpose.values.byName(
+              entry.value as String,
+            ),
         },
         modelReasoning: {
           for (final e in (json['modelReasoning'] as Map? ?? {}).entries)
@@ -256,6 +272,10 @@ void validateProviderDetails(ProviderDetails details, String baseUrl) {
       throw ArgumentError('模型名称不能为空或超过 200 字');
     }
     if (entry.value.isEmpty) throw ArgumentError('请至少选择一种模型用途');
+  }
+  if (details.modelPurposeField.isNotEmpty &&
+      !RegExp(r'^[^.\s]+(?:\.[^.\s]+)*$').hasMatch(details.modelPurposeField)) {
+    throw ArgumentError('模型类型字段路径格式不正确');
   }
   for (final model in details.modelReasoning.keys) {
     if (model.trim().isEmpty || model.length > 200) {

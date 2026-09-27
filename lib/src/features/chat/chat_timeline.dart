@@ -197,6 +197,14 @@ List<ChatTimelineEntry> buildChatTimeline(
                       key: ValueKey(storageId),
                       storageId: storageId,
                       toolName: entry.step.toolName,
+                      fileResults:
+                          entry.step.toolName == 'executeAndroidScript' ||
+                              entry.step.toolName == 'runSkill'
+                          ? [
+                              for (var i = group.start; i < group.end; i++)
+                                liveSteps[i].step.resultJson,
+                            ]
+                          : const [],
                       statuses: [
                         for (var i = group.start; i < group.end; i++)
                           liveSteps[i].step.status,
@@ -408,6 +416,7 @@ List<ChatTimelineEntry> buildChatTimeline(
                   message.sender != null &&
                   message.interactive?.systemPresentation != true
               ? GroupMessageHeading(
+                  groupId: conversation.id,
                   showName: message.htmlGame == null,
                   isFailure: message.isFailure,
                   sender: message.sender!,
@@ -584,6 +593,7 @@ class _ToolActivity extends StatelessWidget {
           ? const EdgeInsets.symmetric(vertical: 5)
           : const EdgeInsets.fromLTRB(18, 4, 18, 8),
       child: ToolActivityView(
+        showFileChanges: !grouped,
         toolName: step.toolName,
         storageId: storageId,
         title:
