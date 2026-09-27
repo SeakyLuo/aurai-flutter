@@ -15,18 +15,17 @@ import 'conversation_icon.dart';
 import 'conversation_more.dart';
 import 'pagination_listener.dart';
 import 'settings_appearance.dart';
-import 'settings_icon.dart';
+import 'message_composer.dart';
+import 'glass_surface.dart';
 
 class AiConversationsPage extends StatefulWidget {
   const AiConversationsPage({
     super.key,
     required this.controller,
     required this.profile,
-    this.openEmptyConversation = true,
   });
   final ChatController controller;
   final AiProfile profile;
-  final bool openEmptyConversation;
   @override
   State<AiConversationsPage> createState() => _AiConversationsPageState();
 }
@@ -34,8 +33,10 @@ class AiConversationsPage extends StatefulWidget {
 class _AiConversationsPageState extends State<AiConversationsPage>
     with RouteAware {
   final _items = <Conversation>[];
+  final _text = TextEditingController();
+  final _focus = FocusNode();
   bool _loading = false, _more = true, _failed = false;
-  bool _firstLoad = true, _opening = false;
+  bool _opening = false;
   @override
   void initState() {
     super.initState();
@@ -58,6 +59,8 @@ class _AiConversationsPageState extends State<AiConversationsPage>
 
   @override
   void dispose() {
+    _text.dispose();
+    _focus.dispose();
     homeRouteObserver.unsubscribe(this);
     super.dispose();
   }
@@ -76,13 +79,6 @@ class _AiConversationsPageState extends State<AiConversationsPage>
         _more = page.length == HomeConversations.pageSize;
         _failed = false;
       });
-      final openEmpty =
-          widget.openEmptyConversation &&
-          _firstLoad &&
-          _items.isEmpty &&
-          ModalRoute.of(context)!.isCurrent;
-      _firstLoad = false;
-      if (openEmpty) await _open();
     } on Object catch (error) {
       if (mounted) setState(() => _failed = true);
       if (mounted)
@@ -100,7 +96,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
     }
   }
 
-  Future<void> _open([String? id]) async {
+  Future<void> _open({String? id, String? message}) async {
     if (_opening) return;
     setState(() => _opening = true);
     try {
@@ -109,12 +105,19 @@ class _AiConversationsPageState extends State<AiConversationsPage>
           await widget.controller.openAiConversation(
             widget.profile,
             newConversation: true,
+            freshDraft: message != null,
           );
       await widget.controller.selectConversation(target);
       if (!mounted) return;
       final route = MaterialPageRoute<void>(
-        builder: (_) => ChatPage(controller: widget.controller, stacked: true),
+        builder: (_) => ChatPage(
+          controller: widget.controller,
+          stacked: true,
+          initialText: message,
+        ),
       );
+      _focus.unfocus();
+      if (message != null) _text.clear();
       await Navigator.push<void>(context, route);
       if (mounted) await _load(reset: true);
     } on Object catch (error) {
@@ -145,14 +148,6 @@ class _AiConversationsPageState extends State<AiConversationsPage>
         ),
         child: Text(widget.profile.sender.name),
       ),
-      actions: [
-        SettingsGlassAction(
-          label: '新建会话',
-          icon: Icons.add_rounded,
-          iconWidget: const SettingsIcon(type: SettingsIconType.add),
-          onPressed: _loading || _opening ? null : _open,
-        ),
-      ],
     ),
     body: _items.isEmpty
         ? Center(
@@ -165,10 +160,11 @@ class _AiConversationsPageState extends State<AiConversationsPage>
                     onPressed: () => _load(reset: true),
                     child: const Text('重试加载'),
                   )
-                : TextButton.icon(
-                    onPressed: _loading || _opening ? null : _open,
-                    icon: const ConversationIcon(),
-                    label: const Text('开始新会话'),
+                : Text(
+                    '还没有会话',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
           )
         : PaginationListener(
@@ -204,7 +200,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 8,
-                          vertical: 5,
+                          vertical: 0,
                         ),
                         leading: ConversationUnreadAvatar(
                           controller: widget.controller,
@@ -240,7 +236,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
                           conversation: item,
                           emptyText: '新会话',
                         ),
-                        onTap: () => _open(item.id),
+                        onTap: () => _open(id: item.id),
                       ),
                     ),
                   ),
@@ -248,5 +244,27 @@ class _AiConversationsPageState extends State<AiConversationsPage>
               },
             ),
           ),
+    bottomNavigationBar: Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: ValueListenableBuilder<TextEditingValue>(
+        valueListenable: _text,
+        builder: (context, value, _) => MessageComposer(
+          controller: _text,
+          focusNode: _focus,
+          enabled: !_opening,
+          hintText: '发消息，开始新会话',
+          action: RoundAction(
+            label: _opening ? '正在打开' : '发送',
+            primary: true,
+            compact: true,
+            inkResponse: false,
+            icon: Icons.arrow_upward_rounded,
+            onPressed: !_opening && value.text.trim().isNotEmpty
+                ? () => _open(message: value.text.trim())
+                : null,
+          ),
+        ),
+      ),
+    ),
   );
 }

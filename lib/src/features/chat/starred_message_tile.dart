@@ -19,6 +19,7 @@ import 'conversation_menu_icon.dart';
 import 'member_avatar.dart';
 import 'message_item.dart';
 import 'message_time.dart';
+import 'menu_press_highlight.dart';
 import 'settings_icon.dart';
 
 class StarredMessageTile extends StatelessWidget {
@@ -179,117 +180,122 @@ class StarredMessageTile extends StatelessWidget {
     return Material(
       type: MaterialType.transparency,
       child: Builder(
-        builder: (menuContext) => InkWell(
-          onTap: selectionMode ? null : onLocate,
-          onLongPress: selectionMode ? null : () => _showMenu(menuContext),
-          child: Padding(
-            padding: contentPadding,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Semantics(
-                      button: true,
-                      label: '查看${result.sender.name}的资料',
-                      child: GestureDetector(
-                        onTap: () => _openProfile(context),
-                        child: MemberAvatar(sender: result.sender, size: 32),
+        builder: (menuContext) => MenuPressHighlight(
+          onLongPressStart: selectionMode
+              ? null
+              : (_) => _showMenu(menuContext),
+          child: InkWell(
+            onTap: selectionMode ? null : onLocate,
+            child: Padding(
+              padding: contentPadding,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Semantics(
+                        button: true,
+                        label: '查看${result.sender.name}的资料',
+                        child: GestureDetector(
+                          onTap: () => _openProfile(context),
+                          child: MemberAvatar(sender: result.sender, size: 32),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            result.sender.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: colors.onSurface,
-                            ),
-                          ),
-                          if (sourceLabel != null)
-                            sourceLabel!
-                          else if (conversationTitle.isNotEmpty)
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              conversationTitle,
+                              result.sender.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 12,
-                                color: colors.onSurfaceVariant,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: colors.onSurface,
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      messageTime(starredAt),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colors.onSurfaceVariant,
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.end,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                if (result.html case final card?)
-                  Stack(
-                    children: [
-                      IgnorePointer(
-                        child: HtmlView(
-                          key: ValueKey(result.id),
-                          card: card,
-                          messageId: result.id,
-                          conversationId: conversationId,
-                          store: controller.htmlStore,
+                            if (sourceLabel != null)
+                              sourceLabel!
+                            else if (conversationTitle.isNotEmpty)
+                              Text(
+                                conversationTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                      if (!selectionMode)
-                        Positioned(
-                          top: HtmlMessageMoreButton.top,
-                          right: HtmlMessageMoreButton.right,
-                          child: Builder(
-                            builder: (buttonContext) => HtmlMessageMoreButton(
-                              label: '小程序操作',
-                              onPressed: () => _showMiniappMenu(buttonContext),
-                            ),
+                      Text(
+                        messageTime(starredAt),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colors.onSurfaceVariant,
+                          height: 1.4,
+                        ),
+                        textAlign: TextAlign.end,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (result.html case final card?)
+                    Stack(
+                      children: [
+                        IgnorePointer(
+                          child: HtmlView(
+                            key: ValueKey(result.id),
+                            card: card,
+                            messageId: result.id,
+                            conversationId: conversationId,
+                            store: controller.htmlStore,
                           ),
                         ),
-                    ],
-                  )
-                else
-                  IgnorePointer(
-                    child: MessageItem(
-                      message: AgentMessage(
-                        id: result.id,
-                        role: result.role,
-                        senderId: result.sender.id,
-                        sender: result.sender,
-                        text: result.text,
-                        createdAt: result.createdAt,
-                        images: result.images,
-                        files: result.files,
-                        interactive: result.interactive,
-                        isGroupMessage: true,
+                        if (!selectionMode)
+                          Positioned(
+                            top: HtmlMessageMoreButton.top,
+                            right: HtmlMessageMoreButton.right,
+                            child: Builder(
+                              builder: (buttonContext) => HtmlMessageMoreButton(
+                                label: '小程序操作',
+                                onPressed: () =>
+                                    _showMiniappMenu(buttonContext),
+                              ),
+                            ),
+                          ),
+                      ],
+                    )
+                  else
+                    IgnorePointer(
+                      child: MessageItem(
+                        message: AgentMessage(
+                          id: result.id,
+                          role: result.role,
+                          senderId: result.sender.id,
+                          sender: result.sender,
+                          text: result.text,
+                          createdAt: result.createdAt,
+                          images: result.images,
+                          files: result.files,
+                          interactive: result.interactive,
+                          isGroupMessage: true,
+                        ),
+                        onEdit: null,
+                        groupBubble: true,
+                        readOnly: true,
+                        onLocate: onLocate,
+                        onInteractiveClick: (_, _, _, {value}) async {
+                          onLocate();
+                          return null;
+                        },
                       ),
-                      onEdit: null,
-                      groupBubble: true,
-                      readOnly: true,
-                      onLocate: onLocate,
-                      onInteractiveClick: (_, _, _, {value}) async {
-                        onLocate();
-                        return null;
-                      },
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

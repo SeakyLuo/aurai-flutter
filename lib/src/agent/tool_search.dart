@@ -90,7 +90,7 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
     final title = toolTitle(tool.name).toLowerCase();
     final aliases = switch (tool.capabilityId) {
       'local.app' =>
-        '会话 私聊 创建聊天 发消息 发送 消息 conversation direct private chat create send message',
+        '会话 私聊 创建聊天 发消息 发送 消息 项目 开发项目 工作目录 project workspace conversation direct private chat create send message',
       'local.diagnostics' =>
         '日志 报错 错误 执行失败 排查 诊断 log logs error failure diagnostics',
       'local.messages' =>
@@ -118,7 +118,8 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
       'memory.manage' =>
         '记忆 记住 整理 补充 查询 新增 修改 删除 时间 memory remember organize list read create update delete timestamp',
       'android.network' => '网络 连接 域名 诊断 network dns tls http',
-      'android.runtime' => '设备 系统 接口 脚本 Android API script runtime',
+      'android.runtime' =>
+        '设备 系统 接口 脚本 生成文件 创建文件 文档 Word DOCX Excel XLSX PDF Markdown MD ZIP Android API script runtime generate document file',
       'android.notifications.observe' ||
       'android.notifications.send' => '通知 推送 提醒 notification push alert',
       'android.apps' => '应用 软件 启动 app launch',

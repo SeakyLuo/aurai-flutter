@@ -1,3 +1,5 @@
+import 'default_model_settings_page.dart';
+import 'header_action_menu.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/glass_notice.dart';
@@ -18,11 +20,13 @@ class ProviderModelManagementPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.service,
+    required this.onConfigureTypes,
     this.readOnly = false,
   });
 
   final ChatController controller;
   final ModelService service;
+  final Future<bool> Function() onConfigureTypes;
   final bool readOnly;
 
   @override
@@ -128,6 +132,8 @@ class _ProviderModelManagementPageState
             requestAdapters: details?.requestAdapters ?? const {},
             modelContextOverrides: details?.modelContextOverrides ?? const {},
             modelPurposes: details?.modelPurposes ?? const {},
+            modelPurposeField: details?.modelPurposeField ?? '',
+            modelTypeMappings: details?.modelTypeMappings ?? const {},
             modelReasoning: details?.modelReasoning ?? const {},
             balance: details?.balance,
             icon: details?.icon,
@@ -147,6 +153,48 @@ class _ProviderModelManagementPageState
     } finally {
       if (mounted) setState(() => _savingSelection = false);
     }
+  }
+
+  Future<void> _more(BuildContext anchor) async {
+    final config = widget.controller.modelSettings.profile(widget.service);
+    final action = await showHeaderActionMenu(
+      anchor,
+      items: [
+        if (!widget.readOnly && config.isConfigured)
+          (
+            value: 'models',
+            label: '添加模型',
+            icon: const SettingsIcon(type: SettingsIconType.add),
+          ),
+        (
+          value: 'defaults',
+          label: '默认模型设置',
+          icon: const SettingsIcon(type: SettingsIconType.model),
+        ),
+        if (config.protocol.supportsChatModels)
+          (
+            value: 'types',
+            label: '模型类型识别',
+            icon: const SettingsIcon(type: SettingsIconType.field),
+          ),
+      ],
+    );
+    if (!mounted) return;
+    if (action == 'defaults') {
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DefaultModelSettingsPage(
+            controller: widget.controller,
+            service: widget.service,
+            readOnly: widget.readOnly,
+          ),
+        ),
+      );
+      if (mounted) setState(() {});
+    }
+    if (action == 'models') await _chooseModels();
+    if (action == 'types') await widget.onConfigureTypes();
   }
 
   String _modelIcon(ModelConfig config, String model) {
@@ -176,18 +224,18 @@ class _ProviderModelManagementPageState
       appBar: SettingsAppBar(
         title: '模型管理',
         onBack: _savingSelection ? null : () => Navigator.pop(context),
-        actions: widget.readOnly
-            ? const []
-            : [
-                SettingsGlassAction(
-                  label: '添加模型',
-                  icon: Icons.add_rounded,
-                  iconWidget: const SettingsIcon(type: SettingsIconType.add),
-                  onPressed: !canChoose || _savingSelection || _loading
-                      ? null
-                      : _chooseModels,
-                ),
-              ],
+        actions: [
+          Builder(
+            builder: (anchor) => SettingsGlassAction(
+              label: '更多',
+              icon: Icons.more_horiz,
+              iconWidget: const SettingsIcon(type: SettingsIconType.more),
+              onPressed: _savingSelection || _loading
+                  ? null
+                  : () => _more(anchor),
+            ),
+          ),
+        ],
       ),
       body: SettingsPageBody(
         avoidHeader: true,

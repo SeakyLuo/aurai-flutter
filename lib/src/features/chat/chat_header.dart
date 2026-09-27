@@ -2,6 +2,7 @@ import 'chat_header_background.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../app/global_ui.dart';
 import 'glass_surface.dart';
 import 'conversation_more.dart';
 import 'chat_controller.dart';
@@ -22,8 +23,10 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
   final bool Function() beforeDelete;
   final bool editing;
   final VoidCallback? onCancelEdit;
+  static const double toolbarHeight = GlobalUI.appBarHeight;
+
   @override
-  Size get preferredSize => const Size.fromHeight(76);
+  Size get preferredSize => const Size.fromHeight(toolbarHeight);
   @override
   Widget build(BuildContext context) => AppBar(
     automaticallyImplyLeading: false,
@@ -41,7 +44,9 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
         : Align(
             alignment: Alignment.topCenter,
             child: Container(
-              height: MediaQuery.paddingOf(context).top + (editing ? 76 : 18),
+              height:
+                  MediaQuery.paddingOf(context).top +
+                  (editing ? toolbarHeight : 18),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
@@ -58,7 +63,7 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
               ),
             ),
           ),
-    toolbarHeight: 76,
+    toolbarHeight: toolbarHeight,
     titleSpacing: 18,
     title: editing
         ? Stack(

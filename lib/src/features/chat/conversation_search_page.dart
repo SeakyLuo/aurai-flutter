@@ -1,4 +1,5 @@
 import 'retained_tab_view.dart';
+import '../../app/global_ui.dart';
 import '../../app/glass_notice.dart';
 import 'search_filter_menu.dart';
 import 'settings_appearance.dart';
@@ -346,7 +347,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
         flexibleSpace: const ChatHeaderBackground(),
         elevation: 0,
         scrolledUnderElevation: 0,
-        toolbarHeight: 64,
+        toolbarHeight: GlobalUI.appBarHeight,
         leadingWidth: 74,
         leading: Padding(
           padding: const EdgeInsets.only(left: 18),

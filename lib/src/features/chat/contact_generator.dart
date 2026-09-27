@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import '../../domain/model_provider.dart';
+import '../../domain/ai_profile.dart';
 import '../../providers/responses_transport.dart';
 import 'random_contact.dart';
 
@@ -21,7 +22,7 @@ class ContactGenerator {
     final input = jsonEncode(preserved);
     if (_firstRoll) {
       _firstRoll = false;
-      final local = RandomContact.roll();
+      final local = await RandomContact.roll();
       _recentNames.add(local.name);
       _prepare(config, preserved, input);
       return local;
@@ -51,7 +52,7 @@ class ContactGenerator {
     ModelConfig config,
     Map<String, String> preserved,
   ) async {
-    final local = RandomContact.roll();
+    final local = await RandomContact.roll();
     if (!config.isConfigured || preserved.length == 3) return local;
     final transport = ResponsesTransport(config);
     _transport = transport;
@@ -88,11 +89,11 @@ class ContactGenerator {
       final description = data['description'] as String;
       final role = data['role'] as String;
       if (name.trim().isEmpty ||
-          name.length > 100 ||
+          name.length > AiProfile.nameMaxLength ||
           description.trim().isEmpty ||
-          description.length > 300 ||
+          description.length > AiProfile.descriptionMaxLength ||
           role.trim().isEmpty ||
-          role.length > 10000) {
+          role.length > AiProfile.instructionsMaxLength) {
         throw const FormatException('生成字段不符合联系人限制');
       }
       _recentNames.add(name);

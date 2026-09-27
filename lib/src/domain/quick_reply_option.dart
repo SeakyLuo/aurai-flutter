@@ -1,3 +1,5 @@
+import 'unicode_emoji_sequences.dart';
+
 class QuickReplyOption {
   const QuickReplyOption({required this.key, required this.emoji});
 
@@ -209,4 +211,19 @@ const quickReplyOptions = [
 
 final quickReplyOptionsByKey = {
   for (final option in quickReplyOptions) option.key: option,
+  for (final emoji in unicodeEmojiSequences.trim().split(' '))
+    'emoji_${emoji.runes.map((rune) => rune.toRadixString(16)).join('_')}':
+        QuickReplyOption(
+          key:
+              'emoji_${emoji.runes.map((rune) => rune.toRadixString(16)).join('_')}',
+          emoji: emoji,
+        ),
+};
+
+final quickReplyOptionsByEmoji = {
+  for (final option in quickReplyOptionsByKey.values)
+    option.emoji.replaceAll('\uFE0F', ''): option,
+  // Keep the existing reaction keys when selecting the same emoji again.
+  for (final option in quickReplyOptions)
+    option.emoji.replaceAll('\uFE0F', ''): option,
 };

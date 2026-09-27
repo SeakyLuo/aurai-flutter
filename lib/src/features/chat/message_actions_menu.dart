@@ -4,6 +4,7 @@ export 'message_action.dart';
 import '../../domain/quick_reply_option.dart';
 import 'quick_reply_groups.dart';
 import 'quick_reply_picker.dart';
+import 'emoji_button.dart';
 import 'sidebar_action_icon.dart';
 import '../../html_games/html_game_icon.dart';
 import 'attachment_action_icon.dart';
@@ -18,6 +19,7 @@ import 'copy_icon.dart';
 import 'conversation_menu_icon.dart';
 import 'text_selection_icon.dart';
 import 'settings_appearance.dart';
+import 'menu_press_highlight.dart';
 
 Future<MessageMenuResult?> showMessageActionsMenu(
   BuildContext context, {
@@ -183,24 +185,17 @@ Future<MessageMenuResult?> showMessageActionsMenu(
                       (key) => options[key]!,
                     ))
                       Expanded(
-                        child: Semantics(
-                          label: option.emoji,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(24),
-                            onTap: () => Navigator.pop(
-                              context,
-                              MessageQuickReplyResult(option),
-                            ),
-                            child: Container(
-                              height: 52,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: sentQuickReplyKeys.contains(option.key)
-                                    ? Theme.of(
-                                        context,
-                                      ).colorScheme.primaryContainer
-                                    : null,
-                                borderRadius: BorderRadius.circular(24),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Semantics(
+                            label: option.emoji,
+                            button: true,
+                            selected: sentQuickReplyKeys.contains(option.key),
+                            child: EmojiButton(
+                              selected: sentQuickReplyKeys.contains(option.key),
+                              onTap: () => Navigator.pop(
+                                context,
+                                MessageQuickReplyResult(option),
                               ),
                               child: Text(
                                 option.emoji,
@@ -216,32 +211,31 @@ Future<MessageMenuResult?> showMessageActionsMenu(
                         ),
                       ),
                     Expanded(
-                      child: Tooltip(
-                        message: '更多表情',
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(24),
-                          onTap: () async {
-                            final option = await showQuickReplyPicker(
-                              context,
-                              selectedKeys: sentQuickReplyKeys,
-                            );
-                            if (context.mounted && option != null) {
-                              Navigator.pop(
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Tooltip(
+                          message: '更多表情',
+                          child: IconButton(
+                            style: IconButton.styleFrom(
+                              fixedSize: const Size.square(44),
+                              backgroundColor: Theme.of(
                                 context,
-                                MessageQuickReplyResult(option),
-                              );
-                            }
-                          },
-                          child: Container(
-                            height: 44,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerHighest,
-                              shape: BoxShape.circle,
+                              ).colorScheme.onSurface.withValues(alpha: .10),
+                              shape: const CircleBorder(),
                             ),
-                            child: const SidebarActionIcon(
+                            onPressed: () async {
+                              final option = await showQuickReplyPicker(
+                                context,
+                                selectedKeys: sentQuickReplyKeys,
+                              );
+                              if (context.mounted && option != null) {
+                                Navigator.pop(
+                                  context,
+                                  MessageQuickReplyResult(option),
+                                );
+                              }
+                            },
+                            icon: const SidebarActionIcon(
                               type: SidebarActionIconType.add,
                             ),
                           ),
@@ -294,7 +288,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
         ),
       );
     },
-  );
+  ).whenComplete(MenuPressHighlight.dismissActive);
 }
 
 class MessageTextSelectionPage extends StatefulWidget {

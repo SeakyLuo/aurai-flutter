@@ -57,50 +57,37 @@ Future<String?> showSkillIconPicker(
             Expanded(
               child: GridView.builder(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 100,
-                  mainAxisExtent:
-                      48 + MediaQuery.textScalerOf(context).scale(13) * 2.6,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 5,
                   crossAxisSpacing: 8,
                   mainAxisSpacing: 8,
                 ),
                 itemCount: skillIconChoices.length,
                 itemBuilder: (context, index) {
                   final entry = skillIconChoices.entries.elementAt(index);
+                  final isSelected = selected == entry.key;
                   return Semantics(
-                    selected: selected == entry.key,
+                    label: entry.value,
+                    selected: isSelected,
                     button: true,
                     child: Material(
-                      color: selected == entry.key
-                          ? settingsFieldColor(context)
+                      color: isSelected
+                          ? Theme.of(
+                              context,
+                              ).colorScheme.onSurface.withValues(alpha: .06)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(16),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(16),
                         onTap: () => Navigator.pop(context, entry.key),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            ColorFiltered(
-                              colorFilter: ColorFilter.mode(
-                                Theme.of(context).colorScheme.onSurface,
-                                BlendMode.srcIn,
-                              ),
-                              child: SkillIcon(entry.key),
+                        child: Center(
+                          child: ColorFiltered(
+                            colorFilter: ColorFilter.mode(
+                              Theme.of(context).colorScheme.onSurface,
+                              BlendMode.srcIn,
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              entry.value,
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
+                            child: SkillIcon(entry.key),
+                          ),
                         ),
                       ),
                     ),

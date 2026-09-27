@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
+import '../features/chat/settings_appearance.dart';
 import 'html_game.dart';
 import 'html_game_session.dart';
 import 'html_store.dart';
@@ -58,7 +59,8 @@ class _MiniappRunPageState extends State<MiniappRunPage>
         theme: Theme.of(context),
         fullscreen: true,
         independent: true,
-        hostTopInset: MediaQuery.paddingOf(context).top + 76,
+        hostTopInset:
+            MediaQuery.paddingOf(context).top + SettingsAppBar.toolbarHeight,
         hostSafeTopInset: MediaQuery.paddingOf(context).top,
         hostRightInset: 124,
       )..addListener(_changed);
@@ -150,7 +152,7 @@ class _MiniappRunPageState extends State<MiniappRunPage>
           Positioned(
             top: MediaQuery.paddingOf(context).top,
             right: 16,
-            height: 76,
+            height: SettingsAppBar.toolbarHeight,
             child: Center(
               child: MiniappFavoriteAction(
                 appId: widget.game.appId,

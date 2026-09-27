@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'settings_icon.dart';
 import '../../html_games/html_game_icon.dart';
+import '../../skills/extra_skill_icon.dart';
 
 const avatarSymbols = <String, String>{
   'app_logo_white': 'App Logo',
@@ -26,6 +27,40 @@ const avatarSymbols = <String, String>{
   'diamond': '晶石',
   'rings': '圆环',
   'waves': '波纹',
+  'music': '音乐',
+  'photo': '图片',
+  'camera': '相机',
+  'palette': '画板',
+  'food': '美食',
+  'shopping': '购物',
+  'travel': '旅行',
+  'location': '地点',
+  'health': '健康',
+  'science': '实验',
+  'brain': '思考',
+  'cloud': '云朵',
+  'clock': '时钟',
+  'calendar': '日历',
+  'mail': '邮件',
+  'news': '新闻',
+  'checklist': '清单',
+  'chart': '统计',
+  'translate': '翻译',
+  'phone': '手机',
+  'browser': '浏览器',
+  'window': '窗口',
+  'clipboard': '剪贴板',
+  'calculator': '计算器',
+  'battery': '电池',
+  'download': '下载',
+  'terminal': '终端',
+  'database': '数据库',
+  'api': '接口',
+  'link': '链接',
+  'lock': '安全',
+  'key': '密钥',
+  'bug': '调试',
+  'automation': '自动化',
 };
 
 class AvatarSymbol extends StatelessWidget {
@@ -34,6 +69,13 @@ class AvatarSymbol extends StatelessWidget {
   final Color color;
   @override
   Widget build(BuildContext context) {
+    if (symbol.startsWith('emoji:')) {
+      return Text(
+        symbol.substring(6),
+        textScaler: TextScaler.noScaling,
+        style: const TextStyle(fontSize: 24, height: 1),
+      );
+    }
     if (symbol == 'game')
       return HtmlGameIcon(HtmlGameIconType.game, color: color);
     if (symbol == 'app_logo_white') {
@@ -43,6 +85,9 @@ class AvatarSymbol extends StatelessWidget {
         height: 24,
         fit: BoxFit.contain,
       );
+    }
+    if (ExtraSkillIcon.names.contains(symbol) && symbol != 'robot') {
+      return ExtraSkillIcon(symbol, color: color);
     }
     const shared = {
       'person': SettingsIconType.personalInfo,

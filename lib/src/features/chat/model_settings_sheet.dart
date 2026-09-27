@@ -8,6 +8,7 @@ import '../../domain/model_provider.dart';
 import '../../providers/model_catalog.dart';
 import 'chat_controller.dart';
 import 'settings_appearance.dart';
+import 'menu_press_highlight.dart';
 import 'settings_icon.dart';
 import 'model_provider_detail.dart';
 import 'model_provider_icon.dart';
@@ -315,75 +316,79 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                           key: ValueKey(service.name),
                           padding: const EdgeInsets.only(bottom: 10),
                           child: Builder(
-                            builder: (anchorContext) => Material(
-                              color: settingsFieldColor(context),
+                            builder: (anchorContext) => MenuPressHighlight(
+                              onLongPressStart:
+                                  !_sorting && _pendingOrder == null
+                                  ? (_) => _menu(service, anchorContext)
+                                  : null,
                               borderRadius: BorderRadius.circular(24),
-                              clipBehavior: Clip.antiAlias,
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                leading: ModelProviderIcon(config: profile),
-                                title: Text(profile.displayName),
-                                subtitle: Text(
-                                  profile.isConfigured
-                                      ? (widget.accountOnly
-                                            ? '已配置'
-                                            : profile.model.isEmpty
-                                            ? '选择模型'
-                                            : modelDisplayName(profile.model))
-                                      : '未配置',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (!widget.accountOnly &&
-                                        settings.activeConfig.isConfigured &&
-                                        settings.activeConfig.service ==
-                                            service) ...[
-                                      Text(
-                                        '默认',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.onSurfaceVariant,
+                              child: Material(
+                                color: settingsFieldColor(context),
+                                borderRadius: BorderRadius.circular(24),
+                                clipBehavior: Clip.antiAlias,
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 10,
+                                  ),
+                                  leading: ModelProviderIcon(config: profile),
+                                  title: Text(profile.displayName),
+                                  subtitle: Text(
+                                    profile.isConfigured
+                                        ? (widget.accountOnly
+                                              ? '已配置'
+                                              : profile.model.isEmpty
+                                              ? '选择模型'
+                                              : modelDisplayName(profile.model))
+                                        : '未配置',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (!widget.accountOnly &&
+                                          settings.activeConfig.isConfigured &&
+                                          settings.activeConfig.service ==
+                                              service) ...[
+                                        Text(
+                                          '默认',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                    ],
-                                    if (_sorting)
-                                      ReorderableDragStartListener(
-                                        index: index,
-                                        enabled: _pendingOrder == null,
-                                        child: const Tooltip(
-                                          message: '拖动排序',
-                                          child: SizedBox(
-                                            width: 40,
-                                            height: 48,
-                                            child: Center(
-                                              child: SettingsIcon(
-                                                type: SettingsIconType.drag,
+                                        const SizedBox(width: 8),
+                                      ],
+                                      if (_sorting)
+                                        ReorderableDragStartListener(
+                                          index: index,
+                                          enabled: _pendingOrder == null,
+                                          child: const Tooltip(
+                                            message: '拖动排序',
+                                            child: SizedBox(
+                                              width: 40,
+                                              height: 48,
+                                              child: Center(
+                                                child: SettingsIcon(
+                                                  type: SettingsIconType.drag,
+                                                ),
                                               ),
                                             ),
                                           ),
+                                        )
+                                      else
+                                        const SettingsIcon(
+                                          type: SettingsIconType.chevron,
                                         ),
-                                      )
-                                    else
-                                      const SettingsIcon(
-                                        type: SettingsIconType.chevron,
-                                      ),
-                                  ],
+                                    ],
+                                  ),
+                                  onTap: !_sorting && _pendingOrder == null
+                                      ? () => _open(service)
+                                      : null,
                                 ),
-                                onTap: !_sorting && _pendingOrder == null
-                                    ? () => _open(service)
-                                    : null,
-                                onLongPress: !_sorting && _pendingOrder == null
-                                    ? () => _menu(service, anchorContext)
-                                    : null,
                               ),
                             ),
                           ),

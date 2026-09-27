@@ -3,10 +3,13 @@ package com.haiskynology.aurai
 import android.content.*
 import android.os.*
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.util.concurrent.Executors
 
 class AndroidScriptRunner(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
     private var active: Run? = null
+    private val worker = Executors.newSingleThreadExecutor()
 
     fun execute(id: String, script: String, conversationId: String, timeoutSeconds: Int, result: MethodChannel.Result) {
         if (timeoutSeconds !in 1..600) {
@@ -23,11 +26,23 @@ class AndroidScriptRunner(private val context: Context) {
         }
         val run = Run(id, script, conversationId, timeoutSeconds, result)
         active = run
-        run.bound = context.bindService(
-            Intent(context, AndroidScriptService::class.java), run, Context.BIND_AUTO_CREATE,
-        )
-        if (!run.bound) run.finish(mapOf("success" to false, "error" to "Cannot start script process"))
-        else handler.postDelayed(run.timeout, timeoutSeconds * 1000L)
+        worker.execute {
+            try {
+                run.changes = WorkspaceChanges(File(ScriptWorkspace(context, conversationId).getDirectory()))
+                run.before = run.changes.snapshot()
+                handler.post {
+                    if (!run.finished) {
+                        run.bound = context.bindService(
+                            Intent(context, AndroidScriptService::class.java), run, Context.BIND_AUTO_CREATE,
+                        )
+                        if (!run.bound) run.finish(mapOf("success" to false, "error" to "Cannot start script process"))
+                        else handler.postDelayed(run.timeout, timeoutSeconds * 1000L)
+                    }
+                }
+            } catch (error: Exception) {
+                handler.post { run.failSnapshot(error) }
+            }
+        }
     }
 
     fun cancel(id: String) {
@@ -47,6 +62,8 @@ class AndroidScriptRunner(private val context: Context) {
         var bound = false
         var pid: Int? = null
         var finished = false
+        lateinit var changes: WorkspaceChanges
+        var before: WorkspaceChanges.Snapshot? = null
         val timeout = Runnable { finish(mapOf(
             "success" to false,
             "error" to "Script timed out after $timeoutSeconds seconds. Earlier side effects are not rolled back; observe before retrying.",
@@ -96,8 +113,32 @@ class AndroidScriptRunner(private val context: Context) {
             handler.removeCallbacks(timeout)
             if (bound) context.unbindService(this)
             pid?.let(Process::killProcess)
+            worker.execute {
+                try {
+                    val initial = before
+                    val after = if (initial != null) changes.snapshot() else null
+                    val details = if (initial != null && after != null) mapOf(
+                        "fileChanges" to changes.compare(initial, after),
+                        "fileChangesComplete" to (initial.complete && after.complete),
+                    ) else emptyMap()
+                    handler.post {
+                        active = null
+                        result.success(output + details)
+                    }
+                } catch (error: Exception) {
+                    handler.post {
+                        active = null
+                        result.success(output + mapOf("fileChangesComplete" to false, "fileChangesError" to error.toString()))
+                    }
+                }
+            }
+        }
+
+        fun failSnapshot(error: Exception) {
+            if (finished) return
+            finished = true
             active = null
-            result.success(output)
+            result.error("workspace_snapshot", error.toString(), null)
         }
     }
 }

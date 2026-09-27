@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 /// 全局视觉配置：品牌色及 Material 组件样式统一在此维护。
 abstract final class GlobalUI {
+  static const double appBarHeight = 60;
+
   static Color messageBackground(ThemeData theme) =>
       theme.brightness == Brightness.dark
       ? const Color(0xff2a292f)
@@ -170,7 +172,7 @@ abstract final class GlobalUI {
             ? SystemUiOverlayStyle.light
             : SystemUiOverlayStyle.dark,
         surfaceTintColor: Colors.transparent,
-        toolbarHeight: 64,
+        toolbarHeight: appBarHeight,
         titleSpacing: 16,
         titleTextStyle: TextStyle(
           fontSize: 19,

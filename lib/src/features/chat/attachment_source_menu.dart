@@ -6,11 +6,13 @@ import 'package:flutter/material.dart';
 import 'attachment_action_icon.dart';
 import 'glass_surface.dart';
 
-enum AttachmentSource { gallery, camera, file, favorite }
+enum AttachmentSource { gallery, camera, file, favorite, friend }
 
 Future<AttachmentSource?> showAttachmentSourceMenu(
   BuildContext context, {
   bool allowFavorites = true,
+  bool allowFriendSelection = false,
+  Widget friendIcon = const SettingsIcon(type: SettingsIconType.personalInfo),
 }) {
   final button = context.findRenderObject()! as RenderBox;
   final overlay =
@@ -84,6 +86,13 @@ Future<AttachmentSource?> showAttachmentSourceMenu(
                                   label: '收藏',
                                   icon: AttachmentActionIconType.file,
                                 ),
+                              if (allowFriendSelection)
+                                _AttachmentSourceItem(
+                                  source: AttachmentSource.friend,
+                                  label: '选择朋友',
+                                  icon: AttachmentActionIconType.file,
+                                  customIcon: friendIcon,
+                                ),
                             ],
                           ),
                         ),
@@ -106,10 +115,12 @@ class _AttachmentSourceItem extends StatelessWidget {
     required this.source,
     required this.label,
     required this.icon,
+    this.customIcon,
   });
   final AttachmentSource source;
   final String label;
   final AttachmentActionIconType icon;
+  final Widget? customIcon;
 
   @override
   Widget build(BuildContext context) => Semantics(
@@ -121,7 +132,9 @@ class _AttachmentSourceItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         child: Row(
           children: [
-            source == AttachmentSource.favorite
+            customIcon != null
+                ? SizedBox.square(dimension: 24, child: customIcon!)
+                : source == AttachmentSource.favorite
                 ? SettingsIcon(
                     type: SettingsIconType.star,
                     color: Theme.of(context).brightness == Brightness.dark

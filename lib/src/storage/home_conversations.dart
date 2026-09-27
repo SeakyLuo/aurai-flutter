@@ -16,7 +16,8 @@ class HomeConversations {
   Future<List<Conversation>> recent({int offset = 0}) async {
     final rows = await store.database.query(
       'conversations',
-      where: 'archived = 0 AND $visibleConversation AND $localUserConversation',
+      where:
+          'archived = 0 AND $visibleConversation AND $localUserConversation',
       orderBy: 'pinned DESC, updated_at DESC, id DESC',
       limit: pageSize,
       offset: offset,
@@ -31,6 +32,22 @@ class HomeConversations {
       where: _groupsWhere,
     );
     return rows.single['count'] as int;
+  }
+
+  Future<List<Conversation>> forProject(
+    String projectId, {
+    int offset = 0,
+  }) async {
+    final rows = await store.database.query(
+      'conversations',
+      where:
+          'project_id = ? AND archived = 0 AND $visibleConversation AND $localUserConversation',
+      whereArgs: [projectId],
+      orderBy: 'pinned DESC, updated_at DESC, id DESC',
+      limit: pageSize,
+      offset: offset,
+    );
+    return _headers(rows);
   }
 
   Future<List<Conversation>> groups({Conversation? after}) async {

@@ -79,7 +79,6 @@ class _AiContactPageState extends State<AiContactPage> {
         widget.controller,
         id,
         waitForClose: true,
-        resetStack: true,
       );
     } on Object catch (error) {
       if (mounted) _notice('无法打开私聊，请稍后重试：${errorMessage(error)}');
@@ -148,8 +147,8 @@ class _AiContactPageState extends State<AiContactPage> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        title: '朋友',
-
+        title: '',
+        titleWidget: const SizedBox.shrink(),
         onBack: () => Navigator.pop(context),
         actions: [
           if (ai != null)
@@ -271,7 +270,7 @@ class _AiContactPageState extends State<AiContactPage> {
                 }),
                 _row(
                   '工具授权',
-                  SettingsIconType.tools,
+                  SettingsIconType.permission,
                   () => _page(ToolApprovalsPage(controller: widget.controller)),
                 ),
                 const SizedBox(height: 24),
@@ -300,7 +299,6 @@ class _AiContactPageState extends State<AiContactPage> {
                             AiConversationsPage(
                               controller: widget.controller,
                               profile: ai,
-                              openEmptyConversation: false,
                             ),
                           ),
                   ),

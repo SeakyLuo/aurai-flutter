@@ -24,9 +24,11 @@ class MiniappDetailPage extends StatefulWidget {
     super.key,
     required this.entry,
     required this.store,
+    this.showOpenAction = true,
   });
   final MiniappEntry entry;
   final HtmlStore store;
+  final bool showOpenAction;
 
   @override
   State<MiniappDetailPage> createState() => _MiniappDetailPageState();
@@ -182,26 +184,28 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-          child: Center(
-            heightFactor: 1,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 600),
-              child: SizedBox(
-                width: double.infinity,
-                child: DialogActionButton(
-                  text: !canOpen ? '已撤下' : '打开',
-                  onPressed: _busy || !canOpen ? null : _open,
-                  loading: _opening,
+      bottomNavigationBar: !widget.showOpenAction
+          ? null
+          : SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                child: Center(
+                  heightFactor: 1,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 600),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: DialogActionButton(
+                        text: !canOpen ? '已撤下' : '打开',
+                        onPressed: _busy || !canOpen ? null : _open,
+                        loading: _opening,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ),
       body: SettingsPageBody(
         child: SafeArea(
           top: false,

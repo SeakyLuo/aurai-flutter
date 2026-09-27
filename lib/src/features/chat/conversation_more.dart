@@ -3,17 +3,18 @@ import '../../domain/error_message.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'chat_controller.dart';
 import 'ai_contact_page.dart';
 import 'group_activity_sheet.dart';
 import 'group_info_page.dart';
+import 'direct_conversation_info_page.dart';
 import 'conversation_task_navigation.dart';
 import 'header_action_menu.dart';
 import 'archive_confirmation_dialog.dart';
 import 'conversation_menu_icon.dart';
 import 'glass_surface.dart';
+import 'menu_press_highlight.dart';
 import 'conversation_rename_dialog.dart';
 import 'delete_confirmation_dialog.dart';
 
@@ -141,17 +142,19 @@ class _ConversationMoreState extends State<ConversationMore> {
     }
   }
 
-  Future<void> _delete() async {
+  Future<void> _delete({bool confirmed = false}) async {
     if (!_canDelete()) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: .24),
-      builder: (_) => DeleteConfirmationDialog(
-        title: '删除会话？',
-        description: '“${_conversation.title}”的消息、草稿和图片将一并删除，无法恢复。',
-      ),
-    );
-    if (!mounted || confirmed != true || !_canDelete()) return;
+    if (!confirmed) {
+      final accepted = await showDialog<bool>(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: .24),
+        builder: (_) => DeleteConfirmationDialog(
+          title: '删除会话？',
+          description: '“${_conversation.title}”的消息、草稿和图片将一并删除，无法恢复。',
+        ),
+      );
+      if (!mounted || accepted != true || !_canDelete()) return;
+    }
     setState(() => _saving = true);
     final deletedId = _conversation.id;
     try {
@@ -188,26 +191,6 @@ class _ConversationMoreState extends State<ConversationMore> {
   }
 
   Future<void> _openMenu([Offset? position]) async {
-    if (widget.child == null && _conversation.kind == ConversationKind.group) {
-      final leftGroup = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => GroupInfoPage(
-            controller: widget.controller,
-            conversation: _conversation,
-            originTaskId: widget.originTaskId,
-            onPin: _pin,
-            onArchive: _archive,
-            onDelete: _delete,
-          ),
-        ),
-      );
-      if (!mounted) return;
-      widget.onChanged?.call();
-      if (leftGroup == true && Navigator.canPop(context))
-        Navigator.pop(context);
-      return;
-    }
     final button = context.findRenderObject()! as RenderBox;
     final overlay =
         Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
@@ -229,8 +212,7 @@ class _ConversationMoreState extends State<ConversationMore> {
             : _conversation.isArchived
             ? 202.0
             : 264.0) +
-        (hasTask ? 54 : 0) +
-        108;
+        (hasTask ? 54 : 0);
     final anchor =
         position ??
         Offset(
@@ -278,7 +260,7 @@ class _ConversationMoreState extends State<ConversationMore> {
                                 icon: const ConversationMenuIcon(
                                   type: ConversationMenuIconType.profile,
                                 ),
-                                label: '查看资料',
+                                label: '查看朋友',
                                 onTap: () => Navigator.pop(
                                   menuContext,
                                   _MoreAction.profile,
@@ -339,16 +321,7 @@ class _ConversationMoreState extends State<ConversationMore> {
                                 _MoreAction.rename,
                               ),
                             ),
-                            GlassMenuItem(
-                              icon: const ConversationMenuIcon(
-                                type: ConversationMenuIconType.copy,
-                              ),
-                              label: '复制会话 ID',
-                              onTap: () => Navigator.pop(
-                                menuContext,
-                                _MoreAction.copyId,
-                              ),
-                            ),
+
                             if (!_conversation.isTemporary)
                               GlassMenuItem(
                                 icon: ConversationMenuIcon(
@@ -356,23 +329,14 @@ class _ConversationMoreState extends State<ConversationMore> {
                                       ? ConversationMenuIconType.unarchive
                                       : ConversationMenuIconType.archive,
                                 ),
-                                label: _conversation.isArchived ? '取消归档' : '归档',
+                                label: _conversation.isArchived
+                                    ? '取消归档'
+                                    : '归档会话',
                                 onTap: () => Navigator.pop(
                                   menuContext,
                                   _MoreAction.archive,
                                 ),
                               ),
-                            GlassMenuItem(
-                              icon: const ConversationMenuIcon(
-                                type: ConversationMenuIconType.delete,
-                              ),
-                              label: '删除会话',
-                              destructive: true,
-                              onTap: () => Navigator.pop(
-                                menuContext,
-                                _MoreAction.delete,
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -431,52 +395,65 @@ class _ConversationMoreState extends State<ConversationMore> {
         );
       case _MoreAction.save:
         await _saveChat();
-      case _MoreAction.copyId:
-        try {
-          await Clipboard.setData(ClipboardData(text: targetId));
-          _notice('已复制会话 ID');
-        } on Object {
-          _notice('复制失败，请重试');
-        }
       case _MoreAction.archive:
         await _archive();
-      case _MoreAction.delete:
-        await _delete();
       case null:
         break;
     }
-    if (action != null && action != _MoreAction.copyId) {
+    if (action != null) {
       widget.onChanged?.call();
+    }
+  }
+
+  Future<void> _openDetails() async {
+    final leftConversation = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _conversation.kind == ConversationKind.group
+            ? GroupInfoPage(
+                controller: widget.controller,
+                conversation: _conversation,
+                originTaskId: widget.originTaskId,
+                onPin: _pin,
+                onArchive: _archive,
+              )
+            : DirectConversationInfoPage(
+                controller: widget.controller,
+                conversation: _conversation,
+                originTaskId: widget.originTaskId,
+                onSave: _saveChat,
+                onPin: _pin,
+                onArchive: _archive,
+                onDelete: () => _delete(confirmed: true),
+              ),
+      ),
+    );
+    if (!mounted) return;
+    widget.onChanged?.call();
+    if (leftConversation == true && Navigator.canPop(context)) {
+      Navigator.pop(context);
     }
   }
 
   @override
   Widget build(BuildContext context) => widget.child != null
-      ? GestureDetector(
+      ? MenuPressHighlight(
           onLongPressStart: _saving
               ? null
               : (details) => _openMenu(details.globalPosition),
-          child: widget.child,
+          borderRadius: BorderRadius.circular(16),
+          child: widget.child!,
         )
       : GlassSurface(
           radius: 28,
           shadowOpacity: .8,
           child: RoundAction(
             icon: Icons.more_horiz_rounded,
-            label: '更多',
-            onPressed: _saving ? null : _openMenu,
+            label: '会话详情',
+            onPressed: _saving ? null : _openDetails,
+            onLongPress: _saving ? null : _openMenu,
           ),
         );
 }
 
-enum _MoreAction {
-  profile,
-  task,
-  members,
-  pin,
-  rename,
-  copyId,
-  archive,
-  delete,
-  save,
-}
+enum _MoreAction { profile, task, members, pin, rename, archive, save }

@@ -17,6 +17,10 @@ class AiModelSelection {
 }
 
 class AiProfile {
+  static const nameMaxLength = 40;
+  static const descriptionMaxLength = 300;
+  static const instructionsMaxLength = 10000;
+
   const AiProfile({
     required this.sender,
     required this.description,
@@ -88,10 +92,20 @@ class ConversationMember {
     required this.sender,
     required this.position,
     required this.joinedAt,
+    required this.role,
     this.leftAt,
   });
   final MessageSender sender;
   final int position;
   final DateTime joinedAt;
+  final GroupMemberRole role;
   final DateTime? leftAt;
+}
+
+enum GroupMemberRole {
+  owner,
+  admin,
+  member;
+
+  bool get canManage => this == owner || this == admin;
 }

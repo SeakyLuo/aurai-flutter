@@ -1,3 +1,4 @@
+import 'group_member_details.dart';
 import 'group_message_marks.dart';
 import '../html_games/miniapp_release_notes.dart';
 import '../html_games/miniapp_recent_store.dart';
@@ -20,15 +21,81 @@ import 'group_chat_schema.dart';
 import 'package:sqflite/sqflite.dart';
 import '../memory/memory_controller.dart';
 import 'message_quick_reply_schema.dart';
+import 'tool_customization_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 49,
+  version: 61,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion >= 52 && oldVersion < 61) {
+      await db.execute(
+        "ALTER TABLE development_projects ADD COLUMN git_remote_url TEXT NOT NULL DEFAULT ''",
+      );
+    }
+    if (oldVersion >= 52 && oldVersion < 60) {
+      await db.execute(
+        "ALTER TABLE development_projects ADD COLUMN default_sender_id TEXT NOT NULL DEFAULT 'agent:aurai'",
+      );
+    }
+    if (oldVersion >= 52 && oldVersion < 59) {
+      await db.execute(
+        "ALTER TABLE development_projects ADD COLUMN description TEXT NOT NULL DEFAULT ''",
+      );
+    }
+    if (oldVersion >= 52 && oldVersion < 58) {
+      await db.execute(
+        'ALTER TABLE development_projects ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0 CHECK(pinned IN (0, 1))',
+      );
+      await db.execute(
+        "ALTER TABLE development_projects ADD COLUMN memory_mode TEXT NOT NULL DEFAULT 'shared' CHECK(memory_mode IN ('shared', 'projectOnly'))",
+      );
+      await db.execute(projectConversationUpdateTrigger);
+      await db.execute(projectConversationInsertTrigger);
+    }
+    if (oldVersion < 57) {
+      await db.execute(toolCustomizationSchema);
+      await seedToolCustomizations(db);
+    }
+    if (oldVersion >= 52 && oldVersion < 54) {
+      await db.execute(
+        "ALTER TABLE development_projects ADD COLUMN icon TEXT NOT NULL DEFAULT 'file'",
+      );
+    }
+    if (oldVersion >= 52 && oldVersion < 55) {
+      await db.execute(
+        "ALTER TABLE development_projects ADD COLUMN icon_color TEXT NOT NULL DEFAULT 'default'",
+      );
+    }
+    if (oldVersion == 55) {
+      await db.update('development_projects', {
+        'icon_color': 'default',
+      }, where: "icon_color = 'slate'");
+    }
+    if (oldVersion < 53) {
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN join_approval_required INTEGER NOT NULL DEFAULT 0 CHECK(join_approval_required IN (0, 1))',
+      );
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN managers_only_rename INTEGER NOT NULL DEFAULT 0 CHECK(managers_only_rename IN (0, 1))',
+      );
+    }
+    if (oldVersion < 52) {
+      await db.execute(developmentProjectSchema);
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN project_id TEXT REFERENCES development_projects(id) ON DELETE SET NULL',
+      );
+      await db.execute(
+        'CREATE INDEX conversation_project_order ON conversations(project_id, pinned DESC, updated_at DESC, id DESC)',
+      );
+      await db.execute(projectConversationUpdateTrigger);
+      await db.execute(projectConversationInsertTrigger);
+    }
+    if (oldVersion < 51) await db.execute(groupMemberDetailsSchema);
+    if (oldVersion >= 11 && oldVersion < 50) await migrateGroupRoles(db);
     if (oldVersion == 48) {
       await db.execute(
         'ALTER TABLE group_favorite_messages ADD COLUMN marked_by TEXT',
@@ -234,6 +301,9 @@ Future<Database> openConversationDatabase() async => openDatabase(
     final batch = db.batch();
     for (final statement in [
       ..._schema,
+      developmentProjectSchema,
+      projectConversationUpdateTrigger,
+      projectConversationInsertTrigger,
       ...favoritesSchema,
       ...interactiveActionSchema,
       messageCallbackSchema,
@@ -249,12 +319,14 @@ Future<Database> openConversationDatabase() async => openDatabase(
       ...groupChatTables,
       groupAnnouncementSchema,
       ...groupMessageMarksSchema,
+      groupMemberDetailsSchema,
       groupParticipationSchema,
       temporaryAiColumn,
       ...contactRelationshipSchema,
       ...skillSchema,
       ...memorySchema,
       ...messageQuickReplySchema,
+      toolCustomizationSchema,
     ]) {
       batch.execute(statement);
     }
@@ -263,6 +335,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
     await migrateSkillLibrary(db);
     await migrateAuraiAvatar(db);
     await migrateAuraiDescription(db);
+    await seedToolCustomizations(db);
   },
 );
 
@@ -292,6 +365,9 @@ const _schema = [
     run_state TEXT NOT NULL DEFAULT 'idle',
     error_detail TEXT,
     active_run_id TEXT,
+    project_id TEXT REFERENCES development_projects(id) ON DELETE SET NULL,
+    join_approval_required INTEGER NOT NULL DEFAULT 0 CHECK(join_approval_required IN (0, 1)),
+    managers_only_rename INTEGER NOT NULL DEFAULT 0 CHECK(managers_only_rename IN (0, 1)),
     message_count INTEGER NOT NULL DEFAULT 0
   )''',
   '''CREATE TABLE agent_runs (
@@ -383,6 +459,7 @@ const _schema = [
   )''',
   'CREATE INDEX conversation_archive_order ON conversations(archived, pinned DESC, updated_at DESC, id DESC)',
   'CREATE INDEX conversation_order ON conversations(pinned DESC, updated_at DESC, id DESC)',
+  'CREATE INDEX conversation_project_order ON conversations(project_id, pinned DESC, updated_at DESC, id DESC)',
   'CREATE INDEX message_history ON messages(conversation_id, created_at DESC, id DESC)',
   'CREATE INDEX message_run ON messages(run_id)',
   'CREATE INDEX attachment_conversation ON attachments(conversation_id, message_id)',
@@ -393,3 +470,40 @@ const _schema = [
   'CREATE INDEX approval_tool ON tool_approvals(tool_call_id)',
   'CREATE INDEX event_run ON run_events(run_id, id)',
 ];
+
+const developmentProjectSchema = '''CREATE TABLE development_projects (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  icon TEXT NOT NULL DEFAULT 'file',
+  icon_color TEXT NOT NULL DEFAULT 'ink',
+  root_uri TEXT NOT NULL UNIQUE,
+  location TEXT NOT NULL CHECK(location IN ('external','managed')),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  archived INTEGER NOT NULL DEFAULT 0,
+  pinned INTEGER NOT NULL DEFAULT 0 CHECK(pinned IN (0, 1)),
+  memory_mode TEXT NOT NULL DEFAULT 'shared' CHECK(memory_mode IN ('shared', 'projectOnly')),
+  default_sender_id TEXT NOT NULL DEFAULT 'agent:aurai',
+  git_remote_url TEXT NOT NULL DEFAULT ''
+)''';
+
+const projectConversationUpdateTrigger =
+    '''CREATE TRIGGER project_conversation_updated
+AFTER UPDATE OF updated_at ON conversations
+WHEN NEW.project_id IS NOT NULL
+BEGIN
+  UPDATE development_projects
+  SET updated_at = MAX(updated_at, NEW.updated_at)
+  WHERE id = NEW.project_id;
+END''';
+
+const projectConversationInsertTrigger =
+    '''CREATE TRIGGER project_conversation_created
+AFTER INSERT ON conversations
+WHEN NEW.project_id IS NOT NULL
+BEGIN
+  UPDATE development_projects
+  SET updated_at = MAX(updated_at, NEW.updated_at)
+  WHERE id = NEW.project_id;
+END''';

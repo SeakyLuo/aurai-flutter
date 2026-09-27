@@ -1,10 +1,11 @@
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
+import '../../domain/message_sender.dart';
 import 'package:flutter/material.dart';
 import 'chat_controller.dart';
+import 'group_avatar.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
-import 'sidebar_action_icon.dart';
 import 'pagination_listener.dart';
 
 class AiGroupList extends StatefulWidget {
@@ -27,6 +28,7 @@ class AiGroupList extends StatefulWidget {
 
 class _AiGroupListState extends State<AiGroupList> {
   final _groups = <Map<String, Object?>>[];
+  final _avatars = <String, List<MessageSender>>{};
   bool _loading = false, _more = true;
   @override
   void initState() {
@@ -43,9 +45,13 @@ class _AiGroupListState extends State<AiGroupList> {
         joined: widget.joined,
         offset: _groups.length,
       );
+      final avatars = await widget.controller.groupStore.avatarMembers([
+        for (final row in rows) row['id'] as String,
+      ]);
       if (mounted)
         setState(() {
           _groups.addAll(rows);
+          _avatars.addAll(avatars);
           _more = rows.length == 50;
         });
     } on Object catch (error) {
@@ -93,11 +99,12 @@ class _AiGroupListState extends State<AiGroupList> {
           ),
         for (final group in _groups)
           ListTile(
+            contentPadding: EdgeInsets.zero,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(22),
             ),
             title: Text(group['title'] as String),
-            leading: const SidebarActionIcon(type: SidebarActionIconType.group),
+            leading: GroupAvatar(members: _avatars[group['id']]!, size: 48),
             onTap: () => widget.onSelected(group),
           ),
         if (_loading) const Center(child: CircularProgressIndicator()),
@@ -131,7 +138,7 @@ class AiGroupPicker extends StatelessWidget {
     body: AiGroupList(
       padding: EdgeInsets.fromLTRB(
         16,
-        MediaQuery.paddingOf(context).top + 76 + 16,
+        MediaQuery.paddingOf(context).top + SettingsAppBar.toolbarHeight + 16,
         16,
         MediaQuery.paddingOf(context).bottom + 16,
       ),

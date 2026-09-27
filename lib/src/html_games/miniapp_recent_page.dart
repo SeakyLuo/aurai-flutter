@@ -37,10 +37,7 @@ class _MiniappRecentPageState extends State<MiniappRecentPage> {
       if (!mounted) return;
       setState(() {
         if (reset) _entries.clear();
-        final ids = _entries.map((entry) => entry.id).toSet();
-        _entries.addAll(
-          result.entries.where((entry) => ids.add(entry.id)),
-        );
+        _entries.addAll(result.entries);
         _more = result.more;
         _time = result.time;
         _id = result.id;
@@ -85,7 +82,9 @@ class _MiniappRecentPageState extends State<MiniappRecentPage> {
               : ListView(
                   padding: EdgeInsets.fromLTRB(
                     16,
-                    MediaQuery.paddingOf(context).top + 76 + 16,
+                    MediaQuery.paddingOf(context).top +
+                        SettingsAppBar.toolbarHeight +
+                        16,
                     16,
                     16,
                   ),

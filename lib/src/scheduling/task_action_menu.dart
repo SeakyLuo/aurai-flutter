@@ -8,6 +8,7 @@ import '../features/chat/chat_page.dart';
 import '../features/chat/conversation_menu_icon.dart';
 import '../features/chat/delete_confirmation_dialog.dart';
 import '../features/chat/glass_surface.dart';
+import '../features/chat/menu_press_highlight.dart';
 import '../features/chat/conversation_icon.dart';
 import 'scheduled_tasks.dart';
 
@@ -195,7 +196,7 @@ Future<String?> showTaskActionMenu(
         ],
       );
     },
-  );
+  ).whenComplete(MenuPressHighlight.dismissActive);
 }
 
 Future<bool> manageTask(

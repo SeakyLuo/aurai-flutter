@@ -17,10 +17,14 @@ class ProviderModelsPage extends StatefulWidget {
     required this.controller,
     required this.config,
     this.selectable = false,
+    this.onConfigureTypes,
+    this.onDefaultSettings,
   });
   final ChatController controller;
   final ModelConfig config;
   final bool selectable;
+  final Future<bool> Function()? onConfigureTypes;
+  final Future<void> Function()? onDefaultSettings;
   @override
   State<ProviderModelsPage> createState() => _ProviderModelsPageState();
 }
@@ -146,20 +150,41 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
     final action = await showHeaderActionMenu(
       anchor,
       items: [
-        if (!_useAll)
+        if (widget.selectable && !_useAll)
           (
             value: 'selected',
             label: _selectedOnly ? '显示全部模型' : '只看已选模型',
             icon: const SettingsIcon(type: SettingsIconType.check),
           ),
-        (
-          value: 'useAll',
-          label: _useAll ? '关闭使用全部' : '使用全部模型',
-          icon: const SettingsIcon(type: SettingsIconType.miniapps),
-        ),
+        if (widget.selectable)
+          (
+            value: 'useAll',
+            label: _useAll ? '关闭使用全部' : '使用全部模型',
+            icon: const SettingsIcon(type: SettingsIconType.miniapps),
+          ),
+        if (widget.onConfigureTypes != null)
+          (
+            value: 'types',
+            label: '模型类型识别',
+            icon: const SettingsIcon(type: SettingsIconType.field),
+          ),
+        if (widget.onDefaultSettings != null)
+          (
+            value: 'defaults',
+            label: '默认模型设置',
+            icon: const SettingsIcon(type: SettingsIconType.modelSettings),
+          ),
       ],
     );
     if (!mounted || action == null) return;
+    if (action == 'types') {
+      await widget.onConfigureTypes!();
+      return;
+    }
+    if (action == 'defaults') {
+      await widget.onDefaultSettings!();
+      return;
+    }
     setState(() {
       if (action == 'selected') {
         _selectedOnly = !_selectedOnly;
@@ -232,10 +257,10 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
               Expanded(
                 child: Text(
                   !_loaded
-                      ? '可用模型'
+                      ? '模型管理'
                       : widget.selectable && _selectedOnly && !_useAll
                       ? '已选模型（${_selected.length}）'
-                      : '可用模型（${available.length}）',
+                      : '模型管理（${available.length}）',
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -253,10 +278,10 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
                     children: [
                       Builder(
                         builder: (anchor) => RoundAction(
-                          label: '筛选模型',
+                          label: '更多',
                           icon: Icons.filter_list_rounded,
                           iconWidget: const SettingsIcon(
-                            type: SettingsIconType.filter,
+                            type: SettingsIconType.more,
                           ),
                           onPressed: _loaded && !_fetching
                               ? () => _showFilter(anchor)
@@ -272,6 +297,16 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
                       ),
                       _saveAction(),
                     ],
+                  ),
+                )
+              else if (widget.onConfigureTypes != null ||
+                  widget.onDefaultSettings != null)
+                Builder(
+                  builder: (anchor) => SettingsGlassAction(
+                    label: '更多',
+                    icon: Icons.more_horiz,
+                    iconWidget: const SettingsIcon(type: SettingsIconType.more),
+                    onPressed: () => _showFilter(anchor),
                   ),
                 )
               else
@@ -336,67 +371,77 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
                             itemBuilder: (_, index) {
                               final model = shown[index];
                               final selected = _selected.contains(model);
-                              return Semantics(
-                                checked: widget.selectable && !_useAll
-                                    ? selected
-                                    : null,
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  shape: const RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.all(
-                                      Radius.circular(20),
+                              return Theme(
+                                data: Theme.of(context).copyWith(
+                                  splashFactory: NoSplash.splashFactory,
+                                  highlightColor: Colors.transparent,
+                                ),
+                                child: Semantics(
+                                  checked: widget.selectable && !_useAll
+                                      ? selected
+                                      : null,
+                                  child: ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
                                     ),
-                                  ),
-                                  leading: widget.selectable && !_useAll
-                                      ? Container(
-                                          width: 22,
-                                          height: 22,
-                                          padding: const EdgeInsets.all(3),
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: selected
-                                                ? colors.onSurface
-                                                : Colors.transparent,
-                                            border: Border.all(
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.all(
+                                        Radius.circular(20),
+                                      ),
+                                    ),
+                                    leading: widget.selectable && !_useAll
+                                        ? Container(
+                                            width: 22,
+                                            height: 22,
+                                            padding: const EdgeInsets.all(3),
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
                                               color: selected
                                                   ? colors.onSurface
-                                                  : colors.outline,
-                                              width: 1.4,
+                                                  : Colors.transparent,
+                                              border: Border.all(
+                                                color: selected
+                                                    ? colors.onSurface
+                                                    : colors.outline,
+                                                width: 1.4,
+                                              ),
                                             ),
+                                            child: selected
+                                                ? SettingsIcon(
+                                                    type:
+                                                        SettingsIconType.check,
+                                                    color: colors.surface,
+                                                  )
+                                                : null,
+                                          )
+                                        : null,
+                                    title: Text(
+                                      widget.config.protocol.displayModel(
+                                        model,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 15),
+                                    ),
+                                    subtitle:
+                                        _loaded && !_models.contains(model)
+                                        ? const Text('未在当前列表中')
+                                        : null,
+                                    trailing: widget.selectable
+                                        ? null
+                                        : const SettingsIcon(
+                                            type: SettingsIconType.chevron,
                                           ),
-                                          child: selected
-                                              ? SettingsIcon(
-                                                  type: SettingsIconType.check,
-                                                  color: colors.surface,
-                                                )
-                                              : null,
-                                        )
-                                      : null,
-                                  title: Text(
-                                    widget.config.protocol.displayModel(model),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 15),
+                                    onTap:
+                                        widget.selectable &&
+                                            !_useAll &&
+                                            _loaded &&
+                                            !_fetching
+                                        ? () => _toggle(model)
+                                        : widget.selectable
+                                        ? null
+                                        : () => _openModel(model),
                                   ),
-                                  subtitle: _loaded && !_models.contains(model)
-                                      ? const Text('未在当前列表中')
-                                      : null,
-                                  trailing: widget.selectable
-                                      ? null
-                                      : const SettingsIcon(
-                                          type: SettingsIconType.chevron,
-                                        ),
-                                  onTap:
-                                      widget.selectable &&
-                                          !_useAll &&
-                                          _loaded &&
-                                          !_fetching
-                                      ? () => _toggle(model)
-                                      : widget.selectable
-                                      ? null
-                                      : () => _openModel(model),
                                 ),
                               );
                             },

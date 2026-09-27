@@ -19,6 +19,7 @@ String? toolInlineDetail(
   final value = switch (name) {
     'askUser' => request['title'],
     'createTextFile' => request['fileName'],
+    'deliverFile' => request['name'],
     'searchFiles' => request['query'],
     'shell' || 'executeShizuku' => request['command'],
     'searchWeb' ||

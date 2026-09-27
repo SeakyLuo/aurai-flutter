@@ -52,6 +52,7 @@ dependencies {
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("org.dmfs:lib-recur:0.17.1")
     implementation("org.mozilla:rhino:1.7.15")
+    implementation("org.eclipse.jgit:org.eclipse.jgit:7.6.0.202603022253-r")
 }
 
 apply(from = "tunnel.gradle")

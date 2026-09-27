@@ -7,6 +7,7 @@ import '../../domain/model_provider.dart';
 import '../../domain/music_model_selection.dart';
 import '../../providers/image_generation_client.dart';
 import '../../providers/model_catalog.dart';
+import '../../providers/model_purpose_catalog.dart';
 import '../../providers/openrouter_models.dart';
 import 'chat_controller.dart';
 import 'choice_sheet.dart';
@@ -163,9 +164,8 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
             );
       final choices = <DefaultModelSelection>[];
       for (final model in models) {
-        final configuredPurposes = account.details?.modelPurposes[model];
-        if (configuredPurposes != null && !configuredPurposes.contains(purpose))
-          continue;
+        final purposes = modelPurposesFor(account, model);
+        if (purposes.isNotEmpty && !purposes.contains(purpose)) continue;
         final info = service.usesOpenRouterCatalog
             ? OpenRouterModels.lookup(account.baseUrl, model)
             : null;
@@ -236,10 +236,11 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
       final account = widget.controller.modelSettings.profile(service);
       final models = [
         for (final model in await client.models(account))
-          if (account.details?.modelPurposes[model.id]?.contains(
-                ModelPurpose.imageGeneration,
-              ) ??
-              true)
+          if (modelPurposesFor(account, model.id).isEmpty ||
+              modelPurposesFor(
+                account,
+                model.id,
+              ).contains(ModelPurpose.imageGeneration))
             model,
       ];
       if (!mounted) return;
@@ -377,7 +378,9 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
                       horizontal: 18,
                       vertical: 10,
                     ),
-                    leading: _providerButton(purpose),
+                    leading: _hasSelection(purpose)
+                        ? _providerButton(purpose)
+                        : null,
                     title: Text(
                       _subtitle(purpose),
                       style: _hasSelection(purpose)

@@ -140,6 +140,59 @@ extension AiIdentityController on ChatController {
     return store;
   }
 
+  Future<MemoryController> projectMemory(
+    DevelopmentProject project, {
+    AiProfile? profile,
+  }) async {
+    final ai = profile ?? await groupStore.loadAi(project.defaultSenderId);
+    final key = 'project-shared:${project.id}';
+    final existing = _aiMemories[key];
+    if (existing != null) {
+      existing.modelConfig = () => aiConfig(ai);
+      return existing;
+    }
+    final store = MemoryController(
+      _store.database,
+      () => aiConfig(ai),
+      ownerId: 'project:${project.id}',
+    );
+    await store.initialize();
+    _aiMemories[key] = store;
+    return store;
+  }
+
+  Future<({
+    DevelopmentProject? project,
+    MemoryController memory,
+    MemoryController? privateMemory,
+  })> _conversationMemory(
+    Conversation conversation,
+    AiProfile profile, {
+    required String privateScope,
+  }) async {
+    final project = conversation.projectId == null
+        ? null
+        : await DevelopmentProjects(_store.database).read(
+            conversation.projectId!,
+          );
+    final privateMemory =
+        project == null || project.memoryMode == ProjectMemoryMode.shared
+        ? await aiMemory(profile, scope: privateScope)
+        : null;
+    return (
+      project: project,
+      privateMemory: privateMemory,
+      memory: project == null
+          ? privateMemory!
+          : await projectMemory(project, profile: profile),
+    );
+  }
+
+  String _projectContext(DevelopmentProject project) => [
+    '当前会话属于开发项目“${project.name}”。项目工作目录已经授权，可通过文件工具直接读取和修改；所有文件操作限制在该项目目录内。',
+    if (project.description.isNotEmpty) '项目介绍：${project.description}',
+  ].join('\n');
+
   Future<SkillStore> aiSkills(String senderId) async {
     if (senderId == MessageSender.aurai.id) return skills;
     final existing = _aiSkills[senderId];
@@ -153,9 +206,10 @@ extension AiIdentityController on ChatController {
   Future<String> openAiConversation(
     AiProfile ai, {
     bool newConversation = false,
+    bool freshDraft = false,
     ConversationMode mode = ConversationMode.normal,
   }) async {
-    if (mode != ConversationMode.normal) {
+    if (freshDraft || mode != ConversationMode.normal) {
       final conversation = Conversation.empty()
         ..defaultSenderId = ai.sender.id
         ..mode = mode;

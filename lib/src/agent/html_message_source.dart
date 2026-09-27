@@ -19,7 +19,7 @@ abstract final class HtmlMessageSource {
     Map<String, Object?> args, {
     required bool creating,
   }) async {
-    if (args['appId'] != null) {
+    if (creating && args['appId'] != null) {
       if (args['html'] != null || args['sourcePath'] != null) {
         throw ArgumentError('重新打开小程序时不要同时提供源码');
       }

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 class ExtraSkillIcon extends StatelessWidget {
-  const ExtraSkillIcon(this.name, {super.key});
+  const ExtraSkillIcon(this.name, {super.key, this.color});
   final String name;
+  final Color? color;
   static const names = {
     'phone',
     'browser',
@@ -26,13 +27,26 @@ class ExtraSkillIcon extends StatelessWidget {
     'mail',
     'health',
     'travel',
+    'terminal',
+    'database',
+    'api',
+    'cloud',
+    'link',
+    'lock',
+    'key',
+    'robot',
+    'bug',
+    'automation',
+    'palette',
+    'science',
+    'brain',
   };
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: const Size.square(24),
     painter: _ExtraPainter(
       name,
-      Theme.of(context).colorScheme.onSurfaceVariant,
+      color ?? Theme.of(context).colorScheme.onSurfaceVariant,
     ),
   );
 }
@@ -337,6 +351,184 @@ class _ExtraPainter extends CustomPainter {
         );
         line(8, 7, 8, 21);
         line(16, 7, 16, 21);
+      case 'terminal':
+        box(const Rect.fromLTWH(2, 4, 20, 16), 3);
+        canvas.drawPath(
+          Path()
+            ..moveTo(6, 9)
+            ..lineTo(9, 12)
+            ..lineTo(6, 15)
+            ..moveTo(12, 15)
+            ..lineTo(17, 15),
+          pen,
+        );
+      case 'database':
+        canvas.drawOval(const Rect.fromLTWH(3, 3, 18, 6), pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(3, 6)
+            ..lineTo(3, 18)
+            ..cubicTo(3, 22, 21, 22, 21, 18)
+            ..lineTo(21, 6)
+            ..moveTo(3, 12)
+            ..cubicTo(3, 16, 21, 16, 21, 12),
+          pen,
+        );
+      case 'api':
+        for (final point in const [
+          Offset(5, 12),
+          Offset(12, 5),
+          Offset(19, 12),
+          Offset(12, 19),
+        ]) {
+          canvas.drawCircle(point, 2.5, pen);
+        }
+        line(6.8, 10.2, 10.2, 6.8);
+        line(13.8, 6.8, 17.2, 10.2);
+        line(17.2, 13.8, 13.8, 17.2);
+        line(10.2, 17.2, 6.8, 13.8);
+      case 'cloud':
+        canvas.drawPath(
+          Path()
+            ..moveTo(7, 19)
+            ..cubicTo(1, 19, 1, 11, 7, 10)
+            ..cubicTo(8, 3, 18, 3, 19, 10)
+            ..cubicTo(24, 11, 23, 19, 18, 19)
+            ..close(),
+          pen,
+        );
+      case 'link':
+        canvas.drawPath(
+          Path()
+            ..moveTo(9, 15)
+            ..lineTo(7, 17)
+            ..cubicTo(3, 21, 0, 16, 3, 12)
+            ..lineTo(5, 7)
+            ..cubicTo(8, 4, 11, 5, 13, 7)
+            ..moveTo(15, 9)
+            ..lineTo(17, 7)
+            ..cubicTo(21, 3, 24, 8, 21, 12)
+            ..lineTo(19, 17)
+            ..cubicTo(16, 20, 13, 19, 11, 17)
+            ..moveTo(8, 16)
+            ..lineTo(16, 8),
+          pen,
+        );
+      case 'lock':
+        box(const Rect.fromLTWH(4, 10, 16, 11), 3);
+        canvas.drawPath(
+          Path()
+            ..moveTo(8, 10)
+            ..lineTo(8, 7)
+            ..cubicTo(8, 1, 16, 1, 16, 7)
+            ..lineTo(16, 10),
+          pen,
+        );
+        canvas.drawCircle(const Offset(12, 15), 1.2, pen);
+        line(12, 16.2, 12, 18);
+      case 'key':
+        canvas.drawCircle(const Offset(7, 9), 4, pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(10, 12)
+            ..lineTo(20, 22)
+            ..moveTo(15, 17)
+            ..lineTo(18, 14)
+            ..moveTo(18, 20)
+            ..lineTo(21, 17),
+          pen,
+        );
+      case 'robot':
+        box(const Rect.fromLTWH(3, 7, 18, 14), 4);
+        line(12, 3, 12, 7);
+        canvas.drawCircle(const Offset(12, 2.5), 1.2, pen);
+        canvas.drawCircle(const Offset(8, 13), 1.2, pen);
+        canvas.drawCircle(const Offset(16, 13), 1.2, pen);
+        line(8, 17, 16, 17);
+      case 'bug':
+        canvas.drawOval(const Rect.fromLTWH(7, 5, 10, 16), pen);
+        line(9, 5, 7, 2);
+        line(15, 5, 17, 2);
+        line(7, 9, 3, 7);
+        line(17, 9, 21, 7);
+        line(7, 13, 3, 13);
+        line(17, 13, 21, 13);
+        line(7, 17, 3, 20);
+        line(17, 17, 21, 20);
+        line(7, 11, 17, 11);
+      case 'automation':
+        canvas.drawCircle(const Offset(12, 12), 3, pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(4, 10)
+            ..cubicTo(5, 5, 10, 2, 15, 4)
+            ..lineTo(18, 6)
+            ..moveTo(15, 2)
+            ..lineTo(18, 6)
+            ..lineTo(14, 7)
+            ..moveTo(20, 14)
+            ..cubicTo(19, 19, 14, 22, 9, 20)
+            ..lineTo(6, 18)
+            ..moveTo(9, 22)
+            ..lineTo(6, 18)
+            ..lineTo(10, 17),
+          pen,
+        );
+      case 'palette':
+        canvas.drawPath(
+          Path()
+            ..moveTo(12, 3)
+            ..cubicTo(3, 3, 0, 13, 5, 19)
+            ..cubicTo(8, 23, 12, 19, 11, 17)
+            ..cubicTo(10, 14, 14, 13, 17, 15)
+            ..cubicTo(20, 17, 23, 14, 21, 9)
+            ..cubicTo(20, 5, 16, 3, 12, 3)
+            ..close(),
+          pen,
+        );
+        for (final point in const [
+          Offset(7, 9),
+          Offset(11, 6.5),
+          Offset(16, 7.5),
+        ]) {
+          canvas.drawCircle(point, 1, pen);
+        }
+      case 'science':
+        canvas.drawPath(
+          Path()
+            ..moveTo(9, 3)
+            ..lineTo(15, 3)
+            ..moveTo(10, 3)
+            ..lineTo(10, 9)
+            ..lineTo(4, 19)
+            ..quadraticBezierTo(3, 21, 6, 21)
+            ..lineTo(18, 21)
+            ..quadraticBezierTo(21, 21, 20, 19)
+            ..lineTo(14, 9)
+            ..lineTo(14, 3)
+            ..moveTo(7, 16)
+            ..quadraticBezierTo(12, 13, 17, 16),
+          pen,
+        );
+      case 'brain':
+        canvas.drawPath(
+          Path()
+            ..moveTo(12, 5)
+            ..cubicTo(10, 1, 5, 3, 6, 7)
+            ..cubicTo(2, 7, 2, 13, 5, 14)
+            ..cubicTo(3, 18, 7, 22, 11, 19)
+            ..lineTo(12, 5)
+            ..moveTo(12, 5)
+            ..cubicTo(14, 1, 19, 3, 18, 7)
+            ..cubicTo(22, 7, 22, 13, 19, 14)
+            ..cubicTo(21, 18, 17, 22, 13, 19)
+            ..lineTo(12, 5)
+            ..moveTo(6, 10)
+            ..cubicTo(9, 9, 10, 11, 10, 13)
+            ..moveTo(18, 10)
+            ..cubicTo(15, 9, 14, 11, 14, 13),
+          pen,
+        );
     }
   }
 

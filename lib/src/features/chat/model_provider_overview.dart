@@ -36,27 +36,17 @@ extension _ProviderOverview on _ModelProviderDetailState {
           title: const Text('服务地址'),
           subtitle: SelectableText(_saved.baseUrl),
         ),
-        if (_saved.isConfigured)
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-            title: const Text('可用模型'),
-            shape: _providerTileShape,
-            subtitle: Text(
-              _saved.autoSyncModels
-                  ? '默认全部'
-                  : '已选 ${_saved.savedModels.length} 个模型',
-            ),
-            trailing: const SettingsIcon(type: SettingsIconType.chevron),
-            onTap: _openModelManagement,
-          ),
         ListTile(
-          minVerticalPadding: 0,
           contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-          title: const Text('默认模型设置'),
+          title: const Text('模型管理'),
           shape: _providerTileShape,
-          subtitle: const Text('此供应商下的模型默认继承，可单独覆盖'),
+          subtitle: Text(
+            _saved.autoSyncModels
+                ? '默认全部'
+                : '已选 ${_saved.savedModels.length} 个模型',
+          ),
           trailing: const SettingsIcon(type: SettingsIconType.chevron),
-          onTap: _openDefaultModelSettings,
+          onTap: _openModelManagement,
         ),
         ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 8),

@@ -15,9 +15,17 @@ class CapabilityIcon extends StatelessWidget {
       'android.network' || 'android.network.capture' => const WelcomeIcon(
         type: WelcomeIconType.network,
       ),
+      'android.permissions' => SettingsIcon(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        type: SettingsIconType.permission,
+      ),
       'android.documents' => const FileToolIcon(type: FileToolIconType.folder),
-      'android.observe' => const SettingsIcon(type: SettingsIconType.device),
-      'android.notifications.observe' => const SettingsIcon(
+      'android.observe' => SettingsIcon(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        type: SettingsIconType.device,
+      ),
+      'android.notifications.observe' => SettingsIcon(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         type: SettingsIconType.notifications,
       ),
       _ => CustomPaint(
@@ -95,25 +103,6 @@ class _CapabilityPainter extends CustomPainter {
           pen,
         );
         canvas.drawCircle(const Offset(12, 12), 3, pen);
-      case 'android.permissions':
-        canvas.drawPath(
-          Path()
-            ..moveTo(12, 2.5)
-            ..lineTo(20, 6)
-            ..lineTo(20, 12)
-            ..quadraticBezierTo(19, 18, 12, 21.5)
-            ..quadraticBezierTo(5, 18, 4, 12)
-            ..lineTo(4, 6)
-            ..close(),
-          pen,
-        );
-        canvas.drawPath(
-          Path()
-            ..moveTo(8, 11.5)
-            ..lineTo(11, 14.5)
-            ..lineTo(16, 9.5),
-          pen,
-        );
       case 'android.intents':
         canvas.drawPath(
           Path()

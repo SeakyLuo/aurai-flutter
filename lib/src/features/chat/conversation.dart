@@ -45,6 +45,7 @@ class Conversation {
   bool isPinned = false;
   bool isArchived = false;
   bool isScheduledTask = false;
+  String? projectId;
   int messageCount = 0;
   String? storedTitle;
   List<String> creationMemberIds = [];
@@ -176,6 +177,7 @@ class Conversation {
     'isPinned': isPinned,
     'isArchived': isArchived,
     'isScheduledTask': isScheduledTask,
+    'projectId': projectId,
     'draft': draft,
     'draftFiles': draftFiles.map((file) => file.toJson()).toList(),
     'draftImages': draftImages.map((image) => image.toJson()).toList(),
@@ -222,6 +224,7 @@ class Conversation {
     conversation.isPinned = json['isPinned'] == true;
     conversation.isArchived = json['isArchived'] == true;
     conversation.isScheduledTask = json['isScheduledTask'] == true;
+    conversation.projectId = json['projectId'] as String?;
     conversation.pendingGoal = json['pendingGoal'] as String?;
     final state = ChatRunState.values.byName(json['runState']! as String);
     conversation.runState =

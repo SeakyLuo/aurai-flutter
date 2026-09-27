@@ -46,9 +46,9 @@ class MemoryRecordTool
       name: operation == 'list' ? 'listMemories' : '${operation}Memory',
       description: switch (operation) {
         'list' =>
-          'Search or list this AI own memories across private chat and all groups, newest updated first, 20 per page. Returns IDs, device-local creation/update timestamps with explicit UTC offset, source references and revision. Use nextOffset for more. IDs are internal, do not display them to users.',
+          '${memory.projectOnly ? "Search or list this AI memories limited to the current project" : "Search or list this AI own memories across private chat and all groups"}, newest updated first, 20 per page. Returns IDs, device-local creation/update timestamps with explicit UTC offset, source references and revision. Use nextOffset for more. IDs are internal, do not display them to users.',
         'read' =>
-          'Read one of this AI own memories from any scene, including creation/update times, source references and revision.',
+          'Read one of this AI memories available in the current scene, including creation/update times, source references and revision.',
         'create' =>
           'Save one lasting fact only when the user explicitly asks to remember it. Query existing memories first to avoid duplicates. Do not store routine tasks, guesses or secrets.',
         'update' =>
@@ -116,15 +116,10 @@ class MemoryRecordTool
         });
       }
       if (operation == 'read') {
-        final rows = await memory.database.query(
-          'user_memories',
-          where: 'owner_id = ? AND id = ?',
-          whereArgs: [memory.ownerId, args['id']],
-          limit: 1,
-        );
-        if (rows.isEmpty) throw StateError('这条记忆已删除，请重新查询');
+        final row = await memory.readableMemory(args['id'] as String);
+        if (row == null) throw StateError('这条记忆已删除，请重新查询');
         return result(call, ToolResultStatus.success, {
-          'memory': memory.contextualRecord(rows.single),
+          'memory': memory.contextualRecord(row),
           'revision': memory.revision,
         });
       }

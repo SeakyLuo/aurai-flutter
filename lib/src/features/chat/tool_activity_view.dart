@@ -1,4 +1,6 @@
 import 'tool_inline_detail.dart';
+import '../../domain/workspace_file_changes.dart';
+import 'workspace_changes_view.dart';
 import 'tool_expand_arrow.dart';
 import 'question_icon.dart';
 import '../../domain/source_reference.dart';
@@ -27,6 +29,7 @@ class ToolActivityView extends StatefulWidget {
     this.toolName,
     this.requestJson,
     this.resultJson,
+    this.showFileChanges = true,
   });
 
   final String? toolName;
@@ -35,6 +38,7 @@ class ToolActivityView extends StatefulWidget {
   final AgentStepStatus status;
   final String? requestJson;
   final String? resultJson;
+  final bool showFileChanges;
 
   @override
   State<ToolActivityView> createState() => _ToolActivityViewState();
@@ -257,6 +261,12 @@ class _ToolActivityViewState extends State<ToolActivityView> {
             ),
           ),
         ),
+        if (widget.showFileChanges &&
+            (widget.toolName == 'executeAndroidScript' ||
+                widget.toolName == 'runSkill'))
+          WorkspaceChangesView(
+            changes: WorkspaceFileChanges.fromResults([widget.resultJson]),
+          ),
         if (_expanded && canExpand)
           if (isQuestion)
             UserQuestionHistory(

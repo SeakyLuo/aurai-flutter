@@ -6,6 +6,7 @@ import '../../domain/image_generation_config.dart';
 import '../../domain/model_provider.dart';
 import '../../providers/image_generation_client.dart';
 import '../../providers/model_catalog.dart';
+import '../../providers/model_purpose_catalog.dart';
 import '../../providers/openrouter_models.dart';
 import 'app_confirmation_dialog.dart';
 import 'chat_controller.dart';
@@ -262,9 +263,11 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
         : generalModels;
     final targets = <ModelReplacementTarget>[];
     for (final id in candidateIds) {
-      final configuredPurposes = account.details?.modelPurposes[id];
-      if (configuredPurposes != null && !configuredPurposes.contains(purpose))
+      final configuredPurposes = modelPurposesFor(account, id);
+      if (configuredPurposes.isNotEmpty &&
+          !configuredPurposes.contains(purpose)) {
         continue;
+      }
       final info = service.usesOpenRouterCatalog
           ? OpenRouterModels.lookup(account.baseUrl, id)
           : null;
@@ -276,7 +279,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
             purpose == ModelPurpose.videoGeneration)
           ModelPurpose.videoGeneration,
       };
-      if (configuredPurposes != null) {
+      if (configuredPurposes.isNotEmpty) {
         supportedPurposes.removeWhere(
           (candidate) => !configuredPurposes.contains(candidate),
         );

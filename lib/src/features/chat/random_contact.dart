@@ -2,6 +2,7 @@ import 'offline_contact_candidates.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../domain/avatar_style.dart';
+import '../../domain/emoji_catalog.dart';
 import '../../domain/response_preferences.dart';
 import 'avatar_background.dart';
 import 'avatar_symbol.dart';
@@ -28,7 +29,7 @@ class RandomContact {
     return colors[_random.nextInt(colors.length)];
   }
 
-  static RandomContact roll({String? avatarColor}) {
+  static Future<RandomContact> roll({String? avatarColor}) async {
     if (_candidateBag.isEmpty) {
       _candidateBag.addAll(
         List.generate(offlineContactCandidates.length, (i) => i)
@@ -43,12 +44,17 @@ class RandomContact {
     final symbols = avatarSymbols.keys
         .where((key) => !key.startsWith('app_logo'))
         .toList();
+    final emojiCategories = (await EmojiCatalog.load()).categories;
+    final emojis = [for (final category in emojiCategories) ...category];
+    final icon = _random.nextBool()
+        ? symbols[_random.nextInt(symbols.length)]
+        : 'emoji:${emojis[_random.nextInt(emojis.length)].emoji}';
     return RandomContact(
       candidate.name,
       candidate.description,
       candidate.role,
       AvatarStyle(
-        icon: symbols[_random.nextInt(symbols.length)],
+        icon: icon,
         color: avatarColor ?? colors[_random.nextInt(colors.length)],
       ),
       ResponsePreferences(

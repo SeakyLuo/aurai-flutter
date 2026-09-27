@@ -1,4 +1,6 @@
 import '../../domain/tool_activity_groups.dart';
+import '../../domain/workspace_file_changes.dart';
+import 'workspace_changes_view.dart';
 import 'tool_activity_group.dart';
 import 'markdown_link_underlines.dart';
 import 'task_elapsed.dart';
@@ -37,6 +39,7 @@ class TaskSummaryView extends StatefulWidget {
 class _TaskSummaryViewState extends State<TaskSummaryView> {
   late bool _expanded;
   List<Widget>? _activityWidgets;
+  WorkspaceFileChanges? _fileChanges;
 
   @override
   void didChangeDependencies() {
@@ -51,7 +54,10 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
   @override
   void didUpdateWidget(TaskSummaryView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.summary, widget.summary)) _activityWidgets = null;
+    if (!identical(oldWidget.summary, widget.summary)) {
+      _activityWidgets = null;
+      _fileChanges = null;
+    }
     if (oldWidget.excludedMessageId != widget.excludedMessageId)
       _activityWidgets = null;
     if (!oldWidget.summary.stopped && widget.summary.stopped) {
@@ -140,6 +146,7 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
                 ),
               )
             : ToolActivityView(
+                showFileChanges: false,
                 storageId: '${widget.messageId}:$index',
                 title: activity.text,
                 toolName: activity.toolName,
@@ -202,6 +209,11 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
           ),
           const Divider(height: 1),
           const SizedBox(height: 12),
+          WorkspaceChangesView(
+            changes: _fileChanges ??= WorkspaceFileChanges.fromResults(
+              widget.summary.activities.map((activity) => activity.resultJson),
+            ),
+          ),
           if (_expanded)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'line_change_count.dart';
 
 enum ToolSafety { readOnly, lowRisk, sensitive, destructive }
 
@@ -184,9 +185,35 @@ class ToolResult {
   final Map<String, Object?> output;
   final List<ToolAttachment> attachments;
 
+  Map<String, Object?> get modelOutput {
+    final changes = output['fileChanges'] as List?;
+    if (changes == null) return output;
+    return {
+      ...output,
+      'fileChanges': [
+        for (final row in changes.cast<Map>()) _fileChangeForModel(row),
+      ],
+    };
+  }
+
+  Map<String, Object?> _fileChangeForModel(Map row) {
+    final before = (row['beforeLines'] as List?)?.cast<String>();
+    final after = (row['afterLines'] as List?)?.cast<String>();
+    final count = before == null || after == null
+        ? null
+        : countLineChanges(before, after);
+    return {
+      for (final entry in row.entries)
+        if (entry.key != 'beforeLines' && entry.key != 'afterLines')
+          entry.key as String: entry.value,
+      if (count != null) 'addedLines': count.added,
+      if (count != null) 'removedLines': count.removed,
+    };
+  }
+
   Map<String, Object?> toModelJson() => <String, Object?>{
     'status': status.name,
-    'result': output,
+    'result': modelOutput,
   };
 }
 

@@ -134,9 +134,12 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 640),
                 child: AnimatedEntryList(
+                  animateChanges: false,
                   empty: Padding(
                     padding: EdgeInsets.only(
-                      top: MediaQuery.paddingOf(context).top + 76,
+                      top:
+                          MediaQuery.paddingOf(context).top +
+                          SettingsAppBar.toolbarHeight,
                     ),
                     child: Center(
                       child: Text(
@@ -147,7 +150,9 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
                   ),
                   padding: EdgeInsets.fromLTRB(
                     12,
-                    MediaQuery.paddingOf(context).top + 76 + 8,
+                    MediaQuery.paddingOf(context).top +
+                        SettingsAppBar.toolbarHeight +
+                        8,
                     12,
                     24,
                   ),
@@ -220,7 +225,9 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
           if (_friendsOpened)
             Padding(
               padding: EdgeInsets.only(
-                top: MediaQuery.paddingOf(context).top + 76,
+                top:
+                    MediaQuery.paddingOf(context).top +
+                    SettingsAppBar.toolbarHeight,
               ),
               child: AiContactsPage(
                 controller: widget.controller,

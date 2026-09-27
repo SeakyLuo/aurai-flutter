@@ -20,6 +20,7 @@ Map<String, Object?> conversationRow(Conversation value) => {
   'pinned': value.isPinned ? 1 : 0,
   'archived': value.isArchived ? 1 : 0,
   'scheduled_task': value.isScheduledTask ? 1 : 0,
+  'project_id': value.projectId,
   'draft': value.draft,
   'draft_quote_json': value.draftQuote == null
       ? null
@@ -54,6 +55,7 @@ Conversation conversationFromRow(Map<String, Object?> row) =>
       ..isPinned = row['pinned'] == 1
       ..isArchived = row['archived'] == 1
       ..isScheduledTask = row['scheduled_task'] == 1
+      ..projectId = row['project_id'] as String?
       ..draftQuote = row['draft_quote_json'] == null
           ? null
           : MessageQuote.fromJson(

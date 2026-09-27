@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'menu_press_highlight.dart';
 
 import '../../app/global_ui.dart';
 
@@ -112,6 +113,7 @@ class RoundAction extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.onLongPress,
     this.primary = false,
     this.iconWidget,
     this.compact = false,
@@ -121,6 +123,7 @@ class RoundAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onPressed;
+  final Future<void> Function()? onLongPress;
   final bool primary;
   final Widget? iconWidget;
   final bool compact;
@@ -132,8 +135,12 @@ class RoundAction extends StatelessWidget {
     button: true,
     enabled: onPressed != null,
     label: label,
+    onLongPress: onLongPress,
     child: Tooltip(
       message: label,
+      triggerMode: onLongPress == null
+          ? TooltipTriggerMode.longPress
+          : TooltipTriggerMode.manual,
       child: SizedBox.square(
         dimension: compact ? 48 : 40,
         child: Padding(
@@ -141,43 +148,49 @@ class RoundAction extends StatelessWidget {
           child: Material(
             color: Colors.transparent,
             shape: const CircleBorder(),
-            child: _RoundActionTap(
-              inkResponse: inkResponse,
-              onPressed: onPressed,
-              child: Padding(
-                padding: EdgeInsets.all(compact && !insetResponse ? 6 : 0),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: primary && onPressed != null
-                        ? GlobalUI.primaryGradient
-                        : null,
-                    color: primary && onPressed == null
-                        ? Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.06)
-                        : null,
-                  ),
-                  child: Center(
-                    child: iconWidget != null
-                        ? (compact
-                              ? iconWidget
-                              : SizedBox.square(
-                                  dimension: 20,
-                                  child: FittedBox(child: iconWidget),
-                                ))
-                        : Icon(
-                            icon,
-                            size: compact ? 23 : 20,
-                            color: primary
-                                ? (onPressed == null
-                                      ? Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant
-                                      : GlobalUI.onPrimary)
-                                : Theme.of(context).colorScheme.onSurface,
-                          ),
+            child: MenuPressHighlight(
+              onLongPressStart: onLongPress == null
+                  ? null
+                  : (_) => onLongPress!(),
+              customBorder: const CircleBorder(),
+              child: _RoundActionTap(
+                inkResponse: inkResponse,
+                onPressed: onPressed,
+                child: Padding(
+                  padding: EdgeInsets.all(compact && !insetResponse ? 6 : 0),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: primary && onPressed != null
+                          ? GlobalUI.primaryGradient
+                          : null,
+                      color: primary && onPressed == null
+                          ? Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.06)
+                          : null,
+                    ),
+                    child: Center(
+                      child: iconWidget != null
+                          ? (compact
+                                ? iconWidget
+                                : SizedBox.square(
+                                    dimension: 20,
+                                    child: FittedBox(child: iconWidget),
+                                  ))
+                          : Icon(
+                              icon,
+                              size: compact ? 23 : 20,
+                              color: primary
+                                  ? (onPressed == null
+                                        ? Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant
+                                        : GlobalUI.onPrimary)
+                                  : Theme.of(context).colorScheme.onSurface,
+                            ),
+                    ),
                   ),
                 ),
               ),
@@ -206,10 +219,13 @@ class _RoundActionTap extends StatelessWidget {
           onTap: onPressed,
           child: child,
         )
-      : CupertinoButton(
-          padding: EdgeInsets.zero,
-          pressedOpacity: 0.6,
-          onPressed: onPressed,
-          child: child,
+      : GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            pressedOpacity: 0.6,
+            onPressed: onPressed,
+            child: child,
+          ),
         );
 }

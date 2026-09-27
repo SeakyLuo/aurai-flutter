@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'search_skeleton.dart';
+import 'settings_appearance.dart';
 
 class ConversationListSkeleton extends StatelessWidget {
   const ConversationListSkeleton({super.key});
@@ -15,7 +16,7 @@ class ConversationListSkeleton extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(
           24,
           View.of(context).padding.top / View.of(context).devicePixelRatio +
-              76 +
+              SettingsAppBar.toolbarHeight +
               20,
           24,
           24,

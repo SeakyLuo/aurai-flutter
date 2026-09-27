@@ -136,10 +136,10 @@ class AiContactTool
             field: {
               'type': operation == 'update' ? ['string', 'null'] : 'string',
               'maxLength': field == 'name'
-                  ? 100
+                  ? AiProfile.nameMaxLength
                   : field == 'description'
-                  ? 300
-                  : 10000,
+                  ? AiProfile.descriptionMaxLength
+                  : AiProfile.instructionsMaxLength,
             },
       },
       'required': [
@@ -217,7 +217,18 @@ class AiContactTool
           if (operation == 'delete' && old!.sender.id == MessageSender.aurai.id)
             throw StateError('内置 Aurai 不能归档');
           final name = ((a['name'] as String?) ?? old!.sender.name).trim();
-          if (name.isEmpty) throw ArgumentError('朋友名字不能为空');
+          if (name.isEmpty || name.length > AiProfile.nameMaxLength) {
+            throw ArgumentError('朋友名字需要 1–${AiProfile.nameMaxLength} 个字符');
+          }
+          final description = (a['description'] as String?) ?? old!.description;
+          final instructions =
+              (a['instructions'] as String?) ?? old!.instructions;
+          if (description.length > AiProfile.descriptionMaxLength ||
+              instructions.length > AiProfile.instructionsMaxLength) {
+            throw ArgumentError(
+              '简介最多 ${AiProfile.descriptionMaxLength} 个字符，自定义指令最多 ${AiProfile.instructionsMaxLength} 个字符',
+            );
+          }
           var selection = old?.modelSelection ?? defaultModel();
           if (operation == 'update' && a['modelSelection'] != null) {
             final requested = a['modelSelection'] as Map;
@@ -246,8 +257,8 @@ class AiContactTool
               avatarPath: old?.sender.avatarPath,
               archived: archived,
             ),
-            description: (a['description'] as String?) ?? old!.description,
-            instructions: (a['instructions'] as String?) ?? old!.instructions,
+            description: description,
+            instructions: instructions,
             modelSelection: selection,
             preferences: old?.preferences ?? const AiPreferences(),
             createdAt: old?.createdAt ?? now,

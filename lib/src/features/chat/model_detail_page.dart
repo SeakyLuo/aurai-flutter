@@ -101,6 +101,8 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
               ...?details?.modelPurposes,
               widget.model: _purposes,
             },
+            modelPurposeField: details?.modelPurposeField ?? '',
+            modelTypeMappings: details?.modelTypeMappings ?? const {},
             modelReasoning:
                 {
                   ...?details?.modelReasoning,

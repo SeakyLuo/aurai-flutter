@@ -50,10 +50,11 @@ class ToolApprovalStore {
     String label,
     String scope,
   ) async {
+    final approvalKey = key(call);
     if (scope == 'session') {
       final updated = {
         ...sessions,
-        conversation: {...?sessions[conversation], key(call): label},
+        conversation: {...?sessions[conversation], approvalKey: label},
       };
       if (!await _preferences.setString(
         'session_tool_approvals',
@@ -63,7 +64,17 @@ class ToolApprovalStore {
       }
       sessions[conversation] = updated[conversation]!;
     } else if (scope == 'always') {
-      final updated = {...persistent, key(call): label};
+      final updated = {...persistent, approvalKey: label};
+      final updatedSessions = {
+        for (final entry in sessions.entries)
+          entry.key: {...entry.value}..remove(approvalKey),
+      };
+      if (!await _preferences.setString(
+        'session_tool_approvals',
+        jsonEncode(updatedSessions),
+      )) {
+        throw StateError('保存授权失败');
+      }
       if (!await _preferences.setString(
         'tool_approvals',
         jsonEncode(updated),
@@ -71,6 +82,9 @@ class ToolApprovalStore {
         throw StateError('保存授权失败');
       }
       persistent.addAll(updated);
+      sessions
+        ..clear()
+        ..addAll(updatedSessions);
     }
   }
 

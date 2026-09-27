@@ -129,8 +129,11 @@ class _AiContactEditorState extends State<AiContactEditor> {
         final value = await Navigator.push<AvatarStyle>(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                CustomAvatarPage(initial: _avatar, name: _name.text),
+            builder: (_) => CustomAvatarPage(
+              initial: _avatar,
+              name: _name.text,
+              database: widget.controller.groupStore.database,
+            ),
           ),
         );
         if (mounted && value != null)
@@ -176,6 +179,18 @@ class _AiContactEditorState extends State<AiContactEditor> {
   Future<void> _save() async {
     if (_name.text.trim().isEmpty) {
       _notice('请填写名字');
+      return;
+    }
+    if (_name.text.characters.length > AiProfile.nameMaxLength) {
+      _notice('名字最多 ${AiProfile.nameMaxLength} 个字符');
+      return;
+    }
+    if (_description.text.characters.length > AiProfile.descriptionMaxLength) {
+      _notice('简介最多 ${AiProfile.descriptionMaxLength} 个字符');
+      return;
+    }
+    if (_role.text.characters.length > AiProfile.instructionsMaxLength) {
+      _notice('自定义指令最多 ${AiProfile.instructionsMaxLength} 个字符');
       return;
     }
     setState(() => _saving = true);
@@ -319,11 +334,12 @@ class _AiContactEditorState extends State<AiContactEditor> {
             ),
           ),
           const SizedBox(height: 24),
-          _field('名字', _name),
+          _field('名字', _name, maxLength: AiProfile.nameMaxLength),
           const SizedBox(height: 16),
           _field(
             '简介',
             _description,
+            maxLength: AiProfile.descriptionMaxLength,
             multiline: true,
             hint: '一句话介绍这个 AI，例如：帮你规划旅行的伙伴',
           ),
@@ -408,6 +424,7 @@ class _AiContactEditorState extends State<AiContactEditor> {
           _field(
             '自定义指令',
             _role,
+            maxLength: AiProfile.instructionsMaxLength,
             lines: 4,
             hint: '告诉 AI 应该怎么做，例如：规划旅行前先问预算，推荐时说明理由。',
           ),
@@ -440,6 +457,7 @@ class _AiContactEditorState extends State<AiContactEditor> {
     int lines = 1,
     bool multiline = false,
     String? hint,
+    required int maxLength,
   }) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -447,6 +465,7 @@ class _AiContactEditorState extends State<AiContactEditor> {
       TextField(
         controller: text,
         enabled: !_saving && !_rolling,
+        maxLength: maxLength,
         minLines: lines,
         maxLines: multiline
             ? null

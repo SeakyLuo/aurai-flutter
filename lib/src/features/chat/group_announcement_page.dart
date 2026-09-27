@@ -6,6 +6,7 @@ import '../../app/ui_action.dart';
 import '../../domain/message_sender.dart';
 import '../../platform/aurai_platform.dart';
 import '../../storage/group_announcement_store.dart';
+import '../../storage/group_chat_store.dart';
 import '../../scheduling/task_unsaved_dialog.dart';
 import 'chat_controller.dart';
 import 'cjk_strong_syntax.dart';
@@ -36,6 +37,7 @@ class _GroupAnnouncementPageState extends State<GroupAnnouncementPage> {
   bool _loading = true;
   bool _failed = false;
   bool _busy = false;
+  bool _canEdit = false;
 
   @override
   void initState() {
@@ -53,6 +55,10 @@ class _GroupAnnouncementPageState extends State<GroupAnnouncementPage> {
         widget.groupId,
         MessageSender.localUser.id,
       );
+      final role = await widget.controller.groupStore.memberRole(
+        widget.groupId,
+        MessageSender.localUser.id,
+      );
       final editorRows = value == null
           ? null
           : await widget.controller.groupStore.database.query(
@@ -64,6 +70,7 @@ class _GroupAnnouncementPageState extends State<GroupAnnouncementPage> {
       if (mounted)
         setState(() {
           _announcement = value;
+          _canEdit = role.canManage;
           _editor = editorRows == null
               ? null
               : MessageSender.fromRow(editorRows.single);
@@ -137,7 +144,7 @@ class _GroupAnnouncementPageState extends State<GroupAnnouncementPage> {
           title: '群公告',
           onBack: _busy ? null : () => Navigator.pop(context),
           actions: [
-            if (!_loading && !_failed)
+            if (!_loading && !_failed && _canEdit)
               SettingsGlassAction(
                 label: '编辑群公告',
                 icon: Icons.edit_rounded,
@@ -152,6 +159,9 @@ class _GroupAnnouncementPageState extends State<GroupAnnouncementPage> {
               ),
           ],
         ),
+        bottomNavigationBar: _loading || _failed
+            ? null
+            : const SafeArea(top: false, child: _AnnouncementEditPermission()),
         body: SafeArea(
           top: false,
           child: Center(
@@ -274,6 +284,49 @@ class _GroupAnnouncementPageState extends State<GroupAnnouncementPage> {
       ),
     );
   }
+}
+
+class _AnnouncementEditPermission extends StatelessWidget {
+  const _AnnouncementEditPermission();
+
+  @override
+  Widget build(BuildContext context) => Center(
+    heightFactor: 1,
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 520),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Divider(
+                height: 1,
+                thickness: .5,
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Text(
+                '只有群主和群管理员才能编辑',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Divider(
+                height: 1,
+                thickness: .5,
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 String _time(DateTime value) =>

@@ -1,6 +1,7 @@
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../providers/model_catalog.dart';
+import '../../providers/model_purpose_catalog.dart';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
 import '../../domain/model_provider.dart';
@@ -236,10 +237,8 @@ class _AiModelPageState extends State<AiModelPage> {
           : profile.savedModels;
       final models = [
         for (final model in availableModels)
-          if (profile.details?.modelPurposes[model]?.contains(
-                ModelPurpose.text,
-              ) ??
-              true)
+          if (modelPurposesFor(profile, model).isEmpty ||
+              modelPurposesFor(profile, model).contains(ModelPurpose.text))
             model,
       ];
       if (!mounted) return;

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../features/chat/glass_surface.dart';
+import '../features/chat/menu_press_highlight.dart';
 import '../features/chat/settings_icon.dart';
 import '../features/chat/conversation_menu_icon.dart';
 import '../scheduling/task_action_menu.dart';
@@ -148,5 +149,5 @@ Future<String?> _showSkillMenu(
         ],
       );
     },
-  );
+  ).whenComplete(MenuPressHighlight.dismissActive);
 }

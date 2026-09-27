@@ -1,3 +1,9 @@
+import '../../app/ui_action.dart';
+import '../../storage/development_projects.dart';
+import 'conversation_project_page.dart';
+import 'group_personal_details.dart';
+import '../../storage/group_member_details.dart';
+import '../../storage/group_chat_store.dart';
 import 'group_pinned_message_entry.dart';
 import 'group_favorites_page.dart';
 import '../../app/glass_notice.dart';
@@ -5,6 +11,7 @@ import '../../domain/error_message.dart';
 import 'dart:math' as math;
 import 'dialog_action_button.dart';
 import 'group_invite_page.dart';
+import 'group_management_page.dart';
 import 'group_remove_members_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -24,6 +31,7 @@ import 'group_message_search_page.dart';
 import 'member_avatar.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
+import 'delete_confirmation_dialog.dart';
 
 class GroupInfoPage extends StatefulWidget {
   const GroupInfoPage({
@@ -32,7 +40,6 @@ class GroupInfoPage extends StatefulWidget {
     required this.conversation,
     required this.onPin,
     required this.onArchive,
-    required this.onDelete,
     this.originTaskId,
   });
 
@@ -40,7 +47,6 @@ class GroupInfoPage extends StatefulWidget {
   final Conversation conversation;
   final Future<void> Function() onPin;
   final Future<void> Function() onArchive;
-  final Future<void> Function() onDelete;
   final String? originTaskId;
 
   @override
@@ -51,9 +57,18 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
   late Conversation _conversation = widget.conversation;
   List<ConversationMember> _members = [];
   GroupAnnouncement? _announcement;
+  List<DevelopmentProject> _projects = [];
+  late GroupManagementSettings _managementSettings;
   bool _loading = true;
   bool _failed = false;
   bool _busy = false;
+  GroupMemberRole get _localRole => _members
+      .firstWhere((member) => member.sender.id == MessageSender.localUser.id)
+      .role;
+  bool get _canManage => _localRole.canManage;
+  bool get _canInvite =>
+      _canManage || !_managementSettings.joinApprovalRequired;
+  bool get _canRename => _canManage || !_managementSettings.managersOnlyRename;
 
   @override
   void initState() {
@@ -64,6 +79,7 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
   Future<void> _reload({bool leaveArchived = false}) async {
     try {
       final results = await Future.wait<Object>([
+        widget.controller.projects.list(),
         widget.controller.groupStore.database.query(
           'conversations',
           where: 'id = ?',
@@ -73,17 +89,23 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
         GroupAnnouncementStore(widget.controller.groupStore)
             .read(widget.conversation.id, MessageSender.localUser.id)
             .then((value) => <GroupAnnouncement>[if (value != null) value]),
+        widget.controller.groupStore.managementSettings(
+          widget.conversation.id,
+          MessageSender.localUser.id,
+        ),
       ]);
       if (!mounted) return;
-      final rows = results[0] as List<Map<String, Object?>>;
+      final rows = results[1] as List<Map<String, Object?>>;
       if (rows.isEmpty || (leaveArchived && rows.single['archived'] == 1)) {
         Navigator.pop(context, true);
         return;
       }
       setState(() {
+        _projects = results[0] as List<DevelopmentProject>;
         _conversation = conversationFromRow(rows.single);
-        _members = results[1] as List<ConversationMember>;
-        _announcement = (results[2] as List<GroupAnnouncement>).firstOrNull;
+        _members = results[2] as List<ConversationMember>;
+        _announcement = (results[3] as List<GroupAnnouncement>).firstOrNull;
+        _managementSettings = results[4] as GroupManagementSettings;
         _failed = false;
       });
     } on Object catch (error) {
@@ -132,12 +154,115 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
     ),
   );
 
+  Future<void> _chooseProject() => _perform(() async {
+    final selection = await ConversationProjectSheet.show(
+      context,
+      controller: widget.controller,
+      projects: _projects,
+      selectedProjectId: _conversation.projectId,
+    );
+    if (!mounted || selection == null) return;
+    await runUiAction(
+      context,
+      () => widget.controller.setConversationProject(
+        _conversation,
+        selection.projectId,
+      ),
+    );
+  });
+
+  Widget _projectRow() => ListTile(
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+    minTileHeight: 60,
+    title: const Text('所属项目', style: TextStyle(fontSize: 15)),
+    trailing: SizedBox(
+      width: MediaQuery.sizeOf(context).width * .5,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _conversation.projectId == null
+                  ? '未加入项目'
+                  : _projects
+                        .singleWhere(
+                          (project) => project.id == _conversation.projectId,
+                        )
+                        .name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontSize: 15,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          if (_canManage) ...[
+            const SizedBox(width: 8),
+            const SettingsIcon(type: SettingsIconType.chevron),
+          ],
+        ],
+      ),
+    ),
+    onTap: _canManage ? _chooseProject : null,
+  );
+
   Future<void> _copyConversationId() async {
     await Clipboard.setData(ClipboardData(text: _conversation.id));
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
     ).showGlassSnackBar(const SnackBar(content: Text('已复制会话 ID')));
+  }
+
+  Future<void> _openManagement() async {
+    final dissolved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GroupManagementPage(
+          controller: widget.controller,
+          groupId: _conversation.id,
+          groupTitle: _conversation.title,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (dissolved == true) {
+      Navigator.pop(context, true);
+      return;
+    }
+    await _reload();
+  }
+
+  Future<void> _leave() async {
+    if (_localRole == GroupMemberRole.owner) {
+      ScaffoldMessenger.of(
+        context,
+      ).showGlassSnackBar(const SnackBar(content: Text('请先转让群主，或在群管理中解散群聊')));
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => DeleteConfirmationDialog(
+        title: '退出群聊？',
+        description: '退出后将不再接收群消息，已有聊天记录仍会保留给其他成员。',
+        confirmLabel: '退出',
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    setState(() => _busy = true);
+    try {
+      await widget.controller.leaveGroup(_conversation.id);
+      if (mounted) Navigator.pop(context, true);
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showGlassSnackBar(
+          SnackBar(content: Text('退出失败，请重试：${errorMessage(error)}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -240,31 +365,33 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                                             ? _members.length - 5
                                             : 0,
                                       ),
-                                    _memberAction(
-                                      '邀请',
-                                      SettingsIcon(
-                                        type: SettingsIconType.add,
-                                        color: colors.onSurfaceVariant,
-                                      ),
-                                      () => _open(
-                                        GroupInvitePage(
-                                          controller: widget.controller,
-                                          conversationId: _conversation.id,
-                                          members: _members,
+                                    if (_canInvite)
+                                      _memberAction(
+                                        '邀请',
+                                        SettingsIcon(
+                                          type: SettingsIconType.add,
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                        () => _open(
+                                          GroupInvitePage(
+                                            controller: widget.controller,
+                                            conversationId: _conversation.id,
+                                            members: _members,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    _memberAction(
-                                      '移除',
-                                      const _RemoveMemberIcon(),
-                                      () => _open(
-                                        GroupRemoveMembersPage(
-                                          controller: widget.controller,
-                                          conversationId: _conversation.id,
-                                          members: _members,
+                                    if (_canManage)
+                                      _memberAction(
+                                        '移除',
+                                        const _RemoveMemberIcon(),
+                                        () => _open(
+                                          GroupRemoveMembersPage(
+                                            controller: widget.controller,
+                                            conversationId: _conversation.id,
+                                            members: _members,
+                                          ),
                                         ),
                                       ),
-                                    ),
                                   ],
                                 ),
                               ),
@@ -274,116 +401,141 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _surface(
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                          ),
-                          minTileHeight: 60,
-                          title: const Text(
-                            '群名称',
-                            style: TextStyle(fontSize: 15),
-                          ),
-                          trailing: SizedBox(
-                            width: MediaQuery.sizeOf(context).width * .5,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    _conversation.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.right,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      color: colors.onSurfaceVariant,
-                                    ),
+                      GroupPersonalDetails(
+                        store: GroupMemberDetailsStore(
+                          widget.controller.groupStore.database,
+                        ),
+                        groupId: _conversation.id,
+                        joinedAt: _members
+                            .firstWhere(
+                              (m) => m.sender.id == MessageSender.localUser.id,
+                            )
+                            .joinedAt,
+                        defaultName: MessageSender.localUser.name,
+                        onChanged: _reload,
+                        builder: (remark, identity) => Column(
+                          children: [
+                            _section([
+                              ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                minTileHeight: 60,
+                                title: const Text(
+                                  '群名称',
+                                  style: TextStyle(fontSize: 15),
+                                ),
+                                trailing: SizedBox(
+                                  width: MediaQuery.sizeOf(context).width * .5,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          _conversation.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: TextAlign.right,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            color: colors.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ),
+                                      if (_canRename) ...[
+                                        const SizedBox(width: 8),
+                                        const SettingsIcon(
+                                          type: SettingsIconType.chevron,
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                const SettingsIcon(
+                                onTap: _canRename ? _rename : null,
+                              ),
+                              ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                minTileHeight: 60,
+                                title: const Text(
+                                  '群公告',
+                                  style: TextStyle(fontSize: 15),
+                                ),
+                                subtitle: Text(
+                                  _announcement == null
+                                      ? '未设置'
+                                      : markdownPreviewText(
+                                          _announcement!.content,
+                                        ),
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                trailing: const SettingsIcon(
                                   type: SettingsIconType.chevron,
                                 ),
-                              ],
-                            ),
-                          ),
-                          onTap: _rename,
+                                onTap: () => _open(
+                                  GroupAnnouncementPage(
+                                    controller: widget.controller,
+                                    groupId: _conversation.id,
+                                  ),
+                                ),
+                              ),
+                              if (_canManage) _row('群管理', _openManagement),
+                              remark,
+                              _projectRow(),
+                            ]),
+                            const SizedBox(height: 12),
+                            _section([
+                              _row(
+                                '查找聊天记录',
+                                () => _open(
+                                  GroupMessageSearchPage(
+                                    controller: widget.controller,
+                                    conversationId: _conversation.id,
+                                  ),
+                                ),
+                              ),
+                              Column(
+                                children: [
+                                  _row(
+                                    '群标记',
+                                    () => _open(
+                                      GroupFavoritesPage(
+                                        controller: widget.controller,
+                                        groupId: _conversation.id,
+                                        groupTitle: _conversation.title,
+                                      ),
+                                    ),
+                                  ),
+                                  GroupPinnedMessageEntry(
+                                    controller: widget.controller,
+                                    groupId: _conversation.id,
+                                    embedded: true,
+                                  ),
+                                ],
+                              ),
+                            ]),
+                            if (!_conversation.isArchived) ...[
+                              const SizedBox(height: 12),
+                              _surface(
+                                SwitchListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  title: const Text(
+                                    '设为置顶',
+                                    style: TextStyle(fontSize: 15),
+                                  ),
+                                  value: _conversation.isPinned,
+                                  onChanged: (_) => _perform(widget.onPin),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 12),
+                            _surface(identity),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      _surface(
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                          ),
-                          minTileHeight: 60,
-                          title: const Text(
-                            '群公告',
-                            style: TextStyle(fontSize: 15),
-                          ),
-                          subtitle: Text(
-                            _announcement == null
-                                ? '未设置'
-                                : markdownPreviewText(_announcement!.content),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: const SettingsIcon(
-                            type: SettingsIconType.chevron,
-                          ),
-                          onTap: () => _open(
-                            GroupAnnouncementPage(
-                              controller: widget.controller,
-                              groupId: _conversation.id,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      GroupPinnedMessageEntry(
-                        controller: widget.controller,
-                        groupId: _conversation.id,
-                      ),
-                      _surface(
-                        _row(
-                          '群标记',
-                          () => _open(
-                            GroupFavoritesPage(
-                              controller: widget.controller,
-                              groupId: _conversation.id,
-                              groupTitle: _conversation.title,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _surface(
-                        _row(
-                          '查找聊天记录',
-                          () => _open(
-                            GroupMessageSearchPage(
-                              controller: widget.controller,
-                              conversationId: _conversation.id,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (!_conversation.isArchived) ...[
-                        const SizedBox(height: 12),
-                        _surface(
-                          SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                            ),
-                            title: const Text(
-                              '设为置顶',
-                              style: TextStyle(fontSize: 15),
-                            ),
-                            value: _conversation.isPinned,
-                            onChanged: (_) => _perform(widget.onPin),
-                          ),
-                        ),
-                      ],
                       const SizedBox(height: 12),
                       DialogActionButton(
                         text: '复制会话 ID',
@@ -424,11 +576,9 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                       ),
                       const SizedBox(height: 12),
                       DialogActionButton(
-                        text: '删除群聊',
+                        text: '退出群聊',
                         role: DialogActionRole.reject,
-                        onPressed: _busy
-                            ? null
-                            : () => _perform(widget.onDelete),
+                        onPressed: _busy ? null : _leave,
                       ),
                     ],
                   ),
@@ -437,6 +587,8 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
       ),
     );
   }
+
+  Widget _section(List<Widget> rows) => _surface(Column(children: rows));
 
   Widget _surface(Widget child) => Material(
     color: Theme.of(context).brightness == Brightness.dark

@@ -1,4 +1,5 @@
 import 'miniapp_forward.dart';
+import 'miniapp_detail_page.dart';
 import '../features/chat/attachment_action_icon.dart';
 import 'package:flutter/material.dart';
 
@@ -61,8 +62,28 @@ class _MiniappFavoriteActionState extends State<MiniappFavoriteAction> {
               color: starred ? const Color(0xffe5ad24) : null,
             ),
           ),
+          (
+          value: 'details',
+          label: '小程序详情',
+          icon: const SettingsIcon(type: SettingsIconType.info),
+          ),
         ],
       );
+      if (action == 'details') {
+        if (mounted) {
+          await Navigator.push<void>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MiniappDetailPage(
+                entry: entry,
+                store: widget.store,
+                showOpenAction: false,
+              ),
+            ),
+          );
+        }
+        return;
+      }
       if (action == 'forward') {
         if (mounted) await forwardMiniapp(context, entry);
         return;
