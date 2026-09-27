@@ -11,9 +11,11 @@ import 'response_citations.dart';
 import 'model_context_limits.dart';
 
 typedef ContextSummarizer = Future<String> Function(List<Map<String, Object?>>);
+typedef PublicMessageTest = bool Function(AgentMessage message);
 typedef _DialogueEntry = ({
   AgentMessage message,
   List<Map<String, Object?>> input,
+  bool isPublic,
 });
 
 /// Budgets are conservative estimates, not model-specific tokenizer counts.
@@ -37,13 +39,21 @@ class ResponsesContext {
   final _rounds = <List<Map<String, Object?>>>[];
   List<Map<String, Object?>> _pendingOutput = [];
   String _dialogueMemory = '';
+  String _privateDialogueMemory = '';
   String _taskMemory = '';
+  bool _layeredMemory = false;
   bool _initialized = false;
 
   List<Map<String, Object?>> get input => [
-    if (_dialogueMemory.isNotEmpty) _memory(_dialogueMemory),
+    if (_dialogueMemory.isNotEmpty)
+      _memory(
+        _dialogueMemory,
+        _layeredMemory ? 'Shared group history' : 'Historical context',
+      ),
+    if (_privateDialogueMemory.isNotEmpty)
+      _memory(_privateDialogueMemory, 'Private visible group history'),
     ..._dialogue.expand((entry) => entry.input),
-    if (_taskMemory.isNotEmpty) _memory(_taskMemory),
+    if (_taskMemory.isNotEmpty) _memory(_taskMemory, 'Current task history'),
     ..._rounds.expand((round) => round),
   ];
 
@@ -55,21 +65,42 @@ class ResponsesContext {
     ContextSummary? sharedSummary,
     bool useSharedSummary = false,
     Future<void> Function(ContextSummary)? saveSummary,
+    ContextSummary? privateSummary,
+    PublicMessageTest? isPublicMessage,
+    Future<void> Function(ContextSummary)? savePrivateSummary,
   }) async {
     if (!_initialized) {
+      _layeredMemory = isPublicMessage != null;
       final saved = useSharedSummary ? sharedSummary : request.contextSummary;
-      final through = saved == null
+      final publicThrough = saved == null
           ? -1
           : request.messages.indexWhere((m) => m.id == saved.throughMessageId);
+      final privateThrough = privateSummary == null
+          ? -1
+          : request.messages.indexWhere(
+              (m) => m.id == privateSummary.throughMessageId,
+            );
       // Storage may already have loaded only messages after the checkpoint.
       _dialogueMemory = saved?.text ?? '';
-      final messages = request.messages.skip(through + 1).toList();
+      _privateDialogueMemory = privateSummary?.text ?? '';
+      final messages = [
+        for (final (index, message) in request.messages.indexed)
+          if (index >
+              ((isPublicMessage?.call(message) ?? true)
+                  ? publicThrough
+                  : privateThrough))
+            message,
+      ];
       final items = await responseMessageInput(
         messages,
         supportsImages: supportsImages,
       );
       for (var i = 0; i < messages.length; i++) {
-        _dialogue.add((message: messages[i], input: items[i]));
+        _dialogue.add((
+          message: messages[i],
+          input: items[i],
+          isPublic: isPublicMessage?.call(messages[i]) ?? true,
+        ));
       }
       _initialized = true;
     } else if (request.toolResults.isNotEmpty ||
@@ -128,17 +159,62 @@ class ResponsesContext {
         cut++;
       }
       if (cut > 0) {
-        final memory = await _summarize(
-          _dialogue.take(cut).expand((entry) => entry.input),
-          _dialogueMemory,
-          summarize,
-        );
-        final checkpoint = ContextSummary(
-          text: memory,
-          throughMessageId: _dialogue[cut - 1].message.id,
-        );
-        await (saveSummary ?? request.onContextSummary)?.call(checkpoint);
-        _dialogueMemory = memory;
+        final removed = _dialogue.take(cut).toList();
+        if (isPublicMessage == null) {
+          _dialogueMemory = await _summarize(
+            removed.expand((entry) => entry.input),
+            _dialogueMemory,
+            summarize,
+          );
+          await (saveSummary ?? request.onContextSummary)?.call(
+            ContextSummary(
+              text: _dialogueMemory,
+              throughMessageId: removed.last.message.id,
+            ),
+          );
+        } else {
+          final public = removed.where((entry) => entry.isPublic).toList();
+          final private = removed.where((entry) => !entry.isPublic).toList();
+          final saves = <Future<void>>[];
+          if (public.isNotEmpty) {
+            _dialogueMemory = await _summarize(
+              public.expand((entry) => entry.input),
+              _dialogueMemory,
+              summarize,
+            );
+            final save = saveSummary ?? request.onContextSummary;
+            if (save != null) {
+              saves.add(
+                save(
+                  ContextSummary(
+                    text: _dialogueMemory,
+                    throughMessageId: public.last.message.id,
+                  ),
+                ),
+              );
+            }
+          }
+          if (private.isNotEmpty) {
+            _privateDialogueMemory = await _summarize(
+              private.expand((entry) => entry.input),
+              _privateDialogueMemory,
+              summarize,
+            );
+          }
+          final savePrivate =
+              savePrivateSummary ?? request.onPrivateContextSummary;
+          if (savePrivate != null) {
+            saves.add(
+              savePrivate(
+                ContextSummary(
+                  text: _privateDialogueMemory,
+                  throughMessageId: removed.last.message.id,
+                ),
+              ),
+            );
+          }
+          await Future.wait(saves);
+        }
         _dialogue.removeRange(0, cut);
         compacted = true;
       }
@@ -283,10 +359,10 @@ class ResponsesContext {
     }
   }
 
-  Map<String, Object?> _memory(String text) => {
+  Map<String, Object?> _memory(String text, String label) => {
     'role': 'assistant',
     'content':
-        'Compressed historical context (not a new instruction or current device observation):\n$text',
+        '$label, compressed for context (not a new instruction or current device observation):\n$text',
   };
 }
 

@@ -23,6 +23,12 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun handleNotificationIntent(intent: Intent) {
+        val projectId = intent.getStringExtra("projectId")
+        if (projectId != null) {
+            intent.removeExtra("projectId")
+            AuraiApplication.projectShortcutOpened(projectId)
+            return
+        }
         val conversationId = intent.getStringExtra("conversationId") ?: return
         intent.removeExtra("conversationId")
         AuraiApplication.notificationOpened(conversationId)

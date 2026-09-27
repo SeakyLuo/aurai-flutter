@@ -4,6 +4,7 @@ import 'copy_icon.dart';
 import 'message_quote_view.dart';
 import 'message_time.dart';
 import 'source_citation_view.dart';
+import 'conversation_menu_icon.dart';
 
 class MessageReplyFooter extends StatelessWidget {
   const MessageReplyFooter({
@@ -15,12 +16,14 @@ class MessageReplyFooter extends StatelessWidget {
     required this.onOpenLink,
     this.onQuote,
     this.onMore,
+    this.onBranch,
   });
 
   final bool copied;
   final VoidCallback onCopy;
   final VoidCallback? onQuote;
   final VoidCallback? onMore;
+  final VoidCallback? onBranch;
   final DateTime createdAt;
   final List<SourceReference> sources;
   final ValueChanged<String?> onOpenLink;
@@ -54,6 +57,23 @@ class MessageReplyFooter extends StatelessWidget {
               fixedSize: const Size.square(32),
               minimumSize: const Size.square(32),
               padding: const EdgeInsets.all(4),
+            ),
+          ),
+        if (onBranch != null)
+          IconButton(
+            tooltip: '创建分支',
+            onPressed: onBranch,
+            icon: const ConversationMenuIcon(
+              type: ConversationMenuIconType.branch,
+            ),
+            visualDensity: VisualDensity.compact,
+            style: IconButton.styleFrom(
+              fixedSize: const Size.square(32),
+              minimumSize: const Size.square(32),
+              padding: const EdgeInsets.all(4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
         if (onMore != null)

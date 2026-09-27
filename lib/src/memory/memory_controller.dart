@@ -33,7 +33,6 @@ class MemoryController extends ChangeNotifier {
     this.scope = '',
   });
   final String ownerId, scope;
-  bool get projectOnly => scope.startsWith('project-only:');
   bool get projectShared => ownerId.startsWith('project:');
   String get _scopeWhere => 'owner_id = ? AND memory_scope = ?';
   List<Object?> get _scopeArgs => [ownerId, scope];
@@ -83,20 +82,17 @@ ${jsonEncode(projectShared ? {'memories': entries.map(memoryRecord).toList()} : 
 
   Future<List<Map<String, Object?>>> readableMemories() => database.query(
     'user_memories',
-    where: projectOnly
-        ? _scopeWhere
-        : "owner_id = ? AND memory_scope NOT LIKE 'project-only:%'",
-    whereArgs: projectOnly ? _scopeArgs : [ownerId],
+    where: "owner_id = ? AND memory_scope NOT LIKE 'project-only:%'",
+    whereArgs: [ownerId],
     orderBy: 'updated_at DESC, id',
   );
 
   Future<Map<String, Object?>?> readableMemory(String id) async {
     final rows = await database.query(
       'user_memories',
-      where: projectOnly
-          ? 'id = ? AND $_scopeWhere'
-          : "id = ? AND owner_id = ? AND memory_scope NOT LIKE 'project-only:%'",
-      whereArgs: projectOnly ? [id, ..._scopeArgs] : [id, ownerId],
+      where:
+          "id = ? AND owner_id = ? AND memory_scope NOT LIKE 'project-only:%'",
+      whereArgs: [id, ownerId],
       limit: 1,
     );
     return rows.isEmpty ? null : rows.single;

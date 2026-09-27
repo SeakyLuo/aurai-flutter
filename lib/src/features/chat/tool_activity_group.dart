@@ -15,12 +15,16 @@ class ToolActivityGroup extends StatefulWidget {
     required this.statuses,
     required this.children,
     this.fileResults = const [],
+    this.active = false,
+    this.activeLabel,
   });
   final String storageId;
   final String toolName;
   final List<AgentStepStatus> statuses;
   final List<Widget> children;
   final List<String?> fileResults;
+  final bool active;
+  final String? activeLabel;
   @override
   State<ToolActivityGroup> createState() => _ToolActivityGroupState();
 }
@@ -41,7 +45,9 @@ class _ToolActivityGroupState extends State<ToolActivityGroup> {
   Widget build(BuildContext context) {
     final running = widget.statuses.contains(AgentStepStatus.running);
     final expanded = _expanded;
-    final label = '${toolTitle(widget.toolName)} · ${widget.statuses.length} 次';
+    final label = widget.active
+        ? widget.activeLabel!
+        : '${toolTitle(widget.toolName)} · ${widget.statuses.length} 次';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

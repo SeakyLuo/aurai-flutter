@@ -135,6 +135,10 @@ class AuraiApplication : Application() {
                     call.argument<ByteArray>("avatar")!!,
                 ),
             )
+            "takeShortcutProject" -> {
+                result.success(pendingShortcutProject)
+                pendingShortcutProject = null
+            }
             "takeNotificationConversation" -> {
                 result.success(pendingNotificationConversation)
                 pendingNotificationConversation = null
@@ -580,9 +584,18 @@ class AuraiApplication : Application() {
         private val IP_LITERAL = Regex("^[0-9a-fA-F:.]+$")
         private var activeChannel: MethodChannel? = null
 
+        private var pendingShortcutProject: String? = null
+
+        fun projectShortcutOpened(projectId: String) {
+            pendingShortcutProject = projectId
+            pendingNotificationConversation = null
+            activeChannel?.invokeMethod("projectShortcutOpened", null)
+        }
+
         private var pendingNotificationConversation: String? = null
 
         fun notificationOpened(conversationId: String) {
+            pendingShortcutProject = null
             pendingNotificationConversation = conversationId
             activeChannel?.invokeMethod("notificationOpened", null)
         }

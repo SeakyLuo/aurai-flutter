@@ -259,8 +259,6 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
                                           ? '这里会记录项目中所有 AI 共享的背景与约定。你可以在下方补充信息。'
                                           : memory.scope.isEmpty
                                           ? '这里会逐渐记录对你的了解。你可以在下方补充希望记住的信息。'
-                                          : memory.projectOnly
-                                          ? '这里会记录仅在这个项目中使用的记忆。你可以在下方补充信息。'
                                           : '这里会记录在这个群聊中形成的记忆。你可以在下方补充信息。')
                                     : '以下是对话中形成、或主动保存的记忆。',
                                 style: const TextStyle(

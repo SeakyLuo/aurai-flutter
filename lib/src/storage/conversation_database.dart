@@ -1,3 +1,4 @@
+import 'group_notice_dismissals.dart';
 import 'group_member_details.dart';
 import 'group_message_marks.dart';
 import '../html_games/miniapp_release_notes.dart';
@@ -25,12 +26,17 @@ import 'tool_customization_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 61,
+  version: 63,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion >= 52 && oldVersion < 62) {
+      await db.execute(
+        "ALTER TABLE development_projects ADD COLUMN instructions TEXT NOT NULL DEFAULT ''",
+      );
+    }
     if (oldVersion >= 52 && oldVersion < 61) {
       await db.execute(
         "ALTER TABLE development_projects ADD COLUMN git_remote_url TEXT NOT NULL DEFAULT ''",
@@ -296,6 +302,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
         );
       }
     }
+    if (oldVersion < 63) await migrateGroupNoticeDismissals(db);
   },
   onCreate: (db, version) async {
     final batch = db.batch();
@@ -318,6 +325,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
       'CREATE INDEX html_games_app ON html_games(app_id)',
       ...groupChatTables,
       groupAnnouncementSchema,
+      groupNoticeDismissalsSchema,
       ...groupMessageMarksSchema,
       groupMemberDetailsSchema,
       groupParticipationSchema,
@@ -475,6 +483,7 @@ const developmentProjectSchema = '''CREATE TABLE development_projects (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
+  instructions TEXT NOT NULL DEFAULT '',
   icon TEXT NOT NULL DEFAULT 'file',
   icon_color TEXT NOT NULL DEFAULT 'ink',
   root_uri TEXT NOT NULL UNIQUE,

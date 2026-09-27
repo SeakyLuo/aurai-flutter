@@ -74,13 +74,13 @@ class GroupMessageMarksTool implements AgentTool, RuntimeCapabilityAgentTool {
     final Map<String, Object?> output;
     if (name == 'readGroupPinnedMessage') {
       final row = await store.pinned(groupId);
-      output = {'message': row == null ? null : _message(row)};
+      output = {'message': row == null ? null : message(row)};
     } else if (name == 'listGroupFavorites') {
       final offset = call.arguments['offset'] as int;
       if (offset < 0) throw ArgumentError('分页位置不能为负数');
       final rows = await store.page(groupId, offset);
       output = {
-        'messages': rows.map(_message).toList(),
+        'messages': rows.map(message).toList(),
         'hasMore': rows.length == 40,
         if (rows.length == 40) 'nextOffset': offset + 40,
       };
@@ -101,7 +101,7 @@ class GroupMessageMarksTool implements AgentTool, RuntimeCapabilityAgentTool {
     );
   }
 
-  Map<String, Object?> _message(Map<String, Object?> row) {
+  Map<String, Object?> message(Map<String, Object?> row) {
     final raw = row['interactive_json'] as String?;
     final card = raw == null
         ? null

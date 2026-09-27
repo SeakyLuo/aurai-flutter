@@ -3,6 +3,7 @@ import '../../app/language_settings.dart';
 import 'default_models_page.dart';
 import '../../domain/error_message.dart';
 import 'data_management_page.dart';
+import 'git_settings_page.dart';
 import 'package:flutter/material.dart';
 
 import '../../providers/model_catalog.dart';
@@ -165,6 +166,26 @@ class SettingsPage extends StatelessWidget {
                         MaterialPageRoute(
                           builder: (_) =>
                               DefaultModelsPage(controller: controller),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Material(
+                    color: settingsFieldColor(context),
+                    borderRadius: BorderRadius.circular(26),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      leading: const SettingsIcon(type: SettingsIconType.git),
+                      title: const Text('Git'),
+                      subtitle: const Text('提交身份、默认分支和 HTTPS 认证'),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: () => Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const GitSettingsPage(),
                         ),
                       ),
                     ),

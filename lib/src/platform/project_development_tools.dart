@@ -22,6 +22,8 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
     'commitProjectGit',
     'pullProjectGit',
     'pushProjectGit',
+    'mergeProjectBranch',
+    'checkoutProjectBranch',
   ];
 
   @override
@@ -29,6 +31,8 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
     name: name,
     capabilityId: 'android.documents',
     description: switch (name) {
+      'checkoutProjectBranch' =>
+        '将项目主目录切换到指定已有本地分支，要求工作目录干净；不能切换到已被工作树占用的分支。工作树自身固定分支，使用 mergeProjectBranch 同步。',
       'runProjectCommand' =>
         '在当前 Aurai 托管项目目录中执行一条 shell 命令，返回退出码和输出。适合构建、格式化、代码生成与项目检查；每次执行都需要用户确认。',
       'getProjectGitStatus' => '读取当前 Aurai 托管项目的 Git 分支、远端和文件状态。',
@@ -39,11 +43,17 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
       'commitProjectGit' => '暂存当前项目的全部改动并创建一次 Git 提交。',
       'pullProjectGit' => '从当前项目的 origin 拉取并合并远端改动。',
       'pushProjectGit' => '将当前项目分支推送到 origin。',
+      'mergeProjectBranch' =>
+        '把指定本地分支合并到当前工作树或主目录，要求先提交当前修改。可用于工作树同步主分支。返回冲突文件；处理冲突后使用 commitProjectGit 完成合并，非快进合并也需提交。',
       _ => throw StateError('Unknown project development tool'),
     },
     inputSchema: {
       'type': 'object',
       'properties': {
+        if (name == 'checkoutProjectBranch')
+          'branch': {'type': 'string', 'minLength': 1},
+        if (name == 'mergeProjectBranch')
+          'branch': {'type': 'string', 'minLength': 1},
         if (name == 'runProjectCommand') ...{
           'command': {'type': 'string', 'minLength': 1, 'maxLength': 4000},
           'timeoutSeconds': {'type': 'integer', 'minimum': 1, 'maximum': 120},
@@ -54,6 +64,8 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
           'message': {'type': 'string', 'minLength': 1, 'maxLength': 500},
       },
       'required': [
+        if (name == 'checkoutProjectBranch') 'branch',
+        if (name == 'mergeProjectBranch') 'branch',
         if (name == 'runProjectCommand') ...['command', 'timeoutSeconds'],
         if (name == 'setProjectGitRemote') 'url',
         if (name == 'commitProjectGit') 'message',
@@ -67,6 +79,8 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
     singleUseConfirmation: name == 'runProjectCommand',
     executionTimeout: const Duration(seconds: 130),
     confirmationDescriptionBuilder: switch (name) {
+      'checkoutProjectBranch' =>
+        (args) => '将项目“${project.name}”主目录切换到 ${args['branch']}。',
       'runProjectCommand' =>
         (args) => '在项目“${project.name}”中执行：${args['command']}',
       'initializeProjectGit' => (_) => '在项目“${project.name}”中初始化 Git 仓库。',
@@ -76,6 +90,9 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
         (args) => '提交项目“${project.name}”的全部改动：${args['message']}',
       'pullProjectGit' => (_) => '从 origin 拉取项目“${project.name}”的更新。',
       'pushProjectGit' => (_) => '将项目“${project.name}”的当前分支推送到 origin。',
+      'mergeProjectBranch' =>
+        (args) =>
+            '将分支 ${args['branch']} 合并到“${project.worktreeName ?? project.name}”。',
       _ => null,
     },
   );
@@ -86,7 +103,7 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
     try {
       final output = await platform
           .deviceExtension('projectDevelopmentOperation', {
-            'projectId': project.id,
+            'projectId': project.workspaceId,
             'callId': call.id,
             'operation': name,
             'arguments': call.arguments,
@@ -94,7 +111,11 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
       return ToolResult(
         callId: call.id,
         toolName: name,
-        output: output,
+        output: {
+          ...output,
+          'workspaceRoot': project.rootUri,
+          'workspaceName': project.worktreeName ?? '主目录',
+        },
         status: ToolResultStatus.success,
       );
     } on PlatformException catch (error) {

@@ -36,6 +36,7 @@ class DocumentOperations(private val context: Context) {
     }
 
     fun execute(operation: String, args: JSONObject, created: (String) -> Unit): Map<String, Any?> {
+        if (operation == "applyTextPatch") return TextPatch(context).apply(args)
         if (operation == "copyDocument" || operation == "moveDocument") {
             return DocumentTransfer(context).execute(operation, args)
         }
@@ -71,13 +72,19 @@ class DocumentOperations(private val context: Context) {
         val info = metadata(uri)
         require(info["directory"] == false) { "请选择文件，不能覆盖文件夹" }
         val content = args.getString("content")
+        DocumentRevision.require(
+            resolver.openInputStream(uri)!!.use { LimitedInput(it).readBytes() },
+            args.getString("expectedRevision"),
+        )
         require(content.length <= MAX_WRITE_CHARACTERS) { "单次最多写入 $MAX_WRITE_CHARACTERS 字" }
         resolver.openOutputStream(uri, "wt")!!.use { it.write(content.toByteArray(Charsets.UTF_8)) }
-        return metadata(uri) + mapOf("written" to true, "encoding" to "UTF-8")
+        return metadata(uri) + mapOf("written" to true, "encoding" to "UTF-8",
+            "revision" to DocumentRevision.hash(content.toByteArray(Charsets.UTF_8)))
     }
 
     private fun replaceText(uri: Uri, args: JSONObject): Map<String, Any?> {
         val bytes = resolver.openInputStream(uri)!!.use { LimitedInput(it).readBytes() }
+        DocumentRevision.require(bytes, args.getString("expectedRevision"))
         val text = bytes.toString(Charsets.UTF_8)
         val old = args.getString("oldText")
         val first = text.indexOf(old)
@@ -86,7 +93,8 @@ class DocumentOperations(private val context: Context) {
         val updated = text.replaceRange(first, first + old.length, args.getString("newText"))
         require(updated.length <= MAX_WRITE_CHARACTERS) { "修改后的文件超过单次写入上限" }
         resolver.openOutputStream(uri, "wt")!!.use { it.write(updated.toByteArray(Charsets.UTF_8)) }
-        return metadata(uri) + mapOf("written" to true, "encoding" to "UTF-8")
+        return metadata(uri) + mapOf("written" to true, "encoding" to "UTF-8",
+            "revision" to DocumentRevision.hash(updated.toByteArray(Charsets.UTF_8)))
     }
 
     private fun createFolder(uri: Uri, args: JSONObject): Map<String, Any?> {
@@ -210,9 +218,11 @@ class DocumentOperations(private val context: Context) {
         require(info["directory"] == false) { "请选择文件；文件夹请使用 listFiles" }
         val size = info["size"] as Long?
         require(size == null || size <= MAX_BYTES) { "暂时只支持读取 10 MB 以内的文件" }
+        val bytes = resolver.openInputStream(uri)!!.use { LimitedInput(it).readBytes() }
+        val revision = DocumentRevision.hash(bytes)
         val mime = info["mimeType"] as String
         return if (mime == "application/pdf" || (info["title"] as String).endsWith(".pdf", true)) {
-            readPdf(uri, info, args)
+            readPdf(bytes, info, args) + mapOf("revision" to revision)
         } else {
             val extension = (info["title"] as String).substringAfterLast('.', "").lowercase()
             require(mime.startsWith("text/") || mime in setOf("application/json", "application/xml") ||
@@ -226,39 +236,24 @@ class DocumentOperations(private val context: Context) {
             require(encoding in setOf("UTF-8", "UTF-16LE", "UTF-16BE", "GB18030"))
             val decoder = Charset.forName(encoding).newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT)
-            val text = StringBuilder()
-            var skipped = 0
-            resolver.openInputStream(uri)!!.use { raw ->
-                java.io.InputStreamReader(LimitedInput(raw), decoder).use { reader ->
-                    val buffer = CharArray(4096)
-                    while (skipped < offset) {
-                        val count = reader.read(buffer, 0, minOf(buffer.size, offset - skipped))
-                        if (count < 0) break
-                        skipped += count
-                    }
-                    while (text.length <= limit) {
-                        val count = reader.read(buffer, 0, minOf(buffer.size, limit + 1 - text.length))
-                        if (count < 0) break
-                        text.append(buffer, 0, count)
-                    }
-                }
-            }
+            val fullText = decoder.decode(java.nio.ByteBuffer.wrap(bytes)).toString()
+            require(offset <= fullText.length) { "读取位置超过文件末尾" }
+            val text = fullText.substring(offset, minOf(fullText.length, offset + limit + 1))
             val more = text.length > limit
             val kept = if (more && text[limit - 1].isHighSurrogate()) limit - 1 else minOf(limit, text.length)
-            info + mapOf("text" to text.take(kept).toString(), "offset" to offset,
+            info + mapOf("text" to text.take(kept), "offset" to offset,
                 "nextOffset" to if (more) offset + kept else null, "partial" to (more || offset > 0),
-                "encoding" to encoding, "sourceRead" to text.isNotBlank())
+                "encoding" to encoding, "sourceRead" to text.isNotBlank(), "revision" to revision)
         }
     }
 
-    private fun readPdf(uri: Uri, info: Map<String, Any?>, args: JSONObject): Map<String, Any?> {
+    private fun readPdf(bytes: ByteArray, info: Map<String, Any?>, args: JSONObject): Map<String, Any?> {
         val start = args.getInt("startPage")
         val count = args.getInt("pageCount")
         val offset = args.getInt("offset")
         val limit = args.getInt("maxCharacters")
         require(start in 1..100000 && count in 1..10 && offset in 0..MAX_BYTES && limit in 2..20000)
         PDFBoxResourceLoader.init(context)
-        val bytes = resolver.openInputStream(uri)!!.use { LimitedInput(it).readBytes() }
         PDDocument.load(bytes).use { document ->
             require(document.currentAccessPermission.canExtractContent()) { "此 PDF 不允许提取文字" }
             require(start <= document.numberOfPages) { "起始页超过 PDF 总页数" }
@@ -293,7 +288,8 @@ class DocumentOperations(private val context: Context) {
             }
             throw error
         }
-        return metadata(file) + mapOf("created" to true, "encoding" to "UTF-8", "sourceRead" to false)
+        return metadata(file) + mapOf("created" to true, "encoding" to "UTF-8", "sourceRead" to false,
+            "revision" to DocumentRevision.hash(content.toByteArray(Charsets.UTF_8)))
     }
 
     private fun validateFile(args: JSONObject): String {
@@ -338,4 +334,5 @@ class DocumentOperations(private val context: Context) {
         private const val MAX_SEARCH_FILES = 2000
         private const val MAX_SEARCH_BYTES = 2 * 1024 * 1024L
     }
+
 }

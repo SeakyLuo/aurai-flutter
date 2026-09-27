@@ -293,11 +293,15 @@ class ConversationWriter {
     String conversationId,
     ContextSummary summary, {
     required int historyVersion,
+    String? senderId,
   }) => mutate(() async {
     if (this.historyVersion(conversationId) != historyVersion) return;
     await database.rawInsert(
       "INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value WHERE (SELECT created_at FROM messages WHERE id = json_extract(excluded.value, '\$.throughMessageId')) >= (SELECT created_at FROM messages WHERE id = json_extract(app_state.value, '\$.throughMessageId'))",
-      ['context_summary:$conversationId', jsonEncode(summary.toJson())],
+      [
+        'context_summary:$conversationId${senderId == null ? '' : ':$senderId'}',
+        jsonEncode(summary.toJson()),
+      ],
     );
   });
 

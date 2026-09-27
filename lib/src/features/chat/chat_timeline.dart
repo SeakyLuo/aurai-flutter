@@ -38,6 +38,7 @@ List<ChatTimelineEntry> buildChatTimeline(
   ValueChanged<AgentMessage>? onReeditRecalled,
   Future<void> Function(AgentMessage, String)? onQuickReply,
   Future<void> Function(AgentMessage)? onRetry,
+  Future<void> Function(AgentMessage)? onBranch,
 }) {
   final conversation = controller.activeConversation;
   final mentionSenders = {
@@ -140,13 +141,24 @@ List<ChatTimelineEntry> buildChatTimeline(
   final liveSources = webSourcesFromSteps(liveSteps.map((entry) => entry.step));
   final groups = toolActivityGroups([
     for (final entry in liveSteps)
-      entry.step.toolName == 'askUser' &&
-              entry.runId == conversation.activeRunId &&
-              (conversation.runState == ChatRunState.running ||
-                  conversation.runState == ChatRunState.stopping)
+      entry.step.toolName == 'askUser'
           ? null
           : '${entry.runId}:${entry.afterMessageId}:${entry.step.toolName}',
   ]);
+  final activeRunIds = {
+    if ((conversation.runState == ChatRunState.running ||
+            conversation.runState == ChatRunState.stopping) &&
+        conversation.activeRunId != null)
+      conversation.activeRunId!,
+    for (final member in members)
+      if ((member.runState == ChatRunState.running ||
+              member.runState == ChatRunState.stopping) &&
+          member.activeRunId != null)
+        member.activeRunId!,
+  };
+  final lastStepByRun = <String, int>{
+    for (final (index, entry) in liveSteps.indexed) entry.runId: index,
+  };
   final elapsedRuns = <String>{};
   if (!isGroup) {
     for (final entry in conversation.cancelledRunMessages.entries) {
@@ -166,6 +178,7 @@ List<ChatTimelineEntry> buildChatTimeline(
   }
   for (final group in groups) {
     final entry = liveSteps[group.start];
+    final latest = liveSteps[group.end - 1];
     final storageId = 'tool:${entry.runId}:${entry.ordinal}';
     final runElapsed = conversation.unfinishedRunElapsed[entry.runId];
     if (runElapsed != null &&
@@ -185,7 +198,7 @@ List<ChatTimelineEntry> buildChatTimeline(
         .add(
           ChatTimelineEntry(
             storageId,
-            (_) => group.end - group.start == 1
+            (_) => entry.step.toolName == 'askUser'
                 ? _ToolActivity(
                     storageId: storageId,
                     step: entry.step,
@@ -197,6 +210,13 @@ List<ChatTimelineEntry> buildChatTimeline(
                       key: ValueKey(storageId),
                       storageId: storageId,
                       toolName: entry.step.toolName,
+                      active:
+                          activeRunIds.contains(entry.runId) &&
+                          lastStepByRun[entry.runId] == group.end - 1,
+                      activeLabel: _toolActivityTitle(
+                        latest.step,
+                        latest.senderName,
+                      ),
                       fileResults:
                           entry.step.toolName == 'executeAndroidScript' ||
                               entry.step.toolName == 'runSkill'
@@ -390,6 +410,12 @@ List<ChatTimelineEntry> buildChatTimeline(
             onRetry: onRetry != null && controller.canOfferFailedRetry(message)
                 ? onRetry
                 : null,
+            onBranch:
+                !isGroup &&
+                    !message.isReasoning &&
+                    !controller.isStreamingMessage(message.id)
+                ? onBranch
+                : null,
             availableSources:
                 memberSources[message.runId] ??
                 (message.runId != null &&
@@ -582,12 +608,6 @@ class _ToolActivity extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final prefix = switch (step.status) {
-      AgentStepStatus.running => '正在',
-      AgentStepStatus.completed => '已完成：',
-      AgentStepStatus.failed => '未完成：',
-      AgentStepStatus.cancelled => '已停止：',
-    };
     return Padding(
       padding: grouped
           ? const EdgeInsets.symmetric(vertical: 5)
@@ -596,12 +616,21 @@ class _ToolActivity extends StatelessWidget {
         showFileChanges: !grouped,
         toolName: step.toolName,
         storageId: storageId,
-        title:
-            '${senderName == null ? '' : '$senderName '}$prefix${step.title}',
+        title: _toolActivityTitle(step, senderName),
         status: step.status,
         requestJson: step.requestJson,
         resultJson: step.resultJson,
       ),
     );
   }
+}
+
+String _toolActivityTitle(AgentStep step, String? senderName) {
+  final prefix = switch (step.status) {
+    AgentStepStatus.running => '正在',
+    AgentStepStatus.completed => '已完成：',
+    AgentStepStatus.failed => '未完成：',
+    AgentStepStatus.cancelled => '已停止：',
+  };
+  return '${senderName == null ? '' : '$senderName '}$prefix${step.title}';
 }

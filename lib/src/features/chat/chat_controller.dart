@@ -1,10 +1,13 @@
+import '../../agent/group_notice_tool.dart';
 import '../../agent/group_access_tool.dart';
 import '../../agent/deliver_file_tool.dart';
 import '../../platform/generated_file_store.dart';
 import '../../agent/group_message_marks_tool.dart';
 import '../../storage/group_message_marks.dart';
 import '../../domain/request_adapter.dart';
+import '../../domain/context_summary.dart';
 import '../../providers/request_adapter_runner.dart';
+import '../../providers/responses_transport.dart';
 import '../../agent/request_adapter_tool.dart';
 import 'pending_message_queue.dart';
 import '../../domain/quick_reply_option.dart';
@@ -91,6 +94,7 @@ import '../../domain/message_file.dart';
 import '../../platform/message_file_store.dart';
 import '../../platform/document_tools.dart';
 import '../../platform/project_development_tools.dart';
+import '../../platform/git_configuration_tool.dart';
 import '../../platform/wait_for_ui_tool.dart';
 import '../../platform/device_extension_tools.dart';
 import '../../agent/image_search_tool.dart';
@@ -155,9 +159,11 @@ part 'message_submission.dart';
 part 'message_quick_replies.dart';
 part 'global_tools.dart';
 part 'generated_file_actions.dart';
+part 'conversation_branching.dart';
 part 'group_reply_context.dart';
 part 'group_reply_draft.dart';
 part 'ai_identity_controller.dart';
+part 'project_controller_actions.dart';
 part 'group_conversation_run.dart';
 part 'group_member_activity.dart';
 part 'group_message_delivery.dart';
@@ -289,6 +295,7 @@ class ChatController extends ChangeNotifier {
   bool loadingConversations = false;
   bool loadingEarlierMessages = false;
   bool changingConversation = false;
+  bool creatingConversationBranch = false;
   List<Conversation> get conversations => List.unmodifiable(
     <Conversation>[..._conversations.where((item) => !item.isArchived)]
       ..sort((a, b) {
@@ -364,6 +371,7 @@ class ChatController extends ChangeNotifier {
 
   bool get isBusy =>
       _submitting ||
+      creatingConversationBranch ||
       identical(_runningConversation, activeConversation) ||
       identical(_privateConversation, activeConversation) ||
       runState == ChatRunState.running ||
@@ -537,193 +545,6 @@ class ChatController extends ChangeNotifier {
         activeConversation.isEmpty)
       return;
     await _switchConversation(null);
-  }
-
-  Future<void> createProjectConversation(
-    DevelopmentProject project, {
-    required String senderId,
-  }) async {
-    await createConversation();
-    activeConversation.projectId = project.id;
-    activeConversation.storedTitle = null;
-    activeConversation.defaultSenderId = senderId;
-    _activeAi = await groupStore.loadAi(senderId);
-    await _newDraftStore.save(activeConversation);
-    _conversationChanged();
-  }
-
-  Future<void> setActiveDraftSender(String senderId) async {
-    activeConversation.defaultSenderId = senderId;
-    _activeAi = await groupStore.loadAi(senderId);
-    await _persist();
-    _conversationChanged();
-  }
-
-  DevelopmentProjects get projects => DevelopmentProjects(_store.database);
-
-  Future<DevelopmentProject> createManagedProject(
-    String name,
-    String icon,
-    String iconColor, {
-    String description = '',
-    String gitRemoteUrl = '',
-  }) async {
-    validateProjectName(name);
-    final id = newMessageId();
-    final output = await _platform.deviceExtension('createManagedProject', {
-      'id': id,
-      'name': name,
-    });
-    if (gitRemoteUrl.isNotEmpty) {
-      await _platform.deviceExtension('projectDevelopmentOperation', {
-        'projectId': id,
-        'operation': 'initializeProjectGit',
-        'arguments': <String, Object?>{},
-      });
-      await _platform.deviceExtension('projectDevelopmentOperation', {
-        'projectId': id,
-        'operation': 'setProjectGitRemote',
-        'arguments': {'url': gitRemoteUrl},
-      });
-    }
-    final now = DateTime.now();
-    final project = DevelopmentProject(
-      id: id,
-      name: name,
-      description: description,
-      icon: icon,
-      iconColor: iconColor,
-      rootUri: output['uri'] as String,
-      location: ProjectLocation.managed,
-      createdAt: now,
-      updatedAt: now,
-      gitRemoteUrl: gitRemoteUrl,
-    );
-    await projects.create(project);
-    notifyListeners();
-    return project;
-  }
-
-  Future<DevelopmentProject> createExternalProject(
-    String name,
-    String icon,
-    String iconColor,
-    String rootUri, {
-    String description = '',
-    String gitRemoteUrl = '',
-  }) async {
-    validateProjectName(name);
-    final now = DateTime.now();
-    final project = DevelopmentProject(
-      id: newMessageId(),
-      name: name,
-      description: description,
-      icon: icon,
-      iconColor: iconColor,
-      rootUri: rootUri,
-      location: ProjectLocation.external,
-      createdAt: now,
-      updatedAt: now,
-      gitRemoteUrl: gitRemoteUrl,
-    );
-    await projects.create(project);
-    notifyListeners();
-    return project;
-  }
-
-  Future<void> setConversationProject(
-    Conversation conversation,
-    String? projectId, {
-    String actorId = 'user:local',
-  }) async {
-    await projects.assignConversation(
-      conversation.id,
-      projectId,
-      actorId: actorId,
-    );
-    conversation.projectId = projectId;
-    if (activeConversation.id == conversation.id) {
-      activeConversation.projectId = projectId;
-    }
-    notifyListeners();
-  }
-
-  Future<DevelopmentProject> updateProjectProfile(
-    DevelopmentProject project, {
-    required String name,
-    required String description,
-    required String icon,
-    required String iconColor,
-    required String gitRemoteUrl,
-  }) async {
-    validateProjectName(name);
-    if (project.location == ProjectLocation.managed &&
-        project.gitRemoteUrl != gitRemoteUrl) {
-      await _platform.deviceExtension('projectDevelopmentOperation', {
-        'projectId': project.id,
-        'operation': 'initializeProjectGit',
-        'arguments': <String, Object?>{},
-      });
-      await _platform.deviceExtension('projectDevelopmentOperation', {
-        'projectId': project.id,
-        'operation': 'setProjectGitRemote',
-        'arguments': {'url': gitRemoteUrl},
-      });
-    }
-    await projects.updateProfile(
-      project.id,
-      name: name,
-      description: description,
-      icon: icon,
-      iconColor: iconColor,
-      gitRemoteUrl: gitRemoteUrl,
-    );
-    notifyListeners();
-    return projects.read(project.id);
-  }
-
-  Future<DevelopmentProject> setProjectPinned(
-    DevelopmentProject project,
-    bool pinned,
-  ) async {
-    await projects.setPinned(project.id, pinned);
-    notifyListeners();
-    return projects.read(project.id);
-  }
-
-  Future<DevelopmentProject> setProjectMemoryMode(
-    DevelopmentProject project,
-    ProjectMemoryMode mode,
-  ) async {
-    await projects.setMemoryMode(project.id, mode);
-    notifyListeners();
-    return projects.read(project.id);
-  }
-
-  Future<DevelopmentProject> setProjectDefaultSender(
-    DevelopmentProject project,
-    String senderId,
-  ) async {
-    await projects.setDefaultSender(project.id, senderId);
-    notifyListeners();
-    return projects.read(project.id);
-  }
-
-  Future<void> removeProject(DevelopmentProject project) async {
-    if (project.location == ProjectLocation.managed) {
-      await _platform.deviceExtension('removeManagedProject', {
-        'id': project.id,
-      });
-    }
-    await projects.remove(project.id);
-    await _reloadConversations();
-    notifyListeners();
-  }
-
-  Future<void> markProjectRead(DevelopmentProject project) async {
-    await projects.markAllRead(project.id);
-    await _reloadConversations();
-    notifyListeners();
   }
 
   Future<void> selectConversation(String id) => _switchConversation(id);

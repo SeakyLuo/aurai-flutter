@@ -287,11 +287,6 @@ extension MessageQuickReplies on ChatController {
           'UPDATE conversations SET message_count = (SELECT COUNT(*) FROM messages WHERE conversation_id = ?) WHERE id = ?',
           [conversation.id, conversation.id],
         );
-        await txn.delete(
-          'app_state',
-          where: 'key = ?',
-          whereArgs: ['context_summary:${conversation.id}'],
-        );
       });
       _store.writer.invalidateHistory(
         conversation.id,
@@ -304,8 +299,6 @@ extension MessageQuickReplies on ChatController {
         _detachQuickReply(value, sourceId, replyId);
         value.messages.removeWhere((message) => message.id == replyId);
         value.messageCount--;
-        value.contextSummary = null;
-        value.sharedContext = null;
       }
       final execution = _executionStates[conversation.id];
       execution?.groupDispatcher?.history.removeWhere(

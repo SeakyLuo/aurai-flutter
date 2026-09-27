@@ -577,9 +577,22 @@ class ConversationReader {
       ),
       database.query('messages', where: where, whereArgs: selectedArgs),
       database.query('tool_calls', where: where, whereArgs: selectedArgs),
+      database.query(
+        'app_state',
+        where: 'key IN (${_slots(runs.length)})',
+        whereArgs: [for (final run in runs) 'git_task:${run['id']}'],
+      ),
     ]);
     final messages = {for (final row in results[1]) row['id']: row};
     final tools = {for (final row in results[2]) row['id']: row};
+    final gitChanges = {
+      for (final row in results[3])
+        (row['key'] as String).substring(
+          'git_task:'.length,
+        ): ProjectGitTaskChanges.fromJson(
+          (jsonDecode(row['value'] as String) as Map).cast<String, Object?>(),
+        ),
+    };
     final events = <Object, List<Map<String, Object?>>>{};
     for (final row in results[0]) {
       events.putIfAbsent(row['run_id']!, () => []).add(row);
@@ -636,6 +649,9 @@ class ConversationReader {
                           messages[event['message_id']]!['text'] != '')))
                 _activity(event, messages, tools),
           ],
+          gitChanges: gitChanges[run['id']]?.fileCount == 0
+              ? null
+              : gitChanges[run['id']],
         ),
     };
   }

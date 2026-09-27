@@ -111,6 +111,60 @@ extension PendingMessageSubmission on ChatController {
         }
       });
 
+  Future<bool> editPendingMessage(
+    String id,
+  ) => _inConversation(activeConversation, () async {
+    final conversation = activeConversation;
+    final queue = pendingMessageQueue;
+    if (queue.busy) return false;
+    final index = queue.messages.indexWhere((message) => message.id == id);
+    // The running reply may have dispatched this item while its menu was open.
+    if (index == -1) return false;
+    queue.busy = true;
+    _notifyRun(conversation);
+    final message = queue.messages.removeAt(index);
+    final draft = conversation.draft;
+    final quote = conversation.draftQuote;
+    final mentions = List.of(conversation.draftMentions);
+    final images = List.of(conversation.draftImages);
+    final files = List.of(conversation.draftFiles);
+    conversation.draft = message.text;
+    conversation.draftQuote = message.quote;
+    conversation.draftMentions.clear();
+    conversation.draftImages
+      ..clear()
+      ..addAll(message.images);
+    conversation.draftFiles
+      ..clear()
+      ..addAll(message.files);
+    try {
+      await _store.writer.save(
+        conversation,
+        makeActive: false,
+        saveDraft: true,
+        saveMessages: false,
+        pendingMessageQueue: queue.encode(),
+      );
+      return true;
+    } on Object {
+      queue.messages.insert(index, message);
+      conversation.draft = draft;
+      conversation.draftQuote = quote;
+      conversation.draftMentions.addAll(mentions);
+      conversation.draftImages
+        ..clear()
+        ..addAll(images);
+      conversation.draftFiles
+        ..clear()
+        ..addAll(files);
+      rethrow;
+    } finally {
+      queue.busy = false;
+      _notifyRun(conversation);
+      _resumeForwardedReply();
+    }
+  });
+
   bool _resumePendingMessages() {
     final conversation = _execution.conversation;
     if (conversation == null || conversation.kind != ConversationKind.direct)

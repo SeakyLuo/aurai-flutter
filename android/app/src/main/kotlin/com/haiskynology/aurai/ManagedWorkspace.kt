@@ -2,6 +2,7 @@ package com.haiskynology.aurai
 
 import android.content.Context
 import android.net.Uri
+import android.util.AtomicFile
 import android.webkit.MimeTypeMap
 import org.json.JSONObject
 import java.io.File
@@ -135,7 +136,8 @@ class ManagedWorkspace(private val context: Context) {
 
     private fun read(file: File, args: JSONObject): Map<String, Any?> {
         require(file.isFile && file.length() <= MAX_BYTES) { "暂时只支持读取 10 MB 以内的文件" }
-        val text = file.readText(Charsets.UTF_8)
+        val bytes = file.readBytes()
+        val text = bytes.toString(Charsets.UTF_8)
         val offset = args.getInt("offset")
         val limit = args.getInt("maxCharacters")
         require(offset <= text.length) { "读取位置超过文件末尾" }
@@ -147,6 +149,7 @@ class ManagedWorkspace(private val context: Context) {
             "partial" to (offset > 0 || end < text.length),
             "encoding" to "UTF-8",
             "sourceRead" to text.isNotBlank(),
+            "revision" to DocumentRevision.hash(bytes),
         )
     }
 
@@ -159,12 +162,15 @@ class ManagedWorkspace(private val context: Context) {
 
     private fun writeText(file: File, args: JSONObject): Map<String, Any?> {
         require(file.isFile) { "请选择文件" }
+        DocumentRevision.require(file.readBytes(), args.getString("expectedRevision"))
         return write(file, args.getString("content"), "written")
     }
 
     private fun replaceText(file: File, args: JSONObject): Map<String, Any?> {
         require(file.isFile && file.length() <= MAX_BYTES) { "暂时只支持修改 10 MB 以内的文件" }
-        val text = file.readText(Charsets.UTF_8)
+        val bytes = file.readBytes()
+        DocumentRevision.require(bytes, args.getString("expectedRevision"))
+        val text = bytes.toString(Charsets.UTF_8)
         val old = args.getString("oldText")
         val first = text.indexOf(old)
         require(first >= 0) { "没有找到要替换的内容" }
@@ -174,8 +180,21 @@ class ManagedWorkspace(private val context: Context) {
 
     private fun write(file: File, content: String, resultKey: String): Map<String, Any?> {
         require(content.length <= MAX_WRITE_CHARACTERS) { "单次最多写入 $MAX_WRITE_CHARACTERS 字" }
-        file.writeText(content, Charsets.UTF_8)
-        return metadata(file) + mapOf(resultKey to true, "encoding" to "UTF-8")
+        val bytes = content.toByteArray(Charsets.UTF_8)
+        val atomicFile = AtomicFile(file)
+        val output = atomicFile.startWrite()
+        try {
+            output.write(bytes)
+            atomicFile.finishWrite(output)
+        } catch (error: Exception) {
+            atomicFile.failWrite(output)
+            throw error
+        }
+        return metadata(file) + mapOf(
+            resultKey to true,
+            "encoding" to "UTF-8",
+            "revision" to DocumentRevision.hash(bytes),
+        )
     }
 
     private fun createFolder(parent: File, args: JSONObject): Map<String, Any?> {
@@ -254,6 +273,7 @@ class ManagedWorkspace(private val context: Context) {
 
         fun remove(context: Context, id: String) {
             val folder = File(context.filesDir, "projects/$id")
+            require(File(folder, ".git/worktrees").listFiles().orEmpty().isEmpty()) { "请先合并并删除项目的工作树" }
             require(folder.deleteRecursively()) { "项目目录删除失败" }
         }
     }

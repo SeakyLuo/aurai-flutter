@@ -1,3 +1,6 @@
+import '../../platform/aurai_platform.dart';
+import '../../app/ui_action.dart';
+import 'projects_page.dart';
 import '../../app/glass_notice.dart';
 import 'notification_avatar.dart';
 import '../../domain/error_message.dart';
@@ -83,6 +86,22 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
       return;
     _openingNotification = true;
     try {
+      final projectId = await AuraiPlatform.instance.takeShortcutProject();
+      if (!mounted) return;
+      if (projectId != null) {
+        await runUiAction(context, () async {
+          final project = await widget.controller.projects.read(projectId);
+          if (!mounted) return;
+          Navigator.of(context).pushAndRemoveUntil<void>(
+            MaterialPageRoute(
+              builder: (_) =>
+                  ProjectPage(controller: widget.controller, project: project),
+            ),
+            (route) => route.isFirst,
+          );
+        });
+        return;
+      }
       final id = await widget.controller.takeNotificationConversation();
       if (!mounted || id == null) return;
       await _openConversation(id);

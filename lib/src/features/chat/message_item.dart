@@ -73,6 +73,7 @@ class MessageItem extends StatefulWidget {
     this.onOpenMember,
     this.onQuickReply,
     this.onRetry,
+    this.onBranch,
     this.availableSources = const {},
     this.mentionMembers = const {},
     this.excludedActivityMessageId,
@@ -94,6 +95,7 @@ class MessageItem extends StatefulWidget {
   final ValueChanged<String>? onOpenMember;
   final Future<void> Function(AgentMessage message, String key)? onQuickReply;
   final Future<void> Function(AgentMessage message)? onRetry;
+  final Future<void> Function(AgentMessage message)? onBranch;
   final String? excludedActivityMessageId;
   final bool streaming;
   final bool readOnly;
@@ -226,6 +228,9 @@ class _MessageItemState extends State<MessageItem> {
                     ? null
                     : () =>
                           widget.onQuote!(message, selectedText: _selectedText),
+                onBranch: widget.onBranch == null
+                    ? null
+                    : () => widget.onBranch!(message),
                 createdAt: message.createdAt,
                 sources: _sources,
                 onOpenLink: (href) => _openLink(context, href),

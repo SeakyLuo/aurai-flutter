@@ -16,6 +16,7 @@ import 'tool_activity_view.dart';
 import 'chat_scroll_anchor.dart';
 import 'source_citation_syntax.dart';
 import 'source_citation_view.dart';
+import 'project_git_changes_page.dart';
 
 class TaskSummaryView extends StatefulWidget {
   const TaskSummaryView({
@@ -209,11 +210,16 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
           ),
           const Divider(height: 1),
           const SizedBox(height: 12),
-          WorkspaceChangesView(
-            changes: _fileChanges ??= WorkspaceFileChanges.fromResults(
-              widget.summary.activities.map((activity) => activity.resultJson),
+          if (widget.summary.gitChanges case final gitChanges?)
+            _GitTaskChangesCard(changes: gitChanges)
+          else
+            WorkspaceChangesView(
+              changes: _fileChanges ??= WorkspaceFileChanges.fromResults(
+                widget.summary.activities.map(
+                  (activity) => activity.resultJson,
+                ),
+              ),
             ),
-          ),
           if (_expanded)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -245,4 +251,43 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
       ),
     );
   }
+}
+
+class _GitTaskChangesCard extends StatelessWidget {
+  const _GitTaskChangesCard({required this.changes});
+
+  final ProjectGitTaskChanges changes;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Material(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProjectGitChangesPage.task(
+              projectId: changes.workspaceId,
+              taskId: changes.taskId,
+            ),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Expanded(child: Text('已编辑 ${changes.fileCount} 个文件')),
+              WorkspaceLineCounts((
+                added: changes.addedLines,
+                removed: changes.removedLines,
+              )),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }

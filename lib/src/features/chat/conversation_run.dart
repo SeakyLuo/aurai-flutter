@@ -42,12 +42,7 @@ extension ConversationRun on ChatController {
     );
     final (:project, :memory, :privateMemory) = memoryContext;
     final skills = await aiSkills(reply.senderId);
-    final documents = AiDocumentScope(
-      _store.database,
-      reply.senderId,
-      project: project,
-    );
-    await documents.initialize();
+    final documents = await _aiDocuments(reply.senderId, project);
     final customInstructions = reply.profile.preferences.customInstructions;
     final responsePreferences = reply.profile.preferences.responses;
     final memoryRevision = memory.revision;
@@ -108,6 +103,34 @@ extension ConversationRun on ChatController {
       responsePreferences: responsePreferences,
     );
     runConversation.activeRunId = runId;
+    var gitTaskStarted = false;
+    var gitTaskFinished = false;
+    if (project?.location == ProjectLocation.managed) {
+      final result = await _platform.deviceExtension(
+        'projectDevelopmentOperation',
+        {
+          'projectId': project!.workspaceId,
+          'operation': 'beginProjectGitTask',
+          'arguments': {'taskId': runId},
+        },
+      );
+      gitTaskStarted = result['available'] == true;
+      if (gitTaskStarted) {
+        await _store.database.rawInsert(
+          'INSERT OR REPLACE INTO app_state(key, value) VALUES (?, ?)',
+          [
+            'git_task:$runId',
+            jsonEncode({
+              'workspaceId': project.workspaceId,
+              'taskId': runId,
+              'fileCount': 0,
+              'addedLines': 0,
+              'removedLines': 0,
+            }),
+          ],
+        );
+      }
+    }
     steps.clear();
     final runStepStart = runConversation.liveToolSteps.length;
     runConversation.errorDetail = null;
@@ -148,12 +171,14 @@ extension ConversationRun on ChatController {
               systemPrompt: systemPrompt,
               summaryConfig: modelSettings.activeConfig,
               sharedContext: groupParent?.sharedContext,
+              sharedContextOwnerId: groupParent == null ? null : reply.senderId,
             )
           : DeepSeekResponsesProvider(
               runConfig,
               systemPrompt: systemPrompt,
               summaryConfig: modelSettings.activeConfig,
               sharedContext: groupParent?.sharedContext,
+              sharedContextOwnerId: groupParent == null ? null : reply.senderId,
             );
       final webSources = WebSourceRegistry();
       final tools = _createTools(
@@ -298,6 +323,8 @@ extension ConversationRun on ChatController {
         contextSummary: groupHistory == null
             ? runConversation.contextSummary
             : groupParent!.contextSummary,
+        privateContextSummary:
+            groupParent?.privateContextSummaries[reply.senderId],
         personalContext: () async => [
           responsePreferences.instructions,
           if (groupParent != null && sleepDraft.isNotEmpty)
@@ -315,21 +342,22 @@ extension ConversationRun on ChatController {
           if (alongsideGroup) '群聊正在后台进行；当前私聊仍可使用完整工具集。共享手机界面和用户交互由执行器互斥协调。',
           if (groupParent != null) '当前群成员：${jsonEncode((awaitedRoster))}',
           if (groupParent != null)
-            await GroupAnnouncementStore(
+            await GroupNoticeTool(
               groupStore,
-            ).context(groupParent.id, reply.senderId),
+              reply.senderId,
+              groupParent.id,
+            ).context(),
         ].join('\n\n'),
-        onContextSummary: (summary) async {
-          final owner = groupParent ?? runConversation;
-          await _store.writer.saveContextSummary(
-            owner.id,
-            summary,
-            historyVersion: historyVersion,
-          );
-          if (_store.writer.historyVersion(owner.id) == historyVersion) {
-            owner.contextSummary = summary;
-          }
-        },
+        onContextSummary: (summary) =>
+            _saveRunContextSummary(summaryOwner, summary, historyVersion),
+        onPrivateContextSummary: groupParent == null
+            ? null
+            : (summary) => _saveRunContextSummary(
+                groupParent,
+                summary,
+                historyVersion,
+                senderId: reply.senderId,
+              ),
         onCompactionChanged: (active) {
           if (groupParent != null) return;
           runConversation.isCompacting = active;
@@ -570,6 +598,62 @@ extension ConversationRun on ChatController {
         if (!runMessageIds.contains(message.id)) runMessageIds.add(message.id);
       }
       executionWatch.stop();
+      ProjectGitTaskChanges? completedGitChanges;
+      if (gitTaskStarted) {
+        final result = await _platform.deviceExtension(
+          'projectDevelopmentOperation',
+          {
+            'projectId': project!.workspaceId,
+            'operation': 'finishProjectGitTask',
+            'arguments': {'taskId': runId},
+          },
+        );
+        gitTaskFinished = result['available'] == true;
+        final files = gitTaskFinished
+            ? result['changes']! as List
+            : const <Object?>[];
+        if (files.isNotEmpty) {
+          completedGitChanges = ProjectGitTaskChanges(
+            workspaceId: project.workspaceId,
+            taskId: runId,
+            fileCount: files.length,
+            addedLines: result['addedLines']! as int,
+            removedLines: result['removedLines']! as int,
+          );
+          final latestKey = 'git_latest:${project.workspaceId}';
+          final previous = await _store.database.query(
+            'app_state',
+            columns: ['value'],
+            where: 'key = ?',
+            whereArgs: [latestKey],
+            limit: 1,
+          );
+          final previousTaskId = previous.firstOrNull?['value'] as String?;
+          await _store.database.transaction((txn) async {
+            if (previousTaskId != null && previousTaskId != runId) {
+              await txn.delete(
+                'app_state',
+                where: 'key = ?',
+                whereArgs: ['git_task:$previousTaskId'],
+              );
+            }
+            await txn.rawInsert(
+              'INSERT OR REPLACE INTO app_state(key, value) VALUES (?, ?)',
+              ['git_task:$runId', jsonEncode(completedGitChanges!.toJson())],
+            );
+            await txn.rawInsert(
+              'INSERT OR REPLACE INTO app_state(key, value) VALUES (?, ?)',
+              [latestKey, runId],
+            );
+          });
+        } else {
+          await _store.database.delete(
+            'app_state',
+            where: 'key = ?',
+            whereArgs: ['git_task:$runId'],
+          );
+        }
+      }
       final hasReasoning = activities.any((activity) => activity.isReasoning);
       if (runMessageIds.isNotEmpty &&
           (runConversation.hasExecutionProcess || hasReasoning)) {
@@ -625,6 +709,7 @@ extension ConversationRun on ChatController {
                       ),
                     ),
             ),
+            gitChanges: completedGitChanges,
           ),
         );
       }
@@ -758,6 +843,18 @@ extension ConversationRun on ChatController {
           );
         }
       } finally {
+        if (gitTaskStarted && !gitTaskFinished) {
+          await _platform.deviceExtension('projectDevelopmentOperation', {
+            'projectId': project!.workspaceId,
+            'operation': 'abortProjectGitTask',
+            'arguments': {'taskId': runId},
+          });
+          await _store.database.delete(
+            'app_state',
+            where: 'key = ?',
+            whereArgs: ['git_task:$runId'],
+          );
+        }
         if (groupParent != null &&
             outcome == 'completed' &&
             !leftSleepDraft &&

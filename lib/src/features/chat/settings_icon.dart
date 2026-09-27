@@ -3,6 +3,7 @@ import 'wrench_painter.dart';
 
 enum SettingsIconType {
   discover,
+  home,
   miniapps,
   star,
   starFilled,
@@ -23,6 +24,7 @@ enum SettingsIconType {
   model,
   modelProvider,
   modelSettings,
+  git,
   device,
   chevron,
   back,
@@ -74,6 +76,22 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.home:
+        canvas.drawPath(
+          Path()
+            ..moveTo(3, 11)
+            ..lineTo(12, 3)
+            ..lineTo(21, 11)
+            ..moveTo(5, 9.3)
+            ..lineTo(5, 21)
+            ..lineTo(10, 21)
+            ..lineTo(10, 15)
+            ..lineTo(14, 15)
+            ..lineTo(14, 21)
+            ..lineTo(19, 21)
+            ..lineTo(19, 9.3),
+          pen,
+        );
       case SettingsIconType.play:
         canvas.drawPath(
           Path()
@@ -461,6 +479,18 @@ class _SettingsIconPainter extends CustomPainter {
         );
         canvas.drawCircle(const Offset(9.5, 7), 2.5, pen);
         canvas.drawCircle(const Offset(14.5, 17), 2.5, pen);
+      case SettingsIconType.git:
+        canvas.drawCircle(const Offset(6, 5), 2.5, pen);
+        canvas.drawCircle(const Offset(18, 6), 2.5, pen);
+        canvas.drawCircle(const Offset(6, 19), 2.5, pen);
+        canvas.drawLine(const Offset(6, 7.5), const Offset(6, 16.5), pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(15.5, 6)
+            ..lineTo(13, 6)
+            ..cubicTo(8.5, 6, 6, 9, 6, 13),
+          pen,
+        );
       case SettingsIconType.device:
         canvas.drawRRect(
           RRect.fromRectAndRadius(

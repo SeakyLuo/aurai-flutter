@@ -53,6 +53,7 @@ part 'chat_message_editing.dart';
 part 'chat_attachments.dart';
 part 'chat_search_navigation.dart';
 part 'chat_quoting.dart';
+part 'chat_branching.dart';
 part 'chat_message_submission.dart';
 
 class ChatPage extends StatefulWidget {
@@ -238,6 +239,13 @@ class _ChatPageState extends State<ChatPage>
       onOpenQuote: _openQuotedMessage,
       onQuickReply: _sendQuickReply,
       onRetry: _retryFailedMessage,
+      onBranch:
+          _editing == null &&
+              !active.isTemporary &&
+              !controller.isBusy &&
+              !controller.addingImages
+          ? _createConversationBranch
+          : null,
       beforeMessageId: _editing?.message.id,
       highlightedMessageId: _highlightedMessageId,
       allowEditing: _editing == null,
@@ -275,7 +283,9 @@ class _ChatPageState extends State<ChatPage>
         }
       },
       child: AbsorbPointer(
-        absorbing: controller.changingConversation,
+        absorbing:
+            controller.changingConversation ||
+            controller.creatingConversationBranch,
         child: BackdropGroup(
           child: Scaffold(
             key: _scaffoldKey,
@@ -316,6 +326,9 @@ class _ChatPageState extends State<ChatPage>
                           child: PendingMessagePanel(
                             controller: controller,
                             onSend: _sendQueuedMessages,
+                            onEdit: _editing == null && !controller.addingImages
+                                ? _editQueuedMessage
+                                : null,
                             child: ChatComposer(
                               controller: _textController,
                               hintText: _editing != null
@@ -527,7 +540,8 @@ class _ChatPageState extends State<ChatPage>
                                       ),
                                     ),
                             ),
-                            if (controller.changingConversation)
+                            if (controller.changingConversation ||
+                                controller.creatingConversationBranch)
                               Positioned.fill(
                                 child: ColoredBox(
                                   color: Theme.of(
@@ -536,7 +550,13 @@ class _ChatPageState extends State<ChatPage>
                                   child: Center(
                                     child: Padding(
                                       padding: EdgeInsets.all(24),
-                                      child: ThinkingIndicator(label: '正在打开会话'),
+                                      child: ThinkingIndicator(
+                                        label:
+                                            controller
+                                                .creatingConversationBranch
+                                            ? '正在创建分支'
+                                            : '正在打开会话',
+                                      ),
                                     ),
                                   ),
                                 ),
