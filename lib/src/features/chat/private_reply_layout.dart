@@ -88,6 +88,7 @@ Map<String, PrivateReplyPart> privateReplyLayout(
                       activity.toolName != null || activity.isReasoning,
                 )
                 .toList(),
+            gitChanges: summary.gitChanges,
           );
     final copyText = text.where((part) => part.isNotEmpty).join('\n\n');
     for (var i = start; i < end; i++) {

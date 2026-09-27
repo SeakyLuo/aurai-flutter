@@ -22,6 +22,7 @@ class AndroidAgentBridge(private val context: Context) {
     private val chatFiles = ChatFileAccess(context)
     private val previewImages = PreviewImageAccess(context)
     private val documents = DocumentAccess(context)
+    private val projectShortcuts = ProjectShortcutAccess(context)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val shizuku = ShizukuAccess(context)
     private val adbAdapter = UnavailableExecutionAdapter(
@@ -33,6 +34,7 @@ class AndroidAgentBridge(private val context: Context) {
         if (previewImages.handle(call, result)) return true
         if (chatFiles.handle(call, result)) return true
         if (documents.handle(call, result)) return true
+        if (projectShortcuts.handle(call, result)) return true
         when (call.method) {
             "getCapabilities" -> result.success(capabilities())
             "getDeviceExtensions" -> result.success(mapOf("shizuku" to shizuku.state(), "vpn" to NetworkCaptureAccess.state(context)))

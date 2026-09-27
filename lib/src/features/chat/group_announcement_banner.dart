@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../storage/group_notice_dismissals.dart';
 import '../../app/ui_action.dart';
 import '../../domain/message_sender.dart';
 import '../../storage/group_announcement_store.dart';
@@ -41,7 +41,8 @@ class GroupAnnouncementBanner extends StatefulWidget {
 }
 
 class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
-  final _preferences = SharedPreferencesAsync();
+  GroupNoticeDismissals get _dismissals =>
+      GroupNoticeDismissals(widget.controller.groupStore.database);
   late final StreamSubscription<String> _subscription;
   GroupAnnouncement? _value;
   GroupMessageSearchResult? _pin;
@@ -77,16 +78,16 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
     final id = widget.groupId;
     if (id == null) return;
     await runUiAction(context, () async {
-      final (value, dismissed, pinRow, pinDismissed) = await (
+      final (value, dismissed, pinRow) = await (
         GroupAnnouncementStore(
           widget.controller.groupStore,
         ).read(id, MessageSender.localUser.id),
-        _preferences.getInt('groupAnnouncementDismissed:$id'),
+        _dismissals.read(id, MessageSender.localUser.id),
         GroupMessageMarks(widget.controller.groupStore).pinned(id),
-        _preferences.getInt('groupPinDismissed:$id'),
       ).wait;
       GroupMessageSearchResult? pin;
-      if (pinRow != null && pinRow['updated_at'] != pinDismissed) {
+      if (pinRow != null &&
+          pinRow['updated_at'].toString() != dismissed['pin']) {
         final root = await getApplicationSupportDirectory();
         final results = await GroupMessageSearch(
           widget.controller.groupStore.database,
@@ -98,7 +99,9 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
       _pin = pin;
       _pinStamp = pinRow?['updated_at'] as int?;
       setState(
-        () => _value = value?.updatedAt.microsecondsSinceEpoch == dismissed
+        () => _value =
+            value?.updatedAt.microsecondsSinceEpoch.toString() ==
+                dismissed['announcement']
             ? null
             : value,
       );
@@ -109,9 +112,11 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
     final id = widget.groupId!;
     final value = _value!;
     await runUiAction(context, () async {
-      await _preferences.setInt(
-        'groupAnnouncementDismissed:$id',
-        value.updatedAt.microsecondsSinceEpoch,
+      await _dismissals.dismiss(
+        id,
+        MessageSender.localUser.id,
+        'announcement',
+        value.updatedAt.microsecondsSinceEpoch.toString(),
       );
       if (mounted && widget.groupId == id && identical(_value, value)) {
         setState(() => _value = null);
@@ -196,7 +201,12 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
         ).pin(id, messageId, false);
         return;
       }
-      await _preferences.setInt('groupPinDismissed:$id', stamp);
+      await _dismissals.dismiss(
+        id,
+        MessageSender.localUser.id,
+        'pin',
+        stamp.toString(),
+      );
       if (mounted && widget.groupId == id && _pinStamp == stamp) {
         setState(() => _pin = null);
       }

@@ -46,9 +46,9 @@ class MemoryRecordTool
       name: operation == 'list' ? 'listMemories' : '${operation}Memory',
       description: switch (operation) {
         'list' =>
-          '${memory.projectOnly ? "Search or list this AI memories limited to the current project" : "Search or list this AI own memories across private chat and all groups"}, newest updated first, 20 per page. Returns IDs, device-local creation/update timestamps with explicit UTC offset, source references and revision. Use nextOffset for more. IDs are internal, do not display them to users.',
+          '${memory.projectShared ? "Search or list shared memories belonging to the current project, available to every AI in this project" : "Search or list this AI own memories across private chat and all groups"}, newest updated first, 20 per page. Returns IDs, device-local creation/update timestamps with explicit UTC offset, source references and revision. Use nextOffset for more. IDs are internal, do not display them to users.',
         'read' =>
-          'Read one of this AI memories available in the current scene, including creation/update times, source references and revision.',
+          'Read one memory available to the current memory owner (this AI or the current project), including creation/update times, source references and revision.',
         'create' =>
           'Save one lasting fact only when the user explicitly asks to remember it. Query existing memories first to avoid duplicates. Do not store routine tasks, guesses or secrets.',
         'update' =>

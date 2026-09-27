@@ -31,6 +31,8 @@ import 'menu_press_highlight.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'send_favorite_page.dart';
+import '../../platform/aurai_platform.dart';
+import 'project_worktrees_page.dart';
 
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key, required this.controller});
@@ -206,12 +208,55 @@ class _ProjectPageState extends State<ProjectPage> {
   final _focusNode = FocusNode();
   AiProfile? _recipient;
   String? _draftConversationId;
+  bool _gitAvailable = false;
+  ProjectWorktreeSelection _workspace = const ProjectWorktreeSelection(
+    null,
+    '主目录',
+  );
+
+  Future<void> _loadWorktreeAvailability() async {
+    if (_project.location != ProjectLocation.managed) return;
+    await runUiAction(context, () async {
+      final result = await AuraiPlatform.instance
+          .deviceExtension('projectDevelopmentOperation', {
+            'projectId': _project.id,
+            'operation': 'listProjectWorktrees',
+            'arguments': <String, Object?>{},
+          });
+      if (mounted) setState(() => _gitAvailable = result['available'] == true);
+    });
+  }
+
+  Future<void> _chooseWorktree() async {
+    final selected = await Navigator.push<ProjectWorktreeSelection>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProjectWorktreesPage(
+          project: _project,
+          controller: widget.controller,
+        ),
+      ),
+    );
+    if (!mounted || selected == null) return;
+    await runUiAction(context, () async {
+      if (_draftConversationId != null) {
+        await widget.controller.selectConversationWorkspace(
+          _draftConversationId!,
+          selected.id == null
+              ? _project
+              : _project.inWorktree(selected.id!, selected.name),
+        );
+      }
+      if (mounted) setState(() => _workspace = selected);
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     _load();
     _loadRecipient();
+    _loadWorktreeAvailability();
     widget.controller.addListener(_controllerChanged);
     _message.addListener(_messageChanged);
   }
@@ -338,7 +383,9 @@ class _ProjectPageState extends State<ProjectPage> {
     final controller = widget.controller;
     if (_draftConversationId == controller.activeConversation.id) return;
     await controller.createProjectConversation(
-      _project,
+      _workspace.id == null
+          ? _project
+          : _project.inWorktree(_workspace.id!, _workspace.name),
       senderId: _recipient!.sender.id,
     );
     _draftConversationId = controller.activeConversation.id;
@@ -456,6 +503,7 @@ class _ProjectPageState extends State<ProjectPage> {
       anchorContext,
       widget.controller,
       _project,
+      allowHomeShortcut: true,
     );
     if (!mounted) return;
     if (result == ProjectActionResult.removed) {
@@ -527,6 +575,18 @@ class _ProjectPageState extends State<ProjectPage> {
               ),
             ),
           ),
+          if (_gitAvailable)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextButton.icon(
+                  onPressed: _opening ? null : _chooseWorktree,
+                  icon: const FileToolIcon(type: FileToolIconType.folder),
+                  label: Text(_workspace.name),
+                ),
+              ),
+            ),
           ChatComposer(
             controller: _message,
             focusNode: _focusNode,

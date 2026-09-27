@@ -10,7 +10,7 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
   ToolDefinition get definition => const ToolDefinition(
     name: 'searchTools',
     description:
-        'Find and load tools for your next model turn. Start with offset 0; use nextOffset only to inspect more matches. Search by a specific task in Chinese or English, or exact tool name. Available domains: web, image generation/editing (generateImage), music generation (generateMusic), reusable skills, Aurai AI contacts/address book, group chat creation/members/management, memory, conversation history/database, scheduled tasks, notifications, model balance/top-up, Android UI/apps/settings, network diagnostics, Android API/scripts and shell. Returns at most 5 relevant matches and loads them; up to 20 search candidates are kept separately from tools used during the current run, which remain loaded. Recent tools are restored from this conversation on later user messages. Explicit tool names in a query restrict results to those tools. Call tools already provided directly; search only when a needed tool is absent. Searching does not execute the tool or grant permission.',
+        'Find and load tools for your next model turn. Start with offset 0; use nextOffset only to inspect more matches. Search by a specific task in Chinese or English, or exact tool name. Available domains: web, image generation/editing (generateImage), music generation (generateMusic), reusable skills, Aurai AI contacts/address book, group chat creation/members/management, memory, conversation history/database, projects and Git, scheduled tasks, notifications, model balance/top-up, Android UI/apps/settings, network diagnostics, Android API/scripts and shell. Returns at most 5 relevant matches and loads them; up to 20 search candidates are kept separately from tools used during the current run, which remain loaded. Recent tools are restored from this conversation on later user messages. Explicit tool names in a query restrict results to those tools. Call tools already provided directly; search only when a needed tool is absent. Searching does not execute the tool or grant permission.',
     inputSchema: {
       'type': 'object',
       'properties': {
@@ -106,6 +106,8 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
         '附件 文档 文件 PDF Word 音频 视频 attachment file document audio video',
       'local.history' =>
         '群历史 群聊记录 读取群消息 历史 会话 消息 数据库 记录 group chat history conversation message database',
+      'local.git' =>
+        'Git 配置 用户名 邮箱 默认分支 HTTPS 令牌 token credentials identity branch version control',
       'android.accessibility' || 'android.observe' || 'screenAccess' =>
         '屏幕 界面 点击 输入 滚动 返回 主页 screen ui click input scroll back home',
       'images.generate' =>

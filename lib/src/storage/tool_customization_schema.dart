@@ -158,6 +158,7 @@ const toolNamesByDefaultIcon = <String, List<String>>{
     'readLocalDatabase',
     'writeTextFile',
     'replaceText',
+    'applyTextPatch',
     'renameDocument',
   ],
   'create-file': ['createTextFile'],

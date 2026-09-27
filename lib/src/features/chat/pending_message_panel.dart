@@ -14,10 +14,12 @@ class PendingMessagePanel extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onSend,
+    this.onEdit,
     required this.child,
   });
   final ChatController controller;
   final ValueChanged<String> onSend;
+  final ValueChanged<String>? onEdit;
   final Widget child;
 
   @override
@@ -158,6 +160,14 @@ class _PendingMessagePanelState extends State<PendingMessagePanel> {
     final action = await showHeaderActionMenu(
       anchor,
       items: [
+        if (widget.onEdit != null)
+          (
+            value: 'edit',
+            label: '编辑',
+            icon: const ConversationMenuIcon(
+              type: ConversationMenuIconType.rename,
+            ),
+          ),
         (
           value: 'send',
           label: '立刻发送',
@@ -186,6 +196,10 @@ class _PendingMessagePanelState extends State<PendingMessagePanel> {
           (message) => message.id == messageId,
         ))
       return;
+    if (action == 'edit') {
+      widget.onEdit?.call(messageId);
+      return;
+    }
     if (action == 'send') {
       widget.onSend(messageId);
       return;

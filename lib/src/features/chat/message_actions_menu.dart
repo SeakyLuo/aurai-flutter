@@ -38,6 +38,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   bool allowRecall = false,
   bool allowRetry = false,
   bool allowForward = false,
+  bool allowBranch = false,
   bool allowQuickReply = false,
   Set<String> sentQuickReplyKeys = const {},
 }) async {
@@ -105,6 +106,15 @@ Future<MessageMenuResult?> showMessageActionsMenu(
               color: iconColor,
             ),
             '转发',
+          ),
+        if (allowBranch)
+          (
+            const MessageActionResult(MessageAction.branch),
+            ConversationMenuIcon(
+              type: ConversationMenuIconType.branch,
+              color: iconColor,
+            ),
+            '创建分支',
           ),
         if (allowCopy && message.text.isNotEmpty)
           (

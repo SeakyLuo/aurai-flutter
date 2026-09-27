@@ -68,6 +68,30 @@ extension ChatMessageSubmission on _ChatPageState {
     }
   }
 
+  Future<void> _editQueuedMessage(String messageId) async {
+    final controller = widget.controller;
+    final conversationId = controller.activeConversation.id;
+    _draftTimer?.cancel();
+    try {
+      final restored = await controller.editPendingMessage(messageId);
+      if (!restored ||
+          !mounted ||
+          controller.activeConversation.id != conversationId)
+        return;
+      _mentions.clear();
+      _mentionText = controller.activeConversation.draft;
+      _textController.value = TextEditingValue(
+        text: _mentionText,
+        selection: TextSelection.collapsed(offset: _mentionText.length),
+      );
+      _focusNode.requestFocus();
+    } on Object catch (error) {
+      if (mounted && controller.activeConversation.id == conversationId) {
+        _showRunNotice(error);
+      }
+    }
+  }
+
   Future<void> _sendQueuedMessages(String messageId) async {
     final controller = widget.controller;
     final conversationId = controller.activeConversation.id;

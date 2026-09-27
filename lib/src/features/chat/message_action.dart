@@ -14,6 +14,7 @@ enum MessageAction {
   fullscreen,
   statistics,
   history,
+  branch,
 }
 
 sealed class MessageMenuResult {

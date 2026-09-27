@@ -23,6 +23,31 @@ class ConversationStore {
   late final AgentRunStore runs;
   late final GroupChatStore groups;
 
+  Future<String?> earliestGroupContextCheckpoint(
+    Conversation conversation,
+    Iterable<String> senderIds,
+  ) async {
+    final summaries = [
+      conversation.contextSummary,
+      for (final senderId in senderIds)
+        conversation.privateContextSummaries[senderId],
+    ];
+    if (summaries.any((summary) => summary == null)) return null;
+    final ids = summaries
+        .cast<ContextSummary>()
+        .map((summary) => summary.throughMessageId)
+        .toList();
+    final rows = await database.query(
+      'messages',
+      columns: ['id'],
+      where: 'id IN (${List.filled(ids.length, '?').join(', ')})',
+      whereArgs: ids,
+      orderBy: 'created_at, id',
+      limit: 1,
+    );
+    return rows.single['id']! as String;
+  }
+
   Future<String?> initialize(
     String imageDirectory,
     Future<String?> Function() loadLegacy,
@@ -161,14 +186,22 @@ class ConversationStore {
     final conversation = await reader.load(id, messageLimit: messageLimit);
     final rows = await database.query(
       'app_state',
-      where: 'key = ?',
-      whereArgs: ['context_summary:$id'],
+      where: 'key = ? OR key LIKE ?',
+      whereArgs: ['context_summary:$id', 'context_summary:$id:%'],
     );
-    if (rows.isNotEmpty) {
-      conversation.contextSummary = ContextSummary.fromJson(
-        (jsonDecode(rows.single['value']! as String) as Map)
-            .cast<String, Object?>(),
+    for (final row in rows) {
+      final summary = ContextSummary.fromJson(
+        (jsonDecode(row['value']! as String) as Map).cast<String, Object?>(),
       );
+      final key = row['key']! as String;
+      if (key == 'context_summary:$id') {
+        conversation.contextSummary = summary;
+      } else {
+        conversation.privateContextSummaries[key.substring(
+              'context_summary:$id:'.length,
+            )] =
+            summary;
+      }
     }
     writer.remember(conversation.messages);
     return conversation;
@@ -197,12 +230,13 @@ class ConversationStore {
       batch.delete('conversations', where: 'id = ?', whereArgs: [removed.id]);
       batch.delete(
         'app_state',
-        where: 'key IN (?, ?, ?, ?)',
+        where: 'key IN (?, ?, ?) OR key = ? OR key LIKE ?',
         whereArgs: [
-          'context_summary:${removed.id}',
           'seen_run:${removed.id}',
           'group_read:${removed.id}',
           'pending_message_queue:${removed.id}',
+          'context_summary:${removed.id}',
+          'context_summary:${removed.id}:%',
         ],
       );
       if (replacement.messageCount > 0) {

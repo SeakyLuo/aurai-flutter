@@ -91,9 +91,12 @@ class Conversation {
 
   bool hasEarlierMessages = false;
   ContextSummary? contextSummary;
+  final Map<String, ContextSummary> privateContextSummaries = {};
   SharedResponsesContext? sharedContext;
-  void beginSharedContext() =>
-      sharedContext = SharedResponsesContext(contextSummary);
+  void beginSharedContext() => sharedContext = SharedResponsesContext(
+    contextSummary,
+    privateContextSummaries,
+  );
   bool isCompacting = false;
   MessageQuote? draftQuote;
   String draft = '';

@@ -16,6 +16,7 @@ class OpenAiResponsesProvider implements ModelProvider {
     required String? systemPrompt,
     ModelConfig? summaryConfig,
     this.sharedContext,
+    this.sharedContextOwnerId,
   }) : _transport = ResponsesTransport(config),
        _summaryTransport = ResponsesTransport(summaryConfig ?? config),
        _context = ResponsesContext(
@@ -30,6 +31,7 @@ class OpenAiResponsesProvider implements ModelProvider {
   final ResponsesContext _context;
   final ResponsesTransport _summaryTransport;
   final SharedResponsesContext? sharedContext;
+  final String? sharedContextOwnerId;
 
   @override
   Future<ModelTurn> respond(ModelRequest request) async {
@@ -42,6 +44,7 @@ class OpenAiResponsesProvider implements ModelProvider {
             _context,
             request,
             _summaryTransport.summarize,
+            sharedContextOwnerId!,
           ));
     _transport.checkCancelled();
     final restart = request.continuationToken == null || compacted;

@@ -64,13 +64,17 @@ extension GroupConversationRun on ChatController {
           .where((m) => m.sender.kind == MessageSenderKind.agent)
           .map((m) => m.sender.id)
           .toList();
+      final contextCheckpoint = await _store.earliestGroupContextCheckpoint(
+        conversation,
+        ids,
+      );
       final data = await Future.wait<Object>([
         _store.groups.groupProfiles(conversation.id),
         _store.reader.messages(
           conversation.id,
           forModel: true,
           includeSystem: true,
-          afterCheckpoint: conversation.contextSummary?.throughMessageId,
+          afterCheckpoint: contextCheckpoint,
         ),
         GroupParticipation(_store.database).paused(conversation.id),
       ]);

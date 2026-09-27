@@ -97,7 +97,7 @@ class ProjectTool
       'setPinned' =>
         'Pin or unpin an existing project. Read listProjects first and use its internal project reference.',
       'setMemoryMode' =>
-        'Set whether an existing project shares each AI memory with chats outside the project or uses project-only memory. Existing memories are retained when switching modes.',
+        'Set whether AIs in a project may also read their own private memories. Every AI in the project always reads and writes the same project shared memory.',
       _ =>
         'Move the current conversation (private or group chat) into an existing project, or remove it from its project with null. Only the group owner or an administrator may change a group chat project. User approval does not override this role requirement. Read listProjects first when assigning a project.',
     },

@@ -169,6 +169,10 @@ extension MessageRecall on ChatController {
         dispatcher != null && !dispatcher.closed && !dispatcher.stopped;
     if (live) dispatcher.hold();
     try {
+      final summaryRevisions = await _revisedSummariesForRecall(
+        conversation,
+        message,
+      );
       await _store.writer.mutate(() async {
         await _store.database.transaction((txn) async {
           await txn.update(
@@ -211,11 +215,18 @@ extension MessageRecall on ChatController {
             r"WHERE id = ? AND json_extract(draft_quote_json, '$.messageId') = ?",
             ['消息已撤回', conversation.id, message.id],
           );
-          await txn.delete(
-            'app_state',
-            where: 'key = ?',
-            whereArgs: ['context_summary:${conversation.id}'],
-          );
+          if (summaryRevisions.isNotEmpty) {
+            final batch = txn.batch();
+            for (final entry in summaryRevisions.entries) {
+              batch.update(
+                'app_state',
+                {'value': jsonEncode(entry.value.toJson())},
+                where: 'key = ?',
+                whereArgs: [entry.key],
+              );
+            }
+            await batch.commit(noResult: true);
+          }
         });
         _store.writer.invalidateHistory(conversation.id);
         final copies = <Conversation>{
@@ -239,8 +250,20 @@ extension MessageRecall on ChatController {
           if (copy.draftQuote?.messageId == message.id) {
             copy.draftQuote = _recalledQuote(copy.draftQuote!);
           }
-          copy.contextSummary = null;
-          copy.sharedContext = null;
+          final public = summaryRevisions['context_summary:${conversation.id}'];
+          if (public != null) copy.contextSummary = public;
+          for (final entry in summaryRevisions.entries.where(
+            (entry) => entry.key != 'context_summary:${conversation.id}',
+          )) {
+            final senderId = entry.key.substring(
+              'context_summary:${conversation.id}:'.length,
+            );
+            copy.privateContextSummaries[senderId] = entry.value;
+          }
+          if (summaryRevisions.isNotEmpty) copy.sharedContext = null;
+        }
+        if (summaryRevisions.isNotEmpty && live) {
+          conversation.beginSharedContext();
         }
         if (live) _replaceRecalled(dispatcher.history, message.id, notice);
         _store.writer.remember([notice]);
@@ -272,6 +295,88 @@ extension MessageRecall on ChatController {
       if (live) dispatcher.release();
     }
   }
+
+  Future<Map<String, ContextSummary>> _revisedSummariesForRecall(
+    Conversation conversation,
+    AgentMessage message,
+  ) async {
+    final publicKey = 'context_summary:${conversation.id}';
+    final audience = message.interactive?.participation['audience'];
+    final candidates = <String, ContextSummary>{
+      if (audience == null && conversation.contextSummary != null)
+        publicKey: conversation.contextSummary!,
+      if (audience != null)
+        for (final senderId in (audience as List).cast<String>())
+          if (conversation.privateContextSummaries[senderId] != null)
+            '$publicKey:$senderId':
+                conversation.privateContextSummaries[senderId]!,
+    };
+    if (candidates.isEmpty || message.text.trim().isEmpty) return const {};
+
+    final checkpointRows = await _store.database.query(
+      'messages',
+      columns: ['id', 'created_at'],
+      where: 'id IN (${List.filled(candidates.length, '?').join(', ')})',
+      whereArgs: [
+        for (final summary in candidates.values) summary.throughMessageId,
+      ],
+    );
+    final checkpointTimes = {
+      for (final row in checkpointRows)
+        row['id']! as String: row['created_at']! as int,
+    };
+    final possible = candidates.entries.where((entry) {
+      final checkpoint = entry.value.throughMessageId;
+      final createdAt = checkpointTimes[checkpoint]!;
+      final coversMessage =
+          createdAt > message.createdAt.microsecondsSinceEpoch ||
+          (createdAt == message.createdAt.microsecondsSinceEpoch &&
+              checkpoint.compareTo(message.id) >= 0);
+      return coversMessage &&
+          _summaryMayContain(entry.value.text, message.text);
+    }).toList();
+    if (possible.isEmpty) return const {};
+
+    final revisions = await Future.wait([
+      for (final entry in possible)
+        ResponsesTransport(modelSettings.activeConfig)
+            .reviseSummaryForRecall(
+              summary: entry.value.text,
+              recalledMessage: message.text,
+              senderName: message.sender!.name,
+            )
+            .then((text) => (key: entry.key, old: entry.value, text: text)),
+    ]);
+    return {
+      for (final revision in revisions)
+        if (revision.text != revision.old.text)
+          revision.key: ContextSummary(
+            text: revision.text,
+            throughMessageId: revision.old.throughMessageId,
+          ),
+    };
+  }
+
+  bool _summaryMayContain(String summary, String message) {
+    final normalizedSummary = _summaryComparableText(summary);
+    final normalizedMessage = _summaryComparableText(message);
+    if (normalizedSummary.contains(normalizedMessage)) return true;
+    if (normalizedMessage.length < 6) return false;
+    final messageParts = _summaryParts(normalizedMessage);
+    final summaryParts = _summaryParts(normalizedSummary);
+    final shared = messageParts.where(summaryParts.contains).length;
+    return shared >= 2 && shared / messageParts.length >= 0.12;
+  }
+
+  String _summaryComparableText(String value) => value.toLowerCase().replaceAll(
+    RegExp(r'[\s，。！？、,.!?；;：:"“”‘’（）()【】\[\]{}<>《》]'),
+    '',
+  );
+
+  Set<String> _summaryParts(String value) => {
+    for (var index = 0; index <= value.length - 3; index++)
+      value.substring(index, index + 3),
+  };
 
   MessageQuote _recalledQuote(MessageQuote quote) => MessageQuote(
     messageId: quote.messageId,

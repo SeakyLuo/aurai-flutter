@@ -54,12 +54,16 @@ class WorkspaceFileChanges {
       if (rows == null) continue;
       for (final row in rows.cast<Map>()) {
         final path = row['path'] as String;
-        final previous = changes[path];
-        changes[path] = WorkspaceFileChange(
+        final workspace = output['workspaceRoot'] as String?;
+        final key = workspace == null ? path : '$workspace::$path';
+        final previous = changes[key];
+        changes[key] = WorkspaceFileChange(
           path,
           previous == null ? row['before'] as String? : previous.before,
           row['after'] as String?,
-          displayPath: row['displayPath'] as String?,
+          displayPath: workspace == null
+              ? row['displayPath'] as String?
+              : '${output['workspaceName']} · ${row['displayPath'] ?? path}',
           beforeLines: previous == null
               ? (row['beforeLines'] as List?)?.cast<String>()
               : previous.beforeLines,

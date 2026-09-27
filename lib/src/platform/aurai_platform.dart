@@ -237,6 +237,9 @@ class AuraiPlatform {
     'avatar': await notificationAvatar(conversationId),
   });
 
+  Future<String?> takeShortcutProject() =>
+      _channel.invokeMethod<String>('takeShortcutProject');
+
   Future<String?> takeNotificationConversation() =>
       _channel.invokeMethod<String>('takeNotificationConversation');
 
@@ -302,7 +305,9 @@ class AuraiPlatform {
   ) {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'stopAgent') await handler(call.arguments as String?);
-      if (call.method == 'notificationOpened') onNotification();
+      if (call.method == 'notificationOpened' ||
+          call.method == 'projectShortcutOpened')
+        onNotification();
     });
   }
 

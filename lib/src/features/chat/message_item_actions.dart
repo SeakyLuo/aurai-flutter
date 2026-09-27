@@ -103,6 +103,7 @@ extension _MessageItemActions on _MessageItemState {
               message.text.isNotEmpty ||
               message.images.isNotEmpty ||
               message.files.isNotEmpty),
+      allowBranch: widget.onBranch != null,
       allowQuickReply:
           widget.onQuickReply != null &&
           (!widget.streaming ||
@@ -233,6 +234,8 @@ extension _MessageItemActions on _MessageItemState {
             context,
           ).showGlassSnackBar(const SnackBar(content: Text('已转发')));
         }
+      case MessageAction.branch:
+        await widget.onBranch?.call(snapshot);
       case MessageAction.recall:
         await widget.onRecall?.call(snapshot);
       case MessageAction.quote:

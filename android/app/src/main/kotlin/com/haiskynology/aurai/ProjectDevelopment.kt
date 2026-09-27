@@ -17,6 +17,16 @@ object ProjectDevelopment {
     private val processes = java.util.concurrent.ConcurrentHashMap<String, Process>()
 
     fun execute(context: Context, callId: String, projectId: String, operation: String, arguments: Map<String, Any?>): Map<String, Any?> {
+        if (operation in setOf("beginProjectGitTask", "finishProjectGitTask", "abortProjectGitTask", "getProjectGitTaskChanges",
+                "getProjectGitTaskFileDiff", "restoreProjectGitTaskFile", "redoProjectGitTaskFile",
+                "discardProjectGitTaskChanges", "redoProjectGitTaskChanges")) {
+            return ProjectGitTasks.execute(context, projectId, operation, arguments)
+        }
+        if (operation in setOf("listProjectWorktrees", "createProjectWorktree", "mergeProjectWorktree",
+                "removeProjectWorktree", "getProjectWorktreeDiff", "getProjectWorktreeChanges",
+                "getProjectWorktreeFileDiff", "restoreProjectWorktreeFile", "discardProjectWorktreeChanges")) {
+            return ProjectWorktrees.execute(context, projectId, operation, arguments)
+        }
         val root = ManagedWorkspace.root(context, projectId).canonicalFile
         require(root.isDirectory) { "项目目录不存在" }
         return when (operation) {
@@ -28,6 +38,32 @@ object ProjectDevelopment {
             "commitProjectGit" -> commit(context, root, arguments["message"] as String)
             "pullProjectGit" -> pull(context, root)
             "pushProjectGit" -> push(context, root)
+            "checkoutProjectBranch" -> repository(root).use { repo ->
+                require(repo.directory.canonicalFile == repo.commonDirectory.canonicalFile) { "工作树固定使用自己的分支；请通过合并同步其他分支" }
+                val branch = arguments["branch"] as String
+                require(repo.exactRef(Constants.R_HEADS + branch) != null) { "分支不存在" }
+                val occupied = java.io.File(repo.commonDirectory, "worktrees").listFiles().orEmpty().any {
+                    val head = java.io.File(it, "HEAD")
+                    head.isFile && head.readText().trim() == "ref: ${Constants.R_HEADS}$branch"
+                }
+                require(!occupied) { "这个分支正在工作树中使用" }
+                Git(repo).use { git ->
+                    require(git.status().call().isClean && repo.repositoryState.canCheckout()) { "请先提交修改并完成当前 Git 操作" }
+                    git.checkout().setName(branch).call()
+                    mapOf("branch" to repo.branch, "switched" to true)
+                }
+            }
+            "mergeProjectBranch" -> repository(root).use { repo ->
+                Git(repo).use { git ->
+                    require(git.status().call().isClean) { "请先提交当前工作目录的修改" }
+                    val branch = arguments["branch"] as String
+                    val ref = repo.exactRef(Constants.R_HEADS + branch) ?: error("分支不存在")
+                    val result = git.merge().include(ref).setCommit(false).call()
+                    mapOf("merged" to result.mergeStatus.isSuccessful, "status" to result.mergeStatus.name,
+                        "conflicting" to git.status().call().conflicting.sorted(),
+                        "notice" to "如有冲突，请修改冲突文件后使用 commitProjectGit 完成合并。非快进合并也需要提交。")
+                }
+            }
             else -> error("不支持的项目开发操作")
         }
     }
@@ -141,7 +177,9 @@ object ProjectDevelopment {
 
     private fun pull(context: Context, root: java.io.File): Map<String, Any?> = repository(root).use { repository ->
         Git(repository).use { git ->
-            val command = git.pull().setRemote("origin")
+            val command = git.pull()
+                .setRemote("origin")
+                .setRemoteBranchName(repository.branch)
             GitConfiguration.credentials(context)?.let(command::setCredentialsProvider)
             val result = command.call()
             mapOf(
@@ -154,7 +192,9 @@ object ProjectDevelopment {
 
     private fun push(context: Context, root: java.io.File): Map<String, Any?> = repository(root).use { repository ->
         Git(repository).use { git ->
-            val command = git.push().setRemote("origin")
+            val command = git.push()
+                .setRemote("origin")
+                .add("refs/heads/${repository.branch}")
             GitConfiguration.credentials(context)?.let(command::setCredentialsProvider)
             val updates = command.call().flatMap { result ->
                 result.remoteUpdates.map { update ->

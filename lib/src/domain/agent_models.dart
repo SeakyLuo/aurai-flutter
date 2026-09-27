@@ -264,6 +264,7 @@ class AgentTaskSummary {
     this.stopped = false,
     required this.intermediateMessageIds,
     required this.activities,
+    this.gitChanges,
   });
 
   final int elapsedMilliseconds;
@@ -271,6 +272,7 @@ class AgentTaskSummary {
   final bool stopped;
   final List<String> intermediateMessageIds;
   final List<AgentTaskActivity> activities;
+  final ProjectGitTaskChanges? gitChanges;
 
   Map<String, Object?> toJson() => {
     'elapsedMilliseconds': elapsedMilliseconds,
@@ -278,6 +280,7 @@ class AgentTaskSummary {
     'stopped': stopped,
     'intermediateMessageIds': intermediateMessageIds,
     'activities': activities.map((activity) => activity.toJson()).toList(),
+    if (gitChanges != null) 'gitChanges': gitChanges!.toJson(),
   };
 
   factory AgentTaskSummary.fromJson(
@@ -294,7 +297,45 @@ class AgentTaskSummary {
               AgentTaskActivity.fromJson((item as Map).cast<String, Object?>()),
         )
         .toList(),
+    gitChanges: json['gitChanges'] == null
+        ? null
+        : ProjectGitTaskChanges.fromJson(
+            (json['gitChanges'] as Map).cast<String, Object?>(),
+          ),
   );
+}
+
+class ProjectGitTaskChanges {
+  const ProjectGitTaskChanges({
+    required this.workspaceId,
+    required this.taskId,
+    required this.fileCount,
+    required this.addedLines,
+    required this.removedLines,
+  });
+
+  final String workspaceId;
+  final String taskId;
+  final int fileCount;
+  final int addedLines;
+  final int removedLines;
+
+  Map<String, Object?> toJson() => {
+    'workspaceId': workspaceId,
+    'taskId': taskId,
+    'fileCount': fileCount,
+    'addedLines': addedLines,
+    'removedLines': removedLines,
+  };
+
+  factory ProjectGitTaskChanges.fromJson(Map<String, Object?> json) =>
+      ProjectGitTaskChanges(
+        workspaceId: json['workspaceId']! as String,
+        taskId: json['taskId']! as String,
+        fileCount: json['fileCount']! as int,
+        addedLines: json['addedLines']! as int,
+        removedLines: json['removedLines']! as int,
+      );
 }
 
 class AgentTaskActivity {
@@ -364,6 +405,8 @@ String _defaultToolTitle(String name) => switch (name) {
   'sendHtmlMessage' => '发送 HTML 消息',
   'readHtmlMessage' => '读取 HTML 消息',
   'readHtmlApp' => '读取小程序',
+  'mergeProjectBranch' => '合并项目分支',
+  'checkoutProjectBranch' => '切换项目分支',
   'updateHtmlApp' => '修改小程序',
   'updateHtmlMessage' => '更新 HTML 消息',
   'sendInteractiveMessage' => '发送交互消息',
@@ -517,6 +560,7 @@ String _defaultToolTitle(String name) => switch (name) {
   'readDocument' => '读取文档',
   'writeTextFile' => '修改文本文件',
   'replaceText' => '修改文本内容',
+  'applyTextPatch' => '应用文件补丁',
   'createFolder' => '新建文件夹',
   'renameDocument' => '重命名文件',
   'copyDocument' => '复制文件',
@@ -534,6 +578,11 @@ String _defaultToolTitle(String name) => switch (name) {
   'getProjectGitDiff' => '读取 Git 差异',
   'initializeProjectGit' => '初始化 Git 仓库',
   'setProjectGitRemote' => '设置 Git 远端',
+  'commitProjectGit' => '提交 Git 改动',
+  'pullProjectGit' => '拉取 Git 更新',
+  'pushProjectGit' => '推送 Git 分支',
+  'readGitConfiguration' => '读取 Git 设置',
+  'updateGitConfiguration' => '修改 Git 设置',
   'createTextFile' => '保存文件',
   'deliverFile' => '发送文件',
   'shareFile' => '分享文件',

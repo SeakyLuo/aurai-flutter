@@ -461,8 +461,10 @@ class ModelRequest {
     required this.capabilities,
     this.continuationToken,
     this.contextSummary,
+    this.privateContextSummary,
     this.personalContext = '',
     this.onContextSummary,
+    this.onPrivateContextSummary,
     this.onCompactionChanged,
     this.onTextChanged,
     this.onReasoningChanged,
@@ -478,8 +480,10 @@ class ModelRequest {
   final List<Capability> capabilities;
   final String? continuationToken;
   final ContextSummary? contextSummary;
+  final ContextSummary? privateContextSummary;
   final String personalContext;
   final Future<void> Function(ContextSummary)? onContextSummary;
+  final Future<void> Function(ContextSummary)? onPrivateContextSummary;
   final void Function(bool)? onCompactionChanged;
   final List<ToolResult> toolResults;
   final List<String> userUpdates;

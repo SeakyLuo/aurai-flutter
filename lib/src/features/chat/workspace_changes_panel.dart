@@ -5,6 +5,7 @@ import '../../domain/workspace_file_changes.dart';
 import 'chat_controller.dart';
 import 'glass_surface.dart';
 import 'workspace_changes_view.dart';
+import 'project_workspace_label.dart';
 
 /// A live task summary above the composer, using the same history as the card.
 class WorkspaceChangesPanel extends StatefulWidget {
@@ -30,13 +31,20 @@ class _WorkspaceChangesPanelState extends State<WorkspaceChangesPanel> {
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
-    if (!controller.isBusy) return widget.child;
+    final composer = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ProjectWorkspaceLabel(controller: controller),
+        widget.child,
+      ],
+    );
+    if (!controller.isBusy) return composer;
     final results = controller.steps.map((step) => step.resultJson).toList();
     if (!listEquals(_results, results)) {
       _results = results;
       _changes = WorkspaceFileChanges.fromResults(results);
     }
-    if (_changes.files.isEmpty) return widget.child;
+    if (_changes.files.isEmpty) return composer;
     final count = _changes.lineCount;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -84,7 +92,7 @@ class _WorkspaceChangesPanelState extends State<WorkspaceChangesPanel> {
             ),
           ),
         ),
-        widget.child,
+        composer,
       ],
     );
   }

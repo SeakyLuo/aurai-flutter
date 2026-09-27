@@ -256,7 +256,7 @@ extension GlobalTools on ChatController {
                 );
                 documents.project = projectId == null
                     ? null
-                    : await projects.read(projectId);
+                    : await projects.forConversation(projectId, target.id);
               },
               changed: _conversationChanged,
             ),
@@ -270,6 +270,7 @@ extension GlobalTools on ChatController {
                       : null),
               () => _store.writer.flush(),
             ),
+          if (groupId != null) GroupNoticeTool(groupStore, senderId, groupId),
           for (final write in [false, true])
             GroupAnnouncementTool(
               GroupAnnouncementStore(groupStore),
@@ -426,6 +427,8 @@ extension GlobalTools on ChatController {
           AppShellTool(_platform),
           for (final name in DocumentTool.names)
             DocumentTool(_platform, name, access: documents),
+          for (final update in [false, true])
+            GitConfigurationTool(_platform, update),
           if (documents.project case final project?
               when project.location == ProjectLocation.managed)
             for (final name in ProjectDevelopmentTool.names)

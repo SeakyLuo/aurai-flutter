@@ -14,6 +14,7 @@ import 'dialog_action_button.dart';
 import 'file_tool_icon.dart';
 import 'project_editor_page.dart';
 import 'project_icon.dart';
+import 'project_instructions_page.dart';
 import 'question_icon.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -99,6 +100,19 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
     final refreshed =
         project ?? await widget.controller.projects.read(_project.id);
     if (mounted) setState(() => _project = refreshed);
+  }
+
+  Future<void> _instructions() async {
+    final project = await Navigator.push<DevelopmentProject>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProjectInstructionsPage(
+          controller: widget.controller,
+          project: _project,
+        ),
+      ),
+    );
+    if (project != null && mounted) setState(() => _project = project);
   }
 
   Future<void> _openPath() async {
@@ -211,6 +225,17 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
                 subtitle: _project.gitRemoteUrl.isEmpty
                     ? '项目名称、介绍、图标和 Git 远端'
                     : _project.gitRemoteUrl,
+              ),
+              _row(
+                '自定义指令',
+                SettingsIcon(
+                  type: SettingsIconType.personalization,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                _instructions,
+                subtitle: _project.instructions.isEmpty
+                    ? '设置项目中 AI 的工作方式'
+                    : _project.instructions,
               ),
               _row(
                 '项目记忆',

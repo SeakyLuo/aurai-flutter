@@ -138,12 +138,14 @@ extension PeerConversations on ChatController {
             systemPrompt: prompt,
             summaryConfig: modelSettings.activeConfig,
             sharedContext: conversation.sharedContext,
+            sharedContextOwnerId: senderId,
           )
         : DeepSeekResponsesProvider(
             config,
             systemPrompt: prompt,
             summaryConfig: modelSettings.activeConfig,
             sharedContext: conversation.sharedContext,
+            sharedContextOwnerId: senderId,
           );
     final runId = await _store.runs.start(
       conversation.id,

@@ -13,6 +13,7 @@ enum ProjectLocation { external, managed }
 enum ProjectMemoryMode { shared, projectOnly }
 
 const projectNameMaxLength = 40;
+const projectInstructionsMaxLength = 10000;
 
 void validateProjectName(String name) {
   if (name.isEmpty) throw StateError('请填写项目名称');
@@ -26,6 +27,7 @@ class DevelopmentProject {
     required this.id,
     required this.name,
     this.description = '',
+    this.instructions = '',
     required this.icon,
     required this.iconColor,
     required this.rootUri,
@@ -37,11 +39,15 @@ class DevelopmentProject {
     this.memoryMode = ProjectMemoryMode.shared,
     this.defaultSenderId = 'agent:aurai',
     this.gitRemoteUrl = '',
+    this.worktreeId,
+    this.worktreeName,
+    this.worktreeDeleted = false,
   });
 
   final String id;
   final String name;
   final String description;
+  final String instructions;
   final String icon;
   final String iconColor;
   final String rootUri;
@@ -53,6 +59,34 @@ class DevelopmentProject {
   final ProjectMemoryMode memoryMode;
   final String defaultSenderId;
   final String gitRemoteUrl;
+  final String? worktreeId, worktreeName;
+  final bool worktreeDeleted;
+  String get workspaceId => worktreeId ?? id;
+
+  DevelopmentProject inWorktree(
+    String workspace,
+    String label, {
+    bool deleted = false,
+  }) => DevelopmentProject(
+    id: id,
+    name: name,
+    description: description,
+    instructions: instructions,
+    icon: icon,
+    iconColor: iconColor,
+    rootUri: 'aurai://project/$workspace',
+    location: location,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    archived: archived,
+    pinned: pinned,
+    memoryMode: memoryMode,
+    defaultSenderId: defaultSenderId,
+    gitRemoteUrl: gitRemoteUrl,
+    worktreeId: workspace,
+    worktreeName: label,
+    worktreeDeleted: deleted,
+  );
 
   factory DevelopmentProject.fromRow(
     Map<String, Object?> row,
@@ -60,6 +94,7 @@ class DevelopmentProject {
     id: row['id'] as String,
     name: row['name'] as String,
     description: row['description'] as String,
+    instructions: row['instructions'] as String,
     icon: row['icon'] as String,
     iconColor: row['icon_color'] as String,
     rootUri: row['root_uri'] as String,
@@ -77,6 +112,7 @@ class DevelopmentProject {
     'id': id,
     'name': name,
     'description': description,
+    'instructions': instructions,
     'icon': icon,
     'icon_color': iconColor,
     'root_uri': rootUri,
@@ -94,6 +130,73 @@ class DevelopmentProject {
 class DevelopmentProjects {
   const DevelopmentProjects(this.database);
   final Database database;
+  static final changingWorktrees = <String>{};
+  static int worktreeRevision = 0;
+
+  Future<void> bindWorktree(
+    String conversationId,
+    DevelopmentProject project,
+  ) async {
+    if (project.worktreeId == null) {
+      await unbindConversationWorktree(conversationId);
+      return;
+    }
+    await database.insert('app_state', {
+      'key': 'conversation_worktree:$conversationId',
+      'value': jsonEncode({
+        'projectId': project.id,
+        'id': project.worktreeId,
+        'name': project.worktreeName,
+      }),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    worktreeRevision++;
+  }
+
+  Future<void> markWorktreeDeleted(String id) async {
+    await database.rawUpdate(
+      "UPDATE app_state SET value = json_set(value, '\$.deleted', 1) "
+      "WHERE key LIKE 'conversation_worktree:%' AND json_extract(value, '\$.id') = ?",
+      [id],
+    );
+    worktreeRevision++;
+  }
+
+  Future<void> unbindConversationWorktree(String id) async {
+    await database.delete(
+      'app_state',
+      where: 'key = ?',
+      whereArgs: ['conversation_worktree:$id'],
+    );
+    worktreeRevision++;
+  }
+
+  Future<DevelopmentProject> forConversation(
+    String projectId,
+    String conversationId,
+  ) async {
+    final results = await Future.wait([
+      database.query(
+        'development_projects',
+        where: 'id = ?',
+        whereArgs: [projectId],
+      ),
+      database.query(
+        'app_state',
+        columns: ['value'],
+        where: 'key = ?',
+        whereArgs: ['conversation_worktree:$conversationId'],
+      ),
+    ]);
+    final project = DevelopmentProject.fromRow(results[0].single);
+    if (results[1].isEmpty) return project;
+    final binding = jsonDecode(results[1].single['value'] as String) as Map;
+    if (binding['projectId'] != projectId) throw StateError('会话的工作树与所属项目不一致');
+    return project.inWorktree(
+      binding['id'] as String,
+      binding['name'] as String,
+      deleted: binding['deleted'] == 1,
+    );
+  }
 
   Future<List<DevelopmentProject>> list() async => (await database.query(
     'development_projects',
@@ -176,6 +279,21 @@ class DevelopmentProjects {
         where: 'id = ?',
         whereArgs: [id],
       );
+
+  Future<void> setInstructions(String id, String instructions) {
+    if (instructions.characters.length > projectInstructionsMaxLength) {
+      throw StateError('项目自定义指令不能超过 $projectInstructionsMaxLength 个字');
+    }
+    return database.update(
+      'development_projects',
+      {
+        'instructions': instructions,
+        'updated_at': DateTime.now().microsecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 
   Future<void> setDefaultSender(String id, String senderId) => database.update(
     'development_projects',
@@ -334,7 +452,7 @@ class DevelopmentProjects {
   }) => database.transaction((txn) async {
     final rows = await txn.query(
       'conversations',
-      columns: ['kind'],
+      columns: ['kind', 'project_id'],
       where: 'id = ?',
       whereArgs: [conversationId],
       limit: 1,
@@ -343,6 +461,13 @@ class DevelopmentProjects {
       await GroupChatStore(
         database,
       ).requireManager(txn, conversationId, actorId);
+    }
+    if (rows.single['project_id'] != projectId) {
+      await txn.delete(
+        'app_state',
+        where: 'key = ?',
+        whereArgs: ['conversation_worktree:$conversationId'],
+      );
     }
     await txn.update(
       'conversations',

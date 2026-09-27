@@ -1,3 +1,4 @@
+import '../../platform/aurai_platform.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/glass_notice.dart';
@@ -17,6 +18,7 @@ Future<ProjectActionResult?> showProjectActions(
   ChatController controller,
   DevelopmentProject project, {
   bool? hasUnread,
+  bool allowHomeShortcut = false,
 }) async {
   final context = anchorContext;
   final unread =
@@ -41,6 +43,12 @@ Future<ProjectActionResult?> showProjectActions(
               : ConversationMenuIconType.pin,
         ),
       ),
+      if (allowHomeShortcut)
+        (
+          value: 'shortcut',
+          label: '添加到主屏幕',
+          icon: const SettingsIcon(type: SettingsIconType.home),
+        ),
       if (unread)
         (
           value: 'read',
@@ -72,6 +80,17 @@ Future<ProjectActionResult?> showProjectActions(
         return removed == true
             ? ProjectActionResult.removed
             : ProjectActionResult.changed;
+      case 'shortcut':
+        final result = await AuraiPlatform.instance.deviceExtension(
+          'pinProjectShortcut',
+          {'projectId': project.id, 'name': project.name},
+        );
+        if (context.mounted)
+          _notice(
+            context,
+            result['existing'] == true ? '主屏幕快捷方式已更新' : '已请求添加，请按桌面提示确认',
+          );
+        return null;
       case 'pin':
         await controller.setProjectPinned(project, !project.pinned);
         return ProjectActionResult.changed;

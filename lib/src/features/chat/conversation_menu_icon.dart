@@ -19,6 +19,7 @@ enum ConversationMenuIconType {
   rename,
   recall,
   retry,
+  branch,
   archive,
   unarchive,
   delete,
@@ -192,6 +193,21 @@ class _MenuIconPainter extends CustomPainter {
             ..lineTo(13, 8.5)
             ..cubicTo(21, 8.5, 21, 19.5, 13, 19.5)
             ..lineTo(9.5, 19.5),
+          pen,
+        );
+      case ConversationMenuIconType.branch:
+        canvas.drawPath(
+          Path()
+            ..moveTo(6, 4)
+            ..lineTo(6, 11)
+            ..quadraticBezierTo(6, 14, 9, 14)
+            ..lineTo(18, 14)
+            ..moveTo(14, 10)
+            ..lineTo(18, 14)
+            ..lineTo(14, 18)
+            ..moveTo(6, 11)
+            ..quadraticBezierTo(6, 8, 9, 8)
+            ..lineTo(13, 8),
           pen,
         );
       case ConversationMenuIconType.archive:
