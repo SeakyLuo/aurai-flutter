@@ -314,6 +314,7 @@ class ProjectGitTaskChanges {
     required this.removedLines,
     this.directoryName,
     this.directories = const [],
+    required this.previewFiles,
   });
 
   final String workspaceId;
@@ -323,6 +324,7 @@ class ProjectGitTaskChanges {
   final int removedLines;
   final String? directoryName;
   final List<ProjectGitTaskChanges> directories;
+  final List<ProjectGitTaskFileChange> previewFiles;
 
   Map<String, Object?> toJson() => {
     'workspaceId': workspaceId,
@@ -332,23 +334,61 @@ class ProjectGitTaskChanges {
     'removedLines': removedLines,
     'directoryName': directoryName,
     'directories': directories.map((item) => item.toJson()).toList(),
+    'previewFiles': previewFiles.map((item) => item.toJson()).toList(),
   };
 
-  factory ProjectGitTaskChanges.fromJson(Map<String, Object?> json) =>
-      ProjectGitTaskChanges(
-        workspaceId: json['workspaceId']! as String,
-        taskId: json['taskId']! as String,
-        fileCount: json['fileCount']! as int,
+  factory ProjectGitTaskChanges.fromJson(
+    Map<String, Object?> json,
+  ) => ProjectGitTaskChanges(
+    workspaceId: json['workspaceId']! as String,
+    taskId: json['taskId']! as String,
+    fileCount: json['fileCount']! as int,
+    addedLines: json['addedLines']! as int,
+    removedLines: json['removedLines']! as int,
+    directoryName: json['directoryName'] as String?,
+    directories: (json['directories'] as List? ?? const [])
+        .cast<Map>()
+        .map(
+          (item) =>
+              ProjectGitTaskChanges.fromJson(item.cast<String, Object?>()),
+        )
+        .toList(),
+    previewFiles: (json['previewFiles']! as List)
+        .cast<Map>()
+        .map(
+          (item) =>
+              ProjectGitTaskFileChange.fromJson(item.cast<String, Object?>()),
+        )
+        .toList(),
+  );
+}
+
+class ProjectGitTaskFileChange {
+  const ProjectGitTaskFileChange({
+    required this.path,
+    required this.addedLines,
+    required this.removedLines,
+    this.oldPath,
+  });
+
+  final String path;
+  final String? oldPath;
+  final int addedLines;
+  final int removedLines;
+
+  Map<String, Object?> toJson() => {
+    'path': path,
+    'oldPath': oldPath,
+    'addedLines': addedLines,
+    'removedLines': removedLines,
+  };
+
+  factory ProjectGitTaskFileChange.fromJson(Map<String, Object?> json) =>
+      ProjectGitTaskFileChange(
+        path: json['path']! as String,
+        oldPath: json['oldPath'] as String?,
         addedLines: json['addedLines']! as int,
         removedLines: json['removedLines']! as int,
-        directoryName: json['directoryName'] as String?,
-        directories: (json['directories'] as List? ?? const [])
-            .cast<Map>()
-            .map(
-              (item) =>
-                  ProjectGitTaskChanges.fromJson(item.cast<String, Object?>()),
-            )
-            .toList(),
       );
 }
 

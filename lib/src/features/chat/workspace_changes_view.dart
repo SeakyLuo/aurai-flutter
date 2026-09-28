@@ -186,3 +186,35 @@ class WorkspaceLineCounts extends StatelessWidget {
     ),
   );
 }
+
+class WorkspaceFilePathText extends StatelessWidget {
+  const WorkspaceFilePathText(this.path, {super.key});
+
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    final separator = path.lastIndexOf('/');
+    final prefix = separator < 0 ? '' : path.substring(0, separator + 1);
+    final name = separator < 0 ? path : path.substring(separator + 1);
+    final colors = Theme.of(context).colorScheme;
+    return Text.rich(
+      TextSpan(
+        children: [
+          if (prefix.isNotEmpty)
+            TextSpan(
+              text: prefix,
+              style: TextStyle(color: colors.onSurfaceVariant),
+            ),
+          TextSpan(
+            text: name,
+            style: TextStyle(color: colors.onSurface),
+          ),
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 13),
+    );
+  }
+}

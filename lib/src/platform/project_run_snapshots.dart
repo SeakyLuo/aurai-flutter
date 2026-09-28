@@ -43,6 +43,12 @@ class ProjectRunSnapshots {
       _pending.remove(directory);
       final files = result['changes'] as List;
       if (files.isEmpty) continue;
+      final previewFiles = files
+          .take(3)
+          .cast<Map>()
+          .map((file) => file.cast<String, Object?>())
+          .map(ProjectGitTaskFileChange.fromJson)
+          .toList();
       changes.add(
         ProjectGitTaskChanges(
           workspaceId: directory.workspaceId,
@@ -51,6 +57,7 @@ class ProjectRunSnapshots {
           fileCount: files.length,
           addedLines: result['addedLines'] as int,
           removedLines: result['removedLines'] as int,
+          previewFiles: previewFiles,
         ),
       );
     }
@@ -62,6 +69,10 @@ class ProjectRunSnapshots {
       addedLines: changes.fold(0, (sum, item) => sum + item.addedLines),
       removedLines: changes.fold(0, (sum, item) => sum + item.removedLines),
       directories: changes,
+      previewFiles: changes
+          .expand((item) => item.previewFiles)
+          .take(3)
+          .toList(),
     );
     await database.insert('app_state', {
       'key': 'git_task:$runId',

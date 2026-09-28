@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 enum QuestionIconType { question, close, userAction, play, pause, stop, undo }
 
 class QuestionIcon extends StatelessWidget {
-  const QuestionIcon({super.key, required this.type});
+  const QuestionIcon({super.key, required this.type, this.color});
   final QuestionIconType type;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => SizedBox.square(
@@ -12,7 +13,7 @@ class QuestionIcon extends StatelessWidget {
     child: CustomPaint(
       painter: _QuestionPainter(
         type,
-        Theme.of(context).colorScheme.onSurfaceVariant,
+        color ?? Theme.of(context).colorScheme.onSurfaceVariant,
       ),
     ),
   );
