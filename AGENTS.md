@@ -8,6 +8,7 @@
 - 设置页图标以 `lib/src/features/chat/settings_icon.dart` 中的 `SettingsIcon` 为准；其他入口可参考 `lib/src/features/chat/sidebar_action_icon.dart` 中的 `SidebarActionIcon`。
 - 当前线稿规范：24 × 24 画布、1.65 线宽、`PaintingStyle.stroke`、`StrokeCap.round`、`StrokeJoin.round`；默认颜色使用主题的 `colorScheme.onSurfaceVariant`，适配亮色与暗色模式。
 - 顶部圆形操作按钮的液态玻璃效果复用汉堡菜单使用的 `GlassSurface` 与 `RoundAction`，设置页优先使用 `SettingsGlassAction`。
+- 同一 AppBar 右侧同时出现两个或多个相邻操作时，必须放进同一个 `SettingsGlassActionSurface`，内部使用 `RoundAction` 和 `VerticalDivider` 拼接，禁止显示为多个分离的玻璃圆按钮。
 
 ## 弹框按钮
 

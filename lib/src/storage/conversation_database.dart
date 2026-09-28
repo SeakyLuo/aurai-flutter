@@ -27,7 +27,7 @@ import 'tool_customization_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 65,
+  version: 66,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -346,6 +346,13 @@ Future<Database> openConversationDatabase() async => openDatabase(
     if (oldVersion < 64) await migrateProjectDirectories(db);
     if (oldVersion >= 57 && oldVersion < 65) {
       await migrateToolCustomizationPrimaryKey(db);
+    }
+    if (oldVersion < 66) {
+      await db.delete(
+        'app_state',
+        where: 'key LIKE ?',
+        whereArgs: ['git_task:%'],
+      );
     }
   },
   onCreate: (db, version) async {
