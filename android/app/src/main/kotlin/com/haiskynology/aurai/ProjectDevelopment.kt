@@ -17,7 +17,7 @@ object ProjectDevelopment {
     private val processes = java.util.concurrent.ConcurrentHashMap<String, Process>()
 
     fun execute(context: Context, callId: String, projectId: String, operation: String, arguments: Map<String, Any?>): Map<String, Any?> {
-        if (operation in setOf("beginProjectGitTask", "finishProjectGitTask", "abortProjectGitTask", "getProjectGitTaskChanges",
+        if (operation in setOf("beginProjectGitTask", "rebaseProjectGitTask", "finishProjectGitTask", "abortProjectGitTask", "getProjectGitTaskChanges",
                 "getProjectGitTaskFileDiff", "restoreProjectGitTaskFile", "redoProjectGitTaskFile",
                 "discardProjectGitTaskChanges", "redoProjectGitTaskChanges")) {
             return ProjectGitTasks.execute(context, projectId, operation, arguments)

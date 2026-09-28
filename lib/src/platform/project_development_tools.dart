@@ -7,11 +7,17 @@ import 'android_network_tools.dart';
 import 'aurai_platform.dart';
 
 class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
-  ProjectDevelopmentTool(this.platform, this.project, this.name);
+  ProjectDevelopmentTool(
+    this.platform,
+    this.project,
+    this.name, {
+    this.onGitBaseChanged,
+  });
 
   final AuraiPlatform platform;
   final DevelopmentProject project;
   final String name;
+  final Future<void> Function(ProjectDirectory directory)? onGitBaseChanged;
   String? _activeCallId;
   ProjectDirectory _directory(Map<String, dynamic> args) {
     final matches = project.directories.where(
@@ -126,6 +132,15 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
             'operation': name,
             'arguments': call.arguments,
           });
+      final baseChanged = switch (name) {
+        'pullProjectGit' => output['pulled'] == true,
+        'checkoutProjectBranch' => output['switched'] == true,
+        'mergeProjectBranch' => output['merged'] == true,
+        _ => false,
+      };
+      if (baseChanged) {
+        await onGitBaseChanged?.call(directory);
+      }
       return ToolResult(
         callId: call.id,
         toolName: name,

@@ -37,6 +37,11 @@ object ProjectGitTasks {
                     capture(repo, root, taskId, "before")
                     mapOf("available" to true)
                 }
+                "rebaseProjectGitTask" -> {
+                    requireSnapshot(repo, taskId, "before")
+                    capture(repo, root, taskId, "before")
+                    mapOf("rebased" to true)
+                }
                 "finishProjectGitTask" -> {
                     requireSnapshot(repo, taskId, "before")
                     if (Git(repo).use { it.status().call().conflicting.isNotEmpty() }) {

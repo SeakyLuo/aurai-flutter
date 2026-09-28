@@ -12,6 +12,7 @@ extension GlobalTools on ChatController {
     required Iterable<AgentMessage> history,
     required AskUserTool questionTool,
     required WebSourceRegistry webSources,
+    Future<void> Function(ProjectDirectory directory)? onProjectGitBaseChanged,
     String? groupId,
   }) {
     final conversationId = conversation.id;
@@ -432,7 +433,12 @@ extension GlobalTools on ChatController {
           if (documents.project case final project?
               when project.directories.any((directory) => directory.managed))
             for (final name in ProjectDevelopmentTool.names)
-              ProjectDevelopmentTool(_platform, project, name),
+              ProjectDevelopmentTool(
+                _platform,
+                project,
+                name,
+                onGitBaseChanged: onProjectGitBaseChanged,
+              ),
           for (final name in DeviceExtensionTool.names)
             DeviceExtensionTool(_platform, name),
         ]
