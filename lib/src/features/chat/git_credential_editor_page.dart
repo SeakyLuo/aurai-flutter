@@ -78,7 +78,7 @@ class _GitCredentialEditorPageState extends State<GitCredentialEditorPage> {
   bool get _customHost => !_editing && widget.initialHost == null;
   bool get _github => _host.text == 'github.com';
   bool get _codeup => _host.text == 'codeup.aliyun.com';
-  bool get _automaticUsername => _github || _codeup;
+  bool get _automaticUsername => _github;
 
   @override
   void initState() {
@@ -200,7 +200,7 @@ class _GitCredentialEditorPageState extends State<GitCredentialEditorPage> {
                   widget.credential?.tokenConfigured == true
                       ? '已配置，留空保持不变'
                       : _codeup
-                      ? 'Aurai 会自动识别 Codeup 账号'
+                      ? '输入 Codeup 个人访问令牌'
                       : '输入密码或 Personal Access Token',
                   obscureText: _obscureToken,
                   sensitive: true,

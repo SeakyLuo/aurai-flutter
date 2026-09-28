@@ -8,6 +8,9 @@ import 'task_elapsed.dart';
 import 'cjk_strong_syntax.dart';
 import 'package:flutter/material.dart';
 import '../../app/global_ui.dart';
+import '../../app/glass_notice.dart';
+import '../../app/ui_action.dart';
+import '../../platform/aurai_platform.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../domain/agent_models.dart';
@@ -18,6 +21,10 @@ import 'chat_scroll_anchor.dart';
 import 'source_citation_syntax.dart';
 import 'source_citation_view.dart';
 import 'project_git_changes_page.dart';
+import 'app_confirmation_dialog.dart';
+import 'delete_confirmation_dialog.dart';
+import 'attachment_action_icon.dart';
+import 'question_icon.dart';
 
 class TaskSummaryView extends StatefulWidget {
   const TaskSummaryView({
@@ -226,23 +233,6 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
           ),
           const Divider(height: 1),
           const SizedBox(height: 12),
-          if (widget.summary.gitChanges case final gitChanges?)
-            Column(
-              children: [
-                for (final change
-                    in gitChanges.directories.isEmpty
-                        ? [gitChanges]
-                        : gitChanges.directories)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (change.directoryName != null)
-                        Text(change.directoryName!),
-                      _GitTaskChangesCard(changes: change),
-                    ],
-                  ),
-              ],
-            ),
           WorkspaceChangesView(
             changes: _fileChanges ??= WorkspaceFileChanges.fromResults(
               _otherFileResults(),
@@ -281,41 +271,245 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
   }
 }
 
-class _GitTaskChangesCard extends StatelessWidget {
-  const _GitTaskChangesCard({required this.changes});
+class GitTaskChangesView extends StatelessWidget {
+  const GitTaskChangesView({super.key, required this.changes});
 
   final ProjectGitTaskChanges changes;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Material(
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => Navigator.push<void>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProjectGitChangesPage.task(
-              projectId: changes.workspaceId,
-              taskId: changes.taskId,
+    padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final change
+            in changes.directories.isEmpty ? [changes] : changes.directories)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (change.directoryName case final name?) ...[
+                  Text(
+                    name,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                ],
+                _GitTaskChangesCard(changes: change),
+              ],
             ),
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Expanded(child: Text('已编辑 ${changes.fileCount} 个文件')),
-              WorkspaceLineCounts((
-                added: changes.addedLines,
-                removed: changes.removedLines,
-              )),
-            ],
-          ),
-        ),
-      ),
+      ],
     ),
   );
+}
+
+class _GitTaskChangesCard extends StatefulWidget {
+  const _GitTaskChangesCard({required this.changes});
+
+  final ProjectGitTaskChanges changes;
+
+  @override
+  State<_GitTaskChangesCard> createState() => _GitTaskChangesCardState();
+}
+
+class _GitTaskChangesCardState extends State<_GitTaskChangesCard> {
+  Map<String, Object?>? _data;
+  bool _busy = false;
+
+  Future<Map<String, Object?>> _invoke(String operation) =>
+      AuraiPlatform.instance.deviceExtension('projectDevelopmentOperation', {
+        'projectId': widget.changes.workspaceId,
+        'operation': operation,
+        'arguments': {'taskId': widget.changes.taskId},
+      });
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() => runUiAction(context, () async {
+    final data = await _invoke('getProjectGitTaskChanges');
+    if (mounted) setState(() => _data = data);
+  });
+
+  Future<void> _review() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProjectGitChangesPage.task(
+          projectId: widget.changes.workspaceId,
+          taskId: widget.changes.taskId,
+        ),
+      ),
+    );
+    if (mounted) await _load();
+  }
+
+  Future<void> _changeAll({required bool redo}) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => redo
+          ? const AppConfirmationDialog(
+              title: '重做全部修改？',
+              description: '恢复本次任务中已撤销的文件修改。文件在撤销后又有其他修改时不会覆盖。',
+              confirmLabel: '全部重做',
+              regular: true,
+            )
+          : const DeleteConfirmationDialog(
+              title: '撤销全部修改？',
+              description: '只撤销本次任务记录的文件修改，不移动当前分支，也不覆盖这些文件之后产生的修改。',
+              confirmLabel: '全部撤销',
+            ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    await runUiAction(context, () async {
+      await _invoke(
+        redo ? 'redoProjectGitTaskChanges' : 'discardProjectGitTaskChanges',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showGlassSnackBar(
+        SnackBar(content: Text(redo ? '已重做全部修改' : '已撤销全部修改')),
+      );
+      await _load();
+    });
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final data = _data;
+    final available = data?['available'] != false;
+    final files = data == null || !available
+        ? const <Map<String, Object?>>[]
+        : (data['changes'] as List)
+              .cast<Map>()
+              .map((item) => item.cast<String, Object?>())
+              .toList();
+    final hasConflict = files.any((file) => file['conflict'] == true);
+    final hasPending = files.any((file) => file['reverted'] != true);
+    final allReverted = files.isNotEmpty && !hasPending;
+    final canChange =
+        data != null && available && files.isNotEmpty && !hasConflict;
+    final added = data?['addedLines'] as int? ?? widget.changes.addedLines;
+    final removed =
+        data?['removedLines'] as int? ?? widget.changes.removedLines;
+    return Material(
+      color: colors.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colors.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: AttachmentActionIcon(
+                    type: AttachmentActionIconType.file,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${allReverted ? '已撤销' : '已编辑'} ${widget.changes.fileCount} 个文件',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      WorkspaceLineCounts((added: added, removed: removed)),
+                    ],
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _busy || !canChange
+                      ? null
+                      : () => _changeAll(redo: allReverted),
+                  icon: const QuestionIcon(type: QuestionIconType.undo),
+                  label: Text(allReverted ? '重做' : '撤销'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 40),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                TextButton(
+                  onPressed: _busy ? null : _review,
+                  style: TextButton.styleFrom(
+                    foregroundColor: colors.onSurface,
+                    backgroundColor: colors.surfaceContainerHighest,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    minimumSize: const Size(0, 40),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: const Text('审核'),
+                ),
+              ],
+            ),
+          ),
+          if (files.isNotEmpty) ...[
+            Divider(height: 1, color: colors.outlineVariant),
+            for (final file in files.take(3))
+              InkWell(
+                onTap: _busy ? null : _review,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          file['path']! as String,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: file['reverted'] == true
+                                ? colors.onSurfaceVariant
+                                : colors.onSurface,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      WorkspaceLineCounts((
+                        added: file['addedLines']! as int,
+                        removed: file['removedLines']! as int,
+                      )),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
 }

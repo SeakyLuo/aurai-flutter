@@ -7,9 +7,7 @@ import org.eclipse.jgit.transport.CredentialsProvider
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
 import java.net.URI
-import java.net.URL
 
 object GitConfiguration {
     fun read(context: Context): Map<String, Any?> {
@@ -77,41 +75,11 @@ object GitConfiguration {
         require(token.isNotEmpty()) { "请先配置 $host 的 HTTPS 密码或访问令牌" }
         val username = credential.optString("username").ifEmpty {
             when (host) {
-                CODEUP_HOST -> resolveCodeupUsername(context, remoteUrl, token)
                 "github.com" -> "git"
                 else -> error("请先配置 $host 的 HTTPS 用户名")
             }
         }
         return UsernamePasswordCredentialsProvider(username, token)
-    }
-
-    private fun resolveCodeupUsername(context: Context, remoteUrl: String, token: String): String {
-        val organizationId = URI(remoteUrl).path.trim('/').substringBefore('/')
-        require(organizationId.matches(Regex("[a-fA-F0-9]{24}"))) { "Codeup 仓库地址缺少组织 ID" }
-        val userId = getCodeupJson("https://$CODEUP_HOST/oapi/v1/platform/user", token).getString("id")
-        val username = getCodeupJson(
-            "https://$CODEUP_HOST/oapi/v1/codeup/organizations/$organizationId/users/$userId/httpsCloneUsername",
-            token,
-        ).getString("httpsCloneUsername")
-        val values = load(context)
-        val credentials = values.getJSONArray("httpsCredentials")
-        for (index in 0 until credentials.length()) {
-            val credential = credentials.getJSONObject(index)
-            if (credential.getString("host") == CODEUP_HOST) credential.put("username", username)
-        }
-        save(context, values)
-        return username
-    }
-
-    private fun getCodeupJson(url: String, token: String): JSONObject {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.requestMethod = "GET"
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 15_000
-        connection.setRequestProperty("Accept", "application/json")
-        connection.setRequestProperty("x-yunxiao-token", token)
-        require(connection.responseCode in 200..299) { "Codeup 账号识别失败（HTTP ${connection.responseCode}）" }
-        return connection.inputStream.bufferedReader().use { JSONObject(it.readText()) }
     }
 
     private fun JSONArray?.toPublicCredentials(): List<Map<String, Any?>> =
@@ -133,8 +101,7 @@ object GitConfiguration {
     private fun validHost(host: String): Boolean =
         host.matches(Regex("[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?")) && host.contains('.')
 
-    private const val CODEUP_HOST = "codeup.aliyun.com"
-    private val AUTOMATIC_USERNAME_HOSTS = setOf(CODEUP_HOST, "github.com")
+    private val AUTOMATIC_USERNAME_HOSTS = setOf("github.com")
 
     private fun load(context: Context): JSONObject {
         val file = context.getDatabasePath("aurai.sqlite")

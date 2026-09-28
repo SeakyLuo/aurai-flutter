@@ -60,7 +60,7 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
     }
   }
 
-  Future<void> _save() async {
+  Future<void> _save({bool close = true}) async {
     if (_saving || _branch.text.trim().isEmpty) return;
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _saving = true);
@@ -85,6 +85,7 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
             .map(GitHttpsCredential.fromPlatform)
             .toList();
       });
+      if (close) Navigator.pop(context);
     } on Object catch (error) {
       if (mounted) _notice(errorMessage(error));
     } finally {
@@ -113,7 +114,7 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
                 )
               : const SettingsIcon(type: SettingsIconType.check),
           onPressed: !_loading && !_saving && _branch.text.trim().isNotEmpty
-              ? _save
+              ? () => _save()
               : null,
         ),
       ],
@@ -296,6 +297,6 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
         _credentials[index] = result.credential!;
       }
     });
-    await _save();
+    await _save(close: false);
   }
 }

@@ -35,7 +35,7 @@ class ProviderConfigurationTool
     capabilityId: 'local.app',
     safety: name == 'listModelProviders'
         ? ToolSafety.readOnly
-        : ToolSafety.sensitive,
+        : ToolSafety.lowRisk,
     waitsForUser: name == 'requestModelProviderKey',
     executionTimeout: name == 'requestModelProviderKey'
         ? const Duration(minutes: 10)

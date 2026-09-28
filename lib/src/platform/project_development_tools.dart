@@ -88,7 +88,8 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
     },
     safety: switch (name) {
       'getProjectGitStatus' || 'getProjectGitDiff' => ToolSafety.readOnly,
-      _ => ToolSafety.sensitive,
+      'runProjectCommand' => ToolSafety.sensitive,
+      _ => ToolSafety.lowRisk,
     },
     singleUseConfirmation: name == 'runProjectCommand',
     executionTimeout: const Duration(seconds: 130),

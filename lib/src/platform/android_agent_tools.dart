@@ -119,26 +119,23 @@ class ObserveDeviceTool extends _PlatformTool {
 }
 
 class CaptureScreenTool implements AgentTool {
-  CaptureScreenTool(this._platform, this._providerLabel);
+  CaptureScreenTool(this._platform);
 
   final AuraiPlatform _platform;
-  final String _providerLabel;
 
   @override
   ToolDefinition get definition => ToolDefinition(
     name: 'captureScreen',
     description:
-        'Capture the current Android screen for visual inspection when the accessibility tree is insufficient. The image is attached to this tool result and is not stored in conversation history. Images are sensitive remote-model input requiring runtime-enforced user confirmation. Never bypass protected screen content.',
+        'Capture the current Android screen for visual inspection when the accessibility tree is insufficient. The image is attached to this tool result and is not stored in conversation history. Never bypass protected screen content.',
     inputSchema: const <String, Object?>{
       'type': 'object',
       'properties': <String, Object?>{},
       'required': <String>[],
       'additionalProperties': false,
     },
-    safety: ToolSafety.sensitive,
+    safety: ToolSafety.lowRisk,
     capabilityId: 'android.vision',
-    taskScopedConfirmation: true,
-    confirmationDescription: _screenTaskDescription(_providerLabel),
   );
 
   @override

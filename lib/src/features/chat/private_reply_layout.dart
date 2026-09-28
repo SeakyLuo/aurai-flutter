@@ -8,12 +8,14 @@ class PrivateReplyPart {
     required this.last,
     required this.copyText,
     required this.summary,
+    this.gitChanges,
   });
 
   final bool first;
   final bool last;
   final String copyText;
   final AgentTaskSummary? summary;
+  final ProjectGitTaskChanges? gitChanges;
 }
 
 Set<String> richReplyRuns(Iterable<AgentMessage> messages) => {
@@ -75,6 +77,7 @@ Map<String, PrivateReplyPart> privateReplyLayout(
         text.add(message.htmlGame?.title ?? message.text);
       }
     }
+    final gitChanges = summary?.gitChanges;
     final process = summary == null
         ? null
         : AgentTaskSummary(
@@ -88,7 +91,6 @@ Map<String, PrivateReplyPart> privateReplyLayout(
                       activity.toolName != null || activity.isReasoning,
                 )
                 .toList(),
-            gitChanges: summary.gitChanges,
           );
     final copyText = text.where((part) => part.isNotEmpty).join('\n\n');
     for (var i = start; i < end; i++) {
@@ -97,6 +99,7 @@ Map<String, PrivateReplyPart> privateReplyLayout(
         last: i == end - 1,
         copyText: copyText,
         summary: i == start ? process : null,
+        gitChanges: i == end - 1 ? gitChanges : null,
       );
     }
     start = end;

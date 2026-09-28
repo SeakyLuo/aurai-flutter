@@ -4,6 +4,7 @@ import android.database.Cursor
 import android.database.MatrixCursor
 import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
+import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import android.provider.DocumentsContract.Root
 import android.provider.DocumentsProvider
@@ -77,6 +78,23 @@ class ManagedWorkspaceDocumentsProvider : DocumentsProvider() {
         val parent = resolve(parentDocumentId)
         val child = resolve(documentId)
         return child != parent && child.path.startsWith(parent.path + File.separator)
+    }
+
+    override fun findDocumentPath(parentDocumentId: String?, childDocumentId: String): DocumentsContract.Path {
+        val child = resolve(childDocumentId)
+        val parent = parentDocumentId?.let(::resolve) ?: workspaceRoot()
+        require(child == parent || child.path.startsWith(parent.path + File.separator)) { "目录不属于指定路径" }
+        val documentIds = buildList {
+            add(documentId(parent))
+            if (child != parent) {
+                var current = parent
+                child.relativeTo(parent).invariantSeparatorsPath.split('/').forEach { name ->
+                    current = File(current, name)
+                    add(documentId(current))
+                }
+            }
+        }
+        return DocumentsContract.Path(ROOT_ID, documentIds)
     }
 
     override fun getDocumentType(documentId: String): String = mimeType(resolve(documentId))

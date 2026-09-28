@@ -66,8 +66,7 @@ class ProjectTool
   ToolDefinition get definition => ToolDefinition(
     name: _toolName,
     capabilityId: 'local.app',
-    safety: operation == 'list' ? ToolSafety.readOnly : ToolSafety.sensitive,
-    singleUseConfirmation: operation != 'list',
+    safety: operation == 'list' ? ToolSafety.readOnly : ToolSafety.lowRisk,
     confirmationDescriptionBuilder: (arguments) => switch (operation) {
       'create' => '是否在 Aurai 中创建项目“${arguments['name']}”？',
       'rename' => '是否将项目“$_projectName”重命名为“${arguments['name']}”？',

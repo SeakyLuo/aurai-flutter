@@ -198,7 +198,8 @@ List<ChatTimelineEntry> buildChatTimeline(
         .add(
           ChatTimelineEntry(
             storageId,
-            (_) => entry.step.toolName == 'askUser'
+            (_) =>
+                entry.step.toolName == 'askUser' || group.end - group.start == 1
                 ? _ToolActivity(
                     storageId: storageId,
                     step: entry.step,
