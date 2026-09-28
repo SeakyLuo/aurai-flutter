@@ -103,34 +103,8 @@ extension ConversationRun on ChatController {
       responsePreferences: responsePreferences,
     );
     runConversation.activeRunId = runId;
-    var gitTaskStarted = false;
-    var gitTaskFinished = false;
-    if (project?.location == ProjectLocation.managed) {
-      final result = await _platform.deviceExtension(
-        'projectDevelopmentOperation',
-        {
-          'projectId': project!.workspaceId,
-          'operation': 'beginProjectGitTask',
-          'arguments': {'taskId': runId},
-        },
-      );
-      gitTaskStarted = result['available'] == true;
-      if (gitTaskStarted) {
-        await _store.database.rawInsert(
-          'INSERT OR REPLACE INTO app_state(key, value) VALUES (?, ?)',
-          [
-            'git_task:$runId',
-            jsonEncode({
-              'workspaceId': project.workspaceId,
-              'taskId': runId,
-              'fileCount': 0,
-              'addedLines': 0,
-              'removedLines': 0,
-            }),
-          ],
-        );
-      }
-    }
+    final gitSnapshots = ProjectRunSnapshots(_platform, _store.database, runId);
+    if (project != null) await gitSnapshots.begin(project.directories);
     steps.clear();
     final runStepStart = runConversation.liveToolSteps.length;
     runConversation.errorDetail = null;
@@ -598,62 +572,7 @@ extension ConversationRun on ChatController {
         if (!runMessageIds.contains(message.id)) runMessageIds.add(message.id);
       }
       executionWatch.stop();
-      ProjectGitTaskChanges? completedGitChanges;
-      if (gitTaskStarted) {
-        final result = await _platform.deviceExtension(
-          'projectDevelopmentOperation',
-          {
-            'projectId': project!.workspaceId,
-            'operation': 'finishProjectGitTask',
-            'arguments': {'taskId': runId},
-          },
-        );
-        gitTaskFinished = result['available'] == true;
-        final files = gitTaskFinished
-            ? result['changes']! as List
-            : const <Object?>[];
-        if (files.isNotEmpty) {
-          completedGitChanges = ProjectGitTaskChanges(
-            workspaceId: project.workspaceId,
-            taskId: runId,
-            fileCount: files.length,
-            addedLines: result['addedLines']! as int,
-            removedLines: result['removedLines']! as int,
-          );
-          final latestKey = 'git_latest:${project.workspaceId}';
-          final previous = await _store.database.query(
-            'app_state',
-            columns: ['value'],
-            where: 'key = ?',
-            whereArgs: [latestKey],
-            limit: 1,
-          );
-          final previousTaskId = previous.firstOrNull?['value'] as String?;
-          await _store.database.transaction((txn) async {
-            if (previousTaskId != null && previousTaskId != runId) {
-              await txn.delete(
-                'app_state',
-                where: 'key = ?',
-                whereArgs: ['git_task:$previousTaskId'],
-              );
-            }
-            await txn.rawInsert(
-              'INSERT OR REPLACE INTO app_state(key, value) VALUES (?, ?)',
-              ['git_task:$runId', jsonEncode(completedGitChanges!.toJson())],
-            );
-            await txn.rawInsert(
-              'INSERT OR REPLACE INTO app_state(key, value) VALUES (?, ?)',
-              [latestKey, runId],
-            );
-          });
-        } else {
-          await _store.database.delete(
-            'app_state',
-            where: 'key = ?',
-            whereArgs: ['git_task:$runId'],
-          );
-        }
-      }
+      final completedGitChanges = await gitSnapshots.finish();
       final hasReasoning = activities.any((activity) => activity.isReasoning);
       if (runMessageIds.isNotEmpty &&
           (runConversation.hasExecutionProcess || hasReasoning)) {
@@ -732,27 +651,13 @@ extension ConversationRun on ChatController {
       }
       outcome = 'completed';
     } on Object catch (error, stack) {
-      failureDiagnostic = '${error.runtimeType}: $error\n$stack';
-      if (runConfig.apiKey.isNotEmpty) {
-        failureDiagnostic = failureDiagnostic.replaceAll(
-          runConfig.apiKey,
-          '[redacted]',
-        );
-      }
-      await ExecutionLog.write({
-        'event': 'run_error',
-        'conversationId': runConversation.id,
-        'senderId': reply.senderId,
-        'senderName': reply.sender.name,
-        'runId': runId,
-        'model': runConfig.model,
-        'diagnostic': failureDiagnostic,
-      }, apiKey: runConfig.apiKey);
-      developer.log(
-        '会话执行失败：${errorMessage(error)}',
-        name: 'aurai.execution',
-        error: error,
-        stackTrace: stack,
+      failureDiagnostic = await _logRunFailure(
+        error,
+        stack,
+        config: runConfig,
+        conversationId: runConversation.id,
+        sender: reply.sender,
+        runId: runId,
       );
       if (runConversation.runState == ChatRunState.stopping ||
           error is AgentCancelled) {
@@ -843,18 +748,7 @@ extension ConversationRun on ChatController {
           );
         }
       } finally {
-        if (gitTaskStarted && !gitTaskFinished) {
-          await _platform.deviceExtension('projectDevelopmentOperation', {
-            'projectId': project!.workspaceId,
-            'operation': 'abortProjectGitTask',
-            'arguments': {'taskId': runId},
-          });
-          await _store.database.delete(
-            'app_state',
-            where: 'key = ?',
-            whereArgs: ['git_task:$runId'],
-          );
-        }
+        await gitSnapshots.abort();
         if (groupParent != null &&
             outcome == 'completed' &&
             !leftSleepDraft &&

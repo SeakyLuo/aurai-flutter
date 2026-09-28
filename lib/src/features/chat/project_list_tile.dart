@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../storage/development_projects.dart';
+import 'message_time.dart';
 import 'project_icon.dart';
 import 'settings_appearance.dart';
 
@@ -81,20 +82,9 @@ class ProjectListTile extends StatelessWidget {
         ),
       ),
       title: Text(project.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(projectUpdatedLabel(project.updatedAt)),
+      subtitle: Text(conversationMessageTime(project.updatedAt)),
       trailing: trailing,
       onTap: onTap,
     ),
   );
-}
-
-String projectUpdatedLabel(DateTime value) {
-  final now = DateTime.now();
-  if (value.year == now.year &&
-      value.month == now.month &&
-      value.day == now.day) {
-    return '今天';
-  }
-  if (value.year == now.year) return '${value.month}月${value.day}日';
-  return '${value.year}年${value.month}月${value.day}日';
 }

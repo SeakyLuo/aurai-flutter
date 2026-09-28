@@ -312,6 +312,8 @@ class ProjectGitTaskChanges {
     required this.fileCount,
     required this.addedLines,
     required this.removedLines,
+    this.directoryName,
+    this.directories = const [],
   });
 
   final String workspaceId;
@@ -319,6 +321,8 @@ class ProjectGitTaskChanges {
   final int fileCount;
   final int addedLines;
   final int removedLines;
+  final String? directoryName;
+  final List<ProjectGitTaskChanges> directories;
 
   Map<String, Object?> toJson() => {
     'workspaceId': workspaceId,
@@ -326,6 +330,8 @@ class ProjectGitTaskChanges {
     'fileCount': fileCount,
     'addedLines': addedLines,
     'removedLines': removedLines,
+    'directoryName': directoryName,
+    'directories': directories.map((item) => item.toJson()).toList(),
   };
 
   factory ProjectGitTaskChanges.fromJson(Map<String, Object?> json) =>
@@ -335,6 +341,14 @@ class ProjectGitTaskChanges {
         fileCount: json['fileCount']! as int,
         addedLines: json['addedLines']! as int,
         removedLines: json['removedLines']! as int,
+        directoryName: json['directoryName'] as String?,
+        directories: (json['directories'] as List? ?? const [])
+            .cast<Map>()
+            .map(
+              (item) =>
+                  ProjectGitTaskChanges.fromJson(item.cast<String, Object?>()),
+            )
+            .toList(),
       );
 }
 

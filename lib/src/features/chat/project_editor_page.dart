@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
-import '../../platform/aurai_platform.dart';
+import '../../storage/project_directory.dart';
+import 'project_directory_picker.dart';
+import 'file_tool_icon.dart';
 import '../../skills/skill_icon.dart';
 import '../../storage/development_projects.dart';
 import 'chat_controller.dart';
 import 'app_dialog.dart';
 import 'avatar_background.dart';
 import 'avatar_symbol_picker.dart';
-import 'file_tool_icon.dart';
 import 'glass_surface.dart';
 import 'header_action_menu.dart';
 import 'project_icon.dart';
@@ -30,30 +31,26 @@ class _ProjectEditorPageState extends State<ProjectEditorPage> {
   late final _description = TextEditingController(
     text: widget.project?.description,
   );
-  late final _gitRemote = TextEditingController(
-    text: widget.project?.gitRemoteUrl,
+  late final _instructions = TextEditingController(
+    text: widget.project?.instructions,
   );
-  final _platform = AuraiPlatform.instance;
   late String _icon = widget.project?.icon ?? 'file';
   late String _iconColor = widget.project?.iconColor ?? 'ink';
-  late _ProjectLocationChoice _location =
-      widget.project?.location == ProjectLocation.external
-      ? _ProjectLocationChoice.external
-      : _ProjectLocationChoice.managed;
-  late String? _folderUri = widget.project?.rootUri;
-  String? _folderName;
+  bool _managed = true;
+  List<ProjectDirectory> _directories = [];
   bool _busy = false;
-
   bool get _canSave =>
       _name.text.trim().isNotEmpty &&
       _name.text.trim().characters.length <= projectNameMaxLength &&
-      (_location == _ProjectLocationChoice.managed || _folderUri != null);
+      _instructions.text.trim().characters.length <=
+          projectInstructionsMaxLength &&
+      (widget.project != null || _managed || _directories.isNotEmpty);
 
   @override
   void dispose() {
     _name.dispose();
     _description.dispose();
-    _gitRemote.dispose();
+    _instructions.dispose();
     super.dispose();
   }
 
@@ -110,67 +107,39 @@ class _ProjectEditorPageState extends State<ProjectEditorPage> {
     }
   }
 
-  Future<void> _chooseFolder() async {
-    setState(() => _busy = true);
-    try {
-      final output = await _platform.deviceExtension('requestDocumentFolder', {
-        'uri': _folderUri,
-      });
-      if (output['cancelled'] == true) return;
-      final uri = output['selectedUri'] as String? ?? _folderUri!;
-      final folders = await _platform.deviceExtension('getDocumentFolders');
-      final folder = (folders['folders'] as List)
-          .map((item) => (item as Map).cast<String, Object?>())
-          .singleWhere((item) => item['uri'] == uri);
-      if (!mounted) return;
-      setState(() {
-        _location = _ProjectLocationChoice.external;
-        _folderUri = uri;
-        _folderName = folder['name'] as String;
-        if (_name.text.trim().isEmpty) _name.text = _folderName!;
-      });
-    } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   Future<void> _save() async {
     if (!_canSave || _busy) return;
     setState(() => _busy = true);
     try {
       final name = _name.text.trim();
       final description = _description.text.trim();
-      final gitRemoteUrl = _gitRemote.text.trim();
-      if (gitRemoteUrl.isNotEmpty && !_validGitRemote(gitRemoteUrl)) {
-        _notice('请输入 HTTPS 或 SSH Git 地址');
-        return;
-      }
+      final instructions = _instructions.text.trim();
       final project = widget.project != null
           ? await widget.controller.updateProjectProfile(
               widget.project!,
               name: name,
               description: description,
+              instructions: instructions,
               icon: _icon,
               iconColor: _iconColor,
-              gitRemoteUrl: gitRemoteUrl,
             )
-          : _location == _ProjectLocationChoice.managed
+          : _managed
           ? await widget.controller.createManagedProject(
               name,
               _icon,
               _iconColor,
               description: description,
-              gitRemoteUrl: gitRemoteUrl,
+              instructions: instructions,
+              directories: _directories,
+              directoryNames: [name],
             )
           : await widget.controller.createExternalProject(
               name,
               _icon,
               _iconColor,
-              _folderUri!,
+              _directories,
               description: description,
-              gitRemoteUrl: gitRemoteUrl,
+              instructions: instructions,
             );
       if (mounted) Navigator.pop(context, project);
     } on Object catch (error) {
@@ -264,68 +233,67 @@ class _ProjectEditorPageState extends State<ProjectEditorPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      '项目介绍',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  if (widget.project != null) ...[
+                    const SizedBox(height: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        '项目介绍',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _description,
-                    enabled: !_busy,
-                    minLines: 3,
-                    maxLines: 6,
-                    maxLength: 1000,
-                    decoration: InputDecoration(
-                      hintText: '作为背景信息提供给 AI',
-                      filled: true,
-                      fillColor: settingsFieldColor(context),
-                      contentPadding: const EdgeInsets.all(18),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(26),
-                        borderSide: BorderSide.none,
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _description,
+                      enabled: !_busy,
+                      minLines: 3,
+                      maxLines: 6,
+                      maxLength: 1000,
+                      decoration: InputDecoration(
+                        hintText: '作为背景信息提供给 AI',
+                        filled: true,
+                        fillColor: settingsFieldColor(context),
+                        contentPadding: const EdgeInsets.all(18),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(26),
+                          borderSide: BorderSide.none,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      'Git 地址',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    const SizedBox(height: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        '自定义指令',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _gitRemote,
-                    enabled: !_busy,
-                    keyboardType: TextInputType.url,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    decoration: InputDecoration(
-                      hintText: 'https://… 或 git@host:owner/repo.git',
-                      filled: true,
-                      fillColor: settingsFieldColor(context),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 18,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(26),
-                        borderSide: BorderSide.none,
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _instructions,
+                      enabled: !_busy,
+                      minLines: 5,
+                      maxLines: 10,
+                      maxLength: projectInstructionsMaxLength,
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: '设置项目中 AI 应遵循的约定和工作方式',
+                        filled: true,
+                        fillColor: settingsFieldColor(context),
+                        contentPadding: const EdgeInsets.all(18),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(26),
+                          borderSide: BorderSide.none,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
+                  ],
                   if (widget.project == null) ...[
                     const SizedBox(height: 24),
                     Padding(
@@ -339,36 +307,30 @@ class _ProjectEditorPageState extends State<ProjectEditorPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Material(
-                      color: settingsFieldColor(context),
-                      borderRadius: BorderRadius.circular(26),
-                      clipBehavior: Clip.antiAlias,
-                      child: Column(
-                        children: [
-                          _locationTile(
-                            title: 'Aurai 工作区',
-                            subtitle: '在 Aurai 中创建新的项目目录',
-                            selected:
-                                _location == _ProjectLocationChoice.managed,
-                            onTap: () => setState(
-                              () => _location = _ProjectLocationChoice.managed,
-                            ),
-                          ),
-                          Divider(
-                            height: 1,
-                            indent: 56,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.outlineVariant.withValues(alpha: .5),
-                          ),
-                          _locationTile(
-                            title: '手机文件夹',
-                            subtitle: _folderName ?? '选择已有文件夹并直接修改其中内容',
-                            selected:
-                                _location == _ProjectLocationChoice.external,
-                            onTap: _chooseFolder,
-                          ),
-                        ],
+                    ProjectDirectoryPicker(
+                      selected: _directories,
+                      enabled: !_busy,
+                      onChanged: (directories) =>
+                          setState(() => _directories = directories),
+                      header: ListTile(
+                        enabled: !_busy,
+                        leading: const FileToolIcon(
+                          type: FileToolIconType.folder,
+                        ),
+                        title: const Text(
+                          'Aurai 工作区',
+                          style: TextStyle(fontSize: 15),
+                        ),
+                        subtitle: const Text(
+                          '使用项目名称创建目录',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        trailing: _managed
+                            ? const SettingsIcon(type: SettingsIconType.check)
+                            : null,
+                        onTap: _busy
+                            ? null
+                            : () => setState(() => _managed = !_managed),
                       ),
                     ),
                   ],
@@ -380,35 +342,7 @@ class _ProjectEditorPageState extends State<ProjectEditorPage> {
       ),
     ),
   );
-
-  Widget _locationTile({
-    required String title,
-    required String subtitle,
-    required bool selected,
-    required VoidCallback onTap,
-  }) => ListTile(
-    enabled: !_busy,
-    minTileHeight: 72,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-    leading: const FileToolIcon(type: FileToolIconType.folder),
-    title: Text(title, style: const TextStyle(fontSize: 15)),
-    subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-    trailing: selected
-        ? const SettingsIcon(type: SettingsIconType.check)
-        : null,
-    onTap: onTap,
-  );
 }
-
-bool _validGitRemote(String value) {
-  final uri = Uri.tryParse(value);
-  return (uri != null &&
-          (uri.scheme == 'https' || uri.scheme == 'ssh') &&
-          uri.host.isNotEmpty) ||
-      RegExp(r'^[^@\s]+@[^:\s]+:.+$').hasMatch(value);
-}
-
-enum _ProjectLocationChoice { managed, external }
 
 Color _projectColor(BuildContext context, String value) => value == 'default'
     ? Theme.of(context).colorScheme.onSurface

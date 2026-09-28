@@ -228,9 +228,6 @@ class _MessageItemState extends State<MessageItem> {
                     ? null
                     : () =>
                           widget.onQuote!(message, selectedText: _selectedText),
-                onBranch: widget.onBranch == null
-                    ? null
-                    : () => widget.onBranch!(message),
                 createdAt: message.createdAt,
                 sources: _sources,
                 onOpenLink: (href) => _openLink(context, href),

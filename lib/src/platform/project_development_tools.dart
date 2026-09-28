@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 
 import '../domain/tool_models.dart';
 import '../storage/development_projects.dart';
+import '../storage/project_directory.dart';
 import 'android_network_tools.dart';
 import 'aurai_platform.dart';
 
@@ -12,6 +13,13 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
   final DevelopmentProject project;
   final String name;
   String? _activeCallId;
+  ProjectDirectory _directory(Map<String, dynamic> args) {
+    final matches = project.directories.where(
+      (directory) => directory.uri == args['directoryUri'] && directory.managed,
+    );
+    if (matches.isEmpty) throw StateError('目标目录不属于本项目的 Aurai 工作区');
+    return matches.single;
+  }
 
   static const names = [
     'runProjectCommand',
@@ -50,6 +58,11 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
     inputSchema: {
       'type': 'object',
       'properties': {
+        'directoryUri': {
+          'type': 'string',
+          'description':
+              '目标目录 URI，必须来自本项目已关联的 Aurai 工作目录。每次调用明确指定，可在同轮任务中操作不同目录。',
+        },
         if (name == 'checkoutProjectBranch')
           'branch': {'type': 'string', 'minLength': 1},
         if (name == 'mergeProjectBranch')
@@ -64,6 +77,7 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
           'message': {'type': 'string', 'minLength': 1, 'maxLength': 500},
       },
       'required': [
+        'directoryUri',
         if (name == 'checkoutProjectBranch') 'branch',
         if (name == 'mergeProjectBranch') 'branch',
         if (name == 'runProjectCommand') ...['command', 'timeoutSeconds'],
@@ -80,30 +94,33 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
     executionTimeout: const Duration(seconds: 130),
     confirmationDescriptionBuilder: switch (name) {
       'checkoutProjectBranch' =>
-        (args) => '将项目“${project.name}”主目录切换到 ${args['branch']}。',
+        (args) => '将目录“${_directory(args).name}”切换到 ${args['branch']}。',
       'runProjectCommand' =>
-        (args) => '在项目“${project.name}”中执行：${args['command']}',
-      'initializeProjectGit' => (_) => '在项目“${project.name}”中初始化 Git 仓库。',
+        (args) => '在目录“${_directory(args).name}”中执行：${args['command']}',
+      'initializeProjectGit' =>
+        (args) => '在目录“${_directory(args).name}”中初始化 Git 仓库。',
       'setProjectGitRemote' =>
-        (args) => '将项目“${project.name}”的 origin 设置为 ${args['url']}。',
+        (args) => '将目录“${_directory(args).name}”的 origin 设置为 ${args['url']}。',
       'commitProjectGit' =>
-        (args) => '提交项目“${project.name}”的全部改动：${args['message']}',
-      'pullProjectGit' => (_) => '从 origin 拉取项目“${project.name}”的更新。',
-      'pushProjectGit' => (_) => '将项目“${project.name}”的当前分支推送到 origin。',
+        (args) => '提交目录“${_directory(args).name}”的全部改动：${args['message']}',
+      'pullProjectGit' =>
+        (args) => '从 origin 拉取目录“${_directory(args).name}”的更新。',
+      'pushProjectGit' =>
+        (args) => '将目录“${_directory(args).name}”的当前分支推送到 origin。',
       'mergeProjectBranch' =>
-        (args) =>
-            '将分支 ${args['branch']} 合并到“${project.worktreeName ?? project.name}”。',
+        (args) => '将分支 ${args['branch']} 合并到目录“${_directory(args).name}”。',
       _ => null,
     },
   );
 
   @override
   Future<ToolResult> execute(ToolCall call) async {
+    final directory = _directory(call.arguments);
     _activeCallId = call.id;
     try {
       final output = await platform
           .deviceExtension('projectDevelopmentOperation', {
-            'projectId': project.workspaceId,
+            'projectId': directory.workspaceId,
             'callId': call.id,
             'operation': name,
             'arguments': call.arguments,
@@ -113,8 +130,8 @@ class ProjectDevelopmentTool implements AgentTool, RuntimeCapabilityAgentTool {
         toolName: name,
         output: {
           ...output,
-          'workspaceRoot': project.rootUri,
-          'workspaceName': project.worktreeName ?? '主目录',
+          'workspaceRoot': directory.uri,
+          'workspaceName': directory.name,
         },
         status: ToolResultStatus.success,
       );

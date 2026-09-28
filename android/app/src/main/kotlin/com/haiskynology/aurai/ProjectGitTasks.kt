@@ -146,7 +146,7 @@ object ProjectGitTasks {
     ): ObjectId {
         val identity = PersonIdent("Aurai", "aurai@localhost")
         val builder = CommitBuilder().apply {
-            treeId = tree
+            setTreeId(tree)
             if (parent != null) setParentId(parent)
             author = identity
             committer = identity
@@ -157,7 +157,7 @@ object ProjectGitTasks {
 
     private fun update(repo: Repository, name: String, objectId: ObjectId) {
         val result = repo.updateRef(name).apply {
-            newObjectId = objectId
+            setNewObjectId(objectId)
             isForceUpdate = true
         }.update()
         require(result.name in setOf("NEW", "FAST_FORWARD", "FORCED", "NO_CHANGE")) { "Git 任务快照保存失败" }
@@ -179,7 +179,7 @@ object ProjectGitTasks {
                 val suffix = reference.name.removePrefix(prefix)
                 suffix.substringBefore('/').takeIf { suffix.endsWith("/after-worktree") }
             }
-            .filter { it != taskId }
+            .filter { it != taskId && it.substringBefore("__") == taskId.substringBefore("__") }
             .distinct()
         completed.forEach { deleteSnapshots(repo, it) }
     }

@@ -1,3 +1,5 @@
+import '../../storage/project_directory.dart';
+import '../../platform/project_run_snapshots.dart';
 import '../../agent/group_notice_tool.dart';
 import '../../agent/group_access_tool.dart';
 import '../../agent/deliver_file_tool.dart';
@@ -296,6 +298,7 @@ class ChatController extends ChangeNotifier {
   bool loadingEarlierMessages = false;
   bool changingConversation = false;
   bool creatingConversationBranch = false;
+  ResponsesTransport? _conversationBranchTransport;
   List<Conversation> get conversations => List.unmodifiable(
     <Conversation>[..._conversations.where((item) => !item.isArchived)]
       ..sort((a, b) {
@@ -336,6 +339,8 @@ class ChatController extends ChangeNotifier {
       _submitting;
   String? get runningConversationId => _runningConversation?.id;
 
+  VoidCallback? _detachGroupNotices;
+
   void _accessibilityChanged() => notifyListeners();
 
   @override
@@ -343,7 +348,7 @@ class ChatController extends ChangeNotifier {
     _disposeExecutions();
     _stopPeerSessions();
     _queuedSystemNotices.clear();
-    groupStore.onSystemNotice = null;
+    _detachGroupNotices?.call();
     skills.dispose();
     for (final store in _aiMemories.values) {
       store.dispose();
@@ -422,6 +427,7 @@ class ChatController extends ChangeNotifier {
     await _loadImageGeneration();
     await _migrateMusicGeneration();
     groupStore.onSystemNotice = _receiveGroupSystemNotice;
+    _detachGroupNotices = () => groupStore.onSystemNotice = null;
     _platform.notificationAvatar = NotificationAvatar(groupStore).render;
     _memory = MemoryController(_store.database, () => config);
     await memory.initialize();
@@ -540,18 +546,6 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> createConversation() async {
-    if (identical(activeConversation, _newConversation) &&
-        activeConversation.isEmpty)
-      return;
-    await _switchConversation(null);
-  }
-
-  Future<void> selectConversation(String id) => _switchConversation(id);
-
-  Future<void> restoreConversation(String id) =>
-      _switchConversation(id == _newConversation.id ? null : id);
-
   final _loadedMessageCounts = <String, int>{};
   Conversation? _pendingAiConversation;
   final _searchWindows = <String, Conversation>{};
@@ -610,16 +604,23 @@ class ChatController extends ChangeNotifier {
     String query,
     int offset, {
     bool includeReasoning = false,
-  }) => _store.reader.search(query, offset, includeReasoning: includeReasoning);
+    String? projectId,
+  }) => _store.reader.search(
+    query,
+    offset,
+    includeReasoning: includeReasoning,
+    projectId: projectId,
+  );
 
   Future<List<AttachmentSearchResult>> searchAttachments(
     String query,
     int offset, {
     int limit = AttachmentSearch.pageSize,
+    String? projectId,
   }) => AttachmentSearch(
     _store.database,
     _imageStore.directory,
-  ).search(query, offset, limit: limit);
+  ).search(query, offset, limit: limit, projectId: projectId);
 
   void updateDraft(String text) {
     final conversation = activeConversation;

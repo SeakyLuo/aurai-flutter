@@ -5,16 +5,12 @@ extension _ChatBranching on _ChatPageState {
     _focusNode.unfocus();
     try {
       await widget.controller.createConversationBranch(message);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(const SnackBar(content: Text('已创建分支')));
-      }
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        final message = errorMessage(error);
+        ScaffoldMessenger.of(context).showGlassSnackBar(
+          SnackBar(content: Text(message == '任务已停止' ? '已取消' : message)),
+        );
       }
     }
   }

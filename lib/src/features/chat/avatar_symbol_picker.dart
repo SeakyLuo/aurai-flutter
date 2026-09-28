@@ -228,7 +228,7 @@ class _AvatarSymbolPickerState extends State<_AvatarSymbolPicker> {
     final entries = widget.symbols.entries.toList();
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-      gridDelegate: _gridDelegate,
+      gridDelegate: _iconGridDelegate,
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
@@ -256,7 +256,7 @@ class _AvatarSymbolPickerState extends State<_AvatarSymbolPicker> {
     return GridView.builder(
       key: ValueKey((_category, _query)),
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-      gridDelegate: _gridDelegate,
+      gridDelegate: _emojiGridDelegate,
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
@@ -266,8 +266,14 @@ class _AvatarSymbolPickerState extends State<_AvatarSymbolPicker> {
     );
   }
 
-  static const _gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
+  static const _iconGridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
     crossAxisCount: 5,
+    crossAxisSpacing: 8,
+    mainAxisSpacing: 8,
+  );
+
+  static const _emojiGridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
+    crossAxisCount: 6,
     crossAxisSpacing: 8,
     mainAxisSpacing: 8,
   );

@@ -180,7 +180,9 @@ object ProjectDevelopment {
             val command = git.pull()
                 .setRemote("origin")
                 .setRemoteBranchName(repository.branch)
-            GitConfiguration.credentials(context)?.let(command::setCredentialsProvider)
+            val remote = repository.config.getString("remote", "origin", "url")
+                ?: error("项目尚未配置远程仓库")
+            GitConfiguration.credentials(context, remote)?.let(command::setCredentialsProvider)
             val result = command.call()
             mapOf(
                 "pulled" to result.isSuccessful,
@@ -195,7 +197,9 @@ object ProjectDevelopment {
             val command = git.push()
                 .setRemote("origin")
                 .add("refs/heads/${repository.branch}")
-            GitConfiguration.credentials(context)?.let(command::setCredentialsProvider)
+            val remote = repository.config.getString("remote", "origin", "url")
+                ?: error("项目尚未配置远程仓库")
+            GitConfiguration.credentials(context, remote)?.let(command::setCredentialsProvider)
             val updates = command.call().flatMap { result ->
                 result.remoteUpdates.map { update ->
                     mapOf(

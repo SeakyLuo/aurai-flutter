@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../platform/aurai_platform.dart';
+import 'choice_sheet.dart';
+import 'git_credential_editor_page.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 
@@ -17,11 +19,7 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _branch = TextEditingController();
-  final _httpsUsername = TextEditingController();
-  final _httpsToken = TextEditingController();
-  bool _tokenConfigured = false;
-  bool _clearToken = false;
-  bool _obscureToken = true;
+  List<GitHttpsCredential> _credentials = [];
   bool _loading = true;
   bool _saving = false;
 
@@ -36,8 +34,6 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
     _name.dispose();
     _email.dispose();
     _branch.dispose();
-    _httpsUsername.dispose();
-    _httpsToken.dispose();
     super.dispose();
   }
 
@@ -50,9 +46,11 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
       _name.text = config['name'] as String;
       _email.text = config['email'] as String;
       _branch.text = config['defaultBranch'] as String;
-      _httpsUsername.text = config['httpsUsername'] as String;
       setState(() {
-        _tokenConfigured = config['httpsTokenConfigured'] as bool;
+        _credentials = (config['httpsCredentials'] as List<Object?>)
+            .cast<Map<Object?, Object?>>()
+            .map(GitHttpsCredential.fromPlatform)
+            .toList();
         _loading = false;
       });
     } on Object catch (error) {
@@ -74,21 +72,19 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
             'name': _name.text.trim(),
             'email': _email.text.trim(),
             'defaultBranch': _branch.text.trim(),
-            'httpsUsername': _httpsUsername.text.trim(),
-            'httpsToken': _httpsToken.text.trim().isEmpty
-                ? null
-                : _httpsToken.text.trim(),
-            'clearHttpsToken': _clearToken,
+            'httpsCredentials': _credentials
+                .map((credential) => credential.toPlatform())
+                .toList(),
           },
         },
       );
       if (!mounted) return;
-      _httpsToken.clear();
       setState(() {
-        _tokenConfigured = config['httpsTokenConfigured'] as bool;
-        _clearToken = false;
+        _credentials = (config['httpsCredentials'] as List<Object?>)
+            .cast<Map<Object?, Object?>>()
+            .map(GitHttpsCredential.fromPlatform)
+            .toList();
       });
-      _notice('Git 设置已保存');
     } on Object catch (error) {
       if (mounted) _notice(errorMessage(error));
     } finally {
@@ -138,7 +134,7 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     children: [
-                      _field('提交用户名', _name, '用于 Git 提交记录'),
+                      _field('提交署名', _name, '用于 Git 提交记录'),
                       const SizedBox(height: 16),
                       _field(
                         '提交邮箱',
@@ -148,47 +144,15 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
                       ),
                       const SizedBox(height: 24),
                       _field('默认分支', _branch, 'main'),
-                      const SizedBox(height: 24),
-                      _field('HTTPS 用户名', _httpsUsername, 'Git 服务账号'),
-                      const SizedBox(height: 16),
-                      _field(
-                        'HTTPS 访问令牌',
-                        _httpsToken,
-                        _clearToken
-                            ? '保存后清除现有令牌'
-                            : _tokenConfigured
-                            ? '已配置，留空保持不变'
-                            : '输入 Personal Access Token',
-                        obscureText: _obscureToken,
-                        suffix: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              tooltip: _obscureToken ? '显示令牌' : '隐藏令牌',
-                              onPressed: () => setState(
-                                () => _obscureToken = !_obscureToken,
-                              ),
-                              icon: SettingsIcon(
-                                type: _obscureToken
-                                    ? SettingsIconType.eye
-                                    : SettingsIconType.eyeOff,
-                              ),
-                            ),
-                            if (_tokenConfigured)
-                              IconButton(
-                                tooltip: _clearToken ? '保留现有令牌' : '清除令牌',
-                                onPressed: () =>
-                                    setState(() => _clearToken = !_clearToken),
-                                icon: SettingsIcon(
-                                  type: SettingsIconType.reset,
-                                  color: _clearToken
-                                      ? Theme.of(context).colorScheme.error
-                                      : null,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
+                      const SizedBox(height: 28),
+                      _credentialsHeader(),
+                      const SizedBox(height: 12),
+                      for (
+                        var index = 0;
+                        index < _credentials.length;
+                        index++
+                      ) ...[_credentialTile(index), const SizedBox(height: 12)],
+                      _addCredentialTile(),
                     ],
                   ),
           ),
@@ -202,8 +166,6 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
     TextEditingController controller,
     String hint, {
     TextInputType? keyboardType,
-    bool obscureText = false,
-    Widget? suffix,
   }) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
@@ -221,7 +183,6 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
         controller: controller,
         enabled: !_saving,
         keyboardType: keyboardType,
-        obscureText: obscureText,
         autocorrect: false,
         enableSuggestions: false,
         onChanged: (_) => setState(() {}),
@@ -229,7 +190,6 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
           hintText: hint,
           filled: true,
           fillColor: settingsFieldColor(context),
-          suffixIcon: suffix,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 18,
             vertical: 20,
@@ -242,4 +202,100 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
       ),
     ],
   );
+
+  Widget _credentialsHeader() => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 18),
+    child: Text(
+      '代码托管账号',
+      style: TextStyle(
+        fontSize: 15,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    ),
+  );
+
+  Widget _credentialTile(int index) {
+    final credential = _credentials[index];
+    return Material(
+      color: settingsFieldColor(context),
+      borderRadius: BorderRadius.circular(26),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        minVerticalPadding: 16,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+        leading: const SettingsIcon(type: SettingsIconType.git),
+        title: Text(gitServiceName(credential.host)),
+        subtitle: Text(
+          credential.tokenConfigured
+              ? gitServiceHosts.containsKey(credential.host)
+                    ? '已配置'
+                    : credential.username
+              : '未配置密码或令牌',
+        ),
+        trailing: const SettingsIcon(type: SettingsIconType.chevron),
+        onTap: _saving ? null : () => _editCredential(index),
+      ),
+    );
+  }
+
+  Widget _addCredentialTile() => Material(
+    color: settingsFieldColor(context),
+    borderRadius: BorderRadius.circular(26),
+    clipBehavior: Clip.antiAlias,
+    child: ListTile(
+      minVerticalPadding: 16,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+      leading: const SettingsIcon(type: SettingsIconType.add),
+      title: const Text('添加代码托管账号'),
+      subtitle: const Text('Codeup、GitHub 等'),
+      onTap: _saving ? null : _addCredential,
+    ),
+  );
+
+  Future<void> _addCredential() async {
+    final host = await showChoiceSheet<String>(
+      context,
+      title: '代码托管服务',
+      selected: '',
+      choices: [
+        for (final entry in gitServiceHosts.entries)
+          if (!_credentials.any((credential) => credential.host == entry.key))
+            (value: entry.key, label: entry.value),
+        (value: 'custom', label: '其他 Git 服务'),
+      ],
+    );
+    if (!mounted || host == null) return;
+    await _editCredential(null, initialHost: host == 'custom' ? null : host);
+  }
+
+  Future<void> _editCredential(int? index, {String? initialHost}) async {
+    final result = await Navigator.push<GitCredentialEditorResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GitCredentialEditorPage(
+          credential: index == null ? null : _credentials[index],
+          initialHost: initialHost,
+          existingHosts: {
+            for (
+              var itemIndex = 0;
+              itemIndex < _credentials.length;
+              itemIndex++
+            )
+              if (itemIndex != index) _credentials[itemIndex].host,
+          },
+        ),
+      ),
+    );
+    if (!mounted || result == null) return;
+    setState(() {
+      if (result.deleted) {
+        _credentials.removeAt(index!);
+      } else if (index == null) {
+        _credentials.add(result.credential!);
+      } else {
+        _credentials[index] = result.credential!;
+      }
+    });
+    await _save();
+  }
 }

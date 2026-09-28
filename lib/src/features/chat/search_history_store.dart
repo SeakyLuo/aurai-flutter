@@ -1,8 +1,13 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SearchHistoryStore {
+  SearchHistoryStore({String? projectId})
+    : _key = projectId == null
+          ? 'conversation_search_history'
+          : 'project_search_history:$projectId';
+
   final _preferences = SharedPreferencesAsync();
-  static const _key = 'conversation_search_history';
+  final String _key;
   Future<void> _pending = Future.value();
   Future<List<String>> read() async =>
       await _preferences.getStringList(_key) ?? [];

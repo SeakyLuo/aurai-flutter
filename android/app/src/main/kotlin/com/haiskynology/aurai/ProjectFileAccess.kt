@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
-import androidx.core.content.FileProvider
 import java.io.File
 
 object ProjectFileAccess {
@@ -65,11 +64,16 @@ object ProjectFileAccess {
 
     fun open(context: Context, root: String) {
         if (!root.startsWith("aurai://")) return
-        val folder = ManagedWorkspace.root(context, Uri.parse(root).pathSegments.first())
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.source_files", folder)
-        context.startActivity(Intent(Intent.ACTION_VIEW)
-            .setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK))
+        val folder = ManagedWorkspace.file(context, root)
+        val relative = folder.canonicalFile.relativeTo(File(context.filesDir, "projects").canonicalFile).invariantSeparatorsPath
+        val documentId = "${ManagedWorkspaceDocumentsProvider.ROOT_ID}/$relative"
+        val uri = DocumentsContract.buildDocumentUri("${context.packageName}.managed_workspaces", documentId)
+        context.startActivity(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            type = "*/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+            putExtra(DocumentsContract.EXTRA_INITIAL_URI, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        })
     }
 
     private fun uniqueFile(folder: File, original: String): File {

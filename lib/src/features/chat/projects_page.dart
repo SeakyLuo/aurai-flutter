@@ -31,8 +31,9 @@ import 'menu_press_highlight.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'send_favorite_page.dart';
-import '../../platform/aurai_platform.dart';
-import 'project_worktrees_page.dart';
+import 'conversation_search_page.dart';
+import 'sidebar_action_icon.dart';
+import 'glass_surface.dart';
 
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key, required this.controller});
@@ -208,55 +209,11 @@ class _ProjectPageState extends State<ProjectPage> {
   final _focusNode = FocusNode();
   AiProfile? _recipient;
   String? _draftConversationId;
-  bool _gitAvailable = false;
-  ProjectWorktreeSelection _workspace = const ProjectWorktreeSelection(
-    null,
-    '主目录',
-  );
-
-  Future<void> _loadWorktreeAvailability() async {
-    if (_project.location != ProjectLocation.managed) return;
-    await runUiAction(context, () async {
-      final result = await AuraiPlatform.instance
-          .deviceExtension('projectDevelopmentOperation', {
-            'projectId': _project.id,
-            'operation': 'listProjectWorktrees',
-            'arguments': <String, Object?>{},
-          });
-      if (mounted) setState(() => _gitAvailable = result['available'] == true);
-    });
-  }
-
-  Future<void> _chooseWorktree() async {
-    final selected = await Navigator.push<ProjectWorktreeSelection>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProjectWorktreesPage(
-          project: _project,
-          controller: widget.controller,
-        ),
-      ),
-    );
-    if (!mounted || selected == null) return;
-    await runUiAction(context, () async {
-      if (_draftConversationId != null) {
-        await widget.controller.selectConversationWorkspace(
-          _draftConversationId!,
-          selected.id == null
-              ? _project
-              : _project.inWorktree(selected.id!, selected.name),
-        );
-      }
-      if (mounted) setState(() => _workspace = selected);
-    });
-  }
-
   @override
   void initState() {
     super.initState();
     _load();
     _loadRecipient();
-    _loadWorktreeAvailability();
     widget.controller.addListener(_controllerChanged);
     _message.addListener(_messageChanged);
   }
@@ -383,9 +340,7 @@ class _ProjectPageState extends State<ProjectPage> {
     final controller = widget.controller;
     if (_draftConversationId == controller.activeConversation.id) return;
     await controller.createProjectConversation(
-      _workspace.id == null
-          ? _project
-          : _project.inWorktree(_workspace.id!, _workspace.name),
+      _project,
       senderId: _recipient!.sender.id,
     );
     _draftConversationId = controller.activeConversation.id;
@@ -468,16 +423,11 @@ class _ProjectPageState extends State<ProjectPage> {
       ),
     );
     if (!mounted || recipient == null) return;
-    final project = await widget.controller.setProjectDefaultSender(
-      _project,
-      recipient.sender.id,
-    );
     if (_draftConversationId == widget.controller.activeConversation.id) {
       await widget.controller.setActiveDraftSender(recipient.sender.id);
     }
     if (mounted) {
       setState(() {
-        _project = project;
         _recipient = recipient;
       });
       _focusNode.requestFocus();
@@ -518,6 +468,17 @@ class _ProjectPageState extends State<ProjectPage> {
     }
   }
 
+  Future<void> _searchProject() => Navigator.push<void>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => ConversationSearchPage(
+        controller: widget.controller,
+        preparingGoal: () => false,
+        projectId: _project.id,
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final conversations = _conversations;
@@ -527,12 +488,34 @@ class _ProjectPageState extends State<ProjectPage> {
         title: _project.name,
         onBack: _opening ? null : () => Navigator.pop(context),
         actions: [
-          Builder(
-            builder: (buttonContext) => SettingsGlassAction(
-              label: '更多',
-              icon: Icons.more_horiz_rounded,
-              iconWidget: const SettingsIcon(type: SettingsIconType.more),
-              onPressed: _opening ? null : () => _showMore(buttonContext),
+          SettingsGlassActionSurface(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RoundAction(
+                  label: '搜索项目',
+                  icon: Icons.search_rounded,
+                  iconWidget: const SidebarActionIcon(
+                    type: SidebarActionIconType.search,
+                  ),
+                  onPressed: _opening ? null : _searchProject,
+                ),
+                Container(
+                  width: 1,
+                  height: 20,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: .12),
+                ),
+                Builder(
+                  builder: (buttonContext) => RoundAction(
+                    label: '更多',
+                    icon: Icons.more_horiz_rounded,
+                    iconWidget: const SettingsIcon(type: SettingsIconType.more),
+                    onPressed: _opening ? null : () => _showMore(buttonContext),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -575,18 +558,6 @@ class _ProjectPageState extends State<ProjectPage> {
               ),
             ),
           ),
-          if (_gitAvailable)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextButton.icon(
-                  onPressed: _opening ? null : _chooseWorktree,
-                  icon: const FileToolIcon(type: FileToolIconType.folder),
-                  label: Text(_workspace.name),
-                ),
-              ),
-            ),
           ChatComposer(
             controller: _message,
             focusNode: _focusNode,

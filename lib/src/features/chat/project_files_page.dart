@@ -3,15 +3,15 @@ import 'package:flutter/material.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../platform/aurai_platform.dart';
-import '../../storage/development_projects.dart';
+import '../../storage/project_directory.dart';
 import 'file_tool_icon.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 
 class ProjectFilesPage extends StatefulWidget {
-  const ProjectFilesPage({super.key, required this.project});
+  const ProjectFilesPage({super.key, required this.directory});
 
-  final DevelopmentProject project;
+  final ProjectDirectory directory;
 
   @override
   State<ProjectFilesPage> createState() => _ProjectFilesPageState();
@@ -35,7 +35,7 @@ class _ProjectFilesPageState extends State<ProjectFilesPage> {
   Future<void> _load() async {
     try {
       final result = await _platform.deviceExtension('listProjectFiles', {
-        'uri': widget.project.rootUri,
+        'uri': widget.directory.uri,
       });
       if (mounted) {
         setState(
@@ -53,7 +53,7 @@ class _ProjectFilesPageState extends State<ProjectFilesPage> {
     setState(() => _busy = true);
     try {
       final result = await _platform.deviceExtension('importProjectFiles', {
-        'uri': widget.project.rootUri,
+        'uri': widget.directory.uri,
       });
       if (result['cancelled'] != true) await _load();
     } on Object catch (error) {

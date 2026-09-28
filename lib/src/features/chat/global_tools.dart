@@ -256,7 +256,7 @@ extension GlobalTools on ChatController {
                 );
                 documents.project = projectId == null
                     ? null
-                    : await projects.forConversation(projectId, target.id);
+                    : await projects.readWorkspace(projectId);
               },
               changed: _conversationChanged,
             ),
@@ -430,7 +430,7 @@ extension GlobalTools on ChatController {
           for (final update in [false, true])
             GitConfigurationTool(_platform, update),
           if (documents.project case final project?
-              when project.location == ProjectLocation.managed)
+              when project.directories.any((directory) => directory.managed))
             for (final name in ProjectDevelopmentTool.names)
               ProjectDevelopmentTool(_platform, project, name),
           for (final name in DeviceExtensionTool.names)

@@ -51,6 +51,7 @@ class InteractiveMessageButton extends StatelessWidget {
         button['icon'] as String? ??
         switch (button['action']) {
           'openUrl' => 'open',
+          'openConversation' => 'open',
           'acknowledge' => 'check',
           _ => 'info',
         };

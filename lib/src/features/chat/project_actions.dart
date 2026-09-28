@@ -104,9 +104,7 @@ Future<ProjectActionResult?> showProjectActions(
           barrierColor: Colors.black.withValues(alpha: .24),
           builder: (_) => DeleteConfirmationDialog(
             title: '移除项目？',
-            description: project.location == ProjectLocation.managed
-                ? '项目中的会话会移回普通会话列表，Aurai 工作区内的项目文件会被删除，无法恢复。'
-                : '项目中的会话会移回普通会话列表，手机文件夹及其中的内容不会删除。',
+            description: '项目中的会话会移回普通会话列表。已关联的目录和文件保留。',
             confirmLabel: '移除',
           ),
         );

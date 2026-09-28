@@ -1,4 +1,6 @@
 import 'group_chat_store.dart';
+import 'project_directory.dart';
+import 'project_directories.dart';
 import 'dart:convert';
 
 import 'package:characters/characters.dart';
@@ -7,8 +9,6 @@ import 'package:sqflite/sqflite.dart';
 import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
 import 'group_unread_messages.dart';
-
-enum ProjectLocation { external, managed }
 
 enum ProjectMemoryMode { shared, projectOnly }
 
@@ -22,6 +22,12 @@ void validateProjectName(String name) {
   }
 }
 
+void validateProjectInstructions(String instructions) {
+  if (instructions.characters.length > projectInstructionsMaxLength) {
+    throw StateError('项目自定义指令不能超过 $projectInstructionsMaxLength 个字');
+  }
+}
+
 class DevelopmentProject {
   const DevelopmentProject({
     required this.id,
@@ -30,18 +36,13 @@ class DevelopmentProject {
     this.instructions = '',
     required this.icon,
     required this.iconColor,
-    required this.rootUri,
-    required this.location,
     required this.createdAt,
     required this.updatedAt,
     this.archived = false,
     this.pinned = false,
     this.memoryMode = ProjectMemoryMode.shared,
     this.defaultSenderId = 'agent:aurai',
-    this.gitRemoteUrl = '',
-    this.worktreeId,
-    this.worktreeName,
-    this.worktreeDeleted = false,
+    this.directories = const [],
   });
 
   final String id;
@@ -50,44 +51,30 @@ class DevelopmentProject {
   final String instructions;
   final String icon;
   final String iconColor;
-  final String rootUri;
-  final ProjectLocation location;
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool archived;
   final bool pinned;
   final ProjectMemoryMode memoryMode;
   final String defaultSenderId;
-  final String gitRemoteUrl;
-  final String? worktreeId, worktreeName;
-  final bool worktreeDeleted;
-  String get workspaceId => worktreeId ?? id;
+  final List<ProjectDirectory> directories;
 
-  DevelopmentProject inWorktree(
-    String workspace,
-    String label, {
-    bool deleted = false,
-  }) => DevelopmentProject(
-    id: id,
-    name: name,
-    description: description,
-    instructions: instructions,
-    icon: icon,
-    iconColor: iconColor,
-    rootUri: 'aurai://project/$workspace',
-    location: location,
-    createdAt: createdAt,
-    updatedAt: updatedAt,
-    archived: archived,
-    pinned: pinned,
-    memoryMode: memoryMode,
-    defaultSenderId: defaultSenderId,
-    gitRemoteUrl: gitRemoteUrl,
-    worktreeId: workspace,
-    worktreeName: label,
-    worktreeDeleted: deleted,
-  );
-
+  DevelopmentProject withDirectories(List<ProjectDirectory> values) =>
+      DevelopmentProject(
+        id: id,
+        name: name,
+        description: description,
+        instructions: instructions,
+        icon: icon,
+        iconColor: iconColor,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+        archived: archived,
+        pinned: pinned,
+        memoryMode: memoryMode,
+        defaultSenderId: defaultSenderId,
+        directories: values,
+      );
   factory DevelopmentProject.fromRow(
     Map<String, Object?> row,
   ) => DevelopmentProject(
@@ -97,15 +84,12 @@ class DevelopmentProject {
     instructions: row['instructions'] as String,
     icon: row['icon'] as String,
     iconColor: row['icon_color'] as String,
-    rootUri: row['root_uri'] as String,
-    location: ProjectLocation.values.byName(row['location'] as String),
     createdAt: DateTime.fromMicrosecondsSinceEpoch(row['created_at'] as int),
     updatedAt: DateTime.fromMicrosecondsSinceEpoch(row['updated_at'] as int),
     archived: row['archived'] == 1,
     pinned: row['pinned'] == 1,
     memoryMode: ProjectMemoryMode.values.byName(row['memory_mode'] as String),
     defaultSenderId: row['default_sender_id'] as String,
-    gitRemoteUrl: row['git_remote_url'] as String,
   );
 
   Map<String, Object?> toRow() => {
@@ -115,15 +99,12 @@ class DevelopmentProject {
     'instructions': instructions,
     'icon': icon,
     'icon_color': iconColor,
-    'root_uri': rootUri,
-    'location': location.name,
     'created_at': createdAt.microsecondsSinceEpoch,
     'updated_at': updatedAt.microsecondsSinceEpoch,
     'archived': archived ? 1 : 0,
     'pinned': pinned ? 1 : 0,
     'memory_mode': memoryMode.name,
     'default_sender_id': defaultSenderId,
-    'git_remote_url': gitRemoteUrl,
   };
 }
 
@@ -131,70 +112,11 @@ class DevelopmentProjects {
   const DevelopmentProjects(this.database);
   final Database database;
   static final changingWorktrees = <String>{};
-  static int worktreeRevision = 0;
 
-  Future<void> bindWorktree(
-    String conversationId,
-    DevelopmentProject project,
-  ) async {
-    if (project.worktreeId == null) {
-      await unbindConversationWorktree(conversationId);
-      return;
-    }
-    await database.insert('app_state', {
-      'key': 'conversation_worktree:$conversationId',
-      'value': jsonEncode({
-        'projectId': project.id,
-        'id': project.worktreeId,
-        'name': project.worktreeName,
-      }),
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
-    worktreeRevision++;
-  }
-
-  Future<void> markWorktreeDeleted(String id) async {
-    await database.rawUpdate(
-      "UPDATE app_state SET value = json_set(value, '\$.deleted', 1) "
-      "WHERE key LIKE 'conversation_worktree:%' AND json_extract(value, '\$.id') = ?",
-      [id],
-    );
-    worktreeRevision++;
-  }
-
-  Future<void> unbindConversationWorktree(String id) async {
-    await database.delete(
-      'app_state',
-      where: 'key = ?',
-      whereArgs: ['conversation_worktree:$id'],
-    );
-    worktreeRevision++;
-  }
-
-  Future<DevelopmentProject> forConversation(
-    String projectId,
-    String conversationId,
-  ) async {
-    final results = await Future.wait([
-      database.query(
-        'development_projects',
-        where: 'id = ?',
-        whereArgs: [projectId],
-      ),
-      database.query(
-        'app_state',
-        columns: ['value'],
-        where: 'key = ?',
-        whereArgs: ['conversation_worktree:$conversationId'],
-      ),
-    ]);
-    final project = DevelopmentProject.fromRow(results[0].single);
-    if (results[1].isEmpty) return project;
-    final binding = jsonDecode(results[1].single['value'] as String) as Map;
-    if (binding['projectId'] != projectId) throw StateError('会话的工作树与所属项目不一致');
-    return project.inWorktree(
-      binding['id'] as String,
-      binding['name'] as String,
-      deleted: binding['deleted'] == 1,
+  Future<DevelopmentProject> readWorkspace(String projectId) async {
+    final project = await read(projectId);
+    return project.withDirectories(
+      await ProjectDirectories(database).list(project),
     );
   }
 
@@ -214,9 +136,25 @@ class DevelopmentProjects {
         )).single,
       );
 
-  Future<void> create(DevelopmentProject project) {
+  Future<void> create(DevelopmentProject project) async {
     validateProjectName(project.name);
-    return database.insert('development_projects', project.toRow());
+    validateProjectInstructions(project.instructions);
+    await database.transaction((txn) async {
+      await txn.insert('development_projects', project.toRow());
+      final batch = txn.batch();
+      for (final directory in project.directories) {
+        batch.insert(
+          'workspace_directories',
+          directory.toJson(),
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+        batch.insert('project_directories', {
+          'project_id': project.id,
+          'directory_uri': directory.uri,
+        });
+      }
+      await batch.commit(noResult: true);
+    });
   }
 
   Future<void> rename(String id, String name) {
@@ -245,19 +183,20 @@ class DevelopmentProjects {
     String id, {
     required String name,
     required String description,
+    required String instructions,
     required String icon,
     required String iconColor,
-    required String gitRemoteUrl,
   }) {
     validateProjectName(name);
+    validateProjectInstructions(instructions);
     return database.update(
       'development_projects',
       {
         'name': name,
         'description': description,
+        'instructions': instructions,
         'icon': icon,
         'icon_color': iconColor,
-        'git_remote_url': gitRemoteUrl,
         'updated_at': DateTime.now().microsecondsSinceEpoch,
       },
       where: 'id = ?',
@@ -279,21 +218,6 @@ class DevelopmentProjects {
         where: 'id = ?',
         whereArgs: [id],
       );
-
-  Future<void> setInstructions(String id, String instructions) {
-    if (instructions.characters.length > projectInstructionsMaxLength) {
-      throw StateError('项目自定义指令不能超过 $projectInstructionsMaxLength 个字');
-    }
-    return database.update(
-      'development_projects',
-      {
-        'instructions': instructions,
-        'updated_at': DateTime.now().microsecondsSinceEpoch,
-      },
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
 
   Future<void> setDefaultSender(String id, String senderId) => database.update(
     'development_projects',
@@ -452,7 +376,7 @@ class DevelopmentProjects {
   }) => database.transaction((txn) async {
     final rows = await txn.query(
       'conversations',
-      columns: ['kind', 'project_id'],
+      columns: ['kind'],
       where: 'id = ?',
       whereArgs: [conversationId],
       limit: 1,
@@ -461,13 +385,6 @@ class DevelopmentProjects {
       await GroupChatStore(
         database,
       ).requireManager(txn, conversationId, actorId);
-    }
-    if (rows.single['project_id'] != projectId) {
-      await txn.delete(
-        'app_state',
-        where: 'key = ?',
-        whereArgs: ['conversation_worktree:$conversationId'],
-      );
     }
     await txn.update(
       'conversations',
