@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/glass_notice.dart';
+import '../../domain/ai_profile.dart';
+import '../../domain/avatar_style.dart';
 import '../../domain/error_message.dart';
 import '../../memory/memory_controller.dart';
 import '../../memory/memory_summary_page.dart';
-import '../../platform/aurai_platform.dart';
+import '../../storage/project_directories.dart';
+import 'project_directories_page.dart';
 import '../../storage/development_projects.dart';
+import 'ai_contacts_page.dart';
 import 'chat_controller.dart';
 import 'conversation_menu_icon.dart';
 import 'delete_confirmation_dialog.dart';
@@ -14,7 +18,7 @@ import 'dialog_action_button.dart';
 import 'file_tool_icon.dart';
 import 'project_editor_page.dart';
 import 'project_icon.dart';
-import 'project_instructions_page.dart';
+import 'profile_avatar.dart';
 import 'question_icon.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -35,6 +39,7 @@ class ProjectProfilePage extends StatefulWidget {
 
 class _ProjectProfilePageState extends State<ProjectProfilePage> {
   late DevelopmentProject _project = widget.project;
+  AiProfile? _defaultHandler;
   String? _localPath;
   bool _busy = false;
 
@@ -42,28 +47,22 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
   void initState() {
     super.initState();
     _loadPath();
+    _loadDefaultHandler();
+  }
+
+  Future<void> _loadDefaultHandler() async {
+    final handler = await widget.controller.groupStore.loadAi(
+      _project.defaultSenderId,
+    );
+    if (mounted) setState(() => _defaultHandler = handler);
   }
 
   Future<void> _loadPath() async {
     try {
-      if (_project.location == ProjectLocation.managed) {
-        setState(() => _localPath = 'Aurai 工作区 / ${_project.name}');
-        return;
-      }
-      final output = await AuraiPlatform.instance.deviceExtension(
-        'getDocumentFolders',
-      );
-      final folder = (output['folders'] as List)
-          .map((value) => (value as Map).cast<String, Object?>())
-          .singleWhere((value) => value['uri'] == _project.rootUri);
-      if (mounted) {
-        setState(
-          () => _localPath = [
-            folder['source'] as String,
-            folder['path'] as String,
-          ].where((value) => value.isNotEmpty).join(' / '),
-        );
-      }
+      final directories = await ProjectDirectories(
+        widget.controller.groupStore.database,
+      ).list(_project);
+      if (mounted) setState(() => _localPath = '${directories.length} 个目录');
     } on Object catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showGlassSnackBar(
@@ -102,28 +101,59 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
     if (mounted) setState(() => _project = refreshed);
   }
 
-  Future<void> _instructions() async {
-    final project = await Navigator.push<DevelopmentProject>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProjectInstructionsPage(
-          controller: widget.controller,
-          project: _project,
-        ),
-      ),
-    );
-    if (project != null && mounted) setState(() => _project = project);
-  }
-
   Future<void> _openPath() async {
     try {
-      await AuraiPlatform.instance.openProjectFolder(_project.rootUri);
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProjectDirectoriesPage(
+            controller: widget.controller,
+            project: _project,
+          ),
+        ),
+      );
+      if (mounted) await _loadPath();
     } on Object catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(content: Text('无法打开本地路径：${errorMessage(error)}')),
         );
       }
+    }
+  }
+
+  Future<void> _selectDefaultHandler() async {
+    final handler = await Navigator.push<AiProfile>(
+      context,
+      MaterialPageRoute<AiProfile>(
+        builder: (_) => AiContactsPage(
+          controller: widget.controller,
+          selectForConversation: true,
+          returnSelection: true,
+        ),
+      ),
+    );
+    if (!mounted || handler == null) return;
+    setState(() => _busy = true);
+    try {
+      final project = await widget.controller.setProjectDefaultSender(
+        _project,
+        handler.sender.id,
+      );
+      if (mounted) {
+        setState(() {
+          _project = project;
+          _defaultHandler = handler;
+        });
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showGlassSnackBar(
+          SnackBar(content: Text('默认处理人保存失败：${errorMessage(error)}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -142,9 +172,7 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
       barrierColor: Colors.black.withValues(alpha: .24),
       builder: (_) => DeleteConfirmationDialog(
         title: '移除项目？',
-        description: _project.location == ProjectLocation.managed
-            ? '项目中的会话会移回普通会话列表，Aurai 工作区内的项目文件会被删除，无法恢复。'
-            : '项目中的会话会移回普通会话列表，手机文件夹及其中的内容不会删除。',
+        description: '项目中的会话会移回普通会话列表。已关联的目录和文件保留。',
         confirmLabel: '移除',
       ),
     );
@@ -222,20 +250,7 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 _edit,
-                subtitle: _project.gitRemoteUrl.isEmpty
-                    ? '项目名称、介绍、图标和 Git 远端'
-                    : _project.gitRemoteUrl,
-              ),
-              _row(
-                '自定义指令',
-                SettingsIcon(
-                  type: SettingsIconType.personalization,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                _instructions,
-                subtitle: _project.instructions.isEmpty
-                    ? '设置项目中 AI 的工作方式'
-                    : _project.instructions,
+                subtitle: '名称、介绍、自定义指令与图标',
               ),
               _row(
                 '项目记忆',
@@ -249,13 +264,32 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
                     : '仅限项目的记忆',
               ),
               _row(
-                '项目文件夹',
+                '项目目录',
                 FileToolIcon(
                   type: FileToolIconType.folder,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 _openPath,
                 subtitle: _localPath ?? '',
+              ),
+              _row(
+                '默认处理人',
+                _defaultHandler == null
+                    ? SettingsIcon(
+                        type: SettingsIconType.contacts,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      )
+                    : ProfileAvatar(
+                        style: AvatarStyle(
+                          icon: _defaultHandler!.sender.avatarIcon,
+                          color: _defaultHandler!.sender.avatarColor,
+                          path: _defaultHandler!.sender.avatarPath,
+                        ),
+                        name: _defaultHandler!.sender.name,
+                        size: 24,
+                      ),
+                _defaultHandler == null ? null : _selectDefaultHandler,
+                subtitle: _defaultHandler?.sender.name ?? '',
               ),
               const SizedBox(height: 14),
               DialogActionButton(
@@ -279,7 +313,7 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
   Widget _row(
     String title,
     Widget icon,
-    VoidCallback onTap, {
+    VoidCallback? onTap, {
     String? subtitle,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 10),

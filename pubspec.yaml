@@ -71,6 +71,7 @@ flutter:
   assets:
     - assets/miniapps/
     - assets/miniapps/icons/
+    - assets/emoji/
     - assets/providers/
     - assets/tokenizers/deepseek_v4.json.gz
     - assets/branding/app_logo.png

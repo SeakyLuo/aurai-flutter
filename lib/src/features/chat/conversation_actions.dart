@@ -1,6 +1,18 @@
 part of 'chat_controller.dart';
 
 extension ConversationActions on ChatController {
+  Future<void> createConversation() async {
+    if (identical(activeConversation, _newConversation) &&
+        activeConversation.isEmpty)
+      return;
+    await _switchConversation(null);
+  }
+
+  Future<void> selectConversation(String id) => _switchConversation(id);
+
+  Future<void> restoreConversation(String id) =>
+      _switchConversation(id == _newConversation.id ? null : id);
+
   Future<List<AgentMessage>> previewConversationMessages(
     String id, {
     AgentMessage? before,

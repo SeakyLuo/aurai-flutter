@@ -1,4 +1,5 @@
 import 'group_notice_dismissals.dart';
+import 'project_directory_schema.dart';
 import 'group_member_details.dart';
 import 'group_message_marks.dart';
 import '../html_games/miniapp_release_notes.dart';
@@ -26,52 +27,91 @@ import 'tool_customization_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 63,
+  version: 65,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
-    if (oldVersion >= 52 && oldVersion < 62) {
+    // The version-54 device received project schema changes before its version
+    // was advanced. Inspect that upgrade range once instead of recreating them.
+    final projectColumns = oldVersion >= 52 && oldVersion < 62
+        ? (await db.rawQuery(
+            'PRAGMA table_info(development_projects)',
+          )).map((row) => row['name']).toSet()
+        : <Object?>{};
+    final existingObjects = oldVersion < 58
+        ? (await db.query(
+            'sqlite_master',
+            columns: ['name'],
+            where: 'name IN (?, ?, ?)',
+            whereArgs: [
+              'tool_customizations',
+              'project_conversation_updated',
+              'project_conversation_created',
+            ],
+          )).map((row) => row['name']).toSet()
+        : <Object?>{};
+    if (oldVersion >= 52 &&
+        oldVersion < 62 &&
+        !projectColumns.contains('instructions')) {
       await db.execute(
         "ALTER TABLE development_projects ADD COLUMN instructions TEXT NOT NULL DEFAULT ''",
       );
     }
-    if (oldVersion >= 52 && oldVersion < 61) {
+    if (oldVersion >= 52 &&
+        oldVersion < 61 &&
+        !projectColumns.contains('git_remote_url')) {
       await db.execute(
         "ALTER TABLE development_projects ADD COLUMN git_remote_url TEXT NOT NULL DEFAULT ''",
       );
     }
-    if (oldVersion >= 52 && oldVersion < 60) {
+    if (oldVersion >= 52 &&
+        oldVersion < 60 &&
+        !projectColumns.contains('default_sender_id')) {
       await db.execute(
         "ALTER TABLE development_projects ADD COLUMN default_sender_id TEXT NOT NULL DEFAULT 'agent:aurai'",
       );
     }
-    if (oldVersion >= 52 && oldVersion < 59) {
+    if (oldVersion >= 52 &&
+        oldVersion < 59 &&
+        !projectColumns.contains('description')) {
       await db.execute(
         "ALTER TABLE development_projects ADD COLUMN description TEXT NOT NULL DEFAULT ''",
       );
     }
     if (oldVersion >= 52 && oldVersion < 58) {
-      await db.execute(
-        'ALTER TABLE development_projects ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0 CHECK(pinned IN (0, 1))',
-      );
-      await db.execute(
-        "ALTER TABLE development_projects ADD COLUMN memory_mode TEXT NOT NULL DEFAULT 'shared' CHECK(memory_mode IN ('shared', 'projectOnly'))",
-      );
-      await db.execute(projectConversationUpdateTrigger);
-      await db.execute(projectConversationInsertTrigger);
+      if (!projectColumns.contains('pinned')) {
+        await db.execute(
+          'ALTER TABLE development_projects ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0 CHECK(pinned IN (0, 1))',
+        );
+      }
+      if (!projectColumns.contains('memory_mode')) {
+        await db.execute(
+          "ALTER TABLE development_projects ADD COLUMN memory_mode TEXT NOT NULL DEFAULT 'shared' CHECK(memory_mode IN ('shared', 'projectOnly'))",
+        );
+      }
+      if (!existingObjects.contains('project_conversation_updated')) {
+        await db.execute(projectConversationUpdateTrigger);
+      }
+      if (!existingObjects.contains('project_conversation_created')) {
+        await db.execute(projectConversationInsertTrigger);
+      }
     }
-    if (oldVersion < 57) {
+    if (oldVersion < 57 && !existingObjects.contains('tool_customizations')) {
       await db.execute(toolCustomizationSchema);
       await seedToolCustomizations(db);
     }
-    if (oldVersion >= 52 && oldVersion < 54) {
+    if (oldVersion >= 52 &&
+        oldVersion < 54 &&
+        !projectColumns.contains('icon')) {
       await db.execute(
         "ALTER TABLE development_projects ADD COLUMN icon TEXT NOT NULL DEFAULT 'file'",
       );
     }
-    if (oldVersion >= 52 && oldVersion < 55) {
+    if (oldVersion >= 52 &&
+        oldVersion < 55 &&
+        !projectColumns.contains('icon_color')) {
       await db.execute(
         "ALTER TABLE development_projects ADD COLUMN icon_color TEXT NOT NULL DEFAULT 'default'",
       );
@@ -303,12 +343,17 @@ Future<Database> openConversationDatabase() async => openDatabase(
       }
     }
     if (oldVersion < 63) await migrateGroupNoticeDismissals(db);
+    if (oldVersion < 64) await migrateProjectDirectories(db);
+    if (oldVersion >= 57 && oldVersion < 65) {
+      await migrateToolCustomizationPrimaryKey(db);
+    }
   },
   onCreate: (db, version) async {
     final batch = db.batch();
     for (final statement in [
       ..._schema,
-      developmentProjectSchema,
+      projectRecordSchema,
+      ...projectDirectorySchema,
       projectConversationUpdateTrigger,
       projectConversationInsertTrigger,
       ...favoritesSchema,

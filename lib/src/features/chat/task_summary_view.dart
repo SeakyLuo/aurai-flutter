@@ -1,4 +1,5 @@
 import '../../domain/tool_activity_groups.dart';
+import 'dart:convert';
 import '../../domain/workspace_file_changes.dart';
 import 'workspace_changes_view.dart';
 import 'tool_activity_group.dart';
@@ -41,6 +42,21 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
   late bool _expanded;
   List<Widget>? _activityWidgets;
   WorkspaceFileChanges? _fileChanges;
+  Iterable<String?> _otherFileResults() sync* {
+    final changes = widget.summary.gitChanges;
+    final reviewedRoots = {
+      if (changes != null)
+        for (final directory
+            in changes.directories.isEmpty ? [changes] : changes.directories)
+          'aurai://project/${directory.workspaceId}',
+    };
+    for (final activity in widget.summary.activities) {
+      final result = activity.resultJson;
+      if (result == null) continue;
+      final output = jsonDecode(result) as Map;
+      if (!reviewedRoots.contains(output['workspaceRoot'])) yield result;
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -211,15 +227,27 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
           const Divider(height: 1),
           const SizedBox(height: 12),
           if (widget.summary.gitChanges case final gitChanges?)
-            _GitTaskChangesCard(changes: gitChanges)
-          else
-            WorkspaceChangesView(
-              changes: _fileChanges ??= WorkspaceFileChanges.fromResults(
-                widget.summary.activities.map(
-                  (activity) => activity.resultJson,
-                ),
-              ),
+            Column(
+              children: [
+                for (final change
+                    in gitChanges.directories.isEmpty
+                        ? [gitChanges]
+                        : gitChanges.directories)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (change.directoryName != null)
+                        Text(change.directoryName!),
+                      _GitTaskChangesCard(changes: change),
+                    ],
+                  ),
+              ],
             ),
+          WorkspaceChangesView(
+            changes: _fileChanges ??= WorkspaceFileChanges.fromResults(
+              _otherFileResults(),
+            ),
+          ),
           if (_expanded)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),

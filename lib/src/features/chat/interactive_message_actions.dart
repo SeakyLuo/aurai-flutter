@@ -403,6 +403,23 @@ extension InteractiveMessageActions on ChatController {
   }) async {
     final conversation = activeConversation;
     await _store.writer.flush();
+    final message = conversation.messages.firstWhere(
+      (message) => message.id == messageId,
+    );
+    final card = message.interactive!;
+    if (card.revision != revision ||
+        card.participantRevision(MessageSender.localUser.id) !=
+            participantRevision) {
+      throw InteractiveMessageChanged(card);
+    }
+    final button = card
+        .viewFor(MessageSender.localUser.id)
+        .buttons
+        .firstWhere((button) => button['id'] == buttonId);
+    if (button['action'] == 'openConversation') {
+      await _switchConversation(button['conversationId'] as String);
+      return (card: card, url: null);
+    }
     try {
       final result = await InteractiveMessageStore(_store.database).click(
         conversation.id,
@@ -420,7 +437,10 @@ extension InteractiveMessageActions on ChatController {
           result.notice!,
           source: conversation,
           notifyParticipants:
-              result.card.participants[MessageSender.localUser.id]?['callback'] == null,
+              result.card.participants[MessageSender
+                  .localUser
+                  .id]?['callback'] ==
+              null,
         );
       MessageCallbacks.changes.add(null);
       return (card: result.card, url: result.url);

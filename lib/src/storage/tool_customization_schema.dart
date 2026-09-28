@@ -1,12 +1,25 @@
 import 'package:sqflite/sqflite.dart';
 
 const toolCustomizationSchema = '''CREATE TABLE tool_customizations (
-  name TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
   icon TEXT NOT NULL,
   title TEXT,
   description TEXT,
   input_schema_json TEXT
 )''';
+
+Future<void> migrateToolCustomizationPrimaryKey(DatabaseExecutor db) async {
+  await db.execute(
+    'ALTER TABLE tool_customizations RENAME TO previous_tool_customizations',
+  );
+  await db.execute(toolCustomizationSchema);
+  await db.execute('''INSERT INTO tool_customizations
+    (name, icon, title, description, input_schema_json)
+    SELECT name, icon, title, description, input_schema_json
+    FROM previous_tool_customizations''');
+  await db.execute('DROP TABLE previous_tool_customizations');
+}
 
 const toolNamesByDefaultIcon = <String, List<String>>{
   'forward': ['forwardMessage'],
@@ -139,7 +152,6 @@ const toolNamesByDefaultIcon = <String, List<String>>{
     'createFolder',
     'listProjects',
     'createProject',
-    'renameProject',
     'setProjectIcon',
     'setProjectPinned',
     'setProjectMemoryMode',

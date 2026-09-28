@@ -3,6 +3,36 @@ part of 'chat_controller.dart';
 final _recordedRunErrors = Expando<String>('recorded run error conversation');
 
 extension ConversationRunFailure on ChatController {
+  Future<String> _logRunFailure(
+    Object error,
+    StackTrace stack, {
+    required ModelConfig config,
+    required String conversationId,
+    required MessageSender sender,
+    required String runId,
+  }) async {
+    var diagnostic = '${error.runtimeType}: $error\n$stack';
+    if (config.apiKey.isNotEmpty) {
+      diagnostic = diagnostic.replaceAll(config.apiKey, '[redacted]');
+    }
+    await ExecutionLog.write({
+      'event': 'run_error',
+      'conversationId': conversationId,
+      'senderId': sender.id,
+      'senderName': sender.name,
+      'runId': runId,
+      'model': config.model,
+      'diagnostic': diagnostic,
+    }, apiKey: config.apiKey);
+    developer.log(
+      '会话执行失败：${errorMessage(error)}',
+      name: 'aurai.execution',
+      error: error,
+      stackTrace: stack,
+    );
+    return diagnostic;
+  }
+
   void _recordRunError(Object error, String conversationId) {
     if (error is Exception || error is Error) {
       _recordedRunErrors[error] = conversationId;

@@ -103,7 +103,7 @@ extension _MessageItemActions on _MessageItemState {
               message.text.isNotEmpty ||
               message.images.isNotEmpty ||
               message.files.isNotEmpty),
-      allowBranch: widget.onBranch != null,
+      allowBranch: compactMenu && widget.onBranch != null,
       allowQuickReply:
           widget.onQuickReply != null &&
           (!widget.streaming ||

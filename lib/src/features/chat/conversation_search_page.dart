@@ -37,10 +37,12 @@ class ConversationSearchPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.preparingGoal,
+    this.projectId,
   });
 
   final ChatController controller;
   final bool Function() preparingGoal;
+  final String? projectId;
 
   @override
   State<ConversationSearchPage> createState() => _ConversationSearchPageState();
@@ -57,7 +59,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
   final _groups = <String, List<MessageSender>>{};
   final _results = <ConversationSearchResult>[];
   final _files = <AttachmentSearchResult>[];
-  final _historyStore = SearchHistoryStore();
+  late final _historyStore = SearchHistoryStore(projectId: widget.projectId);
   List<String> _history = [];
   bool _filesTab = false;
   bool _includeReasoning = false;
@@ -122,6 +124,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
             query,
             reset ? 0 : _results.length,
             includeReasoning: _includeReasoning,
+            projectId: widget.projectId,
           )
         else
           Future.value(<ConversationSearchResult>[]),
@@ -130,6 +133,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
             query,
             reset ? 0 : _files.length,
             limit: query.isEmpty ? 10 : AttachmentSearch.pageSize,
+            projectId: widget.projectId,
           )
         else
           Future.value(<AttachmentSearchResult>[]),
@@ -264,7 +268,12 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
 
   Future<void> _loadRecent() async {
     try {
-      final files = await widget.controller.searchAttachments('', 0, limit: 10);
+      final files = await widget.controller.searchAttachments(
+        '',
+        0,
+        limit: 10,
+        projectId: widget.projectId,
+      );
       final available = await Future.wait(
         files.map((result) async {
           try {
@@ -448,7 +457,9 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
                                         color: colors.onSurface,
                                       ),
                                   decoration: InputDecoration(
-                                    hintText: '搜索会话和文件',
+                                    hintText: widget.projectId == null
+                                        ? '搜索会话和文件'
+                                        : '在项目中搜索会话和文件',
                                     hintStyle: TextStyle(
                                       color: colors.onSurfaceVariant,
                                       fontSize: 15,

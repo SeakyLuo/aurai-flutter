@@ -182,46 +182,7 @@ extension AiIdentityController on ChatController {
         ? null
         : await DevelopmentProjects(
             _store.database,
-          ).forConversation(conversation.projectId!, conversation.id);
-    if (project?.worktreeDeleted == true) {
-      throw StateError('当前工作树已删除，请先选择工作目录');
-    }
-    if (project?.worktreeId != null) {
-      final directories = await _platform
-          .deviceExtension('projectDevelopmentOperation', {
-            'projectId': project!.id,
-            'operation': 'listProjectWorktrees',
-            'arguments': <String, Object?>{},
-          });
-      if (!(directories['worktrees'] as List).cast<Map>().any(
-        (item) => item['id'] == project.worktreeId,
-      )) {
-        throw StateError('当前工作树已删除，请先选择工作目录');
-      }
-      final otherRuns = _executionStates.values
-          .where(
-            (state) =>
-                state.conversation?.projectId == project.id &&
-                state.conversation?.id != conversation.id &&
-                (state.runningConversation != null ||
-                    state.privateConversation != null ||
-                    state.submitting),
-          )
-          .map((state) => 'conversation_worktree:${state.conversation!.id}')
-          .toList();
-      if (otherRuns.isNotEmpty) {
-        final occupied = await _store.database.query(
-          'app_state',
-          columns: ['key'],
-          where:
-              "key IN (${List.filled(otherRuns.length, '?').join(',')}) AND json_extract(value, '\$.id') = ?",
-          whereArgs: [...otherRuns, project.worktreeId],
-          limit: 1,
-        );
-        if (occupied.isNotEmpty)
-          throw StateError('这个工作树已有任务在运行，请等待完成或选择另一个工作树');
-      }
-    }
+          ).readWorkspace(conversation.projectId!);
     final privateMemory =
         project == null || project.memoryMode == ProjectMemoryMode.shared
         ? await aiMemory(profile, scope: privateScope)
@@ -236,10 +197,11 @@ extension AiIdentityController on ChatController {
   }
 
   String _projectContext(DevelopmentProject project) => [
-    '本轮工作目录：${project.rootUri}。会话可在不同工作目录之间切换；历史消息中的文件状态不代表当前目录，操作前重新读取当前文件。所有本轮操作使用此目录。',
-    if (project.worktreeName != null)
-      '当前使用独立 Git 工作树“${project.worktreeName}”。只修改当前工作树，不要修改主目录；完成后提交改动，等待用户合并。',
-    '当前会话属于开发项目“${project.name}”。项目工作目录已经授权，可通过文件工具直接读取和修改；所有文件操作限制在该项目目录内。',
+    '本项目可访问多个工作目录，同一轮可以跨目录读取和修改。命令与 Git 操作必须明确指定目标目录；不同仓库的分支和提交独立。',
+    for (final directory in project.directories)
+      '目录“${directory.name}”：${directory.uri}${directory.worktree ? '（Git 工作树）' : ''}',
+    if (project.directories.isEmpty) '项目尚未关联目录，请用户从项目菜单添加目录。',
+    '当前会话属于开发项目“${project.name}”。项目工作目录已经授权，可通过文件工具直接读取和修改；文件操作限于上面列出的目录。',
     if (project.description.isNotEmpty) '项目介绍：${project.description}',
     if (project.instructions.isNotEmpty) '项目自定义指令：\n${project.instructions}',
   ].join('\n');

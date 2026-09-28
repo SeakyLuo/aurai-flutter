@@ -28,7 +28,8 @@ class AiDocumentScope {
     final uri = Uri.tryParse(value);
     if (uri == null) return false;
     final parts = uri.pathSegments;
-    if (project != null) return _within(value, project!.rootUri);
+    if (project != null)
+      return project!.directories.any((directory) => directory.contains(value));
     return _folders.any((folder) {
       final root = Uri.parse(folder);
       final rootParts = root.pathSegments;
@@ -39,24 +40,6 @@ class AiDocumentScope {
           parts[0] == 'tree' &&
           parts[1] == rootParts[1];
     });
-  }
-
-  bool _within(String value, String rootValue) {
-    final uri = Uri.parse(value);
-    final root = Uri.parse(rootValue);
-    if (uri.scheme == 'aurai') {
-      return uri.scheme == root.scheme &&
-          uri.authority == root.authority &&
-          uri.pathSegments.first == root.pathSegments.first;
-    }
-    final parts = uri.pathSegments;
-    final rootParts = root.pathSegments;
-    return uri.scheme == root.scheme &&
-        uri.authority == root.authority &&
-        parts.length >= 2 &&
-        rootParts.length >= 2 &&
-        parts[0] == 'tree' &&
-        parts[1] == rootParts[1];
   }
 
   Future<void> grant(String value) async {
@@ -72,14 +55,15 @@ class AiDocumentScope {
     ...output,
     'folders': [
       if (project != null)
-        {
-          'uri': project!.rootUri,
-          'name': project!.name,
-          'source': '项目',
-          'path': '',
-          'readable': true,
-          'writable': true,
-        },
+        for (final directory in project!.directories)
+          {
+            'uri': directory.uri,
+            'name': directory.name,
+            'source': '项目',
+            'path': '',
+            'readable': true,
+            'writable': true,
+          },
       if (project == null)
         ...(output['folders'] as List).where(
           (folder) => allows((folder as Map)['uri'] as String),

@@ -11,10 +11,10 @@ enum MessageAction {
   quote,
   recall,
   forward,
+  branch,
   fullscreen,
   statistics,
   history,
-  branch,
 }
 
 sealed class MessageMenuResult {

@@ -1,4 +1,5 @@
 import 'ai_document_scope.dart';
+import '../storage/project_directory.dart';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
@@ -286,9 +287,11 @@ class DocumentTool
       return _result(call, {'error': '此 AI 尚未获得源文件夹授权'});
     }
     if (name != 'createTextFile') return null;
-    if (access.project case final project?
-        when call.arguments['uri'] == project.rootUri) {
-      _folderName = project.name;
+    final roots = access.project?.directories.where(
+      (item) => item.uri == call.arguments['uri'],
+    );
+    if (roots != null && roots.isNotEmpty) {
+      _folderName = roots.single.name;
       return null;
     }
     try {
@@ -308,10 +311,13 @@ class DocumentTool
     toolName: name,
     output: {
       ...output,
-      if (access.project case final project?) ...{
-        'workspaceRoot': project.rootUri,
-        'workspaceName': project.worktreeName ?? '主目录',
-      },
+      for (final directory
+          in access.project?.directories ?? const <ProjectDirectory>[])
+        if (call.arguments['uri'] is String &&
+            directory.contains(call.arguments['uri'] as String)) ...{
+          'workspaceRoot': directory.uri,
+          'workspaceName': directory.name,
+        },
     },
     status: output['cancelled'] == true
         ? ToolResultStatus.cancelled

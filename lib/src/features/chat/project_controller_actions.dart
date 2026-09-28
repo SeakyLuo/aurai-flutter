@@ -1,23 +1,6 @@
 part of 'chat_controller.dart';
 
 extension ProjectControllerActions on ChatController {
-  Future<void> selectConversationWorkspace(
-    String conversationId,
-    DevelopmentProject project,
-  ) async {
-    if ({_execution, ..._executionStates.values}.any(
-      (state) =>
-          state.conversation?.id == conversationId &&
-          (state.runningConversation != null ||
-              state.privateConversation != null ||
-              state.submitting),
-    )) {
-      throw StateError('请等待当前任务完成或停止后再切换工作目录');
-    }
-    await projects.bindWorktree(conversationId, project);
-    _conversationChanged();
-  }
-
   Future<void> createProjectConversation(
     DevelopmentProject project, {
     required String senderId,
@@ -28,7 +11,6 @@ extension ProjectControllerActions on ChatController {
     activeConversation.defaultSenderId = senderId;
     _activeAi = await groupStore.loadAi(senderId);
     await _newDraftStore.save(activeConversation);
-    await projects.bindWorktree(activeConversation.id, project);
     _conversationChanged();
   }
 
@@ -46,38 +28,33 @@ extension ProjectControllerActions on ChatController {
     String icon,
     String iconColor, {
     String description = '',
-    String gitRemoteUrl = '',
+    String instructions = '',
+    List<ProjectDirectory> directories = const [],
+    List<String> directoryNames = const [],
   }) async {
     validateProjectName(name);
     final id = newMessageId();
-    final output = await _platform.deviceExtension('createManagedProject', {
-      'id': id,
-      'name': name,
-    });
-    if (gitRemoteUrl.isNotEmpty) {
-      await _platform.deviceExtension('projectDevelopmentOperation', {
-        'projectId': id,
-        'operation': 'initializeProjectGit',
-        'arguments': <String, Object?>{},
+    final createdDirectories = <ProjectDirectory>[];
+    for (final directoryName in directoryNames.isEmpty ? [name] : directoryNames) {
+      final output = await _platform.deviceExtension('createManagedProject', {
+        'id': newMessageId(),
+        'name': directoryName,
       });
-      await _platform.deviceExtension('projectDevelopmentOperation', {
-        'projectId': id,
-        'operation': 'setProjectGitRemote',
-        'arguments': {'url': gitRemoteUrl},
-      });
+      createdDirectories.add(
+        ProjectDirectory(uri: output['uri'] as String, name: directoryName),
+      );
     }
     final now = DateTime.now();
     final project = DevelopmentProject(
       id: id,
       name: name,
       description: description,
+      instructions: instructions,
       icon: icon,
       iconColor: iconColor,
-      rootUri: output['uri'] as String,
-      location: ProjectLocation.managed,
+      directories: [...createdDirectories, ...directories],
       createdAt: now,
       updatedAt: now,
-      gitRemoteUrl: gitRemoteUrl,
     );
     await projects.create(project);
     notifyListeners();
@@ -88,9 +65,9 @@ extension ProjectControllerActions on ChatController {
     String name,
     String icon,
     String iconColor,
-    String rootUri, {
+    List<ProjectDirectory> directories, {
     String description = '',
-    String gitRemoteUrl = '',
+    String instructions = '',
   }) async {
     validateProjectName(name);
     final now = DateTime.now();
@@ -98,13 +75,12 @@ extension ProjectControllerActions on ChatController {
       id: newMessageId(),
       name: name,
       description: description,
+      instructions: instructions,
       icon: icon,
       iconColor: iconColor,
-      rootUri: rootUri,
-      location: ProjectLocation.external,
+      directories: directories,
       createdAt: now,
       updatedAt: now,
-      gitRemoteUrl: gitRemoteUrl,
     );
     await projects.create(project);
     notifyListeners();
@@ -132,31 +108,18 @@ extension ProjectControllerActions on ChatController {
     DevelopmentProject project, {
     required String name,
     required String description,
+    required String instructions,
     required String icon,
     required String iconColor,
-    required String gitRemoteUrl,
   }) async {
     validateProjectName(name);
-    if (project.location == ProjectLocation.managed &&
-        project.gitRemoteUrl != gitRemoteUrl) {
-      await _platform.deviceExtension('projectDevelopmentOperation', {
-        'projectId': project.id,
-        'operation': 'initializeProjectGit',
-        'arguments': <String, Object?>{},
-      });
-      await _platform.deviceExtension('projectDevelopmentOperation', {
-        'projectId': project.id,
-        'operation': 'setProjectGitRemote',
-        'arguments': {'url': gitRemoteUrl},
-      });
-    }
     await projects.updateProfile(
       project.id,
       name: name,
       description: description,
+      instructions: instructions,
       icon: icon,
       iconColor: iconColor,
-      gitRemoteUrl: gitRemoteUrl,
     );
     notifyListeners();
     return projects.read(project.id);
@@ -180,15 +143,6 @@ extension ProjectControllerActions on ChatController {
     return projects.read(project.id);
   }
 
-  Future<DevelopmentProject> setProjectInstructions(
-    DevelopmentProject project,
-    String instructions,
-  ) async {
-    await projects.setInstructions(project.id, instructions.trim());
-    notifyListeners();
-    return projects.read(project.id);
-  }
-
   Future<DevelopmentProject> setProjectDefaultSender(
     DevelopmentProject project,
     String senderId,
@@ -200,11 +154,6 @@ extension ProjectControllerActions on ChatController {
 
   Future<void> removeProject(DevelopmentProject project) async {
     requireProjectIdle(project.id);
-    if (project.location == ProjectLocation.managed) {
-      await _platform.deviceExtension('removeManagedProject', {
-        'id': project.id,
-      });
-    }
     await projects.remove(project.id);
     await _reloadConversations();
     notifyListeners();

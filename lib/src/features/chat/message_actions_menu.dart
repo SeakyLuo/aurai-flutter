@@ -114,7 +114,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
               type: ConversationMenuIconType.branch,
               color: iconColor,
             ),
-            '创建分支',
+            '在新聊天继续',
           ),
         if (allowCopy && message.text.isNotEmpty)
           (

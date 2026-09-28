@@ -251,6 +251,7 @@ class _ChatPageState extends State<ChatPage>
       allowEditing: _editing == null,
     );
     final showProgress =
+        controller.creatingConversationBranch ||
         (controller.isBusy && controller.runState != ChatRunState.idle) ||
         controller.pendingGoal != null ||
         controller.runState == ChatRunState.failed ||
@@ -273,19 +274,22 @@ class _ChatPageState extends State<ChatPage>
       );
     }
     return PopScope(
-      canPop: _editing == null && (!active.isTemporary || _temporaryExitReady),
+      canPop:
+          _editing == null &&
+          !controller.creatingConversationBranch &&
+          (!active.isTemporary || _temporaryExitReady),
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) unawaited(_saveDraft());
-        if (!didPop && _editing != null) {
+        if (!didPop && controller.creatingConversationBranch) {
+          unawaited(controller.cancelConversationBranch());
+        } else if (!didPop && _editing != null) {
           _cancelMessageEdit();
         } else if (!didPop && active.isTemporary) {
           unawaited(_exitTemporaryConversation());
         }
       },
       child: AbsorbPointer(
-        absorbing:
-            controller.changingConversation ||
-            controller.creatingConversationBranch,
+        absorbing: controller.changingConversation,
         child: BackdropGroup(
           child: Scaffold(
             key: _scaffoldKey,
@@ -350,8 +354,12 @@ class _ChatPageState extends State<ChatPage>
                               submitting: controller.isSubmitting,
                               draftEnabled: _editing != null
                                   ? !_editing!.saving
-                                  : controller.canEditDraft && !_preparingGoal,
-                              enabled: isGroup
+                                  : controller.canEditDraft &&
+                                        !_preparingGoal &&
+                                        !controller.creatingConversationBranch,
+                              enabled: controller.creatingConversationBranch
+                                  ? false
+                                  : isGroup
                                   ? true
                                   : _editing != null
                                   ? !_editing!.saving
@@ -540,8 +548,7 @@ class _ChatPageState extends State<ChatPage>
                                       ),
                                     ),
                             ),
-                            if (controller.changingConversation ||
-                                controller.creatingConversationBranch)
+                            if (controller.changingConversation)
                               Positioned.fill(
                                 child: ColoredBox(
                                   color: Theme.of(
@@ -550,12 +557,8 @@ class _ChatPageState extends State<ChatPage>
                                   child: Center(
                                     child: Padding(
                                       padding: EdgeInsets.all(24),
-                                      child: ThinkingIndicator(
-                                        label:
-                                            controller
-                                                .creatingConversationBranch
-                                            ? '正在创建分支'
-                                            : '正在打开会话',
+                                      child: const ThinkingIndicator(
+                                        label: '正在打开会话',
                                       ),
                                     ),
                                   ),
@@ -788,7 +791,11 @@ class _ChatPageState extends State<ChatPage>
   }
 
   Future<void> _stop() async {
-    await widget.controller.stop();
+    if (widget.controller.creatingConversationBranch) {
+      await widget.controller.cancelConversationBranch();
+    } else {
+      await widget.controller.stop();
+    }
   }
 
   Future<void> _openSettings({required bool continueAfterSave}) async {

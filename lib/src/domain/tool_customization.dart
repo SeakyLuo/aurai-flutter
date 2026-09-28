@@ -55,11 +55,14 @@ abstract final class ToolCustomizations {
   }
 
   static Future<void> save(String name, ToolCustomization value) async {
-    await _database.insert(
+    final row = value.toRow(name);
+    final updated = await _database.update(
       'tool_customizations',
-      value.toRow(name),
-      conflictAlgorithm: ConflictAlgorithm.replace,
+      row,
+      where: 'name = ?',
+      whereArgs: [name],
     );
+    if (updated == 0) await _database.insert('tool_customizations', row);
     values[name] = value;
   }
 

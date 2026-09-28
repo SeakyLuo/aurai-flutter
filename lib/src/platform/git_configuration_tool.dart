@@ -13,8 +13,8 @@ class GitConfigurationTool implements AgentTool, RuntimeCapabilityAgentTool {
     capabilityId: 'local.git',
     safety: update ? ToolSafety.sensitive : ToolSafety.readOnly,
     description: update
-        ? '更新全局 Git 提交身份、默认分支和 HTTPS 认证。先调用 readGitConfiguration。httpsToken 为 null 时保留已有令牌，传入非空字符串时替换；clearHttpsToken 为 true 时清除。令牌保存后不会回显。'
-        : '读取全局 Git 提交身份、默认分支和 HTTPS 用户名，以及令牌是否已配置。不会返回令牌内容。',
+        ? '更新全局 Git 提交身份、默认分支和按域名保存的 HTTPS 凭据。先调用 readGitConfiguration。Codeup 和 GitHub 的 username 可留空，Aurai 会自动处理；凭据 token 为 null 时保留该域名已有令牌，传入非空字符串时替换；从列表移除凭据会删除它。令牌保存后不会回显。'
+        : '读取全局 Git 提交身份、默认分支和按域名保存的 HTTPS 凭据，以及各令牌是否已配置。不会返回令牌内容。',
     inputSchema: {
       'type': 'object',
       'properties': update
@@ -26,28 +26,32 @@ class GitConfigurationTool implements AgentTool, RuntimeCapabilityAgentTool {
                 'minLength': 1,
                 'maxLength': 200,
               },
-              'httpsUsername': {'type': 'string', 'maxLength': 200},
-              'httpsToken': {
-                'type': ['string', 'null'],
-                'maxLength': 2000,
+              'httpsCredentials': {
+                'type': 'array',
+                'maxItems': 20,
+                'items': {
+                  'type': 'object',
+                  'properties': {
+                    'host': {'type': 'string', 'maxLength': 253},
+                    'username': {'type': 'string', 'maxLength': 200},
+                    'token': {
+                      'type': ['string', 'null'],
+                      'maxLength': 2000,
+                    },
+                  },
+                  'required': ['host', 'username', 'token'],
+                  'additionalProperties': false,
+                },
               },
-              'clearHttpsToken': {'type': 'boolean'},
             }
           : <String, Object?>{},
       'required': update
-          ? [
-              'name',
-              'email',
-              'defaultBranch',
-              'httpsUsername',
-              'httpsToken',
-              'clearHttpsToken',
-            ]
+          ? ['name', 'email', 'defaultBranch', 'httpsCredentials']
           : <String>[],
       'additionalProperties': false,
     },
     confirmationDescriptionBuilder: update
-        ? (_) => '更新全局 Git 身份、默认分支和 HTTPS 认证设置。'
+        ? (_) => '更新全局 Git 身份、默认分支和 HTTPS 凭据。'
         : null,
   );
 

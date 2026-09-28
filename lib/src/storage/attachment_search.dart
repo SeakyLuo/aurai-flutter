@@ -32,6 +32,7 @@ class AttachmentSearch {
     String query,
     int offset, {
     int limit = pageSize,
+    String? projectId,
   }) async {
     final rows = await database.rawQuery(
       '''
@@ -41,6 +42,7 @@ class AttachmentSearch {
       INNER JOIN messages m ON m.id = a.message_id
       INNER JOIN conversations c ON c.id = a.conversation_id
       WHERE c.mode = 'normal'
+      ${projectId == null ? '' : 'AND c.project_id = ?'}
       ${query.isEmpty ? '' : '''AND (instr(lower(coalesce(a.display_name, '')), ?) > 0
         OR instr(lower(m.text), ?) > 0)'''}
       ORDER BY m.created_at DESC, a.position, a.id
@@ -48,6 +50,7 @@ class AttachmentSearch {
     ''',
       [
         query,
+        if (projectId != null) projectId,
         if (query.isNotEmpty) query,
         if (query.isNotEmpty) query,
         limit,

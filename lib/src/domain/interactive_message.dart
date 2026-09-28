@@ -361,6 +361,7 @@ class InteractiveMessage {
             'update',
             'acknowledge',
             'openUrl',
+            'openConversation',
             'submit',
             'nextRound',
           ].contains(b['action']) ||
@@ -413,6 +414,11 @@ class InteractiveMessage {
             uri.userInfo.isNotEmpty) {
           throw ArgumentError('按钮链接必须是完整 HTTPS 地址');
         }
+      }
+      if (b['action'] == 'openConversation' &&
+          (b['conversationId'] is! String ||
+              (b['conversationId'] as String).isEmpty)) {
+        throw ArgumentError('会话卡片需要目标会话');
       }
       if (b['nextBody'] is String && (b['nextBody'] as String).length > 10000)
         throw ArgumentError('更新正文最多 10000 字');

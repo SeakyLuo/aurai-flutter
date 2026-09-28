@@ -196,18 +196,23 @@ class _MenuIconPainter extends CustomPainter {
           pen,
         );
       case ConversationMenuIconType.branch:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(3, 4, 13, 13),
+            const Radius.circular(3),
+          ),
+          pen,
+        );
         canvas.drawPath(
           Path()
-            ..moveTo(6, 4)
-            ..lineTo(6, 11)
-            ..quadraticBezierTo(6, 14, 9, 14)
-            ..lineTo(18, 14)
-            ..moveTo(14, 10)
-            ..lineTo(18, 14)
-            ..lineTo(14, 18)
-            ..moveTo(6, 11)
-            ..quadraticBezierTo(6, 8, 9, 8)
-            ..lineTo(13, 8),
+            ..moveTo(7, 17)
+            ..lineTo(5, 20)
+            ..lineTo(5, 17)
+            ..moveTo(12, 12)
+            ..lineTo(21, 3)
+            ..moveTo(15.5, 3)
+            ..lineTo(21, 3)
+            ..lineTo(21, 8.5),
           pen,
         );
       case ConversationMenuIconType.archive:
