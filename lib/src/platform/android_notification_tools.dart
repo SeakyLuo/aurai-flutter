@@ -5,22 +5,16 @@ import 'android_network_tools.dart';
 import 'aurai_platform.dart';
 
 class GetNotificationsTool
-    implements
-        AgentTool,
-        PreflightAgentTool,
-        RuntimeCapabilityAgentTool,
-        ScopedAuthorizationAgentTool {
-  GetNotificationsTool(this._platform, this._providerLabel);
+    implements AgentTool, PreflightAgentTool, RuntimeCapabilityAgentTool {
+  GetNotificationsTool(this._platform);
 
   final AuraiPlatform _platform;
-  final String _providerLabel;
-  late int _listenerEpoch;
 
   @override
   ToolDefinition get definition => ToolDefinition(
     name: 'getNotifications',
     description:
-        'Read a bounded recent window from Android notifications observed while Aurai notification access is connected. Sensitive verification, login-security, payment, transfer, and bank content is redacted on-device before model access. Use only when relevant to the task. System notification access is persistent, but sending data to the model requires task-scoped authorization bounded by provider, app filter, lookback window and result limit. Explain why before opening notificationAccess settings when missing. Respect coverageStart and partial: this is not a complete history, and absence outside the observed window proves nothing. Never recover redacted content using other tools.',
+        'Read a bounded recent window from Android notifications observed while Aurai notification access is connected. Sensitive verification, login-security, payment, transfer, and bank content is redacted on-device before model access. Use only when relevant to the task. Explain why before opening notificationAccess settings when missing. Respect coverageStart and partial: this is not a complete history, and absence outside the observed window proves nothing. Never recover redacted content using other tools.',
     inputSchema: const <String, Object?>{
       'type': 'object',
       'properties': <String, Object?>{
@@ -43,16 +37,8 @@ class GetNotificationsTool
       'required': <String>['lookbackMinutes', 'limit', 'appName'],
       'additionalProperties': false,
     },
-    safety: ToolSafety.sensitive,
+    safety: ToolSafety.lowRisk,
     capabilityId: 'android.notifications.observe',
-    taskScopedConfirmation: true,
-    confirmationDescriptionBuilder: (arguments) {
-      final appName = arguments['appName'] as String?;
-      final target = appName == null ? '所有应用' : appName;
-      return 'Aurai 将读取最近 ${arguments['lookbackMinutes']} 分钟内最多 '
-          '${arguments['limit']} 条$target通知，经手机端敏感信息隐藏后发送给 '
-          '$_providerLabel。本授权只在当前任务及上述范围内有效。';
-    },
   );
 
   @override
@@ -60,7 +46,6 @@ class GetNotificationsTool
     try {
       final state = await _platform.getNotificationAccessState();
       if (state['availability'] == 'available') {
-        _listenerEpoch = state['listenerEpoch']! as int;
         return null;
       }
       return ToolResult(
@@ -78,33 +63,6 @@ class GetNotificationsTool
     } on PlatformException catch (error) {
       return platformToolError(call, error);
     }
-  }
-
-  @override
-  Object authorizationScope(ToolCall call) => <String, Object?>{
-    'provider': _providerLabel,
-    'listenerEpoch': _listenerEpoch,
-    'lookbackMinutes': call.arguments['lookbackMinutes']! as int,
-    'limit': call.arguments['limit']! as int,
-    'appName': call.arguments['appName'] as String?,
-  };
-
-  @override
-  bool authorizationCovers(Object grantedScope, Object requestedScope) {
-    final granted = grantedScope as Map<String, Object?>;
-    final requested = requestedScope as Map<String, Object?>;
-    final grantedApp = granted['appName'] as String?;
-    final requestedApp = requested['appName'] as String?;
-    final appCovered =
-        grantedApp == null ||
-        (requestedApp != null &&
-            grantedApp.toLowerCase() == requestedApp.toLowerCase());
-    return granted['provider'] == requested['provider'] &&
-        granted['listenerEpoch'] == requested['listenerEpoch'] &&
-        (granted['lookbackMinutes']! as int) >=
-            (requested['lookbackMinutes']! as int) &&
-        (granted['limit']! as int) >= (requested['limit']! as int) &&
-        appCovered;
   }
 
   @override

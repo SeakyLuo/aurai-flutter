@@ -209,6 +209,11 @@ class _MessageItemState extends State<MessageItem> {
               key: const ValueKey('message-content'),
               child: _selectableContent(),
             ),
+            if ((widget.replyPart == null
+                    ? message.taskSummary?.gitChanges
+                    : widget.replyPart!.gitChanges)
+                case final gitChanges?)
+              GitTaskChangesView(changes: gitChanges),
             if (message.quickReplies.isNotEmpty)
               this._buildQuickReplies(context),
             if (!widget.readOnly &&

@@ -35,7 +35,7 @@ class DeviceExtensionTool implements AgentTool, RuntimeCapabilityAgentTool {
       'executeShizuku' =>
         '通过已授权的 Shizuku UserService 执行 shell 命令，返回实际 UID、退出码和有界输出。与普通 shell 工具分开，不能暗中升级权限。ADB 身份仍不能读取其他应用私有数据。命令应以前台方式运行，不启动脱离任务的后台进程；超时或取消会终止执行。',
       'startNetworkCapture' =>
-        '经用户明确同意，启动手机本地 VPN 记录其他应用的 TCP/UDP 连接元数据并正常转发。将替换现有 VPN（可能使依赖它的网络不可达），不解密 HTTPS，不安装证书，不提供请求 URL/正文；Aurai 自身除外。必须在 Aurai 前台接受系统授权，30–1800 秒后自动停止。不要用于普通发送通知，也不要无任务理由自动启动。',
+        '启动手机本地 VPN 记录其他应用的 TCP/UDP 连接元数据并正常转发。将替换现有 VPN（可能使依赖它的网络不可达），不解密 HTTPS，不安装证书，不提供请求 URL/正文；Aurai 自身除外。首次使用时 Android 可能要求系统 VPN 授权，30–1800 秒后自动停止。不要用于普通发送通知，也不要无任务理由自动启动。',
       'stopNetworkCapture' =>
         '停止 Aurai 本地 VPN 并释放转发连接，恢复系统普通网络路由。不会自动重新连接先前的 VPN。记录保留到清除或进程结束。',
       'readNetworkTraffic' =>
@@ -73,17 +73,14 @@ class DeviceExtensionTool implements AgentTool, RuntimeCapabilityAgentTool {
     },
     safety: switch (name) {
       'executeShizuku' => ToolSafety.destructive,
-      'startNetworkCapture' => ToolSafety.sensitive,
       'requestShizukuAccess' ||
+      'startNetworkCapture' ||
       'stopNetworkCapture' ||
       'clearNetworkTraffic' => ToolSafety.lowRisk,
       _ => ToolSafety.readOnly,
     },
     executionTimeout: const Duration(seconds: 150),
-    confirmationDescriptionBuilder: name == 'startNetworkCapture'
-        ? (args) =>
-              '开启本地 VPN，记录其他应用的连接元数据，${args['durationSeconds']} 秒后自动停止。这会替换当前 VPN，可能影响依赖它的联网；不读取 HTTPS 明文。停止后需自行重新连接原 VPN。'
-        : name == 'executeShizuku'
+    confirmationDescriptionBuilder: name == 'executeShizuku'
         ? (args) => '通过 Shizuku 的已授权身份执行命令：\n${args['command']}'
         : null,
   );

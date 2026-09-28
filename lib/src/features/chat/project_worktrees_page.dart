@@ -7,7 +7,7 @@ import '../../storage/project_directory.dart';
 import '../../storage/project_directories.dart';
 import 'chat_controller.dart';
 import 'app_confirmation_dialog.dart';
-import 'app_dialog.dart';
+import 'project_worktree_create_page.dart';
 import 'dialog_action_button.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -83,35 +83,35 @@ class _ProjectWorktreesPageState extends State<ProjectWorktreesPage> {
       ).showGlassSnackBar(const SnackBar(content: Text('请先在项目中创建一次 Git 提交')));
       return;
     }
-    final choice = await showDialog<(String, String)>(
-      context: context,
-      builder: (_) => _CreateWorktreeDialog(
-        branches: branches,
-        current: _data!['branch'] as String,
+    final created = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProjectWorktreeCreatePage(
+          branches: branches,
+          current: _data!['branch'] as String,
+          onCreate: (name, branch) async {
+            widget.controller.requireProjectIdle(widget.project.id);
+            final result = await _invoke('createProjectWorktree', {
+              'name': name,
+              'baseBranch': branch,
+            });
+            await ProjectDirectories(widget.controller.groupStore.database).add(
+              widget.project,
+              ProjectDirectory(
+                uri: 'aurai://project/${result['id']}',
+                name: result['name'] as String,
+                repositoryUri: widget.directory.uri,
+              ),
+            );
+          },
+        ),
       ),
     );
-    if (choice == null || !mounted) return;
-    setState(() => _busy = true);
-    await runUiAction(context, () async {
-      final created = await _invoke('createProjectWorktree', {
-        'name': choice.$1,
-        'baseBranch': choice.$2,
-      });
-      await ProjectDirectories(widget.controller.groupStore.database).add(
-        widget.project,
-        ProjectDirectory(
-          uri: 'aurai://project/${created['id']}',
-          name: created['name'] as String,
-          repositoryUri: widget.directory.uri,
-        ),
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(const SnackBar(content: Text('工作树已创建并关联到项目')));
-      await _load();
-    });
-    if (mounted) setState(() => _busy = false);
+    if (created != true || !mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showGlassSnackBar(const SnackBar(content: Text('工作树已创建并关联到项目')));
+    await _load();
   }
 
   Future<void> _act(Map item, String action) async {
@@ -324,69 +324,4 @@ class _ProjectWorktreesPageState extends State<ProjectWorktreesPage> {
       ),
     );
   }
-}
-
-class _CreateWorktreeDialog extends StatefulWidget {
-  const _CreateWorktreeDialog({required this.branches, required this.current});
-  final List<String> branches;
-  final String current;
-  @override
-  State<_CreateWorktreeDialog> createState() => _CreateWorktreeDialogState();
-}
-
-class _CreateWorktreeDialogState extends State<_CreateWorktreeDialog> {
-  final _name = TextEditingController();
-  late String _branch = widget.branches.contains(widget.current)
-      ? widget.current
-      : widget.branches.first;
-  @override
-  void dispose() {
-    _name.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AppDialog(
-    child: Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            '新建工作树',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _name,
-            autofocus: true,
-            maxLength: 40,
-            decoration: const InputDecoration(labelText: '名称'),
-            onChanged: (_) => setState(() {}),
-          ),
-          DropdownButtonFormField<String>(
-            initialValue: _branch,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: '起始分支'),
-            items: [
-              for (final branch in widget.branches)
-                DropdownMenuItem(value: branch, child: Text(branch)),
-            ],
-            onChanged: (value) => setState(() => _branch = value!),
-          ),
-          const SizedBox(height: 12),
-          const Text('从分支最新提交创建，不包含未提交的修改。'),
-          const SizedBox(height: 20),
-          DialogActionButton(
-            text: '创建',
-            role: DialogActionRole.primary,
-            onPressed: _name.text.trim().isEmpty
-                ? null
-                : () => Navigator.pop(context, (_name.text.trim(), _branch)),
-          ),
-        ],
-      ),
-    ),
-  );
 }

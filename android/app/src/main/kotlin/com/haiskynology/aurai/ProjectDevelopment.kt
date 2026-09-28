@@ -176,16 +176,33 @@ object ProjectDevelopment {
     }
 
     private fun pull(context: Context, root: java.io.File): Map<String, Any?> = repository(root).use { repository ->
+        val remote = repository.config.getString("remote", "origin", "url")
+            ?: error("项目尚未配置远程仓库")
+        val credentials = GitConfiguration.credentials(context, remote)
+        val branch = if (repository.resolve(Constants.HEAD) == null) {
+            val remoteHead = Git.lsRemoteRepository()
+                .setRemote(remote)
+                .also { command -> credentials?.let(command::setCredentialsProvider) }
+                .call()
+                .single { it.name == Constants.HEAD }
+            require(remoteHead.isSymbolic && remoteHead.target.name.startsWith(Constants.R_HEADS)) {
+                "远端仓库没有默认分支"
+            }
+            remoteHead.target.name.removePrefix(Constants.R_HEADS).also { defaultBranch ->
+                repository.updateRef(Constants.HEAD).link(Constants.R_HEADS + defaultBranch)
+            }
+        } else {
+            repository.branch
+        }
         Git(repository).use { git ->
             val command = git.pull()
                 .setRemote("origin")
-                .setRemoteBranchName(repository.branch)
-            val remote = repository.config.getString("remote", "origin", "url")
-                ?: error("项目尚未配置远程仓库")
-            GitConfiguration.credentials(context, remote)?.let(command::setCredentialsProvider)
+                .setRemoteBranchName(branch)
+            credentials?.let(command::setCredentialsProvider)
             val result = command.call()
             mapOf(
                 "pulled" to result.isSuccessful,
+                "branch" to branch,
                 "mergeStatus" to result.mergeResult?.mergeStatus?.name,
                 "fetchMessages" to result.fetchResult?.messages,
             )
@@ -214,17 +231,18 @@ object ProjectDevelopment {
     }
 
     private fun setRemote(root: java.io.File, url: String): Map<String, Any?> = repository(root).use { repository ->
+        val remoteUrl = if (url.startsWith("https://codeup.aliyun.com/") && !url.endsWith(".git")) "$url.git" else url
         require(url.isEmpty() || validRemote(url)) { "请输入 HTTPS 或 SSH Git 地址" }
         repository.config.apply {
-            if (url.isEmpty()) {
+            if (remoteUrl.isEmpty()) {
                 unsetSection("remote", "origin")
             } else {
-                setString("remote", "origin", "url", url)
+                setString("remote", "origin", "url", remoteUrl)
                 setString("remote", "origin", "fetch", "+refs/heads/*:refs/remotes/origin/*")
             }
             save()
         }
-        mapOf("updated" to true, "remote" to url.ifEmpty { null })
+        mapOf("updated" to true, "remote" to remoteUrl.ifEmpty { null })
     }
 
     private fun validRemote(value: String): Boolean =

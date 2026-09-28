@@ -199,6 +199,17 @@ extension UserDataReadAccess on ChatController {
     if (targets.isEmpty) return (useUserScope: false, title: '');
     final target = targets.single;
     final conversationId = isGroup ? target['id'] : target['conversation_id'];
+    final privateHtmlFromAnother =
+        call.name == 'readHtmlMessage' &&
+        args['includePrivate'] == true &&
+        (await db.query(
+              'html_games',
+              columns: ['creator_id'],
+              where: 'message_id = ?',
+              whereArgs: [id],
+              limit: 1,
+            )).single['creator_id'] !=
+            senderId;
     final memberships = await db.query(
       'conversation_members',
       columns: ['sender_id'],
@@ -228,7 +239,8 @@ extension UserDataReadAccess on ChatController {
       return true;
     }
 
-    if (canRead(senderId) || !canRead(MessageSender.localUser.id)) {
+    if ((canRead(senderId) && !privateHtmlFromAnother) ||
+        !canRead(MessageSender.localUser.id)) {
       return (useUserScope: false, title: '');
     }
     final titles = isGroup
