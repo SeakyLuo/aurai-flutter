@@ -35,6 +35,11 @@ class ProjectRunSnapshots {
     }
   }
 
+  Future<void> rebaseAfterGitBaseChange(ProjectDirectory directory) async {
+    if (!_pending.contains(directory)) return;
+    await _invoke(directory, 'rebaseProjectGitTask');
+  }
+
   Future<ProjectGitTaskChanges?> finish() async {
     final changes = <ProjectGitTaskChanges>[];
     for (final directory in _pending.toList()) {

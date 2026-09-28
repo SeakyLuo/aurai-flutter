@@ -165,6 +165,7 @@ extension ConversationRun on ChatController {
         documents: documents,
         history: observed,
         webSources: webSources,
+        onProjectGitBaseChanged: gitSnapshots.rebaseAfterGitBaseChange,
         groupId: groupHistory == null ? null : runConversation.id,
         questionTool: AskUserTool(runConversation.id, (question) {
           pendingQuestion = question;
