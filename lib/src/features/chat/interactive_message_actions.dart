@@ -194,7 +194,13 @@ extension InteractiveMessageActions on ChatController {
       );
       _replaceInteractiveCard(source.id, id, result.card, source: source);
       if (result.notice != null)
-        _publishInteractiveChange(source.id, result.notice!, source: source);
+        _publishInteractiveChange(
+          source.id,
+          result.notice!,
+          source: source,
+          notifyParticipants:
+              result.card.participants[senderId]?['callback'] == null,
+        );
       MessageCallbacks.changes.add(null);
       return {
         'messageId': id,

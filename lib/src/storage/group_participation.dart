@@ -41,6 +41,35 @@ class GroupParticipation {
     };
   }
 
+  Future<Set<String>> pauseAll(String groupId) async {
+    final ids = await database.transaction((txn) async {
+      final rows = await txn.query(
+        'conversation_members',
+        columns: ['sender_id'],
+        where:
+            'conversation_id = ? AND left_at IS NULL AND sender_id IN '
+            '(SELECT id FROM message_senders WHERE kind = ?)',
+        whereArgs: [groupId, 'agent'],
+      );
+      final ids = rows.map((row) => row['sender_id'] as String).toSet();
+      if (ids.isEmpty) return ids;
+      final batch = txn.batch();
+      for (final id in ids) {
+        batch.insert('group_participation', {
+          'conversation_id': groupId,
+          'sender_id': id,
+          'paused': 1,
+          'reason': '用户暂停了全部成员的自动接话',
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      await batch.commit(noResult: true);
+      await GroupSleepStore.removeMembersIn(txn, groupId, ids);
+      return ids;
+    });
+    if (ids.isNotEmpty) changes.add(groupId);
+    return ids;
+  }
+
   Future<Set<String>> resumeAll(String groupId) async {
     final ids = await database.transaction((txn) async {
       final rows = await txn.query(
@@ -71,6 +100,28 @@ class GroupParticipation {
     });
     if (ids.isNotEmpty) changes.add(groupId);
     return ids;
+  }
+
+  Future<void> setMembers(
+    String groupId,
+    Set<String> ids,
+    bool paused, {
+    String? reason,
+  }) async {
+    await database.transaction((txn) async {
+      final batch = txn.batch();
+      for (final id in ids) {
+        batch.insert('group_participation', {
+          'conversation_id': groupId,
+          'sender_id': id,
+          'paused': paused ? 1 : 0,
+          'reason': paused ? reason : null,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      await batch.commit(noResult: true);
+      if (paused) await GroupSleepStore.removeMembersIn(txn, groupId, ids);
+    });
+    changes.add(groupId);
   }
 
   Future<void> set(

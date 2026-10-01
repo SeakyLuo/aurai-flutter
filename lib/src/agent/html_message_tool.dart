@@ -17,7 +17,8 @@ class HtmlMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
     description:
         'Send an HTML card as yourself to the current or a specified accessible conversation using optional conversationId, without navigation. In the current private chat the card is inserted into your streamed reply; do not describe that inline card as a separate message or repeat its contents. Cross-conversation cards and group cards are separate messages. HTML 消息也称为小程序消息。 '
             'Supply a short title and HTML body fragment with inline or HTTPS-hosted CSS and JavaScript. For long code, first use shell to write a UTF-8 .html file in its working directory using a quoted heredoc, then supply sourcePath instead of html. Use a unique filename per message/contact; edit that file for later code changes and publish it with updateHtmlMessage. Shell commands are still JSON tool arguments: escape them correctly; writing a file does not bypass model output limits. Do not publish a partially written file. No folder-picker permission is needed for the private shell workspace. ' +
-        htmlAppGuide + htmlMessageComponentGuide +
+        htmlAppGuide +
+        htmlMessageComponentGuide +
         'For inline rendering use compact responsive content without a page-sized wrapper or min-height:100vh. Avoid repeated title bars and developer diagnostics. Inherit the host font and use CSS variables --aurai-text, --aurai-muted, --aurai-field, --aurai-border, --aurai-accent for light/dark themes; custom layouts and Canvas remain supported. Inline message height is measured once on load and then fixed. After an intentional layout change, call AuraiHTML.requestResize() once after updating the DOM to request a new measurement; do not call it on animation frames, timers, or routine input. There is no height cap, collapse control or internal page scrolling. Use natural document flow, no fixed-height outer wrapper, viewport-height units, or nested scrolling containers. Keep chat content concise. Use a compact summary/launcher and fullscreen for long forms, large lists or full applications; fullscreen uses the page viewport. '
             'backgroundMode defaults to message (the normal message bubble color) or can be transparent (no host card fill). Keep the HTML document and outer content wrapper transparent; do not hard-code a page/card background. Use --aurai-message-background when an inner element should match the message, while local controls and Canvas may keep their own colors. '
             'Suggested spacing, not a requirement: use outer padding 12px 16px for ordinary text, forms and widgets, 8px 12px for compact content, or 0 for edge-to-edge images/canvas with separately padded text and controls. Use 8–12px between sections. Apply outer padding once rather than stacking it across nested wrappers. The host supplies the message background and rounded outline; do not duplicate them with another outer border or rounded card. '
@@ -35,10 +36,15 @@ class HtmlMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
     inputSchema: {
       'type': 'object',
       'properties': {
-        'appId': {'type': 'string', 'description': 'Existing app from listHtmlApps; sends a new launcher for the same application and saved data. Omit html/sourcePath/interaction/buttons/participation/stateful when reopening.'},
+        'appId': {
+          'type': 'string',
+          'description':
+              'Existing app from listHtmlApps; sends a new launcher for the same application and saved data. Omit html/sourcePath/interaction/buttons/participation/stateful when reopening.',
+        },
         'conversationId': {
           'type': 'string',
-          'description': 'Optional destination from searchConversations/listGroupChats. Omit for the current conversation. You must be a current member; sending elsewhere creates a separate message without navigation.',
+          'description':
+              'Optional destination from searchConversations/listGroupChats. Omit for the current conversation. You must be a current member; sending elsewhere creates a separate message without navigation.',
         },
         'interaction': sharedInteractionSchema,
         'buttons': interactiveButtonsSchema,
@@ -88,7 +94,13 @@ class HtmlMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         call.arguments,
         creating: true,
       );
-      if (args['appId'] != null && ['interaction', 'buttons', 'participation', 'stateful'].any(args.containsKey)) {
+      if (args['appId'] != null &&
+          [
+            'interaction',
+            'buttons',
+            'participation',
+            'stateful',
+          ].any(args.containsKey)) {
         throw ArgumentError('重新打开小程序时只提供应用引用和入口展示参数');
       }
       if (args['interaction'] != null && args['buttons'] is! List) {
@@ -116,14 +128,14 @@ class HtmlMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.error,
-        output: {'message': error.message},
+        output: {'message': error.toString()},
       );
     } on StateError catch (error) {
       return ToolResult(
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.error,
-        output: {'message': error.message},
+        output: {'message': error.toString()},
       );
     }
   }

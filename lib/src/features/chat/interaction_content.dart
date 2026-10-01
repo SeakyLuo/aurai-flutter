@@ -97,7 +97,7 @@ class InteractionContent extends StatelessWidget {
                 (view['revealed'] == true && view['summaryVisible'] != true)))
           const SizedBox(height: 12),
         for (final button in buttons.where(
-          (button) => button['selection'] != null,
+          (button) => collecting && button['selection'] != null,
         ))
           Padding(
             padding: const EdgeInsets.only(bottom: 8),

@@ -158,13 +158,14 @@ extension GroupConversationRun on ChatController {
                 ..messageCount = conversation.messageCount
                 ..messages.addAll(conversation.messages);
           _groupRuns[id] = member;
+          final visibleSnapshot = snapshot.where((m) => m.canView(id)).toList();
           try {
             await _executeMember(
               member,
               reply: reply,
               callbacksOnly: callbackStarts.remove(id),
-              groupHistory: snapshot,
-              groupUser: snapshot.last,
+              groupHistory: visibleSnapshot,
+              groupUser: visibleSnapshot.last,
               groupParent: conversation,
             );
           } finally {
@@ -194,9 +195,10 @@ extension GroupConversationRun on ChatController {
       dispatcher.start([
         for (final id in ids)
           if ((wakeMembers == null || wakeMembers.contains(id)) &&
-              (user.canView(id)) &&
+              (wakeMembers != null || user.canView(id)) &&
               (wakeMembers != null || id != user.senderId) &&
               (!paused.contains(id) ||
+                  user.messageMetadata?.participation['_programWake'] == true ||
                   wakeMembers != null ||
                   (wakeMembers == null &&
                       !user.isSystem &&

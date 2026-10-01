@@ -285,7 +285,7 @@ class ConversationWriter {
     String runId,
   ) => mutate(() async {
     await database.rawInsert(
-      "INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value WHERE (SELECT started_at FROM agent_runs WHERE id = excluded.value) >= (SELECT started_at FROM agent_runs WHERE id = app_state.value)",
+      "INSERT INTO app_state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value WHERE NOT EXISTS (SELECT 1 FROM agent_runs WHERE id = app_state.value) OR (SELECT started_at FROM agent_runs WHERE id = excluded.value) >= (SELECT started_at FROM agent_runs WHERE id = app_state.value)",
       ['seen_run:$conversationId', runId],
     );
   });

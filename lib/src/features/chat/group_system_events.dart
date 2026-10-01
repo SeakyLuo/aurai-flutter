@@ -9,7 +9,9 @@ extension GroupSystemEvents on ChatController {
         [notice],
         {
           for (final id in _groupReplies.keys)
-            if (notice.canView(id) && !dispatcher.paused.contains(id)) id,
+            if (notice.canView(id) &&
+                (!dispatcher.paused.contains(id) ||
+                    notice.messageMetadata?.participation['_programWake'] == true)) id,
         },
       );
     }
@@ -158,7 +160,12 @@ extension GroupSystemEvents on ChatController {
           }
           _store.writer.remember(notices);
           _notifyRun(target);
-          await _executeGroupChat(target);
+          final programNotices = notices.where((m) =>
+            m.messageMetadata?.participation['_programWake'] == true);
+          await _executeGroupChat(target,
+            wakeMembers: programNotices.isEmpty ? null : {
+              for (final notice in programNotices) ...notice.audience!,
+            });
         } finally {
           _runningConversation = null;
           _resumeForwardedReply();

@@ -75,10 +75,16 @@ extension _ChatProgress on _ChatPageState {
       await _retryFailed(message.runId);
       return;
     }
+    final viewport = _viewportKey.currentState;
     try {
-      await widget.controller.retryFailedMessage(message);
+      await widget.controller.retryFailedMessage(
+        message,
+        beforeRemoval: () async => viewport?.animateRemoval(message.id),
+      );
     } on Object catch (error) {
       _showRunNotice(error);
+    } finally {
+      viewport?.finishRemoval(message.id);
     }
   }
 }

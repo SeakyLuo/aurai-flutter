@@ -119,7 +119,7 @@ class GroupSleepTool implements AgentTool, RuntimeCapabilityAgentTool {
         toolName: call.name,
         status: ToolResultStatus.error,
         output: {
-          'message': error is StateError ? error.message : error.toString(),
+          'message': error.toString(),
         },
       );
     }

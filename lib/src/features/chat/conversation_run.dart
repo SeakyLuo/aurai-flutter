@@ -538,6 +538,8 @@ extension ConversationRun on ChatController {
             }
             final activity = AgentTaskActivity(
               text: step.title,
+              startedAt: step.startedAt,
+              finishedAt: step.finishedAt,
               toolName: step.toolName,
               status: step.status,
               requestJson: step.requestJson,

@@ -1,3 +1,5 @@
+import 'task_playback_icon.dart';
+import '../../storage/group_chat_store.dart';
 import 'group_member_header_actions.dart';
 import 'group_mute_settings_page.dart';
 import 'glass_surface.dart';
@@ -62,6 +64,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
 
   bool _wakingAll = false;
 
+  bool _pausingAll = false;
   bool _resumingAll = false;
   bool _stoppingAll = false;
 
@@ -74,6 +77,23 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       );
     } finally {
       if (mounted) setState(() => _stoppingAll = false);
+    }
+  }
+
+  Future<void> _pauseAll() async {
+    setState(() => _pausingAll = true);
+    try {
+      await runUiAction(context, () async {
+        final count = await widget.controller.pauseAllGroupAutoReply(
+          widget.conversationId,
+        );
+        if (mounted)
+          ScaffoldMessenger.of(context).showGlassSnackBar(
+            SnackBar(content: Text(count == 0 ? '群内暂无 AI 成员' : '已暂停全部成员的自动接话')),
+          );
+      });
+    } finally {
+      if (mounted) setState(() => _pausingAll = false);
     }
   }
 
@@ -99,80 +119,101 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
     }
   }
 
-  Widget _batchActions({VoidCallback? onRemove, bool embedded = false}) =>
-      Builder(
-        builder: (buttonContext) {
-          final busy =
-              _stoppingAll ||
-              _wakingAll ||
-              _resumingAll ||
-              _waking.isNotEmpty ||
-              _resuming.isNotEmpty;
-          final button = RoundAction(
-            label: '更多',
-            icon: Icons.more_vert_rounded,
-            iconWidget: const SettingsIcon(type: SettingsIconType.more),
-            onPressed: busy
-                ? null
-                : () async {
-                    final action = await showHeaderActionMenu(
-                      buttonContext,
-                      items: [
-                        if (onRemove != null)
-                          (
-                            value: 'mute',
-                            label: '禁言设置',
-                            icon: const SettingsIcon(
-                              type: SettingsIconType.permission,
-                            ),
-                          ),
-                        if (onRemove != null)
-                          (
-                            value: 'remove',
-                            label: '移除成员',
-                            icon: const SettingsIcon(
-                              type: SettingsIconType.remove,
-                            ),
-                          ),
-                        (
-                          value: 'stop',
-                          label: '停止当前回复',
-                          icon: QuestionIcon(type: QuestionIconType.stop),
+  Widget _batchActions({
+    VoidCallback? onRemove,
+    bool embedded = false,
+  }) => Builder(
+    builder: (buttonContext) {
+      final busy =
+          _pausingAll ||
+          _stoppingAll ||
+          _wakingAll ||
+          _resumingAll ||
+          _waking.isNotEmpty ||
+          _resuming.isNotEmpty;
+      final button = RoundAction(
+        label: '更多',
+        icon: Icons.more_vert_rounded,
+        iconWidget: const SettingsIcon(type: SettingsIconType.more),
+        onPressed: busy
+            ? null
+            : () async {
+                var canManage = false;
+                final loaded = await runUiAction(context, () async {
+                  final role = await widget.controller.groupStore.memberRole(
+                    widget.conversationId,
+                    MessageSender.localUser.id,
+                  );
+                  canManage = role.canManage;
+                });
+                if (!mounted || !buttonContext.mounted || !loaded) return;
+                final action = await showHeaderActionMenu(
+                  buttonContext,
+                  items: [
+                    if (onRemove != null)
+                      (
+                        value: 'mute',
+                        label: '禁言设置',
+                        icon: const SettingsIcon(
+                          type: SettingsIconType.permission,
                         ),
-                        (
-                          value: 'wake',
-                          label: '全部唤醒',
-                          icon: QuestionIcon(type: QuestionIconType.play),
+                      ),
+                    if (onRemove != null)
+                      (
+                        value: 'remove',
+                        label: '移除成员',
+                        icon: const SettingsIcon(type: SettingsIconType.remove),
+                      ),
+                    (
+                      value: 'stop',
+                      label: '停止当前回复',
+                      icon: QuestionIcon(type: QuestionIconType.stop),
+                    ),
+                    (
+                      value: 'wake',
+                      label: '全部唤醒',
+                      icon: QuestionIcon(type: QuestionIconType.play),
+                    ),
+                    if (canManage)
+                      (
+                        value: 'pause',
+                        label: '全部暂停接话',
+                        icon: TaskPlaybackIcon(
+                          paused: false,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
-                        (
-                          value: 'resume',
-                          label: '全部恢复接话',
-                          icon: QuestionIcon(type: QuestionIconType.play),
-                        ),
-                      ],
-                    );
-                    if (!mounted) return;
-                    if (action == 'remove') onRemove?.call();
-                    if (action == 'mute') {
-                      await Navigator.push<void>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => GroupMuteSettingsPage(
-                            controller: widget.controller,
-                            groupId: widget.conversationId,
-                          ),
-                        ),
-                      );
-                      if (mounted) setState(() => _membersRevision++);
-                    }
-                    if (action == 'stop') await _stopAll();
-                    if (action == 'wake') await _wakeAll();
-                    if (action == 'resume') await _resumeAll();
-                  },
-          );
-          return embedded ? button : SettingsGlassActionSurface(child: button);
-        },
+                      ),
+                    if (canManage)
+                      (
+                        value: 'resume',
+                        label: '全部恢复接话',
+                        icon: QuestionIcon(type: QuestionIconType.play),
+                      ),
+                  ],
+                );
+                if (!mounted) return;
+                if (action == 'remove') onRemove?.call();
+                if (action == 'mute') {
+                  await Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => GroupMuteSettingsPage(
+                        controller: widget.controller,
+                        groupId: widget.conversationId,
+                      ),
+                    ),
+                  );
+                  if (mounted) setState(() => _membersRevision++);
+                }
+                if (action == 'stop') await _stopAll();
+                if (action == 'wake') await _wakeAll();
+                if (action == 'pause') await _pauseAll();
+                if (action == 'resume') await _resumeAll();
+              },
       );
+      return embedded ? button : SettingsGlassActionSurface(child: button);
+    },
+  );
 
   Future<void> _wakeAll() async {
     setState(() => _wakingAll = true);
@@ -412,7 +453,8 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                     )
                   : const QuestionIcon(type: QuestionIconType.play),
               onPressed:
-                  _resumingAll ||
+                  _pausingAll ||
+                      _resumingAll ||
                       _wakingAll ||
                       _resuming.contains(activity.sender.id)
                   ? null

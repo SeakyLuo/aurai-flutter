@@ -1,4 +1,3 @@
-import '../domain/error_message.dart';
 import '../domain/tool_models.dart';
 import '../memory/memory_controller.dart';
 import '../providers/responses_transport.dart';
@@ -72,9 +71,7 @@ class _PrepareMemory implements AgentTool, RuntimeCapabilityAgentTool {
             : 'Call applyMemoryChanges to save these exact changes.',
       });
     } on Object catch (error) {
-      return _result(call, ToolResultStatus.error, {
-        'error': '无法生成整理建议，请检查模型配置或重试：${errorMessage(error)}',
-      });
+      return _result(call, ToolResultStatus.error, {'error': error.toString()});
     } finally {
       if (identical(owner.transport, transport)) owner.transport = null;
     }
@@ -126,7 +123,7 @@ class _ApplyMemory
       owner.plan = null;
       return _result(call, ToolResultStatus.success, {'saved': true});
     } on Object catch (error) {
-      return _result(call, ToolResultStatus.error, {'error': '记忆未能更新：$error'});
+      return _result(call, ToolResultStatus.error, {'error': error.toString()});
     }
   }
 

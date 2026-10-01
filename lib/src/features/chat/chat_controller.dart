@@ -69,6 +69,7 @@ import '../../diagnostics/execution_log.dart';
 import '../../agent/html_message_tool.dart';
 import '../../html_games/html_store.dart';
 import '../../html_games/html_game_session.dart';
+import '../../html_games/miniapp_program_store.dart';
 import '../../domain/interactive_message.dart';
 import '../../storage/interactive_message_store.dart';
 import '../../agent/interactive_message_tool.dart';
@@ -268,6 +269,9 @@ class ChatController extends ChangeNotifier {
   final completedReplies = ValueNotifier<ConversationCompletion?>(null);
   final _store = ConversationStore();
   StreamSubscription<void>? _callbackChanges;
+  StreamSubscription<MiniappProgramChange>? _programChanges;
+  Timer? _programTimer;
+  int _programScheduleGeneration = 0;
   StreamSubscription<List<CallbackCardUpdate>>? _callbackCardChanges;
   bool _drainingCallbacks = false;
   final _callbackConversations = <String>{};
@@ -339,6 +343,7 @@ class ChatController extends ChangeNotifier {
   bool _systemEventDrainScheduled = false;
   final _groupToolQueue = GroupToolQueue();
   final groupActivityChanges = ValueNotifier<int>(0);
+  final programErrors = ValueNotifier<String?>(null);
   final _peerSessions = <String, Future<_PeerSession>>{};
   Iterable<Conversation> get groupRuns =>
       activeConversation.id == runningConversationId
@@ -377,6 +382,8 @@ class ChatController extends ChangeNotifier {
     _groupSleeps.dispose();
     _callbacksDisposed = true;
     _callbackChanges?.cancel();
+    _programChanges?.cancel();
+    _programTimer?.cancel();
     _callbackCardChanges?.cancel();
     removeListener(_drainMessageCallbacks);
     _memory?.removeListener(_onLocalProfileChanged);
@@ -386,6 +393,7 @@ class ChatController extends ChangeNotifier {
     questionNotifications.dispose();
     notificationOpenRequests.dispose();
     groupActivityChanges.dispose();
+    programErrors.dispose();
     super.dispose();
   }
 
@@ -491,6 +499,8 @@ class ChatController extends ChangeNotifier {
     await MessageCallbacks(_store.database).recoverInterrupted();
     await scheduledTasks.initialize(_runScheduled);
     await _groupSleeps.initialize(_store.database, _recoverGroupSleep);
+    _programChanges = MiniappProgramStore.changes.stream.listen(_receiveProgramChange);
+    _scheduleProgramTick();
     _callbackChanges = MessageCallbacks.changes.stream.listen((_) {
       _callbacksPending = true;
       _callbackGeneration++;

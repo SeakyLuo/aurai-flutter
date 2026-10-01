@@ -1,8 +1,8 @@
-import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'tool_elapsed.dart';
 
 class ImageGenerationSkeleton extends StatefulWidget {
   const ImageGenerationSkeleton({
@@ -11,12 +11,14 @@ class ImageGenerationSkeleton extends StatefulWidget {
     required this.aspectRatio,
     this.count = 1,
     this.referenceImage,
+    this.startedAt,
   });
 
   final String title;
   final String aspectRatio;
   final int count;
   final String? referenceImage;
+  final DateTime? startedAt;
 
   @override
   State<ImageGenerationSkeleton> createState() =>
@@ -29,16 +31,6 @@ class _ImageGenerationSkeletonState extends State<ImageGenerationSkeleton>
     vsync: this,
     duration: const Duration(milliseconds: 1600),
   );
-  late final Timer _timer;
-  final Stopwatch _elapsed = Stopwatch()..start();
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
-    });
-  }
 
   @override
   void didChangeDependencies() {
@@ -52,8 +44,6 @@ class _ImageGenerationSkeletonState extends State<ImageGenerationSkeleton>
 
   @override
   void dispose() {
-    _timer.cancel();
-    _elapsed.stop();
     _shimmer.dispose();
     super.dispose();
   }
@@ -65,12 +55,6 @@ class _ImageGenerationSkeletonState extends State<ImageGenerationSkeleton>
     '3:4' => 3 / 4,
     _ => 1,
   };
-
-  String get _elapsedLabel {
-    final seconds = _elapsed.elapsed.inSeconds;
-    if (seconds < 60) return '$seconds 秒';
-    return '${seconds ~/ 60} 分 ${seconds % 60} 秒';
-  }
 
   ImageProvider get _referenceProvider {
     final source = widget.referenceImage!;
@@ -163,14 +147,12 @@ class _ImageGenerationSkeletonState extends State<ImageGenerationSkeleton>
                             ),
                           ),
                         ),
-                        SizedBox(width: multiple ? 4 : 10),
-                        Text(
-                          _elapsedLabel,
-                          style: TextStyle(
+                        if (widget.startedAt != null)
+                          ToolElapsed(
+                            startedAt: widget.startedAt!,
+                            finishedAt: null,
                             fontSize: multiple ? 10 : 12,
-                            color: colors.onSurfaceVariant,
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -183,7 +165,7 @@ class _ImageGenerationSkeletonState extends State<ImageGenerationSkeleton>
     );
 
     return Semantics(
-      label: '${widget.title}，共 ${widget.count} 张，已等待 $_elapsedLabel',
+      label: '${widget.title}，共 ${widget.count} 张',
       child: Padding(
         padding: const EdgeInsets.only(top: 5, bottom: 8),
         child: Wrap(

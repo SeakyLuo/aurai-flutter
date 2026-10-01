@@ -220,7 +220,7 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
         toolName: name,
         status: ToolResultStatus.error,
         output: {
-          'message': error is StateError ? error.message : error.toString(),
+          'message': error.toString(),
         },
       );
     }

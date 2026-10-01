@@ -48,7 +48,7 @@ class SendNotificationTool implements AgentTool {
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.error,
-        output: {'code': error.code, 'message': error.message},
+        output: {'code': error.code, 'message': error.toString()},
       );
     }
   }

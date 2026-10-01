@@ -151,7 +151,7 @@ class ExecutionLogTool
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.error,
-        output: {'message': '读取执行日志失败：$error'},
+        output: {'message': error.toString()},
       );
     }
   }

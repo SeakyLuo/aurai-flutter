@@ -1,0 +1,178 @@
+<script type="application/json" id="aurai-send-action">{"type":"program"}</script>
+<script type="application/aurai-program">
+var s=ctx.state, e=ctx.event, out=[], close=[], controls={}, stageChanged=false;
+var roles={wolf:'狼人',seer:'预言家',witch:'女巫',hunter:'猎人',guard:'守卫',villager:'村民'};
+var boards={six:['wolf','wolf','seer','witch','villager','villager'],nine:['wolf','wolf','wolf','seer','witch','hunter','villager','villager','villager'],twelve:['wolf','wolf','wolf','wolf','seer','witch','hunter','guard','villager','villager','villager','villager']};
+function require(ok,text){if(!ok)throw new Error(text);}
+function player(id){return s.players.filter(function(p){return p.id===id;})[0];}
+function alive(){return s.players.filter(function(p){return p.alive;});}
+function named(p){return p.seat+'号 '+p.name;}
+function note(text,audience,wake){out.push({text:text,audience:audience,wakeAi:!!wake});}
+function announce(text){s.log.push(text);note(text);}
+function pauseAll(){ctx.members.forEach(function(m){if(m.kind==='agent')controls[m.id]=false;});}
+function advance(phase){close=close.concat(s.keys);s.keys=[];s.phase=phase;s.seq++;s.actions={};stageChanged=true;
+  s.deadline=ctx.now+(phase==='speech'?s.speechSeconds:s.actionSeconds)*1000;}
+function card(p,title,body,choices,event){var key=s.seq+':'+p.id;s.keys.push(key);
+  var button={id:'submit',label:event==='speechEnded'?'结束发言':'确认提交',action:'submit',repeatable:false};
+  if(choices)button.selection={mode:'single',options:choices};
+  out.push({key:key,event:event,data:{seq:s.seq},audience:[p.id],wakeAi:true,
+    card:{title:title,body:body,buttons:[button],
+      interaction:{allowChange:false,reveal:'onComplete',actors:[p.id]},participation:{}}});}
+function options(filter,skip){var choices=alive().filter(filter||function(){return true;}).map(function(p){return {id:p.id,label:named(p),value:p.id};});
+  if(skip)choices.push({id:'skip',label:'不使用 / 弃权',value:'skip'});return choices;}
+function expected(){if(s.phase==='wolf')return alive().filter(function(p){return p.role==='wolf';});
+  if(s.phase==='vision')return alive().filter(function(p){return p.role==='seer'||p.role==='guard';});
+  if(s.phase==='witch')return alive().filter(function(p){return p.role==='witch';});
+  if(s.phase==='vote')return alive();
+  if(s.phase==='speech')return [player(s.speakers[s.speakerIndex])];
+  if(s.phase==='hunter')return [player(s.hunter)];return [];}
+function issue(){var ps=expected();
+  if(s.phase==='wolf')ps.forEach(function(p){card(p,'第'+s.day+'夜 · 狼人行动','在私密卡片中选择目标。同票则本夜无人被刀；不要在群里透露身份或行动。',options(function(q){return q.role!=='wolf';},true),'act');});
+  if(s.phase==='vision')ps.forEach(function(p){card(p,'第'+s.day+'夜 · '+roles[p.role]+'行动',p.role==='seer'?'选择一人查验，结果仅你可见。':'选择守护目标，不能连续两夜守护同一人。',options(function(q){return p.role==='seer'?q.id!==p.id:q.id!==s.previousGuard;},true),'act');});
+  if(s.phase==='witch')ps.forEach(function(p){var opts=[{id:'skip',label:'不使用药剂',value:'skip'}];
+    if(!s.saveUsed&&s.kill&&!(s.day>1&&s.kill===p.id))opts.push({id:'save',label:'使用解药救 '+named(player(s.kill)),value:'save'});
+    if(!s.poisonUsed)alive().forEach(function(q){opts.push({id:'poison:'+q.id,label:'使用毒药毒 '+named(q),value:'poison:'+q.id});});
+    card(p,'第'+s.day+'夜 · 女巫行动',(s.saveUsed?'解药已用完；不再提供刀口。':s.kill?'今晚刀口：'+named(player(s.kill))+'。':'今晚没有刀口。')+' 每夜最多用一瓶药；首夜可以自救。',opts,'act');});
+  if(s.phase==='speech'){var p=ps[0];announce('第'+s.day+'天，轮到'+named(p)+'发言。');
+    if(ctx.members.some(function(m){return m.id===p.id&&m.kind==='agent';}))controls[p.id]=true;
+    card(p,'轮到你发言','请使用群消息公开发言。说完后点击“结束发言”，将控制权交回小程序；无需开启目标模式或操作别人的接话状态。',null,'speechEnded');}
+  if(s.phase==='vote'){announce('开始放逐投票。每人一票，投票结束后公开票型；同票无人出局。');ps.forEach(function(p){card(p,'第'+s.day+'天 · 放逐投票','选择放逐目标或弃权。提交后不可修改，结束前不公开票型。',options(null,true),'act');});}
+  if(s.phase==='hunter'){announce(named(ps[0])+'发动猎人技能。');card(ps[0],'猎人开枪','选择带走一人，或放弃开枪。',options(null,true),'act');}
+}
+function winner(){var live=alive(),wolves=live.filter(function(p){return p.role==='wolf';});
+  if(!wolves.length)return '好人';
+  if(!live.some(function(p){return p.role==='villager';})||!live.some(function(p){return p.role!=='wolf'&&p.role!=='villager';}))return '狼人';
+  return null;}
+function finish(w){advance('finished');s.deadline=null;s.winner=w;pauseAll();
+  announce(w+'阵营获胜。\n'+s.players.map(function(p){return named(p)+'：'+roles[p.role];}).join('\n'));}
+function beginNight(){pauseAll();advance('wolf');s.kill=null;s.guard=null;s.saved=false;s.poison=null;
+  announce('第'+s.day+'夜，天黑请闭眼。请只在本人可见的行动卡中提交。');issue();drain();}
+function beginDay(){advance('speech');pauseAll();s.speakers=alive().map(function(p){return p.id;});s.speakerIndex=0;issue();}
+function afterDeath(ids,poisoned,next){ids.forEach(function(id){player(id).alive=false;});
+  var hunter=ids.filter(function(id){return player(id).role==='hunter'&&id!==poisoned;})[0];
+  if(hunter){s.afterHunter=next;s.hunter=hunter;advance('hunter');issue();return;}
+  var w=winner();if(w){finish(w);return;}
+  if(next==='day')beginDay();else{s.day++;beginNight();}}
+function most(actions){var counts={};Object.keys(actions).forEach(function(id){var v=actions[id];if(v!=='skip')counts[v]=(counts[v]||0)+1;});
+  var top=0,targets=[];Object.keys(counts).forEach(function(id){if(counts[id]>top){top=counts[id];targets=[id];}else if(counts[id]===top)targets.push(id);});return targets.length===1?targets[0]:null;}
+function settle(){
+  if(s.phase==='wolf'){s.kill=most(s.actions);advance('vision');issue();}
+  else if(s.phase==='vision'){Object.keys(s.actions).forEach(function(id){var p=player(id),target=s.actions[id];
+    if(p.role==='seer'&&target!=='skip'){var result=named(player(target))+'属于'+(player(target).role==='wolf'?'狼人':'好人')+'阵营。';
+      p.knowledge.push('第'+s.day+'夜：'+result);note(result,[id],false);}
+    if(p.role==='guard'){s.guard=target==='skip'?null:target;s.previousGuard=s.guard;}});
+    advance('witch');issue();}
+  else if(s.phase==='witch'){Object.keys(s.actions).forEach(function(id){var value=s.actions[id];
+    if(value==='save'){s.saved=true;s.saveUsed=true;}else if(value.indexOf('poison:')===0){s.poison=value.substring(7);s.poisonUsed=true;}});
+    var dead=[];if(s.kill&&((!s.saved&&s.guard!==s.kill)||(s.saved&&s.guard===s.kill)))dead.push(s.kill);
+    if(s.poison&&dead.indexOf(s.poison)<0)dead.push(s.poison);
+    announce('第'+s.day+'天，天亮了。'+(dead.length?'昨夜出局：'+dead.map(function(id){return named(player(id));}).join('、')+'。':'昨夜平安夜。'));
+    afterDeath(dead,s.poison,'day');}
+  else if(s.phase==='speech'){pauseAll();s.speakerIndex++;if(s.speakerIndex<s.speakers.length){var speakers=s.speakers,index=s.speakerIndex;
+      advance('speech');s.speakers=speakers;s.speakerIndex=index;issue();}else{advance('vote');issue();}}
+  else if(s.phase==='vote'){var target=most(s.actions);announce('投票结果：\n'+alive().map(function(p){var t=s.actions[p.id];return named(p)+' → '+(t==='skip'?'弃权':named(player(t)));}).join('\n')+'\n'+(target?named(player(target))+'被放逐。':'同票或全部弃权，无人被放逐。'));
+    afterDeath(target?[target]:[],null,'night');}
+  else if(s.phase==='hunter'){var t=s.actions[s.hunter];announce(t==='skip'?'猎人放弃开枪。':named(player(t))+'被猎人带走。');afterDeath(t==='skip'?[]:[t],null,s.afterHunter);}
+}
+function drain(){for(var i=0;i<8;i++){if(['wolf','vision','witch'].indexOf(s.phase)<0||expected().length)break;settle();}}
+if(e.action==='configure'){
+  require(e.actorId===ctx.ownerId,'只有创建人可以配置板子');require(!s.phase||s.phase==='setup','对局已开始');
+  var b=boards[e.data.board];require(!!b,'请选择有效板子');var ids=e.data.players;
+  require(Array.isArray(ids)&&ids.length===b.length,'人数必须与板子一致');
+  require(ids.every(function(id,i){return ids.indexOf(id)===i&&ctx.members.some(function(m){return m.id===id;});}),'请选择不同的当前群成员');
+  require([30,60,120,180].indexOf(e.data.actionSeconds)>=0&&[30,60,120,180].indexOf(e.data.speechSeconds)>=0,'请选择有效时限');
+  s={phase:'ready',board:e.data.board,players:ids.map(function(id,i){return {id:id,name:ctx.members.filter(function(m){return m.id===id;})[0].name,seat:i+1,alive:true,ready:false,knowledge:[]};}),
+    day:1,seq:1,keys:[],actions:{},log:[],actionSeconds:e.data.actionSeconds,speechSeconds:e.data.speechSeconds,deadline:null,saveUsed:false,poisonUsed:false,previousGuard:null};
+  pauseAll();announce('狼人杀等待准备：'+b.length+'人局。身份随机分配，屠边胜负；无警长，同票不放逐。');
+  s.players.forEach(function(p){card(p,'狼人杀 · 准备','确认参加本局。身份和夜间行动仅本人可见。',null,'ready');});
+}else if(e.action==='stop'){
+  require(e.actorId===ctx.ownerId,'只有创建人可以结束对局');require(s.phase&&s.phase!=='finished','当前没有进行中的对局');
+  advance('finished');s.deadline=null;s.winner='对局已结束';announce('创建人结束了本局。');
+}else if(e.action==='ready'){
+  require(s.phase==='ready','准备阶段已结束');var p=player(e.actorId);require(!!p,'你不是本局玩家');p.ready=true;
+  close.push(s.seq+':'+p.id);
+  if(s.players.every(function(p){return p.ready;})){var assigned=boards[s.board].slice();
+    for(var i=assigned.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),r=assigned[i];assigned[i]=assigned[j];assigned[j]=r;}
+    s.players.forEach(function(p,i){p.role=assigned[i];});
+    s.players.forEach(function(p){var teammates=p.role==='wolf'?' 狼队成员：'+s.players.filter(function(q){return q.role==='wolf';}).map(named).join('、')+'。':'';
+      note('你是'+named(p)+'，身份：'+roles[p.role]+'。'+teammates+'请勿公开身份或夜间行动。',[p.id],false);});beginNight();}
+}else if(e.action==='act'||e.action==='speechEnded'){
+  var p=player(e.actorId),bound=e.data.context,value=e.data.value;
+  require(bound.seq===s.seq,'这张卡片已过期');require(expected().some(function(q){return q.id===e.actorId;}),'当前没有轮到你行动');
+  require(s.actions[e.actorId]===undefined,'你已提交本次行动');
+  if(e.action==='speechEnded'){require(s.phase==='speech','当前不是发言阶段');value='done';}
+  else{require(['wolf','vision','witch','vote','hunter'].indexOf(s.phase)>=0,'当前阶段不接受选择');
+    if(s.phase==='witch'){require(value==='skip'||(value==='save'&&!s.saveUsed&&s.kill&&!(s.day>1&&s.kill===p.id))||
+      (value.indexOf('poison:')===0&&!s.poisonUsed&&player(value.substring(7))&&player(value.substring(7)).alive),'药剂或目标不可用');}
+    else if(value!=='skip'){var q=player(value);require(q&&q.alive,'请选择存活玩家');
+      require(s.phase!=='wolf'||q.role!=='wolf','不能选择狼队成员');
+      require(s.phase!=='vision'||(p.role==='seer'?q.id!==p.id:q.id!==s.previousGuard),'这个目标不可选');}}
+  s.actions[e.actorId]=value;close.push(s.seq+':'+p.id);
+  if(expected().every(function(q){return s.actions[q.id]!==undefined;})){settle();drain();}
+}else if(e.action==='timer'){
+  require(s.deadline!==null&&ctx.now>=s.deadline,'尚未到截止时间');
+  expected().forEach(function(p){if(s.actions[p.id]===undefined)s.actions[p.id]=s.phase==='speech'?'done':'skip';});settle();drain();
+}else throw new Error('不支持的对局操作');
+var privateViews={};s.players.forEach(function(p){privateViews[p.id]={role:p.role?roles[p.role]:null,knowledge:p.knowledge,teammates:p.role==='wolf'?s.players.filter(function(q){return q.role==='wolf';}).map(named):[]};});
+var publicPhase=['wolf','vision','witch'].indexOf(s.phase)>=0?'night':s.phase;
+return {state:s,view:{phase:publicPhase,day:s.day,board:s.board,winner:s.winner||null,
+  deadline:publicPhase==='night'?null:s.deadline,
+  speaker:s.phase==='speech'?s.speakers[s.speakerIndex]:null,
+  players:s.players.map(function(p){return {id:p.id,name:p.name,seat:p.seat,alive:p.alive,ready:p.ready,role:s.phase==='finished'&&s.winner!=='对局已结束'?roles[p.role]:null};}),log:s.log},
+  privateViews:privateViews,messages:out,closeKeys:close,replyStates:controls,
+  releaseReplyControl:s.phase==='finished',wakeAt:s.deadline};
+</script>
+<style>
+.ww-head{padding-right:var(--aurai-host-menu-width);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ww-seats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ww-seat{padding:10px 8px;background:var(--aurai-field);border-radius:14px;border:1px solid var(--aurai-border);text-align:center;overflow:hidden}
+.ww-seat strong,.ww-seat span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ww-seat span{font-size:.8em;color:var(--aurai-muted)}
+.ww-seat.out{opacity:.45}.ww-seat.current{border-color:var(--aurai-accent)}
+.ww-options{display:flex;flex-direction:column;gap:8px}.ww-options label{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--aurai-field)}
+#members{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:220px;overflow-y:auto}#members label{min-width:0}#members label span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ww-details{display:none}html[data-aurai-display="fullscreen"] .ww-details{display:block}
+html[data-aurai-display="fullscreen"] .aurai-ui{padding-top:calc(var(--aurai-host-top-inset) + 16px);padding-bottom:24px}
+.ww-rule{font-size:.875em;color:var(--aurai-muted);line-height:1.6}.ww-actions:empty{display:none}
+</style>
+<section class="aurai-ui aurai-stack" id="ww">
+  <header class="ww-head"><h2 class="aurai-title">狼人杀</h2><span class="aurai-muted" id="phase">配置板子</span></header>
+  <form id="setup" class="aurai-stack">
+    <label class="aurai-field">板子<select id="board"><option value="six">6人 · 狼人 / 预言家 / 女巫</option><option value="nine">9人 · 狼人 / 预言家 / 女巫 / 猎人</option><option value="twelve">12人 · 狼人 / 预言家 / 女巫 / 猎人 / 守卫</option></select></label>
+    <div class="aurai-grid"><label class="aurai-field">行动时限<select id="actionTime"><option value="30">30秒</option><option value="60">1分钟</option><option value="120" selected>2分钟</option><option value="180">3分钟</option></select></label><label class="aurai-field">每人发言<select id="speechTime"><option value="30">30秒</option><option value="60" selected>1分钟</option><option value="120">2分钟</option><option value="180">3分钟</option></select></label></div>
+    <fieldset><legend>选择玩家 <span id="count" class="aurai-muted"></span></legend><div id="members" class="ww-options"></div></fieldset>
+    <button class="aurai-button aurai-button--primary aurai-button--block" id="start">发起准备</button>
+  </form>
+  <p id="hint" class="aurai-muted" hidden></p>
+  <div id="seats" class="ww-seats"></div>
+  <div id="own" class="aurai-stack" hidden></div>
+  <div id="actions" class="aurai-stack ww-actions"></div>
+  <div class="ww-details aurai-stack">
+    <h3 class="aurai-title">规则与记录</h3><p class="ww-rule">屠边规则：狼人全灭，好人胜；村民或神职全部出局，狼人胜。无警长，放逐同票不出局；狼人刀口同票空刀。女巫每夜最多使用一瓶药，仅首夜可以自救，解药用完后不再提供刀口；同守同救仍出局。猎人被毒不能开枪。超时视为不行动或弃权；发言超时自动交给下一位。</p>
+    <div id="log" class="aurai-stack"></div>
+  </div>
+  <button type="button" class="aurai-button aurai-button--danger" id="stop" hidden>结束本局</button>
+</section>
+<script>
+(()=>{
+ const $=id=>document.getElementById(id),names={setup:'配置板子',ready:'等待准备',night:'夜晚行动',speech:'白天发言',vote:'放逐投票',hunter:'猎人技能',finished:'对局结束'};
+ let busy=false,roster='',lastPhase='',selection=new Set();
+ function text(tag,value,className){const el=document.createElement(tag);el.textContent=value;if(className)el.className=className;return el}
+ function render(){const s=AuraiHTML.messageState,host=s._miniapp;
+   $('setup').hidden=s.phase!=='setup'||!host||host.viewerId!==host.ownerId;
+   $('phase').textContent=(s.day?'第'+s.day+'天 · ':'')+(names[s.phase]||'狼人杀');
+   $('hint').hidden=false;$('hint').textContent=!host?'发送到群聊后，由你配置板子并开局。':s.phase==='setup'?host.viewerId!==host.ownerId?'等待创建人配置板子。':'选择板子和玩家，所有人准备后自动开局；对局期间按顺序发言。':s.winner?s.winner==='对局已结束'?s.winner:s.winner+'阵营获胜':s.phase==='night'?'请查看本人可见的行动卡；其他玩家的身份和行动不会显示。':s.phase==='ready'?'所有玩家准备后自动开始。':'按当前行动卡操作，程序会自动推进。';
+   if(host&&roster!==JSON.stringify(host.members)){roster=JSON.stringify(host.members);$('members').replaceChildren();host.members.forEach(m=>{const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=m.id;input.checked=selection.has(m.id);input.onchange=()=>{input.checked?selection.add(m.id):selection.delete(m.id);count()};label.append(input,text('span',m.name));$('members').append(label)});count()}
+   $('seats').replaceChildren();(s.players||[]).forEach(p=>{const el=document.createElement('div');el.className='ww-seat'+(!p.alive?' out':'')+(s.speaker===p.id?' current':'');el.append(text('strong',p.seat+'号 '+p.name),text('span',p.role||(!p.alive?'已出局':s.phase==='ready'?p.ready?'已准备':'待准备':s.speaker===p.id?'正在发言':'存活')));$('seats').append(el)});
+   $('own').replaceChildren();$('own').hidden=!host?.own?.role;if(host?.own?.role){$('own').append(text('h3','我的身份 · '+host.own.role,'aurai-title'));if(host.own.teammates.length)$('own').append(text('p','狼队：'+host.own.teammates.join('、'),'aurai-muted'));host.own.knowledge.forEach(v=>$('own').append(text('p',v,'aurai-muted')))}
+   $('actions').replaceChildren();(host?.cards||[]).forEach(card=>{const form=document.createElement('form');form.className='aurai-stack';form.append(text('h3',card.title,'aurai-title'),text('p',card.body,'aurai-muted'));const b=card.buttons[0];if(!b)return;let value;const opts=document.createElement('div');opts.className='ww-options';(b.selection?.options||[]).forEach(o=>{const label=document.createElement('label'),input=document.createElement('input');input.type='radio';input.name='choice';input.required=true;input.onchange=()=>value=o.id;label.append(input,text('span',o.label));opts.append(label)});form.append(opts);const button=text('button',b.label,'aurai-button aurai-button--primary aurai-button--block');button.disabled=busy;form.append(button);form.onsubmit=ev=>{ev.preventDefault();submit('aurai:clickButton',{messageId:card.messageId,buttonId:b.id,value,revision:card.revision,participantRevision:card.participantRevision})};$('actions').append(form)});
+   $('log').replaceChildren();(s.log||[]).forEach(v=>$('log').append(text('p',v,'aurai-muted')));
+   $('stop').hidden=!host||host.viewerId!==host.ownerId||['setup','finished'].includes(s.phase);$('stop').disabled=busy;
+   if(lastPhase!==s.phase){lastPhase=s.phase;AuraiHTML.requestResize()}
+ }
+ function count(){const needed={six:6,nine:9,twelve:12}[$('board').value];$('count').textContent=selection.size+' / '+needed;$('start').disabled=busy||selection.size!==needed}
+ async function submit(action,data){if(busy)return;busy=true;render();try{await AuraiHTML.submitEvent({eventId:crypto.randomUUID(),action,data,notifyAi:false})}catch(e){AuraiGameBridge.reportError(String(e.message||e))}finally{busy=false;render()}}
+ $('board').onchange=count;$('setup').onsubmit=e=>{e.preventDefault();submit('configure',{board:$('board').value,players:[...selection],actionSeconds:Number($('actionTime').value),speechSeconds:Number($('speechTime').value)})};
+ $('stop').onclick=()=>submit('stop',null);
+ document.addEventListener('aurai:messageupdate',render);render();
+})();
+</script>

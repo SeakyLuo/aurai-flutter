@@ -135,6 +135,7 @@ class ToolActionIcon extends StatelessWidget {
                 type: SettingsIconType.skills,
               ),
               'createGoal' ||
+              'clearGoal' ||
               'getGoal' ||
               'getTaskList' ||
               'updateGoal' ||

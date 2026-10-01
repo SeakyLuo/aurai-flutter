@@ -27,6 +27,27 @@ class ToolExecutor {
     void Function(ToolResult)? onWaitingForUser,
   }) async {
     _cancelRequested = false;
+    try {
+      return await _execute(call, onWaitingForUser: onWaitingForUser);
+    } on Object catch (error) {
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: _cancelRequested
+            ? ToolResultStatus.cancelled
+            : ToolResultStatus.error,
+        output: {
+          'error': error.toString(),
+          'next': '先根据原始报错检查原因或调整操作；原因未消除前不要重复相同调用。',
+        },
+      );
+    }
+  }
+
+  Future<ToolResult> _execute(
+    ToolCall call, {
+    void Function(ToolResult)? onWaitingForUser,
+  }) async {
     if (call.userAction != null &&
         (call.userAction!.trim().isEmpty ||
             call.userAction!.trim() == 'null')) {
@@ -118,14 +139,14 @@ class ToolExecutor {
           callId: call.id,
           toolName: call.name,
           status: ToolResultStatus.denied,
-          output: {'error': error.message},
+          output: {'error': error.toString()},
         );
       } on ArgumentError catch (error) {
         return ToolResult(
           callId: call.id,
           toolName: call.name,
           status: ToolResultStatus.error,
-          output: {'error': error.message.toString()},
+          output: {'error': error.toString()},
         );
       }
     }
@@ -196,9 +217,38 @@ class ToolExecutor {
     }
     _activeTool = tool;
     try {
-      final result = await tool
-          .execute(call)
-          .timeout(tool.definition.executionTimeout);
+      final ToolResult result;
+      try {
+        result = await tool
+            .execute(call)
+            .timeout(tool.definition.executionTimeout);
+      } on StateError catch (error) {
+        return ToolResult(
+          callId: call.id,
+          toolName: call.name,
+          status: _cancelRequested
+              ? ToolResultStatus.cancelled
+              : ToolResultStatus.error,
+          output: {
+            'code': 'tool_operation_rejected',
+            'error': error.toString(),
+            'next': '先根据失败原因检查当前状态或调整操作；原因未消除前不要重复相同调用。',
+          },
+        );
+      } on ArgumentError catch (error) {
+        return ToolResult(
+          callId: call.id,
+          toolName: call.name,
+          status: _cancelRequested
+              ? ToolResultStatus.cancelled
+              : ToolResultStatus.error,
+          output: {
+            'code': 'invalid_tool_arguments',
+            'error': error.toString(),
+            'next': '先根据错误修正参数；不要原样重试。',
+          },
+        );
+      }
       if (_cancelRequested ||
           call.userAction == null ||
           result.status != ToolResultStatus.success ||
@@ -229,15 +279,22 @@ class ToolExecutor {
           },
         },
       );
-    } on TimeoutException {
-      await tool.cancel();
+    } on TimeoutException catch (error) {
+      String? cancellationError;
+      try {
+        await tool.cancel();
+      } on Object catch (error) {
+        cancellationError = error.toString();
+      }
       return ToolResult(
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.error,
         output: <String, Object?>{
-          'error':
-              'Tool timed out after ${tool.definition.executionTimeout.inSeconds} seconds',
+          'error': error.toString(),
+          'timeoutSeconds': tool.definition.executionTimeout.inSeconds,
+          if (cancellationError != null) 'cancellationError': cancellationError,
+          'next': '先检查执行状态；超时不代表操作未生效，不要自动重试。',
         },
       );
     } finally {

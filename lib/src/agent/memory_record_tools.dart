@@ -76,7 +76,7 @@ class MemoryRecordTool
       }
       return null;
     } on StateError catch (error) {
-      return result(call, ToolResultStatus.error, {'error': error.message});
+      return result(call, ToolResultStatus.error, {'error': error.toString()});
     }
   }
 
@@ -136,7 +136,7 @@ class MemoryRecordTool
         'revision': memory.revision,
       });
     } on StateError catch (error) {
-      return result(call, ToolResultStatus.error, {'error': error.message});
+      return result(call, ToolResultStatus.error, {'error': error.toString()});
     }
   }
 

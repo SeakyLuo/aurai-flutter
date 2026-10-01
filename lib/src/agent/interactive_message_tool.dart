@@ -187,11 +187,7 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         toolName: name,
         status: ToolResultStatus.error,
         output: {
-          'message': switch (error) {
-            StateError() => error.message,
-            ArgumentError() => error.message,
-            _ => error.toString(),
-          },
+          'message': error.toString(),
         },
       );
     }

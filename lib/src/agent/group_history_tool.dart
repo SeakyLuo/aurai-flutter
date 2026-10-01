@@ -122,7 +122,7 @@ class ReadGroupMessagesTool implements AgentTool, RuntimeCapabilityAgentTool {
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.error,
-        output: {'error': error.message},
+        output: {'error': error.toString()},
       );
     }
   }

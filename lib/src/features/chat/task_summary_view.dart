@@ -179,6 +179,8 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
                 showFileChanges: false,
                 storageId: '${widget.messageId}:$index',
                 title: activity.text,
+                startedAt: activity.startedAt,
+                finishedAt: activity.finishedAt,
                 toolName: activity.toolName,
                 status: activity.status!,
                 requestJson: activity.requestJson,

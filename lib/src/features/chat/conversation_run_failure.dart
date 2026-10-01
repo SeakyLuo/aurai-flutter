@@ -55,7 +55,10 @@ extension ConversationRunFailure on ChatController {
             activeConversation.activeRunId == message.runId &&
             !hasRunningTask;
 
-  Future<void> retryFailedMessage(AgentMessage message) async {
+  Future<void> retryFailedMessage(
+    AgentMessage message, {
+    Future<void> Function()? beforeRemoval,
+  }) async {
     if (activeConversation.kind == ConversationKind.direct) {
       await retryFailedRun(message.runId);
       return;
@@ -75,6 +78,7 @@ extension ConversationRunFailure on ChatController {
     if (dispatcher != null && !dispatcher.closed && !dispatcher.stopped) {
       dispatcher.hold();
       try {
+        await beforeRemoval?.call();
         await _removeFailedGroupMessage(conversation, message);
         dispatcher.history.removeWhere((entry) => entry.id == message.id);
         dispatcher.receiveTargeted(const [], {message.senderId});
@@ -87,6 +91,7 @@ extension ConversationRunFailure on ChatController {
       await _inConversation(conversation, () async {
         _runningConversation = conversation;
         try {
+          await beforeRemoval?.call();
           await _removeFailedGroupMessage(conversation, message);
           await _executeGroupChat(
             conversation,

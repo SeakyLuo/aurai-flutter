@@ -225,6 +225,8 @@ List<ChatTimelineEntry> buildChatTimeline(
                         latest.step,
                         latest.senderName,
                       ),
+                      startedAt: latest.step.startedAt,
+                      finishedAt: latest.step.finishedAt,
                       fileResults:
                           entry.step.toolName == 'executeAndroidScript' ||
                               entry.step.toolName == 'runSkill'
@@ -643,6 +645,8 @@ class _ToolActivity extends StatelessWidget {
         toolName: step.toolName,
         storageId: storageId,
         title: _toolActivityTitle(step, senderName),
+        startedAt: step.startedAt,
+        finishedAt: step.finishedAt,
         status: step.status,
         requestJson: step.requestJson,
         resultJson: step.resultJson,

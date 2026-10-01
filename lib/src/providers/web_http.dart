@@ -1,10 +1,12 @@
-import '../domain/error_message.dart';
-import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 class WebRequestException implements Exception {
   const WebRequestException(this.message);
   final String message;
+
+  @override
+  String toString() => message;
 }
 
 typedef WebResponse = ({Uri url, List<int> bytes, String mimeType});
@@ -32,16 +34,6 @@ class WebHttp {
     _client = client;
     try {
       return await _get(client, url).timeout(const Duration(seconds: 20));
-    } on TimeoutException {
-      throw const WebRequestException('网页请求超时，请稍后重试');
-    } on HandshakeException catch (error) {
-      throw WebRequestException('网站安全连接失败：${errorMessage(error)}');
-    } on SocketException catch (error) {
-      if (_cancelled) throw WebRequestException('请求已取消');
-      throw WebRequestException('无法连接网站，请检查网络：${errorMessage(error)}');
-    } on HttpException {
-      if (_cancelled) throw const WebRequestException('请求已取消');
-      throw const WebRequestException('网页连接中断');
     } finally {
       client.close(force: true);
       _client = null;
@@ -63,11 +55,11 @@ class WebHttp {
         continue;
       }
       if (response.statusCode != 200) {
-        throw WebRequestException(switch (response.statusCode) {
-          401 || 403 => '网站要求登录或验证，无法直接读取',
-          429 => '网站请求过于频繁，请稍后再试',
-          _ => '网站返回错误（${response.statusCode}）',
-        });
+        final body = await utf8.decoder.bind(response).join();
+        throw HttpException(
+          'HTTP ${response.statusCode} ${response.reasonPhrase}\n$body',
+          uri: url,
+        );
       }
       final mimeType = response.headers.contentType?.mimeType ?? '';
       if (!{

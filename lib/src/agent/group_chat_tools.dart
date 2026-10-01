@@ -1,3 +1,4 @@
+import '../storage/group_member_details.dart';
 import '../domain/tool_models.dart';
 import '../domain/ai_profile.dart';
 import '../storage/group_chat_store.dart';
@@ -19,6 +20,8 @@ class GroupChatTool
     'read',
     'create',
     'rename',
+    'readPersonalDetails',
+    'updatePersonalDetails',
     'updateMembers',
     'setAdministrators',
     'transferOwnership',
@@ -99,6 +102,8 @@ class GroupChatTool
   @override
   ToolDefinition get definition => ToolDefinition(
     name: switch (operation) {
+      'readPersonalDetails' => 'readGroupPersonalDetails',
+      'updatePersonalDetails' => 'updateGroupPersonalDetails',
       'updateMembers' => 'updateGroupChatMembers',
       'setAdministrators' => 'setGroupAdministrators',
       'transferOwnership' => 'transferGroupOwnership',
@@ -108,7 +113,9 @@ class GroupChatTool
     capabilityId: 'local.group_chats',
     safety: ['list', 'read'].contains(operation)
         ? ToolSafety.readOnly
-        : operation == 'transferOwnership'
+        : operation == 'transferOwnership' ||
+              operation == 'updatePersonalDetails' ||
+              operation == 'readPersonalDetails'
         ? ToolSafety.sensitive
         : operation == 'dissolve'
         ? ToolSafety.destructive
@@ -116,14 +123,21 @@ class GroupChatTool
     singleUseConfirmation: {
       'transferOwnership',
       'dissolve',
+      'updatePersonalDetails',
     }.contains(operation),
     confirmationDescriptionBuilder: (_) => switch (operation) {
+      'readPersonalDetails' => '是否允许读取“$_groupTitle”中的群昵称和个人备注？',
+      'updatePersonalDetails' => '是否允许修改“$_groupTitle”中的群昵称或个人备注？',
       'setAdministrators' => '是否允许调整“$_groupTitle”的群管理员？',
       'transferOwnership' => '是否允许转让“$_groupTitle”的群主？',
       'dissolve' => '是否允许解散“$_groupTitle”？所有本地聊天记录将被删除且无法恢复。',
       _ => '是否允许调整“$_groupTitle”的成员？移除成员会停止其当前任务，新成员可以参与群聊。',
     },
     description: switch (operation) {
+      'readPersonalDetails' =>
+        'Read your own group nickname and private remark. senderId may be your own ID or user:local when requested by the human user; never another AI.',
+      'updatePersonalDetails' =>
+        'Update a group nickname and private remark requested by the human user. senderId defaults to yourself; user:local edits the human user and requires confirmation. Only these two identities are allowed. Omitted fields preserve values; empty strings clear. Remark is private to that identity. Read details first.',
       'list' =>
         'Search saved Aurai group chats by title with offset pagination, at most 50. Returns internal IDs; never ask the user to enter IDs. Does not search messages; use readGroupMessages for group message contents.',
       'read' =>
@@ -144,6 +158,17 @@ class GroupChatTool
     inputSchema: {
       'type': 'object',
       'properties': {
+        if (operation == 'readPersonalDetails' ||
+            operation == 'updatePersonalDetails')
+          'senderId': {
+            'type': 'string',
+            'enum': [senderId, 'user:local'].toSet().toList(),
+            'description': 'Omit for yourself.',
+          },
+        if (operation == 'updatePersonalDetails') ...{
+          'nickname': {'type': 'string', 'maxLength': 32},
+          'remark': {'type': 'string', 'maxLength': 200},
+        },
         if (operation == 'list') ...{
           'query': {'type': 'string'},
           'offset': {'type': 'integer', 'minimum': 0},
@@ -232,7 +257,35 @@ class GroupChatTool
           whereArgs: [id, senderId],
         );
         if (rows.isEmpty) throw StateError('未找到群聊，请先查询群聊列表');
-        if (operation == 'read') {
+        if (operation == 'readPersonalDetails' ||
+            operation == 'updatePersonalDetails') {
+          final target = a['senderId'] as String? ?? senderId;
+          if (target != senderId && target != 'user:local')
+            throw ArgumentError('只能操作自己或用户的群资料');
+          final members = await store.members(id);
+          if (!members.any((m) => m.sender.id == target))
+            throw StateError('目标成员不在群内');
+          final details = GroupMemberDetailsStore(store.database);
+          final old = await details.read(id, senderId: target);
+          if (operation == 'updatePersonalDetails') {
+            if (!a.containsKey('nickname') && !a.containsKey('remark'))
+              throw ArgumentError('请提供群昵称或备注');
+            final nickname = a['nickname'] as String? ?? old.nickname;
+            final remark = a['remark'] as String? ?? old.remark;
+            if (nickname.length > 32 || remark.length > 200)
+              throw ArgumentError('群昵称最多32字，备注最多200字');
+            await details.save(
+              id,
+              senderId: target,
+              nickname: nickname,
+              remark: remark,
+            );
+            changed();
+            output = {'updated': true, 'nickname': nickname, 'remark': remark};
+          } else {
+            output = {'nickname': old.nickname, 'remark': old.remark};
+          }
+        } else if (operation == 'read') {
           final (members, muted) = await (
             store.members(id),
             store.mutedMembers(id),

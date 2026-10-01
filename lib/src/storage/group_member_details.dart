@@ -15,11 +15,14 @@ class GroupMemberDetailsStore {
   const GroupMemberDetailsStore(this.database);
   final Database database;
 
-  Future<({String nickname, String remark})> read(String groupId) async {
+  Future<({String nickname, String remark})> read(
+    String groupId, {
+    String senderId = 'user:local',
+  }) async {
     final rows = await database.query(
       'group_member_details',
       where: 'conversation_id = ? AND sender_id = ?',
-      whereArgs: [groupId, MessageSender.localUser.id],
+      whereArgs: [groupId, senderId],
     );
     return rows.isEmpty
         ? (nickname: '', remark: '')
@@ -31,12 +34,13 @@ class GroupMemberDetailsStore {
 
   Future<void> save(
     String groupId, {
+    String senderId = 'user:local',
     required String nickname,
     required String remark,
   }) async {
     await database.insert('group_member_details', {
       'conversation_id': groupId,
-      'sender_id': MessageSender.localUser.id,
+      'sender_id': senderId,
       'nickname': nickname.trim(),
       'remark': remark.trim(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);

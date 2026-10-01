@@ -102,6 +102,14 @@ class AuraiApplication : Application() {
 
     private fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "runMiniappProgram" -> Thread {
+                try {
+                    val output = MiniappProgram.run(call.argument<String>("script")!!, call.argument<String>("input")!!)
+                    mainHandler.post { result.success(output) }
+                } catch (error: Exception) {
+                    mainHandler.post { result.error("miniapp_program", error.message, null) }
+                }
+            }.start()
             "transformModelRequest" -> Thread {
                 try {
                     val output = ModelRequestTransform.run(call.argument<String>("script")!!, call.argument<String>("input")!!)

@@ -7,5 +7,13 @@
     "asset": "assets/miniapps/tipoff.html",
     "iconAsset": "assets/miniapps/icons/tipoff-logo.jpg",
     "version": "0bec1717f814c781852c383f7b862a052dc64586c7ccf1c78c7ab0f5d11a1f7b"
+  },
+  {
+    "id": "builtin.werewolf",
+    "title": "狼人杀",
+    "description": "在群聊中配置板子，自动分配身份、推进昼夜和结算投票。支持真人与 AI，身份和夜间行动仅接收人可见。",
+    "publisherId": "user:local",
+    "asset": "assets/miniapps/werewolf.html",
+    "version": "werewolf-program-v1"
   }
 ]

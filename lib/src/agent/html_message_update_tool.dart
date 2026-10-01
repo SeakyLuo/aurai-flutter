@@ -91,11 +91,7 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
         toolName: name,
         status: ToolResultStatus.error,
         output: {
-          'message': error is StateError
-              ? error.message
-              : error is ArgumentError
-              ? error.message
-              : error.toString(),
+          'message': error.toString(),
         },
       );
     }
