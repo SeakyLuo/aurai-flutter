@@ -43,7 +43,8 @@ class _ToolActivityGroupState extends State<ToolActivityGroup> {
 
   @override
   Widget build(BuildContext context) {
-    final running = widget.statuses.contains(AgentStepStatus.running);
+    final running =
+        widget.active || widget.statuses.contains(AgentStepStatus.running);
     final expanded = _expanded;
     final label = widget.active
         ? widget.activeLabel!
@@ -72,6 +73,7 @@ class _ToolActivityGroupState extends State<ToolActivityGroup> {
                     child: ThinkingIndicator(
                       label: label,
                       animate: running,
+                      singleLine: true,
                       leading: SizedBox.square(
                         dimension: MediaQuery.textScalerOf(context).scale(18),
                         child: FittedBox(

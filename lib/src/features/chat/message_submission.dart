@@ -11,6 +11,12 @@ extension MessageSubmission on ChatController {
     String goal,
     List<String>? mentionedRecipients,
   ) async {
+    if (activeConversation.kind == ConversationKind.group) {
+      await groupStore.requireCanSpeak(
+        activeConversation.id,
+        MessageSender.localUser.id,
+      );
+    }
     if (shouldQueuePrivateMessage) {
       await _enqueuePrivateMessage(goal, fromDraft: true);
       return false;

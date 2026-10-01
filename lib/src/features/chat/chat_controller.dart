@@ -12,6 +12,7 @@ import '../../agent/group_message_marks_tool.dart';
 import '../../storage/group_message_marks.dart';
 import '../../domain/request_adapter.dart';
 import '../../domain/context_summary.dart';
+import '../../domain/live_project_changes.dart';
 import '../../providers/request_adapter_runner.dart';
 import '../../providers/responses_transport.dart';
 import '../../agent/request_adapter_tool.dart';
@@ -26,6 +27,7 @@ import '../../app/language_settings.dart';
 import '../../agent/hide_thinking_tool.dart';
 import '../../agent/group_wake_tool.dart';
 import '../../agent/group_auto_reply_tool.dart';
+import '../../agent/group_mute_tool.dart';
 import '../../storage/group_system_notice.dart';
 import '../../platform/svg_image.dart';
 import '../../domain/image_generation_config.dart';
@@ -174,6 +176,7 @@ part 'project_controller_actions.dart';
 part 'group_conversation_run.dart';
 part 'group_member_activity.dart';
 part 'group_message_delivery.dart';
+part 'group_message_audience.dart';
 part 'private_group_message.dart';
 part 'group_private_conversation.dart';
 part 'group_system_events.dart';
@@ -201,9 +204,12 @@ part 'scheduled_execution.dart';
 part 'message_edit_actions.dart';
 part 'accessibility_request.dart';
 part 'pending_confirmation.dart';
+part 'private_goal_actions.dart';
 part 'conversation_execution_state.dart';
+part 'live_project_changes.dart';
 part 'group_sleep_recovery.dart';
 part 'group_run_tools.dart';
+part 'group_member_mute.dart';
 part 'user_data_read_access.dart';
 
 class ChatController extends ChangeNotifier {
@@ -263,6 +269,7 @@ class ChatController extends ChangeNotifier {
   final _callbackConversations = <String>{};
   bool _callbacksDisposed = false;
   bool _callbacksPending = true;
+  Timer? _callbackMuteExpiry;
   int _callbackGeneration = 0;
   MemoryController? _memory;
   MemoryController get memory => _memory!;
@@ -584,6 +591,15 @@ class ChatController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  PrivateTaskState? get privateTaskState =>
+      activeConversation.kind == ConversationKind.direct
+      ? PrivateTaskState(
+          _store.database,
+          activeConversation.id,
+          activeConversation.defaultSenderId,
+        )
+      : null;
 
   GroupChatStore get groupStore => _store.groups;
 

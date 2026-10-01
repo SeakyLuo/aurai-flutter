@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'dart:convert';
 
 import '../../app/glass_notice.dart';
@@ -7,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'chat_controller.dart';
 import 'glass_surface.dart';
 import 'settings_appearance.dart';
-import 'settings_icon.dart';
 import 'tool_action_icon.dart';
 import 'tool_detail_page.dart';
 
@@ -353,47 +353,12 @@ class _EmptyApprovals extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: EdgeInsets.fromLTRB(32, settingsHeaderHeight(context), 32, 24),
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: settingsFieldColor(context),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: SettingsIcon(
-                  type: SettingsIconType.permission,
-                  color: colors.onSurfaceVariant,
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              '暂无已保存的授权',
-              style: TextStyle(
-                fontSize: 17,
-                height: 1.4,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '需要确认的操作仍会在执行前询问你，授权后会显示在这里。',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.55,
-                color: colors.onSurfaceVariant,
-              ),
-            ),
-          ],
+        child: const EmptyDataView(
+          title: '暂无已保存的授权',
+          description: '需要确认的操作仍会在执行前询问你，授权后会显示在这里。',
         ),
       ),
     );

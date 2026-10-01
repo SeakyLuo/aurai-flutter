@@ -47,6 +47,9 @@ class InteractiveMessageStore {
       jsonDecode(rows.single['interactive_json'] as String)
           as Map<String, dynamic>,
     );
+    if (card.participation['presentation'] == 'message') {
+      throw StateError('这是一条普通消息，请使用历史消息工具读取');
+    }
     card.validateTransport(html: rows.single['kind'] == 'html_game');
     if (card.revision != revision ||
         card.participantRevision(actor.id) != participantRevision)
@@ -374,9 +377,7 @@ class InteractiveMessageStore {
     await db.rawUpdate(
       'UPDATE conversations SET message_count = message_count + 1, preview = ?, updated_at = ? WHERE id = ?',
       [
-        notice.interactive?.canView(MessageSender.localUser.id) == false
-            ? '私密交互消息'
-            : text,
+        !notice.canView(MessageSender.localUser.id) ? '私密交互消息' : text,
         notice.createdAt.microsecondsSinceEpoch,
         conversationId,
       ],

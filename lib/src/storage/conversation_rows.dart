@@ -74,9 +74,9 @@ Map<String, Object?> messageRow(String conversationId, AgentMessage value) => {
   'conversation_id': conversationId,
   'run_id': value.runId,
   'model_turn_id': value.modelTurnId,
-  'interactive_json': value.interactive == null
+  'interactive_json': value.messageMetadata == null
       ? null
-      : jsonEncode(value.interactive!.toJson(includeParticipants: true)),
+      : jsonEncode(value.messageMetadata!.toJson(includeParticipants: true)),
   'quote_json': value.quote == null ? null : jsonEncode(value.quote!.toJson()),
   'role': value.role.name,
   'sender_id': value.senderId,

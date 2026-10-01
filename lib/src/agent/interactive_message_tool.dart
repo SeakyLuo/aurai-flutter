@@ -28,11 +28,11 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
             'The app settles rules atomically; distribution/text/metric views render visible state. A poll and simultaneous-choice game use this same mechanism. nextRound keeps shared state and resets submissions plus roundInitial fields. '
             'notifyAi=true locks only the triggering button until its callback result. A later state-changing action supersedes the previous callback. Complete it with updateInteractiveMessage plus callbackEventId; a plain chat reply is not a card result. update/nextState buttons change only the acting participant’s presentation. openUrl opens/returns HTTPS; notifyAi requests a creator callback. Every button requires id,label,action,repeatable. '
             'Default visibility is public. reveal=onComplete hides other choices, aggregates and runtime state until completed or closed. Keep completion reachable and gate result views on available context. '
-            'For complete examples, discover the public skill 共享交互消息 with listSkills/readSkill. Keep message/button IDs internal and do not repeat the full card as ordinary text.',
+            'This tool performs the operation directly. For complex rules and complete examples only, discover the reference guide 交互消息工具使用指南 with listSkills/readSkill. Reading the guide does not perform the operation. Keep message/button IDs internal and do not repeat the full card as ordinary text.',
       'readInteractiveMessage' =>
         'Read an accessible interactive message without switching conversations. Returns your current card, revision, participantRevision, definition, visible interactionView and up to 50 of your action-history events. '
             'Read before clicking; interactionView contains phase, round, submitted, self and permitted results. Hidden opponents’ choices and runtime state are not available before reveal. '
-            'participantId changes only the read-only perspective; perspective.interactionView belongs to that participant, while top-level revisions and ownParticipation remain yours. Use the last history sequence as beforeEvent for earlier events.',
+            'For your own card, pass only messageId; omit participantId and beforeEvent or set them to JSON null. Never use an empty participantId or invent a pagination cursor. participantId changes only the read-only perspective; perspective.interactionView belongs to that participant, while top-level revisions and ownParticipation remain yours. Use the last history sequence as beforeEvent only for earlier events. messageId must identify the actual card, not an ordinary message asking you to read it. A parameter or message-type error does not mean the card needs to be resent.',
       'retryInteractiveCallback' =>
         'Retry your failed callback using messageId and callbackEventId from ownParticipation.callback. Reuses the same event; does not click the button again or repeat its local state changes. Only failed events can retry. Read current state after a status conflict.',
       'clickInteractiveMessage' =>
@@ -70,11 +70,17 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         },
         if (name == 'readInteractiveMessage') ...{
           'participantId': {
-            'type': 'string',
+            'type': ['string', 'null'],
+            'minLength': 1,
             'description':
-                'Optional read-only perspective; defaults to yourself.',
+                'Omit or use JSON null to read as yourself. For another perspective use a real participant ID from the roster. Empty string is invalid; this does not grant access to hidden choices.',
           },
-          'beforeEvent': {'type': 'integer', 'minimum': 1},
+          'beforeEvent': {
+            'type': ['integer', 'null'],
+            'minimum': 1,
+            'description':
+                'Omit or use JSON null on the first read. For earlier history, use the last sequence returned by the previous read; do not guess 1.',
+          },
         },
         if (name != 'sendInteractiveMessage') 'messageId': {'type': 'string'},
         if (name == 'updateInteractiveMessage' ||
@@ -132,6 +138,21 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
   @override
   Future<ToolResult> execute(ToolCall call) async {
     try {
+      if (name == 'readInteractiveMessage') {
+        final participant = call.arguments['participantId'];
+        if (participant != null &&
+            (participant is! String || participant.trim().isEmpty)) {
+          throw ArgumentError(
+            'participantId 必须是真实成员标识，不能填空字符串。读取自己的卡片请省略此参数或传 JSON null；无需重新发卡。',
+          );
+        }
+        final before = call.arguments['beforeEvent'];
+        if (before != null && (before is! int || before < 1)) {
+          throw ArgumentError(
+            'beforeEvent 必须是上一页返回的正整数序号；首次读取请省略或传 JSON null。',
+          );
+        }
+      }
       final required = definition.inputSchema['required'] as List;
       for (final key in required) {
         if (!call.arguments.containsKey(key) || call.arguments[key] == null) {

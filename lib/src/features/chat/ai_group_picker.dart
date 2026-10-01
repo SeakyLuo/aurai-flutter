@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../domain/message_sender.dart';
@@ -111,7 +112,11 @@ class _AiGroupListState extends State<AiGroupList> {
         if (!_loading && _groups.isEmpty)
           Padding(
             padding: const EdgeInsets.all(24),
-            child: Center(child: Text(widget.joined ? '尚未加入群聊' : '没有可加入的群聊')),
+            child: Center(
+              child: EmptyDataView(
+                title: widget.joined ? '尚未加入群聊' : '没有可加入的群聊',
+              ),
+            ),
           ),
       ],
     ),

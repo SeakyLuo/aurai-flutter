@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
 import 'conversation_list_skeleton.dart';
 import 'conversation_status_dot.dart';
@@ -240,12 +241,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
                     onPressed: () => _load(reset: true),
                     child: const Text('重试加载'),
                   )
-                : Text(
-                    '还没有会话',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
+                : EmptyDataView(title: '还没有会话'),
           )
         : PaginationListener(
             hasMore: _more,

@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'dart:async';
@@ -352,11 +353,10 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
                             _created.isEmpty)
                           Padding(
                             padding: const EdgeInsets.all(32),
-                            child: Text(
-                              _search.text.trim().isEmpty
+                            child: EmptyDataView(
+                              title: _search.text.trim().isEmpty
                                   ? '暂无成员，点击右上方＋添加'
                                   : '没有找到匹配的 AI',
-                              textAlign: TextAlign.center,
                             ),
                           ),
                       ],

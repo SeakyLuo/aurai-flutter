@@ -42,7 +42,7 @@ Future<void> loadConversationListPreviews(
   };
   if (groups.isEmpty) return;
   final rows = await database.rawQuery(
-    '''SELECT id, conversation_id, sender_id, kind, text, json_extract(interactive_json, '\$.title') AS interactive_title, json_extract(interactive_json, '\$.body') AS interactive_body, created_at
+    '''SELECT id, conversation_id, sender_id, kind, text, CASE WHEN json_extract(interactive_json, '\$.participation.presentation') = 'message' THEN NULL ELSE json_extract(interactive_json, '\$.title') END AS interactive_title, json_extract(interactive_json, '\$.body') AS interactive_body, created_at
        FROM messages WHERE id IN (
          SELECT (SELECT id FROM messages
            WHERE conversation_id = conversations.id AND kind NOT IN ('commentary', 'quick_reply', 'reasoning')

@@ -119,11 +119,11 @@ extension InteractiveMessageActions on ChatController {
       whereArgs: [id, source.id],
       limit: 1,
     );
-    if (rows.isEmpty ||
-        rows.single['interactive_json'] == null ||
-        rows.single['kind'] == 'system') {
-      throw StateError('交互消息不存在或已撤回');
-    }
+    if (rows.isEmpty) throw StateError('找不到这条消息，请从当前可访问的聊天记录确认卡片消息后重试');
+    if (rows.single['kind'] == 'system')
+      throw StateError('指定的是系统消息或已撤回消息，不能作为交互卡片读取，请确认原卡片的消息标识');
+    if (rows.single['interactive_json'] == null)
+      throw StateError('指定消息存在，但不是交互卡片。请读取卡片本身，不要使用“请读取卡片”等普通文字消息的标识；无需因此重新发卡');
     final row = rows.single;
     final old = InteractiveMessage.fromJson(
       jsonDecode(row['interactive_json'] as String) as Map<String, dynamic>,
@@ -133,7 +133,9 @@ extension InteractiveMessageActions on ChatController {
       final perspective = args['participantId'] as String? ?? senderId;
       if (perspective != senderId &&
           !old.visible('visibility', actor: senderId))
-        throw StateError('这条消息尚未公开其他参与者的选择');
+        throw StateError(
+          '不能切换到其他参与者视角：这条卡片尚未公开他人的选择。读取自己的卡片请省略 participantId 或传 JSON null',
+        );
       if (perspective != senderId &&
           !old.visible('summaryVisibility', actor: senderId))
         throw StateError('当前权限不允许查看其他参与者的历史快照');

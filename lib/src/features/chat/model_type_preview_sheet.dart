@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 import '../../app/ui_action.dart';
 import '../../providers/model_catalog.dart';
@@ -132,9 +133,8 @@ class _ModelTypePreviewSheetState extends State<_ModelTypePreviewSheet> {
                       )
                     : entries.isEmpty
                     ? Center(
-                        child: Text(
-                          query.isEmpty ? '暂无模型' : '没有匹配的模型',
-                          style: TextStyle(color: colors.onSurfaceVariant),
+                        child: EmptyDataView(
+                          title: query.isEmpty ? '暂无模型' : '没有匹配的模型',
                         ),
                       )
                     : ListView.builder(

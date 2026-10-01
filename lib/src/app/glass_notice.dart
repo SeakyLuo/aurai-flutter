@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../features/chat/glass_surface.dart';
+import 'notice_details_sheet.dart';
 
 extension GlassNoticeMessenger on ScaffoldMessengerState {
   ScaffoldFeatureController<SnackBar, SnackBarClosedReason> showGlassSnackBar(
@@ -76,7 +77,66 @@ class _GlassNotice extends StatelessWidget {
               ),
               child: LayoutBuilder(
                 builder: (context, constraints) {
+                  final content = notice.content;
+                  final text = content is Text ? content : null;
+                  final span = text == null
+                      ? null
+                      : text.textSpan ?? TextSpan(text: text.data);
+                  final style = textStyle.merge(text?.style);
+                  final direction =
+                      text?.textDirection ?? Directionality.of(context);
+                  final scaler =
+                      text?.textScaler ?? MediaQuery.textScalerOf(context);
+                  final measure = span == null
+                      ? null
+                      : (TextPainter(
+                          text: TextSpan(style: style, children: [span]),
+                          textDirection: direction,
+                          textScaler: scaler,
+                          maxLines: 4,
+                          ellipsis: '…',
+                          textAlign: text!.textAlign ?? TextAlign.start,
+                          locale: text.locale,
+                          strutStyle: text.strutStyle,
+                          textWidthBasis:
+                              text.textWidthBasis ?? TextWidthBasis.parent,
+                          textHeightBehavior: text.textHeightBehavior,
+                        )..layout(maxWidth: constraints.maxWidth));
+                  final hasDetails = measure?.didExceedMaxLines ?? false;
+                  measure?.dispose();
+                  final preview = text == null
+                      ? content
+                      : Text.rich(
+                          span!,
+                          style: style,
+                          maxLines: 4,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: text.textAlign,
+                          textDirection: direction,
+                          textScaler: scaler,
+                          locale: text.locale,
+                          strutStyle: text.strutStyle,
+                          textWidthBasis: text.textWidthBasis,
+                          textHeightBehavior: text.textHeightBehavior,
+                          semanticsLabel: text.semanticsLabel,
+                        );
                   final controls = <Widget>[
+                    if (hasDetails)
+                      TextButton(
+                        onPressed: () {
+                          final messenger = ScaffoldMessenger.of(context);
+                          showNoticeDetailsSheet(
+                            context,
+                            text: span!,
+                            style: style,
+                            action: action,
+                          );
+                          messenger.hideCurrentSnackBar(
+                            reason: SnackBarClosedReason.dismiss,
+                          );
+                        },
+                        child: const Text('详情'),
+                      ),
                     if (action != null) action,
                     if (close)
                       IconButton(
@@ -94,39 +154,14 @@ class _GlassNotice extends StatelessWidget {
                             ),
                       ),
                   ];
-                  final label = TextPainter(
-                    text: TextSpan(
-                      text: action?.label ?? '',
-                      style: theme.textTheme.labelLarge,
-                    ),
-                    textDirection: Directionality.of(context),
-                    textScaler: MediaQuery.textScalerOf(context),
-                  )..layout();
-                  final actionWidth = action == null ? 0.0 : label.width + 32;
-                  label.dispose();
-                  final separateAction =
-                      actionWidth + (close ? 48 : 0) >
-                      constraints.maxWidth *
-                          (notice.actionOverflowThreshold ?? .25);
-                  if (controls.isEmpty) return notice.content;
-                  if (separateAction)
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        notice.content,
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: controls,
-                        ),
-                      ],
-                    );
-                  return Row(
+                  if (controls.isEmpty) return preview;
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(child: notice.content),
-                      const SizedBox(width: 8),
-                      ...controls,
+                      preview,
+                      const SizedBox(height: 4),
+                      Wrap(alignment: WrapAlignment.end, children: controls),
                     ],
                   );
                 },

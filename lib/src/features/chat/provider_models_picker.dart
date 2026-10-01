@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -90,12 +91,7 @@ class _ProviderModelsPickerState extends State<ProviderModelsPicker> {
               ),
               Expanded(
                 child: shown.isEmpty
-                    ? Center(
-                        child: Text(
-                          '没有匹配的模型',
-                          style: TextStyle(color: colors.onSurfaceVariant),
-                        ),
-                      )
+                    ? Center(child: EmptyDataView(title: '没有匹配的模型'))
                     : ListView.builder(
                         itemCount: shown.length,
                         padding: const EdgeInsets.symmetric(horizontal: 12),

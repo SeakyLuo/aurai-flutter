@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/model_provider.dart';
@@ -337,8 +338,9 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
                           child: Center(
                             child: Padding(
                               padding: const EdgeInsets.all(24),
-                              child: Text(
-                                widget.selectable &&
+                              child: EmptyDataView(
+                                title:
+                                    widget.selectable &&
                                         _selectedOnly &&
                                         query.isEmpty &&
                                         shown.isEmpty
@@ -350,10 +352,6 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
                                     : widget.config.apiKey.isEmpty
                                     ? '请返回供应商页配置 API 密钥'
                                     : '暂无可用模型，可下拉重试或返回检查供应商配置',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: colors.onSurfaceVariant,
-                                ),
                               ),
                             ),
                           ),

@@ -2,10 +2,12 @@ import '../../app/glass_notice.dart';
 import 'dart:async';
 import '../../domain/ai_profile.dart';
 import '../../storage/group_participation.dart';
+import '../../storage/group_chat_store.dart';
 import 'package:flutter/material.dart';
 import '../../domain/error_message.dart';
 import '../../domain/message_sender.dart';
 import 'chat_controller.dart';
+import 'settings_icon.dart';
 
 class GroupStatusBuilder extends StatefulWidget {
   const GroupStatusBuilder({
@@ -32,6 +34,7 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
   Map<String, MessageSender> _members = {};
   Set<String> _paused = {};
   Map<String, String> _pauseReasons = {};
+  Map<String, GroupMute> _mutedUntil = {};
   Timer? _sleepExpiry;
   bool _loaded = false;
   bool _failed = false;
@@ -60,11 +63,13 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
         GroupParticipation(
           widget.controller.groupStore.database,
         ).pausedWithReasons(widget.conversationId),
+        widget.controller.groupStore.mutedMembers(widget.conversationId),
       ]);
       final members = results[0] as List<ConversationMember>;
       if (mounted)
         setState(() {
           _members = {for (final m in members) m.sender.id: m.sender};
+          _mutedUntil = results[2] as Map<String, GroupMute>;
           _pauseReasons = results[1] as Map<String, String>;
           _paused = _pauseReasons.keys.toSet();
           _loaded = true;
@@ -77,7 +82,7 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
         ScaffoldMessenger.of(context).showGlassSnackBar(
           SnackBar(
             content: Text('成员状态加载失败：${errorMessage(error)}'),
-            action: SnackBarAction(label: '重试', onPressed: _load),
+            action: SnackBarAction(label: '重新加载', onPressed: _load),
           ),
         );
       }
@@ -95,7 +100,14 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
       if (widget.includeInactive && !_loaded) {
         return Center(
           child: _failed
-              ? TextButton(onPressed: _load, child: const Text('重试'))
+              ? TextButton.icon(
+                  onPressed: _load,
+                  icon: const SizedBox.square(
+                    dimension: 18,
+                    child: SettingsIcon(type: SettingsIconType.reset),
+                  ),
+                  label: const Text('重新加载成员状态'),
+                )
               : const CircularProgressIndicator(),
         );
       }
@@ -104,6 +116,7 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
         includeThoughts: widget.includeThoughts,
         pausedMembers: _paused,
         pausedReasons: _pauseReasons,
+        mutedMembers: _mutedUntil,
       );
       final active = activities.map((a) => a.sender.id).toSet();
       final now = DateTime.now();
@@ -113,10 +126,15 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
           if (entry.value.isAfter(now)) entry.key: entry.value,
       };
       _sleepExpiry?.cancel();
-      if (sleeps.isNotEmpty) {
-        final nextExpiry = sleeps.values.reduce(
-          (a, b) => a.isBefore(b) ? a : b,
-        );
+      final deadlines = [
+        ...sleeps.values,
+        ..._mutedUntil.values
+            .map((mute) => mute.until)
+            .whereType<DateTime>()
+            .where((until) => until.isAfter(now)),
+      ];
+      if (deadlines.isNotEmpty) {
+        final nextExpiry = deadlines.reduce((a, b) => a.isBefore(b) ? a : b);
         _sleepExpiry = Timer(nextExpiry.difference(now), () => setState(() {}));
       }
       final bySender = {for (final a in activities) a.sender.id: a};
@@ -132,14 +150,19 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
                     _paused.contains(member.id)))
               GroupMemberActivity(
                 sender: member,
+                mute: _mutedUntil[member.id],
                 runId: 'inactive:${member.id}',
                 elapsed: Duration.zero,
                 sleepingUntil: sleeps[member.id],
                 idle: !sleeps.containsKey(member.id),
                 autoReplyPaused: _paused.contains(member.id),
                 autoReplyPauseReason: _pauseReasons[member.id],
-                description: _paused.contains(member.id)
-                    ? '自动接话已关闭 · ${_pauseReasons[member.id]}'
+                description: _mutedUntil[member.id]?.isActive == true
+                    ? '已${_mutedUntil[member.id]!.description}'
+                    : _paused.contains(member.id)
+                    ? _pauseReasons[member.id]!.isEmpty
+                          ? '自动接话已关闭'
+                          : '自动接话已关闭 · ${_pauseReasons[member.id]}'
                     : sleeps.containsKey(member.id)
                     ? '睡眠中'
                     : '等待新消息',
@@ -147,9 +170,12 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
           ] else if (widget.includeInactive)
             GroupMemberActivity(
               sender: member,
+              mute: _mutedUntil[member.id],
               runId: 'member:${member.id}',
               elapsed: Duration.zero,
-              description: '群成员',
+              description: _mutedUntil[member.id]?.isActive == true
+                  ? '已${_mutedUntil[member.id]!.description}'
+                  : '群成员',
               idle: true,
             ),
         ],

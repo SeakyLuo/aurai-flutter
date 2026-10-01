@@ -1,5 +1,5 @@
+import '../../widgets/empty_data_view.dart';
 import '../../storage/development_projects.dart';
-import '../../utils/widget_utils.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../domain/ai_profile.dart';
@@ -23,7 +23,6 @@ import 'group_avatar.dart';
 import 'home_navigation.dart';
 import 'profile_avatar.dart';
 import 'pagination_listener.dart';
-import 'file_tool_icon.dart';
 import 'project_editor_page.dart';
 import 'project_list_tile.dart';
 import 'project_actions.dart';
@@ -107,7 +106,6 @@ class _ProjectsPageState extends State<ProjectsPage> {
   @override
   Widget build(BuildContext context) {
     final projects = _projects;
-    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
@@ -130,29 +128,11 @@ class _ProjectsPageState extends State<ProjectsPage> {
               : projects.isEmpty
               ? Padding(
                   padding: const EdgeInsets.all(32),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const FileToolIcon(type: FileToolIconType.folder),
-                      const SizedBox(height: 16),
-                      const Text(
-                        '还没有项目',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '项目会把工作目录和相关会话放在一起。',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      WidgetUtils.primaryButton(text: '添加项目', onPressed: _add),
-                    ],
+                  child: EmptyDataView(
+                    title: '还没有项目',
+                    description: '项目会把工作目录和相关会话放在一起。',
+                    actionText: '添加项目',
+                    onAction: _add,
                   ),
                 )
               : ListView.separated(

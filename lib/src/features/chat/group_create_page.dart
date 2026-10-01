@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
@@ -479,7 +480,7 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
                             _members.isEmpty)
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 16),
-                            child: Text('暂无成员，点击右上方＋添加'),
+                            child: EmptyDataView(title: '暂无成员，点击右上方＋添加'),
                           ),
                       ],
                     ),

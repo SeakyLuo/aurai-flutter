@@ -1,4 +1,5 @@
 import 'group_announcement_banner.dart';
+import 'group_mute_builder.dart';
 import 'send_favorite_page.dart';
 import 'asset_library_page.dart';
 import '../../domain/library_asset.dart';
@@ -57,6 +58,7 @@ part 'chat_search_navigation.dart';
 part 'chat_quoting.dart';
 part 'chat_branching.dart';
 part 'chat_message_submission.dart';
+part 'chat_composer.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({
@@ -335,98 +337,7 @@ class _ChatPageState extends State<ChatPage>
                             onEdit: _editing == null && !controller.addingImages
                                 ? _editQueuedMessage
                                 : null,
-                            child: ChatComposer(
-                              controller: _textController,
-                              hintText: _editing != null
-                                  ? '编辑消息'
-                                  : isGroup
-                                  ? ''
-                                  : '回复 ${controller.activeAi!.sender.name}',
-                              quote: _editing != null
-                                  ? _editing!.message.quote
-                                  : controller.activeConversation.draftQuote,
-                              onCancelQuote: _editing == null
-                                  ? () => _quoteMessage(null)
-                                  : null,
-                              focusNode: _focusNode,
-                              queueing:
-                                  !isGroup &&
-                                  controller.shouldQueuePrivateMessage,
-                              savingEdit: _editing?.saving == true,
-                              submitting: controller.isSubmitting,
-                              draftEnabled: _editing != null
-                                  ? !_editing!.saving
-                                  : controller.canEditDraft &&
-                                        !_preparingGoal &&
-                                        !controller.creatingConversationBranch,
-                              enabled: controller.creatingConversationBranch
-                                  ? false
-                                  : isGroup
-                                  ? true
-                                  : _editing != null
-                                  ? !_editing!.saving
-                                  : !controller.isBusy ||
-                                        _canSend ||
-                                        controller.draftImages.isNotEmpty ||
-                                        controller.draftFiles.isNotEmpty,
-                              canSend:
-                                  !controller.pendingMessageQueue.busy &&
-                                  (_canSend ||
-                                      (_editing?.images ??
-                                              controller.draftImages)
-                                          .isNotEmpty ||
-                                      (_editing?.files ?? controller.draftFiles)
-                                          .isNotEmpty),
-                              images:
-                                  _editing?.images ?? controller.draftImages,
-                              files: _editing?.files ?? controller.draftFiles,
-                              onRemoveFile: (file) async {
-                                if (_editing != null) {
-                                  _updateEditing(
-                                    () => _editing!.files.remove(file),
-                                  );
-                                  return;
-                                }
-                                try {
-                                  await controller.removeDraftFile(file);
-                                } on Object catch (error) {
-                                  if (mounted)
-                                    _imageNotice(
-                                      '附件移除失败，请重试：${errorMessage(error)}',
-                                    );
-                                }
-                              },
-                              addingImages:
-                                  controller.addingImages ||
-                                  _editing?.picking == true,
-                              onAddImages: _editing != null
-                                  ? _addEditImages
-                                  : _addImages,
-                              onRemoveImage: _editing != null
-                                  ? _removeEditImage
-                                  : _removeImage,
-                              stopping:
-                                  controller.runState == ChatRunState.stopping,
-                              onSend: _editing != null
-                                  ? _submitMessageEdit
-                                  : _send,
-                              canResume:
-                                  !isGroup &&
-                                  !_preparingGoal &&
-                                  !controller.isBusy &&
-                                  _editing == null &&
-                                  controller
-                                      .pendingMessageQueue
-                                      .messages
-                                      .isEmpty &&
-                                  (controller.runState ==
-                                          ChatRunState.cancelled ||
-                                      controller.runState ==
-                                          ChatRunState.idle) &&
-                                  controller.pendingGoal != null,
-                              onResume: _continuePending,
-                              onStop: _stop,
-                            ),
+                            child: _buildChatComposer(isGroup),
                           ),
                         ),
                       ),

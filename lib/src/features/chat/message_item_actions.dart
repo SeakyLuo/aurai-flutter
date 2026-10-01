@@ -241,11 +241,12 @@ extension _MessageItemActions on _MessageItemState {
       case MessageAction.quote:
         widget.onQuote?.call(snapshot);
       case MessageAction.copy:
-        await _copy(context, snapshot.text);
+        await _copy(context, _copyableText(snapshot.text));
       case MessageAction.select:
         await Navigator.of(context).push<void>(
           MaterialPageRoute(
-            builder: (_) => MessageTextSelectionPage(text: snapshot.text),
+            builder: (_) =>
+                MessageTextSelectionPage(text: _copyableText(snapshot.text)),
           ),
         );
       case MessageAction.edit:

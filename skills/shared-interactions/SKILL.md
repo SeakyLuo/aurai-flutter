@@ -1,11 +1,11 @@
 ---
 name: shared-interactions
-description: 在 Aurai 中设计、创建和参与持续交互卡片。适用于多人投票、报名选择、隐藏出招、答题计分及多轮协作；用共享状态、提交、结算规则和视图组合玩法。
+description: 交互消息工具使用指南。介绍 sendInteractiveMessage、readInteractiveMessage、clickInteractiveMessage 和 updateInteractiveMessage 的复杂用法；不提供独立执行能力。
 ---
 
-# 共享交互消息
+# 交互消息工具使用指南
 
-这是 Aurai 技能库中的公共使用指南，供人和 AI 协作维护。阅读后直接调用交互消息工具；不需要运行技能脚本。工具的参数 schema 是当前版本能力的依据。
+这是交互消息工具的公共参考资料，不是独立能力。创建、读取、参与和更新交互消息时，直接调用 `sendInteractiveMessage`、`readInteractiveMessage`、`clickInteractiveMessage` 和 `updateInteractiveMessage`；只有复杂规则或多人玩法需要示例时才读取本指南。这里没有需要运行的技能脚本，工具的参数 schema 始终是当前版本能力的依据。
 
 ## 如何选择场景
 

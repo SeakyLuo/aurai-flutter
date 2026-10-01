@@ -38,6 +38,13 @@ extension MessageCallbackActions on ChatController {
         limit: 32,
       );
       if (rows.isEmpty) {
+        final expiry = await MessageCallbacks(_store.database).nextMuteExpiry();
+        _callbackMuteExpiry?.cancel();
+        if (expiry != null && !_callbacksDisposed) {
+          _callbackMuteExpiry = Timer(expiry.difference(DateTime.now()), () {
+            MessageCallbacks.changes.add(null);
+          });
+        }
         if (generation == _callbackGeneration) _callbacksPending = false;
         return generation != _callbackGeneration;
       }

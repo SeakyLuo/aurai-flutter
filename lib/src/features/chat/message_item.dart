@@ -15,6 +15,7 @@ import 'forwarded_interactive_message.dart';
 import '../../storage/interactive_action_history.dart';
 import 'interactive_message_paging.dart';
 import '../../domain/message_sender.dart';
+import '../../domain/markdown_plain_text.dart';
 import 'interactive_history_page.dart';
 import '../../domain/interactive_message.dart';
 import 'interactive_statistics_sheet.dart';
@@ -60,6 +61,7 @@ class MessageItem extends StatefulWidget {
     required this.message,
     required this.onEdit,
     this.replyPart,
+    this.trailingActivities,
     this.streaming = false,
     this.readOnly = false,
     this.groupBubble = false,
@@ -80,6 +82,7 @@ class MessageItem extends StatefulWidget {
   });
   final AgentMessage message;
   final PrivateReplyPart? replyPart;
+  final Widget? trailingActivities;
   final Map<String, String> mentionMembers;
   final Future<InteractiveClickResult?> Function(
     String buttonId,
@@ -154,7 +157,7 @@ class _MessageItemState extends State<MessageItem> {
 
   @override
   Widget build(BuildContext context) =>
-      message.interactive?.canView('user:local') == false
+      !message.canView('user:local')
       ? const SizedBox.shrink()
       : ImageMessageScope(
           messageId: message.id,
@@ -214,6 +217,7 @@ class _MessageItemState extends State<MessageItem> {
                     : widget.replyPart!.gitChanges)
                 case final gitChanges?)
               GitTaskChangesView(changes: gitChanges),
+            if (widget.trailingActivities case final activities?) activities,
             if (message.quickReplies.isNotEmpty)
               this._buildQuickReplies(context),
             if (!widget.readOnly &&
@@ -227,8 +231,16 @@ class _MessageItemState extends State<MessageItem> {
                 onMore: message.htmlGame == null
                     ? () => _openActions(compactMenu: true)
                     : null,
-                onCopy: () =>
-                    _copy(context, _selectedText ?? widget.replyPart?.copyText),
+                onCopy: () {
+                  final selectedText = _selectedText;
+                  _copy(
+                    context,
+                    selectedText ??
+                        _copyableText(
+                          widget.replyPart?.copyText ?? message.text,
+                        ),
+                  );
+                },
                 onQuote: widget.onQuote == null
                     ? null
                     : () =>
@@ -664,6 +676,10 @@ class _MessageItemState extends State<MessageItem> {
       if (context.mounted) _notice(context, '复制失败，请重试：${errorMessage(error)}');
     }
   }
+
+  String _copyableText(String text) => message.role == AgentMessageRole.user
+      ? memberMentionsPlainText(text)
+      : markdownPlainText(text);
 
   Future<void> _openLink(BuildContext context, String? href) async {
     final memberLink = Uri.tryParse(href ?? '');

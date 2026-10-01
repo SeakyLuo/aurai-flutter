@@ -1,3 +1,4 @@
+import 'private_goal_panel.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/glass_notice.dart';
@@ -8,6 +9,7 @@ import 'pending_queue_icon.dart';
 import 'image_attachments.dart';
 import 'header_action_menu.dart';
 import 'conversation_menu_icon.dart';
+import 'composer_more_action.dart';
 
 class PendingMessagePanel extends StatefulWidget {
   const PendingMessagePanel({
@@ -30,7 +32,13 @@ class _PendingMessagePanelState extends State<PendingMessagePanel> {
   Object? _shownError;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => PrivateGoalPanel(
+    store: widget.controller.privateTaskState,
+    controller: widget.controller,
+    builder: (context, header) => _buildPanel(context, header),
+  );
+
+  Widget _buildPanel(BuildContext context, Widget? header) {
     final queue = widget.controller.pendingMessageQueue;
     if (queue.error != null && !identical(_shownError, queue.error)) {
       _shownError = queue.error;
@@ -43,7 +51,7 @@ class _PendingMessagePanelState extends State<PendingMessagePanel> {
         }
       });
     }
-    if (queue.messages.isEmpty) return widget.child;
+    if (queue.messages.isEmpty && header == null) return widget.child;
     final colors = Theme.of(context).colorScheme;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -68,80 +76,86 @@ class _PendingMessagePanelState extends State<PendingMessagePanel> {
                       child: SizedBox.expand(),
                     ),
                   ),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight:
-                          ((MediaQuery.sizeOf(context).height -
-                                      MediaQuery.viewInsetsOf(context).bottom) *
-                                  .2)
-                              .clamp(48.0, 144.0),
-                    ),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      // The composer contributes the matching 8 px below this list.
-                      padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
-                      itemCount: queue.messages.length,
-                      itemBuilder: (context, index) {
-                        final message = queue.messages[index];
-                        final preview = [
-                          if (message.text.isNotEmpty) message.text,
-                          ...message.files.map((file) => file.name),
-                          if (message.quote != null)
-                            '引用：${message.quote!.text}',
-                        ].join(' · ');
-                        return Padding(
-                          key: ValueKey(message.id),
-                          padding: EdgeInsets.only(
-                            bottom: index == queue.messages.length - 1 ? 0 : 6,
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (header != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 12, 0),
+                          child: header,
+                        ),
+                      if (queue.messages.isNotEmpty)
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight:
+                                ((MediaQuery.sizeOf(context).height -
+                                            MediaQuery.viewInsetsOf(
+                                              context,
+                                            ).bottom) *
+                                        .2)
+                                    .clamp(48.0, 144.0),
                           ),
-                          child: Row(
-                            children: [
-                              PendingQueueIcon(color: colors.onSurfaceVariant),
-                              const SizedBox(width: 10),
-                              if (message.images.isNotEmpty) ...[
-                                ImageAttachment(
-                                  image: message.images.first,
-                                  gallery: message.images,
-                                  size: 32,
-                                  borderRadius: 6,
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            // The composer contributes the matching 8 px below this list.
+                            padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
+                            itemCount: queue.messages.length,
+                            itemBuilder: (context, index) {
+                              final message = queue.messages[index];
+                              final preview = [
+                                if (message.text.isNotEmpty) message.text,
+                                ...message.files.map((file) => file.name),
+                                if (message.quote != null)
+                                  '引用：${message.quote!.text}',
+                              ].join(' · ');
+                              return Padding(
+                                key: ValueKey(message.id),
+                                padding: EdgeInsets.only(
+                                  bottom: index == queue.messages.length - 1
+                                      ? 0
+                                      : 6,
                                 ),
-                                const SizedBox(width: 10),
-                              ],
-                              Expanded(
-                                child: Text(
-                                  preview,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: colors.onSurface,
-                                  ),
+                                child: Row(
+                                  children: [
+                                    PendingQueueIcon(
+                                      color: colors.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    if (message.images.isNotEmpty) ...[
+                                      ImageAttachment(
+                                        image: message.images.first,
+                                        gallery: message.images,
+                                        size: 32,
+                                        borderRadius: 6,
+                                      ),
+                                      const SizedBox(width: 10),
+                                    ],
+                                    Expanded(
+                                      child: Text(
+                                        preview,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: colors.onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                    Builder(
+                                      builder: (anchor) => ComposerMoreAction(
+                                        label: '更多',
+                                        onPressed: queue.busy
+                                            ? null
+                                            : () => _more(anchor, message.id),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                              Builder(
-                                builder: (anchor) => IconButton(
-                                  style: IconButton.styleFrom(
-                                    minimumSize: const Size(40, 32),
-                                    maximumSize: const Size(40, 32),
-                                    padding: EdgeInsets.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  tooltip: '更多',
-                                  icon: const Icon(
-                                    Icons.more_vert_rounded,
-                                    size: 20,
-                                  ),
-                                  onPressed: queue.busy
-                                      ? null
-                                      : () => _more(anchor, message.id),
-                                ),
-                              ),
-                            ],
+                              );
+                            },
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                    ],
                   ),
                 ],
               ),

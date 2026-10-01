@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -457,14 +458,7 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
           : widget.trash
           ? '回收站为空'
           : '还没有${_type.label}';
-      return Center(
-        child: Text(
-          label,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-      );
+      return Center(child: EmptyDataView(title: label));
     }
     final grid = _grid ?? _type == AssetType.image;
     return CustomScrollView(

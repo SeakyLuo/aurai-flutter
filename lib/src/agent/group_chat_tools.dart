@@ -208,7 +208,10 @@ class GroupChatTool
         );
         if (rows.isEmpty) throw StateError('未找到群聊，请先查询群聊列表');
         if (operation == 'read') {
-          final members = await store.members(id);
+          final (members, muted) = await (
+            store.members(id),
+            store.mutedMembers(id),
+          ).wait;
           output = {
             ...rows.single,
             'members': [
@@ -218,6 +221,13 @@ class GroupChatTool
                   'name': m.sender.name,
                   'kind': m.sender.kind.name,
                   'role': m.role.name,
+                  'muted': muted.containsKey(m.sender.id),
+                  'muteType': !muted.containsKey(m.sender.id)
+                      ? 'none'
+                      : muted[m.sender.id]!.until == null
+                      ? 'permanent'
+                      : 'until',
+                  'mutedUntil': muted[m.sender.id]?.until?.toIso8601String(),
                   'archived': m.sender.archived,
                 },
             ],

@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'dart:async';
 import 'retained_tab_view.dart';
 import 'search_skeleton.dart';
@@ -246,14 +247,7 @@ class _StarredMessageListState extends State<_StarredMessageList> {
         )
       : AnimatedEntryList(
           controller: _scroll,
-          empty: Center(
-            child: Text(
-              '还没有收藏的消息',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
+          empty: Center(child: EmptyDataView(title: '还没有收藏的消息')),
           padding: EdgeInsets.fromLTRB(
             0,
             settingsHeaderHeight(context) + 16,

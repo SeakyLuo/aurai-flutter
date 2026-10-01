@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 import '../../app/ui_action.dart';
 import '../../app/glass_notice.dart';
@@ -262,17 +263,10 @@ class _ProjectWorktreesPageState extends State<ProjectWorktreesPage> {
                             vertical: 32,
                             horizontal: 16,
                           ),
-                          child: Text(
-                            canCreate
+                          child: EmptyDataView(
+                            title: canCreate
                                 ? '还没有工作树，点击右上角创建'
                                 : '此目录尚无 Git 提交，提交后可创建工作树',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
                           ),
                         ),
                       for (final item in items.cast<Map>())

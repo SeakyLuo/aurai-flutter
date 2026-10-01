@@ -213,6 +213,7 @@ extension MessageQuickReplies on ChatController {
         MessageQuote(
             messageId: source.id,
             senderId: source.senderId,
+            audience: source.audience,
             text: [
               if (source.images.isNotEmpty) '[图片]',
               for (final file in source.files) '[文件] ${file.name}',
@@ -229,6 +230,7 @@ extension MessageQuickReplies on ChatController {
       senderId: MessageSender.localUser.id,
       text: text,
       quote: quote,
+      audience: source.audience,
       quickReplyToId: source.id,
       quickReplyKey: key,
       createdAt: DateTime.now(),
@@ -346,11 +348,17 @@ extension MessageQuickReplies on ChatController {
       for (final row in senderRows)
         row['id'] as String: MessageSender.fromRow(row),
     };
+    final metadata = rows.single['interactive_json'] as String?;
+    final audience = metadata == null
+        ? null
+        : ((jsonDecode(metadata) as Map)['participation'] as Map)['audience']
+              as List?;
     final message = AgentMessage(
       id: newMessageId(),
       role: AgentMessageRole.assistant,
       senderId: actor,
       sender: senders[actor]!,
+      audience: audience?.cast<String>(),
       text: text,
       createdAt: DateTime.now(),
       quickReplyToId: sourceId,
@@ -358,6 +366,7 @@ extension MessageQuickReplies on ChatController {
       quote: MessageQuote(
         messageId: sourceId,
         senderId: rows.single['sender_id'] as String,
+        audience: audience?.cast<String>(),
         text: String.fromCharCodes(
           (rows.single['text'] as String).runes.take(1000),
         ),

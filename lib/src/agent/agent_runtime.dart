@@ -75,12 +75,14 @@ class AgentRuntime {
           );
         }
         if (updates.isNotEmpty) onStepsChanged(List.unmodifiable(steps));
+        var goalActiveAtTurnStart = false;
         if (task != null) {
           final state = await task.read();
           if (state['status'] == 'active') {
-            await task.change(
-              (state) => state['turns'] = (state['turns'] as int) + 1,
-            );
+            final problem = await task.budgetProblem();
+            if (problem != null) throw ModelProviderException(problem);
+            goalActiveAtTurnStart = true;
+            await task.beginTurn();
           }
         }
         await onTurnStarted?.call();
@@ -130,7 +132,15 @@ class AgentRuntime {
           onTextChanged?.call(modelTurn.text!);
         }
 
+        if (task != null && (await task.read())['runningSince'] != null) {
+          await task.change((_) {});
+        }
         await onTurnCompleted?.call(modelTurn);
+        if (goalActiveAtTurnStart) {
+          await task!.recordUsage(modelTurn.response['usage'] as Map?);
+          final problem = await task.budgetProblem();
+          if (problem != null) throw ModelProviderException(problem);
+        }
         if (modelTurn.response['status'] == 'failed') {
           throw ModelProviderException(
             '模型回复失败，已保留生成的内容，请重试',
@@ -169,6 +179,7 @@ class AgentRuntime {
           }
           if (questions != null &&
               (questions.hasPending || questions.hasUpdates)) {
+            await task?.stopClock();
             await questions.waitForPending();
             _throwIfCancelled();
             toolResults = const [];

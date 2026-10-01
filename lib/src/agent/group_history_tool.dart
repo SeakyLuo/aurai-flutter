@@ -1,4 +1,5 @@
 import '../domain/local_time.dart';
+import 'dart:convert';
 import '../domain/tool_models.dart';
 import '../storage/group_chat_store.dart';
 
@@ -61,7 +62,15 @@ class ReadGroupMessagesTool implements AgentTool, RuntimeCapabilityAgentTool {
       final query = (args['query'] as String).toLowerCase();
       final rows = await store.database.query(
         'messages',
-        columns: ['id', 'sender_id', 'role', 'kind', 'text', 'created_at'],
+        columns: [
+          'id',
+          'sender_id',
+          'role',
+          'kind',
+          'text',
+          'created_at',
+          "json_extract(interactive_json, '\$.participation.audience') AS audience",
+        ],
         where:
             "conversation_id = ? AND (interactive_json IS NULL OR json_extract(interactive_json, '\$.participation.audience') IS NULL OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = ?))${query.isEmpty ? '' : ' AND instr(lower(text), ?) > 0'}",
         whereArgs: [groupId, senderId, if (query.isNotEmpty) query],
@@ -92,11 +101,16 @@ class ReadGroupMessagesTool implements AgentTool, RuntimeCapabilityAgentTool {
             for (final row in page)
               {
                 ...row,
+                'audience': row['audience'] == null
+                    ? null
+                    : jsonDecode(row['audience'] as String),
                 'senderName': names[row['sender_id']],
-                'createdAt': localIsoTime(DateTime.fromMicrosecondsSinceEpoch(
-                  row['created_at'] as int,
-                  isUtc: true,
-                )),
+                'createdAt': localIsoTime(
+                  DateTime.fromMicrosecondsSinceEpoch(
+                    row['created_at'] as int,
+                    isUtc: true,
+                  ),
+                ),
               },
           ],
           'hasMore': rows.length > limit,

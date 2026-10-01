@@ -1,4 +1,7 @@
+import 'group_mute_schema.dart';
 import 'group_member_details.dart';
+import 'group_sleep_store.dart';
+import 'group_participation.dart';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'contact_relationships.dart';
@@ -12,6 +15,7 @@ import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
 
 part 'group_management_store.dart';
+part 'group_mute_store.dart';
 
 class GroupChatStore {
   GroupChatStore(this.database);
@@ -600,6 +604,7 @@ class GroupChatStore {
             row['joined_at'] as int,
           ),
           role: GroupMemberRole.values.byName(row['role'] as String),
+          mute: GroupMute.fromStored(row['muted_until'] as int),
           leftAt: row['left_at'] == null
               ? null
               : DateTime.fromMicrosecondsSinceEpoch(row['left_at'] as int),

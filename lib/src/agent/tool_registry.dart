@@ -47,10 +47,11 @@ class ToolRegistry {
             tool.name == 'hideThinking' ||
             const [
               'createGoal',
-              'createPlan',
+              'createTaskList',
               'getGoal',
+              'getTaskList',
               'updateGoal',
-              'updatePlan',
+              'updateTaskList',
             ].contains(tool.name) ||
             _loaded.contains(tool.name) ||
             _retained.contains(tool.name),

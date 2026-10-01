@@ -1,4 +1,5 @@
 import 'group_member_header_actions.dart';
+import 'group_mute_settings_page.dart';
 import 'glass_surface.dart';
 import 'header_action_menu.dart';
 import '../../app/glass_notice.dart';
@@ -16,6 +17,8 @@ import 'thinking_indicator.dart';
 import '../../app/ui_action.dart';
 import '../../domain/message_sender.dart';
 import 'settings_icon.dart';
+
+part 'group_thought_details.dart';
 
 Future<void> showGroupActivitySheet(
   BuildContext context, {
@@ -117,6 +120,14 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                       items: [
                         if (onRemove != null)
                           (
+                            value: 'mute',
+                            label: '禁言设置',
+                            icon: const SettingsIcon(
+                              type: SettingsIconType.permission,
+                            ),
+                          ),
+                        if (onRemove != null)
+                          (
                             value: 'remove',
                             label: '移除成员',
                             icon: const SettingsIcon(
@@ -142,6 +153,18 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                     );
                     if (!mounted) return;
                     if (action == 'remove') onRemove?.call();
+                    if (action == 'mute') {
+                      await Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => GroupMuteSettingsPage(
+                            controller: widget.controller,
+                            groupId: widget.conversationId,
+                          ),
+                        ),
+                      );
+                      if (mounted) setState(() => _membersRevision++);
+                    }
                     if (action == 'stop') await _stopAll();
                     if (action == 'wake') await _wakeAll();
                     if (action == 'resume') await _resumeAll();
@@ -209,9 +232,8 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
           controller: widget.controller,
           conversationId: widget.conversationId,
           activity: activity,
-          sleepReason: rows.isEmpty
-              ? '本次睡眠未记录原因'
-              : rows.single['value'] as String,
+          reasonTitle: '睡眠原因',
+          reason: rows.isEmpty ? '本次睡眠未记录原因' : rows.single['value'] as String,
         ),
       );
     } on Object catch (error) {
@@ -221,6 +243,21 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       );
     }
   }
+
+  Future<void> _openPauseDetails(GroupMemberActivity activity) =>
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: false,
+        builder: (_) => _GroupThoughtDetails(
+          controller: widget.controller,
+          conversationId: widget.conversationId,
+          activity: activity,
+          reasonTitle: '关闭接话原因',
+          reason: activity.autoReplyPauseReason!,
+        ),
+      );
 
   Future<void> _openDetails(GroupMemberActivity activity) =>
       showModalBottomSheet<void>(
@@ -285,6 +322,9 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
           '${until.hour.toString().padLeft(2, '0')}:${until.minute.toString().padLeft(2, '0')}:${until.second.toString().padLeft(2, '0')}';
       description = '睡眠中 · 预计 $time 唤醒';
     }
+    if (activity.isMuted) {
+      description = '已${activity.mute!.description}';
+    }
     return Padding(
       key: ValueKey(activity.sender.id),
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -301,6 +341,9 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                   ? () => _openDetails(activity)
                   : activity.sleeping
                   ? () => _openSleepDetails(activity)
+                  : activity.autoReplyPaused &&
+                        activity.autoReplyPauseReason!.isNotEmpty
+                  ? () => _openPauseDetails(activity)
                   : null,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -332,14 +375,22 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                         color: colors.onSurfaceVariant,
                       ),
                     ),
-                  if (running && activity.autoReplyPaused)
-                    Text(
-                      '自动接话已关闭 · ${activity.autoReplyPauseReason}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colors.onSurfaceVariant,
+                  if (running && activity.autoReplyPaused && !activity.isMuted)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: activity.autoReplyPauseReason!.isEmpty
+                          ? null
+                          : () => _openPauseDetails(activity),
+                      child: Text(
+                        activity.autoReplyPauseReason!.isEmpty
+                            ? '自动接话已关闭'
+                            : '自动接话已关闭 · ${activity.autoReplyPauseReason}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colors.onSurfaceVariant,
+                        ),
                       ),
                     ),
                 ],
@@ -347,7 +398,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
             ),
           ),
           const SizedBox(width: 8),
-          if (activity.autoReplyPaused)
+          if (activity.autoReplyPaused && !activity.isMuted)
             SettingsGlassAction(
               label: _resuming.contains(activity.sender.id) ? '恢复中' : '恢复接话',
               icon: Icons.play_arrow_rounded,
@@ -373,7 +424,9 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
               conversationId: widget.conversationId,
               activity: activity,
             )
-          else if (activity.sleeping && !activity.autoReplyPaused)
+          else if (activity.sleeping &&
+              !activity.autoReplyPaused &&
+              !activity.isMuted)
             SettingsGlassAction(
               label: _waking.contains(activity.sender.id) ? '唤醒中' : '唤醒',
               icon: Icons.play_arrow_rounded,
@@ -466,167 +519,6 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
         onBack: () => Navigator.pop(context),
       ),
       body: SettingsPageBody(child: SafeArea(top: false, child: content)),
-    );
-  }
-}
-
-class _GroupThoughtDetails extends StatefulWidget {
-  const _GroupThoughtDetails({
-    required this.controller,
-    required this.conversationId,
-    required this.activity,
-    this.sleepReason,
-  });
-  final ChatController controller;
-  final String conversationId;
-  final GroupMemberActivity activity;
-  final String? sleepReason;
-
-  @override
-  State<_GroupThoughtDetails> createState() => _GroupThoughtDetailsState();
-}
-
-class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
-  final _scroll = ScrollController();
-  late GroupMemberActivity _activity = widget.activity;
-  late final _updates = Listenable.merge([
-    widget.controller,
-    widget.controller.groupActivityChanges,
-    widget.controller.groupSleepChanges,
-  ]);
-  bool _running = true;
-  bool _showJumpToBottom = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _scroll.addListener(_updateJumpButton);
-    _updates.addListener(_sync);
-    _sync();
-  }
-
-  void _sync() {
-    final current = widget.controller
-        .groupActivitiesFor(widget.conversationId)
-        .where((activity) => activity.runId == widget.activity.runId)
-        .firstOrNull;
-    final follow = !_scroll.hasClients || _scroll.position.extentAfter < 48;
-    setState(() {
-      _running = current != null;
-      if (current != null) _activity = current;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scroll.hasClients) return;
-      if (follow) _scroll.jumpTo(_scroll.position.maxScrollExtent);
-      _updateJumpButton();
-    });
-  }
-
-  void _updateJumpButton() {
-    final threshold = _showJumpToBottom ? 120.0 : 160.0;
-    final show = _scroll.position.extentAfter > threshold;
-    if (show != _showJumpToBottom) {
-      setState(() => _showJumpToBottom = show);
-    }
-  }
-
-  void _jumpToBottom() {
-    _scroll.jumpTo(_scroll.position.maxScrollExtent);
-  }
-
-  @override
-  void dispose() {
-    _updates.removeListener(_sync);
-    _scroll.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return SizedBox(
-      height: MediaQuery.sizeOf(context).height * .8,
-      child: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            _ActivitySheetHeader(
-              title: _activity.sender.name,
-              avatar: Semantics(
-                button: true,
-                label: '查看${_activity.sender.name}的资料',
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(
-                      builder: (_) => AiContactPage(
-                        controller: widget.controller,
-                        senderId: _activity.sender.id,
-                        groupId: widget.conversationId,
-                      ),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: MemberAvatar(sender: _activity.sender, size: 24),
-                  ),
-                ),
-              ),
-              trailing: _running
-                  ? _StopMemberButton(
-                      controller: widget.controller,
-                      conversationId: widget.conversationId,
-                      activity: _activity,
-                    )
-                  : null,
-            ),
-            Expanded(
-              child: ScrollAwareJumpStack(
-                fit: StackFit.expand,
-                children: [
-                  ListView(
-                    controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-                    children: [
-                      if (widget.sleepReason != null) ...[
-                        const Text(
-                          '睡眠原因',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SelectableText(
-                          widget.sleepReason!,
-                          style: const TextStyle(fontSize: 15, height: 1.65),
-                        ),
-                      ],
-                      if (_activity.thoughts.isNotEmpty)
-                        SelectableText(
-                          _activity.thoughts.join('\n\n'),
-                          style: TextStyle(
-                            fontSize: 15,
-                            height: 1.65,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                    ],
-                  ),
-                  if (_showJumpToBottom)
-                    Positioned(
-                      right: 16,
-                      bottom: 8,
-                      child: Center(
-                        child: JumpToBottomButton(onPressed: _jumpToBottom),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -29,16 +29,19 @@ class AgentMessage {
     this.isReasoning = false,
     this.isRichReply = false,
     this.quote,
-    this.interactive,
+    InteractiveMessage? interactive,
+    List<String>? audience,
     this.htmlGame,
     this.quickReplyToId,
     this.quickReplyKey,
     this.quickReplies = const [],
-  });
+  }) : _interactive = interactive,
+       _audience = audience;
 
   AgentMessage withSender(
     MessageSender? value, {
     InteractiveMessage? interactive,
+    MessageQuote? quote,
   }) => AgentMessage(
     id: id,
     role: role,
@@ -47,7 +50,7 @@ class AgentMessage {
     text: interactive == null
         ? text
         : '${interactive.title}\n${interactive.body}',
-    interactive: interactive ?? this.interactive,
+    interactive: interactive ?? messageMetadata,
     htmlGame: htmlGame,
     createdAt: createdAt,
     images: images,
@@ -61,7 +64,7 @@ class AgentMessage {
     isGroupMessage: isGroupMessage,
     isReasoning: isReasoning,
     isRichReply: isRichReply,
-    quote: quote,
+    quote: quote ?? this.quote,
     quickReplyToId: quickReplyToId,
     quickReplyKey: quickReplyKey,
     quickReplies: quickReplies,
@@ -73,7 +76,7 @@ class AgentMessage {
     senderId: senderId,
     sender: sender,
     text: text,
-    interactive: interactive,
+    interactive: messageMetadata,
     htmlGame: htmlGame,
     createdAt: createdAt,
     images: images,
@@ -117,7 +120,7 @@ class AgentMessage {
             ...interactive!.toJson(includeParticipants: true),
             'title': value,
           })
-        : interactive,
+        : messageMetadata,
     htmlGame: htmlGame,
     quickReplyToId: quickReplyToId,
     quickReplyKey: quickReplyKey,
@@ -125,7 +128,27 @@ class AgentMessage {
   );
 
   final HtmlGameCard? htmlGame;
-  final InteractiveMessage? interactive;
+  final InteractiveMessage? _interactive;
+  final List<String>? _audience;
+  List<String>? get audience =>
+      _audience ??
+      (_interactive?.participation['audience'] as List?)?.cast<String>();
+  bool canView(String viewer) => audience == null || audience!.contains(viewer);
+  InteractiveMessage? get interactive =>
+      _interactive?.participation['presentation'] == 'message'
+      ? null
+      : _interactive;
+  InteractiveMessage? get messageMetadata =>
+      _interactive ??
+      (_audience == null
+          ? null
+          : InteractiveMessage(
+              revision: 1,
+              title: '',
+              body: '',
+              buttons: const [],
+              participation: {'audience': _audience, 'presentation': 'message'},
+            ));
   final MessageQuote? quote;
   final bool isSystem;
   final bool isFailure;
@@ -153,7 +176,7 @@ class AgentMessage {
     'id': id,
     'role': role.name,
     'senderId': senderId,
-    if (interactive != null) 'interactive': interactive!.toJson(),
+    if (messageMetadata != null) 'interactive': messageMetadata!.toJson(),
     if (htmlGame != null) 'htmlGameTitle': htmlGame!.title,
     if (quote != null) 'quote': quote!.toJson(),
     if (isSystem) 'isSystem': true,
@@ -452,10 +475,11 @@ String toolTitle(String name) =>
 
 String _defaultToolTitle(String name) => switch (name) {
   'createGoal' => '建立目标',
-  'createPlan' => '建立执行计划',
-  'getGoal' => '查看目标与计划',
+  'createTaskList' => '建立任务清单',
+  'getGoal' => '查看目标',
+  'getTaskList' => '查看任务清单',
   'updateGoal' => '更新目标状态',
-  'updatePlan' => '更新执行计划',
+  'updateTaskList' => '更新任务清单',
   'readMyProfile' => '读取自己的资料',
   'updateMyProfile' => '更新自己的资料',
   'listHtmlApps' => '查找小程序',
@@ -501,6 +525,7 @@ String _defaultToolTitle(String name) => switch (name) {
   'openModelConfiguration' => '打开模型设置',
   'sendGroupMessage' => '发送群消息',
   'wakeGroupMember' => '唤醒群成员',
+  'setGroupMemberMute' => '设置成员禁言',
   'pauseGroupAutoReply' => '暂停成员自动接话',
   'resumeGroupAutoReply' => '恢复成员自动接话',
   'sleepGroupChat' => '稍后查看群聊',

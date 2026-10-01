@@ -1,3 +1,4 @@
+import '../widgets/empty_data_view.dart';
 import 'miniapp_recent_page.dart';
 import 'miniapp_launcher.dart';
 import '../features/chat/settings_icon.dart';
@@ -371,8 +372,8 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
                           Padding(
                             padding: const EdgeInsets.all(32),
                             child: Center(
-                              child: Text(
-                                query.isEmpty ? '暂无已发布的小程序' : '没有匹配的小程序',
+                              child: EmptyDataView(
+                                title: query.isEmpty ? '暂无已发布的小程序' : '没有匹配的小程序',
                               ),
                             ),
                           ),

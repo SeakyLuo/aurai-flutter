@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'retained_tab_view.dart';
 import 'animated_entry_list.dart';
 import '../../app/glass_notice.dart';
@@ -106,7 +107,6 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
@@ -141,12 +141,7 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
                           MediaQuery.paddingOf(context).top +
                           SettingsAppBar.toolbarHeight,
                     ),
-                    child: Center(
-                      child: Text(
-                        '没有已归档会话',
-                        style: TextStyle(color: colors.onSurfaceVariant),
-                      ),
-                    ),
+                    child: Center(child: EmptyDataView(title: '没有已归档会话')),
                   ),
                   padding: EdgeInsets.fromLTRB(
                     12,

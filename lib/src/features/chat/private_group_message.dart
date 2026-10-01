@@ -30,7 +30,9 @@ extension PrivateGroupMessage on ChatController {
         return {'sent': false, 'participation': participation, 'groupId': id};
       return _changePrivateGroupParticipation(arguments, senderId);
     }
+    if (isGroup) await groupStore.requireCanSpeak(id, senderId);
     final images = item['_images'] as List<MessageImage>;
+    final audience = _messageAudience(item, senders.keys, senderId);
     final files = item['_files'] as List<MessageFile>? ?? const <MessageFile>[];
     final text = (item['text'] as String).trim();
     if (text.length > 20000) throw ArgumentError('消息文字不能超过 20000 字');
@@ -43,16 +45,23 @@ extension PrivateGroupMessage on ChatController {
     if (quoteId != null) {
       final sources = await _store.database.query(
         'messages',
-        columns: ['id', 'sender_id', 'text'],
+        columns: ['id', 'sender_id', 'text', 'interactive_json'],
         where: 'id = ? AND conversation_id = ?',
         whereArgs: [quoteId, id],
         limit: 1,
       );
       if (sources.isEmpty) throw ArgumentError('引用消息必须来自目标会话');
       final source = sources.single;
+      final metadata = source['interactive_json'] as String?;
+      final sourceAudience = metadata == null
+          ? null
+          : ((jsonDecode(metadata) as Map)['participation'] as Map)['audience']
+                as List?;
+      _checkQuoteAudience(sourceAudience?.cast<String>(), senderId);
       quote = MessageQuote(
         messageId: quoteId,
         senderId: source['sender_id'] as String,
+        audience: sourceAudience?.cast<String>(),
         text: source['text'] as String,
       );
       final authors = await _store.database.query(
@@ -95,6 +104,7 @@ extension PrivateGroupMessage on ChatController {
       role: AgentMessageRole.assistant,
       senderId: senderId,
       sender: senders[senderId]!,
+      audience: audience,
       isGroupMessage: isGroup,
       runId: inlineRunId,
       isRichReply: inlineRunId != null,

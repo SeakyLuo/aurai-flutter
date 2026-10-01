@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'animated_entry_list.dart';
 import '../../app/glass_notice.dart';
 import 'conversation_list_skeleton.dart';
@@ -329,14 +330,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                 MediaQuery.paddingOf(context).bottom + 24,
               ),
               empty: widget.groupsOnly
-                  ? Center(
-                      child: Text(
-                        '暂无群聊',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    )
+                  ? Center(child: EmptyDataView(title: '暂无群聊'))
                   : Padding(
                       padding: EdgeInsets.fromLTRB(
                         12,

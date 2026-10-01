@@ -2,16 +2,14 @@ part of 'chat_controller.dart';
 
 extension GroupSystemEvents on ChatController {
   void _dispatchGroupNotice(GroupDispatcher dispatcher, AgentMessage notice) {
-    if (notice.interactive?.participation['audience'] == null) {
+    if (notice.audience == null) {
       dispatcher.receive([notice], mentions: _groupNoticeMentions([notice]));
     } else {
       dispatcher.receiveTargeted(
         [notice],
         {
           for (final id in _groupReplies.keys)
-            if (notice.interactive!.canView(id) &&
-                !dispatcher.paused.contains(id))
-              id,
+            if (notice.canView(id) && !dispatcher.paused.contains(id)) id,
         },
       );
     }
@@ -22,6 +20,7 @@ extension GroupSystemEvents on ChatController {
       if (messages.any(
         (message) =>
             !message.isSystem &&
+            message.canView(entry.key) &&
             (message.text.contains(
                   '](aurai://member/${Uri.encodeComponent(entry.key)})',
                 ) ||
@@ -77,7 +76,13 @@ extension GroupSystemEvents on ChatController {
   }
 
   Future<void> _refreshGroupRoster(String groupId) async {
-    final profiles = await groupStore.groupProfiles(groupId);
+    final (profiles, muted) = await (
+      groupStore.groupProfiles(groupId),
+      groupStore.mutedMembers(groupId),
+    ).wait;
+    _groupDispatcher?.mutedUntil
+      ?..clear()
+      ..addAll(muted);
     final retained = profiles.map((p) => p.sender.id).toSet();
     final removed = _groupReplies.keys
         .where((id) => !retained.contains(id))

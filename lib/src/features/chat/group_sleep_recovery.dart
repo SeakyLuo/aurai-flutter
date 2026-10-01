@@ -21,6 +21,9 @@ extension GroupSleepRecovery on ChatController {
     }
     if (!_groupSleeps.forGroup(conversationId).containsKey(senderId))
       return false;
+    if (members.firstWhere((m) => m.sender.id == senderId).isMuted) {
+      throw StateError('该成员已被禁言，不能唤醒');
+    }
     final actorName = senders[actorId]!.name;
     await _store.writer.flush();
     final notice = await _store.database.transaction(
@@ -60,6 +63,7 @@ extension GroupSleepRecovery on ChatController {
         .where(
           (member) =>
               member.sender.kind == MessageSenderKind.agent &&
+              !member.isMuted &&
               sleeping.containsKey(member.sender.id) &&
               !paused.contains(member.sender.id),
         )
@@ -101,6 +105,7 @@ extension GroupSleepRecovery on ChatController {
   ) async {
     if (dispatcher.stopped ||
         dispatcher.closed ||
+        dispatcher.isMuted(senderId) ||
         member.runState == ChatRunState.stopping)
       throw const AgentCancelled();
     final until = duration.isNegative ? null : DateTime.now().add(duration);

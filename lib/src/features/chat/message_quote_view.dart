@@ -22,7 +22,7 @@ class MessageQuoteView extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
+        onTap: quote.canView('user:local') ? onTap : null,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 9, 8, 9),
           child: Row(
@@ -52,7 +52,7 @@ class MessageQuoteView extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     QuoteTextPreview(
-                      text: quote.text,
+                      text: quote.textFor('user:local'),
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.35,

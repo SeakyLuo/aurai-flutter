@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../app/glass_notice.dart';
 import '../../app/ui_action.dart';
 import '../../platform/aurai_platform.dart';
+import '../../domain/live_project_changes.dart';
 import 'app_confirmation_dialog.dart';
 import 'delete_confirmation_dialog.dart';
 import 'git_diff_view.dart';
@@ -24,7 +26,8 @@ class ProjectGitChangesPage extends StatefulWidget {
     required this.projectId,
     required this.worktreeId,
     required this.worktreeName,
-  }) : taskId = null,
+  }) : additionalTasks = const [],
+       taskId = null,
        initialData = null;
 
   const ProjectGitChangesPage.task({
@@ -32,6 +35,7 @@ class ProjectGitChangesPage extends StatefulWidget {
     required this.projectId,
     required this.taskId,
     this.initialData,
+    this.additionalTasks = const [],
   }) : worktreeId = null,
        worktreeName = '本次任务';
 
@@ -40,6 +44,7 @@ class ProjectGitChangesPage extends StatefulWidget {
   final String? taskId;
   final String worktreeName;
   final Map<String, Object?>? initialData;
+  final List<LiveProjectChanges> additionalTasks;
 
   @override
   State<ProjectGitChangesPage> createState() => _ProjectGitChangesPageState();
@@ -69,6 +74,25 @@ class _ProjectGitChangesPageState extends State<ProjectGitChangesPage> {
   void initState() {
     super.initState();
     _data = widget.initialData;
+    if (widget.additionalTasks.isNotEmpty) {
+      final tasks = widget.additionalTasks;
+      _data = {
+        'available': true,
+        'live': true,
+        'addedLines': tasks.fold<int>(0, (sum, item) => sum + item.added),
+        'removedLines': tasks.fold<int>(0, (sum, item) => sum + item.removed),
+        'changes': [
+          for (final task in tasks)
+            for (final file in (task.data['changes'] as List).cast<Map>())
+              {
+                ...file,
+                'workspaceId': task.workspaceId,
+                'taskId': task.taskId,
+                'displayPath': '${task.name} · ${file['path']}',
+              },
+        ],
+      };
+    }
     if (_data == null) _load();
   }
 
@@ -85,7 +109,8 @@ class _ProjectGitChangesPageState extends State<ProjectGitChangesPage> {
       MaterialPageRoute(
         builder: (_) => ProjectGitFileDiffPage.load(
           path: change['path']! as String,
-          loader: () => _invoke(
+          loader: () => _fileInvoke(
+            change,
             _operation(
               'getProjectWorktreeFileDiff',
               'getProjectGitTaskFileDiff',
@@ -93,12 +118,29 @@ class _ProjectGitChangesPageState extends State<ProjectGitChangesPage> {
             {'path': change['path']},
           ),
           actionLabel: change['reverted'] == true ? '重做这个文件' : '撤销这个文件',
-          canAct: change['conflict'] != true,
+          canAct: _data?['live'] != true && change['conflict'] != true,
+          showActions: _data?['live'] != true,
           onAction: () => _restore(change, closeDetail: true),
         ),
       ),
     );
     if (restored == true && mounted) await _load();
+  }
+
+  Future<Map<String, Object?>> _fileInvoke(
+    Map<String, Object?> file,
+    String operation,
+    Map<String, Object?> arguments,
+  ) {
+    if (widget.additionalTasks.isEmpty) return _invoke(operation, arguments);
+    return AuraiPlatform.instance.deviceExtension(
+      'projectDevelopmentOperation',
+      {
+        'projectId': file['workspaceId'],
+        'operation': operation,
+        'arguments': {'taskId': file['taskId'], ...arguments},
+      },
+    );
   }
 
   Future<bool> _restore(
@@ -312,6 +354,7 @@ class _ProjectGitChangesPageState extends State<ProjectGitChangesPage> {
           onBack: _busy ? null : () => Navigator.pop(context),
           actions: [
             if (!_busy &&
+                data?['live'] != true &&
                 !hasConflict &&
                 (hasPending || (widget.taskId != null && hasReverted)))
               Builder(
@@ -351,7 +394,7 @@ class _ProjectGitChangesPageState extends State<ProjectGitChangesPage> {
             : !available
             ? const Center(child: Text('仅保留最近一次修改任务的撤销记录'))
             : changes.isEmpty
-            ? const Center(child: Text('没有修改'))
+            ? const Center(child: EmptyDataView(title: '没有修改'))
             : ListView.builder(
                 padding: settingsPagePadding(
                   context,
@@ -454,7 +497,9 @@ class _GitChangeTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    WorkspaceFilePathText(change['path']! as String),
+                    WorkspaceFilePathText(
+                      (change['displayPath'] ?? change['path'])! as String,
+                    ),
                     if (change['oldPath'] case final String oldPath) ...[
                       const SizedBox(height: 3),
                       Text(
@@ -504,6 +549,7 @@ class ProjectGitFileDiffPage extends StatefulWidget {
     required this.actionLabel,
     required this.canAct,
     required this.onAction,
+    this.showActions = true,
     super.key,
   }) : loader = null;
 
@@ -513,6 +559,7 @@ class ProjectGitFileDiffPage extends StatefulWidget {
     required this.actionLabel,
     required this.canAct,
     required this.onAction,
+    this.showActions = true,
     super.key,
   }) : diff = null,
        truncated = false;
@@ -522,6 +569,7 @@ class ProjectGitFileDiffPage extends StatefulWidget {
   final bool truncated;
   final String actionLabel;
   final bool canAct;
+  final bool showActions;
   final Future<bool> Function() onAction;
   final Future<Map<String, Object?>> Function()? loader;
 
@@ -600,25 +648,27 @@ class _ProjectGitFileDiffPageState extends State<ProjectGitFileDiffPage> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  RoundAction(
-                    label: widget.canAct ? widget.actionLabel : '文件之后有修改',
-                    icon: Icons.undo_rounded,
-                    iconWidget: QuestionIcon(
-                      type: QuestionIconType.undo,
-                      color: SettingsGlassAction.foregroundColor(
-                        context,
-                        enabled: enabled,
+                  if (widget.showActions)
+                    RoundAction(
+                      label: widget.canAct ? widget.actionLabel : '文件之后有修改',
+                      icon: Icons.undo_rounded,
+                      iconWidget: QuestionIcon(
+                        type: QuestionIconType.undo,
+                        color: SettingsGlassAction.foregroundColor(
+                          context,
+                          enabled: enabled,
+                        ),
+                      ),
+                      onPressed: enabled ? _act : null,
+                    ),
+                  if (widget.showActions)
+                    SizedBox(
+                      height: 18,
+                      child: VerticalDivider(
+                        width: 1,
+                        color: Theme.of(context).colorScheme.outlineVariant,
                       ),
                     ),
-                    onPressed: enabled ? _act : null,
-                  ),
-                  SizedBox(
-                    height: 18,
-                    child: VerticalDivider(
-                      width: 1,
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                    ),
-                  ),
                   Builder(
                     builder: (buttonContext) => RoundAction(
                       label: '显示设置',

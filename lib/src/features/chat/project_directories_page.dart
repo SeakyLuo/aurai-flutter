@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 import '../../app/ui_action.dart';
 import '../../domain/agent_models.dart';
@@ -179,7 +180,7 @@ class _ProjectDirectoriesPageState extends State<ProjectDirectoriesPage> {
             else if (items.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(24),
-                child: Text('还没有关联目录，点击右上角添加。', textAlign: TextAlign.center),
+                child: EmptyDataView(title: '还没有关联目录，点击右上角添加。'),
               ),
             for (final item in items ?? <ProjectDirectory>[])
               Padding(

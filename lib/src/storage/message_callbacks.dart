@@ -1,3 +1,4 @@
+import 'group_mute_schema.dart';
 import 'html_callback_state.dart';
 import 'interactive_callback_state.dart';
 import '../domain/interactive_message.dart';
@@ -90,8 +91,33 @@ class MessageCallbacks {
     });
   }
 
-  static const readyWhere =
-      "processed_at IS NULL AND ((status = 'legacy' AND attempts < 3) OR status = 'queued')";
+  static final readyWhere =
+      "processed_at IS NULL AND ((status = 'legacy' AND attempts < 3) OR status = 'queued') "
+      "AND NOT EXISTS (SELECT 1 FROM conversation_members member "
+      "WHERE member.conversation_id = message_callbacks.conversation_id "
+      "AND member.sender_id = message_callbacks.sender_id AND member.left_at IS NULL "
+      "AND (${effectiveGroupMuteSql('member')} = -1 OR ${effectiveGroupMuteSql('member')} > CAST((julianday('now') - 2440587.5) * 86400000000 AS INTEGER)))";
+
+  Future<DateTime?> nextMuteExpiry() async {
+    final rows = await database.query(
+      'conversation_members',
+      columns: [
+        'MIN(${effectiveGroupMuteSql('conversation_members')}) AS deadline',
+      ],
+      where:
+          "left_at IS NULL AND ${effectiveGroupMuteSql('conversation_members')} > ? AND EXISTS "
+          "(SELECT 1 FROM message_callbacks callback WHERE "
+          "callback.conversation_id = conversation_members.conversation_id "
+          "AND callback.sender_id = conversation_members.sender_id "
+          "AND callback.processed_at IS NULL AND ((callback.status = 'legacy' "
+          "AND callback.attempts < 3) OR callback.status = 'queued'))",
+      whereArgs: [DateTime.now().microsecondsSinceEpoch],
+    );
+    final deadline = rows.single['deadline'] as int?;
+    return deadline == null
+        ? null
+        : DateTime.fromMicrosecondsSinceEpoch(deadline);
+  }
 
   Future<List<Map<String, Object?>>> pending(
     String conversationId,

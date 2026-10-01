@@ -282,9 +282,7 @@ extension MessageRecall on ChatController {
       if (userInitiated && live) {
         dispatcher.start(
           _groupReplies.keys.where(
-            (id) =>
-                !dispatcher.paused.contains(id) &&
-                (notice.interactive?.canView(id) ?? true),
+            (id) => !dispatcher.paused.contains(id) && (notice.canView(id)),
           ),
         );
       } else if (userInitiated) {
@@ -301,7 +299,7 @@ extension MessageRecall on ChatController {
     AgentMessage message,
   ) async {
     final publicKey = 'context_summary:${conversation.id}';
-    final audience = message.interactive?.participation['audience'];
+    final audience = message.audience;
     final candidates = <String, ContextSummary>{
       if (audience == null && conversation.contextSummary != null)
         publicKey: conversation.contextSummary!,
@@ -381,6 +379,7 @@ extension MessageRecall on ChatController {
   MessageQuote _recalledQuote(MessageQuote quote) => MessageQuote(
     messageId: quote.messageId,
     senderId: quote.senderId,
+    audience: quote.audience,
     text: '消息已撤回',
   )..senderName = quote.senderName;
 
@@ -394,7 +393,7 @@ extension MessageRecall on ChatController {
               : memory.nickname)
         : message.sender!.name;
     final text = '${actorName}撤回了一条消息';
-    final audience = message.interactive?.participation['audience'];
+    final audience = message.audience;
     return AgentMessage(
       id: message.id,
       role: message.role,
@@ -407,7 +406,7 @@ extension MessageRecall on ChatController {
       interactive: audience == null
           ? null
           : InteractiveMessage(
-              revision: message.interactive!.revision,
+              revision: message.messageMetadata!.revision,
               title: text,
               body: '',
               buttons: const [],
@@ -442,7 +441,7 @@ extension MessageRecall on ChatController {
           isSystem: m.isSystem,
           isGroupMessage: m.isGroupMessage,
           htmlGame: m.htmlGame,
-          interactive: m.interactive,
+          interactive: m.messageMetadata,
           isFailure: m.isFailure,
           quote: _recalledQuote(m.quote!),
         );
