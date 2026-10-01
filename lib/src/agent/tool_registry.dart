@@ -47,6 +47,7 @@ class ToolRegistry {
             tool.name == 'hideThinking' ||
             const [
               'createGoal',
+              'clearGoal',
               'createTaskList',
               'getGoal',
               'getTaskList',

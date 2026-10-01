@@ -102,6 +102,13 @@ class AiContactTool
       'type': 'object',
       'properties': {
         if (operation == 'update')
+          'reasoning': {
+            'type': 'string',
+            'enum': ModelReasoning.values.map((v) => v.name).toList(),
+            'description':
+                'Thinking effort for this AI. Omit to preserve; inherit follows provider settings.',
+          },
+        if (operation == 'update')
           'modelSelection': {
             'type': ['object', 'null'],
             'description':
@@ -193,6 +200,7 @@ class AiContactTool
             ..._summary(old!),
             if (old.sender.id == ownerId || a['includePrivate'] == true) ...{
               'instructions': old.instructions,
+              'reasoning': old.preferences.reasoning.name,
               'model': old.modelSelection?.model,
               'provider': old.modelSelection?.provider.name,
               'availableProviders': [
@@ -260,7 +268,11 @@ class AiContactTool
             description: description,
             instructions: instructions,
             modelSelection: selection,
-            preferences: old?.preferences ?? const AiPreferences(),
+            preferences: (old?.preferences ?? const AiPreferences()).copyWith(
+              reasoning: a['reasoning'] == null
+                  ? old?.preferences.reasoning ?? ModelReasoning.inherit
+                  : ModelReasoning.values.byName(a['reasoning'] as String),
+            ),
             createdAt: old?.createdAt ?? now,
             updatedAt: now,
             previousUpdatedAt: old?.updatedAt,

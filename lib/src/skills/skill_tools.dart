@@ -207,7 +207,7 @@ class SkillTool
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.error,
-        output: {'message': error.message},
+        output: {'message': error.toString()},
       );
     }
   }
@@ -304,7 +304,7 @@ class SkillTool
           try {
             store.resolvedDependencies(skill);
           } on StateError catch (e) {
-            unavailable = e.message;
+            unavailable = e.toString();
           }
           result = {
             ...skill.toJson(),

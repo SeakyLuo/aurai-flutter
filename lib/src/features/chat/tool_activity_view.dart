@@ -1,4 +1,5 @@
 import 'private_task_history.dart';
+import 'tool_elapsed.dart';
 import 'tool_inline_detail.dart';
 import '../../domain/workspace_file_changes.dart';
 import 'workspace_changes_view.dart';
@@ -32,6 +33,8 @@ class ToolActivityView extends StatefulWidget {
     this.requestJson,
     this.resultJson,
     this.showFileChanges = true,
+    this.startedAt,
+    this.finishedAt,
   });
 
   final String? toolName;
@@ -41,6 +44,8 @@ class ToolActivityView extends StatefulWidget {
   final String? requestJson;
   final String? resultJson;
   final bool showFileChanges;
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
 
   @override
   State<ToolActivityView> createState() => _ToolActivityViewState();
@@ -48,6 +53,9 @@ class ToolActivityView extends StatefulWidget {
 
 class _ToolActivityViewState extends State<ToolActivityView> {
   bool _expanded = false;
+  late WorkspaceFileChanges _fileChanges = WorkspaceFileChanges.fromResults([
+    widget.resultJson,
+  ]);
 
   bool get _failedQuestion =>
       widget.toolName == 'askUser' && widget.status == AgentStepStatus.failed;
@@ -67,6 +75,9 @@ class _ToolActivityViewState extends State<ToolActivityView> {
   @override
   void didUpdateWidget(ToolActivityView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.resultJson != widget.resultJson) {
+      _fileChanges = WorkspaceFileChanges.fromResults([widget.resultJson]);
+    }
     if (oldWidget.status != AgentStepStatus.failed && _failedQuestion) {
       _expanded = true;
       PageStorage.of(context).writeState(
@@ -102,6 +113,7 @@ class _ToolActivityViewState extends State<ToolActivityView> {
       final request = jsonDecode(widget.requestJson!) as Map;
       return ImageGenerationSkeleton(
         title: widget.title,
+        startedAt: widget.startedAt,
         aspectRatio: request['aspectRatio'] as String,
         referenceImage: request['referenceImage'] as String?,
         count: request['count'] as int? ?? 1,
@@ -181,13 +193,20 @@ class _ToolActivityViewState extends State<ToolActivityView> {
         (showStatus
             ? widget.title.replaceFirst(RegExp(r'^(已完成：|未完成：|已停止：)'), '')
             : widget.title);
-    final inlineDetail = toolInlineDetail(
-      legacyName ?? widget.toolName,
-      widget.requestJson,
-      widget.resultJson,
-    );
+    final hasFileChanges = !running && _fileChanges.files.isNotEmpty;
+    final inlineDetail = hasFileChanges
+        ? _fileChanges.files.length == 1
+              ? _fileChanges.files.single.path.split(RegExp(r'[/\\]')).last
+              : '${_fileChanges.files.length} 个文件'
+        : toolInlineDetail(
+            legacyName ?? widget.toolName,
+            widget.requestJson,
+            widget.resultJson,
+          );
     final displayTitle = isQuestion && inlineDetail != null
         ? '$title · $inlineDetail'
+        : hasFileChanges
+        ? '已编辑${_fileChanges.complete ? '' : '（部分）'}'
         : title;
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -244,8 +263,22 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                       detail: isQuestion || waitingForUser
                           ? null
                           : inlineDetail,
+                      suffix: hasFileChanges && _fileChanges.allLinesCounted
+                          ? Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: WorkspaceLineCounts(
+                                _fileChanges.lineCount!,
+                              ),
+                            )
+                          : null,
                     ),
                   ),
+                  if (widget.startedAt != null &&
+                      (running || widget.finishedAt != null))
+                    ToolElapsed(
+                      startedAt: widget.startedAt!,
+                      finishedAt: widget.finishedAt,
+                    ),
                   if (showStatus &&
                       (widget.status != AgentStepStatus.completed ||
                           skipped)) ...[
@@ -272,12 +305,8 @@ class _ToolActivityViewState extends State<ToolActivityView> {
             ),
           ),
         ),
-        if (widget.showFileChanges &&
-            (widget.toolName == 'executeAndroidScript' ||
-                widget.toolName == 'runSkill'))
-          WorkspaceChangesView(
-            changes: WorkspaceFileChanges.fromResults([widget.resultJson]),
-          ),
+        if (widget.showFileChanges && hasFileChanges && _expanded)
+          WorkspaceChangesView(changes: _fileChanges),
         if (_expanded && canExpand)
           if (isQuestion)
             UserQuestionHistory(
@@ -287,6 +316,7 @@ class _ToolActivityViewState extends State<ToolActivityView> {
             )
           else if (const [
                 'createGoal',
+                'clearGoal',
                 'createTaskList',
                 'getGoal',
                 'getTaskList',

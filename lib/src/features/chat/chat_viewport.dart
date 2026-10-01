@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -87,6 +88,44 @@ class ChatViewportState extends State<ChatViewport> {
   bool _bottomSyncQueued = false;
   bool _keepSentMessageAtTop = false;
   bool _sentSyncQueued = false;
+  final _removals = <String, Completer<void>>{};
+
+  Future<void> animateRemoval(String id) async {
+    final index = _indices[id];
+    final visible =
+        _positions.itemPositions.value
+            .where(
+              (item) => item.itemTrailingEdge > 0 && item.itemLeadingEdge < 1,
+            )
+            .toList()
+          ..sort((a, b) => a.itemLeadingEdge.compareTo(b.itemLeadingEdge));
+    if (!visible.any((item) => item.index == index)) return;
+    if (!_following) {
+      final retained = visible
+          .where(
+            (item) =>
+                item.index < widget.entries.length &&
+                widget.entries[item.index].id != id,
+          )
+          .firstOrNull;
+      if (retained != null) {
+        _preserveEntry(widget.entries[retained.index].id);
+      } else {
+        _anchor = null;
+      }
+    }
+    if (_replyAnchorId == id) {
+      _replyAnchorId = null;
+      _keepSentMessageAtTop = false;
+    }
+    final completion = Completer<void>();
+    setState(() => _removals[id] = completion);
+    await completion.future;
+  }
+
+  void finishRemoval(String id) {
+    if (mounted) setState(() => _removals.remove(id));
+  }
 
   double get _footerHeight {
     final start = _indices[_replyAnchorId];
@@ -417,7 +456,9 @@ class ChatViewportState extends State<ChatViewport> {
     widget.onBookmark(anchor);
     _restoring = true;
     // Establish the item's anchor before its height changes, in the same frame.
-    _jumpToEntry(
+    // Rebase the list's center sliver as well as the pixel offset. Keeping its
+    // old center (often the footer) makes expanding content move this entry.
+    _items.jumpTo(
       index: _anchorIndex(anchor),
       alignment: _listAlignment(_anchorIndex(anchor), anchor.alignment),
     );
@@ -502,6 +543,9 @@ class ChatViewportState extends State<ChatViewport> {
   @override
   void dispose() {
     _positions.itemPositions.removeListener(_rememberPosition);
+    for (final completion in _removals.values) {
+      if (!completion.isCompleted) completion.complete();
+    }
     super.dispose();
   }
 
@@ -592,6 +636,14 @@ class ChatViewportState extends State<ChatViewport> {
                             ).position;
                             return _ChatEntryEntrance(
                               animate: animateEntrance,
+                              removing: _removals.containsKey(entry.id),
+                              onRemoved: () {
+                                final completion = _removals[entry.id];
+                                if (completion != null &&
+                                    !completion.isCompleted) {
+                                  completion.complete();
+                                }
+                              },
                               child: entry.builder(context),
                             );
                           },
@@ -619,10 +671,17 @@ class ChatViewportState extends State<ChatViewport> {
 }
 
 class _ChatEntryEntrance extends StatefulWidget {
-  const _ChatEntryEntrance({required this.animate, required this.child});
+  const _ChatEntryEntrance({
+    required this.animate,
+    required this.child,
+    required this.removing,
+    required this.onRemoved,
+  });
 
   final bool animate;
   final Widget child;
+  final bool removing;
+  final VoidCallback onRemoved;
 
   @override
   State<_ChatEntryEntrance> createState() => _ChatEntryEntranceState();
@@ -648,7 +707,20 @@ class _ChatEntryEntranceState extends State<_ChatEntryEntrance>
   }
 
   @override
+  void didUpdateWidget(_ChatEntryEntrance oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.removing && !oldWidget.removing) {
+      _controller.reverse().then((_) {
+        if (mounted && widget.removing) widget.onRemoved();
+      });
+    } else if (!widget.removing && oldWidget.removing) {
+      _controller.forward();
+    }
+  }
+
+  @override
   void dispose() {
+    if (widget.removing) widget.onRemoved();
     _controller.dispose();
     super.dispose();
   }

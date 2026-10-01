@@ -360,35 +360,6 @@ class _PrivateGoalSheetState extends State<PrivateGoalSheet> {
                         _budget,
                         _goal['tokenBudget']?.toString() ?? '不限',
                       ),
-                      if (!_editing) ...[
-                        _overviewField('状态', switch (_goal['status']) {
-                          'active' => '进行中',
-                          'paused' => '已暂停',
-                          'blocked' => '目标已停滞',
-                          'budget_limited' => '预算已用完',
-                          'complete' => '已完成',
-                          _ => '',
-                        }),
-                        _overviewField(
-                          'Token 用量',
-                          _goal['usageIncomplete'] == true
-                              ? '用量不完整'
-                              : (_goal['tokensUsed'] ?? 0).toString(),
-                        ),
-                        if ((_goal['reason'] as String? ?? '').isNotEmpty)
-                          _overviewField('说明', _goal['reason'] as String),
-                      ],
-                      if (_editing && _goal['status'] == 'active')
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-                          child: Text(
-                            '保存后暂停当前执行，可从目标菜单继续。',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: colors.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),

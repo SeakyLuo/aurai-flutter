@@ -279,7 +279,10 @@ class AgentRunStore {
       );
       batch.update(
         'tool_calls',
-        {'status': status == 'cancelled' ? 'cancelled' : 'failed'},
+        {
+          'status': status == 'cancelled' ? 'cancelled' : 'failed',
+          'finished_at': DateTime.now().microsecondsSinceEpoch,
+        },
         where: 'run_id = ? AND status = ?',
         whereArgs: [runId, 'running'],
       );

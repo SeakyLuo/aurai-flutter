@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 
 String taskDuration(Duration duration) => [
   if (duration.inHours > 0) '${duration.inHours}小时',
-  if (duration.inMinutes > 0) '${duration.inMinutes.remainder(60)}分钟',
+  if (duration.inMinutes.remainder(60) > 0)
+    '${duration.inMinutes.remainder(60)}分',
   '${duration.inSeconds.remainder(60)}秒',
 ].join(' ');
 

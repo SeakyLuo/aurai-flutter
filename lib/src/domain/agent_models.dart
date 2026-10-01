@@ -264,6 +264,8 @@ class AgentStep {
     this.detail,
     this.requestJson,
     this.resultJson,
+    this.startedAt,
+    this.finishedAt,
   });
 
   final String toolName;
@@ -272,6 +274,8 @@ class AgentStep {
   final String? detail;
   final String? requestJson;
   final String? resultJson;
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
 
   AgentStep copyWith({
     AgentStepStatus? status,
@@ -284,6 +288,14 @@ class AgentStep {
     detail: detail ?? this.detail,
     requestJson: requestJson,
     resultJson: resultJson ?? this.resultJson,
+    startedAt: startedAt,
+    finishedAt:
+        finishedAt ??
+        (startedAt != null &&
+                status != null &&
+                status != AgentStepStatus.running
+            ? DateTime.now()
+            : null),
   );
 }
 
@@ -431,6 +443,8 @@ class AgentTaskActivity {
     this.toolName,
     this.requestJson,
     this.resultJson,
+    this.startedAt,
+    this.finishedAt,
   });
 
   final String text;
@@ -440,6 +454,8 @@ class AgentTaskActivity {
   final AgentStepStatus? status;
   final String? requestJson;
   final String? resultJson;
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
 
   Map<String, Object?> toJson() => {
     'text': text,
@@ -449,6 +465,8 @@ class AgentTaskActivity {
     'status': status?.name,
     if (requestJson != null) 'requestJson': requestJson,
     if (resultJson != null) 'resultJson': resultJson,
+    if (startedAt != null) 'startedAt': startedAt!.toIso8601String(),
+    if (finishedAt != null) 'finishedAt': finishedAt!.toIso8601String(),
   };
 
   factory AgentTaskActivity.fromJson(Map<String, Object?> json) {
@@ -461,6 +479,12 @@ class AgentTaskActivity {
       status: status == null ? null : AgentStepStatus.values.byName(status),
       requestJson: json['requestJson'] as String?,
       resultJson: json['resultJson'] as String?,
+      startedAt: json['startedAt'] == null
+          ? null
+          : DateTime.parse(json['startedAt'] as String),
+      finishedAt: json['finishedAt'] == null
+          ? null
+          : DateTime.parse(json['finishedAt'] as String),
     );
   }
 }
@@ -482,6 +506,9 @@ String toolTitle(String name) =>
 
 String _defaultToolTitle(String name) => switch (name) {
   'createGoal' => '建立目标',
+  'clearGoal' => '清除目标',
+  'readGroupPersonalDetails' => '读取群个人资料',
+  'updateGroupPersonalDetails' => '更新群个人资料',
   'createTaskList' => '建立任务清单',
   'getGoal' => '查看目标',
   'getTaskList' => '查看任务清单',

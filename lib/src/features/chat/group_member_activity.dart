@@ -68,7 +68,29 @@ extension GroupMemberActivities on ChatController {
     notifyListeners();
   }
 
+  Future<int> pauseAllGroupAutoReply(String groupId) async {
+    await groupStore.requireManager(
+      _store.database,
+      groupId,
+      MessageSender.localUser.id,
+    );
+    final ids = await GroupParticipation(_store.database).pauseAll(groupId);
+    final dispatcher = _executionStates[groupId]?.groupDispatcher;
+    for (final id in ids) {
+      dispatcher?.pause(id);
+    }
+    await Future.wait([stopAllGroupReplies(groupId), _groupSleeps.reload()]);
+    groupActivityChanges.value++;
+    notifyListeners();
+    return ids.length;
+  }
+
   Future<int> resumeAllGroupAutoReply(String groupId) async {
+    await groupStore.requireManager(
+      _store.database,
+      groupId,
+      MessageSender.localUser.id,
+    );
     final ids = await GroupParticipation(_store.database).resumeAll(groupId);
     _executionStates[groupId]?.groupDispatcher?.paused.removeAll(ids);
     groupActivityChanges.value++;

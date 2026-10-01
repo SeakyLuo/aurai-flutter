@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../domain/agent_models.dart';
 import 'chat_scroll_anchor.dart';
 import 'thinking_indicator.dart';
+import 'tool_elapsed.dart';
 import 'tool_action_icon.dart';
 import 'tool_expand_arrow.dart';
 import '../../domain/workspace_file_changes.dart';
@@ -17,6 +18,8 @@ class ToolActivityGroup extends StatefulWidget {
     this.fileResults = const [],
     this.active = false,
     this.activeLabel,
+    this.startedAt,
+    this.finishedAt,
   });
   final String storageId;
   final String toolName;
@@ -25,6 +28,8 @@ class ToolActivityGroup extends StatefulWidget {
   final List<String?> fileResults;
   final bool active;
   final String? activeLabel;
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
   @override
   State<ToolActivityGroup> createState() => _ToolActivityGroupState();
 }
@@ -83,6 +88,11 @@ class _ToolActivityGroupState extends State<ToolActivityGroup> {
                     ),
                   ),
                   const SizedBox(width: 6),
+                  if (widget.active && widget.startedAt != null)
+                    ToolElapsed(
+                      startedAt: widget.startedAt!,
+                      finishedAt: widget.finishedAt,
+                    ),
                   Transform.translate(
                     offset: const Offset(4, 0),
                     child: ToolExpandArrow(expanded: expanded),

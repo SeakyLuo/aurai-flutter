@@ -154,6 +154,21 @@ extension ProviderConfigurationActions on ChatController {
     'name': config.displayName,
     'website': config.website,
     'models': config.savedModels,
+    'autoSyncModels': config.autoSyncModels,
+    'modelTypeMappings': {
+      for (final e
+          in (config.details?.modelTypeMappings ??
+                  const <String, ModelPurpose>{})
+              .entries)
+        e.key: e.value.name,
+    },
+    'modelPurposes': {
+      for (final e
+          in (config.details?.modelPurposes ??
+                  const <String, Set<ModelPurpose>>{})
+              .entries)
+        e.key: e.value.map((v) => v.name).toList(),
+    },
     'baseUrl': config.baseUrl,
     'model': config.model,
     'configured': config.isConfigured,
@@ -202,8 +217,23 @@ extension ProviderConfigurationActions on ChatController {
             : modelSettings.profiles[service];
         final details = ProviderDetails(
           requestAdapters: old?.details?.requestAdapters ?? const {},
-          modelPurposes: old?.details?.modelPurposes ?? const {},
-          modelTypeMappings: old?.details?.modelTypeMappings ?? const {},
+          modelPurposes: args['modelPurposes'] == null
+              ? old?.details?.modelPurposes ?? const {}
+              : {
+                  for (final e in (args['modelPurposes'] as Map).entries)
+                    e.key as String: {
+                      for (final v in e.value as List)
+                        ModelPurpose.values.byName(v as String),
+                    },
+                },
+          modelTypeMappings: args['modelTypeMappings'] == null
+              ? old?.details?.modelTypeMappings ?? const {}
+              : {
+                  for (final e in (args['modelTypeMappings'] as Map).entries)
+                    e.key as String: ModelPurpose.values.byName(
+                      e.value as String,
+                    ),
+                },
           modelPurposeField:
               (args['modelPurposeField'] as String? ??
                       old?.details?.modelPurposeField ??

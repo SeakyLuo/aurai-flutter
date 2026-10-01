@@ -1,7 +1,6 @@
 import '../diagnostics/execution_log.dart';
 import 'agent_runtime.dart' show AgentCancelled;
 import '../platform/svg_image.dart';
-import '../domain/error_message.dart';
 import '../domain/tool_models.dart';
 import '../domain/message_image.dart';
 import 'dart:convert';
@@ -230,15 +229,7 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.error,
-        output: {
-          'message': switch (error) {
-            ArgumentError() => error.message,
-            ImageInputException() => error.message,
-            FileSystemException() =>
-              '无法读取图片文件，请确认文件路径和访问权限：${errorMessage(error)}',
-            _ => error.toString(),
-          },
-        },
+        output: {'message': error.toString()},
       );
     } finally {
       if (!sent) await store.remove(imported);

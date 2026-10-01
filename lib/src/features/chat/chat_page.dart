@@ -124,6 +124,7 @@ class _ChatPageState extends State<ChatPage>
   @override
   void initState() {
     super.initState();
+    widget.controller.programErrors.addListener(_onProgramError);
     _conversationId = widget.controller.activeConversation.id;
     _textController.text = widget.controller.activeConversation.draft;
     _canSend = _textController.text.trim().isNotEmpty;
@@ -192,6 +193,7 @@ class _ChatPageState extends State<ChatPage>
 
   @override
   void dispose() {
+    widget.controller.programErrors.removeListener(_onProgramError);
     homeRouteObserver.unsubscribe(this);
     _chatPages.remove(this);
     _recordPagePosition();
@@ -206,6 +208,13 @@ class _ChatPageState extends State<ChatPage>
     _highlightTimer?.cancel();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _onProgramError() {
+    final error = widget.controller.programErrors.value;
+    if (error != null && mounted) {
+      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(error)));
+    }
   }
 
   @override

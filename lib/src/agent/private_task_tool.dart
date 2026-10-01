@@ -10,6 +10,7 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
     'getGoal',
     'getTaskList',
     'updateGoal',
+    'clearGoal',
     'createTaskList',
     'updateTaskList',
   ];
@@ -23,13 +24,15 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
         : ToolSafety.lowRisk,
     description: switch (name) {
       'createGoal' =>
-        'Create a durable objective only when explicitly requested by the user or system instructions. Do not infer goals from ordinary tasks. Include concrete completion criteria in the objective text. Only one unfinished goal is allowed. The runtime continues an active goal after a final answer; complete or block it when appropriate. There is no model-turn limit. Omit tokenBudget unless the user explicitly requested a concrete token budget for this goal; never estimate, recommend, or choose one yourself.',
+        'Create a durable objective only when explicitly requested by the user or system instructions. Do not infer goals from ordinary tasks. Include concrete completion criteria in the objective text. Only one unfinished goal is allowed. If creation fails because one already exists, call getGoal to inspect it; do not repeat createGoal or finish the existing goal just to make room. Ask the user when replacing or ending the existing goal requires their decision. Fix invalid arguments before trying again. The runtime continues an active goal after a final answer; complete or block it when appropriate. There is no model-turn limit. Omit tokenBudget unless the user explicitly requested a concrete token budget for this goal; never estimate, recommend, or choose one yourself.',
       'getGoal' =>
         'Read your current objective, status and model-turn usage in this conversation. Available in private chats and groups; each AI owns its own state.',
       'getTaskList' =>
         'Read the current progress checklist and its explanation, independently of the goal.',
+      'clearGoal' =>
+        'Clear your current goal only when the user asks to remove it. Preserve the independent task list and chat history.',
       'updateGoal' =>
-        'Update goal status and explain why. complete requires evidence that completion criteria are satisfied. blocked reports the same blocking condition after attempting meaningful alternatives; use an identical blocker key for that condition. The runtime only blocks after three consecutive reports in distinct model turns. Do not manufacture retries when approval or user input is required; use askUser. Report active with progress to reset the blocking audit; paused stops execution. active resumes a paused or blocked goal only when the user asks to continue. Never resume because of unrelated messages.',
+        'Update goal objective, status or token budget and explain why. Change objective only when the user requests it; omission preserves the text and changing it alone does not resume execution. Omit status to preserve it. Change tokenBudget only when explicitly requested by the user: a positive integer sets the total budget, null removes the limit, omission preserves it. Preserve accumulated usage; changing the budget alone does not resume execution. complete requires evidence that completion criteria are satisfied. blocked reports the same blocking condition after attempting meaningful alternatives; use an identical blocker key for that condition. The runtime only blocks after three consecutive reports in distinct model turns. Do not manufacture retries when approval or user input is required; use askUser. Report active with progress to reset the blocking audit; paused stops execution. active resumes a paused, blocked or budget-limited goal only when the user asks to continue. Never resume because of unrelated messages.',
       'createTaskList' =>
         'Create a task list when work has multiple meaningful steps or will take enough time that visible progress helps the user. Skip simple requests. Keep items concise and outcome-oriented, with pending, in_progress or completed status and at most one in_progress item. This list does not require approval, create a durable goal, or trigger continued execution. Use updateTaskList for an existing unfinished list.',
       _ =>
@@ -48,6 +51,13 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
           },
         },
         if (name == 'updateGoal') ...{
+          'objective': {'type': 'string', 'minLength': 1},
+          'tokenBudget': {
+            'type': ['integer', 'null'],
+            'minimum': 1,
+            'description':
+                'User-requested total input plus output token budget, not additional tokens. Positive integer sets the limit; null means unlimited; omit to keep the current budget. Does not reset usage or resume the goal.',
+          },
           'status': {
             'type': 'string',
             'enum': ['active', 'complete', 'blocked', 'paused'],
@@ -81,7 +91,7 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
       },
       'required': switch (name) {
         'createGoal' => ['objective'],
-        'updateGoal' => ['status', 'reason'],
+        'updateGoal' => ['reason'],
         'createTaskList' || 'updateTaskList' => ['explanation', 'steps'],
         _ => <String>[],
       },
@@ -97,7 +107,9 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
         : await store.change((state) {
             if (name == 'createGoal') {
               if (state['objective'] != null && state['status'] != 'complete') {
-                throw StateError('已有未结束的目标，请先完成或取消');
+                throw StateError(
+                  '已有未结束的目标，请先用 getGoal 读取当前目标；不要重复创建或为创建新目标擅自结束旧目标',
+                );
               }
               state.removeWhere(
                 (key, _) => key != 'steps' && key != 'explanation',
@@ -116,9 +128,37 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
                 'runningSince': DateTime.now().millisecondsSinceEpoch,
                 'reason': '',
               });
+            } else if (name == 'clearGoal') {
+              state.removeWhere(
+                (key, _) => key != 'steps' && key != 'explanation',
+              );
             } else if (name == 'updateGoal') {
               if (state['objective'] == null) throw StateError('当前没有目标');
-              final status = args['status'] as String;
+              if (args.containsKey('tokenBudget')) {
+                final budget = args['tokenBudget'] as int?;
+                if (budget != null && budget <= 0) {
+                  throw ArgumentError('Token 预算必须大于 0');
+                }
+                if (budget == null) {
+                  state.remove('tokenBudget');
+                } else {
+                  state['tokenBudget'] = budget;
+                }
+              }
+              if (args.containsKey('objective')) {
+                final objective = (args['objective'] as String).trim();
+                if (objective.isEmpty) throw ArgumentError('目标不能为空');
+                state['objective'] = objective;
+              }
+              final status = args['status'] as String?;
+              if (status == null) {
+                if (!args.containsKey('tokenBudget') &&
+                    !args.containsKey('objective')) {
+                  throw ArgumentError('请提供目标正文、状态或 Token 预算');
+                }
+                state['reason'] = args['reason'];
+                return;
+              }
               if (![
                 'active',
                 'complete',

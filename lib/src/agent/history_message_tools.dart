@@ -1,10 +1,8 @@
 import '../platform/svg_image.dart';
-import '../domain/error_message.dart';
 import '../domain/local_time.dart';
 import '../domain/message_quote.dart';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
 import '../domain/tool_models.dart';
 import '../platform/message_file_store.dart';
@@ -192,15 +190,7 @@ class HistoryMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.error,
-        output: {
-          'error': switch (error) {
-            StateError() => error.message,
-            FileSystemException() => '附件文件无法读取，请重新提供：${errorMessage(error)}',
-            PlatformException() =>
-              error.message ?? '此附件暂时无法读取：${errorMessage(error)}',
-            _ => error.toString(),
-          },
-        },
+        output: {'error': error.toString()},
       );
     }
   }

@@ -43,43 +43,34 @@ abstract final class HtmlMessageSource {
         !source.toLowerCase().endsWith('.htm')) {
       throw ArgumentError('sourcePath 只支持 .html 或 .htm 文件');
     }
-    try {
-      final support = await getApplicationSupportDirectory();
-      final workspace = await Directory(
-        '${support.path}/agent-shell',
-      ).resolveSymbolicLinks();
-      final file = File(source).isAbsolute
-          ? File(source)
-          : File('$workspace/$source');
-      final path = await file.resolveSymbolicLinks();
-      if (!path.startsWith('$workspace${Platform.pathSeparator}')) {
-        throw ArgumentError('sourcePath 必须位于 shell 工作目录内');
-      }
-      if (await FileSystemEntity.type(path) != FileSystemEntityType.file) {
-        throw ArgumentError('sourcePath 必须指向普通 HTML 文件');
-      }
-      final handle = await File(path).open();
-      late final String content;
-      try {
-        if (await handle.length() > maxBytes) {
-          throw ArgumentError('HTML 最多 4 MB');
-        }
-        final bytes = await handle.read(maxBytes + 1);
-        if (bytes.length > maxBytes) throw ArgumentError('HTML 最多 4 MB');
-        content = utf8.decode(bytes);
-      } finally {
-        await handle.close();
-      }
-      _validate(content);
-      return {...args, 'html': content}..remove('sourcePath');
-    } on FileSystemException catch (error) {
-      throw StateError(
-        '无法读取小程序文件：${error.osError?.message ?? error.message}。'
-        '请先用 shell 在工作目录中写好文件，再发布。',
-      );
-    } on FormatException {
-      throw ArgumentError('小程序文件必须使用有效的 UTF-8 编码');
+    final support = await getApplicationSupportDirectory();
+    final workspace = await Directory(
+      '${support.path}/agent-shell',
+    ).resolveSymbolicLinks();
+    final file = File(source).isAbsolute
+        ? File(source)
+        : File('$workspace/$source');
+    final path = await file.resolveSymbolicLinks();
+    if (!path.startsWith('$workspace${Platform.pathSeparator}')) {
+      throw ArgumentError('sourcePath 必须位于 shell 工作目录内');
     }
+    if (await FileSystemEntity.type(path) != FileSystemEntityType.file) {
+      throw ArgumentError('sourcePath 必须指向普通 HTML 文件');
+    }
+    final handle = await File(path).open();
+    late final String content;
+    try {
+      if (await handle.length() > maxBytes) {
+        throw ArgumentError('HTML 最多 4 MB');
+      }
+      final bytes = await handle.read(maxBytes + 1);
+      if (bytes.length > maxBytes) throw ArgumentError('HTML 最多 4 MB');
+      content = utf8.decode(bytes);
+    } finally {
+      await handle.close();
+    }
+    _validate(content);
+    return {...args, 'html': content}..remove('sourcePath');
   }
 
   static void _validate(String html) {

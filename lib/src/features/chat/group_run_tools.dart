@@ -61,7 +61,7 @@ extension GroupRunTools on ChatController {
       GroupAutoReplyTool(
         pause: pause,
         currentGroupId: currentGroupId,
-        change: (groupId, senderId, triggerReply) async {
+        change: (groupId, senderIds, all, triggerReply) async {
           final results = await Future.wait<Object>([
             _store.database.query(
               'conversations',
@@ -74,16 +74,29 @@ extension GroupRunTools on ChatController {
           ]);
           final groups = results[0] as List<Map<String, Object?>>;
           final members = results[1] as List<ConversationMember>;
+          final targets = all
+              ? members
+                    .where((m) => m.sender.kind == MessageSenderKind.agent)
+                    .map((m) => m.sender.id)
+                    .toSet()
+              : senderIds;
+          if (targets.isEmpty) throw StateError('群内没有目标 AI 成员');
           if (groups.isEmpty ||
               groups.single['kind'] != 'group' ||
               !members.any((m) => m.sender.id == actorId) ||
-              !members.any(
-                (m) =>
-                    m.sender.id == senderId &&
-                    m.sender.kind == MessageSenderKind.agent,
+              !targets.every(
+                (id) => members.any(
+                  (m) =>
+                      m.sender.id == id &&
+                      m.sender.kind == MessageSenderKind.agent &&
+                      !m.isMuted,
+                ),
               )) {
             throw StateError('只能调整你已加入的群聊中 AI 成员的自动接话');
           }
+          final actorMember = members.firstWhere((m) => m.sender.id == actorId);
+          if ((all || senderIds.length > 1) && !actorMember.role.canManage)
+            throw StateError('只有群主和群管理员可以批量暂停或恢复接话');
           final state = _executionStates[groupId];
           final dispatcher = state?.groupDispatcher;
           final active =
@@ -93,29 +106,41 @@ extension GroupRunTools on ChatController {
             final actor = members
                 .firstWhere((m) => m.sender.id == actorId)
                 .sender;
-            await GroupParticipation(_store.database).set(
+            await GroupParticipation(_store.database).setMembers(
               groupId,
-              senderId,
+              targets,
               pause,
-              reason: pause ? '${actor.name}暂停了自动接话' : null,
+              reason: pause ? actor.name + '暂停了自动接话' : null,
             );
             if (pause) {
-              dispatcher?.pause(senderId);
-              await _groupSleeps.remove(groupId, senderId);
-              final target = state?.groupRuns[senderId];
-              if (target?.runState == ChatRunState.running) {
-                target!.runState = ChatRunState.stopping;
-                if (senderId != actorId)
-                  await state!.groupRuntimes[senderId]?.cancel();
+              for (final senderId in targets) {
+                dispatcher?.pause(senderId);
+                final target = state?.groupRuns[senderId];
+                if (target?.runState == ChatRunState.running)
+                  target!.runState = ChatRunState.stopping;
               }
+              await Future.wait([
+                for (final id in targets)
+                  if (id != actorId && state?.groupRuntimes[id] != null)
+                    state!.groupRuntimes[id]!.cancel(),
+                _groupSleeps.reload(),
+              ]);
             } else {
-              dispatcher?.paused.remove(senderId);
+              dispatcher?.paused.removeAll(targets);
               if (triggerReply) {
                 if (active) {
-                  await _groupSleeps.remove(groupId, senderId);
-                  dispatcher.receiveTargeted(const [], {senderId});
+                  await _groupSleeps.wakeMembers(
+                    groupId,
+                    targets,
+                    immediate: true,
+                  );
+                  dispatcher.receiveTargeted(const [], targets);
                 } else {
-                  await _groupSleeps.save(groupId, senderId, DateTime.now());
+                  await _groupSleeps.saveMembers(
+                    groupId,
+                    targets,
+                    DateTime.now(),
+                  );
                 }
               }
             }

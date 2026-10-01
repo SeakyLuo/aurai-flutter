@@ -11,6 +11,9 @@ import '../domain/message_image.dart';
 class ImageInputException implements Exception {
   const ImageInputException(this.message);
   final String message;
+
+  @override
+  String toString() => message;
 }
 
 class MessageImageStore {

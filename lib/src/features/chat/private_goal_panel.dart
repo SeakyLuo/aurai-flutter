@@ -12,6 +12,7 @@ import 'task_playback_icon.dart';
 import 'private_task_list.dart';
 import 'settings_icon.dart';
 import 'composer_more_action.dart';
+import 'task_elapsed.dart';
 
 /// Shares the queue's composer surface; listens to persisted goal changes.
 /// The independent task list uses the same subscription and initial read.
@@ -124,15 +125,7 @@ class _PrivateGoalPanelState extends State<PrivateGoalPanel> {
             : DateTime.now().millisecondsSinceEpoch -
                   (_state['runningSince'] as int));
     final duration = Duration(milliseconds: elapsed);
-    final time = duration.inHours > 0
-        ? duration.inHours.toString() +
-              'h ' +
-              duration.inMinutes.remainder(60).toString() +
-              'm'
-        : duration.inMinutes.toString() +
-              'm ' +
-              duration.inSeconds.remainder(60).toString() +
-              's';
+    final time = taskDuration(duration);
     return Row(
       children: [
         SizedBox.square(

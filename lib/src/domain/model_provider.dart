@@ -550,7 +550,10 @@ class ModelProviderException implements Exception {
   }
 
   @override
-  String toString() => displayMessage;
+  String toString() => [
+    statusCode == null ? message : '$message（HTTP $statusCode）',
+    if (detail != null) detail!,
+  ].join('\n');
 }
 
 class ModelConnectionInterrupted extends ModelProviderException {

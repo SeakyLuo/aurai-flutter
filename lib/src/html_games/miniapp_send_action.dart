@@ -13,6 +13,7 @@ Map<String, Object?> miniappSendAction(String html) {
 Map<String, Object?> initializeMiniappMessage(String html) {
   final action = miniappSendAction(html);
   if (action.isEmpty) return {};
+  if (action['type'] == 'program') return {'phase': 'setup'};
   final choices = action['choices'];
   if (action['type'] != 'random-choice' ||
       choices is! List ||

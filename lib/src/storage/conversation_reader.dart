@@ -293,6 +293,14 @@ class ConversationReader {
           step: AgentStep(
             toolName: tool['name']! as String,
             title: tool['title']! as String,
+            startedAt: DateTime.fromMicrosecondsSinceEpoch(
+              tool['started_at']! as int,
+            ),
+            finishedAt: tool['finished_at'] == null
+                ? null
+                : DateTime.fromMicrosecondsSinceEpoch(
+                    tool['finished_at']! as int,
+                  ),
             requestJson: tool['arguments_json'] as String?,
             resultJson: tool['result_json'] as String?,
             status: AgentStepStatus.values.byName(tool['status']! as String),
@@ -675,6 +683,12 @@ class ConversationReader {
       final tool = tools[event['tool_call_id']]!;
       return AgentTaskActivity(
         text: tool['title']! as String,
+        startedAt: DateTime.fromMicrosecondsSinceEpoch(
+          tool['started_at']! as int,
+        ),
+        finishedAt: tool['finished_at'] == null
+            ? null
+            : DateTime.fromMicrosecondsSinceEpoch(tool['finished_at']! as int),
         toolName: tool['name']! as String,
         requestJson: tool['arguments_json'] as String?,
         resultJson: tool['result_json'] as String?,
@@ -708,6 +722,12 @@ class ConversationReader {
         AgentStep(
           toolName: row['name']! as String,
           title: row['title']! as String,
+          startedAt: DateTime.fromMicrosecondsSinceEpoch(
+            row['started_at']! as int,
+          ),
+          finishedAt: row['finished_at'] == null
+              ? null
+              : DateTime.fromMicrosecondsSinceEpoch(row['finished_at']! as int),
           requestJson: row['arguments_json'] as String?,
           resultJson: row['result_json'] as String?,
           status: AgentStepStatus.values.byName(row['status']! as String),

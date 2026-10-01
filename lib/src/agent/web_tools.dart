@@ -93,14 +93,14 @@ class WebTool implements AgentTool, RuntimeCapabilityAgentTool {
         status: _http.cancelled
             ? ToolResultStatus.cancelled
             : ToolResultStatus.error,
-        output: {'error': error.message},
+        output: {'error': error.toString()},
       );
     } on FormatException catch (error) {
       return ToolResult(
         callId: call.id,
         toolName: name,
         status: ToolResultStatus.error,
-        output: {'error': '网页内容或链接格式无法解析：$error'},
+        output: {'error': error.toString()},
       );
     }
   }

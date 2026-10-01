@@ -86,14 +86,14 @@ class ImageSearchTool implements AgentTool, RuntimeCapabilityAgentTool {
         status: _http.cancelled
             ? ToolResultStatus.cancelled
             : ToolResultStatus.error,
-        output: {'error': error.message},
+        output: {'error': error.toString()},
       );
     } on FormatException catch (error) {
       return ToolResult(
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.error,
-        output: {'error': '图片搜索结果无法解析：$error'},
+        output: {'error': error.toString()},
       );
     }
   }

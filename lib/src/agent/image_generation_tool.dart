@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import '../domain/error_message.dart';
 import '../domain/image_generation_config.dart';
 import '../domain/tool_models.dart';
 import '../providers/image_generation_client.dart';
@@ -132,15 +130,8 @@ class ImageGenerationTool implements AgentTool, RuntimeCapabilityAgentTool {
             : ToolResultStatus.error,
         output: {
           'generated': false,
-          'error': client.cancelled
-              ? '已停止等待生成；服务商可能仍在处理，请勿自动重试'
-              : switch (error) {
-                  SocketException() ||
-                  HandshakeException() => '生图服务连接失败，请检查网络和服务地址',
-                  TimeoutException() => '等待生图超时，服务商可能仍在处理，请勿自动重试',
-                  FormatException() || TypeError() => '生图服务返回了无法识别的结果，请检查接口配置',
-                  _ => errorMessage(error),
-                },
+          'error': error.toString(),
+          'next': '服务商可能仍在处理或已扣费，请勿自动重试。',
           'retryAutomatically': false,
         },
       );

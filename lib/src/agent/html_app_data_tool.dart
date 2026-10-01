@@ -13,14 +13,17 @@ const htmlAppGuide =
 class HtmlAppDataTool implements AgentTool, RuntimeCapabilityAgentTool {
   HtmlAppDataTool(this.name, this.invoke);
   final String name;
-  final Future<Map<String, Object?>> Function(String, Map<String, Object?>) invoke;
+  final Future<Map<String, Object?>> Function(String, Map<String, Object?>)
+  invoke;
   static const names = ['listHtmlApps', 'readHtmlAppData', 'writeHtmlAppData'];
 
   @override
   ToolDefinition get definition => ToolDefinition(
     name: name,
     capabilityId: 'local.messages',
-    safety: name == 'writeHtmlAppData' ? ToolSafety.lowRisk : ToolSafety.readOnly,
+    safety: name == 'writeHtmlAppData'
+        ? ToolSafety.lowRisk
+        : ToolSafety.readOnly,
     description: name == 'listHtmlApps'
         ? 'Find up to 50 of your persistent miniapps by title, newest first. Apps survive deletion of message launchers. Use the returned appId with readHtmlApp/updateHtmlApp to read or modify its source without a messageId, or sendHtmlMessage to reopen the same app and data. Ask by title/date if ambiguous; never ask users for IDs or paths.'
         : 'Read or write a named JSON data document owned by your miniapp. The HTML page shares these exact documents through AuraiHTML.readData/writeData. Use names such as career.json or season_2026.json. Each document is at most 4 MB. Read returns revision/value; a missing document returns revision 0 and value null. Write requires that revision and atomically replaces the file; stale writes fail. Keep large app data here, not in the 64 KB message summary. Use these tools rather than editing data envelopes through shell. A successful write notifies open app pages; listen for aurai:messageupdate and reread needed data. No AI callback is started by a data write.',
@@ -28,7 +31,10 @@ class HtmlAppDataTool implements AgentTool, RuntimeCapabilityAgentTool {
       'type': 'object',
       'properties': {
         if (name == 'listHtmlApps')
-          'query': {'type': 'string', 'description': 'Title fragment; empty lists recent apps.'}
+          'query': {
+            'type': 'string',
+            'description': 'Title fragment; empty lists recent apps.',
+          }
         else ...{
           'appId': {'type': 'string'},
           'name': {'type': 'string'},
@@ -49,12 +55,21 @@ class HtmlAppDataTool implements AgentTool, RuntimeCapabilityAgentTool {
   @override
   Future<ToolResult> execute(ToolCall call) async {
     try {
-      return ToolResult(callId: call.id, toolName: name,
-        status: ToolResultStatus.success, output: await invoke(name, call.arguments));
+      return ToolResult(
+        callId: call.id,
+        toolName: name,
+        status: ToolResultStatus.success,
+        output: await invoke(name, call.arguments),
+      );
     } on Object catch (error) {
-      return ToolResult(callId: call.id, toolName: name,
+      return ToolResult(
+        callId: call.id,
+        toolName: name,
         status: ToolResultStatus.error,
-        output: {'message': error is StateError ? error.message : error.toString()});
+        output: {
+          'message': error.toString(),
+        },
+      );
     }
   }
 

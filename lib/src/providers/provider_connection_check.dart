@@ -36,11 +36,11 @@ Future<Map<String, Object?>> checkProviderConnection(
       request.write(jsonEncode(transformed.body));
       final response = await request.close();
       if (response.statusCode != 200) {
-        return {
-          'connected': false,
-          'httpStatus': response.statusCode,
-          'message': '测试请求未成功。请检查模型权限、额度和请求参数；这不一定是网络故障。',
-        };
+        throw ModelProviderException(
+          response.reasonPhrase,
+          statusCode: response.statusCode,
+          detail: await utf8.decoder.bind(response).join(),
+        );
       }
       final bytes = <int>[];
       await for (final chunk in response) {
@@ -51,6 +51,13 @@ Future<Map<String, Object?>> checkProviderConnection(
       final valid = chat
           ? body['choices'] is List && (body['choices'] as List).isNotEmpty
           : body['output'] is List && (body['output'] as List).isNotEmpty;
+      if (!valid) {
+        throw ModelProviderException(
+          '接口没有返回有效的聊天响应',
+          statusCode: response.statusCode,
+          detail: utf8.decode(bytes),
+        );
+      }
       return {
         'connected': valid,
         'httpStatus': 200,

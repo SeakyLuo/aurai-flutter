@@ -258,6 +258,7 @@ class AgentRuntime {
               toolName: call.name,
               title: toolTitle(call.name),
               status: AgentStepStatus.running,
+              startedAt: DateTime.now(),
               requestJson: jsonEncode(historyArguments),
             ),
           );

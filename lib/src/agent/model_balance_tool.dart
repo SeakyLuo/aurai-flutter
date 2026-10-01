@@ -54,7 +54,7 @@ class GetModelBalanceTool implements AgentTool, RuntimeCapabilityAgentTool {
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.error,
-        output: {'provider': service.label, 'error': error.message},
+        output: {'provider': service.label, 'error': error.toString()},
       );
     }
   }

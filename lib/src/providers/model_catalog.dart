@@ -1,8 +1,6 @@
 import 'model_type_recognition.dart';
 import 'openrouter_models.dart';
 import 'model_purpose_catalog.dart';
-import '../domain/error_message.dart';
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -32,29 +30,13 @@ class ModelCatalog {
     bool openRouter = false,
     bool textOnly = true,
   }) async {
-    try {
-      return await _load(
-        config,
-        baseUrl,
-        apiKey,
-        openRouter,
-        textOnly,
-      ).timeout(const Duration(seconds: 20));
-    } on TimeoutException catch (error) {
-      throw ModelProviderException('获取模型超时，请检查网络后重试', detail: error.toString());
-    } on SocketException catch (error) {
-      throw ModelProviderException(
-        '无法连接服务，请检查网络和服务地址：${errorMessage(error)}',
-        detail: error.toString(),
-      );
-    } on HandshakeException catch (error) {
-      throw ModelProviderException(
-        '安全连接失败，请检查服务地址和证书：${errorMessage(error)}',
-        detail: error.toString(),
-      );
-    } on FormatException catch (error) {
-      throw ModelProviderException('该服务没有返回有效的模型列表', detail: error.toString());
-    }
+    return await _load(
+      config,
+      baseUrl,
+      apiKey,
+      openRouter,
+      textOnly,
+    ).timeout(const Duration(seconds: 20));
   }
 
   Future<List<String>> _load(
@@ -124,15 +106,14 @@ class ModelCatalog {
     request.followRedirects = false;
     request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $apiKey');
     final response = await request.close();
-    if (response.statusCode != 200) {
-      throw ModelProviderException(switch (response.statusCode) {
-        401 || 403 => '密钥无效或没有访问权限，请检查密钥',
-        404 => '该地址不支持获取模型，请检查服务地址',
-        429 => '请求过于频繁或额度不足，请稍后再试',
-        _ => '获取模型失败，请检查服务地址后重试',
-      });
-    }
     final body = await utf8.decoder.bind(response).join();
+    if (response.statusCode != 200) {
+      throw ModelProviderException(
+        response.reasonPhrase,
+        statusCode: response.statusCode,
+        detail: body,
+      );
+    }
     final json = jsonDecode(body) as Map<String, dynamic>;
     final entries = (json['data'] as List)
         .map((item) => Map<String, dynamic>.from(item as Map))

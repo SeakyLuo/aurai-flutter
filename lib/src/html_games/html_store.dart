@@ -1,4 +1,6 @@
 import 'html_app_store.dart';
+import 'miniapp_program.dart';
+import 'miniapp_program_store.dart';
 import 'miniapp_send_action.dart';
 import '../domain/interactive_message.dart';
 import 'dart:convert';
@@ -77,12 +79,56 @@ class HtmlStore {
             (jsonDecode(raw as String) as Map).cast<String, Object?>(),
           );
     final app = await HtmlAppStore.load(db, rows.single['app_id'] as String);
+    final html = (rows.single['html'] as String).isNotEmpty
+        ? rows.single['html'] as String
+        : await HtmlAppStore.code(app);
+    final state = MiniappProgram.decode(
+      rows.single['session_data_json'] != null
+          ? rows.single['state_json']
+          : app['state_json'],
+    );
+    card?.requireViewer(viewer);
+    if (MiniappProgram.source(html) != null) {
+      final saved = await db.query(
+        'app_state',
+        columns: ['value'],
+        where: 'key = ?',
+        whereArgs: [MiniappProgram.key(id)],
+      );
+      final runtime = MiniappProgram.decode(saved.single['value']);
+      final bindings = runtime['bindings'] as Map;
+      final ownIds = [
+        for (final entry in bindings.entries)
+          if ((entry.value['actors'] as List).contains(viewer)) entry.key,
+      ];
+      final ownCards = ownIds.isEmpty
+          ? const <Map<String, Object?>>[]
+          : await db.query(
+              'messages',
+              columns: ['id', 'interactive_json'],
+              where: 'id IN (${List.filled(ownIds.length, '?').join(',')})',
+              whereArgs: ownIds,
+            );
+      state['_miniapp'] = {
+        'viewerId': viewer,
+        'ownerId': MessageSender.localUser.id,
+        'members': await MiniappProgramStore.members(db, conversationId),
+        'own': (runtime['privateViews'] as Map)[viewer],
+        'cards': [
+          for (final row in ownCards)
+            {
+              'messageId': row['id'],
+              ...InteractiveMessage.fromJson(
+                MiniappProgram.decode(row['interactive_json']),
+              ).readFor(viewer),
+            },
+        ],
+      };
+    }
     return HtmlGame.fromRow({
       ...rows.single,
-      'html': (rows.single['html'] as String).isNotEmpty
-          ? rows.single['html'] : await HtmlAppStore.code(app),
-      'state_json': rows.single['session_data_json'] != null
-          ? rows.single['state_json'] : app['state_json'],
+      'html': MiniappProgram.document(html),
+      'state_json': jsonEncode(state),
       'stateful': app['stateful'],
       'interaction_projection': card?.webViewFor(viewer),
     });
@@ -123,15 +169,26 @@ class HtmlStore {
   }) => database.transaction((txn) async {
     final title = (args['title'] as String).trim();
     final existingId = args['appId'] as String?;
-    final existing = existingId == null ? null : await HtmlAppStore.load(txn, existingId);
-    if (existing != null && !newSession && existing['creator_id'] != creator.id) {
+    final existing = existingId == null
+        ? null
+        : await HtmlAppStore.load(txn, existingId);
+    if (existing != null &&
+        !newSession &&
+        existing['creator_id'] != creator.id) {
       throw StateError('只能重新发送自己创建的小程序入口');
     }
-    final html = forwardedHtml ?? (existing == null ? args['html'] as String : await HtmlAppStore.code(existing));
+    final html =
+        forwardedHtml ??
+        (existing == null
+            ? args['html'] as String
+            : await HtmlAppStore.code(existing));
     final width = args['width'] as int?;
     final height = args['height'] as int? ?? 320;
     final displayMode = args['displayMode'] as String? ?? 'hybrid';
-    final backgroundMode = miniappSendAction(html)['backgroundMode'] as String? ?? args['backgroundMode'] as String? ?? 'message';
+    final backgroundMode =
+        miniappSendAction(html)['backgroundMode'] as String? ??
+        args['backgroundMode'] as String? ??
+        'message';
     if (!['message', 'transparent'].contains(backgroundMode)) {
       throw ArgumentError('backgroundMode 必须为 message 或 transparent');
     }
@@ -139,9 +196,12 @@ class HtmlStore {
         height > 640 ||
         (width != null && (width < 180 || width > 600)))
       throw ArgumentError('卡片高度需在 180–640 之间，宽度可自适应或设为 180–600');
-    final state = newSession ? (forwardedResult ?? initializeMiniappMessage(html)) : existing == null
+    final state = newSession
+        ? (forwardedResult ?? initializeMiniappMessage(html))
+        : existing == null
         ? (args['state'] as Map).cast<String, Object?>()
-        : (jsonDecode(existing['state_json'] as String) as Map).cast<String, Object?>();
+        : (jsonDecode(existing['state_json'] as String) as Map)
+              .cast<String, Object?>();
     final participants = List<String>.from(args['participants'] as List);
     final turn = args['turnSenderId'] as String?;
     if (title.isEmpty ||
@@ -180,7 +240,9 @@ class HtmlStore {
       role: role,
       senderId: creator.id,
       sender: creator,
-      text: messageText ?? (interactive?.participation['audience'] == null ? title : '私密交互消息'),
+      text:
+          messageText ??
+          (interactive?.participation['audience'] == null ? title : '私密交互消息'),
       createdAt: DateTime.now(),
       isGroupMessage: groupMessage,
       runId: runId,
@@ -229,6 +291,13 @@ class HtmlStore {
       'turn_sender_id': turn,
       'updated_at': message.createdAt.microsecondsSinceEpoch,
     });
+    if (MiniappProgram.source(html) != null) {
+      if (!newSession) throw ArgumentError('程序小程序需要独立的消息会话');
+      await txn.insert('app_state', {
+        'key': MiniappProgram.key(message.id),
+        'value': jsonEncode(MiniappProgram.initial()),
+      });
+    }
     await txn.rawUpdate(
       'UPDATE conversations SET message_count = message_count + 1, preview = ?, updated_at = ? WHERE id = ?',
       [message.text, message.createdAt.microsecondsSinceEpoch, conversationId],
@@ -270,6 +339,8 @@ class HtmlStore {
     Map<String, Object?> args,
   ) => database.transaction((txn) async {
     final game = await _load(txn, conversationId, messageId);
+    if (game.state.containsKey('_miniapp'))
+      throw StateError('请通过小程序事件提交操作，不能覆盖程序状态');
     if (game.state['_auraiFixedResult'] == true) throw StateError('这条消息的结果已固定');
     final eventId = args['eventId'] as String;
     final expected = args['expectedVersion'] as int;
@@ -338,11 +409,17 @@ class HtmlStore {
       'status': status,
     };
     final now = DateTime.now().microsecondsSinceEpoch;
-    if (!game.sessionScoped) await txn.update('html_apps', {
-      'state_json': jsonEncode(nextState),
-      'version': expected + 1,
-      'updated_at': now,
-    }, where: 'id = ?', whereArgs: [game.appId]);
+    if (!game.sessionScoped)
+      await txn.update(
+        'html_apps',
+        {
+          'state_json': jsonEncode(nextState),
+          'version': expected + 1,
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [game.appId],
+      );
     await txn.update(
       'html_games',
       {
@@ -353,7 +430,9 @@ class HtmlStore {
         'preview': null,
         'updated_at': now,
       },
-      where: game.sessionScoped ? 'message_id = ?' : 'app_id = ? AND session_data_json IS NULL',
+      where: game.sessionScoped
+          ? 'message_id = ?'
+          : 'app_id = ? AND session_data_json IS NULL',
       whereArgs: [game.sessionScoped ? messageId : game.appId],
     );
     await txn.insert('html_game_events', {
@@ -379,6 +458,15 @@ class HtmlStore {
 
   Future<void> savePreview(String id, int version, Uint8List bytes) async {
     if (bytes.length > 256 * 1024) return;
+    final program = await database.query(
+      'app_state',
+      columns: ['key'],
+      where: 'key = ?',
+      whereArgs: [MiniappProgram.key(id)],
+      limit: 1,
+    );
+    // One shared preview cannot safely represent different private player views.
+    if (program.isNotEmpty) return;
     await database.update(
       'html_games',
       {'preview': bytes},

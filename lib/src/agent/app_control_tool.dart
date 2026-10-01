@@ -124,11 +124,7 @@ class AppControlTool implements AgentTool, RuntimeCapabilityAgentTool {
         toolName: name,
         status: ToolResultStatus.error,
         output: {
-          'message': switch (error) {
-            ArgumentError() => error.message,
-            StateError() => error.message,
-            _ => error.toString(),
-          },
+          'message': error.toString(),
         },
       );
     }
