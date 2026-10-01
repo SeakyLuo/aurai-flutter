@@ -1,9 +1,79 @@
 part of 'chat_controller.dart';
 
 extension GroupSleepRecovery on ChatController {
-  GroupWakeTool _groupWakeTool(String groupId, String actorId) => GroupWakeTool(
-    (senderId) => wakeGroupMember(groupId, senderId, actorId: actorId),
-  );
+  Future<DateTime?> _sleepInTargetGroup(
+    String groupId,
+    String senderId,
+    Duration duration,
+    String draft,
+    String reason,
+  ) async {
+    final results = await Future.wait<Object>([
+      _store.database.query(
+        'conversations',
+        columns: ['kind'],
+        where: 'id = ?',
+        whereArgs: [groupId],
+        limit: 1,
+      ),
+      groupStore.members(groupId),
+      GroupParticipation(_store.database).paused(groupId),
+    ]);
+    final groups = results[0] as List<Map<String, Object?>>;
+    final members = results[1] as List<ConversationMember>;
+    final paused = results[2] as Set<String>;
+    final member = members.where((m) => m.sender.id == senderId).firstOrNull;
+    if (groups.isEmpty ||
+        groups.single['kind'] != 'group' ||
+        member == null ||
+        member.sender.kind != MessageSenderKind.agent) {
+      throw StateError('只能安排自己在已加入的群聊中睡眠');
+    }
+    if (member.isMuted) throw StateError('你已被禁言，不能安排定时唤醒');
+    final until = duration.isNegative ? null : DateTime.now().add(duration);
+    if (paused.contains(senderId) && until != null) {
+      throw StateError('自动接话已关闭，请先恢复自动接话再安排定时唤醒');
+    }
+    final state = _executionStates[groupId];
+    final dispatcher = state?.groupDispatcher;
+    final active =
+        dispatcher != null && !dispatcher.closed && !dispatcher.stopped;
+    if (active) dispatcher.hold();
+    try {
+      final batch = _store.database.batch();
+      for (final entry in {'draft': draft, 'reason': reason}.entries) {
+        batch.insert('app_state', {
+          'key': 'group_sleep_${entry.key}:$groupId:$senderId',
+          'value': entry.value,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      await batch.commit(noResult: true);
+      if (until == null) {
+        await _groupSleeps.remove(groupId, senderId);
+      } else {
+        await _groupSleeps.save(groupId, senderId, until);
+      }
+      if (active) dispatcher.sleepUntil(senderId, until);
+      state?.groupReplyDrafts.remove(senderId);
+      final running = state?.groupRuns[senderId];
+      if (running?.runState == ChatRunState.running) {
+        running!.runState = ChatRunState.stopping;
+        await state!.groupRuntimes[senderId]?.cancel();
+      }
+      groupActivityChanges.value++;
+      notifyListeners();
+      return until;
+    } finally {
+      if (active) dispatcher.release();
+    }
+  }
+
+  GroupWakeTool _groupWakeTool(String? groupId, String actorId) =>
+      GroupWakeTool(
+        (targetGroupId, senderId) =>
+            wakeGroupMember(targetGroupId, senderId, actorId: actorId),
+        currentGroupId: groupId,
+      );
 
   Future<bool> wakeGroupMember(
     String conversationId,
@@ -15,12 +85,16 @@ extension GroupSleepRecovery on ChatController {
       for (final member in members) member.sender.id: member.sender,
     };
     if (!senders.containsKey(actorId) ||
-        senders[senderId]?.kind != MessageSenderKind.agent ||
-        actorId == senderId) {
-      throw StateError('只能唤醒当前群聊中的其他 AI 成员');
+        senders[senderId]?.kind != MessageSenderKind.agent) {
+      throw StateError('只能唤醒当前群聊中的 AI 成员');
     }
     if (!_groupSleeps.forGroup(conversationId).containsKey(senderId))
       return false;
+    if ((await GroupParticipation(
+      _store.database,
+    ).paused(conversationId)).contains(senderId)) {
+      throw StateError('该成员已暂停自动接话，唤醒不能绕过暂停');
+    }
     if (members.firstWhere((m) => m.sender.id == senderId).isMuted) {
       throw StateError('该成员已被禁言，不能唤醒');
     }

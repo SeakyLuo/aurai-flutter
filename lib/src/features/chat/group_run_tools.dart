@@ -1,7 +1,8 @@
 part of 'chat_controller.dart';
 
 extension GroupRunTools on ChatController {
-  List<AgentTool> _groupRunTools({
+  void _bindGroupRunTools({
+    required List<AgentTool> tools,
     required Conversation parent,
     required Conversation member,
     required _ReplyContext reply,
@@ -11,72 +12,33 @@ extension GroupRunTools on ChatController {
   }) {
     // Bind tools to the dispatcher that owns this run, including after awaits.
     final dispatcher = _groupDispatcher!;
-    return [
-      GroupMuteTool(
-        (senderId, duration) => setGroupMemberMute(
-          parent.id,
-          senderId,
-          duration: duration,
-          actorId: reply.senderId,
-        ),
-      ),
-      _groupWakeTool(parent.id, reply.senderId),
-      for (final pause in [true, false])
-        GroupAutoReplyTool(
-          pause: pause,
-          change: (senderId, triggerReply) async {
-            if (dispatcher.stopped || dispatcher.closed)
-              throw const AgentCancelled();
-            final members = await groupStore.members(parent.id);
-            if (!members.any((m) => m.sender.id == reply.senderId) ||
-                senderId == reply.senderId ||
-                !members.any(
-                  (m) =>
-                      m.sender.id == senderId &&
-                      m.sender.kind == MessageSenderKind.agent,
-                )) {
-              throw StateError('只能调整当前群聊中其他 AI 成员的自动接话');
-            }
-            await GroupParticipation(_store.database).set(
-              parent.id,
-              senderId,
-              pause,
-              reason: pause ? '${reply.sender.name}暂停了自动接话' : null,
-            );
-            if (pause) {
-              dispatcher.pause(senderId);
-              await _groupSleeps.remove(parent.id, senderId);
-              final target = _groupRuns[senderId];
-              if (target?.runState == ChatRunState.running) {
-                target!.runState = ChatRunState.stopping;
-                await _groupRuntimes[senderId]?.cancel();
-              }
-            } else {
-              dispatcher.paused.remove(senderId);
-              if (triggerReply) {
-                await _groupSleeps.remove(parent.id, senderId);
-                if (dispatcher.stopped || dispatcher.closed)
-                  throw const AgentCancelled();
-                dispatcher.receiveTargeted(const [], {senderId});
-              }
-            }
-            groupActivityChanges.value++;
-            notifyListeners();
-          },
-        ),
-      GroupSleepTool((duration, draft, reason) async {
-        final until = await _scheduleMemberSleep(
-          parent,
-          member,
-          reply.senderId,
-          duration,
-          draft,
-          reason,
-          dispatcher,
-        );
-        onSleep();
+    tools.removeWhere(
+      (t) =>
+          t.definition.name == 'sendGroupMessage' ||
+          t.definition.name == 'sleepGroupChat',
+    );
+    tools.addAll([
+      GroupSleepTool((targetGroupId, duration, draft, reason) async {
+        final until = targetGroupId == parent.id
+            ? await _scheduleMemberSleep(
+                parent,
+                member,
+                reply.senderId,
+                duration,
+                draft,
+                reason,
+                dispatcher,
+              )
+            : await _sleepInTargetGroup(
+                targetGroupId,
+                reply.senderId,
+                duration,
+                draft,
+                reason,
+              );
+        if (targetGroupId == parent.id) onSleep();
         return until;
-      }),
+      }, currentGroupId: parent.id),
       GroupMessageTool(
         (arguments) => _deliverGroupMessage(
           arguments: arguments,
@@ -88,6 +50,81 @@ extension GroupRunTools on ChatController {
           dispatcher: dispatcher,
         ),
       ),
-    ];
+    ]);
   }
+
+  List<AgentTool> _groupAutoReplyTools(
+    String? currentGroupId,
+    String actorId,
+  ) => [
+    for (final pause in [true, false])
+      GroupAutoReplyTool(
+        pause: pause,
+        currentGroupId: currentGroupId,
+        change: (groupId, senderId, triggerReply) async {
+          final results = await Future.wait<Object>([
+            _store.database.query(
+              'conversations',
+              columns: ['kind'],
+              where: 'id = ?',
+              whereArgs: [groupId],
+              limit: 1,
+            ),
+            groupStore.members(groupId),
+          ]);
+          final groups = results[0] as List<Map<String, Object?>>;
+          final members = results[1] as List<ConversationMember>;
+          if (groups.isEmpty ||
+              groups.single['kind'] != 'group' ||
+              !members.any((m) => m.sender.id == actorId) ||
+              !members.any(
+                (m) =>
+                    m.sender.id == senderId &&
+                    m.sender.kind == MessageSenderKind.agent,
+              )) {
+            throw StateError('只能调整你已加入的群聊中 AI 成员的自动接话');
+          }
+          final state = _executionStates[groupId];
+          final dispatcher = state?.groupDispatcher;
+          final active =
+              dispatcher != null && !dispatcher.closed && !dispatcher.stopped;
+          if (active) dispatcher.hold();
+          try {
+            final actor = members
+                .firstWhere((m) => m.sender.id == actorId)
+                .sender;
+            await GroupParticipation(_store.database).set(
+              groupId,
+              senderId,
+              pause,
+              reason: pause ? '${actor.name}暂停了自动接话' : null,
+            );
+            if (pause) {
+              dispatcher?.pause(senderId);
+              await _groupSleeps.remove(groupId, senderId);
+              final target = state?.groupRuns[senderId];
+              if (target?.runState == ChatRunState.running) {
+                target!.runState = ChatRunState.stopping;
+                if (senderId != actorId)
+                  await state!.groupRuntimes[senderId]?.cancel();
+              }
+            } else {
+              dispatcher?.paused.remove(senderId);
+              if (triggerReply) {
+                if (active) {
+                  await _groupSleeps.remove(groupId, senderId);
+                  dispatcher.receiveTargeted(const [], {senderId});
+                } else {
+                  await _groupSleeps.save(groupId, senderId, DateTime.now());
+                }
+              }
+            }
+            groupActivityChanges.value++;
+            notifyListeners();
+          } finally {
+            if (active) dispatcher.release();
+          }
+        },
+      ),
+  ];
 }

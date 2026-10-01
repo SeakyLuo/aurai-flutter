@@ -98,6 +98,7 @@ Map<String, Object?> messageRow(String conversationId, AgentMessage value) => {
       ? 'final'
       : 'assistant',
   'text': value.text,
+  'markdown': value.markdown ? 1 : 0,
   'created_at': value.createdAt.microsecondsSinceEpoch,
 };
 

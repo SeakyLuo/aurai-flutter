@@ -391,12 +391,9 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
                               ).colorScheme.onSurfaceVariant,
                             ),
                     ),
-                    trailing: _loading == purpose
-                        ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const SettingsIcon(type: SettingsIconType.chevron),
+                    trailing: const SettingsIcon(
+                      type: SettingsIconType.chevron,
+                    ),
                     onTap: _loading == null ? () => _select(purpose) : null,
                   ),
                 ),

@@ -12,6 +12,10 @@ extension MessageQuoteActions on ChatController {
         messageId: message.id,
         senderId: message.senderId,
         audience: message.audience,
+        markdown:
+            selectedText == null &&
+            message.role == AgentMessageRole.assistant &&
+            (!message.isGroupMessage || message.markdown),
         text:
             selectedText ??
             [

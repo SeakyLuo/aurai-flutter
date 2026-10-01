@@ -1,13 +1,20 @@
 part of 'chat_controller.dart';
 
 class PendingConfirmation {
-  PendingConfirmation(this.call, this.definition, this.conversationId)
-    : deadline = call.confirmationTimeoutSeconds == null
+  PendingConfirmation(
+    this.call,
+    this.definition,
+    this.conversationId,
+    this.senderId,
+    this.label,
+  ) : deadline = call.confirmationTimeoutSeconds == null
           ? null
           : DateTime.now().add(
               Duration(seconds: call.confirmationTimeoutSeconds!),
             );
   final String conversationId;
+  final String senderId;
+  final String label;
   final DateTime? deadline;
   final ToolCall call;
   final ToolDefinition definition;
@@ -42,7 +49,16 @@ extension _PendingConfirmationActions on ChatController {
     final existing =
         !definition.singleUseConfirmation &&
         ((screenAccess && isScreenTool(call.name)) ||
-            toolApprovals.allows(conversationId, call));
+            toolApprovals.allows(conversationId, call, senderId, definition));
+    final sender = (await _store.database.query(
+      'message_senders',
+      columns: ['name'],
+      where: 'id = ?',
+      whereArgs: [senderId],
+      limit: 1,
+    )).single;
+    final label =
+        '${sender['name']} · ${definition.authorizationLabel ?? (call.name == 'runSkill' ? '技能：${call.arguments['name']}（版本 ${call.arguments['revision']}）' : toolTitle(call.name))}';
     if (!existing)
       await _platform.updateAttentionNotification(
         conversationId,
@@ -60,23 +76,29 @@ extension _PendingConfirmationActions on ChatController {
               call.id,
               call.name,
               call.arguments,
-              '${definition.confirmationDescriptionFor(call.arguments) ?? definition.description}\n\n授权对象：${call.name == 'runSkill' ? call.arguments['name'] : toolTitle(call.name)}',
+              '${definition.confirmationDescriptionFor(call.arguments) ?? definition.description}\n\n授权对象：$label',
               definition.taskScopedConfirmation,
               call.confirmationTimeoutSeconds,
               autoApproved: existing,
             )
           : existing
           ? 'once'
-          : await _confirmInApp(call, definition, conversationId);
+          : await _confirmInApp(
+              call,
+              definition,
+              conversationId,
+              senderId,
+              label,
+            );
       approved = scope != 'deny';
       if (approved && !definition.singleUseConfirmation) {
         await toolApprovals.grant(
           conversationId,
           call,
-          call.name == 'runSkill'
-              ? '技能：${call.arguments['name']}（版本 ${call.arguments['revision']}）'
-              : toolTitle(call.name),
+          label,
           scope,
+          senderId,
+          definition,
         );
       }
     } finally {
@@ -93,8 +115,16 @@ extension _PendingConfirmationActions on ChatController {
     ToolCall call,
     ToolDefinition definition,
     String conversationId,
+    String senderId,
+    String label,
   ) async {
-    final request = PendingConfirmation(call, definition, conversationId);
+    final request = PendingConfirmation(
+      call,
+      definition,
+      conversationId,
+      senderId,
+      label,
+    );
     pendingConfirmation = request;
     notifyListeners();
     final timer = call.confirmationTimeoutSeconds == null

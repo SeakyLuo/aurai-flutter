@@ -399,6 +399,7 @@ class HtmlGameSession extends ChangeNotifier {
         preview = bytes;
         previewVersion = version;
         await store.savePreview(game.messageId, version, bytes);
+        if (!_closed) notifyListeners();
       }
     } on Object {
       // A preview is optional; canonical state is already committed per action.

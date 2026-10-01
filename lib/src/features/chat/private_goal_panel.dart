@@ -1,22 +1,17 @@
-import 'goal_edit_dialog.dart';
+import 'private_goal_sheet.dart';
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../app/ui_action.dart';
 import '../../storage/private_task_state.dart';
-import 'private_task_history.dart';
 import 'chat_controller.dart';
 import 'conversation_menu_icon.dart';
 import 'delete_confirmation_dialog.dart';
 import 'header_action_menu.dart';
 import 'task_playback_icon.dart';
 import 'private_task_list.dart';
-import 'question_icon.dart';
-import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'composer_more_action.dart';
-import 'glass_surface.dart';
 
 /// Shares the queue's composer surface; listens to persisted goal changes.
 /// The independent task list uses the same subscription and initial read.
@@ -120,7 +115,6 @@ class _PrivateGoalPanelState extends State<PrivateGoalPanel> {
       'blocked' => '已停滞',
       'budget_limited' => '预算已用完',
       'complete' => '已完成',
-      'cancelled' => '已取消',
       _ => '目标',
     };
     final elapsed =
@@ -233,19 +227,7 @@ class _PrivateGoalPanelState extends State<PrivateGoalPanel> {
         widget.store?.conversationId != store.conversationId)
       return;
     if (action == 'edit') {
-      await showDialog<void>(
-        context: context,
-        builder: (_) => GoalEditDialog(
-          objective: _state['objective'] as String,
-          running: _state['status'] == 'active',
-          tokenBudget: _state['tokenBudget'] as int?,
-          onSave: (text, budget) => widget.controller.editPrivateGoal(
-            store.conversationId,
-            text,
-            budget,
-          ),
-        ),
-      );
+      await _showGoal(editing: true);
       return;
     }
     if (action == 'detail') {
@@ -279,147 +261,19 @@ class _PrivateGoalPanelState extends State<PrivateGoalPanel> {
     return succeeded;
   }
 
-  Future<void> _showGoal() => showModalBottomSheet<void>(
+  Future<void> _showGoal({bool editing = false}) => showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    isDismissible: false,
+    enableDrag: false,
     showDragHandle: false,
-    builder: (context) => SafeArea(
-      top: false,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * .75,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 81,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: SettingsGlassAction(
-                        label: '关闭',
-                        icon: Icons.close_rounded,
-                        iconWidget: const QuestionIcon(
-                          type: QuestionIconType.close,
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ),
-                  ),
-                  const Expanded(
-                    child: Text(
-                      '目标',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  StreamBuilder<Map<String, dynamic>>(
-                    stream: widget.store!.changes,
-                    initialData: _state,
-                    builder: (sheetContext, snapshot) {
-                      final status = snapshot.requireData['status'];
-                      final active = status == 'active';
-                      final canPlay = status == 'paused' || status == 'blocked';
-                      return SettingsGlassActionSurface(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            RoundAction(
-                              label: active ? '暂停目标' : '继续目标',
-                              icon: active
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              iconWidget: active
-                                  ? TaskPlaybackIcon(
-                                      paused: false,
-                                      color:
-                                          SettingsGlassAction.foregroundColor(
-                                            sheetContext,
-                                            enabled: !_acting,
-                                          ),
-                                    )
-                                  : SettingsIcon(
-                                      type: SettingsIconType.play,
-                                      color:
-                                          SettingsGlassAction.foregroundColor(
-                                            sheetContext,
-                                            enabled: canPlay,
-                                          ),
-                                    ),
-                              onPressed: _acting || (!active && !canPlay)
-                                  ? null
-                                  : () {
-                                      final store = widget.store!;
-                                      Navigator.pop(sheetContext);
-                                      _controlGoal(
-                                        active ? 'pause' : 'resume',
-                                        store,
-                                      );
-                                    },
-                            ),
-                            SizedBox(
-                              height: 18,
-                              child: VerticalDivider(
-                                width: 1,
-                                color: Theme.of(
-                                  sheetContext,
-                                ).colorScheme.outlineVariant,
-                              ),
-                            ),
-                            RoundAction(
-                              label: '删除目标',
-                              icon: Icons.delete_outline_rounded,
-                              iconWidget: const ConversationMenuIcon(
-                                type: ConversationMenuIconType.delete,
-                              ),
-                              onPressed: _acting
-                                  ? null
-                                  : () async {
-                                      final removed = await _controlGoal(
-                                        'clear',
-                                        widget.store!,
-                                      );
-                                      if (removed && sheetContext.mounted)
-                                        Navigator.pop(sheetContext);
-                                    },
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-                child: StreamBuilder<Map<String, dynamic>>(
-                  stream: widget.store!.changes,
-                  initialData: _state,
-                  builder: (context, snapshot) {
-                    final goal = Map<String, dynamic>.from(snapshot.requireData)
-                      ..remove('steps')
-                      ..remove('explanation');
-                    return PrivateTaskHistory(
-                      resultJson: jsonEncode({'kind': 'goal', 'task': goal}),
-                      showGoalMetadata: false,
-                    );
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    builder: (_) => PrivateGoalSheet(
+      store: widget.store!,
+      controller: widget.controller,
+      initialState: _state,
+      initiallyEditing: editing,
+      onControl: (action) => _controlGoal(action, widget.store!),
     ),
   );
 }

@@ -302,6 +302,12 @@ class _HtmlViewState extends State<HtmlView>
     final session = _session!;
     var changed = _surfaceReady != session.ready;
     _surfaceReady = session.ready;
+    if (session.previewVersion == session.game.version &&
+        session.preview != null &&
+        !identical(_preview, session.preview)) {
+      _preview = session.preview;
+      changed = true;
+    }
     // Keep the saved dimensions while the document and its state are loading.
     if (session.ready && session.contentHeight != null) {
       if (_contentHeight == null ||

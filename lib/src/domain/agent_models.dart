@@ -26,6 +26,7 @@ class AgentMessage {
     this.isSystem = false,
     this.isFailure = false,
     this.isGroupMessage = false,
+    this.markdown = false,
     this.isReasoning = false,
     this.isRichReply = false,
     this.quote,
@@ -62,6 +63,7 @@ class AgentMessage {
     isSystem: isSystem,
     isFailure: isFailure,
     isGroupMessage: isGroupMessage,
+    markdown: markdown,
     isReasoning: isReasoning,
     isRichReply: isRichReply,
     quote: quote ?? this.quote,
@@ -88,6 +90,7 @@ class AgentMessage {
     isSystem: isSystem,
     isFailure: isFailure,
     isGroupMessage: isGroupMessage,
+    markdown: markdown,
     isReasoning: isReasoning,
     isRichReply: isRichReply,
     quote: quote,
@@ -112,6 +115,7 @@ class AgentMessage {
     isSystem: isSystem,
     isFailure: isFailure,
     isGroupMessage: isGroupMessage,
+    markdown: markdown,
     isReasoning: isReasoning,
     isRichReply: isRichReply,
     quote: quote,
@@ -153,6 +157,7 @@ class AgentMessage {
   final bool isSystem;
   final bool isFailure;
   final bool isGroupMessage;
+  final bool markdown;
   final bool isReasoning;
   // Derived in a page-wide read, including runs whose cards are off-page.
   final bool isRichReply;
@@ -182,6 +187,7 @@ class AgentMessage {
     if (isSystem) 'isSystem': true,
     if (isFailure) 'isFailure': true,
     if (isGroupMessage) 'isGroupMessage': true,
+    if (markdown) 'markdown': true,
     if (isReasoning) 'isReasoning': true,
     if (quickReplyToId != null) 'quickReplyToId': quickReplyToId,
     if (quickReplyKey != null) 'quickReplyKey': quickReplyKey,
@@ -208,6 +214,7 @@ class AgentMessage {
     isSystem: json['isSystem'] == true,
     isFailure: json['isFailure'] == true,
     isGroupMessage: json['isGroupMessage'] == true,
+    markdown: json['markdown'] == true,
     isReasoning: json['isReasoning'] == true,
     quickReplyToId: json['quickReplyToId'] as String?,
     quickReplyKey: json['quickReplyKey'] as String?,

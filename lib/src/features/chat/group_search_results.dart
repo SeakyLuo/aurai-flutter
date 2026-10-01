@@ -215,6 +215,7 @@ class GroupSearchResults extends StatelessWidget {
                               ),
                               const SizedBox(height: 6),
                               MessageContentPreview(
+                                markdown: r.markdown,
                                 text: r.text,
                                 images: r.images,
                                 files: r.files,

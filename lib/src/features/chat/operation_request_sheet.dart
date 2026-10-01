@@ -97,10 +97,10 @@ class _OperationRequestSheetState extends State<_OperationRequestSheet> {
         await widget.controller.toolApprovals.grant(
           widget.request.conversationId,
           widget.request.call,
-          widget.request.call.name == 'runSkill'
-              ? '技能：${widget.request.call.arguments['name']}（版本 ${widget.request.call.arguments['revision']}）'
-              : toolTitle(widget.request.call.name),
+          widget.request.label,
           scope,
+          widget.request.senderId,
+          widget.request.definition,
         );
       } catch (caughtError) {
         if (mounted)
@@ -164,7 +164,7 @@ class _OperationRequestSheetState extends State<_OperationRequestSheet> {
                 Flexible(
                   child: SingleChildScrollView(
                     child: Text(
-                      '${widget.detail}\n\n授权对象：${widget.request.call.name == 'runSkill' ? widget.request.call.arguments['name'] : toolTitle(widget.request.call.name)}${widget.request.deadline == null ? '' : '\n未处理将自动拒绝'}',
+                      '${widget.detail}\n\n授权对象：${widget.request.label}${widget.request.deadline == null ? '' : '\n未处理将自动拒绝'}',
                       style: TextStyle(
                         fontSize: 15,
                         height: 1.6,

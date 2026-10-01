@@ -91,6 +91,7 @@ extension GroupMessageDelivery on ChatController {
                 senderId: source.senderId,
                 audience: source.audience,
                 text: source.text,
+                markdown: source.markdown,
               )
               ..senderName =
                   source.sender?.name ?? MessageSender.localUser.name);
@@ -110,6 +111,7 @@ extension GroupMessageDelivery on ChatController {
           id: newMessageId(),
           role: AgentMessageRole.assistant,
           isGroupMessage: true,
+          markdown: item['markdown'] == true,
           senderId: reply.senderId,
           sender: _groupSenders[reply.senderId]!,
           audience: audience,
@@ -191,7 +193,7 @@ extension GroupMessageDelivery on ChatController {
     if (output.isNotEmpty &&
         output.single.canView(MessageSender.localUser.id)) {
       final body =
-          '${reply.sender.name}：${output.map((m) => markdownPreviewText(m.text)).join('\n')}';
+          '${reply.sender.name}：${output.map((m) => m.markdown ? markdownPreviewText(m.text) : memberMentionsPlainText(m.text)).join('\n')}';
       completedReplies.value = ConversationCompletion(
         conversationId: parent.id,
         title: parent.title,

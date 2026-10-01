@@ -422,7 +422,6 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
                       ? null
                       : _selectCurrentModel,
                   subtitle: '不指定具体模型时，将修改所有 AI 当前使用的模型',
-                  loading: _loadingUsedModels,
                 ),
                 const SizedBox(height: 16),
                 _label('新模型'),
@@ -434,7 +433,6 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
                           _replacing
                       ? null
                       : _selectNewModel,
-                  loading: _loadingNewModels,
                 ),
                 if (_noCandidates) ...[
                   const SizedBox(height: 12),
@@ -491,26 +489,20 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
     ),
   );
 
-  Widget _choice(
-    String title,
-    VoidCallback? onTap, {
-    String? subtitle,
-    bool loading = false,
-  }) => Material(
-    color: settingsFieldColor(context),
-    borderRadius: BorderRadius.circular(26),
-    clipBehavior: Clip.antiAlias,
-    child: ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-      title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
-      subtitle: subtitle == null ? null : Text(subtitle),
-      trailing: loading
-          ? const SizedBox.square(
-              dimension: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const SettingsIcon(type: SettingsIconType.chevron),
-      onTap: onTap,
-    ),
-  );
+  Widget _choice(String title, VoidCallback? onTap, {String? subtitle}) =>
+      Material(
+        color: settingsFieldColor(context),
+        borderRadius: BorderRadius.circular(26),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 8,
+          ),
+          title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
+          subtitle: subtitle == null ? null : Text(subtitle),
+          trailing: const SettingsIcon(type: SettingsIconType.chevron),
+          onTap: onTap,
+        ),
+      );
 }

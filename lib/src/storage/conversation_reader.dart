@@ -537,6 +537,7 @@ class ConversationReader {
                         as Map<String, dynamic>,
                   ),
             role: AgentMessageRole.values.byName(row['role']! as String),
+            markdown: row['markdown'] == 1,
             senderId: row['sender_id'] as String,
             sender: senders[row['sender_id']]!,
             text: row['text']! as String,

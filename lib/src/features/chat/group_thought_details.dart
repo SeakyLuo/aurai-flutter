@@ -150,7 +150,10 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
                       right: 16,
                       bottom: 8,
                       child: Center(
-                        child: JumpToBottomButton(onPressed: _jumpToBottom),
+                        child: JumpToBottomButton(
+                          iconOnly: true,
+                          onPressed: _jumpToBottom,
+                        ),
                       ),
                     ),
                 ],

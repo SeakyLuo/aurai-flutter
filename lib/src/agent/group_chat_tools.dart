@@ -1,4 +1,5 @@
 import '../domain/tool_models.dart';
+import '../domain/ai_profile.dart';
 import '../storage/group_chat_store.dart';
 
 class GroupChatTool
@@ -62,6 +63,36 @@ class GroupChatTool
         output: {'message': '群聊不存在或你不是当前成员'},
       );
     _groupTitle = rows.single['title'] as String;
+    final id = call.arguments['id'] as String? ?? currentConversationId;
+    if ({
+      'setAdministrators',
+      'transferOwnership',
+      'dissolve',
+    }.contains(operation)) {
+      await store.requireOwner(store.database, id, senderId);
+    } else if (operation == 'updateMembers') {
+      await store.requireManager(store.database, id, senderId);
+      final members = await store.members(id);
+      final role = members.firstWhere((m) => m.sender.id == senderId).role;
+      final ids = (call.arguments['aiIds'] as List).cast<String>().toSet();
+      if (members.any(
+        (m) =>
+            m.role == GroupMemberRole.owner &&
+            m.sender.id != 'user:local' &&
+            !ids.contains(m.sender.id),
+      )) {
+        throw StateError('不能移除群主，不能申请越权');
+      }
+      if (role != GroupMemberRole.owner &&
+          members.any(
+            (m) =>
+                m.role == GroupMemberRole.admin && !ids.contains(m.sender.id),
+          )) {
+        throw StateError('群管理员不能移除其他管理员，不能申请越权');
+      }
+    } else if (operation == 'rename') {
+      await store.requireRenamePermission(store.database, id, senderId);
+    }
     return null;
   }
 

@@ -48,7 +48,12 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
             'text': {
               'type': 'string',
               'description':
-                  'May be empty when images are attached. Network reference images may also use Markdown image syntax.',
+                  'May be empty when images are attached. Network reference images may use Markdown image syntax only with markdown=true.',
+            },
+            'markdown': {
+              'type': 'boolean',
+              'description':
+                  'Optional, defaults to false. Text is displayed literally; set true only when Markdown formatting or network image syntax is intended.',
             },
             'imagePaths': {
               'type': 'array',

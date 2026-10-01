@@ -148,7 +148,7 @@ class QuickReplyTool implements AgentTool, RuntimeCapabilityAgentTool {
     capabilityId: 'local.messages',
     safety: ToolSafety.lowRisk,
     description:
-        '向当前会话中可见的消息发送快捷消息（快捷回复、表情回应），显示在原消息下方。同一人可发送多种类型，每种类型最多一项；发送新类型会保留已有类型。适合点赞、点踩、喜欢、哈哈、庆祝、附议、完成、收到、在看、疑问，避免为简单回应另发长消息。messageId 从消息上下文获取，不要让用户填写。',
+        '向你有权访问的任意会话中可见的消息发送快捷消息（快捷回复、表情回应），显示在原消息下方。通过 messageId 自动定位原会话，不受当前私聊或群聊限制；保留原消息可见范围，被禁言时不能向该群发送。同一人可发送多种类型，每种类型最多一项；发送新类型会保留已有类型。适合点赞、点踩、喜欢、哈哈、庆祝、附议、完成、收到、在看、疑问，避免为简单回应另发长消息。messageId 从消息上下文或历史工具获取，不要让用户填写。',
     inputSchema: {
       'type': 'object',
       'properties': {

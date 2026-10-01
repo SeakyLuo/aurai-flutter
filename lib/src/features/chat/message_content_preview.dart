@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../domain/message_image.dart';
 import '../../domain/message_file.dart';
 import '../../domain/message_summary.dart';
+import '../../domain/markdown_plain_text.dart';
 import 'image_attachments.dart';
 import 'message_preview_text.dart';
 import 'unavailable_image.dart';
@@ -25,6 +26,7 @@ class MessageContentPreview extends StatelessWidget {
     this.gallery,
     this.sourceMessageId,
     this.maxImages = 3,
+    this.markdown = true,
   });
   final Uint8List? htmlPreview;
   final String text, query;
@@ -34,6 +36,7 @@ class MessageContentPreview extends StatelessWidget {
   final List<MessageImage>? gallery;
   final int? maxLines;
   final int maxImages;
+  final bool markdown;
   final TextStyle? style;
 
   @override
@@ -55,7 +58,8 @@ class MessageContentPreview extends StatelessWidget {
           )
         else if (body.isNotEmpty)
           MessagePreviewText(
-            text: body,
+            text: markdown ? body : memberMentionsPlainText(body),
+            literal: !markdown,
             maxLines: maxLines,
             query: query,
             snippet: true,

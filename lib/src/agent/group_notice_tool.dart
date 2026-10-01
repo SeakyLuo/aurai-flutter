@@ -10,18 +10,22 @@ import 'group_message_marks_tool.dart';
 class GroupNoticeTool implements AgentTool, RuntimeCapabilityAgentTool {
   GroupNoticeTool(this.groups, this.actorId, this.groupId);
   final GroupChatStore groups;
-  final String actorId, groupId;
+  final String actorId;
+  final String? groupId;
 
   @override
   ToolDefinition get definition => ToolDefinition(
     name: 'dismissGroupNotice',
     description:
-        'Hide a banner from your own automatic context in the current group. Use the exact kind and version from the banner you saw. Does not clear announcements, unpin messages, affect other members or erase history. You may dismiss it yourself. Updated announcements and new pins appear again. readGroupAnnouncement and readGroupPinnedMessage still read hidden content.',
+        'Hide a banner from your own automatic context in a group you belong to. Available from any conversation; supply groupId when there is no current group. Use the exact kind and version from the banner you saw. Does not clear announcements, unpin messages, affect other members or erase history. You may dismiss it yourself. Updated announcements and new pins appear again. readGroupAnnouncement and readGroupPinnedMessage still read hidden content.',
     capabilityId: 'local.group_chats',
     safety: ToolSafety.lowRisk,
     inputSchema: {
       'type': 'object',
       'properties': {
+        'groupId': {
+          'type': ['string', 'null'],
+        },
         'kind': {
           'type': 'string',
           'enum': ['announcement', 'pin'],
@@ -31,12 +35,13 @@ class GroupNoticeTool implements AgentTool, RuntimeCapabilityAgentTool {
           'description': 'Exact version from the banner.',
         },
       },
-      'required': ['kind', 'version'],
+      'required': ['kind', 'version', if (groupId == null) 'groupId'],
       'additionalProperties': false,
     },
   );
 
   Future<String> context() async {
+    final groupId = this.groupId!;
     final (announcement, pin, hidden) = await (
       GroupAnnouncementStore(groups).read(groupId, actorId),
       GroupMessageMarks(groups, actorId: actorId).pinned(groupId),
@@ -83,6 +88,8 @@ class GroupNoticeTool implements AgentTool, RuntimeCapabilityAgentTool {
 
   @override
   Future<ToolResult> execute(ToolCall call) async {
+    final groupId = call.arguments['groupId'] as String? ?? this.groupId;
+    if (groupId == null) throw ArgumentError('请指定目标群聊 groupId');
     // Recheck membership; dismiss never borrows another member's access.
     await GroupAnnouncementStore(groups).read(groupId, actorId);
     final kind = call.arguments['kind'] as String;

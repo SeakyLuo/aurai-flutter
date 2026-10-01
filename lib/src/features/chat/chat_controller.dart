@@ -1,3 +1,4 @@
+import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 import '../../agent/private_task_tool.dart';
 import '../../storage/private_task_state.dart';
 import '../../storage/asset_library.dart';
@@ -6,6 +7,7 @@ import '../../storage/project_directory.dart';
 import '../../platform/project_run_snapshots.dart';
 import '../../agent/group_notice_tool.dart';
 import '../../agent/group_access_tool.dart';
+import '../../agent/peer_access_tool.dart';
 import '../../agent/deliver_file_tool.dart';
 import '../../platform/generated_file_store.dart';
 import '../../agent/group_message_marks_tool.dart';
@@ -74,6 +76,7 @@ import '../../agent/history_message_tools.dart';
 import '../../storage/group_sleep_store.dart';
 import '../../agent/group_history_tool.dart';
 import 'markdown_preview_text.dart';
+import '../../domain/markdown_plain_text.dart';
 import 'dart:developer' as developer;
 import '../../agent/app_control_tool.dart';
 import '../../agent/app_assistance_tool.dart';
@@ -211,6 +214,7 @@ part 'group_sleep_recovery.dart';
 part 'group_run_tools.dart';
 part 'group_member_mute.dart';
 part 'user_data_read_access.dart';
+part 'group_tool_access.dart';
 
 class ChatController extends ChangeNotifier {
   AiProfile? _activeAi;

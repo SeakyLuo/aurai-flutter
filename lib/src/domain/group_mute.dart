@@ -1,4 +1,5 @@
 class GroupMute {
+  static const maxDuration = Duration(days: 30);
   const GroupMute({this.until});
   // No deadline means permanent; no GroupMute object means unrestricted.
   final DateTime? until;

@@ -114,10 +114,7 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
         : const <String, SourceReference>{};
     Widget activityAt(int index) {
       final activity = widget.summary.activities[index];
-      // Ordinary output stays in the conversation at its original position.
-      if (activity.messageId != null && !activity.isReasoning) {
-        return const SizedBox.shrink();
-      }
+      // Completed output remains available when the task process is expanded.
       if (widget.excludedMessageId != null &&
           activity.messageId == widget.excludedMessageId) {
         return const SizedBox.shrink();

@@ -268,8 +268,7 @@ class ExecutionProgress extends StatelessWidget {
         !accessibilityRequestPending;
     final toolRunning =
         state == ChatRunState.running &&
-        steps.isNotEmpty &&
-        steps.last.status == AgentStepStatus.running &&
+        steps.any((step) => step.status == AgentStepStatus.running) &&
         !accessibilityRequestPending;
     if (streamingReply ||
         toolRunning ||

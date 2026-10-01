@@ -71,6 +71,7 @@ class ChatViewportState extends State<ChatViewport> {
   final _pageStorage = PageStorageBucket();
   final _items = ItemScrollController();
   final _positions = ItemPositionsListener.create();
+  ScrollPosition? _listScrollPosition;
   late Map<String, int> _indices;
   ChatScrollBookmark? _anchor;
   late bool _following;
@@ -114,6 +115,21 @@ class ChatViewportState extends State<ChatViewport> {
     return itemAlignment - (index == 0 ? widget.padding.top / _height : 0);
   }
 
+  void _jumpToEntry({required int index, required double alignment}) {
+    final position = _positions.itemPositions.value
+        .where((item) => item.index == index)
+        .firstOrNull;
+    final scroll = _listScrollPosition;
+    if (position != null && scroll != null && scroll.hasContentDimensions) {
+      final targetLeading =
+          alignment * _height + (index == 0 ? widget.padding.top : 0);
+      final delta = position.itemLeadingEdge * _height - targetLeading;
+      scroll.jumpTo(scroll.pixels + delta);
+      return;
+    }
+    _items.jumpTo(index: index, alignment: alignment);
+  }
+
   void _scheduleSentSync() {
     if (_sentSyncQueued) return;
     _sentSyncQueued = true;
@@ -144,7 +160,7 @@ class ChatViewportState extends State<ChatViewport> {
         _restoring = false;
         return;
       }
-      _items.jumpTo(
+      _jumpToEntry(
         index: _indices[_replyAnchorId]!,
         alignment: _listAlignment(
           _indices[_replyAnchorId]!,
@@ -222,7 +238,7 @@ class ChatViewportState extends State<ChatViewport> {
         _restoring = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || revision != _scrollRevision) return;
-          _items.jumpTo(
+          _jumpToEntry(
             index: nextIndex,
             alignment: _listAlignment(nextIndex, anchor.alignment),
           );
@@ -359,7 +375,7 @@ class ChatViewportState extends State<ChatViewport> {
     final index = position.floor().clamp(0, widget.entries.length - 1);
     final height = _entryHeights[widget.entries[index].id];
     final withinItem = height == null ? 0.0 : (position - index) * height;
-    _items.jumpTo(
+    _jumpToEntry(
       index: index,
       alignment: _listAlignment(
         index,
@@ -401,7 +417,7 @@ class ChatViewportState extends State<ChatViewport> {
     widget.onBookmark(anchor);
     _restoring = true;
     // Establish the item's anchor before its height changes, in the same frame.
-    _items.jumpTo(
+    _jumpToEntry(
       index: _anchorIndex(anchor),
       alignment: _listAlignment(_anchorIndex(anchor), anchor.alignment),
     );
@@ -422,7 +438,7 @@ class ChatViewportState extends State<ChatViewport> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || revision != _scrollRevision) return;
       final index = _anchorIndex(bookmark);
-      _items.jumpTo(
+      _jumpToEntry(
         index: index,
         alignment: _listAlignment(index, bookmark.alignment),
       );
@@ -477,7 +493,7 @@ class ChatViewportState extends State<ChatViewport> {
             .5)
       return;
     if (_replyAnchorId != null) setState(() => _replyAnchorId = null);
-    _items.jumpTo(
+    _jumpToEntry(
       index: widget.entries.length,
       alignment: (1 - widget.padding.bottom / _height).clamp(0.0, 1.0),
     );
@@ -554,7 +570,12 @@ class ChatViewportState extends State<ChatViewport> {
                 itemCount: widget.entries.length + 1,
                 itemBuilder: (context, index) {
                   if (index == widget.entries.length) {
-                    return SizedBox(height: _footerHeight);
+                    return Builder(
+                      builder: (context) {
+                        _listScrollPosition = Scrollable.of(context).position;
+                        return SizedBox(height: _footerHeight);
+                      },
+                    );
                   }
                   final entry = widget.entries[index];
                   final animateEntrance = _enteringToolEntries.remove(entry.id);
@@ -564,9 +585,16 @@ class ChatViewportState extends State<ChatViewport> {
                       preserve: () => _preserveEntry(entry.id),
                       child: ChatEntrySize(
                         onHeight: (height) => _measureEntry(entry.id, height),
-                        child: _ChatEntryEntrance(
-                          animate: animateEntrance,
-                          child: entry.builder(context),
+                        child: Builder(
+                          builder: (context) {
+                            _listScrollPosition = Scrollable.of(
+                              context,
+                            ).position;
+                            return _ChatEntryEntrance(
+                              animate: animateEntrance,
+                              child: entry.builder(context),
+                            );
+                          },
                         ),
                       ),
                     ),

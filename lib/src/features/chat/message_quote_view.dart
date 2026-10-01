@@ -53,6 +53,7 @@ class MessageQuoteView extends StatelessWidget {
                     const SizedBox(height: 2),
                     QuoteTextPreview(
                       text: quote.textFor('user:local'),
+                      markdown: quote.markdown,
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.35,

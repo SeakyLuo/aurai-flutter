@@ -11,10 +11,12 @@ class JumpToBottomButton extends StatelessWidget {
     required this.onPressed,
     this.visible = true,
     this.newMessagesOnly = false,
+    this.iconOnly = false,
   });
 
   final bool visible;
   final bool newMessagesOnly;
+  final bool iconOnly;
   final VoidCallback onPressed;
 
   @override
@@ -43,41 +45,48 @@ class JumpToBottomButton extends StatelessWidget {
                 duration: duration,
                 curve: Curves.easeOutCubic,
                 child: GlassSurface(
-                  radius: 24,
+                  radius: iconOnly ? 20 : 24,
                   child: AnimatedSize(
                     duration: duration,
                     alignment: Alignment.centerRight,
                     curve: Curves.easeOutCubic,
-                    child: TextButton(
-                      onPressed: onPressed,
-                      style: TextButton.styleFrom(
-                        foregroundColor: color,
-                        minimumSize: const Size(56, 40),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Semantics(
-                        label: state.unread > 0
-                            ? '${state.unread}条新消息，回到最新消息'
-                            : '回到底部',
-                        excludeSemantics: true,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            MessageJumpArrow(color: color),
-                            if (state.unread > 0) ...[
-                              const SizedBox(width: 6),
-                              Text(
-                                '${state.unread > 9999 ? '9999+' : state.unread}条新消息',
+                    child: iconOnly
+                        ? RoundAction(
+                            icon: Icons.arrow_downward_rounded,
+                            iconWidget: MessageJumpArrow(color: color),
+                            label: '回到底部',
+                            onPressed: onPressed,
+                          )
+                        : TextButton(
+                            onPressed: onPressed,
+                            style: TextButton.styleFrom(
+                              foregroundColor: color,
+                              minimumSize: const Size(56, 40),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
                               ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
+                              shape: const StadiumBorder(),
+                            ),
+                            child: Semantics(
+                              label: state.unread > 0
+                                  ? '${state.unread}条新消息，回到最新消息'
+                                  : '回到底部',
+                              excludeSemantics: true,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  MessageJumpArrow(color: color),
+                                  if (state.unread > 0) ...[
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '${state.unread > 9999 ? '9999+' : state.unread}条新消息',
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
                   ),
                 ),
               ),
