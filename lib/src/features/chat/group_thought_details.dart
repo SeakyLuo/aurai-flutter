@@ -28,6 +28,7 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
   ]);
   bool _running = true;
   bool _showJumpToBottom = false;
+  bool _followBottom = true;
 
   @override
   void initState() {
@@ -42,14 +43,13 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
         .groupActivitiesFor(widget.conversationId)
         .where((activity) => activity.runId == widget.activity.runId)
         .firstOrNull;
-    final follow = !_scroll.hasClients || _scroll.position.extentAfter < 48;
     setState(() {
       _running = current != null;
       if (current != null) _activity = current;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scroll.hasClients) return;
-      if (follow) _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      if (_followBottom) _scroll.jumpTo(_scroll.position.maxScrollExtent);
       _updateJumpButton();
     });
   }
@@ -63,7 +63,22 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
   }
 
   void _jumpToBottom() {
+    _followBottom = true;
     _scroll.jumpTo(_scroll.position.maxScrollExtent);
+  }
+
+  bool _onScroll(ScrollNotification notification) {
+    if (notification.depth != 0) return false;
+    if (notification is ScrollStartNotification &&
+        notification.dragDetails != null) {
+      _followBottom = false;
+    } else if (notification is ScrollUpdateNotification &&
+        notification.scrollDelta! < 0) {
+      _followBottom = false;
+    } else if (notification is ScrollEndNotification) {
+      _followBottom = notification.metrics.extentAfter <= 1;
+    }
+    return false;
   }
 
   @override
@@ -116,34 +131,37 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
               child: ScrollAwareJumpStack(
                 fit: StackFit.expand,
                 children: [
-                  ListView(
-                    controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-                    children: [
-                      if (widget.reason != null) ...[
-                        Text(
-                          widget.reasonTitle!,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
+                  NotificationListener<ScrollNotification>(
+                    onNotification: _onScroll,
+                    child: ListView(
+                      controller: _scroll,
+                      padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+                      children: [
+                        if (widget.reason != null) ...[
+                          Text(
+                            widget.reasonTitle!,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        SelectableText(
-                          widget.reason!,
-                          style: const TextStyle(fontSize: 15, height: 1.65),
-                        ),
+                          const SizedBox(height: 12),
+                          SelectableText(
+                            widget.reason!,
+                            style: const TextStyle(fontSize: 15, height: 1.65),
+                          ),
+                        ],
+                        if (_activity.thoughts.isNotEmpty)
+                          SelectableText(
+                            _activity.thoughts.join('\n\n'),
+                            style: TextStyle(
+                              fontSize: 15,
+                              height: 1.65,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
                       ],
-                      if (_activity.thoughts.isNotEmpty)
-                        SelectableText(
-                          _activity.thoughts.join('\n\n'),
-                          style: TextStyle(
-                            fontSize: 15,
-                            height: 1.65,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                    ],
+                    ),
                   ),
                   if (_showJumpToBottom)
                     Positioned(

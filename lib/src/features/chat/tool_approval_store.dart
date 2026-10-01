@@ -23,18 +23,20 @@ class ToolApprovalStore {
   }
 
   String key(ToolCall call, String senderId, ToolDefinition definition) {
-    final keys = call.arguments.keys.where((key) => key != 'offset').toList()..sort();
+    final keys = call.arguments.keys.where((key) => key != 'offset').toList()
+      ..sort();
     return jsonEncode([
-        call.name,
-        senderId,
-        definition.authorizationScope ?? (call.name == 'runSkill' ? null : {
-          for (final key in keys) key: call.arguments[key],
-        }),
-        if (call.name == 'runSkill') ...[
-          call.arguments['name'],
-          call.arguments['revision'],
-        ],
-      ]);
+      call.name,
+      senderId,
+      definition.authorizationScope ??
+          (call.name == 'runSkill'
+              ? null
+              : {for (final key in keys) key: call.arguments[key]}),
+      if (call.name == 'runSkill') ...[
+        call.arguments['name'],
+        call.arguments['revision'],
+      ],
+    ]);
   }
 
   bool allows(

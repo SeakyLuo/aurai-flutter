@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/global_ui.dart';
+import 'conversation_menu_icon.dart';
 import 'glass_surface.dart';
 import 'task_failure_icon.dart';
 import 'task_playback_icon.dart';
@@ -57,11 +58,14 @@ class TaskFailureCard extends StatelessWidget {
             transformHitTests: false,
             child: RoundAction(
               label: actionLabel,
-              icon: paused == true
-                  ? Icons.play_arrow_rounded
-                  : Icons.refresh_rounded,
-              iconWidget: paused != false
-                  ? null
+              icon: Icons.refresh_rounded,
+              iconWidget: paused == null
+                  ? ConversationMenuIcon(
+                      type: ConversationMenuIconType.retry,
+                      color: enabled
+                          ? GlobalUI.onPrimary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                    )
                   : TaskPlaybackIcon(
                       paused: paused!,
                       color: enabled

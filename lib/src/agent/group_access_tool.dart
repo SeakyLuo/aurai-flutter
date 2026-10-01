@@ -61,13 +61,13 @@ class GroupAccessTool
     return ToolDefinition(
       name: base.name,
       description:
-          '${base.description} Reading outside your own access and removing another member\'s group mark require approval. Changing the shared top pin requires approval. Approval cannot grant a group management role. Denial grants no access; do not repeatedly request it.',
+          '${base.description} The acting AI being the group owner or an administrator permits changing the shared top pin and removing shared group marks without extra approval. Other members must request approval for changing the shared top pin or removing another member\'s mark. Reading or using access outside your own membership requires approval and never grants a group management role. Denial grants no access; do not repeatedly request it.',
       inputSchema: base.inputSchema,
       capabilityId: base.capabilityId,
       safety: base.safety,
       executionTimeout: base.executionTimeout,
       confirmationMayBeRequired: true,
-      singleUseConfirmation: base.safety != ToolSafety.readOnly,
+      singleUseConfirmation: false,
       authorizationScope: _scope,
       authorizationLabel: '操作群“$_title”',
       confirmationDescriptionBuilder: (args) =>

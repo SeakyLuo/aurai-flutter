@@ -28,7 +28,10 @@ extension _ChatGroupNavigation on _ChatPageState {
   ) => ListView(
     key: ValueKey('introduction:$_conversationId'),
     primary: false,
-    padding: EdgeInsets.only(top: top, bottom: bottom + 16),
+    padding: EdgeInsets.only(
+      top: top,
+      bottom: bottom + GroupActivityAvatars.height,
+    ),
     children: [for (final entry in timeline) entry.builder(context)],
   );
 }

@@ -114,11 +114,19 @@ class ToolExecutor {
         final rejected = await (tool as PreflightAgentTool).preflight(call);
         if (rejected != null) return rejected;
       } on StateError catch (error) {
-        return ToolResult(callId: call.id, toolName: call.name,
-          status: ToolResultStatus.denied, output: {'error': error.message});
+        return ToolResult(
+          callId: call.id,
+          toolName: call.name,
+          status: ToolResultStatus.denied,
+          output: {'error': error.message},
+        );
       } on ArgumentError catch (error) {
-        return ToolResult(callId: call.id, toolName: call.name,
-          status: ToolResultStatus.error, output: {'error': error.message.toString()});
+        return ToolResult(
+          callId: call.id,
+          toolName: call.name,
+          status: ToolResultStatus.error,
+          output: {'error': error.message.toString()},
+        );
       }
     }
     final safety = tool.definition.safetyFor(call.arguments);

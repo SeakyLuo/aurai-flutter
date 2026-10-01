@@ -17,6 +17,8 @@ class GroupActivityAvatars extends StatefulWidget {
   final List<GroupMemberActivity> activities;
   final VoidCallback onPressed;
 
+  static const height = 40.0;
+
   @override
   State<GroupActivityAvatars> createState() => _ActivityAvatarsState();
 }
@@ -131,7 +133,7 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
           heightFactor: 1,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
-            // The positioned overlay never changes the viewport's bottom padding.
+            // Reserve this overlay's height in the viewport even when hidden.
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Align(
@@ -164,10 +166,13 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
         behavior: HitTestBehavior.opaque,
         onTap: widget.onPressed,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          constraints: const BoxConstraints(
+            minWidth: 40,
+            minHeight: GroupActivityAvatars.height,
+          ),
           child: SizedBox(
             width: pileWidth,
-            height: 40,
+            height: GroupActivityAvatars.height,
             child: Stack(
               clipBehavior: Clip.none,
               children: [

@@ -51,20 +51,32 @@ extension GroupToolAccess on ChatController {
         }
         if (target.isMuted) throw StateError('该成员已被禁言，不能调整接话或唤醒');
       }
+      var approval = false;
+      if (tool is GroupAutoReplyTool && targetId != actorId) {
+        if (target.role == GroupMemberRole.owner ||
+            actor.role == GroupMemberRole.member &&
+                target.role == GroupMemberRole.admin) {
+          throw StateError('不能调整更高角色成员的自动接话，不能申请越权');
+        }
+        approval = actor.role == target.role;
+      }
       final action = switch (call.name) {
         'pauseGroupAutoReply' => '暂停自动接话',
         'resumeGroupAutoReply' =>
           call.arguments['triggerReply'] == true ? '恢复自动接话并触发思考' : '恢复自动接话',
         'wakeGroupMember' => '唤醒',
-        _ => call.arguments['durationMinutes'] == 0 ? '解除禁言' : '禁言',
+        _ => switch (call.arguments['durationMinutes']) {
+          0 => '解除禁言',
+          null => '永久禁言',
+          final minutes => '禁言 $minutes 分钟',
+        },
       };
-      final keys = call.arguments.keys.where((key) => key != 'groupId').toList()
-        ..sort();
       return (
-        approval: tool is! GroupWakeTool && targetId != actorId,
+        approval: approval,
         scope: jsonEncode([
           id,
-          {for (final key in keys) key: call.arguments[key]},
+          targetId,
+          if (tool is GroupMuteTool) call.arguments['durationMinutes'],
         ]),
         description:
             '在“${groups.single['title']}”中对“${target.sender.name}”$action',

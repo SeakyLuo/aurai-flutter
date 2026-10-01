@@ -44,12 +44,98 @@ extension ConversationRunFailure on ChatController {
       _recordedRunErrors[error] == activeConversation.id;
 
   bool canOfferFailedRetry(AgentMessage message) =>
-      activeConversation.kind == ConversationKind.direct &&
-      message.role == AgentMessageRole.assistant &&
-      message.runId != null &&
-      activeConversation.runState == ChatRunState.failed &&
-      activeConversation.activeRunId == message.runId &&
-      !hasRunningTask;
+      activeConversation.kind == ConversationKind.group
+      ? message.isFailure &&
+            _groupRuns[message.senderId]?.runState != ChatRunState.running &&
+            _groupDispatcher?.hasPending(message.senderId) != true &&
+            activeConversation.runState != ChatRunState.stopping
+      : message.role == AgentMessageRole.assistant &&
+            message.runId != null &&
+            activeConversation.runState == ChatRunState.failed &&
+            activeConversation.activeRunId == message.runId &&
+            !hasRunningTask;
+
+  Future<void> retryFailedMessage(AgentMessage message) async {
+    if (activeConversation.kind == ConversationKind.direct) {
+      await retryFailedRun(message.runId);
+      return;
+    }
+    if (!canOfferFailedRetry(message)) throw StateError('这条消息当前不能重试');
+    final conversation = activeConversation;
+    final members = await groupStore.members(conversation.id);
+    final member = members
+        .where((m) => m.sender.id == message.senderId)
+        .firstOrNull;
+    if (member == null || member.sender.kind != MessageSenderKind.agent) {
+      throw StateError('该 AI 已不在群聊中');
+    }
+    if (member.isMuted) throw StateError('该成员已被禁言，不能重试');
+    await _groupSleeps.remove(conversation.id, message.senderId);
+    final dispatcher = _groupDispatcher;
+    if (dispatcher != null && !dispatcher.closed && !dispatcher.stopped) {
+      dispatcher.hold();
+      try {
+        await _removeFailedGroupMessage(conversation, message);
+        dispatcher.history.removeWhere((entry) => entry.id == message.id);
+        dispatcher.receiveTargeted(const [], {message.senderId});
+        _notifyRun(conversation);
+      } finally {
+        dispatcher.release();
+      }
+    } else {
+      if (hasRunningTask) throw StateError('当前任务还未结束');
+      await _inConversation(conversation, () async {
+        _runningConversation = conversation;
+        try {
+          await _removeFailedGroupMessage(conversation, message);
+          await _executeGroupChat(
+            conversation,
+            wakeMembers: {message.senderId},
+          );
+        } finally {
+          _runningConversation = null;
+          _resumeForwardedReply();
+          _notifyRun(conversation);
+        }
+      });
+    }
+  }
+
+  Future<void> _removeFailedGroupMessage(
+    Conversation conversation,
+    AgentMessage message,
+  ) async {
+    late int count;
+    await _store.writer.mutate(() async {
+      await _store.database.transaction((txn) async {
+        await txn.delete(
+          'messages',
+          where: 'id = ? AND conversation_id = ?',
+          whereArgs: [message.id, conversation.id],
+        );
+        final counts = await txn.rawQuery(
+          'SELECT COUNT(*) AS count FROM messages WHERE conversation_id = ?',
+          [conversation.id],
+        );
+        count = counts.single['count'] as int;
+        await txn.rawUpdate(
+          "UPDATE conversations SET message_count = ?, preview = (SELECT text FROM messages WHERE conversation_id = ? AND kind NOT IN ('commentary', 'reasoning', 'quick_reply') ORDER BY created_at DESC, id DESC LIMIT 1) WHERE id = ?",
+          [count, conversation.id, conversation.id],
+        );
+        _store.writer.invalidateHistory(
+          conversation.id,
+          deletedMessageId: message.id,
+        );
+      });
+    });
+    conversation.messages.removeWhere((entry) => entry.id == message.id);
+    conversation.searchMessages?.removeWhere((entry) => entry.id == message.id);
+    conversation.messageCount = count;
+    for (final member in _groupRuns.values) {
+      member.messages.removeWhere((entry) => entry.id == message.id);
+    }
+    _notifyRun(conversation);
+  }
 
   Future<void> retryFailedRun([String? expectedRunId]) => _inConversation(
     activeConversation,

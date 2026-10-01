@@ -108,18 +108,12 @@ class GroupChatTool
     capabilityId: 'local.group_chats',
     safety: ['list', 'read'].contains(operation)
         ? ToolSafety.readOnly
-        : {
-            'updateMembers',
-            'setAdministrators',
-            'transferOwnership',
-          }.contains(operation)
+        : operation == 'transferOwnership'
         ? ToolSafety.sensitive
         : operation == 'dissolve'
         ? ToolSafety.destructive
         : ToolSafety.lowRisk,
     singleUseConfirmation: {
-      'updateMembers',
-      'setAdministrators',
       'transferOwnership',
       'dissolve',
     }.contains(operation),
@@ -139,13 +133,13 @@ class GroupChatTool
       'rename' =>
         'Rename a group chat requested by the user. Read or search the group first; null id means the current group. Records a rename system event that active members may respond to.',
       'setAdministrators' =>
-        'Replace the group administrator list. Only the current group owner may do this. Supply up to 3 current non-owner member IDs.',
+        'Replace the group administrator list. Only the acting AI itself being the current group owner permits this; it needs no additional user approval. Other roles cannot request delegated owner access. Supply up to 3 current non-owner member IDs.',
       'transferOwnership' =>
         'Transfer group ownership to one current member. Only the current owner may do this. The previous owner becomes a regular member.',
       'dissolve' =>
         'Permanently dissolve a group owned by the current AI. This deletes the local conversation and all of its messages and attachments.',
       _ =>
-        'Replace the current AI member roster of a group after reading it. Supply the complete desired list of 1–32 distinct AI IDs, preserving members the user did not ask to remove. User membership is retained. History is preserved. Changes take effect immediately. Removing a member stops the removed member active task and retains its messages; other members continue. Records actual membership changes as a system event. Current active members, including new members, may choose to respond. Paused members remain silent.',
+        'Replace the current AI member roster of a group after reading it. The acting AI must itself be the owner or an administrator; authorized management needs no additional user approval. Administrators cannot remove other administrators, and the owner cannot be removed. Missing management authority cannot be obtained through an approval request. Supply the complete desired list of 1–32 distinct AI IDs, preserving members the user did not ask to remove. User membership is retained. History is preserved. Changes take effect immediately. Removing a member stops the removed member active task and retains its messages; other members continue. Records actual membership changes as a system event. Current active members, including new members, may choose to respond. Paused members remain silent.',
     },
     inputSchema: {
       'type': 'object',

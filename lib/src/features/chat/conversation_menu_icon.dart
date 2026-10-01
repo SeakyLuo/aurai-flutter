@@ -186,13 +186,14 @@ class _MenuIconPainter extends CustomPainter {
       case ConversationMenuIconType.retry:
         canvas.drawPath(
           Path()
-            ..moveTo(7.5, 5)
-            ..lineTo(4, 8.5)
-            ..lineTo(7.5, 12)
-            ..moveTo(4, 8.5)
-            ..lineTo(13, 8.5)
-            ..cubicTo(21, 8.5, 21, 19.5, 13, 19.5)
-            ..lineTo(9.5, 19.5),
+            ..moveTo(19.5, 8)
+            ..cubicTo(17.8, 4.8, 14.2, 3.2, 10.7, 3.8)
+            ..cubicTo(6.7, 4.4, 3.8, 7.9, 3.8, 12)
+            ..cubicTo(3.8, 16.5, 7.5, 20.2, 12, 20.2)
+            ..cubicTo(15.7, 20.2, 18.9, 17.8, 19.9, 14.3)
+            ..moveTo(19.5, 3.5)
+            ..lineTo(19.5, 8)
+            ..lineTo(15, 8),
           pen,
         );
       case ConversationMenuIconType.branch:

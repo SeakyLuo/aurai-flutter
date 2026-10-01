@@ -427,7 +427,11 @@ class _ChatPageState extends State<ChatPage>
                                         },
                                         padding: EdgeInsets.only(
                                           top: top + 12,
-                                          bottom: bottom + 16,
+                                          bottom:
+                                              bottom +
+                                              (isGroup
+                                                  ? GroupActivityAvatars.height
+                                                  : 16),
                                         ),
                                         hasEarlierMessages:
                                             controller.visibleHasEarlier,
