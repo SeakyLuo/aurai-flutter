@@ -81,6 +81,9 @@ class ConversationStore {
         where:
             "key = 'active_conversation' AND value IN (SELECT id FROM conversations WHERE mode != 'normal')",
       );
+      await database.rawUpdate(
+        r"UPDATE private_task_state SET state_json = json_set(state_json, '$.status', 'paused', '$.reason', '应用重启，等待继续') WHERE json_extract(state_json, '$.status') = 'active'",
+      );
       final interruptedAt = DateTime.now().microsecondsSinceEpoch;
       await database.transaction((txn) async {
         final batch = txn.batch();

@@ -1,3 +1,4 @@
+import 'private_task_history.dart';
 import 'tool_inline_detail.dart';
 import '../../domain/workspace_file_changes.dart';
 import 'workspace_changes_view.dart';
@@ -19,6 +20,7 @@ import 'tool_action_icon.dart';
 import 'tool_payload_section.dart';
 import 'user_question_history.dart';
 import 'scheduled_task_history.dart';
+import 'image_generation_skeleton.dart';
 
 class ToolActivityView extends StatefulWidget {
   const ToolActivityView({
@@ -96,6 +98,15 @@ class _ToolActivityViewState extends State<ToolActivityView> {
             siteName: pageResult['siteName'] as String?,
           );
     final running = widget.status == AgentStepStatus.running;
+    if (widget.toolName == 'generateImage' && running) {
+      final request = jsonDecode(widget.requestJson!) as Map;
+      return ImageGenerationSkeleton(
+        title: widget.title,
+        aspectRatio: request['aspectRatio'] as String,
+        referenceImage: request['referenceImage'] as String?,
+        count: request['count'] as int? ?? 1,
+      );
+    }
     final waitingForUser =
         running &&
         widget.resultJson != null &&
@@ -274,6 +285,16 @@ class _ToolActivityViewState extends State<ToolActivityView> {
               resultJson: widget.resultJson,
               status: widget.status,
             )
+          else if (const [
+                'createGoal',
+                'createPlan',
+                'getGoal',
+                'updateGoal',
+                'updatePlan',
+              ].contains(widget.toolName) &&
+              widget.resultJson != null &&
+              (jsonDecode(widget.resultJson!) as Map).containsKey('task'))
+            PrivateTaskHistory(resultJson: widget.resultJson!)
           else if (taskOperation != null)
             ScheduledTaskHistory(
               operation: taskOperation,

@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import '../domain/error_message.dart';
 import '../domain/image_generation_config.dart';
 import '../domain/tool_models.dart';
 import '../providers/image_generation_client.dart';
+import '../platform/svg_image.dart';
 
 class ImageGenerationTool implements AgentTool, RuntimeCapabilityAgentTool {
   ImageGenerationTool(this.run, {required this.configuration});
@@ -24,6 +26,7 @@ class ImageGenerationTool implements AgentTool, RuntimeCapabilityAgentTool {
     final model = selected.model;
     return 'Current default image model: ${model.name}. '
         '${model.supportsReference ? 'Reference image editing is supported.' : 'Text-to-image only; referenceImage must be null.'} '
+        'Supports up to ${model.maxImages} images per call. Image charges scale with count. '
         'Supported aspect ratios: ${['auto', ...model.aspectRatios].join(', ')}. ';
   }
 
@@ -33,9 +36,8 @@ class ImageGenerationTool implements AgentTool, RuntimeCapabilityAgentTool {
     description:
         _modelDescription +
         'Generate one image, or edit an existing image, using the user-configured image model. '
-            'Saves the generated image locally and returns imagePath and mimeType. This tool does not send messages. '
-            'To send the result, separately call sendConversationMessage or sendGroupMessage with imagePaths containing imagePath. '
-            'Choose whether and where to send based on the task. Use only when an image is requested or helps the task. '
+            'Saves the generated image locally and publishes it in the current conversation. Do not call another message tool to send it again. '
+            'Returns the sent message ID, imagePaths and mimeTypes. Use only when an image is requested or helps the task. '
             'referenceImage accepts a known local image path, HTTP(S) image URL, or image data URL; images may come from any conversation. '
             'Use readAttachment to obtain a stored image path when necessary. Never invent paths. '
             'Use null for text-to-image. If configuration is missing, opens image settings without charging; '
@@ -52,6 +54,13 @@ class ImageGenerationTool implements AgentTool, RuntimeCapabilityAgentTool {
         },
         'referenceImage': {
           'type': ['string', 'null'],
+        },
+        'count': {
+          'type': 'integer',
+          'minimum': 1,
+          'maximum': configuration()?.model.maxImages ?? 10,
+          'default': 1,
+          'description': 'Number of images to generate. Omit for one image.',
         },
       },
       'required': ['prompt', 'aspectRatio', 'referenceImage'],
@@ -81,12 +90,38 @@ class ImageGenerationTool implements AgentTool, RuntimeCapabilityAgentTool {
       ].contains(call.arguments['aspectRatio'])) {
         throw ArgumentError('请选择自动、方形、横向或竖向画幅');
       }
+      final count = call.arguments['count'] as int? ?? 1;
+      final maxImages = configuration()?.model.maxImages;
+      if (count < 1) throw ArgumentError('每次至少生成 1 张图片');
+      if (maxImages != null && count > maxImages) {
+        throw ArgumentError('当前生图模型每次最多生成 $maxImages 张图片');
+      }
       final output = await run(call.arguments, client);
+      final attachments = <ToolAttachment>[];
+      if (output['generated'] == true) {
+        final paths = (output['imagePaths'] as List).cast<String>();
+        final mimeTypes = (output['mimeTypes'] as List).cast<String>();
+        for (var index = 0; index < paths.length; index++) {
+          final vision = await readVisionImage(
+            File(paths[index]),
+            mimeTypes[index],
+          );
+          attachments.add(
+            ToolAttachment(
+              type: ToolAttachmentType.image,
+              mimeType: vision.mimeType,
+              base64Data: base64Encode(vision.bytes),
+              detail: 'auto',
+            ),
+          );
+        }
+      }
       return ToolResult(
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.success,
         output: output,
+        attachments: attachments,
       );
     } on Object catch (error) {
       return ToolResult(

@@ -130,9 +130,12 @@ extension GroupMessageDelivery on ChatController {
     final participation = arguments['participation'] as String;
     if (participation != 'unchanged') {
       // Only human messages in this context may authorize a participation change.
-      await GroupParticipation(
-        _store.database,
-      ).set(parent.id, reply.senderId, participation == 'paused');
+      await GroupParticipation(_store.database).set(
+        parent.id,
+        reply.senderId,
+        participation == 'paused',
+        reason: arguments['participationReason'] as String?,
+      );
       if (participation == 'paused') {
         await _groupSleeps.remove(parent.id, reply.senderId);
         dispatcher.pause(reply.senderId);
@@ -202,6 +205,8 @@ extension GroupMessageDelivery on ChatController {
       'participation': dispatcher.paused.contains(reply.senderId)
           ? 'paused'
           : 'active',
+      if (participation == 'paused')
+        'participationReason': arguments['participationReason'],
       'instruction': '消息已发送，不要重复发送。当前意思表达完整就可以结束，无需主动寻找下一处补充。',
     };
   }
@@ -224,9 +229,18 @@ extension GroupMessageDelivery on ChatController {
       throw ArgumentError('你不是这个群的成员');
     }
     final paused = participation == 'paused';
-    await GroupParticipation(_store.database).set(groupId, senderId, paused);
+    await GroupParticipation(_store.database).set(
+      groupId,
+      senderId,
+      paused,
+      reason: arguments['participationReason'] as String?,
+    );
     await _applyPrivateGroupParticipation(groupId, senderId, paused);
-    return {'participation': participation, 'groupId': groupId};
+    return {
+      'participation': participation,
+      'groupId': groupId,
+      if (paused) 'participationReason': arguments['participationReason'],
+    };
   }
 
   Future<void> _applyPrivateGroupParticipation(

@@ -5,6 +5,7 @@ import '../domain/message_sender.dart';
 import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
 import 'group_chat_store.dart';
+import 'development_projects.dart';
 
 class HomeConversations {
   HomeConversations(this.store);
@@ -138,6 +139,23 @@ class HomeConversations {
     );
     return {
       for (final row in rows) row['id'] as String: MessageSender.fromRow(row),
+    };
+  }
+
+  Future<Map<String, DevelopmentProject>> projects(
+    List<Conversation> items,
+  ) async {
+    final ids = items.map((item) => item.projectId).nonNulls.toSet().toList();
+    if (ids.isEmpty) return {};
+    final rows = await store.database.query(
+      'development_projects',
+      where: 'id IN (${List.filled(ids.length, '?').join(',')})',
+      whereArgs: ids,
+      limit: pageSize,
+    );
+    return {
+      for (final row in rows)
+        row['id'] as String: DevelopmentProject.fromRow(row),
     };
   }
 }

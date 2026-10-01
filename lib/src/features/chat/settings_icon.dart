@@ -12,6 +12,7 @@ enum SettingsIconType {
   data,
   contacts,
   add,
+  remove,
   memory,
   skills,
   personalization,
@@ -39,6 +40,9 @@ enum SettingsIconType {
   play,
   eye,
   eyeOff,
+  grid,
+  list,
+  selectCircle,
 }
 
 class SettingsIcon extends StatelessWidget {
@@ -76,6 +80,32 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.grid:
+        for (final x in [3.5, 14.0]) {
+          for (final y in [3.5, 14.0]) {
+            canvas.drawRRect(
+              RRect.fromRectAndRadius(
+                Rect.fromLTWH(x, y, 6.5, 6.5),
+                const Radius.circular(1.6),
+              ),
+              pen,
+            );
+          }
+        }
+      case SettingsIconType.list:
+        for (final y in [5.5, 12.0, 18.5]) {
+          canvas.drawCircle(Offset(4.5, y), 1.1, Paint()..color = color);
+          canvas.drawLine(Offset(9, y), Offset(20, y), pen);
+        }
+      case SettingsIconType.selectCircle:
+        canvas.drawCircle(const Offset(12, 12), 9, pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(7.8, 12)
+            ..lineTo(10.7, 15)
+            ..lineTo(16.5, 9),
+          pen,
+        );
       case SettingsIconType.home:
         canvas.drawPath(
           Path()
@@ -120,8 +150,8 @@ class _SettingsIconPainter extends CustomPainter {
         );
       case SettingsIconType.more:
         pen.style = PaintingStyle.fill;
-        for (final x in [5.0, 12.0, 19.0]) {
-          canvas.drawCircle(Offset(x, 12), 1.5, pen);
+        for (final y in [5.0, 12.0, 19.0]) {
+          canvas.drawCircle(Offset(12, y), 1.5, pen);
         }
       case SettingsIconType.discover:
         canvas.drawCircle(const Offset(12, 12), 9, pen);
@@ -243,6 +273,8 @@ class _SettingsIconPainter extends CustomPainter {
             ..cubicTo(9, 12, 16, 12, 16, 16),
           pen,
         );
+      case SettingsIconType.remove:
+        canvas.drawLine(const Offset(4, 12), const Offset(20, 12), pen);
       case SettingsIconType.add:
         canvas.drawLine(const Offset(12, 4), const Offset(12, 20), pen);
         canvas.drawLine(const Offset(4, 12), const Offset(20, 12), pen);

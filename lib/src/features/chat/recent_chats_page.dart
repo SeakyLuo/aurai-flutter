@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import '../../domain/avatar_style.dart';
 import '../../domain/message_sender.dart';
 import '../../storage/home_conversations.dart';
+import '../../storage/development_projects.dart';
 import 'conversation_more.dart';
 import 'chat_controller.dart';
 import 'group_create_page.dart';
@@ -44,6 +45,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
   final _items = <Conversation>[];
   final _senders = <String, MessageSender>{};
   final _groups = <String, List<MessageSender>>{};
+  final _projects = <String, DevelopmentProject>{};
   Timer? _updates;
   int _groupCount = 0;
   bool _loading = false, _more = true, _loaded = false;
@@ -100,6 +102,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
               .map((item) => item.id)
               .toList(),
         ),
+        reader.projects(page),
       ]);
       if (!mounted) return;
       setState(() {
@@ -107,11 +110,13 @@ class RecentChatsPageState extends State<RecentChatsPage> {
           _items.clear();
           _senders.clear();
           _groups.clear();
+          _projects.clear();
         }
         final existing = _items.map((item) => item.id).toSet();
         _items.addAll(page.where((item) => !existing.contains(item.id)));
         _senders.addAll(avatars[0] as Map<String, MessageSender>);
         _groups.addAll(avatars[1] as Map<String, List<MessageSender>>);
+        _projects.addAll(avatars[2] as Map<String, DevelopmentProject>);
         _more = page.length == HomeConversations.pageSize;
         _loaded = true;
         _groupCount = groupCount;
@@ -373,6 +378,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                     key: ValueKey(item.id),
                     controller: widget.controller,
                     conversation: item,
+                    showProjectAction: true,
                     onChanged: reload,
                     child: _tile(item),
                   ),
@@ -405,6 +411,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
     return ConversationListTile(
       controller: widget.controller,
       conversation: item,
+      project: _projects[item.projectId],
       avatar: group
           ? GroupAvatar(members: _groups[item.id]!, size: 48)
           : ProfileAvatar(

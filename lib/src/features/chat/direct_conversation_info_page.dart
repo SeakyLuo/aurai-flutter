@@ -160,6 +160,14 @@ class _DirectConversationInfoPageState
       _conversation,
       selection.projectId,
     );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showGlassSnackBar(
+      SnackBar(
+        content: Text(
+          conversationProjectChangedMessage(_projects, selection.projectId),
+        ),
+      ),
+    );
   });
 
   DevelopmentProject get _assignedProject =>

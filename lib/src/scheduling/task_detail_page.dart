@@ -425,34 +425,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (_dirty)
-                      RoundAction(
-                        icon: Icons.check_rounded,
-                        iconWidget: Opacity(
-                          opacity: enabled ? 1 : .3,
-                          child: const SettingsIcon(
-                            type: SettingsIconType.check,
-                          ),
-                        ),
-                        label: _saving ? '正在保存' : '保存任务',
-                        onPressed: enabled && !_busy ? () => _save() : null,
-                      )
-                    else if (running ||
-                        state == 'paused' ||
-                        state == 'scheduled')
-                      RoundAction(
-                        icon: Icons.pause,
-                        iconWidget: TaskActionIcon(control),
-                        label: running
-                            ? '停止执行'
-                            : state == 'paused'
-                            ? '恢复任务'
-                            : '暂停任务',
-                        onPressed: _busy ? null : () => _action(control, task),
-                      ),
                     Builder(
                       builder: (buttonContext) => RoundAction(
-                        icon: Icons.more_horiz_rounded,
+                        icon: Icons.more_vert_rounded,
                         iconWidget: const TaskActionIcon('more'),
                         label: '更多',
                         onPressed: _busy
@@ -473,6 +448,43 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                               },
                       ),
                     ),
+                    if (_dirty ||
+                        running ||
+                        state == 'paused' ||
+                        state == 'scheduled') ...[
+                      SizedBox(
+                        height: 18,
+                        child: VerticalDivider(
+                          width: 1,
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                      if (_dirty)
+                        RoundAction(
+                          icon: Icons.check_rounded,
+                          iconWidget: Opacity(
+                            opacity: enabled ? 1 : .3,
+                            child: const SettingsIcon(
+                              type: SettingsIconType.check,
+                            ),
+                          ),
+                          label: _saving ? '正在保存' : '保存任务',
+                          onPressed: enabled && !_busy ? () => _save() : null,
+                        )
+                      else
+                        RoundAction(
+                          icon: Icons.pause,
+                          iconWidget: TaskActionIcon(control),
+                          label: running
+                              ? '停止执行'
+                              : state == 'paused'
+                              ? '恢复任务'
+                              : '暂停任务',
+                          onPressed: _busy
+                              ? null
+                              : () => _action(control, task),
+                        ),
+                    ],
                   ],
                 ),
               ),

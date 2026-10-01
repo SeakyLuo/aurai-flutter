@@ -13,10 +13,12 @@ class GroupMemberActivity {
     this.thinkingHidden = false,
     this.sleepingUntil,
     this.autoReplyPaused = false,
+    this.autoReplyPauseReason,
     this.idle = false,
   });
 
   final bool autoReplyPaused;
+  final String? autoReplyPauseReason;
   final bool idle;
   final DateTime? sleepingUntil;
   bool get sleeping => sleepingUntil != null;
@@ -117,6 +119,7 @@ extension GroupMemberActivities on ChatController {
     String conversationId, {
     bool includeThoughts = true,
     Set<String> pausedMembers = const {},
+    Map<String, String> pausedReasons = const {},
   }) {
     final state = _executionStates[conversationId];
     final conversation = state?.runningConversation;
@@ -158,6 +161,7 @@ extension GroupMemberActivities on ChatController {
           elapsed: member.executionWatch!.elapsed,
           stopping: stopping,
           autoReplyPaused: pausedMembers.contains(entry.key),
+          autoReplyPauseReason: pausedReasons[entry.key],
           thinkingHidden: member.thinkingHidden,
           waitingForUser:
               confirming || waitingForAction || step?.toolName == 'askUser',

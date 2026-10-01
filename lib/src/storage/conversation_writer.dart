@@ -47,7 +47,7 @@ class ConversationWriter {
     bool saveMessages = true,
     String? pendingMessageQueue,
     Map<String, List<String>> recipients = const {},
-    ({String senderId, bool paused})? participation,
+    ({String senderId, bool paused, String? reason})? participation,
   }) {
     if (conversation.kind == ConversationKind.direct &&
         conversation.messageCount == 0 &&
@@ -235,6 +235,7 @@ class ConversationWriter {
             conversation.id,
             participation.senderId,
             participation.paused,
+            reason: participation.reason,
           );
         }
         if (messageRows.isNotEmpty) {

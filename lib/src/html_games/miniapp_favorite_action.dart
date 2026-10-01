@@ -163,7 +163,7 @@ class _MiniappFavoriteActionState extends State<MiniappFavoriteAction> {
           Builder(
             builder: (anchor) => RoundAction(
               label: '更多',
-              icon: Icons.more_horiz_rounded,
+              icon: Icons.more_vert_rounded,
               iconWidget: const TaskActionIcon('more'),
               onPressed: _busy || widget.appId == null
                   ? null

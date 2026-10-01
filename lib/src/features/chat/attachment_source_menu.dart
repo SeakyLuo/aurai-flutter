@@ -4,13 +4,15 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'attachment_action_icon.dart';
+import 'file_tool_icon.dart';
 import 'glass_surface.dart';
 
-enum AttachmentSource { gallery, camera, file, favorite, friend }
+enum AttachmentSource { gallery, camera, file, asset, favorite, friend }
 
 Future<AttachmentSource?> showAttachmentSourceMenu(
   BuildContext context, {
   bool allowFavorites = true,
+  bool allowAssets = false,
   bool allowFriendSelection = false,
   Widget friendIcon = const SettingsIcon(type: SettingsIconType.personalInfo),
 }) {
@@ -85,6 +87,18 @@ Future<AttachmentSource?> showAttachmentSourceMenu(
                                   source: AttachmentSource.favorite,
                                   label: '收藏',
                                   icon: AttachmentActionIconType.file,
+                                ),
+                              if (allowAssets)
+                                _AttachmentSourceItem(
+                                  source: AttachmentSource.asset,
+                                  label: '资料库',
+                                  icon: AttachmentActionIconType.file,
+                                  customIcon: FileToolIcon(
+                                    type: FileToolIconType.library,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
+                                  ),
                                 ),
                               if (allowFriendSelection)
                                 _AttachmentSourceItem(

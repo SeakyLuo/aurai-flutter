@@ -155,7 +155,7 @@ class _AiContactPageState extends State<AiContactPage> {
             Builder(
               builder: (buttonContext) => SettingsGlassAction(
                 label: '更多',
-                icon: Icons.more_horiz_rounded,
+                icon: Icons.more_vert_rounded,
                 onPressed: _busy
                     ? null
                     : () async {

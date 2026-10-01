@@ -148,32 +148,12 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
         );
 
   Widget _buildCluster(BuildContext context, BoxConstraints constraints) {
-    final colors = Theme.of(context).colorScheme;
-    final countStyle = TextStyle(
-      color: colors.onSurfaceVariant,
-      fontSize: 11,
-      fontWeight: FontWeight.w600,
-    );
     // Leave the centered jump-to-bottom button in its original position.
     final budget = math.min(144.0, (constraints.maxWidth - 56) / 2);
     final count = math.min(_visible.length, 5);
     final remaining = _visible.length - count;
-    var overflowWidth = 0.0;
-    if (remaining > 0) {
-      final painter = TextPainter(
-        text: TextSpan(text: '+$remaining', style: countStyle),
-        textDirection: Directionality.of(context),
-        textScaler: MediaQuery.textScalerOf(context),
-      )..layout();
-      overflowWidth = math.max(26.0, painter.width + 12);
-      painter.dispose();
-    }
-    final overflowExtension = remaining > 0
-        ? (overflowWidth - _avatarSize) / 2
-        : 0.0;
-    final pileBudget = budget - overflowExtension;
     final stride = count > 1
-        ? math.min(_avatarStride, (pileBudget - _avatarSize) / (count - 1))
+        ? math.min(_avatarStride, (budget - _avatarSize) / (count - 1))
         : _avatarStride;
     final pileWidth = _avatarSize + (count - 1) * stride;
     final shown = _visible.take(count).toList();
@@ -186,7 +166,7 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
         child: ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
           child: SizedBox(
-            width: pileWidth + overflowExtension,
+            width: pileWidth,
             height: 40,
             child: Stack(
               clipBehavior: Clip.none,
@@ -196,22 +176,10 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
                     key: ValueKey(shown[i].runId),
                     left: i * stride,
                     top: 7,
-                    child: _buildAvatar(shown[i], i),
-                  ),
-                if (remaining > 0)
-                  Positioned(
-                    left: (count - 1) * stride - overflowExtension,
-                    top: 7,
-                    child: Container(
-                      width: overflowWidth,
-                      height: _avatarSize,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: colors.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(_avatarSize / 2),
-                        border: Border.all(color: colors.surface),
-                      ),
-                      child: Text('+$remaining', style: countStyle),
+                    child: _buildAvatar(
+                      shown[i],
+                      i,
+                      overflowCount: i == count - 1 ? remaining : 0,
                     ),
                   ),
               ],
@@ -240,100 +208,131 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
     );
   }
 
-  Widget _framedAvatar(GroupMemberActivity activity) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
-      shape: BoxShape.circle,
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(1),
-      child: MemberAvatar(sender: activity.sender, size: 24),
-    ),
-  );
-
-  Widget _buildAvatar(GroupMemberActivity activity, int index) => Stack(
-    clipBehavior: Clip.none,
-    children: [
-      _avatarBody(activity, index),
-      if (activity.autoReplyPaused)
-        Positioned(
-          right: -4,
-          top: -6,
-          child: Semantics(
-            label: '自动接话已暂停',
-            child: Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: const SizedBox.square(
-                dimension: 16,
-                child: QuestionIcon(type: QuestionIconType.pause),
-              ),
-            ),
+  Widget _framedAvatar(
+    GroupMemberActivity activity, {
+    required int overflowCount,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return Stack(
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surface,
+            shape: BoxShape.circle,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(1),
+            child: MemberAvatar(sender: activity.sender, size: 24),
           ),
         ),
-    ],
-  );
-
-  Widget _avatarBody(GroupMemberActivity activity, int index) =>
-      activity.sleeping
-      ? Stack(
-          clipBehavior: Clip.none,
-          children: [
-            _framedAvatar(activity),
-            if (!activity.autoReplyPaused)
-              Positioned(
-                right: -4,
-                top: -6,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: AnimatedBuilder(
-                    animation: _sleepAnimation,
-                    builder: (context, _) => Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (var i = 0; i < 3; i++)
-                          Padding(
-                            padding: EdgeInsets.only(right: i < 2 ? 1.5 : 0),
-                            child: _sleepLetter(i),
-                          ),
-                      ],
+        if (overflowCount > 0)
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.all(1),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colors.surface.withValues(alpha: .62),
+                  shape: BoxShape.circle,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '+$overflowCount',
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: colors.onSurface,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
               ),
-          ],
-        )
-      : activity.idle
-      ? _framedAvatar(activity)
-      : AnimatedBuilder(
-          animation: _animation,
-          child: _framedAvatar(activity),
-          builder: (context, child) {
-            final phase =
-                (_animation.value - index * .19 - (index % 3) * .035) % 1;
-            final pose = _animate ? _bouncePose(phase, index) : _restingPose;
-            return Transform.translate(
-              offset: Offset(0, pose.y),
-              child: Transform.rotate(
-                angle: pose.angle,
-                alignment: Alignment.bottomCenter,
-                child: Transform.scale(
-                  scaleX: pose.scaleX,
-                  scaleY: pose.scaleY,
-                  alignment: Alignment.bottomCenter,
-                  child: child,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildAvatar(
+    GroupMemberActivity activity,
+    int index, {
+    required int overflowCount,
+  }) {
+    final body = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        _framedAvatar(activity, overflowCount: overflowCount),
+        if (activity.sleeping && !activity.autoReplyPaused)
+          Positioned(
+            right: -4,
+            top: -6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: AnimatedBuilder(
+                animation: _sleepAnimation,
+                builder: (context, _) => Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var i = 0; i < 3; i++)
+                      Padding(
+                        padding: EdgeInsets.only(right: i < 2 ? 1.5 : 0),
+                        child: _sleepLetter(i),
+                      ),
+                  ],
                 ),
               ),
-            );
-          },
+            ),
+          ),
+        if (activity.autoReplyPaused)
+          Positioned(
+            right: -4,
+            top: -5,
+            child: Semantics(
+              label: '自动接话已暂停',
+              child: Container(
+                width: 13,
+                height: 15,
+                padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const QuestionIcon(type: QuestionIconType.pause),
+              ),
+            ),
+          ),
+      ],
+    );
+    if (activity.sleeping || activity.idle) return body;
+    return AnimatedBuilder(
+      animation: _animation,
+      child: body,
+      builder: (context, child) {
+        final phase = (_animation.value - index * .19 - (index % 3) * .035) % 1;
+        final pose = _animate ? _bouncePose(phase, index) : _restingPose;
+        return Transform.translate(
+          offset: Offset(0, pose.y),
+          child: Transform.rotate(
+            angle: pose.angle,
+            alignment: Alignment.bottomCenter,
+            child: Transform.scale(
+              scaleX: pose.scaleX,
+              scaleY: pose.scaleY,
+              alignment: Alignment.bottomCenter,
+              child: child,
+            ),
+          ),
         );
+      },
+    );
+  }
 }
 
 typedef _BouncePose = ({double y, double scaleX, double scaleY, double angle});

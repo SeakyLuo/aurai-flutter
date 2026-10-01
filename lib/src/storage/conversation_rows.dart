@@ -109,7 +109,7 @@ Map<String, Object?> attachmentRow(
 }) {
   final fileName = File(image.path).uri.pathSegments.last;
   return {
-    'id': '$conversationId:$fileName',
+    'id': '$conversationId:${messageId ?? 'draft'}:$fileName',
     'conversation_id': conversationId,
     'message_id': messageId,
     'file_name': fileName,
@@ -132,7 +132,7 @@ Map<String, Object?> fileAttachmentRow(
   int position, {
   String? messageId,
 }) => {
-  'id': '$conversationId:${file.id}',
+  'id': '$conversationId:${messageId ?? 'draft'}:${file.id}',
   'conversation_id': conversationId,
   'message_id': messageId,
   'file_name': file.id,

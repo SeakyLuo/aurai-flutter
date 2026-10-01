@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum FileToolIconType { folder, read, document }
+enum FileToolIconType { folder, read, document, library }
 
 class FileToolIcon extends StatelessWidget {
   const FileToolIcon({super.key, required this.type, this.color});
@@ -32,6 +32,27 @@ class _FileToolPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case FileToolIconType.library:
+        for (final x in [3.0, 9.5]) {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTWH(x, 3, 3.5, 18),
+              const Radius.circular(1),
+            ),
+            pen,
+          );
+        }
+        canvas.save();
+        canvas.translate(15, 4);
+        canvas.rotate(-.24);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(0, 0, 3.5, 17),
+            const Radius.circular(1),
+          ),
+          pen,
+        );
+        canvas.restore();
       case FileToolIconType.document:
         canvas.drawPath(
           Path()

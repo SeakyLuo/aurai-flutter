@@ -1,3 +1,5 @@
+import 'group_member_header_actions.dart';
+import 'glass_surface.dart';
 import 'header_action_menu.dart';
 import '../../app/glass_notice.dart';
 import 'group_status_builder.dart';
@@ -53,6 +55,7 @@ class GroupActivityPage extends StatefulWidget {
 class _GroupActivitySheetState extends State<GroupActivityPage> {
   final _waking = <String>{};
   int? _memberCount;
+  int _membersRevision = 0;
 
   bool _wakingAll = false;
 
@@ -93,49 +96,60 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
     }
   }
 
-  Widget _batchActions() => Builder(
-    builder: (buttonContext) {
-      final busy =
-          _stoppingAll ||
-          _wakingAll ||
-          _resumingAll ||
-          _waking.isNotEmpty ||
-          _resuming.isNotEmpty;
-      return SettingsGlassAction(
-        label: '更多',
-        icon: Icons.more_horiz_rounded,
-        iconWidget: const SettingsIcon(type: SettingsIconType.more),
-        onPressed: busy
-            ? null
-            : () async {
-                final action = await showHeaderActionMenu(
-                  buttonContext,
-                  items: const [
-                    (
-                      value: 'stop',
-                      label: '停止当前回复',
-                      icon: QuestionIcon(type: QuestionIconType.stop),
-                    ),
-                    (
-                      value: 'wake',
-                      label: '全部唤醒',
-                      icon: QuestionIcon(type: QuestionIconType.play),
-                    ),
-                    (
-                      value: 'resume',
-                      label: '全部恢复接话',
-                      icon: QuestionIcon(type: QuestionIconType.play),
-                    ),
-                  ],
-                );
-                if (!mounted) return;
-                if (action == 'stop') await _stopAll();
-                if (action == 'wake') await _wakeAll();
-                if (action == 'resume') await _resumeAll();
-              },
+  Widget _batchActions({VoidCallback? onRemove, bool embedded = false}) =>
+      Builder(
+        builder: (buttonContext) {
+          final busy =
+              _stoppingAll ||
+              _wakingAll ||
+              _resumingAll ||
+              _waking.isNotEmpty ||
+              _resuming.isNotEmpty;
+          final button = RoundAction(
+            label: '更多',
+            icon: Icons.more_vert_rounded,
+            iconWidget: const SettingsIcon(type: SettingsIconType.more),
+            onPressed: busy
+                ? null
+                : () async {
+                    final action = await showHeaderActionMenu(
+                      buttonContext,
+                      items: [
+                        if (onRemove != null)
+                          (
+                            value: 'remove',
+                            label: '移除成员',
+                            icon: const SettingsIcon(
+                              type: SettingsIconType.remove,
+                            ),
+                          ),
+                        (
+                          value: 'stop',
+                          label: '停止当前回复',
+                          icon: QuestionIcon(type: QuestionIconType.stop),
+                        ),
+                        (
+                          value: 'wake',
+                          label: '全部唤醒',
+                          icon: QuestionIcon(type: QuestionIconType.play),
+                        ),
+                        (
+                          value: 'resume',
+                          label: '全部恢复接话',
+                          icon: QuestionIcon(type: QuestionIconType.play),
+                        ),
+                      ],
+                    );
+                    if (!mounted) return;
+                    if (action == 'remove') onRemove?.call();
+                    if (action == 'stop') await _stopAll();
+                    if (action == 'wake') await _wakeAll();
+                    if (action == 'resume') await _resumeAll();
+                  },
+          );
+          return embedded ? button : SettingsGlassActionSurface(child: button);
+        },
       );
-    },
-  );
 
   Future<void> _wakeAll() async {
     setState(() => _wakingAll = true);
@@ -320,7 +334,9 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                     ),
                   if (running && activity.autoReplyPaused)
                     Text(
-                      '自动接话已关闭',
+                      '自动接话已关闭 · ${activity.autoReplyPauseReason}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
@@ -385,6 +401,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
   @override
   Widget build(BuildContext context) {
     final content = GroupStatusBuilder(
+      key: ValueKey(_membersRevision),
       controller: widget.controller,
       conversationId: widget.conversationId,
       includeInactive: !widget._asSheet,
@@ -437,7 +454,15 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: _memberCount == null ? '群成员' : '群成员（$_memberCount）',
-        actions: [_batchActions()],
+        actions: [
+          GroupMemberHeaderActions(
+            controller: widget.controller,
+            groupId: widget.conversationId,
+            onChanged: () => setState(() => _membersRevision++),
+            moreBuilder: (onRemove) =>
+                _batchActions(onRemove: onRemove, embedded: true),
+          ),
+        ],
         onBack: () => Navigator.pop(context),
       ),
       body: SettingsPageBody(child: SafeArea(top: false, child: content)),

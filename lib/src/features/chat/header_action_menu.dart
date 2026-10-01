@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'glass_surface.dart';
 import 'menu_press_highlight.dart';
+import 'settings_icon.dart';
 
 typedef HeaderMenuItem = ({String value, String label, Widget icon});
 
@@ -10,6 +11,8 @@ Future<String?> showHeaderActionMenu(
   required List<HeaderMenuItem> items,
   Set<String> destructiveValues = const {},
   Set<String> preserveIconColors = const {},
+  Set<String> selectedValues = const {},
+  Set<String> separatorBeforeValues = const {},
 }) {
   final button = context.findRenderObject()! as RenderBox;
   final overlay =
@@ -57,7 +60,12 @@ Future<String?> showHeaderActionMenu(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          for (final item in items)
+                          for (final item in items) ...[
+                            if (separatorBeforeValues.contains(item.value))
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 14),
+                                child: Divider(height: 17),
+                              ),
                             GlassMenuItem(
                               icon: item.icon,
                               label: item.label,
@@ -68,7 +76,9 @@ Future<String?> showHeaderActionMenu(
                               preserveIconColor: preserveIconColors.contains(
                                 item.value,
                               ),
+                              selected: selectedValues.contains(item.value),
                             ),
+                          ],
                         ],
                       ),
                     ),
@@ -92,6 +102,7 @@ class GlassMenuItem extends StatelessWidget {
     required this.onTap,
     this.destructive = false,
     this.preserveIconColor = false,
+    this.selected = false,
   });
 
   final Widget icon;
@@ -99,6 +110,7 @@ class GlassMenuItem extends StatelessWidget {
   final VoidCallback onTap;
   final bool destructive;
   final bool preserveIconColor;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +118,7 @@ class GlassMenuItem extends StatelessWidget {
     final color = destructive ? colors.error : colors.onSurface;
     return Semantics(
       button: true,
+      selected: selected,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(17),
@@ -134,6 +147,10 @@ class GlassMenuItem extends StatelessWidget {
                   ),
                 ),
               ),
+              if (selected) ...[
+                const SizedBox(width: 10),
+                SettingsIcon(type: SettingsIconType.check, color: color),
+              ],
             ],
           ),
         ),

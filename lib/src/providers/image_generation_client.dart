@@ -16,12 +16,14 @@ class ImageGenerationClient {
       name: '千问图像 3.0 Pro',
       supportsReference: true,
       aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
+      maxImages: 6,
     ),
     ImageGenerationModel(
       id: 'qwen-image-3.0',
       name: '千问图像 3.0',
       supportsReference: true,
       aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
+      maxImages: 6,
     ),
     ImageGenerationModel(
       id: 'qwen-image-max',
@@ -77,6 +79,7 @@ class ImageGenerationClient {
                 (row['supported_parameters'] as Map).containsKey(
                   'input_references',
                 ),
+            maxImages: _maxImages(row['supported_parameters']['n']),
             aspectRatios: List<String>.from(
               (row['supported_parameters']['aspect_ratio']?['values']
                       as List?) ??
@@ -97,11 +100,17 @@ class ImageGenerationClient {
     ].where((format) => values?.contains(format) == true).firstOrNull;
   }
 
-  Future<Uint8List> generate({
+  static int _maxImages(Object? descriptor) {
+    if (descriptor is! Map || descriptor['type'] != 'range') return 1;
+    return (descriptor['max'] as int).clamp(1, 10);
+  }
+
+  Future<List<Uint8List>> generate({
     required ModelConfig account,
     required ImageGenerationConfig selection,
     required String prompt,
     required String aspectRatio,
+    required int count,
     String? reference,
   }) async {
     if (reference != null && !selection.model.supportsReference) {
@@ -118,6 +127,7 @@ class ImageGenerationClient {
       body = {
         'model': selection.model.id,
         'prompt': prompt,
+        'n': count,
         if (selection.model.outputFormat != null)
           'output_format': selection.model.outputFormat,
         if (aspectRatio != 'auto') 'aspect_ratio': aspectRatio,
@@ -157,7 +167,7 @@ class ImageGenerationClient {
           ],
         },
         'parameters': {
-          'n': 1,
+          'n': count,
           if (aspectRatio != 'auto')
             'size': switch (aspectRatio) {
               '16:9' => '1664*928',
@@ -173,19 +183,30 @@ class ImageGenerationClient {
     if (selection.service.usesOpenRouterCatalog) {
       final results = json['data'] as List;
       if (results.isEmpty) throw const ModelProviderException('服务未返回图片');
-      final bytes = base64Decode(results.first['b64_json'] as String);
-      _checkSize(bytes.length);
-      return bytes;
+      final images = [
+        for (final result in results.take(count))
+          base64Decode(result['b64_json'] as String),
+      ];
+      for (final bytes in images) {
+        _checkSize(bytes.length);
+      }
+      return images;
     }
     final choices = json['output']['choices'] as List;
     final images = choices
         .expand((c) => c['message']['content'] as List)
         .where((c) => c['image'] != null)
+        .take(count)
         .toList();
     if (images.isEmpty) throw const ModelProviderException('服务未返回图片');
-    final request = await _http.getUrl(
-      Uri.parse(images.first['image'] as String),
-    );
+    return Future.wait([
+      for (final image in images)
+        _downloadGeneratedImage(Uri.parse(image['image'] as String)),
+    ]);
+  }
+
+  Future<Uint8List> _downloadGeneratedImage(Uri uri) async {
+    final request = await _http.getUrl(uri);
     final response = await request.close();
     if (response.statusCode != 200) {
       throw const ModelProviderException('图片已生成，但下载失败，请勿反复提交生成');

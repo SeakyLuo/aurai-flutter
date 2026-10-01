@@ -1,3 +1,4 @@
+import 'private_task_tool.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -56,6 +57,8 @@ class AgentRuntime {
     var toolResults = const <ToolResult>[];
 
     final questions = _registry.find('askUser') as AskUserTool?;
+    final task = (_registry.find('getGoal') as PrivateTaskTool?)?.store;
+    var goalContinuation = false;
     try {
       while (true) {
         _throwIfCancelled();
@@ -72,13 +75,24 @@ class AgentRuntime {
           );
         }
         if (updates.isNotEmpty) onStepsChanged(List.unmodifiable(steps));
+        if (task != null) {
+          final state = await task.read();
+          if (state['status'] == 'active') {
+            await task.change(
+              (state) => state['turns'] = (state['turns'] as int) + 1,
+            );
+          }
+        }
         await onTurnStarted?.call();
         final modelTurn = await _provider.respond(
           ModelRequest(
             messages: conversation,
             contextSummary: contextSummary,
             privateContextSummary: privateContextSummary,
-            personalContext: await personalContext?.call() ?? '',
+            personalContext: [
+              await personalContext?.call() ?? '',
+              if (task != null) await task.context(),
+            ].join('\n\n'),
             onContextSummary: onContextSummary,
             onPrivateContextSummary: onPrivateContextSummary,
             onCompactionChanged: onCompactionChanged,
@@ -101,11 +115,14 @@ class AgentRuntime {
             continuationToken: continuationToken,
             toolResults: toolResults,
             userUpdates: [
+              if (goalContinuation)
+                '运行时续跑提醒（不是新的用户授权）：目标仍未完成。继续推进并验证完成条件；完成后调用 updateGoal。相同阻塞条件连续三轮仍无法推进才会停止；有进展时用 active 清除阻塞计数，需要用户信息用 askUser。不要只重复进度说明。',
               for (final update in updates)
                 'Response to the earlier askUser question: ${jsonEncode(update.output)}',
             ],
           ),
         );
+        goalContinuation = false;
         continuationToken = modelTurn.continuationToken;
         _throwIfCancelled();
 
@@ -143,13 +160,22 @@ class AgentRuntime {
           final messages = (modelTurn.response['output'] as List? ?? const [])
               .cast<Map>()
               .where((item) => item['type'] == 'message');
-          if (messages.isNotEmpty && messages.last['phase'] == 'commentary') {
+          final activeGoal =
+              task != null && (await task.read())['status'] == 'active';
+          if (!activeGoal &&
+              messages.isNotEmpty &&
+              messages.last['phase'] == 'commentary') {
             throw const ModelProviderException('模型只返回了过程说明，尚未给出最终答复，请继续或重试');
           }
           if (questions != null &&
               (questions.hasPending || questions.hasUpdates)) {
             await questions.waitForPending();
             _throwIfCancelled();
+            toolResults = const [];
+            continue;
+          }
+          if (activeGoal) {
+            goalContinuation = true;
             toolResults = const [];
             continue;
           }
@@ -267,6 +293,9 @@ class AgentRuntime {
         toolResults = nextResults;
       }
     } finally {
+      if (task != null && (await task.read())['status'] == 'active') {
+        await task.pause(_cancelRequested ? '用户停止了当前执行' : '执行已中断，等待继续');
+      }
       await questions?.cancel();
       for (final update in questions?.takeUpdates() ?? const <ToolResult>[]) {
         await onToolCompleted?.call(update);

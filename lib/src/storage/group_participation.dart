@@ -7,6 +7,7 @@ CREATE TABLE group_participation (
   conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
   sender_id TEXT NOT NULL REFERENCES message_senders(id) ON DELETE CASCADE,
   paused INTEGER NOT NULL DEFAULT 0,
+  reason TEXT,
   PRIMARY KEY (conversation_id, sender_id)
 )
 ''';
@@ -26,6 +27,19 @@ class GroupParticipation {
     return rows.map((row) => row['sender_id'] as String).toSet();
   }
 
+  Future<Map<String, String>> pausedWithReasons(String groupId) async {
+    final rows = await database.query(
+      'group_participation',
+      columns: ['sender_id', 'reason'],
+      where: 'conversation_id = ? AND paused = 1',
+      whereArgs: [groupId],
+    );
+    return {
+      for (final row in rows)
+        row['sender_id'] as String: row['reason'] as String,
+    };
+  }
+
   Future<Set<String>> resumeAll(String groupId) async {
     final ids = await database.transaction((txn) async {
       final rows = await txn.query(
@@ -41,7 +55,7 @@ class GroupParticipation {
       if (ids.isNotEmpty) {
         await txn.update(
           'group_participation',
-          {'paused': 0},
+          {'paused': 0, 'reason': null},
           where:
               'conversation_id = ? AND sender_id IN (${List.filled(ids.length, '?').join(',')})',
           whereArgs: [groupId, ...ids],
@@ -53,8 +67,15 @@ class GroupParticipation {
     return ids;
   }
 
-  Future<void> set(String groupId, String senderId, bool paused) async {
-    await database.transaction((txn) => setIn(txn, groupId, senderId, paused));
+  Future<void> set(
+    String groupId,
+    String senderId,
+    bool paused, {
+    String? reason,
+  }) async {
+    await database.transaction(
+      (txn) => setIn(txn, groupId, senderId, paused, reason: reason),
+    );
     changes.add(groupId);
   }
 
@@ -62,8 +83,9 @@ class GroupParticipation {
     DatabaseExecutor txn,
     String groupId,
     String senderId,
-    bool paused,
-  ) async {
+    bool paused, {
+    String? reason,
+  }) async {
     final members = await txn.query(
       'conversation_members',
       columns: ['sender_id'],
@@ -77,6 +99,7 @@ class GroupParticipation {
       'conversation_id': groupId,
       'sender_id': senderId,
       'paused': paused ? 1 : 0,
+      'reason': paused ? reason : null,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 }

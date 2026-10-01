@@ -54,8 +54,16 @@ class _QuestionPainter extends CustomPainter {
           pen,
         );
       case QuestionIconType.pause:
-        canvas.drawLine(const Offset(7.5, 5), const Offset(7.5, 19), pen);
-        canvas.drawLine(const Offset(16.5, 5), const Offset(16.5, 19), pen);
+        final fill = Paint()..color = color;
+        for (final left in const [6.5, 13.5]) {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTWH(left, 5.5, 4, 13),
+              const Radius.circular(2),
+            ),
+            fill,
+          );
+        }
       case QuestionIconType.play:
         canvas.drawPath(
           Path()

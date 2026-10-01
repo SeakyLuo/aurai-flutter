@@ -182,7 +182,7 @@ class _MessageItemState extends State<MessageItem> {
       ? Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            _withActions(_content),
+            message.text.isEmpty ? _withActions(_content) : _content,
             if (message.quickReplies.isNotEmpty)
               this._buildQuickReplies(context),
           ],
@@ -241,10 +241,12 @@ class _MessageItemState extends State<MessageItem> {
         );
 
   Widget _selectableContent() {
+    if (message.interactive != null) return _content;
+    if (widget.groupBubble && message.htmlGame == null) {
+      return message.isReasoning ? _withActions(_content) : _content;
+    }
     if (widget.streaming) return _withActions(_content);
-    if (message.interactive != null && !widget.groupBubble)
-      return _withActions(_content);
-    if (widget.groupBubble || message.htmlGame != null) {
+    if (message.htmlGame != null) {
       return widget.onQuote == null && widget.onQuickReply == null
           ? _content
           : _withActions(_content);
@@ -388,6 +390,7 @@ class _MessageItemState extends State<MessageItem> {
                         borderRadius: BorderRadius.circular(26),
                         clipBehavior: Clip.antiAlias,
                         child: InkWell(
+                          borderRadius: BorderRadius.circular(26),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 20,
@@ -619,6 +622,7 @@ class _MessageItemState extends State<MessageItem> {
               borderRadius: BorderRadius.circular(22),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
+                borderRadius: BorderRadius.circular(22),
                 onTap: message.interactive != null ? widget.onLocate : null,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(

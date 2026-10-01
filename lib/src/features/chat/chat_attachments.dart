@@ -11,8 +11,29 @@ extension _ChatAttachments on _ChatPageState {
     final controller = widget.controller;
     if (controller.addingImages || !controller.canEditDraft || _preparingGoal)
       return;
-    final source = await showAttachmentSourceMenu(buttonContext);
+    final source = await showAttachmentSourceMenu(
+      buttonContext,
+      allowAssets: true,
+    );
     if (source == null || !mounted) return;
+    if (source == AttachmentSource.asset) {
+      final target = controller.activeConversation;
+      _focusNode.unfocus();
+      final assets = await Navigator.push<List<LibraryAsset>>(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              AssetLibraryPage(controller: controller, picking: true),
+        ),
+      );
+      if (assets == null || !mounted) return;
+      try {
+        await controller.addLibraryAssets(assets, target: target);
+      } on Object catch (error) {
+        if (mounted) _imageNotice(errorMessage(error));
+      }
+      return;
+    }
     if (source == AttachmentSource.favorite) {
       _focusNode.unfocus();
       final sent = await showSendFavoritePage(context, controller);

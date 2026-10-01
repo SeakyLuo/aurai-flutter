@@ -362,6 +362,7 @@ class ChatComposer extends StatelessWidget {
     this.queueing = false,
     this.quote,
     this.onCancelQuote,
+    this.maxLength,
   });
 
   final TextEditingController controller;
@@ -386,6 +387,7 @@ class ChatComposer extends StatelessWidget {
   final bool queueing;
   final MessageQuote? quote;
   final VoidCallback? onCancelQuote;
+  final int? maxLength;
 
   @override
   Widget build(
@@ -403,6 +405,7 @@ class ChatComposer extends StatelessWidget {
         focusNode: focusNode,
         enabled: draftEnabled,
         hintText: hintText,
+        maxLength: maxLength,
         attachments:
             quote == null && images.isEmpty && files.isEmpty && !addingImages
             ? null

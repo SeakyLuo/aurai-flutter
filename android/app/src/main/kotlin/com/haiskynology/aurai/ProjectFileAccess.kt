@@ -69,6 +69,7 @@ object ProjectFileAccess {
         val documentId = "${ManagedWorkspaceDocumentsProvider.ROOT_ID}/$relative"
         val uri = DocumentsContract.buildDocumentUri("${context.packageName}.managed_workspaces", documentId)
         context.startActivity(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            setClassName("com.android.documentsui", "com.android.documentsui.picker.PickActivity")
             type = "*/*"
             addCategory(Intent.CATEGORY_OPENABLE)
             putExtra(DocumentsContract.EXTRA_INITIAL_URI, uri)

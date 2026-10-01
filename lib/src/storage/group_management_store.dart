@@ -163,53 +163,41 @@ extension GroupManagementStore on GroupChatStore {
     String conversationId,
     List<String> administratorIds, {
     String actorId = 'user:local',
-  }) => database
-      .transaction((txn) async {
-        await requireOwner(txn, conversationId, actorId);
-        if (administratorIds.length > GroupChatStore.maxAdministrators ||
-            administratorIds.toSet().length != administratorIds.length ||
-            administratorIds.contains(actorId)) {
-          throw ArgumentError('最多可设置 3 位不同的群管理员');
-        }
-        if (administratorIds.isNotEmpty) {
-          final rows = await txn.query(
-            'conversation_members',
-            columns: ['sender_id'],
-            where:
-                "conversation_id = ? AND left_at IS NULL AND role != 'owner' AND sender_id IN (${_slots(administratorIds.length)})",
-            whereArgs: [conversationId, ...administratorIds],
-          );
-          if (rows.length != administratorIds.length) {
-            throw StateError('只能将当前群成员设置为管理员');
-          }
-        }
-        await txn.update(
-          'conversation_members',
-          {'role': GroupMemberRole.member.name},
-          where: "conversation_id = ? AND role = 'admin'",
-          whereArgs: [conversationId],
-        );
-        if (administratorIds.isNotEmpty) {
-          await txn.update(
-            'conversation_members',
-            {'role': GroupMemberRole.admin.name},
-            where:
-                'conversation_id = ? AND sender_id IN (${_slots(administratorIds.length)})',
-            whereArgs: [conversationId, ...administratorIds],
-          );
-        }
-        final actor =
-            (await txn.query(
-                  'message_senders',
-                  columns: ['name'],
-                  where: 'id = ?',
-                  whereArgs: [actorId],
-                  limit: 1,
-                )).single['name']
-                as String;
-        return writeGroupNotice(txn, conversationId, '$actor 更新了群管理员');
-      })
-      .then((notice) => _notifySystem(conversationId, notice));
+  }) => database.transaction((txn) async {
+    await requireOwner(txn, conversationId, actorId);
+    if (administratorIds.length > GroupChatStore.maxAdministrators ||
+        administratorIds.toSet().length != administratorIds.length ||
+        administratorIds.contains(actorId)) {
+      throw ArgumentError('最多可设置 3 位不同的群管理员');
+    }
+    if (administratorIds.isNotEmpty) {
+      final rows = await txn.query(
+        'conversation_members',
+        columns: ['sender_id'],
+        where:
+            "conversation_id = ? AND left_at IS NULL AND role != 'owner' AND sender_id IN (${_slots(administratorIds.length)})",
+        whereArgs: [conversationId, ...administratorIds],
+      );
+      if (rows.length != administratorIds.length) {
+        throw StateError('只能将当前群成员设置为管理员');
+      }
+    }
+    await txn.update(
+      'conversation_members',
+      {'role': GroupMemberRole.member.name},
+      where: "conversation_id = ? AND role = 'admin'",
+      whereArgs: [conversationId],
+    );
+    if (administratorIds.isNotEmpty) {
+      await txn.update(
+        'conversation_members',
+        {'role': GroupMemberRole.admin.name},
+        where:
+            'conversation_id = ? AND sender_id IN (${_slots(administratorIds.length)})',
+        whereArgs: [conversationId, ...administratorIds],
+      );
+    }
+  });
 
   Future<void> transferOwnership(
     String conversationId,
