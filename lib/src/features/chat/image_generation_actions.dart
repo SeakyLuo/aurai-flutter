@@ -29,6 +29,8 @@ extension ImageGenerationActions on ChatController {
   Future<Map<String, Object?>> _generateImage(
     Map<String, Object?> args,
     ImageGenerationClient client,
+    Conversation conversation,
+    String senderId,
   ) async {
     final selection = imageGeneration;
     if (selection == null ||
@@ -73,12 +75,14 @@ extension ImageGenerationActions on ChatController {
       }
     }
     if (client.cancelled) throw const AgentCancelled();
-    final bytes = await client
+    final count = args['count'] as int? ?? 1;
+    final generated = await client
         .generate(
           account: account,
           selection: selection,
           prompt: (args['prompt'] as String).trim(),
           aspectRatio: args['aspectRatio'] as String,
+          count: count,
           reference: reference,
         )
         .timeout(
@@ -89,18 +93,41 @@ extension ImageGenerationActions on ChatController {
           },
         );
     if (client.cancelled) throw const AgentCancelled();
-    final image = await _imageStore.importBytes(bytes);
-    if (client.cancelled) {
-      await _imageStore.remove([image]);
-      throw const AgentCancelled();
+    final images = <MessageImage>[];
+    var sent = false;
+    try {
+      for (final bytes in generated) {
+        images.add(
+          await _imageStore.importBytes(
+            bytes,
+            name: 'AI 生成的图片 ${images.length + 1}',
+          ),
+        );
+      }
+      if (client.cancelled) throw const AgentCancelled();
+      final delivery = await _sendPrivateGroupMessage(
+        {
+          'groupId': conversation.id,
+          'message': {'text': '', 'mentionIds': <String>[], '_images': images},
+          'participation': 'unchanged',
+        },
+        senderId,
+        requireGroup: false,
+        sourceId: conversation.id,
+      );
+      sent = delivery['sent'] == true;
+      return {
+        'generated': true,
+        'sent': sent,
+        'count': images.length,
+        'model': selection.model.name,
+        'imagePaths': images.map((image) => image.path).toList(),
+        'mimeTypes': images.map((image) => image.mimeType).toList(),
+        'messageId': delivery['messageId'],
+        'instruction': '图片已生成并发送到当前会话，不要再次调用消息发送工具重复发送。',
+      };
+    } finally {
+      if (!sent) await _imageStore.remove(images);
     }
-    return {
-      'generated': true,
-      'model': selection.model.name,
-      'imagePath': image.path,
-      'mimeType': image.mimeType,
-      'instruction':
-          '图片已生成并保存在本地，尚未发送。需要发送时，另行调用 sendConversationMessage 或 sendGroupMessage，将 imagePath 放入 imagePaths。',
-    };
   }
 }

@@ -10,6 +10,7 @@ import '../features/chat/delete_confirmation_dialog.dart';
 import '../features/chat/glass_surface.dart';
 import '../features/chat/menu_press_highlight.dart';
 import '../features/chat/conversation_icon.dart';
+import '../features/chat/settings_icon.dart';
 import 'scheduled_tasks.dart';
 
 class TaskActionIcon extends StatelessWidget {
@@ -19,6 +20,9 @@ class TaskActionIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = this.color ?? Theme.of(context).colorScheme.onSurface;
+    if (action == 'more') {
+      return SettingsIcon(type: SettingsIconType.more, color: color);
+    }
     if (action == 'edit' || action == 'delete') {
       return ConversationMenuIcon(
         type: action == 'edit'
@@ -52,12 +56,6 @@ class _ActionPainter extends CustomPainter {
       ..strokeWidth = 1.65
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
-    if (action == 'more') {
-      for (final x in [5.0, 12.0, 19.0]) {
-        canvas.drawCircle(Offset(x, 12), 1.4, Paint()..color = color);
-      }
-      return;
-    }
     if (action != 'resume') {
       canvas.drawCircle(const Offset(12, 12), 9, pen);
     }

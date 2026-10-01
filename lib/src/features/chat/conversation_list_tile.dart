@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'chat_controller.dart';
 import 'conversation_status_dot.dart';
+import 'conversation_list_status.dart';
 import 'conversation_preview_text.dart';
 import 'message_time.dart';
+import '../../storage/development_projects.dart';
 
 class ConversationListTile extends StatelessWidget {
   const ConversationListTile({
@@ -11,12 +13,14 @@ class ConversationListTile extends StatelessWidget {
     required this.conversation,
     required this.avatar,
     required this.onTap,
+    this.project,
   });
 
   final ChatController controller;
   final Conversation conversation;
   final Widget avatar;
   final VoidCallback onTap;
+  final DevelopmentProject? project;
 
   @override
   Widget build(BuildContext context) {
@@ -35,16 +39,39 @@ class ConversationListTile extends StatelessWidget {
         leading: ConversationUnreadAvatar(
           controller: controller,
           conversation: item,
+          project: project,
+          showScheduled: false,
           child: avatar,
         ),
         title: Row(
           children: [
             Expanded(
-              child: Text(
-                item.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 16),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                  ListenableBuilder(
+                    listenable: controller.scheduledTasks,
+                    builder: (context, _) =>
+                        ConversationListStatus.isScheduled(controller, item)
+                        ? Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: ConversationListStatus(
+                              controller: controller,
+                              conversation: item,
+                              showUnread: false,
+                              showFailure: false,
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ],
               ),
             ),
 

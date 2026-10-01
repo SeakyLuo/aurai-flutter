@@ -13,6 +13,8 @@ import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'settings_page.dart';
 import 'sidebar_action_icon.dart';
+import 'asset_library_page.dart';
+import 'file_tool_icon.dart';
 
 class MePage extends StatelessWidget {
   const MePage({super.key, required this.controller});
@@ -57,6 +59,9 @@ class MePage extends StatelessWidget {
       listenable: controller.memory,
       builder: (context, _) {
         final memory = controller.memory;
+        final iconColor = Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).colorScheme.onSurfaceVariant
+            : const Color(0xff222222);
         return Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
@@ -135,6 +140,20 @@ class MePage extends StatelessWidget {
                 ),
                 _entry(
                   context,
+                  '资料库',
+                  FileToolIcon(
+                    type: FileToolIconType.library,
+                    color: iconColor,
+                  ),
+                  () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AssetLibraryPage(controller: controller),
+                    ),
+                  ),
+                ),
+                _entry(
+                  context,
                   '收藏',
                   const SettingsIcon(type: SettingsIconType.star),
                   () => Navigator.push<void>(
@@ -150,9 +169,7 @@ class MePage extends StatelessWidget {
                   '已归档',
                   ConversationMenuIcon(
                     type: ConversationMenuIconType.archive,
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Theme.of(context).colorScheme.onSurfaceVariant
-                        : const Color(0xff222222),
+                    color: iconColor,
                   ),
                   () => _archive(context),
                 ),

@@ -10,11 +10,13 @@ import 'group_activity_sheet.dart';
 import 'group_info_page.dart';
 import 'direct_conversation_info_page.dart';
 import 'conversation_task_navigation.dart';
+import 'file_tool_icon.dart';
 import 'header_action_menu.dart';
 import 'archive_confirmation_dialog.dart';
 import 'conversation_menu_icon.dart';
 import 'glass_surface.dart';
 import 'menu_press_highlight.dart';
+import 'project_profile_page.dart';
 import 'conversation_rename_dialog.dart';
 import 'delete_confirmation_dialog.dart';
 
@@ -27,6 +29,7 @@ class ConversationMore extends StatefulWidget {
     this.child,
     this.onChanged,
     this.originTaskId,
+    this.showProjectAction = false,
   });
 
   final ChatController controller;
@@ -35,6 +38,7 @@ class ConversationMore extends StatefulWidget {
   final Widget? child;
   final VoidCallback? onChanged;
   final String? originTaskId;
+  final bool showProjectAction;
 
   @override
   State<ConversationMore> createState() => _ConversationMoreState();
@@ -204,6 +208,8 @@ class _ConversationMoreState extends State<ConversationMore> {
       targetId,
       originTaskId: widget.originTaskId,
     ).isNotEmpty;
+    final hasProject =
+        widget.showProjectAction && _conversation.projectId != null;
     final safe = MediaQuery.paddingOf(context);
     final menuWidth = 212.0;
     final menuHeight =
@@ -212,7 +218,8 @@ class _ConversationMoreState extends State<ConversationMore> {
             : _conversation.isArchived
             ? 202.0
             : 264.0) +
-        (hasTask ? 54 : 0);
+        (hasTask ? 54 : 0) +
+        (hasProject ? 54 : 0);
     final anchor =
         position ??
         Offset(
@@ -299,6 +306,17 @@ class _ConversationMoreState extends State<ConversationMore> {
                                   _MoreAction.task,
                                 ),
                               ),
+                            if (hasProject)
+                              GlassMenuItem(
+                                icon: const FileToolIcon(
+                                  type: FileToolIconType.folder,
+                                ),
+                                label: '查看项目',
+                                onTap: () => Navigator.pop(
+                                  menuContext,
+                                  _MoreAction.project,
+                                ),
+                              ),
                             if (!_conversation.isArchived &&
                                 !_conversation.isTemporary)
                               GlassMenuItem(
@@ -369,6 +387,20 @@ class _ConversationMoreState extends State<ConversationMore> {
           widget.controller,
           targetId,
           originTaskId: widget.originTaskId,
+        );
+      case _MoreAction.project:
+        final project = await widget.controller.projects.read(
+          _conversation.projectId!,
+        );
+        if (!mounted) return;
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProjectProfilePage(
+              controller: widget.controller,
+              project: project,
+            ),
+          ),
         );
       case _MoreAction.pin:
         await _pin();
@@ -448,7 +480,7 @@ class _ConversationMoreState extends State<ConversationMore> {
           radius: 28,
           shadowOpacity: .8,
           child: RoundAction(
-            icon: Icons.more_horiz_rounded,
+            icon: Icons.more_vert_rounded,
             label: '会话详情',
             onPressed: _saving ? null : _openDetails,
             onLongPress: _saving ? null : _openMenu,
@@ -456,4 +488,4 @@ class _ConversationMoreState extends State<ConversationMore> {
         );
 }
 
-enum _MoreAction { profile, task, members, pin, rename, archive, save }
+enum _MoreAction { profile, task, project, members, pin, rename, archive, save }

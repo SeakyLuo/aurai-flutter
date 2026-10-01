@@ -102,9 +102,14 @@ class MessageImageStore {
     }
   }
 
-  Future<MessageImage> importBytes(List<int> bytes) async {
+  Future<MessageImage> importBytes(List<int> bytes, {String? name}) async {
     final file = XFile.fromData(Uint8List.fromList(bytes));
-    return (await _store([file], 1)).single;
+    final image = (await _store([file], 1)).single;
+    return MessageImage(
+      path: image.path,
+      mimeType: image.mimeType,
+      name: name ?? image.name,
+    );
   }
 
   Future<void> remove(Iterable<MessageImage> images) async {

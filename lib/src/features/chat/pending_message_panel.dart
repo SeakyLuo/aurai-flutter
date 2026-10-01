@@ -129,7 +129,7 @@ class _PendingMessagePanelState extends State<PendingMessagePanel> {
                                   ),
                                   tooltip: '更多',
                                   icon: const Icon(
-                                    Icons.more_horiz_rounded,
+                                    Icons.more_vert_rounded,
                                     size: 20,
                                   ),
                                   onPressed: queue.busy

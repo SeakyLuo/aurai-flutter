@@ -317,7 +317,7 @@ class _ProjectGitChangesPageState extends State<ProjectGitChangesPage> {
               Builder(
                 builder: (buttonContext) => SettingsGlassAction(
                   label: '更多',
-                  icon: Icons.more_horiz_rounded,
+                  icon: Icons.more_vert_rounded,
                   onPressed: () {
                     final box = buttonContext.findRenderObject()! as RenderBox;
                     _showActions(
@@ -622,7 +622,7 @@ class _ProjectGitFileDiffPageState extends State<ProjectGitFileDiffPage> {
                   Builder(
                     builder: (buttonContext) => RoundAction(
                       label: '显示设置',
-                      icon: Icons.more_horiz_rounded,
+                      icon: Icons.more_vert_rounded,
                       iconWidget: const SettingsIcon(
                         type: SettingsIconType.more,
                       ),

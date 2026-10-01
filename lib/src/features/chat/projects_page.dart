@@ -31,6 +31,8 @@ import 'menu_press_highlight.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'send_favorite_page.dart';
+import 'asset_library_page.dart';
+import '../../domain/library_asset.dart';
 import 'conversation_search_page.dart';
 import 'sidebar_action_icon.dart';
 import 'glass_surface.dart';
@@ -354,6 +356,7 @@ class _ProjectPageState extends State<ProjectPage> {
     final source = await showAttachmentSourceMenu(
       buttonContext,
       allowFriendSelection: true,
+      allowAssets: true,
       friendIcon: ProfileAvatar(
         style: AvatarStyle(
           icon: _recipient!.sender.avatarIcon,
@@ -393,6 +396,20 @@ class _ProjectPageState extends State<ProjectPage> {
             return;
           }
           await widget.controller.addFiles();
+        case AttachmentSource.asset:
+          _focusNode.unfocus();
+          final target = widget.controller.activeConversation;
+          final assets = await Navigator.push<List<LibraryAsset>>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AssetLibraryPage(
+                controller: widget.controller,
+                picking: true,
+              ),
+            ),
+          );
+          if (assets != null && mounted)
+            await widget.controller.addLibraryAssets(assets, target: target);
         case AttachmentSource.favorite:
           _focusNode.unfocus();
           final sent = await showSendFavoritePage(context, widget.controller);
@@ -510,7 +527,7 @@ class _ProjectPageState extends State<ProjectPage> {
                 Builder(
                   builder: (buttonContext) => RoundAction(
                     label: '更多',
-                    icon: Icons.more_horiz_rounded,
+                    icon: Icons.more_vert_rounded,
                     iconWidget: const SettingsIcon(type: SettingsIconType.more),
                     onPressed: _opening ? null : () => _showMore(buttonContext),
                   ),

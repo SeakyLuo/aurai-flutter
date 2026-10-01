@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'chat_controller.dart';
 import 'conversation_list_status.dart';
 import 'task_failure_icon.dart';
+import '../../storage/development_projects.dart';
+import 'project_icon.dart';
+import 'settings_appearance.dart';
+
+const _unreadDotColor = Colors.red;
 
 class ConversationStatusDot extends StatelessWidget {
   const ConversationStatusDot({super.key, required this.conversation});
@@ -40,7 +45,7 @@ class ConversationStatusDot extends StatelessWidget {
                 height: 8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: _unreadDotColor,
                 ),
               ),
       ),
@@ -54,10 +59,14 @@ class ConversationUnreadAvatar extends StatelessWidget {
     required this.conversation,
     required this.child,
     required this.controller,
+    this.project,
+    this.showScheduled = true,
   });
   final Conversation conversation;
   final Widget child;
   final ChatController controller;
+  final DevelopmentProject? project;
+  final bool showScheduled;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -66,6 +75,28 @@ class ConversationUnreadAvatar extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         child,
+        if (project case final project?)
+          Positioned(
+            bottom: -3,
+            right: -3,
+            child: Semantics(
+              label: '项目：${project.name}',
+              child: Container(
+                width: 22,
+                height: 22,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(7),
+                  color: settingsFieldColor(context),
+                ),
+                child: ProjectIcon(
+                  icon: project.icon,
+                  color: project.iconColor,
+                  size: 16,
+                ),
+              ),
+            ),
+          ),
         if (ConversationStatusDot.hasUnreadCompletion(conversation))
           Positioned(
             top: -2,
@@ -77,7 +108,7 @@ class ConversationUnreadAvatar extends StatelessWidget {
                 height: 12,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: _unreadDotColor,
                   border: Border.all(
                     color: Theme.of(context).scaffoldBackgroundColor,
                     width: 2,
@@ -86,10 +117,12 @@ class ConversationUnreadAvatar extends StatelessWidget {
               ),
             ),
           ),
-        if (ConversationListStatus.isScheduled(controller, conversation))
+        if (showScheduled &&
+            ConversationListStatus.isScheduled(controller, conversation))
           Positioned(
             bottom: -3,
-            right: -3,
+            right: project == null ? -3 : null,
+            left: project == null ? null : -3,
             child: Container(
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(

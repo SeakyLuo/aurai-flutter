@@ -162,11 +162,19 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
       selectedProjectId: _conversation.projectId,
     );
     if (!mounted || selection == null) return;
-    await runUiAction(
+    final saved = await runUiAction(
       context,
       () => widget.controller.setConversationProject(
         _conversation,
         selection.projectId,
+      ),
+    );
+    if (!saved || !mounted) return;
+    ScaffoldMessenger.of(context).showGlassSnackBar(
+      SnackBar(
+        content: Text(
+          conversationProjectChangedMessage(_projects, selection.projectId),
+        ),
       ),
     );
   });
@@ -337,63 +345,78 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                                 horizontal: 12,
                               ),
                               child: LayoutBuilder(
-                                builder: (context, constraints) => GridView(
-                                  padding: EdgeInsets.zero,
-                                  gridDelegate:
-                                      SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount:
-                                            constraints.maxWidth < 320 ? 4 : 5,
-                                        mainAxisExtent:
-                                            62 +
-                                            MediaQuery.textScalerOf(
-                                              context,
-                                            ).scale(17),
-                                        mainAxisSpacing: 10,
-                                        crossAxisSpacing: 8,
-                                      ),
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  children: [
-                                    for (
-                                      var index = 0;
-                                      index < math.min(_members.length, 5);
-                                      index++
-                                    )
-                                      _member(
-                                        _members[index].sender,
-                                        remaining: index == 4
-                                            ? _members.length - 5
-                                            : 0,
-                                      ),
-                                    if (_canInvite)
-                                      _memberAction(
-                                        '邀请',
-                                        SettingsIcon(
-                                          type: SettingsIconType.add,
-                                          color: colors.onSurfaceVariant,
+                                builder: (context, constraints) {
+                                  final columns = constraints.maxWidth < 320
+                                      ? 4
+                                      : 5;
+                                  final slots =
+                                      columns * 3 -
+                                      (_canInvite ? 1 : 0) -
+                                      (_canManage ? 1 : 0);
+                                  final visible = math.min(
+                                    _members.length,
+                                    slots,
+                                  );
+                                  return GridView(
+                                    padding: EdgeInsets.zero,
+                                    gridDelegate:
+                                        SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: columns,
+                                          mainAxisExtent:
+                                              62 +
+                                              MediaQuery.textScalerOf(
+                                                context,
+                                              ).scale(17),
+                                          mainAxisSpacing: 10,
+                                          crossAxisSpacing: 8,
                                         ),
-                                        () => _open(
-                                          GroupInvitePage(
-                                            controller: widget.controller,
-                                            conversationId: _conversation.id,
-                                            members: _members,
+                                    shrinkWrap: true,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    children: [
+                                      for (
+                                        var index = 0;
+                                        index < visible;
+                                        index++
+                                      )
+                                        _member(
+                                          _members[index].sender,
+                                          remaining:
+                                              index == visible - 1 &&
+                                                  _members.length > visible
+                                              ? _members.length - visible + 1
+                                              : 0,
+                                        ),
+                                      if (_canInvite)
+                                        _memberAction(
+                                          '邀请',
+                                          SettingsIcon(
+                                            type: SettingsIconType.add,
+                                            color: colors.onSurfaceVariant,
+                                          ),
+                                          () => _open(
+                                            GroupInvitePage(
+                                              controller: widget.controller,
+                                              conversationId: _conversation.id,
+                                              members: _members,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    if (_canManage)
-                                      _memberAction(
-                                        '移除',
-                                        const _RemoveMemberIcon(),
-                                        () => _open(
-                                          GroupRemoveMembersPage(
-                                            controller: widget.controller,
-                                            conversationId: _conversation.id,
-                                            members: _members,
+                                      if (_canManage)
+                                        _memberAction(
+                                          '移除',
+                                          const _RemoveMemberIcon(),
+                                          () => _open(
+                                            GroupRemoveMembersPage(
+                                              controller: widget.controller,
+                                              conversationId: _conversation.id,
+                                              members: _members,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                  ],
-                                ),
+                                    ],
+                                  );
+                                },
                               ),
                             ),
                             const SizedBox(height: 8),

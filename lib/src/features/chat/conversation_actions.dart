@@ -459,8 +459,6 @@ extension ConversationActions on ChatController {
     _conversations.removeWhere((conversation) => conversation.id == removed.id);
     _updateConversationList();
     _conversationChanged();
-    for (final path in images) {
-      await File(path).delete();
-    }
+    await _removeUnreferencedAttachments(images);
   }
 }

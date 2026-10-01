@@ -25,7 +25,7 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         'nothing is sent and the new messages are returned: reconsider your draft, '
         'then retry or remain silent. Do not repeat already executed device actions. '
         'Only explicit instructions from the human user may change participation. participation=paused is persistent until restored. For a temporary pause, consider sleepGroupChat instead: seconds=-1 waits for new messages, while a positive duration schedules a wake-up. Choose based on the user intent and context rather than matching fixed phrases. '
-        'paused stops automatic replies, active resumes them, unchanged preserves state. '
+        'paused stops automatic replies and requires a concise participationReason explaining why. active resumes them, unchanged preserves state. '
         'A null message allows silence or participation changes. '
         'message must be a nested JSON object, never JSON encoded inside a string. '
         'Use JSON null, not the string "null". Minimal current-group send: '
@@ -73,6 +73,12 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         'participation': {
           'type': 'string',
           'enum': ['unchanged', 'paused', 'active'],
+        },
+        'participationReason': {
+          'type': 'string',
+          'maxLength': 500,
+          'description':
+              'Required and non-empty when participation is paused. Briefly explain the human user instruction that caused automatic replies to be disabled. Omit for unchanged or active.',
         },
       },
       'required': ['groupId', 'message', 'participation'],
@@ -147,6 +153,18 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         'active',
       ].contains(arguments['participation'])) {
         throw ArgumentError('participation 必须是 unchanged、paused 或 active');
+      }
+      final participationReason = arguments['participationReason'];
+      if (participationReason != null && participationReason is! String) {
+        throw ArgumentError('participationReason 必须是文本');
+      }
+      if (participationReason is String && participationReason.length > 500) {
+        throw ArgumentError('关闭接话原因不能超过 500 字');
+      }
+      if (arguments['participation'] == 'paused' &&
+          (participationReason is! String ||
+              participationReason.trim().isEmpty)) {
+        throw ArgumentError('关闭自动接话时必须填写 participationReason');
       }
       arguments['message'] = message;
       await store.initialize();

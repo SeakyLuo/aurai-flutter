@@ -281,7 +281,7 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                   Builder(
                     builder: (anchor) => SettingsGlassAction(
                       label: '更多',
-                      icon: Icons.more_horiz_rounded,
+                      icon: Icons.more_vert_rounded,
                       onPressed: _pendingOrder == null
                           ? () => _openMore(anchor)
                           : null,

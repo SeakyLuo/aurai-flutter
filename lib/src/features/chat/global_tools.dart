@@ -17,6 +17,13 @@ extension GlobalTools on ChatController {
   }) {
     final conversationId = conversation.id;
     return <AgentTool>[
+          // TODO: Add group goals/plans with per-member ownership and group scheduling.
+          if (groupId == null && conversation.kind == ConversationKind.direct)
+            for (final name in PrivateTaskTool.names)
+              PrivateTaskTool(
+                PrivateTaskState(_store.database, conversationId, senderId),
+                name,
+              ),
           DeliverFileTool(
             (args, cancelled) =>
                 _deliverFile(args, conversation, senderId, cancelled),
@@ -353,7 +360,8 @@ extension GlobalTools on ChatController {
           SourceDatesTool(webSources),
           ImageSearchTool(),
           ImageGenerationTool(
-            _generateImage,
+            (args, client) =>
+                _generateImage(args, client, conversation, senderId),
             configuration: () => imageGeneration,
           ),
           MusicGenerationTool(

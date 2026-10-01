@@ -13,6 +13,13 @@ class ConversationProjectSelection {
   final String? projectId;
 }
 
+String conversationProjectChangedMessage(
+  List<DevelopmentProject> projects,
+  String? projectId,
+) => projectId == null
+    ? '已将会话移出项目'
+    : '已将会话加入“${projects.singleWhere((project) => project.id == projectId).name}”';
+
 class ConversationProjectSheet extends StatefulWidget {
   const ConversationProjectSheet({
     super.key,

@@ -229,7 +229,7 @@ extension ConversationRun on ChatController {
       );
       registry.load([
         'sendGroupMessage',
-        if (groupParent != null) ...['sleepGroupChat', 'wakeGroupMember'],
+        if (groupParent != null) ...['sleepGroupChat', 'wakeGroupMember', 'pauseGroupAutoReply', 'resumeGroupAutoReply'],
       ]);
       Future<bool> confirm(ToolCall call, ToolDefinition definition) =>
           _confirm(

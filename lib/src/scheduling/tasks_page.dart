@@ -1,6 +1,8 @@
 import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
+import '../domain/library_asset.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../app/global_ui.dart';
 
@@ -8,10 +10,14 @@ import '../features/chat/chat_controller.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
 import 'task_filter_menu.dart';
-import '../features/chat/glass_surface.dart';
-import '../features/chat/message_composer.dart';
+import '../features/chat/attachment_source_menu.dart';
+import '../features/chat/asset_library_page.dart';
+import '../features/chat/chat_widgets.dart';
+import '../features/chat/send_favorite_page.dart';
 import '../features/chat/keyboard_inset.dart';
 import '../features/chat/menu_press_highlight.dart';
+import '../platform/message_file_store.dart';
+import '../platform/message_image_store.dart';
 import 'scheduled_tasks.dart';
 import 'task_detail_page.dart';
 import 'task_action_menu.dart';
@@ -28,18 +34,25 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
   final _focus = FocusNode();
   final _filterButton = GlobalKey();
   String _filter = 'all';
+  String? _draftConversationId;
   bool _loading = true;
   ScheduledTasks get tasks => widget.controller.scheduledTasks;
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _text.addListener(_textChanged);
     _load();
+  }
+
+  void _textChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _text.removeListener(_textChanged);
     _text.dispose();
     _focus.dispose();
     super.dispose();
@@ -62,6 +75,69 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
   void _notice(String text) => ScaffoldMessenger.of(
     context,
   ).showGlassSnackBar(SnackBar(content: Text(text)));
+
+  Future<void> _ensureDraft() async {
+    if (_draftConversationId == widget.controller.activeConversation.id) return;
+    await widget.controller.createConversation();
+    _draftConversationId = widget.controller.activeConversation.id;
+  }
+
+  Future<void> _openSendMenu(BuildContext buttonContext) async {
+    final source = await showAttachmentSourceMenu(
+      buttonContext,
+      allowAssets: true,
+    );
+    if (!mounted || source == null) return;
+    try {
+      await _ensureDraft();
+      switch (source) {
+        case AttachmentSource.gallery:
+          if (widget.controller.draftImages.length ==
+              MessageImageStore.maxImages) {
+            _notice('每条消息最多添加 4 张图片，请先移除一张');
+            return;
+          }
+          await widget.controller.addImages(ImageSource.gallery);
+        case AttachmentSource.camera:
+          if (widget.controller.draftImages.length ==
+              MessageImageStore.maxImages) {
+            _notice('每条消息最多添加 4 张图片，请先移除一张');
+            return;
+          }
+          await widget.controller.addImages(ImageSource.camera);
+        case AttachmentSource.file:
+          if (widget.controller.draftFiles.length ==
+              MessageFileStore.maxFiles) {
+            _notice('每条消息最多添加 10 个文件');
+            return;
+          }
+          await widget.controller.addFiles();
+        case AttachmentSource.asset:
+          _focus.unfocus();
+          final target = widget.controller.activeConversation;
+          final assets = await Navigator.push<List<LibraryAsset>>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AssetLibraryPage(
+                controller: widget.controller,
+                picking: true,
+              ),
+            ),
+          );
+          if (assets != null && mounted) {
+            await widget.controller.addLibraryAssets(assets, target: target);
+          }
+        case AttachmentSource.favorite:
+          _focus.unfocus();
+          await showSendFavoritePage(context, widget.controller);
+        case AttachmentSource.friend:
+          return;
+      }
+    } on Object catch (error) {
+      if (mounted) _notice('附件添加失败，请重试：${errorMessage(error)}');
+    }
+  }
+
   Future<void> _permission() async {
     try {
       await tasks.permission();
@@ -125,30 +201,67 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
         extendBody: true,
         resizeToAvoidBottomInset: false,
         bottomNavigationBar: KeyboardInset(
-          child: MessageComposer(
-            controller: _text,
-            focusNode: _focus,
-            enabled: tasks.supported,
-            hintText: '创建任务',
-            maxLength: 4000,
-            onChanged: (_) => setState(() {}),
-            action: RoundAction(
-              label: '创建任务',
-              icon: Icons.arrow_upward_rounded,
-              compact: true,
-              primary: true,
-              onPressed: !tasks.supported || _text.text.trim().isEmpty
-                  ? null
-                  : () {
-                      if (widget.controller.needsConfiguration) {
-                        _notice('请先在设置中配置模型，再创建任务');
-                        return;
-                      }
-                      Navigator.pop(
-                        context,
+          child: ListenableBuilder(
+            listenable: widget.controller,
+            builder: (context, _) => ChatComposer(
+              controller: _text,
+              focusNode: _focus,
+              enabled: true,
+              draftEnabled: tasks.supported,
+              hintText: '创建任务',
+              maxLength: 4000,
+              canSend: _text.text.trim().isNotEmpty,
+              stopping: false,
+              onSend: () {
+                if (widget.controller.needsConfiguration) {
+                  _notice('请先在设置中配置模型，再创建任务');
+                  return;
+                }
+                Navigator.pop(
+                  context,
+                  _TaskCreationRequest(
+                    prompt:
                         '请创建定时任务：${_text.text.trim()}。请使用定时任务工具保存，时间不明确时先询问我。',
-                      );
-                    },
+                    conversationId: _draftConversationId,
+                  ),
+                );
+              },
+              onResume: () {},
+              canResume: false,
+              onStop: () {},
+              onAddImages: _openSendMenu,
+              images:
+                  _draftConversationId ==
+                      widget.controller.activeConversation.id
+                  ? widget.controller.draftImages
+                  : const [],
+              files:
+                  _draftConversationId ==
+                      widget.controller.activeConversation.id
+                  ? widget.controller.draftFiles
+                  : const [],
+              onRemoveImage: (image) async {
+                try {
+                  await widget.controller.removeDraftImage(image);
+                } on Object catch (error) {
+                  if (mounted) {
+                    _notice('附件移除失败，请重试：${errorMessage(error)}');
+                  }
+                }
+              },
+              onRemoveFile: (file) async {
+                try {
+                  await widget.controller.removeDraftFile(file);
+                } on Object catch (error) {
+                  if (mounted) {
+                    _notice('附件移除失败，请重试：${errorMessage(error)}');
+                  }
+                }
+              },
+              addingImages:
+                  _draftConversationId ==
+                      widget.controller.activeConversation.id &&
+                  widget.controller.addingImages,
             ),
           ),
         ),
@@ -338,14 +451,18 @@ Future<void> openScheduledTasks(
   BuildContext context,
   ChatController controller,
 ) async {
-  final request = await Navigator.of(context).push<String>(
+  final request = await Navigator.of(context).push<_TaskCreationRequest>(
     MaterialPageRoute(builder: (_) => TasksPage(controller: controller)),
   );
   if (!context.mounted || request == null) return;
   try {
     if (controller.needsConfiguration) throw StateError('请先在设置中配置模型，再创建任务');
-    await controller.createConversation();
-    await controller.submitGoal(request);
+    if (request.conversationId == null) {
+      await controller.createConversation();
+    } else if (controller.activeConversation.id != request.conversationId) {
+      await controller.selectConversation(request.conversationId!);
+    }
+    await controller.submitGoal(request.prompt);
   } on Object catch (error) {
     if (context.mounted)
       ScaffoldMessenger.of(context).showGlassSnackBar(
@@ -358,4 +475,11 @@ Future<void> openScheduledTasks(
         ),
       );
   }
+}
+
+class _TaskCreationRequest {
+  const _TaskCreationRequest({required this.prompt, this.conversationId});
+
+  final String prompt;
+  final String? conversationId;
 }

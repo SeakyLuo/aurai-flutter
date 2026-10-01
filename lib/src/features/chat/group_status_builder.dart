@@ -31,6 +31,7 @@ class GroupStatusBuilder extends StatefulWidget {
 class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
   Map<String, MessageSender> _members = {};
   Set<String> _paused = {};
+  Map<String, String> _pauseReasons = {};
   Timer? _sleepExpiry;
   bool _loaded = false;
   bool _failed = false;
@@ -58,13 +59,14 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
         widget.controller.groupStore.members(widget.conversationId),
         GroupParticipation(
           widget.controller.groupStore.database,
-        ).paused(widget.conversationId),
+        ).pausedWithReasons(widget.conversationId),
       ]);
       final members = results[0] as List<ConversationMember>;
       if (mounted)
         setState(() {
           _members = {for (final m in members) m.sender.id: m.sender};
-          _paused = results[1] as Set<String>;
+          _pauseReasons = results[1] as Map<String, String>;
+          _paused = _pauseReasons.keys.toSet();
           _loaded = true;
           _failed = false;
         });
@@ -101,6 +103,7 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
         widget.conversationId,
         includeThoughts: widget.includeThoughts,
         pausedMembers: _paused,
+        pausedReasons: _pauseReasons,
       );
       final active = activities.map((a) => a.sender.id).toSet();
       final now = DateTime.now();
@@ -134,8 +137,9 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
                 sleepingUntil: sleeps[member.id],
                 idle: !sleeps.containsKey(member.id),
                 autoReplyPaused: _paused.contains(member.id),
+                autoReplyPauseReason: _pauseReasons[member.id],
                 description: _paused.contains(member.id)
-                    ? '自动接话已关闭'
+                    ? '自动接话已关闭 · ${_pauseReasons[member.id]}'
                     : sleeps.containsKey(member.id)
                     ? '睡眠中'
                     : '等待新消息',

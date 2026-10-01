@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 import 'new_conversation_draft.dart';
+import 'asset_library.dart';
 
 /// Removal intents survive a crash between saving the draft and deleting files.
 class DraftAttachmentCleanup {
@@ -66,11 +67,16 @@ class DraftAttachmentCleanup {
           ],
         );
         final names = referenced.map((r) => r['file_name']).toSet();
+        final removable = (await AssetLibrary.unreferencedPaths(
+          txn,
+          candidates.values.map((v) => v['path'] as String),
+        )).toSet();
         final batch = txn.batch();
         for (final entry in candidates.entries) {
           final file = File(entry.value['path'] as String);
           if (!names.contains(file.uri.pathSegments.last) &&
-              !draftPaths.contains(file.path)) {
+              !draftPaths.contains(file.path) &&
+              removable.contains(file.path)) {
             try {
               if (await file.exists()) await file.delete();
             } on FileSystemException catch (error, stack) {

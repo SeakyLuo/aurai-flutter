@@ -6,6 +6,7 @@ class ImageGenerationModel {
     required this.name,
     required this.supportsReference,
     required this.aspectRatios,
+    this.maxImages = 1,
     this.outputFormat,
   });
 
@@ -13,6 +14,7 @@ class ImageGenerationModel {
   final String name;
   final bool supportsReference;
   final List<String> aspectRatios;
+  final int maxImages;
   final String? outputFormat;
 
   Map<String, Object?> toJson() => {
@@ -20,6 +22,7 @@ class ImageGenerationModel {
     'name': name,
     'supportsReference': supportsReference,
     'aspectRatios': aspectRatios,
+    'maxImages': maxImages,
     'outputFormat': outputFormat,
   };
 
@@ -29,6 +32,12 @@ class ImageGenerationModel {
         name: json['name'] as String,
         supportsReference: json['supportsReference'] as bool,
         aspectRatios: List<String>.from(json['aspectRatios'] as List),
+        maxImages:
+            json['maxImages'] as int? ??
+            (json['id'] == 'qwen-image-3.0-pro' ||
+                    json['id'] == 'qwen-image-3.0'
+                ? 6
+                : 1),
         outputFormat: json['outputFormat'] as String?,
       );
 }

@@ -1,3 +1,5 @@
+import 'private_task_state.dart';
+import 'asset_library_schema.dart';
 import 'group_notice_dismissals.dart';
 import 'project_directory_schema.dart';
 import 'group_member_details.dart';
@@ -27,12 +29,20 @@ import 'tool_customization_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 66,
+  version: 69,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion >= 18 && oldVersion < 67) {
+      await db.execute(
+        'ALTER TABLE group_participation ADD COLUMN reason TEXT',
+      );
+      await db.update('group_participation', {
+        'reason': '此前关闭时未记录原因',
+      }, where: 'paused = 1');
+    }
     // The version-54 device received project schema changes before its version
     // was advanced. Inspect that upgrade range once instead of recreating them.
     final projectColumns = oldVersion >= 52 && oldVersion < 62
@@ -354,11 +364,15 @@ Future<Database> openConversationDatabase() async => openDatabase(
         whereArgs: ['git_task:%'],
       );
     }
+    if (oldVersion < 68) await migrateAssetLibrary(db);
+    if (oldVersion < 69) await db.execute(privateTaskStateSchema);
   },
   onCreate: (db, version) async {
     final batch = db.batch();
     for (final statement in [
       ..._schema,
+      privateTaskStateSchema,
+      ...assetLibrarySchema,
       projectRecordSchema,
       ...projectDirectorySchema,
       projectConversationUpdateTrigger,

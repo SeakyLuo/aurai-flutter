@@ -177,7 +177,7 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
           Builder(
             builder: (anchor) => SettingsGlassAction(
               label: '更多',
-              icon: Icons.more_horiz_rounded,
+              icon: Icons.more_vert_rounded,
               iconWidget: const TaskActionIcon('more'),
               onPressed: _busy || _menuBusy ? null : () => _more(anchor),
             ),

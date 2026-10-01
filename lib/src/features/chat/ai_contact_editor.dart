@@ -281,21 +281,6 @@ class _AiContactEditorState extends State<AiContactEditor> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   RoundAction(
-                    label: '保存',
-                    icon: Icons.check_rounded,
-                    iconWidget: const SettingsIcon(
-                      type: SettingsIconType.check,
-                    ),
-                    onPressed: _saving || _rolling ? null : _save,
-                  ),
-                  SizedBox(
-                    height: 18,
-                    child: VerticalDivider(
-                      width: 1,
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                    ),
-                  ),
-                  RoundAction(
                     label: '随机生成',
                     icon: Icons.casino_outlined,
                     iconWidget: _rolling
@@ -305,6 +290,21 @@ class _AiContactEditorState extends State<AiContactEditor> {
                           )
                         : const RollContactIcon(),
                     onPressed: _saving || _rolling ? null : _roll,
+                  ),
+                  SizedBox(
+                    height: 18,
+                    child: VerticalDivider(
+                      width: 1,
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  RoundAction(
+                    label: '保存',
+                    icon: Icons.check_rounded,
+                    iconWidget: const SettingsIcon(
+                      type: SettingsIconType.check,
+                    ),
+                    onPressed: _saving || _rolling ? null : _save,
                   ),
                 ],
               ),

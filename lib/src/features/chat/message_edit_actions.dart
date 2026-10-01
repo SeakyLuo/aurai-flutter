@@ -65,9 +65,7 @@ extension MessageEditActions on ChatController {
       _loadedMessageCounts[replacement.id] = replacement.messages.length;
       _updateConversationList();
       try {
-        for (final path in removedImages) {
-          await File(path).delete();
-        }
+        await _removeUnreferencedAttachments(removedImages);
         return true;
       } on FileSystemException {
         return false;

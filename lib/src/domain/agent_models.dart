@@ -451,6 +451,11 @@ String toolTitle(String name) =>
     ToolCustomizations.values[name]?.title ?? _defaultToolTitle(name);
 
 String _defaultToolTitle(String name) => switch (name) {
+  'createGoal' => '建立目标',
+  'createPlan' => '建立执行计划',
+  'getGoal' => '查看目标与计划',
+  'updateGoal' => '更新目标状态',
+  'updatePlan' => '更新执行计划',
   'readMyProfile' => '读取自己的资料',
   'updateMyProfile' => '更新自己的资料',
   'listHtmlApps' => '查找小程序',
@@ -496,6 +501,8 @@ String _defaultToolTitle(String name) => switch (name) {
   'openModelConfiguration' => '打开模型设置',
   'sendGroupMessage' => '发送群消息',
   'wakeGroupMember' => '唤醒群成员',
+  'pauseGroupAutoReply' => '暂停成员自动接话',
+  'resumeGroupAutoReply' => '恢复成员自动接话',
   'sleepGroupChat' => '稍后查看群聊',
   'hideThinking' => '隐藏思考',
   'starMessage' => '收藏消息',

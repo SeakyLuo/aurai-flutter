@@ -228,7 +228,7 @@ class _ProviderModelManagementPageState
           Builder(
             builder: (anchor) => SettingsGlassAction(
               label: '更多',
-              icon: Icons.more_horiz,
+              icon: Icons.more_vert,
               iconWidget: const SettingsIcon(type: SettingsIconType.more),
               onPressed: _savingSelection || _loading
                   ? null

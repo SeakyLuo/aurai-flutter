@@ -45,6 +45,13 @@ class ToolRegistry {
             tool.name == 'searchTools' ||
             tool.name == 'askUser' ||
             tool.name == 'hideThinking' ||
+            const [
+              'createGoal',
+              'createPlan',
+              'getGoal',
+              'updateGoal',
+              'updatePlan',
+            ].contains(tool.name) ||
             _loaded.contains(tool.name) ||
             _retained.contains(tool.name),
       )

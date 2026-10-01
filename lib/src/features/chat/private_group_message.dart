@@ -112,7 +112,11 @@ extension PrivateGroupMessage on ChatController {
         makeActive: false,
         participation: participation == 'unchanged'
             ? null
-            : (senderId: senderId, paused: participation == 'paused'),
+            : (
+                senderId: senderId,
+                paused: participation == 'paused',
+                reason: arguments['participationReason'] as String?,
+              ),
       );
     } on Object {
       target.messages.remove(message);
