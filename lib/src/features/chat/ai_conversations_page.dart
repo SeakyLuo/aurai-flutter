@@ -2,10 +2,12 @@ import '../../app/glass_notice.dart';
 import 'conversation_list_skeleton.dart';
 import 'conversation_status_dot.dart';
 import '../../domain/error_message.dart';
+import '../../domain/library_asset.dart';
 import 'conversation_preview_text.dart';
 import 'message_time.dart';
 import 'home_page.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../domain/ai_profile.dart';
 import '../../storage/home_conversations.dart';
 import 'ai_contact_page.dart';
@@ -15,8 +17,12 @@ import 'conversation_icon.dart';
 import 'conversation_more.dart';
 import 'pagination_listener.dart';
 import 'settings_appearance.dart';
-import 'message_composer.dart';
-import 'glass_surface.dart';
+import 'attachment_source_menu.dart';
+import 'asset_library_page.dart';
+import 'chat_widgets.dart';
+import 'send_favorite_page.dart';
+import '../../platform/message_file_store.dart';
+import '../../platform/message_image_store.dart';
 
 class AiConversationsPage extends StatefulWidget {
   const AiConversationsPage({
@@ -37,6 +43,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
   final _focus = FocusNode();
   bool _loading = false, _more = true, _failed = false;
   bool _opening = false;
+  String? _draftConversationId;
   @override
   void initState() {
     super.initState();
@@ -102,6 +109,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
     try {
       final target =
           id ??
+          _draftConversationId ??
           await widget.controller.openAiConversation(
             widget.profile,
             newConversation: true,
@@ -118,6 +126,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
       );
       _focus.unfocus();
       if (message != null) _text.clear();
+      _draftConversationId = null;
       await Navigator.push<void>(context, route);
       if (mounted) await _load(reset: true);
     } on Object catch (error) {
@@ -129,6 +138,77 @@ class _AiConversationsPageState extends State<AiConversationsPage>
       if (mounted) setState(() => _opening = false);
     }
   }
+
+  Future<void> _ensureDraft() async {
+    if (_draftConversationId == widget.controller.activeConversation.id) return;
+    final id = await widget.controller.openAiConversation(
+      widget.profile,
+      newConversation: true,
+      freshDraft: true,
+    );
+    await widget.controller.selectConversation(id);
+    _draftConversationId = id;
+  }
+
+  Future<void> _openSendMenu(BuildContext buttonContext) async {
+    final source = await showAttachmentSourceMenu(
+      buttonContext,
+      allowAssets: true,
+    );
+    if (!mounted || source == null) return;
+    try {
+      await _ensureDraft();
+      switch (source) {
+        case AttachmentSource.gallery:
+          if (widget.controller.draftImages.length ==
+              MessageImageStore.maxImages) {
+            _notice('每条消息最多添加 4 张图片，请先移除一张');
+            return;
+          }
+          await widget.controller.addImages(ImageSource.gallery);
+        case AttachmentSource.camera:
+          if (widget.controller.draftImages.length ==
+              MessageImageStore.maxImages) {
+            _notice('每条消息最多添加 4 张图片，请先移除一张');
+            return;
+          }
+          await widget.controller.addImages(ImageSource.camera);
+        case AttachmentSource.file:
+          if (widget.controller.draftFiles.length ==
+              MessageFileStore.maxFiles) {
+            _notice('每条消息最多添加 10 个文件');
+            return;
+          }
+          await widget.controller.addFiles();
+        case AttachmentSource.asset:
+          _focus.unfocus();
+          final target = widget.controller.activeConversation;
+          final assets = await Navigator.push<List<LibraryAsset>>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AssetLibraryPage(
+                controller: widget.controller,
+                picking: true,
+              ),
+            ),
+          );
+          if (assets != null && mounted) {
+            await widget.controller.addLibraryAssets(assets, target: target);
+          }
+        case AttachmentSource.favorite:
+          _focus.unfocus();
+          await showSendFavoritePage(context, widget.controller);
+        case AttachmentSource.friend:
+          return;
+      }
+    } on Object catch (error) {
+      if (mounted) _notice('附件添加失败，请重试：${errorMessage(error)}');
+    }
+  }
+
+  void _notice(String message) => ScaffoldMessenger.of(
+    context,
+  ).showGlassSnackBar(SnackBar(content: Text(message)));
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -248,20 +328,57 @@ class _AiConversationsPageState extends State<AiConversationsPage>
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: ValueListenableBuilder<TextEditingValue>(
         valueListenable: _text,
-        builder: (context, value, _) => MessageComposer(
-          controller: _text,
-          focusNode: _focus,
-          enabled: !_opening,
-          hintText: '发消息，开始新会话',
-          action: RoundAction(
-            label: _opening ? '正在打开' : '发送',
-            primary: true,
-            compact: true,
-            inkResponse: false,
-            icon: Icons.arrow_upward_rounded,
-            onPressed: !_opening && value.text.trim().isNotEmpty
-                ? () => _open(message: value.text.trim())
-                : null,
+        builder: (context, value, _) => ListenableBuilder(
+          listenable: widget.controller,
+          builder: (context, _) => ChatComposer(
+            controller: _text,
+            focusNode: _focus,
+            enabled: true,
+            draftEnabled: !_opening,
+            hintText: '发消息，开始新会话',
+            canSend:
+                value.text.trim().isNotEmpty ||
+                (_draftConversationId ==
+                        widget.controller.activeConversation.id &&
+                    (widget.controller.draftImages.isNotEmpty ||
+                        widget.controller.draftFiles.isNotEmpty)),
+            stopping: false,
+            submitting: _opening,
+            onSend: () => _open(message: value.text.trim()),
+            onResume: () {},
+            canResume: false,
+            onStop: () {},
+            onAddImages: _openSendMenu,
+            images:
+                _draftConversationId == widget.controller.activeConversation.id
+                ? widget.controller.draftImages
+                : const [],
+            files:
+                _draftConversationId == widget.controller.activeConversation.id
+                ? widget.controller.draftFiles
+                : const [],
+            onRemoveImage: (image) async {
+              try {
+                await widget.controller.removeDraftImage(image);
+              } on Object catch (error) {
+                if (mounted) {
+                  _notice('附件移除失败，请重试：${errorMessage(error)}');
+                }
+              }
+            },
+            onRemoveFile: (file) async {
+              try {
+                await widget.controller.removeDraftFile(file);
+              } on Object catch (error) {
+                if (mounted) {
+                  _notice('附件移除失败，请重试：${errorMessage(error)}');
+                }
+              }
+            },
+            addingImages:
+                _draftConversationId ==
+                    widget.controller.activeConversation.id &&
+                widget.controller.addingImages,
           ),
         ),
       ),

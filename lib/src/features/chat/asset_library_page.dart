@@ -21,7 +21,6 @@ import 'conversation_icon.dart';
 import 'glass_surface.dart';
 import 'header_action_menu.dart';
 import 'home_navigation.dart';
-import 'model_search_field.dart';
 import 'question_icon.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -44,6 +43,9 @@ class AssetLibraryPage extends StatefulWidget {
 
 class _AssetLibraryPageState extends State<AssetLibraryPage> {
   final _search = TextEditingController();
+  final _searchFocus = FocusNode();
+  bool _searchHidden = false;
+  Timer? _searchReveal;
   final _scroll = ScrollController();
   final _items = <LibraryAsset>[];
   final _imageRatios = <String, double>{};
@@ -52,8 +54,7 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
   AssetType _type = AssetType.image;
   AssetSort _sort = AssetSort.newest;
   bool? _grid;
-  bool _searching = false,
-      _selecting = false,
+  bool _selecting = false,
       _loading = false,
       _more = true,
       _busy = false,
@@ -77,6 +78,8 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _searchReveal?.cancel();
+    _searchFocus.dispose();
     _search.dispose();
     _scroll.dispose();
     super.dispose();
@@ -251,14 +254,70 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
     ),
   );
 
-  void _toggleSearch() {
+  void _searchChanged(String value) {
+    setState(() {});
+    ++_generation;
     _debounce?.cancel();
-    setState(() => _searching = !_searching);
-    if (!_searching) {
-      _search.clear();
-      _perform(() => _load(reset: true));
-    }
+    _debounce = Timer(
+      const Duration(milliseconds: 250),
+      () => _perform(() => _load(reset: true)),
+    );
   }
+
+  bool _onScroll(ScrollNotification notification) {
+    if (notification.depth != 0 || _searchFocus.hasFocus || _selectionMode)
+      return false;
+    if (notification is ScrollStartNotification) {
+      _searchReveal?.cancel();
+      if (!_searchHidden) setState(() => _searchHidden = true);
+    } else if (notification is ScrollEndNotification) {
+      _searchReveal?.cancel();
+      _searchReveal = Timer(const Duration(milliseconds: 350), () {
+        if (mounted) setState(() => _searchHidden = false);
+      });
+    }
+    return false;
+  }
+
+  Widget _searchBar() => GlassSurface(
+    radius: 28,
+    child: Material(
+      type: MaterialType.transparency,
+      child: TextField(
+        controller: _search,
+        focusNode: _searchFocus,
+        onChanged: _searchChanged,
+        onTapOutside: (_) => _searchFocus.unfocus(),
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => _searchFocus.unfocus(),
+        decoration: InputDecoration(
+          hintText: '搜索资料库',
+          filled: false,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          prefixIcon: const Padding(
+            padding: EdgeInsets.all(14),
+            child: SidebarActionIcon(type: SidebarActionIconType.search),
+          ),
+          suffixIcon: _search.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: '清除搜索',
+                  icon: const QuestionIcon(type: QuestionIconType.close),
+                  onPressed: () {
+                    _search.clear();
+                    _searchChanged('');
+                  },
+                ),
+        ),
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) => PopScope(
@@ -309,36 +368,14 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
               onPressed: _busy ? null : _closeSelection,
             )
           else
-            SettingsGlassActionSurface(
-              child: IntrinsicHeight(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    RoundAction(
-                      label: _searching ? '关闭搜索' : '搜索',
-                      icon: Icons.search,
-                      iconWidget: _searching
-                          ? const QuestionIcon(type: QuestionIconType.close)
-                          : const SidebarActionIcon(
-                              type: SidebarActionIconType.search,
-                            ),
-                      onPressed: _busy ? null : _toggleSearch,
-                    ),
-                    const VerticalDivider(width: 1, indent: 12, endIndent: 12),
-                    Builder(
-                      builder: (buttonContext) => RoundAction(
-                        label: '更多',
-                        icon: Icons.more_vert,
-                        iconWidget: const SettingsIcon(
-                          type: SettingsIconType.more,
-                        ),
-                        onPressed: _busy
-                            ? null
-                            : () => _perform(() => _moreMenu(buttonContext)),
-                      ),
-                    ),
-                  ],
-                ),
+            Builder(
+              builder: (buttonContext) => SettingsGlassAction(
+                label: '更多',
+                icon: Icons.more_vert,
+                iconWidget: const SettingsIcon(type: SettingsIconType.more),
+                onPressed: _busy
+                    ? null
+                    : () => _perform(() => _moreMenu(buttonContext)),
               ),
             ),
         ],
@@ -355,23 +392,44 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
                 child: Column(
                   children: [
                     _typeTabs(),
-                    if (_searching)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                        child: ModelSearchField(
-                          controller: _search,
-                          hintText: '搜索资产名称',
-                          onChanged: (_) {
-                            ++_generation;
-                            _debounce?.cancel();
-                            _debounce = Timer(
-                              const Duration(milliseconds: 250),
-                              () => _perform(() => _load(reset: true)),
-                            );
-                          },
-                        ),
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: NotificationListener<ScrollNotification>(
+                              onNotification: _onScroll,
+                              child: _content(),
+                            ),
+                          ),
+                          if (!_selectionMode)
+                            Positioned(
+                              left: 24,
+                              right: 24,
+                              bottom: 16,
+                              child: IgnorePointer(
+                                ignoring: _searchHidden,
+                                child: AnimatedSlide(
+                                  offset: _searchHidden
+                                      ? const Offset(0, 1.5)
+                                      : Offset.zero,
+                                  duration:
+                                      MediaQuery.disableAnimationsOf(context)
+                                      ? Duration.zero
+                                      : const Duration(milliseconds: 180),
+                                  child: AnimatedOpacity(
+                                    opacity: _searchHidden ? 0 : 1,
+                                    duration:
+                                        MediaQuery.disableAnimationsOf(context)
+                                        ? Duration.zero
+                                        : const Duration(milliseconds: 180),
+                                    child: _searchBar(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                    Expanded(child: _content()),
+                    ),
                     if (_selectionMode) _selectionActions(),
                   ],
                 ),
@@ -395,7 +453,7 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
       );
     if (_items.isEmpty) {
       final label = _search.text.isNotEmpty
-          ? '没有找到相关资产'
+          ? '没有找到相关资料'
           : widget.trash
           ? '回收站为空'
           : '还没有${_type.label}';
@@ -443,6 +501,8 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
               ),
             ),
           ),
+        if (!_selectionMode)
+          const SliverToBoxAdapter(child: SizedBox(height: 88)),
       ],
     );
   }
@@ -464,6 +524,7 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
       setState(() {
         _selected.clear();
         _selecting = false;
+        _searchHidden = false;
       });
     }
   }
