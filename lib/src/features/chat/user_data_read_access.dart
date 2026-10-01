@@ -137,12 +137,16 @@ extension UserDataReadAccess on ChatController {
           : Future.value(<Map<String, Object?>>[]),
     ).wait;
     if (groups.isEmpty) throw StateError('群聊不存在');
-    await groupStore.memberRole(targetGroupId,
-        scope.useUserScope ? MessageSender.localUser.id : senderId);
+    final role = await groupStore.memberRole(
+      targetGroupId,
+      scope.useUserScope ? MessageSender.localUser.id : senderId,
+    );
+    final managesGroup = !scope.useUserScope && role.canManage;
     final sharedChange =
-        call.name == 'pinGroupMessage' ||
-        call.name == 'unpinGroupMessage' ||
-        marks.isNotEmpty && marks.single['marked_by'] != senderId;
+        !managesGroup &&
+        (call.name == 'pinGroupMessage' ||
+            call.name == 'unpinGroupMessage' ||
+            marks.isNotEmpty && marks.single['marked_by'] != senderId);
     var preview = '';
     final messageId = call.arguments['messageId'] as String?;
     if ((scope.useUserScope || sharedChange) && messageId != null) {

@@ -4,9 +4,9 @@ extension _MessageItemActions on _MessageItemState {
   Future<void> _openActions({bool compactMenu = false}) async {
     final snapshot = message;
     var hasHistory = false;
-    var allowRetry = false;
+    var allowRetry = widget.onRetry != null && snapshot.isFailure;
     final database = ImageActionScope.of(context).groupStore.database;
-    if (widget.onRetry != null) {
+    if (widget.onRetry != null && !snapshot.isFailure) {
       try {
         final runs = await database.query(
           'agent_runs',

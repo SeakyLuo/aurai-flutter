@@ -70,6 +70,15 @@ extension _ChatProgress on _ChatPageState {
     }
   }
 
-  Future<void> _retryFailedMessage(AgentMessage message) =>
-      _retryFailed(message.runId);
+  Future<void> _retryFailedMessage(AgentMessage message) async {
+    if (widget.controller.activeConversation.kind == ConversationKind.direct) {
+      await _retryFailed(message.runId);
+      return;
+    }
+    try {
+      await widget.controller.retryFailedMessage(message);
+    } on Object catch (error) {
+      _showRunNotice(error);
+    }
+  }
 }

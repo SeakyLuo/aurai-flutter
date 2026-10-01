@@ -84,6 +84,8 @@ abstract final class ToolCustomizations {
       confirmationMayBeRequired: tool.confirmationMayBeRequired,
       singleUseConfirmation: tool.singleUseConfirmation,
       waitsForUser: tool.waitsForUser,
+      authorizationScope: tool.authorizationScope,
+      authorizationLabel: tool.authorizationLabel,
     );
   }
 }

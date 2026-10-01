@@ -6,6 +6,7 @@ class PendingConfirmation {
     this.definition,
     this.conversationId,
     this.senderId,
+    this.senderName,
     this.label,
   ) : deadline = call.confirmationTimeoutSeconds == null
           ? null
@@ -14,6 +15,7 @@ class PendingConfirmation {
             );
   final String conversationId;
   final String senderId;
+  final String senderName;
   final String label;
   final DateTime? deadline;
   final ToolCall call;
@@ -57,8 +59,9 @@ extension _PendingConfirmationActions on ChatController {
       whereArgs: [senderId],
       limit: 1,
     )).single;
+    final senderName = sender['name'] as String;
     final label =
-        '${sender['name']} · ${definition.authorizationLabel ?? (call.name == 'runSkill' ? '技能：${call.arguments['name']}（版本 ${call.arguments['revision']}）' : toolTitle(call.name))}';
+        '$senderName · ${definition.authorizationLabel ?? (call.name == 'runSkill' ? '技能：${call.arguments['name']}（版本 ${call.arguments['revision']}）' : toolTitle(call.name))}';
     if (!existing)
       await _platform.updateAttentionNotification(
         conversationId,
@@ -76,7 +79,7 @@ extension _PendingConfirmationActions on ChatController {
               call.id,
               call.name,
               call.arguments,
-              '${definition.confirmationDescriptionFor(call.arguments) ?? definition.description}\n\n授权对象：$label',
+              '${definition.confirmationDescriptionFor(call.arguments) ?? definition.description}\n\n执行者：$senderName',
               definition.taskScopedConfirmation,
               call.confirmationTimeoutSeconds,
               autoApproved: existing,
@@ -88,6 +91,7 @@ extension _PendingConfirmationActions on ChatController {
               definition,
               conversationId,
               senderId,
+              senderName,
               label,
             );
       approved = scope != 'deny';
@@ -116,6 +120,7 @@ extension _PendingConfirmationActions on ChatController {
     ToolDefinition definition,
     String conversationId,
     String senderId,
+    String senderName,
     String label,
   ) async {
     final request = PendingConfirmation(
@@ -123,6 +128,7 @@ extension _PendingConfirmationActions on ChatController {
       definition,
       conversationId,
       senderId,
+      senderName,
       label,
     );
     pendingConfirmation = request;
