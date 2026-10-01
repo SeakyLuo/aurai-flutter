@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import '../../domain/group_mute.dart';
 import 'app_dialog.dart';
 import 'dialog_action_button.dart';
 import 'settings_appearance.dart';
@@ -118,6 +119,8 @@ class _CustomMuteDurationState extends State<_CustomMuteDuration> {
   late int _days = widget.initial.inDays;
   late int _hours = widget.initial.inHours % 24;
   late int _minutes = widget.initial.inMinutes % 60;
+  Duration get _duration =>
+      Duration(days: _days, hours: _hours, minutes: _minutes);
   final _controllers = <FixedExtentScrollController>[];
   @override
   void initState() {
@@ -153,13 +156,26 @@ class _CustomMuteDurationState extends State<_CustomMuteDuration> {
             height: 180,
             child: Row(
               children: [
-                _wheel(0, '天', null, (value) => _days = value),
+                _wheel(
+                  0,
+                  '天',
+                  GroupMute.maxDuration.inDays + 1,
+                  (value) => _days = value,
+                ),
                 _wheel(1, '小时', 24, (value) => _hours = value),
                 _wheel(2, '分钟', 60, (value) => _minutes = value),
               ],
             ),
           ),
           const SizedBox(height: 20),
+          Text(
+            '最多 30 天',
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -173,16 +189,11 @@ class _CustomMuteDurationState extends State<_CustomMuteDuration> {
               Expanded(
                 child: DialogActionButton(
                   text: '确认',
-                  onPressed: _days + _hours + _minutes == 0
+                  onPressed:
+                      _duration == Duration.zero ||
+                          _duration > GroupMute.maxDuration
                       ? null
-                      : () => Navigator.pop(
-                          context,
-                          Duration(
-                            days: _days,
-                            hours: _hours,
-                            minutes: _minutes,
-                          ),
-                        ),
+                      : () => Navigator.pop(context, _duration),
                 ),
               ),
             ],
@@ -194,7 +205,7 @@ class _CustomMuteDurationState extends State<_CustomMuteDuration> {
   Widget _wheel(
     int index,
     String unit,
-    int? count,
+    int count,
     void Function(int) changed,
   ) => Expanded(
     child: CupertinoPicker.builder(

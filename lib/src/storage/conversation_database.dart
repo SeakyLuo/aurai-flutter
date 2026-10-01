@@ -30,7 +30,7 @@ import 'tool_customization_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 74,
+  version: 75,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -396,6 +396,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
       await db.execute('DROP TRIGGER group_mute_message');
       await db.execute(groupMuteMessageTrigger);
     }
+    if (oldVersion < 75) await db.execute(messageMarkdownColumn);
   },
   onCreate: (db, version) async {
     final batch = db.batch();
@@ -420,6 +421,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
       ...htmlGameSchema,
       'CREATE INDEX html_games_app ON html_games(app_id)',
       ...groupChatTables,
+      messageMarkdownColumn,
       groupMuteColumn,
       groupWideMuteColumn,
       groupMuteMessageTrigger,
@@ -615,3 +617,6 @@ BEGIN
   SET updated_at = MAX(updated_at, NEW.updated_at)
   WHERE id = NEW.project_id;
 END''';
+
+const messageMarkdownColumn =
+    'ALTER TABLE messages ADD COLUMN markdown INTEGER NOT NULL DEFAULT 0';

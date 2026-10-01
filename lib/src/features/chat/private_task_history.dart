@@ -19,12 +19,11 @@ class PrivateTaskHistory extends StatelessWidget {
     final isTaskList = result['kind'] == 'taskList';
     final colors = Theme.of(context).colorScheme;
     final status = switch (task['status']) {
-      'active' => '进行中',
+      'active' => null,
       'complete' => '已完成',
       'paused' => '已暂停',
       'blocked' => '目标已停滞',
       'budget_limited' => '目标预算已用完',
-      'cancelled' => '已取消',
       _ => null,
     };
     return Padding(
@@ -37,20 +36,39 @@ class PrivateTaskHistory extends StatelessWidget {
               task['objective'] as String,
               style: const TextStyle(fontSize: 15, height: 1.5),
             ),
-            if (showGoalMetadata) ...[
+            if (showGoalMetadata && status != null) ...[
               const SizedBox(height: 6),
               Text(
-                status!,
+                status,
                 style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
               ),
             ],
           ],
           if (task['tokenBudget'] != null)
-            Text(
-              task['usageIncomplete'] == true
-                  ? 'Token 用量不完整 · 预算 ${task['tokenBudget']}'
-                  : 'Token：${task['tokensUsed'] ?? 0} / ${task['tokenBudget']}',
-              style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    'Token 预算',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  Text(
+                    '${task['tokenBudget']}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colors.onSurfaceVariant,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
             ),
           if (showGoalMetadata &&
               (task['reason'] as String? ?? '').isNotEmpty) ...[

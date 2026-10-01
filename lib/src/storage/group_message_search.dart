@@ -26,12 +26,14 @@ class GroupMessageSearchResult {
     this.createdAt,
     this.sender, {
     required this.role,
+    this.markdown = false,
     this.images = const [],
     this.files = const [],
     this.html,
     this.interactive,
   });
   final AgentMessageRole role;
+  final bool markdown;
   final List<MessageImage> images;
   final List<MessageFile> files;
   final HtmlGameCard? html;
@@ -157,6 +159,7 @@ class GroupMessageSearch {
         DateTime.fromMicrosecondsSinceEpoch(row['created_at'] as int),
         senders[row['sender_id']]!,
         role: AgentMessageRole.values.byName(row['role'] as String),
+        markdown: row['markdown'] == 1,
         images: images[id] ?? const [],
         files: files[id] ?? const [],
         html: cards[id],

@@ -106,7 +106,7 @@ List<ChatTimelineEntry> buildChatTimeline(
     for (final message in controller.visibleMessages)
       if (!isGroup && message.taskSummary != null)
         for (final id in message.taskSummary!.intermediateMessageIds)
-          if (reasoningIds.contains(id))
+          if (reasoningIds.contains(id) || !richRuns.contains(message.runId))
             id,
   };
   final toolsByMessage = <String, List<ChatTimelineEntry>>{};
@@ -596,6 +596,7 @@ class _StoppedRunElapsed extends StatelessWidget {
 }
 
 Map<String, String> chatSummaryOwners(ChatController controller) {
+  final richRuns = richReplyRuns(controller.visibleMessages);
   final reasoningIds = {
     for (final message in controller.visibleMessages)
       if (message.isReasoning) message.id,
@@ -608,7 +609,7 @@ Map<String, String> chatSummaryOwners(ChatController controller) {
         'elapsed:${message.runId}': message.id,
         for (final id in message.taskSummary!.intermediateMessageIds)
           if (id != controller.activeConversation.searchMessageId &&
-              reasoningIds.contains(id))
+              (reasoningIds.contains(id) || !richRuns.contains(message.runId)))
             id: message.id,
         for (var i = 0; i < message.taskSummary!.activities.length; i++)
           'tool:${message.runId}:$i': message.id,

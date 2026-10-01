@@ -110,8 +110,16 @@ class ToolExecutor {
       );
     }
     if (tool is PreflightAgentTool) {
-      final rejected = await (tool as PreflightAgentTool).preflight(call);
-      if (rejected != null) return rejected;
+      try {
+        final rejected = await (tool as PreflightAgentTool).preflight(call);
+        if (rejected != null) return rejected;
+      } on StateError catch (error) {
+        return ToolResult(callId: call.id, toolName: call.name,
+          status: ToolResultStatus.denied, output: {'error': error.message});
+      } on ArgumentError catch (error) {
+        return ToolResult(callId: call.id, toolName: call.name,
+          status: ToolResultStatus.error, output: {'error': error.message.toString()});
+      }
     }
     final safety = tool.definition.safetyFor(call.arguments);
     final needsConfirmation = tool is ToolConfirmationPolicyAgentTool

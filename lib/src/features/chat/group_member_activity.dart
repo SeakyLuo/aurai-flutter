@@ -85,38 +85,66 @@ extension GroupMemberActivities on ChatController {
         parent != null &&
         _execution.hiddenThinkingMembers.contains(reply.senderId);
     final candidates = parent == null ? {reply.senderId: reply} : _groupReplies;
+    final tool = HideThinkingTool((targets, excluded, all) {
+      final unknown = {
+        ...targets,
+        ...excluded,
+      }.difference(candidates.keys.toSet());
+      if (unknown.isNotEmpty) throw StateError('只能隐藏当前会话中的 AI 成员思考');
+      final requested = all
+          ? candidates.keys.toSet()
+          : targets.isEmpty
+          ? {reply.senderId}
+          : targets;
+      final selected = requested.difference(excluded);
+      final hidden = selected
+          .where((id) => !_removedGroupMembers.contains(id))
+          .toSet();
+      if (parent == null) {
+        if (hidden.contains(reply.senderId)) member.thinkingHidden = true;
+      } else {
+        _execution.hiddenThinkingMembers.addAll(hidden);
+        for (final id in hidden) {
+          final running = _groupRuns[id];
+          if (running != null) running.thinkingHidden = true;
+        }
+      }
+      _notifyMember(member, parent);
+      groupActivityChanges.value++;
+      return {
+        'hiddenSenderIds': hidden.toList(),
+        'excludedSenderIds': requested.intersection(excluded).toList(),
+        'scope': parent == null ? 'current_task' : 'current_group_task',
+      };
+    });
     return [
-      HideThinkingTool((targets, excluded, all) {
-        final unknown = {
+      PeerAccessTool(tool, (call) async {
+        final targets = (call.arguments['senderIds'] as List)
+            .cast<String>()
+            .toSet();
+        final excluded = (call.arguments['excludeSenderIds'] as List)
+            .cast<String>()
+            .toSet();
+        if ({
           ...targets,
           ...excluded,
-        }.difference(candidates.keys.toSet());
-        if (unknown.isNotEmpty) throw StateError('只能隐藏当前会话中的 AI 成员思考');
-        final requested = all
-            ? candidates.keys.toSet()
-            : targets.isEmpty
-            ? {reply.senderId}
-            : targets;
-        final selected = requested.difference(excluded);
-        final hidden = selected
-            .where((id) => !_removedGroupMembers.contains(id))
-            .toSet();
-        if (parent == null) {
-          if (hidden.contains(reply.senderId)) member.thinkingHidden = true;
-        } else {
-          _execution.hiddenThinkingMembers.addAll(hidden);
-          for (final id in hidden) {
-            final running = _groupRuns[id];
-            if (running != null) running.thinkingHidden = true;
-          }
+        }.difference(candidates.keys.toSet()).isNotEmpty) {
+          throw StateError('只能隐藏当前会话中的 AI 成员思考');
         }
-        _notifyMember(member, parent);
-        groupActivityChanges.value++;
-        return {
-          'hiddenSenderIds': hidden.toList(),
-          'excludedSenderIds': requested.intersection(excluded).toList(),
-          'scope': parent == null ? 'current_task' : 'current_group_task',
-        };
+        final selected =
+            (call.arguments['all'] == true
+                    ? candidates.keys.toSet()
+                    : targets.isEmpty
+                    ? {reply.senderId}
+                    : targets)
+                .difference(excluded);
+        final sorted = selected.toList()..sort();
+        return (
+          approval: selected.any((id) => id != reply.senderId),
+          scope: jsonEncode([parent?.id ?? member.id, sorted]),
+          description:
+              '隐藏${sorted.map((id) => candidates[id]!.sender.name).join('、')}本轮任务的可见思考',
+        );
       }),
     ];
   }

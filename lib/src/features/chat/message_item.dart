@@ -156,8 +156,7 @@ class _MessageItemState extends State<MessageItem> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      !message.canView('user:local')
+  Widget build(BuildContext context) => !message.canView('user:local')
       ? const SizedBox.shrink()
       : ImageMessageScope(
           messageId: message.id,
@@ -491,12 +490,20 @@ class _MessageItemState extends State<MessageItem> {
               onOpenLink: (url) => _openLink(context, url),
             ),
           )
+        else if (widget.groupBubble && !message.markdown)
+          GroupMentionText(
+            text: message.text,
+            style: body,
+            members: widget.mentionMembers,
+            onOpen: widget.onOpenMember,
+          )
         else
           MediaQuery.removePadding(
             context: context,
             removeBottom: true,
             child: MarkdownLinkUnderlines(
               child: MarkdownBody(
+                softLineBreak: true,
                 blockSyntaxes: [ReplyImageSyntax()],
                 inlineSyntaxes: [
                   SourceCitationSyntax(availableSources),
@@ -677,7 +684,9 @@ class _MessageItemState extends State<MessageItem> {
     }
   }
 
-  String _copyableText(String text) => message.role == AgentMessageRole.user
+  String _copyableText(String text) =>
+      message.role == AgentMessageRole.user ||
+          (widget.groupBubble && !message.markdown)
       ? memberMentionsPlainText(text)
       : markdownPlainText(text);
 

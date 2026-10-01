@@ -8,6 +8,13 @@ extension UserDataReadAccess on ChatController {
     String? groupId,
   ) {
     final name = tool.definition.name;
+    if (tool is GroupAnnouncementTool && tool.write) {
+      return PeerAccessTool(tool, (call) async {
+        final id = call.arguments['groupId'] as String? ?? tool.currentGroupId;
+        await groupStore.requireManager(_store.database, id, senderId);
+        return (approval: false, scope: id, description: '更新群公告');
+      });
+    }
     if (tool is GroupMessageMarksTool || tool is GroupAnnouncementTool) {
       final user = MessageSender.localUser.id;
       final AgentTool delegated = tool is GroupMessageMarksTool
@@ -94,24 +101,57 @@ extension UserDataReadAccess on ChatController {
       original: tool,
       delegated: delegated,
       resolve: (call) => _resolveDataReadAccess(call, senderId, groupId),
+      currentConversationId: groupId ?? conversation.id,
     );
   }
 
-  Future<({bool useUserScope, String title, String preview})>
+  Future<
+    ({
+      bool useUserScope,
+      bool approval,
+      String title,
+      String preview,
+      String scope,
+    })
+  >
   _resolveGroupAccess(ToolCall call, String senderId, String? groupId) async {
     final scope = await _resolveDataReadAccess(call, senderId, groupId);
+    final targetGroupId = call.arguments['groupId'] as String? ?? groupId;
+    if (targetGroupId == null) throw ArgumentError('请指定目标群聊');
+    final (groups, marks) = await (
+      _store.database.query(
+        'conversations',
+        columns: ['title'],
+        where: "id = ? AND kind = 'group'",
+        whereArgs: [targetGroupId],
+        limit: 1,
+      ),
+      call.name == 'removeGroupFavorite'
+          ? _store.database.query(
+              'group_favorite_messages',
+              columns: ['marked_by'],
+              where: 'conversation_id = ? AND message_id = ?',
+              whereArgs: [targetGroupId, call.arguments['messageId']],
+              limit: 1,
+            )
+          : Future.value(<Map<String, Object?>>[]),
+    ).wait;
+    if (groups.isEmpty) throw StateError('群聊不存在');
+    await groupStore.memberRole(targetGroupId,
+        scope.useUserScope ? MessageSender.localUser.id : senderId);
+    final sharedChange =
+        call.name == 'pinGroupMessage' ||
+        call.name == 'unpinGroupMessage' ||
+        marks.isNotEmpty && marks.single['marked_by'] != senderId;
     var preview = '';
     final messageId = call.arguments['messageId'] as String?;
-    if (scope.useUserScope && messageId != null) {
+    if ((scope.useUserScope || sharedChange) && messageId != null) {
       final (rows, attachments, apps) = await (
         _store.database.query(
           'messages',
           columns: ['text', 'interactive_json'],
           where: 'id = ? AND conversation_id = ?',
-          whereArgs: [
-            messageId,
-            call.arguments['groupId'] as String? ?? groupId,
-          ],
+          whereArgs: [messageId, targetGroupId],
         ),
         _store.database.query(
           'attachments',
@@ -143,8 +183,11 @@ extension UserDataReadAccess on ChatController {
           final card = InteractiveMessage.fromJson(
             jsonDecode(raw) as Map<String, dynamic>,
           );
-          card.requireViewer(MessageSender.localUser.id);
-          final view = card.viewFor(MessageSender.localUser.id);
+          final viewer = scope.useUserScope
+              ? MessageSender.localUser.id
+              : senderId;
+          card.requireViewer(viewer);
+          final view = card.viewFor(viewer);
           preview = card.participation['presentation'] == 'message'
               ? rows.single['text'] as String
               : '${view.title}\n${view.body}';
@@ -153,8 +196,20 @@ extension UserDataReadAccess on ChatController {
     }
     return (
       useUserScope: scope.useUserScope,
-      title: scope.title,
+      approval: scope.useUserScope || sharedChange,
+      title: groups.single['title'] as String,
       preview: preview,
+      scope: jsonEncode([
+        targetGroupId,
+        {
+          for (final key
+              in (call.arguments.keys
+                  .where((key) => key != 'offset' && key != 'groupId')
+                  .toList()
+                ..sort()))
+            key: call.arguments[key],
+        },
+      ]),
     );
   }
 

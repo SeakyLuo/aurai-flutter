@@ -323,6 +323,10 @@ extension MessageQuickReplies on ChatController {
   ) async {
     final text = quickReplyEmojis[key];
     if (text == null) throw StateError('不支持的快捷回复');
+    conversation = await _messageConversation(sourceId, actor, conversation);
+    if (conversation.kind == ConversationKind.group) {
+      await groupStore.requireCanSpeak(conversation.id, actor);
+    }
     await _store.writer.flush();
     final rows = await _store.database.query(
       'messages',

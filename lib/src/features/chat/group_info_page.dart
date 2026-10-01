@@ -484,17 +484,32 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                                   '群公告',
                                   style: TextStyle(fontSize: 15),
                                 ),
-                                subtitle: Text(
-                                  _announcement == null
-                                      ? '未设置'
-                                      : markdownPreviewText(
+                                subtitle: _announcement == null
+                                    ? null
+                                    : Text(
+                                        markdownPreviewText(
                                           _announcement!.content,
                                         ),
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                trailing: const SettingsIcon(
-                                  type: SettingsIconType.chevron,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (_announcement == null) ...[
+                                      Text(
+                                        '未设置',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
+                                    const SettingsIcon(
+                                      type: SettingsIconType.chevron,
+                                    ),
+                                  ],
                                 ),
                                 onTap: () => _open(
                                   GroupAnnouncementPage(

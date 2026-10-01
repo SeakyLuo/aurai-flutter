@@ -171,7 +171,6 @@ class _AiModelPageState extends State<AiModelPage> {
             _choice(
               _model.text.isEmpty ? '选择模型' : modelDisplayName(_model.text),
               _saving || _loading ? null : _selectModel,
-              loading: _loading,
             ),
             ModelReasoningField(
               service: _service,
@@ -283,23 +282,17 @@ class _AiModelPageState extends State<AiModelPage> {
       ),
     ),
   );
-  Widget _choice(String value, VoidCallback? onTap, {bool loading = false}) =>
-      Material(
-        color: settingsFieldColor(context),
-        borderRadius: BorderRadius.circular(26),
-        clipBehavior: Clip.antiAlias,
-        child: ListTile(
-          title: Text(value, style: const TextStyle(fontSize: 15)),
-          trailing: loading
-              ? const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const RotatedBox(
-                  quarterTurns: 1,
-                  child: SettingsIcon(type: SettingsIconType.chevron),
-                ),
-          onTap: onTap,
-        ),
-      );
+  Widget _choice(String value, VoidCallback? onTap) => Material(
+    color: settingsFieldColor(context),
+    borderRadius: BorderRadius.circular(26),
+    clipBehavior: Clip.antiAlias,
+    child: ListTile(
+      title: Text(value, style: const TextStyle(fontSize: 15)),
+      trailing: const RotatedBox(
+        quarterTurns: 1,
+        child: SettingsIcon(type: SettingsIconType.chevron),
+      ),
+      onTap: onTap,
+    ),
+  );
 }

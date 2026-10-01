@@ -45,7 +45,7 @@ extension PrivateGroupMessage on ChatController {
     if (quoteId != null) {
       final sources = await _store.database.query(
         'messages',
-        columns: ['id', 'sender_id', 'text', 'interactive_json'],
+        columns: ['id', 'sender_id', 'text', 'interactive_json', 'markdown'],
         where: 'id = ? AND conversation_id = ?',
         whereArgs: [quoteId, id],
         limit: 1,
@@ -63,6 +63,7 @@ extension PrivateGroupMessage on ChatController {
         senderId: source['sender_id'] as String,
         audience: sourceAudience?.cast<String>(),
         text: source['text'] as String,
+        markdown: isGroup ? source['markdown'] == 1 : true,
       );
       final authors = await _store.database.query(
         'message_senders',
@@ -106,6 +107,7 @@ extension PrivateGroupMessage on ChatController {
       sender: senders[senderId]!,
       audience: audience,
       isGroupMessage: isGroup,
+      markdown: item['markdown'] == true,
       runId: inlineRunId,
       isRichReply: inlineRunId != null,
       text: [...prefixes, if (text.isNotEmpty) text].join(' '),

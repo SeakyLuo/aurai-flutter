@@ -7,7 +7,8 @@ import android.content.res.Configuration
 
 /** Bounded LRU of live pages; evicted pages restore explicitly saved state. */
 object HtmlGamePool : ComponentCallbacks2 {
-    private val pages = LinkedHashMap<String, HtmlGameRuntime>(4, .75f, true)
+    private const val MIN_IDLE_PAGES = 6
+    private val pages = LinkedHashMap<String, HtmlGameRuntime>(8, .75f, true)
     private var registered = false
     private lateinit var memory: ActivityManager
     private var underPressure = false
@@ -20,7 +21,7 @@ object HtmlGamePool : ComponentCallbacks2 {
         if (underPressure || info.lowMemory) return 0
         val spare = (info.availMem - info.threshold).coerceAtLeast(0)
         val bytes = minOf(memory.memoryClass.toLong() * 1024 * 1024 / 4, spare / 16)
-        return (bytes / (32L * 1024 * 1024)).toInt()
+        return maxOf(MIN_IDLE_PAGES, (bytes / (32L * 1024 * 1024)).toInt())
     }
 
     fun acquire(context: Context, args: Map<*, *>): HtmlGameRuntime {

@@ -83,7 +83,7 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
                         const SizedBox(height: 28),
                         _ApprovalSection(
                           title: '始终允许',
-                          description: '这些工具可在所有会话中直接执行',
+                          description: '仅对应 AI 可在授权范围内执行，不会获得额外群角色',
                           entries: store.persistent,
                           tools: tools,
                           removing: _removing,
@@ -95,7 +95,7 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
                         const SizedBox(height: 28),
                         _ApprovalSection(
                           title: '当前会话允许',
-                          description: '这些工具仅可在当前会话中直接执行',
+                          description: '仅对应 AI 可在当前会话的授权范围内执行',
                           entries: current,
                           tools: tools,
                           scope: _conversation,
@@ -127,7 +127,7 @@ class _PageIntroduction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-    '已保存的授权会让 AI 在执行对应工具时不再重复询问。你可以随时撤销，之后再次执行时会重新确认。',
+    '授权绑定具体 AI；涉及他人数据或状态时还会限定目标和操作。授权不能提升群管理角色。你可以随时撤销，之后需要授权的操作会重新询问。',
     style: TextStyle(
       fontSize: 14,
       height: 1.55,

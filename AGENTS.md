@@ -1,5 +1,6 @@
 # 项目约定
 - 不要安装App到手机
+- 真机数据备份脚本位于 `scripts/.codex_backup_app_data.py`。
 
 ## 图标风格
 

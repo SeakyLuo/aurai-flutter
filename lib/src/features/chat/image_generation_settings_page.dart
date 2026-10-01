@@ -223,7 +223,6 @@ class _ImageGenerationSettingsPageState
                   _row(
                     title: '生图模型',
                     subtitle: _model?.name ?? '选择模型',
-                    loading: _loading,
                     onTap: _locked ? null : _chooseModel,
                   ),
                   const SizedBox(height: 12),
@@ -264,7 +263,6 @@ class _ImageGenerationSettingsPageState
     required String title,
     required String subtitle,
     Widget? leading,
-    bool loading = false,
     VoidCallback? onTap,
   }) => Material(
     color: settingsFieldColor(context),
@@ -275,12 +273,7 @@ class _ImageGenerationSettingsPageState
       leading: leading,
       title: Text(title),
       subtitle: Text(subtitle),
-      trailing: loading
-          ? const SizedBox.square(
-              dimension: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const SettingsIcon(type: SettingsIconType.chevron),
+      trailing: const SettingsIcon(type: SettingsIconType.chevron),
       onTap: onTap,
     ),
   );

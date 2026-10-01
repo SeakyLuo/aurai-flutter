@@ -24,6 +24,8 @@ class ToolDefinition {
     this.confirmationMayBeRequired = false,
     this.singleUseConfirmation = false,
     this.waitsForUser = false,
+    this.authorizationScope,
+    this.authorizationLabel,
   });
 
   final String name;
@@ -40,6 +42,8 @@ class ToolDefinition {
   final bool confirmationMayBeRequired;
   final bool singleUseConfirmation;
   final bool waitsForUser;
+  final String? authorizationScope;
+  final String? authorizationLabel;
 
   Map<String, Object?> get modelInputSchema {
     final needsConfirmation = [safety, ...actionSafety.values].any(
@@ -153,12 +157,21 @@ class ToolCall {
     final executionArguments = Map<String, Object?>.of(arguments);
     final timeout = executionArguments.remove('confirmationTimeoutSeconds');
     final userAction = executionArguments.remove('userAction');
+    final argumentErrors = <String>[
+      if (timeout != null && timeout is! int)
+        'confirmationTimeoutSeconds 必须是整数或 null',
+      if (userAction != null && userAction is! String)
+        'userAction 必须是字符串或 null',
+    ];
     return ToolCall(
       id: id,
       name: name,
       arguments: executionArguments,
-      confirmationTimeoutSeconds: timeout as int?,
-      userAction: userAction as String?,
+      confirmationTimeoutSeconds: timeout is int ? timeout : null,
+      userAction: userAction is String ? userAction : null,
+      argumentsError: argumentErrors.isEmpty
+          ? null
+          : '工具参数不符合 schema：${argumentErrors.join('；')}',
     );
   }
 

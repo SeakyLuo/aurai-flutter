@@ -23,13 +23,13 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
         : ToolSafety.lowRisk,
     description: switch (name) {
       'createGoal' =>
-        'Create a durable objective only when explicitly requested by the user or system instructions. Do not infer goals from ordinary tasks. Include concrete completion criteria in the objective text. Only one unfinished goal is allowed. The runtime continues an active goal after a final answer; complete or block it when appropriate. There is no model-turn limit.',
+        'Create a durable objective only when explicitly requested by the user or system instructions. Do not infer goals from ordinary tasks. Include concrete completion criteria in the objective text. Only one unfinished goal is allowed. The runtime continues an active goal after a final answer; complete or block it when appropriate. There is no model-turn limit. Omit tokenBudget unless the user explicitly requested a concrete token budget for this goal; never estimate, recommend, or choose one yourself.',
       'getGoal' =>
-        'Read the current objective, status and model-turn usage in this private chat.',
+        'Read your current objective, status and model-turn usage in this conversation. Available in private chats and groups; each AI owns its own state.',
       'getTaskList' =>
         'Read the current progress checklist and its explanation, independently of the goal.',
       'updateGoal' =>
-        'Update goal status and explain why. complete requires evidence that completion criteria are satisfied. blocked reports the same blocking condition after attempting meaningful alternatives; use an identical blocker key for that condition. The runtime only blocks after three consecutive reports in distinct model turns. Do not manufacture retries when approval or user input is required; use askUser. Report active with progress to reset the blocking audit; paused stops execution; cancelled abandons it. active resumes a paused or blocked goal only when the user asks to continue. Never resume because of unrelated messages.',
+        'Update goal status and explain why. complete requires evidence that completion criteria are satisfied. blocked reports the same blocking condition after attempting meaningful alternatives; use an identical blocker key for that condition. The runtime only blocks after three consecutive reports in distinct model turns. Do not manufacture retries when approval or user input is required; use askUser. Report active with progress to reset the blocking audit; paused stops execution. active resumes a paused or blocked goal only when the user asks to continue. Never resume because of unrelated messages.',
       'createTaskList' =>
         'Create a task list when work has multiple meaningful steps or will take enough time that visible progress helps the user. Skip simple requests. Keep items concise and outcome-oriented, with pending, in_progress or completed status and at most one in_progress item. This list does not require approval, create a durable goal, or trigger continued execution. Use updateTaskList for an existing unfinished list.',
       _ =>
@@ -44,13 +44,13 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
             'type': 'integer',
             'minimum': 1,
             'description':
-                'Optional total input plus output token budget. Set only when the user explicitly requests a budget; omit for unlimited.',
+                'Optional total input plus output token budget. Omit by default for unlimited. Set only when the user explicitly requests a concrete token amount for this goal. Never estimate or choose a budget.',
           },
         },
         if (name == 'updateGoal') ...{
           'status': {
             'type': 'string',
-            'enum': ['active', 'complete', 'blocked', 'paused', 'cancelled'],
+            'enum': ['active', 'complete', 'blocked', 'paused'],
           },
           'reason': {'type': 'string', 'minLength': 1},
           'blocker': {
@@ -96,8 +96,7 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
         ? await store.read()
         : await store.change((state) {
             if (name == 'createGoal') {
-              if (state['objective'] != null &&
-                  !['complete', 'cancelled'].contains(state['status'])) {
+              if (state['objective'] != null && state['status'] != 'complete') {
                 throw StateError('已有未结束的目标，请先完成或取消');
               }
               state.removeWhere(
@@ -125,12 +124,11 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
                 'complete',
                 'blocked',
                 'paused',
-                'cancelled',
               ].contains(status)) {
                 throw ArgumentError('目标状态无效');
               }
               if (status == 'active') {
-                if (['complete', 'cancelled'].contains(state['status'])) {
+                if (state['status'] == 'complete') {
                   throw StateError('已结束的目标不能恢复，请创建新目标');
                 }
                 state.remove('blocker');

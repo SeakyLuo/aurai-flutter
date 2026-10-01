@@ -19,6 +19,8 @@ extension GroupMuteStore on GroupChatStore {
   }) => database.transaction((txn) async {
     if (duration != null && duration < Duration.zero)
       throw ArgumentError('禁言时长不能为负数');
+    if (duration != null && duration > GroupMute.maxDuration)
+      throw ArgumentError('限时禁言最长为 30 天');
     final actors = await txn.query(
       'conversation_members',
       columns: ['role'],
@@ -98,6 +100,9 @@ extension GroupMuteStore on GroupChatStore {
   }) => database.transaction((txn) async {
     if (duration != null && duration < Duration.zero) {
       throw ArgumentError('禁言时长不能为负数');
+    }
+    if (duration != null && duration > GroupMute.maxDuration) {
+      throw ArgumentError('限时禁言最长为 30 天');
     }
     if (senderIds.isEmpty || senderIds.length > GroupChatStore.pageSize)
       throw ArgumentError('请选择群成员');

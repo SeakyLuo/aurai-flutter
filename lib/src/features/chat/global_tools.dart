@@ -17,13 +17,12 @@ extension GlobalTools on ChatController {
   }) {
     final conversationId = conversation.id;
     return <AgentTool>[
-          // TODO: Add group goals/plans with per-member ownership and group scheduling.
-          if (groupId == null && conversation.kind == ConversationKind.direct)
-            for (final name in PrivateTaskTool.names)
-              PrivateTaskTool(
-                PrivateTaskState(_store.database, conversationId, senderId),
-                name,
-              ),
+          // Goals/plans are isolated by conversation and member; scheduling remains independent.
+          for (final name in PrivateTaskTool.names)
+            PrivateTaskTool(
+              PrivateTaskState(_store.database, conversationId, senderId),
+              name,
+            ),
           DeliverFileTool(
             (args, cancelled) =>
                 _deliverFile(args, conversation, senderId, cancelled),
@@ -79,10 +78,7 @@ extension GlobalTools on ChatController {
                 HtmlGameSignals.appChanges.add(appId);
               return result;
             }),
-          ExecutionLogTool(
-            senderId: senderId,
-            inGroup: conversation.kind == ConversationKind.group,
-          ),
+          ExecutionLogTool(senderId: senderId),
           for (final name in HtmlMessageUpdateTool.names)
             HtmlMessageUpdateTool(name, (operation, args) async {
               await _store.writer.flush();
@@ -238,6 +234,27 @@ extension GlobalTools on ChatController {
           GroupMessageTool(
             (arguments) => _sendPrivateGroupMessage(arguments, senderId),
           ),
+          ..._groupAutoReplyTools(groupId, senderId),
+          GroupSleepTool(
+            (targetGroupId, duration, draft, reason) => _sleepInTargetGroup(
+              targetGroupId,
+              senderId,
+              duration,
+              draft,
+              reason,
+            ),
+            currentGroupId: groupId,
+          ),
+          _groupWakeTool(groupId, senderId),
+          GroupMuteTool(
+            (targetGroupId, targetSenderId, duration) => setGroupMemberMute(
+              targetGroupId,
+              targetSenderId,
+              duration: duration,
+              actorId: senderId,
+            ),
+            currentGroupId: groupId,
+          ),
           for (final operation in GroupChatTool.operations)
             GroupChatTool(
               groupStore,
@@ -278,7 +295,7 @@ extension GlobalTools on ChatController {
                       : null),
               () => _store.writer.flush(),
             ),
-          if (groupId != null) GroupNoticeTool(groupStore, senderId, groupId),
+          GroupNoticeTool(groupStore, senderId, groupId),
           for (final write in [false, true])
             GroupAnnouncementTool(
               GroupAnnouncementStore(groupStore),
@@ -451,8 +468,11 @@ extension GlobalTools on ChatController {
             DeviceExtensionTool(_platform, name),
         ]
         .map(
-          (tool) =>
-              _withUserDataReadAccess(tool, conversation, senderId, groupId),
+          (tool) => _withGroupMemberAccess(
+            _withUserDataReadAccess(tool, conversation, senderId, groupId),
+            senderId,
+            groupId,
+          ),
         )
         .toList();
   }

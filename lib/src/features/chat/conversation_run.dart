@@ -210,16 +210,14 @@ extension ConversationRun on ChatController {
         }),
       )..addAll(_thinkingTools(runConversation, groupParent, reply));
       if (groupParent != null) {
-        tools.removeWhere((t) => t.definition.name == 'sendGroupMessage');
-        tools.addAll(
-          _groupRunTools(
-            parent: groupParent,
-            member: runConversation,
-            reply: reply,
-            observed: observed,
-            publishedIds: runMessageIds,
-            onSleep: () => leftSleepDraft = true,
-          ),
+        _bindGroupRunTools(
+          tools: tools,
+          parent: groupParent,
+          member: runConversation,
+          reply: reply,
+          observed: observed,
+          publishedIds: runMessageIds,
+          onSleep: () => leftSleepDraft = true,
         );
       }
       final registry = ToolRegistry(tools: tools, capabilities: capabilities);
@@ -276,11 +274,9 @@ extension ConversationRun on ChatController {
       String? reasoningMessageId;
       int? reasoningActivityIndex, outputMessageIndex;
       await runtime.run(
-        endsRun: groupParent == null
-            ? null
-            : (result) =>
-                  result.toolName == 'sleepGroupChat' &&
-                  result.status == ToolResultStatus.success,
+        endsRun: (result) =>
+            result.toolName == 'sleepGroupChat' &&
+            result.status == ToolResultStatus.success,
         conversation: [
           ...(groupHistory == null
               ? _privateHistory(history.take(lastUser + 1), reply.senderId)

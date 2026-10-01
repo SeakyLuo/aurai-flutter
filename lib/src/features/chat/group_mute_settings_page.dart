@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../app/ui_action.dart';
-import '../../app/glass_notice.dart';
 import '../../domain/ai_profile.dart';
 import '../../storage/group_chat_store.dart';
 import 'chat_controller.dart';
@@ -94,9 +93,6 @@ class _GroupMuteSettingsPageState extends State<GroupMuteSettingsPage> {
     );
     if (!mounted) return;
     if (saved) {
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(const SnackBar(content: Text('已更新禁言设置')));
       await _load();
     }
     if (mounted) setState(() => _busy = false);

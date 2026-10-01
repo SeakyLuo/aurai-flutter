@@ -20,7 +20,8 @@ class EmptyDataView extends StatelessWidget {
   final VoidCallback? onAction;
 
   @override
-  Widget build(BuildContext context) => Center(
+  Widget build(BuildContext context) => Align(
+    alignment: const Alignment(0, -.3),
     child: SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: ConstrainedBox(
@@ -30,18 +31,18 @@ class EmptyDataView extends StatelessWidget {
           children: [
             Image.asset(
               'assets/illustrations/empty_box.png',
-              width: 176,
-              height: 176,
+              width: 144,
+              height: 144,
               excludeFromSemantics: true,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             Text(
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 17,
+                fontSize: 15,
                 height: 1.4,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
                 color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
@@ -61,8 +62,15 @@ class EmptyDataView extends StatelessWidget {
               const SizedBox(height: 24),
               WidgetUtils.primaryButton(
                 text: actionText!,
-                icon: actionIcon,
+                icon: actionIcon == null
+                    ? null
+                    : SizedBox.square(
+                        dimension: 18,
+                        child: FittedBox(child: actionIcon),
+                      ),
                 onPressed: onAction,
+                height: 42,
+                fontSize: 14,
               ),
             ],
           ],

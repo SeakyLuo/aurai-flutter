@@ -80,7 +80,12 @@ class AgentRuntime {
           final state = await task.read();
           if (state['status'] == 'active') {
             final problem = await task.budgetProblem();
-            if (problem != null) throw ModelProviderException(problem);
+            if (problem != null) {
+              return AgentRunResult(
+                answer: '',
+                steps: List.unmodifiable(steps),
+              );
+            }
             goalActiveAtTurnStart = true;
             await task.beginTurn();
           }
@@ -139,7 +144,30 @@ class AgentRuntime {
         if (goalActiveAtTurnStart) {
           await task!.recordUsage(modelTurn.response['usage'] as Map?);
           final problem = await task.budgetProblem();
-          if (problem != null) throw ModelProviderException(problem);
+          if (problem != null) {
+            for (final call in modelTurn.toolCalls) {
+              final tool = _registry.find(call.name);
+              final arguments =
+                  call.argumentsError == null && tool is ToolHistoryAgentTool
+                  ? (tool as ToolHistoryAgentTool).historyArguments(call)
+                  : call.arguments;
+              await onToolStarted?.call(
+                ToolCall(id: call.id, name: call.name, arguments: arguments),
+              );
+              await onToolCompleted?.call(
+                ToolResult(
+                  callId: call.id,
+                  toolName: call.name,
+                  status: ToolResultStatus.cancelled,
+                  output: {'performed': false, 'reason': problem},
+                ),
+              );
+            }
+            return AgentRunResult(
+              answer: modelTurn.text?.trim() ?? '',
+              steps: List.unmodifiable(steps),
+            );
+          }
         }
         if (modelTurn.response['status'] == 'failed') {
           throw ModelProviderException(

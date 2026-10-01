@@ -7,7 +7,6 @@ import '../../domain/ai_profile.dart';
 import '../../domain/message_sender.dart';
 import 'app_confirmation_dialog.dart';
 import 'group_mute_duration_page.dart';
-import 'dialog_action_button.dart';
 import 'chat_controller.dart';
 import 'member_avatar.dart';
 import 'group_mute_selection.dart';
@@ -159,6 +158,11 @@ class _GroupMutePageState extends State<GroupMutePage> {
         : _members
               .firstWhere((m) => m.sender.id == MessageSender.localUser.id)
               .role;
+    final canAdd =
+        role != null &&
+        _members.any(
+          (m) => !m.isMuted && m.canBeMutedBy(role, MessageSender.localUser.id),
+        );
     return PopScope(
       canPop: !_busy,
       child: Scaffold(
@@ -192,6 +196,19 @@ class _GroupMutePageState extends State<GroupMutePage> {
               ? Center(
                   child: TextButton(onPressed: _load, child: const Text('重试')),
                 )
+              : !_members.any((m) => m.isMuted)
+              ? Padding(
+                  padding: EdgeInsets.only(top: settingsHeaderHeight(context)),
+                  child: EmptyDataView(
+                    title: '暂无禁言成员',
+                    actionText: canAdd ? '添加成员' : null,
+                    actionIcon: SettingsIcon(
+                      type: SettingsIconType.add,
+                      color: colors.onPrimary,
+                    ),
+                    onAction: _busy ? null : _add,
+                  ),
+                )
               : ListView(
                   padding: EdgeInsets.fromLTRB(
                     16,
@@ -200,30 +217,6 @@ class _GroupMutePageState extends State<GroupMutePage> {
                     24,
                   ),
                   children: [
-                    if (!_members.any((m) => m.isMuted))
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 64),
-                        child: Column(
-                          children: [
-                            const EmptyDataView(title: '暂无禁言成员'),
-                            const SizedBox(height: 20),
-                            if (role != null &&
-                                _members.any(
-                                  (m) =>
-                                      !m.isMuted &&
-                                      m.canBeMutedBy(
-                                        role,
-                                        MessageSender.localUser.id,
-                                      ),
-                                ))
-                              DialogActionButton(
-                                text: '添加成员',
-                                role: DialogActionRole.primary,
-                                onPressed: _busy ? null : _add,
-                              ),
-                          ],
-                        ),
-                      ),
                     Material(
                       color: Colors.transparent,
                       borderRadius: BorderRadius.circular(26),

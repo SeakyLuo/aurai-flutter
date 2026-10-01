@@ -42,9 +42,22 @@ class AppControlTool implements AgentTool, RuntimeCapabilityAgentTool {
         if (name == 'setConversationArchived') 'archived': {'type': 'boolean'},
         if (name == 'sendConversationMessage') ...{
           'text': {'type': 'string', 'maxLength': 20000},
-          'imagePaths': {'type': 'array', 'maxItems': 4, 'items': {'type': 'string'}},
+          'markdown': {
+            'type': 'boolean',
+            'description':
+                'Message bubbles default to plain text. Set true to enable Markdown formatting in the bubble. This does not change the private AI reply body.',
+          },
+          'imagePaths': {
+            'type': 'array',
+            'maxItems': 4,
+            'items': {'type': 'string'},
+          },
           'quoteMessageId': {'type': 'string'},
-          'mentionIds': {'type': 'array', 'items': {'type': 'string'}, 'uniqueItems': true},
+          'mentionIds': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'uniqueItems': true,
+          },
         },
         if (name == 'openAppPage') ...{
           'page': {
@@ -71,19 +84,32 @@ class AppControlTool implements AgentTool, RuntimeCapabilityAgentTool {
   @override
   Future<ToolResult> execute(ToolCall call) async {
     if (name == 'sendConversationMessage') {
-      return GroupMessageTool((prepared) => run(name, {
-        'conversationId': call.arguments['conversationId'],
-        'message': prepared['message'],
-      })).execute(ToolCall(id: call.id, name: call.name, arguments: {
-        'groupId': call.arguments['conversationId'],
-        'message': {
-          'text': call.arguments['text'],
-          if (call.arguments.containsKey('imagePaths')) 'imagePaths': call.arguments['imagePaths'],
-          if (call.arguments.containsKey('quoteMessageId')) 'quoteMessageId': call.arguments['quoteMessageId'],
-          if (call.arguments.containsKey('mentionIds')) 'mentionIds': call.arguments['mentionIds'],
-        },
-        'participation': 'unchanged',
-      }));
+      return GroupMessageTool(
+        (prepared) => run(name, {
+          'conversationId': call.arguments['conversationId'],
+          'message': prepared['message'],
+        }),
+      ).execute(
+        ToolCall(
+          id: call.id,
+          name: call.name,
+          arguments: {
+            'groupId': call.arguments['conversationId'],
+            'message': {
+              'text': call.arguments['text'],
+              if (call.arguments.containsKey('markdown'))
+                'markdown': call.arguments['markdown'],
+              if (call.arguments.containsKey('imagePaths'))
+                'imagePaths': call.arguments['imagePaths'],
+              if (call.arguments.containsKey('quoteMessageId'))
+                'quoteMessageId': call.arguments['quoteMessageId'],
+              if (call.arguments.containsKey('mentionIds'))
+                'mentionIds': call.arguments['mentionIds'],
+            },
+            'participation': 'unchanged',
+          },
+        ),
+      );
     }
     try {
       return ToolResult(
