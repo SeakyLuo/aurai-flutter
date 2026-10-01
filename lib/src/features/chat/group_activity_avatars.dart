@@ -231,7 +231,7 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
               padding: const EdgeInsets.all(1),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: colors.surface.withValues(alpha: .62),
+                  color: Colors.black.withValues(alpha: .48),
                   shape: BoxShape.circle,
                 ),
                 child: Padding(
@@ -242,7 +242,7 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
                       '+$overflowCount',
                       maxLines: 1,
                       style: TextStyle(
-                        color: colors.onSurface,
+                        color: Colors.white,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
