@@ -59,8 +59,7 @@ class Conversation {
         (message) =>
             !message.isReasoning &&
             message.quickReplyToId == null &&
-            (message.interactive?.canView(MessageSender.localUser.id) ??
-                true) &&
+            (message.canView(MessageSender.localUser.id)) &&
             !(message.isSystem && message.text == '私密交互消息已更新'),
       )
       .firstOrNull;

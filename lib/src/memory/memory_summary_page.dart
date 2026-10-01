@@ -1,3 +1,4 @@
+import '../widgets/empty_data_view.dart';
 import '../features/chat/retained_tab_view.dart';
 import '../domain/error_message.dart';
 import '../features/chat/delete_confirmation_dialog.dart';
@@ -253,19 +254,22 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12,
                               ),
-                              child: Text(
-                                memory.entries.isEmpty
-                                    ? (memory.projectShared
+                              child: memory.entries.isEmpty
+                                  ? EmptyDataView(
+                                      title: '还没有记忆',
+                                      description: memory.projectShared
                                           ? '这里会记录项目中所有 AI 共享的背景与约定。你可以在下方补充信息。'
                                           : memory.scope.isEmpty
                                           ? '这里会逐渐记录对你的了解。你可以在下方补充希望记住的信息。'
-                                          : '这里会记录在这个群聊中形成的记忆。你可以在下方补充信息。')
-                                    : '以下是对话中形成、或主动保存的记忆。',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Color(0xFF6B6B6B),
-                                ),
-                              ),
+                                          : '这里会记录在这个群聊中形成的记忆。你可以在下方补充信息。',
+                                    )
+                                  : const Text(
+                                      '以下是对话中形成、或主动保存的记忆。',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Color(0xFF6B6B6B),
+                                      ),
+                                    ),
                             ),
                             if (memory.entries.isNotEmpty) ...[
                               const SizedBox(height: 20),

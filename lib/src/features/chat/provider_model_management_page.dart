@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'default_model_settings_page.dart';
 import 'header_action_menu.dart';
 import 'package:flutter/material.dart';
@@ -262,31 +263,14 @@ class _ProviderModelManagementPageState
                         ? Center(
                             child: Padding(
                               padding: const EdgeInsets.all(24),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    query.isNotEmpty
-                                        ? '没有匹配的模型'
-                                        : canChoose
-                                        ? '还没有添加的模型'
-                                        : '请先返回供应商页填写 API 密钥',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  if (query.isNotEmpty) ...[
-                                    const SizedBox(height: 12),
-                                    TextButton(
-                                      onPressed: () =>
-                                          setState(() => _search.clear()),
-                                      child: const Text('清除搜索'),
-                                    ),
-                                  ],
-                                ],
+                              child: EmptyDataView(
+                                title: query.isNotEmpty
+                                    ? '没有匹配的模型'
+                                    : canChoose
+                                    ? '还没有添加的模型'
+                                    : '请先返回供应商页填写 API 密钥',
+                                actionText: query.isNotEmpty ? '清除搜索' : null,
+                                onAction: () => setState(() => _search.clear()),
                               ),
                             ),
                           )

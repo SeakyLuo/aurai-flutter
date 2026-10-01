@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../../domain/agent_models.dart';
+import '../../domain/group_mute.dart';
 
 /// One mailbox per member. A new arrival never restarts an existing delay.
 class GroupDispatcher {
@@ -10,7 +11,9 @@ class GroupDispatcher {
     required this.respond,
     required this.failed,
     required this.paused,
-  }) : history = List.of(history) {
+    Map<String, GroupMute> mutedUntil = const {},
+  }) : history = List.of(history),
+       mutedUntil = Map.of(mutedUntil) {
     for (final id in members) {
       _members[id] = _Mailbox();
     }
@@ -21,6 +24,18 @@ class GroupDispatcher {
   respond;
   final Future<void> Function(String senderId, Object error) failed;
   final Set<String> paused;
+  final Map<String, GroupMute> mutedUntil;
+  bool isMuted(String id) => mutedUntil[id]?.isActive == true;
+
+  void mute(String id, GroupMute? until) {
+    if (until == null) {
+      mutedUntil.remove(id);
+    } else {
+      mutedUntil[id] = until;
+      interrupt(id);
+    }
+  }
+
   final _members = <String, _Mailbox>{};
   final _done = Completer<void>();
   bool stopped = false;
@@ -39,7 +54,9 @@ class GroupDispatcher {
     history.addAll(messages);
     final authors = messages.map((m) => m.senderId).toSet();
     for (final entry in _members.entries) {
+      if (isMuted(entry.key)) continue;
       if (authors.contains(entry.key)) continue;
+      if (!messages.any((message) => message.canView(entry.key))) continue;
       if (paused.contains(entry.key) && !mentions.contains(entry.key)) continue;
       if (mentions.contains(entry.key)) {
         entry.value.timer?.cancel();
@@ -54,6 +71,7 @@ class GroupDispatcher {
   void receiveTargeted(List<AgentMessage> messages, Set<String> recipients) {
     history.addAll(messages);
     for (final id in recipients) {
+      if (isMuted(id)) continue;
       final mailbox = _members[id];
       if (mailbox == null) continue;
       mailbox.timer?.cancel();
@@ -66,6 +84,7 @@ class GroupDispatcher {
 
   void start(Iterable<String> recipients) {
     for (final id in recipients) {
+      if (isMuted(id)) continue;
       final mailbox = _members[id];
       if (mailbox == null) continue;
       _markPending(mailbox);
@@ -121,6 +140,7 @@ class GroupDispatcher {
     }
     if (paused.contains(id) && until != null)
       throw StateError('已暂停自动接话，不能安排唤醒');
+    if (isMuted(id)) throw StateError('已被禁言，不能安排唤醒');
     final mailbox = _members[id]!;
     mailbox.sleepUntil = until;
     return until;
@@ -129,7 +149,9 @@ class GroupDispatcher {
   void restoreSleeps(Map<String, DateTime> sleeps) {
     for (final entry in sleeps.entries) {
       final mailbox = _members[entry.key];
-      if (mailbox != null && !paused.contains(entry.key)) {
+      if (mailbox != null &&
+          !paused.contains(entry.key) &&
+          !isMuted(entry.key)) {
         mailbox.sleepUntil = entry.value;
       }
     }
@@ -144,7 +166,8 @@ class GroupDispatcher {
   }
 
   void _schedule(String id, _Mailbox mailbox) {
-    if (stopped || mailbox.active || mailbox.timer != null) return;
+    if (stopped || isMuted(id) || mailbox.active || mailbox.timer != null)
+      return;
     mailbox.timer = Timer(
       mailbox.sleepUntil?.difference(DateTime.now()) ?? Duration.zero,
       () {

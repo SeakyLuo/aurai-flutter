@@ -4,18 +4,26 @@ import 'settings_icon.dart';
 
 /// Uses the surrounding tool activity card; no separate task-mode UI.
 class PrivateTaskHistory extends StatelessWidget {
-  const PrivateTaskHistory({super.key, required this.resultJson});
+  const PrivateTaskHistory({
+    super.key,
+    required this.resultJson,
+    this.showGoalMetadata = true,
+  });
   final String resultJson;
+  final bool showGoalMetadata;
 
   @override
   Widget build(BuildContext context) {
-    final task = (jsonDecode(resultJson) as Map)['task'] as Map;
+    final result = jsonDecode(resultJson) as Map;
+    final task = result['task'] as Map;
+    final isTaskList = result['kind'] == 'taskList';
     final colors = Theme.of(context).colorScheme;
     final status = switch (task['status']) {
       'active' => '进行中',
       'complete' => '已完成',
       'paused' => '已暂停',
-      'blocked' => '等待补充',
+      'blocked' => '目标已停滞',
+      'budget_limited' => '目标预算已用完',
       'cancelled' => '已取消',
       _ => null,
     };
@@ -27,21 +35,36 @@ class PrivateTaskHistory extends StatelessWidget {
           if (task['objective'] != null) ...[
             Text(
               task['objective'] as String,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 15, height: 1.5),
             ),
-            const SizedBox(height: 6),
+            if (showGoalMetadata) ...[
+              const SizedBox(height: 6),
+              Text(
+                status!,
+                style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
+              ),
+            ],
+          ],
+          if (task['tokenBudget'] != null)
             Text(
-              '$status · ${task['completionCriteria']}',
+              task['usageIncomplete'] == true
+                  ? 'Token 用量不完整 · 预算 ${task['tokenBudget']}'
+                  : 'Token：${task['tokensUsed'] ?? 0} / ${task['tokenBudget']}',
               style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
             ),
-          ],
-          if ((task['reason'] as String? ?? '').isNotEmpty) ...[
+          if (showGoalMetadata &&
+              (task['reason'] as String? ?? '').isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
               task['reason'] as String,
               style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
             ),
           ],
+          if ((task['explanation'] as String? ?? '').isNotEmpty)
+            Text(
+              task['explanation'] as String,
+              style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
+            ),
           for (final step in task['steps'] as List? ?? const [])
             Padding(
               padding: const EdgeInsets.only(top: 10),
@@ -83,8 +106,13 @@ class PrivateTaskHistory extends StatelessWidget {
                 ],
               ),
             ),
-          if (task.isEmpty)
-            Text('暂无目标或计划', style: TextStyle(color: colors.onSurfaceVariant)),
+          if (isTaskList
+              ? (task['steps'] as List? ?? const []).isEmpty
+              : task.isEmpty)
+            Text(
+              isTaskList ? '暂无任务' : '暂无目标',
+              style: TextStyle(color: colors.onSurfaceVariant),
+            ),
         ],
       ),
     );

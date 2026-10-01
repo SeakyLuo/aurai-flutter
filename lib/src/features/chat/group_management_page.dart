@@ -11,6 +11,7 @@ import 'chat_controller.dart';
 import 'delete_confirmation_dialog.dart';
 import 'dialog_action_button.dart';
 import 'group_administrators_page.dart';
+import 'group_mute_settings_page.dart';
 import 'group_owner_transfer_page.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -232,6 +233,17 @@ class _GroupManagementPageState extends State<GroupManagementPage> {
                               detail: administrators == 0
                                   ? '未设置'
                                   : '$administrators 位',
+                            ),
+                            _row(
+                              '禁言设置',
+                              _role.canManage
+                                  ? () => _open(
+                                      GroupMuteSettingsPage(
+                                        controller: widget.controller,
+                                        groupId: widget.groupId,
+                                      ),
+                                    )
+                                  : null,
                             ),
                           ],
                         ),

@@ -8,34 +8,44 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
   static const names = [
     'createGoal',
     'getGoal',
+    'getTaskList',
     'updateGoal',
-    'createPlan',
-    'updatePlan',
+    'createTaskList',
+    'updateTaskList',
   ];
 
   @override
   ToolDefinition get definition => ToolDefinition(
     name: name,
     capabilityId: 'task.manage',
-    safety: name == 'getGoal' ? ToolSafety.readOnly : ToolSafety.lowRisk,
+    safety: name == 'getGoal' || name == 'getTaskList'
+        ? ToolSafety.readOnly
+        : ToolSafety.lowRisk,
     description: switch (name) {
       'createGoal' =>
-        'Create a durable objective for a complex user task in this private chat. You may decide to use it yourself, within the user request. Provide concrete completion criteria. Only one unfinished goal is allowed. The runtime continues an active goal after a final answer; complete or block it when appropriate. There is no model-turn limit. Never create goals for ordinary small talk.',
+        'Create a durable objective only when explicitly requested by the user or system instructions. Do not infer goals from ordinary tasks. Include concrete completion criteria in the objective text. Only one unfinished goal is allowed. The runtime continues an active goal after a final answer; complete or block it when appropriate. There is no model-turn limit.',
       'getGoal' =>
-        'Read the current objective, completion criteria, status, plan and model-turn usage in this private chat.',
+        'Read the current objective, status and model-turn usage in this private chat.',
+      'getTaskList' =>
+        'Read the current progress checklist and its explanation, independently of the goal.',
       'updateGoal' =>
-        'Update goal status and explain why. complete requires evidence that completion criteria are satisfied and all plan steps are complete. blocked reports the same blocking condition after attempting meaningful alternatives; use an identical blocker key for that condition. The runtime only blocks after three consecutive reports in distinct model turns. Do not manufacture retries when approval or user input is required; use askUser. Report active with progress to reset the blocking audit; paused stops execution; cancelled abandons it. active resumes a paused or blocked goal only when the user asks to continue. Never resume because of unrelated messages.',
-      'createPlan' =>
-        'Create an independent execution plan, with or without a goal. Use updatePlan for an existing unfinished plan. Steps use pending, in_progress or completed; at most one step is in_progress.',
+        'Update goal status and explain why. complete requires evidence that completion criteria are satisfied. blocked reports the same blocking condition after attempting meaningful alternatives; use an identical blocker key for that condition. The runtime only blocks after three consecutive reports in distinct model turns. Do not manufacture retries when approval or user input is required; use askUser. Report active with progress to reset the blocking audit; paused stops execution; cancelled abandons it. active resumes a paused or blocked goal only when the user asks to continue. Never resume because of unrelated messages.',
+      'createTaskList' =>
+        'Create a task list when work has multiple meaningful steps or will take enough time that visible progress helps the user. Skip simple requests. Keep items concise and outcome-oriented, with pending, in_progress or completed status and at most one in_progress item. This list does not require approval, create a durable goal, or trigger continued execution. Use updateTaskList for an existing unfinished list.',
       _ =>
-        'Update the existing execution plan for this private task, preserving completed work. No approval is needed to maintain the plan. Steps use pending, in_progress or completed; at most one step can be in_progress. Can be used without a goal. An empty list clears the plan.',
+        'Keep the existing task list current while work proceeds. Mark finished items completed before advancing the next item to in_progress, preserve completed work, and revise pending items when the approach changes. Do not create a list through updateTaskList. At most one item can be in_progress. A task list can exist without a goal and does not trigger continued execution. An empty list clears it.',
     },
     inputSchema: {
       'type': 'object',
       'properties': {
         if (name == 'createGoal') ...{
           'objective': {'type': 'string', 'minLength': 1},
-          'completionCriteria': {'type': 'string', 'minLength': 1},
+          'tokenBudget': {
+            'type': 'integer',
+            'minimum': 1,
+            'description':
+                'Optional total input plus output token budget. Set only when the user explicitly requests a budget; omit for unlimited.',
+          },
         },
         if (name == 'updateGoal') ...{
           'status': {
@@ -49,7 +59,7 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
                 'Stable condition key, required when reporting blocked. Reuse it only while the same condition prevents progress.',
           },
         },
-        if (name == 'createPlan' || name == 'updatePlan') ...{
+        if (name == 'createTaskList' || name == 'updateTaskList') ...{
           'explanation': {'type': 'string'},
           'steps': {
             'type': 'array',
@@ -70,9 +80,9 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
         },
       },
       'required': switch (name) {
-        'createGoal' => ['objective', 'completionCriteria'],
+        'createGoal' => ['objective'],
         'updateGoal' => ['status', 'reason'],
-        'createPlan' || 'updatePlan' => ['explanation', 'steps'],
+        'createTaskList' || 'updateTaskList' => ['explanation', 'steps'],
         _ => <String>[],
       },
       'additionalProperties': false,
@@ -82,7 +92,7 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
   @override
   Future<ToolResult> execute(ToolCall call) async {
     final args = call.arguments;
-    final state = name == 'getGoal'
+    final state = name == 'getGoal' || name == 'getTaskList'
         ? await store.read()
         : await store.change((state) {
             if (name == 'createGoal') {
@@ -90,14 +100,21 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
                   !['complete', 'cancelled'].contains(state['status'])) {
                 throw StateError('已有未结束的目标，请先完成或取消');
               }
-              final plan = state['objective'] == null ? state['steps'] : null;
-              state.clear();
+              state.removeWhere(
+                (key, _) => key != 'steps' && key != 'explanation',
+              );
+              if (args['tokenBudget'] != null &&
+                  (args['tokenBudget'] as int) <= 0)
+                throw ArgumentError('Token 预算必须大于 0');
               state.addAll({
                 'objective': args['objective'],
-                'completionCriteria': args['completionCriteria'],
                 'status': 'active',
                 'turns': 0,
-                'steps': plan ?? <Object>[],
+                'elapsedMs': 0,
+                'tokensUsed': 0,
+                if (args['tokenBudget'] != null)
+                  'tokenBudget': args['tokenBudget'],
+                'runningSince': DateTime.now().millisecondsSinceEpoch,
                 'reason': '',
               });
             } else if (name == 'updateGoal') {
@@ -137,23 +154,17 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
                   return;
                 }
               }
-              if (status == 'complete' &&
-                  (state['steps'] as List).any(
-                    (s) => s['status'] != 'completed',
-                  )) {
-                throw StateError('计划还有未完成步骤，请先更新计划');
-              }
               state['status'] = status;
               state['reason'] = args['reason'];
             } else {
-              if (name == 'createPlan' &&
+              if (name == 'createTaskList' &&
                   (state['steps'] as List? ?? const []).any(
                     (s) => s['status'] != 'completed',
                   )) {
-                throw StateError('已有未完成的计划，请使用 updatePlan');
+                throw StateError('已有未完成的任务清单，请使用 updateTaskList');
               }
-              if (name == 'updatePlan' && !state.containsKey('steps')) {
-                throw StateError('当前没有计划，请先使用 createPlan');
+              if (name == 'updateTaskList' && !state.containsKey('steps')) {
+                throw StateError('当前没有任务清单，请先使用 createTaskList');
               }
               final steps = (args['steps'] as List).cast<Map>();
               if (steps.length > 30 ||
@@ -167,17 +178,24 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
                           'completed',
                         ].contains(s['status']),
                   )) {
-                throw ArgumentError('计划最多 30 步，同时只能有一步进行中');
+                throw ArgumentError('任务清单最多 30 项，同时只能有一项进行中');
               }
               state['steps'] = steps;
               state['explanation'] = args['explanation'];
             }
           });
+    final isTaskList = name.endsWith('TaskList');
+    final result = Map<String, dynamic>.from(state)
+      ..removeWhere(
+        (key, _) => isTaskList
+            ? key != 'steps' && key != 'explanation'
+            : key == 'steps' || key == 'explanation',
+      );
     return ToolResult(
       callId: call.id,
       toolName: name,
       status: ToolResultStatus.success,
-      output: {'task': state},
+      output: {'task': result, 'kind': isTaskList ? 'taskList' : 'goal'},
     );
   }
 

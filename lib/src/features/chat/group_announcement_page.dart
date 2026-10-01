@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import '../../app/glass_notice.dart';
@@ -177,14 +178,7 @@ class _GroupAnnouncementPageState extends State<GroupAnnouncementPage> {
                       ),
                     )
                   : value == null
-                  ? Center(
-                      child: Text(
-                        '暂无群公告',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    )
+                  ? Center(child: EmptyDataView(title: '暂无群公告'))
                   : ListView(
                       padding: EdgeInsets.fromLTRB(
                         20,

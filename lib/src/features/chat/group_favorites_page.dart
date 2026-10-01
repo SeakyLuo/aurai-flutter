@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -181,14 +182,7 @@ class _GroupFavoritesPageState extends State<GroupFavoritesPage> {
               )
             : AnimatedEntryList(
                 controller: _scroll,
-                empty: Center(
-                  child: Text(
-                    '还没有标记的消息',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
+                empty: Center(child: EmptyDataView(title: '还没有标记的消息')),
                 padding: EdgeInsets.fromLTRB(
                   0,
                   settingsHeaderHeight(context) + 16,

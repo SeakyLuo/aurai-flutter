@@ -224,7 +224,7 @@ extension GroupManagementStore on GroupChatStore {
         );
         await txn.update(
           'conversation_members',
-          {'role': GroupMemberRole.owner.name},
+          {'role': GroupMemberRole.owner.name, 'muted_until': 0},
           where: 'conversation_id = ? AND sender_id = ?',
           whereArgs: [conversationId, nextOwnerId],
         );
@@ -234,7 +234,10 @@ extension GroupManagementStore on GroupChatStore {
           '${target.single['name']} 已成为新群主',
         );
       })
-      .then((notice) => _notifySystem(conversationId, notice));
+      .then((notice) async {
+        GroupParticipation.changes.add(conversationId);
+        await _notifySystem(conversationId, notice);
+      });
 
   Future<void> leaveGroup(
     String conversationId, {

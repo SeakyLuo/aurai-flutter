@@ -27,8 +27,16 @@ String? toolInlineDetail(
     'searchTools' ||
     'searchSkills' ||
     'findApps' ||
+    'findContacts' ||
+    'listFriends' ||
+    'listAiContacts' ||
+    'listGroupChats' ||
+    'readGroupMessages' ||
+    'listMemories' ||
+    'listHtmlApps' ||
+    'listHtmlAppPublications' => request['query'],
     'searchConversations' ||
-    'searchMessages' => request['query'],
+    'searchMessages' => (request['keywords'] as List?)?.join('、'),
     'readWebPage' => Uri.tryParse(
       (result['url'] ?? request['url']) as String? ?? '',
     )?.host,
@@ -43,6 +51,9 @@ String? toolInlineDetail(
     'uninstallSkill' => request['name'],
     'executeAndroidScript' => request['purpose'],
     'createScheduledTask' || 'updateScheduledTask' => request['title'],
+    'sendConversationMessage' => _messagePreview(request),
+    'sendGroupMessage' => _messagePreview(request['message'] as Map?),
+    'sendHtmlMessage' || 'sendInteractiveMessage' => request['title'],
     'inputUiText' => request['text'],
     'clickUiElement' => result['targetLabel'],
     'launchApp' => result['appName'],
@@ -54,4 +65,16 @@ String? toolInlineDetail(
   };
   if (value is! String || value.isEmpty) return null;
   return value.replaceAll(RegExp(r'[\r\n\t]+'), ' ');
+}
+
+// Message text has the same meaning for private sends and nested group sends.
+// Show image counts, not local paths or internal message/recipient IDs.
+String? _messagePreview(Map? message) {
+  if (message == null) return null;
+  final text = message['text'] as String?;
+  final imageCount = (message['imagePaths'] as List? ?? const []).length;
+  return [
+    if (text != null && text.isNotEmpty) text,
+    if (imageCount > 0) '图片 × $imageCount',
+  ].join(' · ');
 }

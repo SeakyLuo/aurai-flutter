@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'retained_tab_view.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/message_sender.dart';
@@ -276,7 +277,6 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
 
   Widget _results(BuildContext context, GroupSearchType type) {
     final page = _pages[type]!;
-    final colors = Theme.of(context).colorScheme;
     return (type == GroupSearchType.all && _query.isEmpty)
         ? const SizedBox.expand()
         : page.loading && page.results.isEmpty
@@ -288,14 +288,10 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
         ? Center(
             child: page.failed
                 ? TextButton(onPressed: _load, child: const Text('重新搜索'))
-                : Text(
-                    _query.isEmpty
+                : EmptyDataView(
+                    title: _query.isEmpty
                         ? '暂无${type == GroupSearchType.all ? '聊天记录' : type.label + '消息'}'
                         : '没有找到相关${type == GroupSearchType.all ? '消息' : type.label}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: colors.onSurfaceVariant,
-                    ),
                   ),
           )
         : GroupSearchResults(

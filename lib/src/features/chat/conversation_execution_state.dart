@@ -21,6 +21,8 @@ class _ConversationExecutionState {
   Map<String, MessageSender> groupSenders = {};
   Map<String, Conversation> groupRuns = {};
   Map<String, _GroupMemberThoughts> groupThoughts = {};
+  Set<String> hiddenThinkingMembers = {};
+  final liveProjectChanges = <String, List<LiveProjectChanges>>{};
   Map<String, String> groupReplyDrafts = {};
   Set<String> removedGroupMembers = {};
   String? confirmingSenderId;
@@ -82,6 +84,7 @@ extension ConversationExecutionState on ChatController {
   }
 
   void _disposeExecutions() {
+    _callbackMuteExpiry?.cancel();
     for (final state in _executionStates.values) {
       state.groupDispatcher?.stop();
       unawaited(state.runtime?.cancel());

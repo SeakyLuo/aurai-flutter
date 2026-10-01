@@ -12,6 +12,14 @@ extension GroupRunTools on ChatController {
     // Bind tools to the dispatcher that owns this run, including after awaits.
     final dispatcher = _groupDispatcher!;
     return [
+      GroupMuteTool(
+        (senderId, duration) => setGroupMemberMute(
+          parent.id,
+          senderId,
+          duration: duration,
+          actorId: reply.senderId,
+        ),
+      ),
       _groupWakeTool(parent.id, reply.senderId),
       for (final pause in [true, false])
         GroupAutoReplyTool(

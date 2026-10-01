@@ -20,6 +20,7 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
     description:
         'Publish exactly one complete message as yourself to any group you have joined, from private chat or another group, per call. Call again only if you have another message to send. '
         'Send local pictures with imagePaths, with or without text; this sends existing images, not image generation. '
+        'For private text or pictures set message.audience to the exact group members allowed to read it. Omit audience for public messages. The sender is included automatically; include the host or observers explicitly when needed. Recipients outside audience cannot read or receive this message. When replying to a private message preserve its audience unless explicitly authorized to publish its content. '
         'Use member IDs from readGroupChat or the supplied roster for mentions and message IDs from readGroupMessages or '
         'the supplied history for quotes. Never invent IDs. In the current group, if new messages arrived, '
         'nothing is sent and the new messages are returned: reconsider your draft, '
@@ -62,6 +63,14 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
               'uniqueItems': true,
               'description':
                   'Optional; omit when not mentioning anyone. Mentioned members are automatically added to the message; do not repeat the same @names in text.',
+            },
+            'audience': {
+              'type': 'array',
+              'minItems': 1,
+              'uniqueItems': true,
+              'items': {'type': 'string'},
+              'description':
+                  'Optional visible group member IDs from the roster; omit for public messages. Applies to text and all attached images.',
             },
             'quoteMessageId': {
               'type': ['string', 'null'],

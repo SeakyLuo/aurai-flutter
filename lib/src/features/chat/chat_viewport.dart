@@ -81,6 +81,7 @@ class ChatViewportState extends State<ChatViewport> {
   bool _hasLayout = false;
   String? _replyAnchorId;
   final _entryHeights = <String, double>{};
+  final _enteringToolEntries = <String>{};
   bool _contentBelow = false;
   bool _bottomSyncQueued = false;
   bool _keepSentMessageAtTop = false;
@@ -182,6 +183,18 @@ class ChatViewportState extends State<ChatViewport> {
   @override
   void didUpdateWidget(ChatViewport oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final enteringToolEntries = <String>[];
+    for (final entry in widget.entries) {
+      if (entry.id.startsWith('tool:') && !_indices.containsKey(entry.id)) {
+        _enteringToolEntries.add(entry.id);
+        enteringToolEntries.add(entry.id);
+      }
+    }
+    if (enteringToolEntries.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _enteringToolEntries.removeAll(enteringToolEntries),
+      );
+    }
     if (widget.followOutput != oldWidget.followOutput) {
       _following = widget.followOutput;
     }
@@ -544,13 +557,17 @@ class ChatViewportState extends State<ChatViewport> {
                     return SizedBox(height: _footerHeight);
                   }
                   final entry = widget.entries[index];
+                  final animateEntrance = _enteringToolEntries.remove(entry.id);
                   return KeyedSubtree(
                     key: PageStorageKey(entry.id),
                     child: ChatScrollAnchor(
                       preserve: () => _preserveEntry(entry.id),
                       child: ChatEntrySize(
                         onHeight: (height) => _measureEntry(entry.id, height),
-                        child: entry.builder(context),
+                        child: _ChatEntryEntrance(
+                          animate: animateEntrance,
+                          child: entry.builder(context),
+                        ),
                       ),
                     ),
                   );
@@ -570,5 +587,48 @@ class ChatViewportState extends State<ChatViewport> {
         );
       },
     ),
+  );
+}
+
+class _ChatEntryEntrance extends StatefulWidget {
+  const _ChatEntryEntrance({required this.animate, required this.child});
+
+  final bool animate;
+  final Widget child;
+
+  @override
+  State<_ChatEntryEntrance> createState() => _ChatEntryEntranceState();
+}
+
+class _ChatEntryEntranceState extends State<_ChatEntryEntrance>
+    with SingleTickerProviderStateMixin {
+  static const _duration = Duration(milliseconds: 260);
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: _duration,
+    value: widget.animate ? 0 : 1,
+  );
+  late final Animation<double> _animation = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeInOutCubic,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.animate) _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SizeTransition(
+    sizeFactor: _animation,
+    alignment: Alignment.topCenter,
+    child: FadeTransition(opacity: _animation, child: widget.child),
   );
 }

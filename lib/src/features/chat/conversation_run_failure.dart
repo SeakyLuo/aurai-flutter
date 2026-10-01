@@ -137,7 +137,9 @@ extension ConversationRunFailure on ChatController {
       ..contextSummary = null
       ..reconnectAttempt = 0;
     conversation.steps.clear();
-    conversation.liveToolSteps.clear();
+    conversation.liveToolSteps.removeWhere((entry) => entry.runId == runId);
+    conversation.unfinishedRunElapsed.remove(runId);
+    conversation.cancelledRunMessages.remove(runId);
     _store.writer.invalidateHistory(conversation.id);
     _notifyRun(conversation);
     await _continuePending();

@@ -69,6 +69,7 @@ const toolNamesByDefaultIcon = <String, List<String>>{
   'group': [
     'sendGroupMessage',
     'wakeGroupMember',
+    'setGroupMemberMute',
     'pauseGroupAutoReply',
     'resumeGroupAutoReply',
     'sleepGroupChat',

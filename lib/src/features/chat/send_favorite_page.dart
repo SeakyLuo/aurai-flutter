@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -350,12 +351,7 @@ class _FavoriteChoicesState extends State<_FavoriteChoices> {
       );
     if (_items.isEmpty && !_failed)
       return Center(
-        child: Text(
-          widget.miniapps ? '还没有收藏的小程序' : '还没有收藏的消息',
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
+        child: EmptyDataView(title: widget.miniapps ? '还没有收藏的小程序' : '还没有收藏的消息'),
       );
     return ListView.builder(
       controller: _scroll,

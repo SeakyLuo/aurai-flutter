@@ -15,9 +15,12 @@ class GroupMemberActivity {
     this.autoReplyPaused = false,
     this.autoReplyPauseReason,
     this.idle = false,
+    this.mute,
   });
 
   final bool autoReplyPaused;
+  final GroupMute? mute;
+  bool get isMuted => mute?.isActive == true;
   final String? autoReplyPauseReason;
   final bool idle;
   final DateTime? sleepingUntil;
@@ -58,6 +61,7 @@ extension GroupMemberActivities on ChatController {
   }
 
   Future<void> resumeGroupAutoReply(String groupId, String senderId) async {
+    await groupStore.requireCanSpeak(groupId, senderId);
     await GroupParticipation(_store.database).set(groupId, senderId, false);
     await _applyPrivateGroupParticipation(groupId, senderId, false);
     groupActivityChanges.value++;
@@ -72,16 +76,49 @@ extension GroupMemberActivities on ChatController {
     return ids.length;
   }
 
-  HideThinkingTool _hideThinkingTool(
+  List<AgentTool> _thinkingTools(
     Conversation member,
     Conversation? parent,
+    _ReplyContext reply,
   ) {
-    member.thinkingHidden = false;
-    return HideThinkingTool(() {
-      member.thinkingHidden = true;
-      _notifyMember(member, parent);
-      groupActivityChanges.value++;
-    });
+    member.thinkingHidden =
+        parent != null &&
+        _execution.hiddenThinkingMembers.contains(reply.senderId);
+    final candidates = parent == null ? {reply.senderId: reply} : _groupReplies;
+    return [
+      HideThinkingTool((targets, excluded, all) {
+        final unknown = {
+          ...targets,
+          ...excluded,
+        }.difference(candidates.keys.toSet());
+        if (unknown.isNotEmpty) throw StateError('只能隐藏当前会话中的 AI 成员思考');
+        final requested = all
+            ? candidates.keys.toSet()
+            : targets.isEmpty
+            ? {reply.senderId}
+            : targets;
+        final selected = requested.difference(excluded);
+        final hidden = selected
+            .where((id) => !_removedGroupMembers.contains(id))
+            .toSet();
+        if (parent == null) {
+          if (hidden.contains(reply.senderId)) member.thinkingHidden = true;
+        } else {
+          _execution.hiddenThinkingMembers.addAll(hidden);
+          for (final id in hidden) {
+            final running = _groupRuns[id];
+            if (running != null) running.thinkingHidden = true;
+          }
+        }
+        _notifyMember(member, parent);
+        groupActivityChanges.value++;
+        return {
+          'hiddenSenderIds': hidden.toList(),
+          'excludedSenderIds': requested.intersection(excluded).toList(),
+          'scope': parent == null ? 'current_task' : 'current_group_task',
+        };
+      }),
+    ];
   }
 
   Listenable get groupSleepChanges => _groupSleeps;
@@ -120,6 +157,7 @@ extension GroupMemberActivities on ChatController {
     bool includeThoughts = true,
     Set<String> pausedMembers = const {},
     Map<String, String> pausedReasons = const {},
+    Map<String, GroupMute> mutedMembers = const {},
   }) {
     final state = _executionStates[conversationId];
     final conversation = state?.runningConversation;
@@ -161,6 +199,7 @@ extension GroupMemberActivities on ChatController {
           elapsed: member.executionWatch!.elapsed,
           stopping: stopping,
           autoReplyPaused: pausedMembers.contains(entry.key),
+          mute: mutedMembers[entry.key],
           autoReplyPauseReason: pausedReasons[entry.key],
           thinkingHidden: member.thinkingHidden,
           waitingForUser:

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import '../domain/agent_models.dart';
+import '../domain/live_project_changes.dart';
 import '../storage/project_directory.dart';
 import 'aurai_platform.dart';
 
@@ -91,5 +92,22 @@ class ProjectRunSnapshots {
       await _invoke(directory, 'abortProjectGitTask');
       _pending.remove(directory);
     }
+  }
+
+  Future<List<LiveProjectChanges>> preview() async {
+    final results = await Future.wait([
+      for (final directory in _pending)
+        _invoke(directory, 'getProjectGitTaskChanges').then(
+          (data) => data['available'] == true
+              ? LiveProjectChanges(
+                  workspaceId: directory.workspaceId,
+                  taskId: _task(directory),
+                  name: directory.name,
+                  data: data,
+                )
+              : null,
+        ),
+    ]);
+    return results.nonNulls.where((item) => item.fileCount > 0).toList();
   }
 }

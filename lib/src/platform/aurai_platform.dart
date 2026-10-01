@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 
 import '../domain/capability.dart';
+import '../domain/markdown_plain_text.dart';
 import '../domain/model_provider.dart';
 
 class AuraiPlatform {
@@ -71,7 +72,7 @@ class AuraiPlatform {
     String conversationId,
   ) async => _invokeMap('sendNotification', {
     'title': title,
-    'body': body,
+    'body': markdownPlainText(body),
     'conversationId': conversationId,
     'avatar': await notificationAvatar(conversationId),
   });
@@ -182,7 +183,7 @@ class AuraiPlatform {
   ) async => _channel.invokeMethod<void>('notifyGroupMessage', {
     'conversationId': conversationId,
     'title': title,
-    'body': body,
+    'body': markdownPlainText(body),
     'avatar': await notificationAvatar(conversationId),
   });
 
@@ -215,7 +216,7 @@ class AuraiPlatform {
         'kind': kind,
         'avatar': avatar,
         'title': title,
-        'body': body,
+        'body': body == null ? null : markdownPlainText(body),
         'timeoutSeconds': timeoutSeconds,
       });
     } finally {
@@ -233,7 +234,7 @@ class AuraiPlatform {
     'outcome': outcome,
     'conversationId': conversationId,
     'title': title,
-    'reply': reply,
+    'reply': markdownPlainText(reply),
     'avatar': await notificationAvatar(conversationId),
   });
 

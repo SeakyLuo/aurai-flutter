@@ -1,3 +1,4 @@
+import 'group_mute_schema.dart';
 import 'dart:async';
 import 'package:sqflite/sqflite.dart';
 import 'group_sleep_store.dart';
@@ -47,9 +48,14 @@ class GroupParticipation {
         columns: ['sender_id'],
         where:
             'conversation_id = ? AND paused = 1 AND sender_id IN '
-            '(SELECT sender_id FROM conversation_members WHERE conversation_id = ? AND left_at IS NULL) '
+            '(SELECT sender_id FROM conversation_members WHERE conversation_id = ? AND left_at IS NULL AND ${effectiveGroupMuteSql('conversation_members')} != -1 AND ${effectiveGroupMuteSql('conversation_members')} <= ?) '
             'AND sender_id IN (SELECT id FROM message_senders WHERE kind = ?)',
-        whereArgs: [groupId, groupId, 'agent'],
+        whereArgs: [
+          groupId,
+          groupId,
+          DateTime.now().microsecondsSinceEpoch,
+          'agent',
+        ],
       );
       final ids = rows.map((row) => row['sender_id'] as String).toSet();
       if (ids.isNotEmpty) {
@@ -88,12 +94,20 @@ class GroupParticipation {
   }) async {
     final members = await txn.query(
       'conversation_members',
-      columns: ['sender_id'],
+      columns: [
+        'sender_id',
+        '${effectiveGroupMuteSql('conversation_members')} AS muted_until',
+      ],
       where: 'conversation_id = ? AND sender_id = ? AND left_at IS NULL',
       whereArgs: [groupId, senderId],
       limit: 1,
     );
     if (members.isEmpty) throw StateError('你已不在这个群聊中');
+    if (members.single['muted_until'] == -1 ||
+        (members.single['muted_until'] as int) >
+            DateTime.now().microsecondsSinceEpoch) {
+      throw StateError('该成员已被禁言，请先解除禁言再调整自动接话');
+    }
     if (paused) await GroupSleepStore.removeIn(txn, groupId, senderId);
     await txn.insert('group_participation', {
       'conversation_id': groupId,

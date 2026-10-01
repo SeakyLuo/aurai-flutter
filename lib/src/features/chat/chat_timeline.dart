@@ -106,31 +106,38 @@ List<ChatTimelineEntry> buildChatTimeline(
     for (final message in controller.visibleMessages)
       if (!isGroup && message.taskSummary != null)
         for (final id in message.taskSummary!.intermediateMessageIds)
-          if (reasoningIds.contains(id) || !richRuns.contains(message.runId))
+          if (reasoningIds.contains(id))
             id,
   };
   final toolsByMessage = <String, List<ChatTimelineEntry>>{};
+  // Completed summaries render their saved activities; keep the source records.
+  final summarizedRuns = {
+    for (final message in controller.visibleMessages)
+      if (message.taskSummary != null) message.runId,
+  };
   final members = controller.groupRuns.toList();
   final liveSteps = [
     if (!isGroup && members.isEmpty)
       for (final (ordinal, entry) in conversation.liveToolSteps.indexed)
-        (
-          ordinal: ordinal,
-          afterMessageId: entry.afterMessageId,
-          step: entry.step,
-          runId: entry.runId,
-          senderName: null as String?,
-        )
-    else if (!isGroup)
-      for (final member in members)
-        for (final (ordinal, entry) in member.liveToolSteps.indexed)
+        if (!summarizedRuns.contains(entry.runId))
           (
             ordinal: ordinal,
             afterMessageId: entry.afterMessageId,
             step: entry.step,
             runId: entry.runId,
-            senderName: member.replyingSenderName,
-          ),
+            senderName: null as String?,
+          )
+        else if (!isGroup)
+          for (final member in members)
+            for (final (ordinal, entry) in member.liveToolSteps.indexed)
+              if (!summarizedRuns.contains(entry.runId))
+                (
+                  ordinal: ordinal,
+                  afterMessageId: entry.afterMessageId,
+                  step: entry.step,
+                  runId: entry.runId,
+                  senderName: member.replyingSenderName,
+                ),
   ];
   final memberSources = {
     for (final member in members.where((_) => !isGroup))
@@ -214,7 +221,7 @@ List<ChatTimelineEntry> buildChatTimeline(
                       active:
                           activeRunIds.contains(entry.runId) &&
                           lastStepByRun[entry.runId] == group.end - 1,
-                      activeLabel: _toolActivityTitle(
+                      activeLabel: _activeToolActivityTitle(
                         latest.step,
                         latest.senderName,
                       ),
@@ -249,8 +256,7 @@ List<ChatTimelineEntry> buildChatTimeline(
       .where(
         (message) =>
             !(message.isSystem && message.text == '私密交互消息已更新') &&
-            (message.interactive?.canView(MessageSender.localUser.id) ??
-                true) &&
+            (message.canView(MessageSender.localUser.id)) &&
             (!hiddenIds.contains(message.id) ||
                 message.id == conversation.searchMessageId),
       )
@@ -357,6 +363,23 @@ List<ChatTimelineEntry> buildChatTimeline(
             key: ValueKey(message.id),
             message: message,
             replyPart: replyParts[message.id],
+            trailingActivities:
+                !isGroup &&
+                    message.role == AgentMessageRole.assistant &&
+                    !message.isReasoning &&
+                    message.id != beforeMessageId &&
+                    toolsByMessage.containsKey(message.id)
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final entry in toolsByMessage[message.id]!)
+                        KeyedSubtree(
+                          key: ValueKey(entry.id),
+                          child: entry.builder(context),
+                        ),
+                    ],
+                  )
+                : null,
             mentionMembers: mentionMembers,
             htmlView: message.htmlGame == null
                 ? null
@@ -528,7 +551,11 @@ List<ChatTimelineEntry> buildChatTimeline(
             failed: conversation.runState == ChatRunState.failed,
           ),
         ),
-      if (!isGroup && message.id != beforeMessageId)
+      if (!isGroup &&
+          message.id != beforeMessageId &&
+          (message.role != AgentMessageRole.assistant ||
+              message.isReasoning ||
+              message.isSystem))
         ...?toolsByMessage[message.id],
     ],
   ];
@@ -569,9 +596,6 @@ class _StoppedRunElapsed extends StatelessWidget {
 }
 
 Map<String, String> chatSummaryOwners(ChatController controller) {
-  final richRuns = controller.activeConversation.kind == ConversationKind.group
-      ? <String>{}
-      : richReplyRuns(controller.visibleMessages);
   final reasoningIds = {
     for (final message in controller.visibleMessages)
       if (message.isReasoning) message.id,
@@ -584,7 +608,7 @@ Map<String, String> chatSummaryOwners(ChatController controller) {
         'elapsed:${message.runId}': message.id,
         for (final id in message.taskSummary!.intermediateMessageIds)
           if (id != controller.activeConversation.searchMessageId &&
-              (reasoningIds.contains(id) || !richRuns.contains(message.runId)))
+              reasoningIds.contains(id))
             id: message.id,
         for (var i = 0; i < message.taskSummary!.activities.length; i++)
           'tool:${message.runId}:$i': message.id,
@@ -635,3 +659,6 @@ String _toolActivityTitle(AgentStep step, String? senderName) {
   };
   return '${senderName == null ? '' : '$senderName '}$prefix${step.title}';
 }
+
+String _activeToolActivityTitle(AgentStep step, String? senderName) =>
+    '${senderName == null ? '' : '$senderName '}正在${step.title}';

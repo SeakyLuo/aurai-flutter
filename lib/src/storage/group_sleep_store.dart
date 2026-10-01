@@ -53,6 +53,12 @@ class GroupSleepStore extends ChangeNotifier {
     DatabaseExecutor txn,
     String group,
     String member,
+  ) => removeMembersIn(txn, group, {member});
+
+  static Future<void> removeMembersIn(
+    DatabaseExecutor txn,
+    String group,
+    Set<String> memberIds,
   ) async {
     final rows = await txn.query(
       'app_state',
@@ -63,7 +69,7 @@ class GroupSleepStore extends ChangeNotifier {
     final groups = jsonDecode(rows.single['value'] as String) as Map;
     final members = groups[group] as Map?;
     if (members == null) return;
-    members.remove(member);
+    members.removeWhere((id, _) => memberIds.contains(id));
     if (members.isEmpty) groups.remove(group);
     await txn.update(
       'app_state',

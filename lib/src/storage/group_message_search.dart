@@ -60,7 +60,8 @@ class GroupMessageSearch {
       GroupSearchType.file =>
         "EXISTS (SELECT 1 FROM attachments a WHERE a.message_id = messages.id AND a.kind = 'file')",
       GroupSearchType.html => "kind = 'html_game'",
-      GroupSearchType.interactive => 'interactive_json IS NOT NULL',
+      GroupSearchType.interactive =>
+        "interactive_json IS NOT NULL AND json_extract(interactive_json, '\$.participation.presentation') IS NOT 'message'",
     };
     final rows = await database.query(
       'messages',
@@ -144,6 +145,12 @@ class GroupMessageSearch {
     };
     return rows.map((row) {
       final id = row['id'] as String;
+      final metadata = row['interactive_json'] == null
+          ? null
+          : InteractiveMessage.fromJson(
+              jsonDecode(row['interactive_json'] as String)
+                  as Map<String, dynamic>,
+            );
       return GroupMessageSearchResult(
         id,
         row['text'] as String,
@@ -153,12 +160,9 @@ class GroupMessageSearch {
         images: images[id] ?? const [],
         files: files[id] ?? const [],
         html: cards[id],
-        interactive: row['interactive_json'] == null
+        interactive: metadata?.participation['presentation'] == 'message'
             ? null
-            : InteractiveMessage.fromJson(
-                jsonDecode(row['interactive_json'] as String)
-                    as Map<String, dynamic>,
-              ),
+            : metadata,
       );
     }).toList();
   }

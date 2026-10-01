@@ -129,7 +129,7 @@ class _ScrollAwareJumpStackState extends State<ScrollAwareJumpStack> {
           message.quickReplyToId != null ||
           message.senderId == MessageSender.localUser.id ||
           message.role != AgentMessageRole.assistant ||
-          !(message.interactive?.canView(MessageSender.localUser.id) ?? true)) {
+          !(message.canView(MessageSender.localUser.id))) {
         continue;
       }
       final acknowledged =

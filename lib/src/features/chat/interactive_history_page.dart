@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -94,7 +95,7 @@ class _InteractiveHistoryPageState extends State<InteractiveHistoryPage> {
             if (!_loading && _events.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 32),
-                child: Center(child: Text('还没有点按记录')),
+                child: Center(child: EmptyDataView(title: '还没有点按记录')),
               ),
             if (!_loading && _events.isNotEmpty && _more)
               TextButton(onPressed: _load, child: const Text('查看更早记录')),

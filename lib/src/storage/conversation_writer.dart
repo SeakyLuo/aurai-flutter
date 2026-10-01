@@ -104,7 +104,7 @@ class ConversationWriter {
                 columns: [
                   'id',
                   'kind',
-                  'interactive_json IS NOT NULL AS has_interactive',
+                  "interactive_json IS NOT NULL AND json_extract(interactive_json, '\$.participation.presentation') IS NOT 'message' AS has_interactive",
                 ],
                 where:
                     "conversation_id = ? AND id IN (SELECT value FROM json_each(?))",

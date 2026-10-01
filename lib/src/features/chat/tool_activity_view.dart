@@ -287,10 +287,11 @@ class _ToolActivityViewState extends State<ToolActivityView> {
             )
           else if (const [
                 'createGoal',
-                'createPlan',
+                'createTaskList',
                 'getGoal',
+                'getTaskList',
                 'updateGoal',
-                'updatePlan',
+                'updateTaskList',
               ].contains(widget.toolName) &&
               widget.resultJson != null &&
               (jsonDecode(widget.resultJson!) as Map).containsKey('task'))

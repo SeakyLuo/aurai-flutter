@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
@@ -157,34 +158,11 @@ class _DocumentFoldersPageState extends State<DocumentFoldersPage>
                   : folders.isEmpty
                   ? Padding(
                       padding: const EdgeInsets.all(32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const FileToolIcon(type: FileToolIconType.folder),
-                          const SizedBox(height: 16),
-                          const Text(
-                            '选择要交给 Aurai 的文件夹',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '读取文档、查找文件，并把结果保存到这里。你可以随时移除授权。',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 1.5,
-                              color: colors.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          WidgetUtils.primaryButton(
-                            text: '选择文件夹',
-                            onPressed: _busy ? null : () => _choose(),
-                          ),
-                        ],
+                      child: EmptyDataView(
+                        title: '选择要交给 Aurai 的文件夹',
+                        description: '读取文档、查找文件，并把结果保存到这里。你可以随时移除授权。',
+                        actionText: '添加文件夹',
+                        onAction: _busy ? null : () => _choose(),
                       ),
                     )
                   : ListView.separated(

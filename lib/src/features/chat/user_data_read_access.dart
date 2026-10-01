@@ -145,7 +145,9 @@ extension UserDataReadAccess on ChatController {
           );
           card.requireViewer(MessageSender.localUser.id);
           final view = card.viewFor(MessageSender.localUser.id);
-          preview = '${view.title}\n${view.body}';
+          preview = card.participation['presentation'] == 'message'
+              ? rows.single['text'] as String
+              : '${view.title}\n${view.body}';
         }
       }
     }

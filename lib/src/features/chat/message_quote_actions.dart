@@ -11,6 +11,7 @@ extension MessageQuoteActions on ChatController {
       quote = MessageQuote(
         messageId: message.id,
         senderId: message.senderId,
+        audience: message.audience,
         text:
             selectedText ??
             [

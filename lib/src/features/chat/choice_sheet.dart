@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 
 typedef Choice<T> = ({T value, String label});
@@ -103,16 +104,7 @@ class _ChoiceSheetState<T> extends State<_ChoiceSheet<T>> {
                 ),
               Flexible(
                 child: choices.isEmpty
-                    ? Center(
-                        child: Text(
-                          '没有匹配的模型',
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      )
+                    ? Center(child: EmptyDataView(title: '没有匹配的模型'))
                     : ListView.builder(
                         shrinkWrap: widget.choices.length <= 8,
                         padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),

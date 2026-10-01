@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../app/glass_notice.dart';
@@ -157,7 +158,7 @@ class _AssetChatPickerState extends State<AssetChatPicker> {
                   Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
-                      child: const Text('没有找到聊天'),
+                      child: const EmptyDataView(title: '没有找到聊天'),
                     ),
                   ),
                 if (_failed || _more && !_loading)

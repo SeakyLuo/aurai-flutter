@@ -60,10 +60,12 @@ object ProjectGitTasks {
                     deleteSnapshots(repo, taskId)
                     mapOf("aborted" to true)
                 }
-                "getProjectGitTaskChanges" -> if (hasSnapshot(repo, taskId, "after")) {
-                    changes(repo, root, taskId)
-                } else {
-                    mapOf("available" to false)
+                "getProjectGitTaskChanges" -> {
+                    if (hasSnapshot(repo, taskId, "after")) changes(repo, root, taskId)
+                    else if (hasSnapshot(repo, taskId, "before")) {
+                        capture(repo, root, taskId, "live")
+                        changes(repo, root, taskId, "live")
+                    } else mapOf("available" to false)
                 }
                 "getProjectGitTaskFileDiff" -> fileDiff(repo, taskId, args["path"] as String)
                 "restoreProjectGitTaskFile" -> {
@@ -169,7 +171,7 @@ object ProjectGitTasks {
     }
 
     private fun deleteSnapshots(repo: Repository, taskId: String) {
-        for (phase in listOf("before-worktree", "before-index", "after-worktree", "after-index")) {
+        for (phase in listOf("before-worktree", "before-index", "after-worktree", "after-index", "live-worktree", "live-index")) {
             val update = repo.updateRef(ref(taskId, phase))
             update.isForceUpdate = true
             val result = update.delete()
@@ -189,9 +191,10 @@ object ProjectGitTasks {
         completed.forEach { deleteSnapshots(repo, it) }
     }
 
-    private fun changes(repo: Repository, root: File, taskId: String): Map<String, Any?> {
-        requireSnapshot(repo, taskId, "after")
-        val rows = diffEntries(repo, taskId).map { entry ->
+    private fun changes(repo: Repository, root: File, taskId: String, phase: String = "after"): Map<String, Any?> {
+        requireSnapshot(repo, taskId, phase)
+        val live = phase == "live"
+        val rows = diffEntries(repo, taskId, phase).map { entry ->
             val counts = DiffFormatter(DisabledOutputStream.INSTANCE).use { formatter ->
                 formatter.setRepository(repo)
                 formatter.toFileHeader(entry).toEditList().fold(0 to 0) { total, edit ->
@@ -200,8 +203,8 @@ object ProjectGitTasks {
             }
             val path = if (entry.changeType == DiffEntry.ChangeType.DELETE) entry.oldPath else entry.newPath
             val affected = listOf(entry.oldPath, entry.newPath).filter { it != DiffEntry.DEV_NULL }.distinct()
-            val reverted = affected.all { matches(repo, root, taskId, "before", it) }
-            val restorable = affected.all { matches(repo, root, taskId, "after", it) }
+            val reverted = !live && affected.all { matches(repo, root, taskId, "before", it) }
+            val restorable = live || affected.all { matches(repo, root, taskId, "after", it) }
             mapOf(
                 "path" to path,
                 "oldPath" to entry.oldPath.takeUnless { it == DiffEntry.DEV_NULL || it == entry.newPath },
@@ -214,6 +217,7 @@ object ProjectGitTasks {
         }
         return mapOf(
             "available" to true,
+            "live" to live,
             "taskId" to taskId,
             "changes" to rows,
             "addedLines" to rows.sumOf { it["addedLines"] as Int },
@@ -237,14 +241,15 @@ object ProjectGitTasks {
             "truncated" to (bytes.size > shown.size))
     }
 
-    private fun diffEntries(repo: Repository, taskId: String): List<DiffEntry> =
+    private fun diffEntries(repo: Repository, taskId: String,
+        phase: String = if (hasSnapshot(repo, taskId, "after")) "after" else "live"): List<DiffEntry> =
         repo.newObjectReader().use { reader ->
             DiffFormatter(DisabledOutputStream.INSTANCE).use { formatter ->
                 formatter.setRepository(repo)
                 formatter.isDetectRenames = true
                 formatter.scan(
                     CanonicalTreeParser(null, reader, tree(repo, taskId, "before-worktree")),
-                    CanonicalTreeParser(null, reader, tree(repo, taskId, "after-worktree")),
+                    CanonicalTreeParser(null, reader, tree(repo, taskId, "$phase-worktree")),
                 )
             }
         }

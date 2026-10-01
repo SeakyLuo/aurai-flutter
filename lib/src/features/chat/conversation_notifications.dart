@@ -4,6 +4,7 @@ import 'projects_page.dart';
 import '../../app/glass_notice.dart';
 import 'notification_avatar.dart';
 import '../../domain/error_message.dart';
+import '../../domain/markdown_plain_text.dart';
 import 'app_page_navigation.dart';
 import 'home_navigation.dart';
 import 'package:flutter/material.dart';
@@ -152,7 +153,7 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
       builder: (context) => ConversationNotificationToast(
         title: completion.title,
         avatar: avatar,
-        reply: completion.reply,
+        reply: markdownPlainText(completion.reply),
         onDismiss: _hideCompletionToast,
         onOpen: () {
           _openConversation(completion.conversationId);

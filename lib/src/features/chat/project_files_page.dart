@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/glass_notice.dart';
@@ -89,31 +90,9 @@ class _ProjectFilesPageState extends State<ProjectFilesPage> {
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const FileToolIcon(type: FileToolIconType.document),
-                        const SizedBox(height: 14),
-                        const Text(
-                          '还没有项目文件',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '添加文档、图片或其他素材，AI 可以从项目工作目录中读取。',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            height: 1.5,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+                    child: const EmptyDataView(
+                      title: '还没有项目文件',
+                      description: '添加文档、图片或其他素材，AI 可以从项目工作目录中读取。',
                     ),
                   ),
                 )

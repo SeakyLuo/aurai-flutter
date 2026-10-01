@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'search_skeleton.dart';
 import '../../app/glass_notice.dart';
 import 'header_action_menu.dart';
@@ -349,14 +350,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
               if (_items.isEmpty && _archived && !_loading)
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: Center(
-                    child: Text(
-                      '没有已归档朋友',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
+                  child: Center(child: EmptyDataView(title: '没有已归档朋友')),
                 )
               else if (_items.isEmpty)
                 SliverToBoxAdapter(
@@ -371,8 +365,8 @@ class _AiContactsPageState extends State<AiContactsPage> {
                         : Center(
                             child: _loading
                                 ? const CircularProgressIndicator()
-                                : Text(
-                                    _search.text.isNotEmpty
+                                : EmptyDataView(
+                                    title: _search.text.isNotEmpty
                                         ? '没有找到朋友'
                                         : _archived
                                         ? '没有已归档朋友'

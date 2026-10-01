@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import 'retained_tab_view.dart';
 import '../../app/global_ui.dart';
 import '../../app/glass_notice.dart';
@@ -562,7 +563,6 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
         : _loadingRecent;
     final results = query == _query ? _results : <ConversationSearchResult>[];
     final media = MediaQuery.of(context);
-    final colors = Theme.of(context).colorScheme;
     return query.isNotEmpty &&
             filesTab &&
             !pending &&
@@ -572,12 +572,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
             padding: EdgeInsets.only(
               bottom: media.viewInsets.bottom + media.viewPadding.bottom + 104,
             ),
-            child: Center(
-              child: Text(
-                '没有找到相关文件',
-                style: TextStyle(fontSize: 14, color: colors.onSurfaceVariant),
-              ),
-            ),
+            child: Center(child: EmptyDataView(title: '没有找到相关文件')),
           )
         : PaginationListener(
             hasMore: query.isNotEmpty && (filesTab ? _filesMore : _hasMore),
@@ -625,17 +620,13 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
                 if (index == count)
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: Text(
-                      pending
-                          ? '正在搜索…'
-                          : count == 0 && !_searchFailed
-                          ? (filesTab ? '没有找到相关文件' : '没有找到相关会话')
-                          : '',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
+                    child: pending
+                        ? const Text('正在搜索…', textAlign: TextAlign.center)
+                        : count == 0 && !_searchFailed
+                        ? EmptyDataView(
+                            title: filesTab ? '没有找到相关文件' : '没有找到相关会话',
+                          )
+                        : const SizedBox.shrink(),
                   );
                 if (filesTab) {
                   final file = _files[index];

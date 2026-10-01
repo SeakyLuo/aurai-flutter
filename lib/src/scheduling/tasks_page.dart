@@ -1,3 +1,4 @@
+import '../widgets/empty_data_view.dart';
 import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
 import '../domain/library_asset.dart';
@@ -318,12 +319,11 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
                         ? const Center(child: CircularProgressIndicator())
                         : filtered.isEmpty
                         ? Center(
-                            child: Text(
-                              _filter == 'all'
-                                  ? '还没有任务，在下方说说要做什么和执行时间'
-                                  : '没有符合条件的任务',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: colors.onSurfaceVariant),
+                            child: EmptyDataView(
+                              title: _filter == 'all' ? '还没有任务' : '没有符合条件的任务',
+                              description: _filter == 'all'
+                                  ? '在下方说说要做什么和执行时间。'
+                                  : null,
                             ),
                           )
                         : ListView.builder(

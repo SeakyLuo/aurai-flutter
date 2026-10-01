@@ -31,10 +31,10 @@ extension ConversationRun on ChatController {
         ? ''
         : sleepDraftRows.single['value'] as String;
     var leftSleepDraft = false;
-    final systemPrompt = groupParent == null
-        ? reply.systemPrompt
-        : '${reply.systemPrompt}\n'
-              '${_groupDispatcher!.wokeFromSleep(reply.senderId) ? "这是你自己安排的睡眠到期，重新看看最新群聊；不代表用户发了新指令。" : "这是群消息触发的接话机会。"}';
+    final systemPrompt = await _memberSystemPrompt(
+      reply,
+      group: groupParent != null,
+    );
     final memoryContext = await _conversationMemory(
       summaryOwner,
       reply.profile,
@@ -118,7 +118,6 @@ extension ConversationRun on ChatController {
     _notifyMember(runConversation, groupParent);
     var sessionStarted = groupHistory != null || alongsideGroup;
     var outcome = 'failed';
-    var producedFinalAnswer = false;
     String? failureDiagnostic;
     String? unfinishedFinalMessageId;
     final activities = <AgentTaskActivity>[];
@@ -209,7 +208,7 @@ extension ConversationRun on ChatController {
           }
           _notifyMember(runConversation, groupParent);
         }),
-      )..add(_hideThinkingTool(runConversation, groupParent));
+      )..addAll(_thinkingTools(runConversation, groupParent, reply));
       if (groupParent != null) {
         tools.removeWhere((t) => t.definition.name == 'sendGroupMessage');
         tools.addAll(
@@ -229,7 +228,12 @@ extension ConversationRun on ChatController {
       );
       registry.load([
         'sendGroupMessage',
-        if (groupParent != null) ...['sleepGroupChat', 'wakeGroupMember', 'pauseGroupAutoReply', 'resumeGroupAutoReply'],
+        if (groupParent != null) ...[
+          'sleepGroupChat',
+          'wakeGroupMember',
+          'pauseGroupAutoReply',
+          'resumeGroupAutoReply',
+        ],
       ]);
       Future<bool> confirm(ToolCall call, ToolDefinition definition) =>
           _confirm(
@@ -279,7 +283,7 @@ extension ConversationRun on ChatController {
                   result.status == ToolResultStatus.success,
         conversation: [
           ...(groupHistory == null
-              ? List.unmodifiable(history.take(lastUser + 1))
+              ? _privateHistory(history.take(lastUser + 1), reply.senderId)
               : _groupHistory([...history], reply.senderId)),
           if (callbackEvents.isNotEmpty) _callbackContext(callbackEvents),
           if (continuationProtocol.isNotEmpty)
@@ -367,6 +371,7 @@ extension ConversationRun on ChatController {
         },
         onToolCompleted: (result) async {
           await _store.runs.finishTool(runId, result);
+          await _updateLiveProjectChanges(gitSnapshots, result, runId);
           final shape = diagnosticCalls.remove(result.callId);
           if (result.status == ToolResultStatus.error) {
             await ExecutionLog.write({
@@ -586,7 +591,6 @@ extension ConversationRun on ChatController {
             answer.interactive == null &&
             answer.htmlGame == null &&
             answer.text.isNotEmpty;
-        producedFinalAnswer = hasFinalAnswer;
         messages[answerIndex] = AgentMessage(
           id: answer.id,
           role: answer.role,
@@ -644,7 +648,6 @@ extension ConversationRun on ChatController {
             : messages.lastWhere((m) => runMessageIds.contains(m.id)).id,
         isTask: runConversation.hasExecutionProcess,
       );
-      if (producedFinalAnswer) runConversation.liveToolSteps.clear();
       if (groupHistory == null && _execution.queuedUserMessageId == null)
         runConversation.pendingGoal = null;
       if (runConversation.runState != ChatRunState.stopping) {
@@ -749,7 +752,7 @@ extension ConversationRun on ChatController {
           );
         }
       } finally {
-        await gitSnapshots.abort();
+        await _finishLiveProjectChanges(gitSnapshots, runId);
         if (groupParent != null &&
             outcome == 'completed' &&
             !leftSleepDraft &&

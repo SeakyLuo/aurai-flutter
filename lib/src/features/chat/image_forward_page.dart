@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../domain/avatar_style.dart';
@@ -236,7 +237,7 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
                 if (!_loading && _items.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(24),
-                    child: Center(child: Text('没有找到会话')),
+                    child: Center(child: EmptyDataView(title: '没有找到会话')),
                   ),
               ],
             ),

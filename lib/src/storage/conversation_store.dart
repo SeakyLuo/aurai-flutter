@@ -82,7 +82,7 @@ class ConversationStore {
             "key = 'active_conversation' AND value IN (SELECT id FROM conversations WHERE mode != 'normal')",
       );
       await database.rawUpdate(
-        r"UPDATE private_task_state SET state_json = json_set(state_json, '$.status', 'paused', '$.reason', '应用重启，等待继续') WHERE json_extract(state_json, '$.status') = 'active'",
+        r"UPDATE private_task_state SET state_json = json_remove(json_set(state_json, '$.status', 'paused', '$.reason', '应用重启，等待继续'), '$.runningSince') WHERE json_extract(state_json, '$.status') = 'active'",
       );
       final interruptedAt = DateTime.now().microsecondsSinceEpoch;
       await database.transaction((txn) async {
@@ -123,7 +123,7 @@ class ConversationStore {
       await database.delete(
         'conversations',
         where:
-            "kind = 'direct' AND id NOT IN (SELECT conversation_id FROM direct_conversation_pairs) AND message_count = 0 AND draft = '' AND pending_goal IS NULL AND NOT EXISTS (SELECT 1 FROM attachments WHERE conversation_id = conversations.id)",
+            "kind = 'direct' AND id NOT IN (SELECT conversation_id FROM direct_conversation_pairs) AND message_count = 0 AND draft = '' AND pending_goal IS NULL AND NOT EXISTS (SELECT 1 FROM attachments WHERE conversation_id = conversations.id) AND NOT EXISTS (SELECT 1 FROM agent_runs WHERE conversation_id = conversations.id)",
       );
       await database.delete(
         'app_state',
@@ -171,7 +171,7 @@ class ConversationStore {
     await writer.flush();
     await database.delete(
       'conversations',
-      where: "id = ? AND kind = 'direct' AND message_count = 0",
+      where: "id = ? AND kind = 'direct' AND message_count = 0 AND NOT EXISTS (SELECT 1 FROM agent_runs WHERE conversation_id = conversations.id)",
       whereArgs: [id],
     );
     await database.delete(

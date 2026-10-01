@@ -67,7 +67,7 @@ abstract final class MessageSummary {
     bool withSender = false,
     bool includeAttachments = true,
   }) {
-    if (message.interactive?.canView(MessageSender.localUser.id) == false) {
+    if (!message.canView(MessageSender.localUser.id)) {
       return '';
     }
     final body = content(

@@ -69,7 +69,10 @@ class StarredMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
                 'senderId': row['sender_id'],
                 'text': row['interactive_json'] == null
                     ? row['text']
-                    : _cardText(row['interactive_json'] as String),
+                    : _cardText(
+                        row['interactive_json'] as String,
+                        row['text'] as String,
+                      ),
                 'createdAt': row['created_at'],
                 'starredAt': row['starred_at'],
               },
@@ -135,11 +138,13 @@ class StarredMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
     }
   }
 
-  String _cardText(String value) {
+  String _cardText(String value, String text) {
     final card = InteractiveMessage.fromJson(
       jsonDecode(value) as Map<String, dynamic>,
     ).viewFor(senderId);
-    return '${card.title}\n${card.body}';
+    return card.participation['presentation'] == 'message'
+        ? text
+        : '${card.title}\n${card.body}';
   }
 
   @override

@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'group_mute.dart';
+export 'group_mute.dart';
 import 'ai_preferences.dart';
 export 'ai_preferences.dart';
 import 'message_sender.dart';
@@ -94,12 +96,22 @@ class ConversationMember {
     required this.joinedAt,
     required this.role,
     this.leftAt,
+    this.mute,
   });
   final MessageSender sender;
   final int position;
   final DateTime joinedAt;
   final GroupMemberRole role;
   final DateTime? leftAt;
+  final GroupMute? mute;
+  bool get isMuted => mute?.isActive == true;
+
+  bool canBeMutedBy(GroupMemberRole actorRole, String actorId) =>
+      sender.id != actorId &&
+      role != GroupMemberRole.owner &&
+      (actorRole == GroupMemberRole.owner ||
+          (actorRole == GroupMemberRole.admin &&
+              role == GroupMemberRole.member));
 }
 
 enum GroupMemberRole {

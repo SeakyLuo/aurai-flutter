@@ -73,6 +73,7 @@ class ToolActionIcon extends StatelessWidget {
               'locateMessage' ||
               'sendQuickReply' => const ConversationIcon(),
               'wakeGroupMember' ||
+              'setGroupMemberMute' ||
               'pauseGroupAutoReply' ||
               'resumeGroupAutoReply' ||
               'sleepGroupChat' ||
@@ -135,9 +136,10 @@ class ToolActionIcon extends StatelessWidget {
               ),
               'createGoal' ||
               'getGoal' ||
+              'getTaskList' ||
               'updateGoal' ||
-              'createPlan' ||
-              'updatePlan' ||
+              'createTaskList' ||
+              'updateTaskList' ||
               'scheduledTask' ||
               'createScheduledTask' ||
               'updateScheduledTask' ||

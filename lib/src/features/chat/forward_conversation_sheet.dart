@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
 import 'package:flutter/material.dart';
 import '../../domain/agent_models.dart';
@@ -135,7 +136,7 @@ class _ForwardConversationSheetState extends State<ForwardConversationSheet> {
                 ? Center(
                     child: _loading
                         ? const CircularProgressIndicator()
-                        : const Text('暂无消息'),
+                        : const EmptyDataView(title: '暂无消息'),
                   )
                 : ListView.builder(
                     controller: _scroll,

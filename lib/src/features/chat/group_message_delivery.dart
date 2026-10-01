@@ -29,6 +29,7 @@ extension GroupMessageDelivery on ChatController {
       throw const AgentCancelled();
     }
     final item = arguments['message'] as Map<String, Object?>?;
+    if (dispatcher.isMuted(reply.senderId)) throw const AgentCancelled();
     _cacheGroupMessageDraft(reply.senderId, item);
     final seen = {for (final m in observed) m.id: m};
     final updates = dispatcher.history
@@ -40,9 +41,7 @@ extension GroupMessageDelivery on ChatController {
     observed.removeWhere((m) => updates.any((f) => f.id == m.id));
     observed.addAll(updates);
     final fresh = updates
-        .where(
-          (message) => message.interactive?.canView(reply.senderId) ?? true,
-        )
+        .where((message) => message.canView(reply.senderId))
         .toList();
     if (fresh.isNotEmpty) {
       return {
@@ -56,7 +55,7 @@ extension GroupMessageDelivery on ChatController {
               'senderId': message.senderId,
               'kind': message.isSystem ? 'system_event' : 'message',
               'name': message.sender?.name ?? MessageSender.localUser.name,
-              'text': _quotedInput(message),
+              'text': _quotedInput(message, reply.senderId),
               'files': message.files.map((f) => f.toJson()).toList(),
             },
         ],
@@ -69,6 +68,7 @@ extension GroupMessageDelivery on ChatController {
     final mentions = <String>{};
     final output = <AgentMessage>[];
     if (item != null) {
+      final audience = _messageAudience(item, senders.keys, reply.senderId);
       final text = (item['text'] as String).trim();
       final images = item['_images'] as List<MessageImage>;
       if (text.isEmpty && images.isEmpty) throw ArgumentError('消息不能为空');
@@ -81,11 +81,15 @@ extension GroupMessageDelivery on ChatController {
       if (quoteId != null && source == null) {
         throw ArgumentError('引用消息必须来自当前群聊');
       }
+      if (source != null) {
+        _checkQuoteAudience(source.audience, reply.senderId);
+      }
       final quote = source == null
           ? null
           : (MessageQuote(
                 messageId: source.id,
                 senderId: source.senderId,
+                audience: source.audience,
                 text: source.text,
               )
               ..senderName =
@@ -108,6 +112,7 @@ extension GroupMessageDelivery on ChatController {
           isGroupMessage: true,
           senderId: reply.senderId,
           sender: _groupSenders[reply.senderId]!,
+          audience: audience,
           runId: member.activeRunId,
           text: [
             if (missingMentions.isNotEmpty)
@@ -165,6 +170,7 @@ extension GroupMessageDelivery on ChatController {
         member.runState == ChatRunState.stopping) {
       throw const AgentCancelled();
     }
+    if (dispatcher.isMuted(reply.senderId)) throw const AgentCancelled();
     member.messages.addAll(output);
     member.messageCount += output.length;
     try {
@@ -182,7 +188,8 @@ extension GroupMessageDelivery on ChatController {
     observed.addAll(output);
     if (output.isNotEmpty) dispatcher.receive(output, mentions: mentions);
     _notifyMember(member, parent);
-    if (output.isNotEmpty) {
+    if (output.isNotEmpty &&
+        output.single.canView(MessageSender.localUser.id)) {
       final body =
           '${reply.sender.name}：${output.map((m) => markdownPreviewText(m.text)).join('\n')}';
       completedReplies.value = ConversationCompletion(

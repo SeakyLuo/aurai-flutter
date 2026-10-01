@@ -1,3 +1,4 @@
+import '../widgets/empty_data_view.dart';
 import '../app/glass_notice.dart';
 import 'package:flutter/material.dart';
 import '../features/chat/chat_controller.dart';
@@ -334,38 +335,34 @@ class _SkillsPageState extends State<SkillsPage> {
                             ..sort(widget.store.compareSkills);
                       if (items.isEmpty)
                         return Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                query.isNotEmpty
-                                    ? '没有匹配的技能'
-                                    : scope == 'installed'
-                                    ? switch (_status) {
-                                        'enabled' => '暂无已启用技能',
-                                        'disabled' => '暂无已停用技能',
-                                        _ => '暂无已启用技能',
-                                      }
-                                    : '暂无技能',
-                                style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              if (query.isEmpty && scope == 'installed') ...[
-                                const SizedBox(height: 8),
-                                TextButton(
-                                  onPressed: _status == 'enabled'
-                                      ? _install
-                                      : () =>
-                                            setState(() => _status = 'enabled'),
-                                  child: Text(
-                                    _status == 'enabled' ? '去安装' : '查看已启用技能',
-                                  ),
-                                ),
-                              ],
-                            ],
+                          child: EmptyDataView(
+                            title: query.isNotEmpty
+                                ? '没有匹配的技能'
+                                : scope == 'installed'
+                                ? (_status == 'disabled'
+                                      ? '暂无已停用技能'
+                                      : '暂无已启用技能')
+                                : '暂无技能',
+                            description:
+                                query.isEmpty &&
+                                    scope == 'installed' &&
+                                    _status == 'enabled'
+                                ? '安装并启用技能，让 AI 拥有更多能力，帮你处理各种任务。'
+                                : null,
+                            actionText: query.isEmpty && scope == 'installed'
+                                ? (_status == 'enabled' ? '去安装' : '查看已启用技能')
+                                : null,
+                            actionIcon: _status == 'enabled'
+                                ? SettingsIcon(
+                                    type: SettingsIconType.add,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimary,
+                                  )
+                                : null,
+                            onAction: _status == 'enabled'
+                                ? _install
+                                : () => setState(() => _status = 'enabled'),
                           ),
                         );
                       return ListView.separated(

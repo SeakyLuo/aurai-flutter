@@ -1,3 +1,4 @@
+import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
@@ -105,7 +106,7 @@ class _GroupContactPickerState extends State<GroupContactPicker> {
           if (!_loading && !_failed && _profiles.isEmpty)
             const Padding(
               padding: EdgeInsets.all(24),
-              child: Text('通讯录还没有朋友，可返回随机添加成员。', textAlign: TextAlign.center),
+              child: EmptyDataView(title: '通讯录还没有朋友，可返回随机添加成员。'),
             ),
         ],
       ),

@@ -114,6 +114,10 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
         : const <String, SourceReference>{};
     Widget activityAt(int index) {
       final activity = widget.summary.activities[index];
+      // Ordinary output stays in the conversation at its original position.
+      if (activity.messageId != null && !activity.isReasoning) {
+        return const SizedBox.shrink();
+      }
       if (widget.excludedMessageId != null &&
           activity.messageId == widget.excludedMessageId) {
         return const SizedBox.shrink();
@@ -456,7 +460,7 @@ class _GitTaskChangesCardState extends State<_GitTaskChangesCard> {
                                 type: AttachmentActionIconType.file,
                                 color: color,
                               ),
-                              label: '审核改动',
+                              label: '查看变更',
                               onTap: () => Navigator.pop(
                                 dialogContext,
                                 _GitChangeAction.review,

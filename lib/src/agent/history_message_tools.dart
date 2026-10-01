@@ -1,6 +1,7 @@
 import '../platform/svg_image.dart';
 import '../domain/error_message.dart';
 import '../domain/local_time.dart';
+import '../domain/message_quote.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
@@ -132,7 +133,7 @@ class HistoryMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
           'nextOffset': next < (message['text_length'] as int) ? next : null,
           'quote': message['quote_json'] == null
               ? null
-              : jsonDecode(message['quote_json'] as String),
+              : _quoteForViewer(message['quote_json'] as String),
           'attachments': results[1].take(50).toList(),
           'nextAttachmentOffset': results[1].length > 50
               ? attachmentOffset + 50
@@ -202,6 +203,13 @@ class HistoryMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         },
       );
     }
+  }
+
+  Map<String, Object?> _quoteForViewer(String value) {
+    final quote = MessageQuote.fromJson(
+      (jsonDecode(value) as Map).cast<String, Object?>(),
+    );
+    return {...quote.toJson(), 'text': quote.textFor(senderId)};
   }
 
   ToolResult _result(
