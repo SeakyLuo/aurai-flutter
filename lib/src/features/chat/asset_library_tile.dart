@@ -5,6 +5,7 @@ import 'file_type_icon.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'unavailable_image.dart';
+import 'image_preview.dart';
 
 class AssetLibraryTile extends StatelessWidget {
   const AssetLibraryTile({
@@ -23,13 +24,19 @@ class AssetLibraryTile extends StatelessWidget {
   final bool selectionMode, selected, grid;
 
   Widget _thumbnail() => asset.isImage
-      ? Image(
-          image: ResizeImage(
-            localImageProvider(asset.path),
-            width: grid ? 480 : 144,
+      ? Hero(
+          tag: 'library-asset:${asset.id}',
+          createRectTween: (begin, end) => RectTween(begin: begin, end: end),
+          flightShuttleBuilder: (context, animation, direction, from, to) =>
+              imagePreviewFlight(localImageProvider(asset.path), animation),
+          child: Image(
+            image: ResizeImage(
+              localImageProvider(asset.path),
+              width: grid ? 480 : 144,
+            ),
+            fit: BoxFit.cover,
+            errorBuilder: (_, error, stack) => const UnavailableImage(),
           ),
-          fit: BoxFit.cover,
-          errorBuilder: (_, error, stack) => const UnavailableImage(),
         )
       : Center(child: FileTypeIcon(file: asset.file));
 
@@ -100,7 +107,7 @@ class AssetLibraryTile extends StatelessWidget {
     return Semantics(
       checked: selected,
       button: true,
-      label: selected ? '取消选择' : '选择资产',
+      label: selected ? '取消选择' : '选择资料',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onSelect,
@@ -167,7 +174,7 @@ class AssetLibraryTile extends StatelessWidget {
       else
         Builder(
           builder: (context) => IconButton(
-            tooltip: '资产操作',
+            tooltip: '更多',
             icon: const SettingsIcon(type: SettingsIconType.more),
             onPressed: () => onMore(context),
           ),

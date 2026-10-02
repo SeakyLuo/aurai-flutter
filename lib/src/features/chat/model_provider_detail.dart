@@ -238,7 +238,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
                 ? '正在保存'
                 : '保存',
             icon: Icons.check_rounded,
-            onPressed: _locked || (_editing && !_dirty && !widget.creating)
+            onPressed: _locked
                 ? null
                 : _editing
                 ? _save
@@ -578,6 +578,11 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
   }
 
   Future<void> _save() async {
+    if (!widget.creating && !_dirty) {
+      FocusScope.of(context).unfocus();
+      setState(() => _editing = false);
+      return;
+    }
     if (_name.text.trim().isEmpty) {
       _notice('请输入供应商名称');
       return;
@@ -629,7 +634,6 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
         );
       }
       if (!mounted) return;
-      _notice(widget.credentialsOnly ? '服务商配置已保存' : '模型配置已保存');
       if (widget.creating) {
         setState(() => _allowPop = true);
         WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -314,7 +314,7 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                         final profile = settings.profile(service);
                         return Padding(
                           key: ValueKey(service.name),
-                          padding: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.only(bottom: 8),
                           child: Builder(
                             builder: (anchorContext) => MenuPressHighlight(
                               onLongPressStart:
@@ -327,9 +327,11 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                                 borderRadius: BorderRadius.circular(24),
                                 clipBehavior: Clip.antiAlias,
                                 child: ListTile(
+                                  minTileHeight: 76,
+                                  horizontalTitleGap: 14,
                                   contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 10,
+                                    horizontal: 14,
+                                    vertical: 2,
                                   ),
                                   leading: ModelProviderIcon(config: profile),
                                   title: Text(profile.displayName),

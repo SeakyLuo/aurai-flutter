@@ -16,6 +16,7 @@ class GroupStatusBuilder extends StatefulWidget {
     required this.conversationId,
     required this.builder,
     this.onMemberCount,
+    this.onMembersLoaded,
     this.includeThoughts = true,
     this.includeInactive = false,
   });
@@ -25,6 +26,7 @@ class GroupStatusBuilder extends StatefulWidget {
   final bool includeInactive;
   final Widget Function(BuildContext, List<GroupMemberActivity>) builder;
   final ValueChanged<int>? onMemberCount;
+  final ValueChanged<List<ConversationMember>>? onMembersLoaded;
 
   @override
   State<GroupStatusBuilder> createState() => _GroupStatusBuilderState();
@@ -76,6 +78,7 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
           _failed = false;
         });
       if (mounted) widget.onMemberCount?.call(members.length);
+      if (mounted) widget.onMembersLoaded?.call(members);
     } on Object catch (error) {
       if (mounted) {
         setState(() => _failed = true);

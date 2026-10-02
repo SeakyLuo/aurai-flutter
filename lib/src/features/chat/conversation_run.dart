@@ -458,6 +458,16 @@ extension ConversationRun on ChatController {
           _notifyMember(runConversation, groupParent);
         },
         onTextChanged: (text) {
+          if (groupParent != null && text.trim().isNotEmpty) {
+            _recordGroupThought(
+              reply.senderId,
+              runId,
+              turnOrdinal,
+              text,
+              isReasoning: false,
+              messageIndex: outputMessageIndex ?? 0,
+            );
+          }
           if (_cacheGroupReplyText(
             groupParent,
             runConversation,

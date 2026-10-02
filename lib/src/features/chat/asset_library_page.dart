@@ -12,8 +12,14 @@ import '../../scheduling/task_filter_menu.dart';
 import 'asset_library_dialogs.dart';
 import 'asset_library_tile.dart';
 import 'asset_library_grid.dart';
-import 'asset_chat_picker.dart';
-import 'asset_detail_page.dart';
+import '../../domain/agent_models.dart';
+import '../../domain/message_sender.dart';
+import 'image_forward_page.dart';
+import 'asset_info_dialog.dart';
+import '../../platform/message_file_store.dart';
+import '../../platform/svg_image.dart';
+import 'image_action_scope.dart';
+import 'image_preview.dart';
 import 'chat_controller.dart';
 import 'conversation_menu_icon.dart';
 import 'delete_confirmation_dialog.dart';
@@ -541,7 +547,7 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     RoundAction(
-                      label: widget.trash ? '彻底删除' : '删除',
+                      label: widget.trash ? '彻底删除' : '移入回收站',
                       icon: Icons.delete_outline,
                       iconWidget: ConversationMenuIcon(
                         type: ConversationMenuIconType.delete,
@@ -558,7 +564,7 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
                         endIndent: 12,
                       ),
                       RoundAction(
-                        label: '保存到设备',
+                        label: '下载',
                         icon: Icons.download,
                         iconWidget: AttachmentActionIcon(
                           type: AttachmentActionIconType.download,
@@ -586,18 +592,23 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
                   ? () => _perform(
                       () => widget.trash
                           ? _restore(_selected.toList())
-                          : _useSelected(),
+                          : _forwardSelected(),
                     )
                   : null,
               icon: widget.trash
                   ? QuestionIcon(type: QuestionIconType.undo, color: color)
-                  : ConversationIcon(color: color),
+                  : widget.picking
+                  ? ConversationIcon(color: color)
+                  : AttachmentActionIcon(
+                      type: AttachmentActionIconType.forward,
+                      color: color,
+                    ),
               label: Text(
                 widget.trash
                     ? '恢复'
                     : widget.picking
                     ? '添加到聊天'
-                    : '聊天',
+                    : '转发',
               ),
             ),
           ),

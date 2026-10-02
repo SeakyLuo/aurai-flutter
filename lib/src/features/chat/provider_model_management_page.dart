@@ -1,9 +1,13 @@
 import 'provider_settings_draft.dart';
-import 'model_removal_row.dart';
 import '../../widgets/empty_data_view.dart';
 import 'default_model_settings_page.dart';
 import 'header_action_menu.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'menu_press_highlight.dart';
+import 'copy_icon.dart';
+import 'conversation_menu_icon.dart';
+import 'glass_surface.dart';
 
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
@@ -46,6 +50,7 @@ class _ProviderModelManagementPageState
   List<String> _remoteModels = const [];
   bool _loading = false;
   bool _savingSelection = false;
+  bool _removing = false;
 
   @override
   void initState() {
@@ -124,29 +129,62 @@ class _ProviderModelManagementPageState
     useAll: false,
     models: [
       ...{
+        ...(widget.draft?.config ??
+                widget.controller.modelSettings.profile(widget.service))
+            .savedModels,
         if ((widget.draft?.config ??
                 widget.controller.modelSettings.profile(widget.service))
             .autoSyncModels)
           ..._remoteModels,
-        ...(widget.draft?.config ??
-                widget.controller.modelSettings.profile(widget.service))
-            .savedModels,
       }.where((item) => item != model),
     ],
   ));
 
-  Future<void> _modelMenu(BuildContext anchor, String model) async {
+  Future<void> _modelMenu(
+    BuildContext anchor,
+    String model,
+    Offset position,
+  ) async {
     final action = await showHeaderActionMenu(
       anchor,
+      position: position,
       items: [
-        (
-          value: 'remove',
-          label: '删除模型',
-          icon: const SettingsIcon(type: SettingsIconType.remove),
-        ),
+        if (widget.readOnly) ...[
+          (
+            value: 'open',
+            label: '查看详情',
+            icon: const SettingsIcon(type: SettingsIconType.model),
+          ),
+          (value: 'copy', label: '复制名称', icon: const CopyIcon()),
+        ] else
+          (
+            value: 'remove',
+            label: '删除模型',
+            icon: const ConversationMenuIcon(
+              type: ConversationMenuIconType.delete,
+            ),
+          ),
       ],
       destructiveValues: const {'remove'},
     );
+    if (!mounted) return;
+    if (action == 'open') await _open(model);
+    if (action == 'copy') {
+      await Clipboard.setData(
+        ClipboardData(
+          text: modelDisplayName(
+            (widget.draft?.config ??
+                    widget.controller.modelSettings.profile(widget.service))
+                .protocol
+                .displayModel(model),
+          ),
+        ),
+      );
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showGlassSnackBar(const SnackBar(content: Text('已复制名称')));
+    }
     if (mounted && action == 'remove' && !_savingSelection) {
       await _removeModel(model);
     }
@@ -210,11 +248,13 @@ class _ProviderModelManagementPageState
     final action = await showHeaderActionMenu(
       anchor,
       items: [
-        if (!widget.readOnly && config.isConfigured)
+        if (!widget.readOnly)
           (
-            value: 'models',
-            label: '添加模型',
-            icon: const SettingsIcon(type: SettingsIconType.add),
+            value: 'remove',
+            label: '移除模型',
+            icon: const ConversationMenuIcon(
+              type: ConversationMenuIconType.delete,
+            ),
           ),
         (
           value: 'defaults',
@@ -230,6 +270,7 @@ class _ProviderModelManagementPageState
       ],
     );
     if (!mounted) return;
+    if (action == 'remove') setState(() => _removing = true);
     if (action == 'defaults') {
       await Navigator.push<void>(
         context,
@@ -244,7 +285,6 @@ class _ProviderModelManagementPageState
       );
       if (mounted) setState(() {});
     }
-    if (action == 'models') await _chooseModels();
     if (action == 'types') await widget.onConfigureTypes();
   }
 
@@ -265,29 +305,78 @@ class _ProviderModelManagementPageState
     final canChoose = config.isConfigured;
     final query = _search.text.trim().toLowerCase();
     final selectedModels = config.autoSyncModels
-        ? {..._remoteModels, ...config.savedModels}
+        ? {...config.savedModels, ..._remoteModels}
         : config.savedModels.toSet();
-    final models =
-        selectedModels
-            .where((model) => model.toLowerCase().contains(query))
-            .toList()
-          ..sort();
+    final models = selectedModels
+        .where((model) => model.toLowerCase().contains(query))
+        .toList();
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: '模型管理',
-        onBack: _savingSelection ? null : () => Navigator.pop(context),
+        onBack: _savingSelection
+            ? null
+            : () {
+                if (_removing) {
+                  setState(() => _removing = false);
+                } else {
+                  Navigator.pop(context);
+                }
+              },
         actions: [
-          Builder(
-            builder: (anchor) => SettingsGlassAction(
-              label: '更多',
-              icon: Icons.more_vert,
-              iconWidget: const SettingsIcon(type: SettingsIconType.more),
-              onPressed: _savingSelection || _loading
+          if (_removing)
+            SettingsGlassAction(
+              label: '完成',
+              icon: Icons.check_rounded,
+              iconWidget: const SettingsIcon(type: SettingsIconType.check),
+              onPressed: _savingSelection
                   ? null
-                  : () => _more(anchor),
+                  : () => setState(() => _removing = false),
+            )
+          else
+            SettingsGlassActionSurface(
+              child: SizedBox(
+                height: 40,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!widget.readOnly) ...[
+                      RoundAction(
+                        label: '添加模型',
+                        icon: Icons.add_rounded,
+                        iconWidget: const SettingsIcon(
+                          type: SettingsIconType.add,
+                        ),
+                        onPressed: _savingSelection || _loading || !canChoose
+                            ? null
+                            : _chooseModels,
+                      ),
+                      VerticalDivider(
+                        width: 1,
+                        thickness: 1,
+                        indent: 10,
+                        endIndent: 10,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: .12),
+                      ),
+                    ],
+                    Builder(
+                      builder: (anchor) => RoundAction(
+                        label: '更多',
+                        icon: Icons.more_vert,
+                        iconWidget: const SettingsIcon(
+                          type: SettingsIconType.more,
+                        ),
+                        onPressed: _savingSelection || _loading
+                            ? null
+                            : () => _more(anchor),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
         ],
       ),
       body: SettingsPageBody(
@@ -327,68 +416,122 @@ class _ProviderModelManagementPageState
                             ),
                           )
                         : ListView.separated(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.fromLTRB(4, 4, 4, 16),
                             keyboardDismissBehavior:
                                 ScrollViewKeyboardDismissBehavior.onDrag,
                             itemCount: models.length,
                             separatorBuilder: (_, _) =>
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 2),
                             itemBuilder: (context, index) {
                               final model = models[index];
-                              final tile = Material(
-                                color: settingsFieldColor(context),
-                                borderRadius: BorderRadius.circular(22),
-                                clipBehavior: Clip.antiAlias,
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                    vertical: 10,
-                                  ),
-                                  title: Row(
-                                    children: [
-                                      ColorFiltered(
-                                        colorFilter: ColorFilter.mode(
-                                          Theme.of(
-                                            context,
-                                          ).colorScheme.onSurfaceVariant,
-                                          BlendMode.srcIn,
-                                        ),
-                                        child: SkillIcon(
-                                          _modelIcon(config, model),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          modelDisplayName(
-                                            config.protocol.displayModel(model),
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  trailing: const SettingsIcon(
-                                    type: SettingsIconType.chevron,
-                                  ),
-                                  onTap: _savingSelection
-                                      ? null
-                                      : () => _open(model),
-                                  onLongPress:
-                                      widget.readOnly ||
-                                          _savingSelection ||
-                                          _loading
-                                      ? null
-                                      : () => _modelMenu(context, model),
+                              return Theme(
+                                data: Theme.of(context).copyWith(
+                                  splashFactory: NoSplash.splashFactory,
+                                  highlightColor: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: .06),
                                 ),
-                              );
-                              if (widget.readOnly) return tile;
-                              return ModelRemovalRow(
-                                key: ValueKey(model),
-                                enabled: !_savingSelection && !_loading,
-                                onRemove: () => _removeModel(model),
-                                child: tile,
+                                child: Builder(
+                                  builder: (anchor) => MenuPressHighlight(
+                                    borderRadius: BorderRadius.circular(24),
+                                    onLongPressStart:
+                                        _savingSelection ||
+                                            _loading ||
+                                            _removing
+                                        ? null
+                                        : (details) => _modelMenu(
+                                            anchor,
+                                            model,
+                                            details.globalPosition,
+                                          ),
+                                    child: Theme(
+                                      data: Theme.of(context).copyWith(
+                                        splashFactory: NoSplash.splashFactory,
+                                        highlightColor: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: .06),
+                                      ),
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        borderRadius: BorderRadius.circular(24),
+                                        clipBehavior: Clip.antiAlias,
+                                        child: ListTile(
+                                          minTileHeight: 60,
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                              ),
+                                          title: Row(
+                                            children: [
+                                              Container(
+                                                width: 36,
+                                                height: 36,
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(
+                                                  color: settingsFieldColor(
+                                                    context,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: ColorFiltered(
+                                                  colorFilter: ColorFilter.mode(
+                                                    Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                                    BlendMode.srcIn,
+                                                  ),
+                                                  child: SkillIcon(
+                                                    _modelIcon(config, model),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Text(
+                                                  modelDisplayName(
+                                                    config.protocol
+                                                        .displayModel(model),
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          trailing: _removing
+                                              ? IconButton(
+                                                  tooltip: '移除模型',
+                                                  onPressed:
+                                                      _savingSelection ||
+                                                          _loading
+                                                      ? null
+                                                      : () =>
+                                                            _removeModel(model),
+                                                  icon: ConversationMenuIcon(
+                                                    type:
+                                                        ConversationMenuIconType
+                                                            .delete,
+                                                    color: Theme.of(
+                                                      context,
+                                                    ).colorScheme.error,
+                                                  ),
+                                                )
+                                              : const SettingsIcon(
+                                                  type:
+                                                      SettingsIconType.chevron,
+                                                ),
+                                          onTap: _savingSelection || _removing
+                                              ? null
+                                              : () => _open(model),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               );
                             },
                           ),

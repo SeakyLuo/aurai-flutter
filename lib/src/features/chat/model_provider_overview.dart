@@ -46,7 +46,7 @@ extension _ProviderOverview on _ModelProviderDetailState {
                 : '已选 ${_saved.savedModels.length} 个模型',
           ),
           trailing: const SettingsIcon(type: SettingsIconType.chevron),
-          onTap: _openManagedModels,
+          onTap: _openModelManagement,
         ),
         ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 8),

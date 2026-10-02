@@ -39,11 +39,32 @@ class GroupMemberActivity {
 class _GroupMemberThoughts {
   _GroupMemberThoughts(this.runId);
   final String runId;
-  final turns = <int, String>{};
-  String preview = '';
+  final turns = <(int, int, bool), String>{};
 }
 
 extension GroupMemberActivities on ChatController {
+  Future<void> setGroupMemberAutoReply(
+    String groupId,
+    String senderId, {
+    required bool paused,
+  }) async {
+    await groupStore.requireManager(
+      _store.database,
+      groupId,
+      MessageSender.localUser.id,
+    );
+    await groupStore.requireCanSpeak(groupId, senderId);
+    await GroupParticipation(_store.database).set(
+      groupId,
+      senderId,
+      paused,
+      reason: paused ? '${MessageSender.localUser.name}暂停了自动接话' : null,
+    );
+    await _applyPrivateGroupParticipation(groupId, senderId, paused);
+    groupActivityChanges.value++;
+    notifyListeners();
+  }
+
   Future<void> stopAllGroupReplies(String conversationId) async {
     final current = groupActivitiesFor(
       conversationId,
@@ -74,7 +95,9 @@ extension GroupMemberActivities on ChatController {
       groupId,
       MessageSender.localUser.id,
     );
-    final ids = await GroupParticipation(_store.database).pauseAll(groupId);
+    final ids = await GroupParticipation(
+      _store.database,
+    ).pauseAll(groupId, reason: '${MessageSender.localUser.name}暂停了全部成员的自动接话');
     final dispatcher = _executionStates[groupId]?.groupDispatcher;
     for (final id in ids) {
       dispatcher?.pause(id);
@@ -183,23 +206,28 @@ extension GroupMemberActivities on ChatController {
     String senderId,
     String runId,
     int turn,
-    String text,
-  ) {
+    String text, {
+    bool isReasoning = true,
+    int messageIndex = 0,
+  }) {
     if (_callbacksDisposed) return;
     final cache = _execution.groupThoughts;
     if (cache[senderId]?.runId != runId) {
       cache[senderId] = _GroupMemberThoughts(runId);
     }
     final thoughts = cache[senderId]!;
-    thoughts.turns[turn] = text;
+    thoughts.turns[(turn, messageIndex, isReasoning)] = text;
+    groupActivityChanges.value++;
+  }
+
+  String _groupActivityPreview(String text) {
     final latest = text.trimRight();
     final lineStart = latest.lastIndexOf('\n') + 1;
     // Keep the growing end visible instead of repeating a truncated first line.
     final start = latest.length - lineStart > 120
         ? latest.length - 120
         : lineStart;
-    thoughts.preview = latest.substring(start).trim();
-    groupActivityChanges.value++;
+    return latest.substring(start).trim();
   }
 
   List<GroupMemberActivity> groupActivitiesFor(
@@ -239,9 +267,13 @@ extension GroupMemberActivities on ChatController {
       final stopping = member.runState == ChatRunState.stopping;
       final thoughts = state.groupThoughts[entry.key];
       final hasThoughts =
-          includeThoughts &&
-          !member.thinkingHidden &&
-          thoughts?.runId == member.activeRunId;
+          includeThoughts && thoughts?.runId == member.activeRunId;
+      final visibleThoughts = hasThoughts
+          ? thoughts!.turns.entries
+                .where((entry) => !member.thinkingHidden || !entry.key.$3)
+                .map((entry) => entry.value)
+                .toList()
+          : const <String>[];
       activities.add(
         GroupMemberActivity(
           sender: entry.value,
@@ -254,10 +286,10 @@ extension GroupMemberActivities on ChatController {
           thinkingHidden: member.thinkingHidden,
           waitingForUser:
               confirming || waitingForAction || step?.toolName == 'askUser',
-          thoughts: hasThoughts
-              ? List.unmodifiable(thoughts!.turns.values)
-              : const [],
-          preview: hasThoughts ? thoughts!.preview : '',
+          thoughts: List.unmodifiable(visibleThoughts),
+          preview: visibleThoughts.isEmpty
+              ? ''
+              : _groupActivityPreview(visibleThoughts.last),
           description: stopping
               ? '正在终止'
               : confirming
