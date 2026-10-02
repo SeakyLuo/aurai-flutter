@@ -161,7 +161,7 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
           (
             value: 'useAll',
             label: _useAll ? '关闭使用全部' : '使用全部模型',
-            icon: const SettingsIcon(type: SettingsIconType.miniapps),
+            icon: const SettingsIcon(type: SettingsIconType.grid),
           ),
         if (widget.onConfigureTypes != null)
           (

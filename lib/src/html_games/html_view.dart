@@ -1,4 +1,5 @@
 import 'miniapp_recent_store.dart';
+import '../features/chat/settings_appearance.dart';
 import 'miniapp_favorite_action.dart';
 import '../app/glass_notice.dart';
 import 'html_game_display_cache.dart';
@@ -173,7 +174,13 @@ class _HtmlViewState extends State<HtmlView>
   void _checkVisibility() {
     if (!_visible) {
       if (_leaving || !htmlRouteObserver.isVisible(ModalRoute.of(context)!)) {
-        if (_session != null) unawaited(_close());
+        if (_leaving) {
+          if (_session != null) unawaited(_close());
+        } else {
+          _idleTimer?.cancel();
+          _idleTimer = null;
+          unawaited(_session?.setVisible(false));
+        }
       } else {
         unawaited(_session?.setVisible(false));
         if (_session != null) {
@@ -277,6 +284,16 @@ class _HtmlViewState extends State<HtmlView>
         game,
         widget.store,
         fullscreen: widget.fullscreen,
+        hostTopInset: widget.fullscreen
+            ? MediaQuery.paddingOf(context).top + SettingsAppBar.toolbarHeight
+            : 0,
+        hostSafeTopInset: widget.fullscreen
+            ? MediaQuery.paddingOf(context).top
+            : 0,
+        hostRightInset: widget.fullscreen ? 124 : 0,
+        hostSafeBottomInset: widget.fullscreen
+            ? MediaQuery.paddingOf(context).bottom
+            : 0,
         theme: Theme.of(context),
       );
       setState(() {
@@ -432,36 +449,31 @@ class _HtmlViewState extends State<HtmlView>
       if (!didPop) unawaited(_leaveFullscreen());
     },
     child: Scaffold(
-      body: SafeArea(
-        child: Stack(
-          key: _anchor,
-          fit: StackFit.expand,
-          children: [
-            if (_session != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 64),
-                child: HtmlGameSurface(
-                  session: _session!,
-                  borderRadius: BorderRadius.zero,
-                ),
-              )
-            else
-              Center(
-                child: _failed
-                    ? TextButton(onPressed: _open, child: const Text('重试'))
-                    : const CircularProgressIndicator(strokeWidth: 2),
-              ),
-            Positioned(
-              top: 12,
-              right: 16,
+      body: Stack(
+        key: _anchor,
+        fit: StackFit.expand,
+        children: [
+          if (_session != null)
+            HtmlGameSurface(session: _session!, borderRadius: BorderRadius.zero)
+          else
+            Center(
+              child: _failed
+                  ? TextButton(onPressed: _open, child: const Text('重试'))
+                  : const CircularProgressIndicator(strokeWidth: 2),
+            ),
+          Positioned(
+            top: MediaQuery.paddingOf(context).top,
+            right: 16,
+            height: SettingsAppBar.toolbarHeight,
+            child: Center(
               child: MiniappFavoriteAction(
                 appId: _session?.game.appId,
                 store: widget.store,
                 onClose: _leaveFullscreen,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );

@@ -251,6 +251,17 @@ class MiniappLibraryStore {
     ).apply(await _mine(rows))).single;
   }
 
+  Future<MiniappEntry> entryForMessage(String messageId) async {
+    final rows = await database.query(
+      'html_games',
+      columns: ['app_id'],
+      where: 'message_id = ?',
+      whereArgs: [messageId],
+    );
+    if (rows.isEmpty) throw StateError('小程序消息已删除或撤回');
+    return entryForApp(rows.single['app_id'] as String);
+  }
+
   Future<MiniappEntry> refresh(MiniappEntry entry) async {
     if (entry.bundled)
       return (await bundled()).singleWhere((e) => e.id == entry.id);

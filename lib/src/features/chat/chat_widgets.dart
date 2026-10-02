@@ -7,7 +7,7 @@ import 'reconnect_indicator.dart';
 import 'package:flutter/material.dart';
 
 import 'welcome_logo.dart';
-import 'settings_icon.dart';
+import '../../html_games/miniapp_symbol.dart';
 import 'sidebar_action_icon.dart';
 import 'question_icon.dart';
 
@@ -56,7 +56,7 @@ class EmptyConversation extends StatelessWidget {
             const SizedBox(height: 10),
             for (final example in const [
               (
-                SettingsIcon(type: SettingsIconType.miniapps),
+                MiniappSymbol(),
                 '做个小程序',
                 '在会话里玩贪吃蛇',
                 '帮我做一个可以在会话里玩的贪吃蛇小程序，支持触屏操作、计分和重新开始。',
@@ -362,6 +362,7 @@ class ChatComposer extends StatelessWidget {
     this.quote,
     this.onCancelQuote,
     this.maxLength,
+    this.onVisibility,
   });
 
   final TextEditingController controller;
@@ -387,6 +388,7 @@ class ChatComposer extends StatelessWidget {
   final MessageQuote? quote;
   final VoidCallback? onCancelQuote;
   final int? maxLength;
+  final Future<void> Function()? onVisibility;
 
   @override
   Widget build(
@@ -467,6 +469,14 @@ class ChatComposer extends StatelessWidget {
           ),
         ),
         action: RoundAction(
+          onLongPress:
+              draftEnabled &&
+                  !savingEdit &&
+                  !submitting &&
+                  !addingImages &&
+                  !resume
+              ? onVisibility
+              : null,
           inkResponse: false,
           label: savingEdit
               ? '正在保存'

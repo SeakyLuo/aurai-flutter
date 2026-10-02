@@ -14,6 +14,7 @@ extension GroupMessageAudience on ChatController {
             senderId: quote.senderId,
             text: quote.textFor(viewerId),
             audience: quote.audience,
+            excludedAudience: quote.excludedAudience,
           )..senderName = quote.senderName,
         )
       else
@@ -26,6 +27,9 @@ extension GroupMessageAudience on ChatController {
     String senderId,
   ) {
     final raw = message['audience'];
+    if (raw != null && message['excludedAudience'] != null) {
+      throw ArgumentError('部分可见和部分不可见不能同时设置');
+    }
     if (raw == null) return null;
     if (raw is! List || raw.isEmpty || raw.any((id) => id is! String)) {
       throw ArgumentError('可见范围必须是非空的群成员列表');
@@ -41,9 +45,34 @@ extension GroupMessageAudience on ChatController {
     return audience.toList();
   }
 
-  void _checkQuoteAudience(List<String>? sourceAudience, String senderId) {
-    if (sourceAudience == null) return;
-    if (!sourceAudience.contains(senderId)) {
+  List<String>? _messageExcludedAudience(
+    Map<String, Object?> message,
+    Iterable<String> members,
+    String senderId,
+  ) {
+    final raw = message['excludedAudience'];
+    if (raw == null) return null;
+    if (raw is! List || raw.isEmpty || raw.any((id) => id is! String)) {
+      throw ArgumentError('不可见范围必须是非空的群成员列表');
+    }
+    final excluded = raw.cast<String>().toSet();
+    if (excluded.contains(senderId)) throw ArgumentError('不能将自己设为不可见');
+    if (excluded.any((id) => !members.contains(id))) {
+      throw ArgumentError('不可见范围只能包含当前群成员');
+    }
+    if ((message['mentionIds'] as List).any(excluded.contains)) {
+      throw ArgumentError('不能 @ 不可见范围内的群成员');
+    }
+    return excluded.toList();
+  }
+
+  void _checkQuoteAudience(
+    List<String>? sourceAudience,
+    String senderId, [
+    List<String>? excluded,
+  ]) {
+    if ((sourceAudience != null && !sourceAudience.contains(senderId)) ||
+        (excluded?.contains(senderId) ?? false)) {
       throw ArgumentError('你无权引用这条消息');
     }
   }

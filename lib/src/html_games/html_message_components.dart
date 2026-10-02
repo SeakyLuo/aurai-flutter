@@ -18,7 +18,12 @@ const htmlMessageComponentGuide =
     'In chat, the host overlays its More control inside the HTML surface at the top right. '
     'Keep that corner clear for --aurai-host-menu-width by --aurai-host-menu-height '
     '(currently 38px by 36px): do not place text, buttons, canvas interaction, or other meaningful content there. '
-    'Reserve only that corner, not a full-width blank row. In fullscreen both variables are 0px, so the page may use the entire top edge. ';
+    'Reserve only that corner, not a full-width blank row. In fullscreen both message-menu variables are 0px. '
+    'Use --aurai-host-safe-top-inset above the page header and reserve --aurai-host-right-inset '
+    'inside that header for the system controls; keep the title in the free space on the left. '
+    '--aurai-host-top-inset is available for content that deliberately starts below the system controls. '
+    'Fullscreen HTML fills the viewport; the host does not add content padding. '
+    'Use --aurai-host-safe-bottom-inset to keep bottom actions clear of the system navigation area. ';
 
 const htmlMessageComponentStyles = r'''
 .aurai-ui{padding:12px 16px;min-width:0;color:var(--aurai-text)}
@@ -29,6 +34,8 @@ const htmlMessageComponentStyles = r'''
 .aurai-ui :where(legend){padding:0;margin-bottom:8px}
 .aurai-ui :where(.aurai-stack){display:flex;flex-direction:column;gap:12px;min-width:0}
 .aurai-ui.aurai-stack{display:flex;flex-direction:column;gap:12px}
+.aurai-ui details.aurai-stack{display:block}
+.aurai-ui details.aurai-stack[open]>:not(summary){margin-top:12px}
 .aurai-ui :where(.aurai-row,.aurai-actions){display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
 .aurai-ui :where(.aurai-grid){display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:12px;min-width:0}
 .aurai-ui :where(.aurai-grid,.aurai-row)>*{min-width:0;max-width:100%}

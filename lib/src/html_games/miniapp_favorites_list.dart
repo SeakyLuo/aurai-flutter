@@ -240,17 +240,14 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
           ),
           children: [
             for (final item in _items) _tile(item),
-            if (_loading || _failed || _more)
+            if (_loading || _failed)
               Padding(
                 key: const ValueKey('footer'),
                 padding: const EdgeInsets.all(24),
                 child: Center(
                   child: _loading
                       ? const CircularProgressIndicator()
-                      : TextButton(
-                          onPressed: _load,
-                          child: Text(_failed ? '重试' : '加载更多'),
-                        ),
+                      : TextButton(onPressed: _load, child: const Text('重试')),
                 ),
               ),
           ],

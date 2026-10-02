@@ -10,10 +10,19 @@ Map<String, Object?> miniappSendAction(String html) {
   return (jsonDecode(match.group(1)!) as Map).cast<String, Object?>();
 }
 
+bool supportsMiniappMessage(String html) => const [
+  'program',
+  'message',
+  'random-choice',
+].contains(miniappSendAction(html)['type']);
+
 Map<String, Object?> initializeMiniappMessage(String html) {
   final action = miniappSendAction(html);
   if (action.isEmpty) return {};
   if (action['type'] == 'program') return {'phase': 'setup'};
+  if (action['type'] == 'message') {
+    return (action['state'] as Map).cast<String, Object?>();
+  }
   final choices = action['choices'];
   if (action['type'] != 'random-choice' ||
       choices is! List ||

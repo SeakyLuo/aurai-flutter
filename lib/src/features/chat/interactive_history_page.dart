@@ -204,7 +204,9 @@ class InteractiveHistoryTile extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       title: Text('点按“${event['label']}”'),
       subtitle: Text(
-        '${messageTime(DateTime.fromMicrosecondsSinceEpoch(event['created_at'] as int))}${available ? '' : ' · 旧记录未保存卡片快照'}',
+        messageTime(
+          DateTime.fromMicrosecondsSinceEpoch(event['created_at'] as int),
+        ),
       ),
       trailing: available
           ? const SettingsIcon(type: SettingsIconType.chevron)

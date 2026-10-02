@@ -31,11 +31,14 @@ class InteractionContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final submitted = view['submitted'] == true;
+    final participantButtons = eligible
+        ? buttons
+        : const <Map<String, Object?>>[];
     final collecting = view['phase'] == 'collecting' && view['closed'] != true;
     final choosing = collecting && (!submitted || allowChange);
     final self = view['self'] as Map?;
     final selectedButton = collecting && submitted && !allowChange
-        ? buttons
+        ? participantButtons
               .where(
                 (button) =>
                     button['selection'] == null &&
@@ -48,8 +51,16 @@ class InteractionContent extends StatelessWidget {
     final showSubmitted = selectedButton != null;
     final status = view['closed'] == true || view['phase'] == 'closed'
         ? '已结束'
+        : view['completed'] == true
+        ? '本轮已完成'
+        : view['summaryVisible'] == true
+        ? '进行中'
         : null;
-    final actions = buttons
+    final participationSummary = [
+      if (status != null) status,
+      if (view['summaryVisible'] == true) '${view['submittedCount']} 人参与',
+    ].join(' · ');
+    final actions = participantButtons
         .where((button) => button['selection'] == null)
         .where(
           (button) => button['action'] == 'nextRound'
@@ -82,9 +93,9 @@ class InteractionContent extends StatelessWidget {
               ),
             },
           ),
-        if (status != null)
+        if (participationSummary.isNotEmpty)
           Text(
-            status,
+            participationSummary,
             style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
           ),
         if (view['revealed'] == true && view['summaryVisible'] != true)
@@ -96,7 +107,7 @@ class InteractionContent extends StatelessWidget {
             (status != null ||
                 (view['revealed'] == true && view['summaryVisible'] != true)))
           const SizedBox(height: 12),
-        for (final button in buttons.where(
+        for (final button in participantButtons.where(
           (button) => collecting && button['selection'] != null,
         ))
           Padding(
@@ -107,7 +118,6 @@ class InteractionContent extends StatelessWidget {
               self: self,
               locked:
                   readOnly ||
-                  !eligible ||
                   !collecting ||
                   busy != null ||
                   pendingButtonId == button['id'],
@@ -139,11 +149,7 @@ class InteractionContent extends StatelessWidget {
                 button: button,
                 busy: busy == button['id'],
                 locked:
-                    readOnly ||
-                    busy != null ||
-                    pendingButtonId == button['id'] ||
-                    (!eligible &&
-                        ['submit', 'nextRound'].contains(button['action'])),
+                    readOnly || busy != null || pendingButtonId == button['id'],
                 onPressed: () => onClick(button),
               ),
           ],
@@ -162,12 +168,15 @@ class InteractionDistribution extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final total = data['total'] as int;
     final selected = data['selected'] as Map?;
+    final items = data['items'] as List;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final option in data['items'] as List)
+        for (final (index, option) in items.indexed)
           Padding(
-            padding: const EdgeInsets.only(bottom: 16),
+            padding: EdgeInsets.only(
+              bottom: index == items.length - 1 ? 0 : 16,
+            ),
             child: Builder(
               builder: (context) {
                 final count = option['count'] as int;
@@ -217,10 +226,6 @@ class InteractionDistribution extends StatelessWidget {
               },
             ),
           ),
-        Text(
-          '$total 人参与',
-          style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
-        ),
       ],
     );
   }

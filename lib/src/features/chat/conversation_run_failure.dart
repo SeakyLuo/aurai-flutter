@@ -57,6 +57,7 @@ extension ConversationRunFailure on ChatController {
 
   Future<void> retryFailedMessage(
     AgentMessage message, {
+    bool resumeAutoReply = false,
     Future<void> Function()? beforeRemoval,
   }) async {
     if (activeConversation.kind == ConversationKind.direct) {
@@ -73,6 +74,9 @@ extension ConversationRunFailure on ChatController {
       throw StateError('该 AI 已不在群聊中');
     }
     if (member.isMuted) throw StateError('该成员已被禁言，不能重试');
+    if (resumeAutoReply) {
+      await resumeGroupAutoReply(conversation.id, message.senderId);
+    }
     await _groupSleeps.remove(conversation.id, message.senderId);
     final dispatcher = _groupDispatcher;
     if (dispatcher != null && !dispatcher.closed && !dispatcher.stopped) {

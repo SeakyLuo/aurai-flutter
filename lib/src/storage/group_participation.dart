@@ -47,9 +47,15 @@ class GroupParticipation {
         'conversation_members',
         columns: ['sender_id'],
         where:
-            'conversation_id = ? AND left_at IS NULL AND sender_id IN '
+            'conversation_id = ? AND left_at IS NULL AND ${effectiveGroupMuteSql('conversation_members')} != -1 AND ${effectiveGroupMuteSql('conversation_members')} <= ? '
+            'AND sender_id NOT IN (SELECT sender_id FROM group_participation WHERE conversation_id = ? AND paused = 1) AND sender_id IN '
             '(SELECT id FROM message_senders WHERE kind = ?)',
-        whereArgs: [groupId, 'agent'],
+        whereArgs: [
+          groupId,
+          DateTime.now().microsecondsSinceEpoch,
+          groupId,
+          'agent',
+        ],
       );
       final ids = rows.map((row) => row['sender_id'] as String).toSet();
       if (ids.isEmpty) return ids;

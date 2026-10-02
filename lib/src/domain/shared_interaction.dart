@@ -131,14 +131,14 @@ class SharedInteraction {
     'closed': closed,
     'completed': phase == 'completed',
     'submitted': submissions.containsKey(actorId),
-    if (revealed && summaryVisible) 'submittedCount': submissions.length,
+    if (summaryVisible) 'submittedCount': submissions.length,
     'self': submissions[actorId],
-    'revealed': revealed,
+    'revealed': choicesVisible || summaryVisible,
     'summaryVisible': summaryVisible,
-    if (revealed && summaryVisible) 'distribution': distribution,
+    if (summaryVisible) 'distribution': distribution,
     // Shared values can contain choices or derived counts, so both policies apply.
-    if (revealed && choicesVisible && summaryVisible) 'state': state,
-    if (revealed && choicesVisible) ...{
+    if (choicesVisible && summaryVisible) 'state': state,
+    if (choicesVisible) ...{
       'submissions': submissions,
       'choices': submissions.values.toList(),
     },

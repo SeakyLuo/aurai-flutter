@@ -1,11 +1,10 @@
+import 'conversation_list_tile.dart';
+import 'member_avatar.dart';
 import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
 import 'conversation_list_skeleton.dart';
-import 'conversation_status_dot.dart';
 import '../../domain/error_message.dart';
 import '../../domain/library_asset.dart';
-import 'conversation_preview_text.dart';
-import 'message_time.dart';
 import 'home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -14,11 +13,11 @@ import '../../storage/home_conversations.dart';
 import 'ai_contact_page.dart';
 import 'chat_controller.dart';
 import 'chat_page.dart';
-import 'conversation_icon.dart';
 import 'conversation_more.dart';
 import 'pagination_listener.dart';
 import 'settings_appearance.dart';
 import 'attachment_source_menu.dart';
+import 'send_miniapp_message.dart';
 import 'asset_library_page.dart';
 import 'chat_widgets.dart';
 import 'send_favorite_page.dart';
@@ -155,6 +154,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
     final source = await showAttachmentSourceMenu(
       buttonContext,
       allowAssets: true,
+      allowMiniapps: true,
     );
     if (!mounted || source == null) return;
     try {
@@ -199,6 +199,9 @@ class _AiConversationsPageState extends State<AiConversationsPage>
         case AttachmentSource.favorite:
           _focus.unfocus();
           await showSendFavoritePage(context, widget.controller);
+        case AttachmentSource.miniapp:
+          _focus.unfocus();
+          await sendMiniappMessage(context, widget.controller);
         case AttachmentSource.friend:
           return;
       }
@@ -260,61 +263,14 @@ class _AiConversationsPageState extends State<AiConversationsPage>
                   controller: widget.controller,
                   conversation: item,
                   onChanged: () => _load(reset: true),
-                  child: Material(
-                    color: item.isPinned
-                        ? Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.035)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListenableBuilder(
-                      listenable: widget.controller.scheduledTasks,
-                      builder: (context, _) => ListTile(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 0,
-                        ),
-                        leading: ConversationUnreadAvatar(
-                          controller: widget.controller,
-                          conversation: item,
-                          child: const ConversationIcon(),
-                        ),
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                item.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-
-                            if (item.lastMessageAt != null) ...[
-                              const SizedBox(width: 8),
-                              Text(
-                                conversationMessageTime(item.lastMessageAt!),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        subtitle: ConversationPreviewText(
-                          showFailure: true,
-                          conversation: item,
-                          emptyText: '新会话',
-                        ),
-                        onTap: () => _open(id: item.id),
-                      ),
+                  child: ConversationListTile(
+                    controller: widget.controller,
+                    conversation: item,
+                    avatar: MemberAvatar(
+                      sender: widget.profile.sender,
+                      size: 48,
                     ),
+                    onTap: () => _open(id: item.id),
                   ),
                 );
               },

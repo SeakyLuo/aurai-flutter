@@ -6,7 +6,7 @@ const interactionExpressionSchema = {
 const sharedInteractionSchema = {
   'type': 'object',
   'description':
-      'Generic shared round, not a game type. Each actor submits one JSON value; completion rules run atomically and once. Missing completion means keep collecting until the author closes. Definition changes preserve current session; roundInitial applies on the next round.',
+      'Generic shared round, not a game type. Each actor submits one JSON value; completion rules run atomically and once. Completion automatically closes the card unless a nextRound button is configured. For a fixed voter list, configure actors and a completion expression comparing submittedCount with that list length. Missing completion means keep collecting until the author closes. Definition changes preserve current session; roundInitial applies on the next round.',
   'properties': {
     'initial': {
       'type': 'object',
@@ -35,7 +35,7 @@ const sharedInteractionSchema = {
       'type': 'string',
       'enum': ['immediate', 'onComplete'],
       'description':
-          'onComplete hides others choices, aggregates and runtime state until this round completes or is closed.',
+          'Default reveal timing. onComplete hides others choices, aggregates and runtime state until the round completes or closes. participation visibilityTiming/summaryVisibilityTiming and their ImmediateActors configure each part independently.',
     },
     'completion': interactionExpressionSchema,
     'onComplete': {
@@ -58,7 +58,7 @@ const sharedInteractionSchema = {
     'views': {
       'type': 'array',
       'description':
-          'Result components bound to the viewer-visible context. They do not control settlement. Context: round, phase(collecting/completed/closed), closed, completed, submitted, submittedCount, self, revealed, summaryVisible. After reveal: distribution requires summary visibility; choices/submissions require individual visibility; state requires both because it can contain derived choices and counts. Never rely on a hidden field. Completion rules have full state, choices/submissions, submittedCount, round, phase, closed.',
+          'Result components bound to the viewer-visible context. They do not control settlement. Context: round, phase(collecting/completed/closed), closed, completed, submitted, self, revealed (choices or summary available), summaryVisible. submittedCount/distribution require summary visibility; choices/submissions require individual visibility; state requires both because it can contain derived choices and counts. Each follows its own audience/timing. Never rely on a hidden field. Completion rules have full state, choices/submissions, submittedCount, round, phase, closed.',
       'items': {
         'type': 'object',
         'properties': {

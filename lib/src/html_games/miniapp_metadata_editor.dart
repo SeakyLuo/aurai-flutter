@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../domain/agent_models.dart';
 import 'miniapp_icon_editor.dart';
+import '../domain/miniapp_share.dart';
+import 'miniapp_share_image_editor.dart';
 
 import 'package:flutter/material.dart';
 
@@ -34,13 +36,17 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
   late MiniappEntry _saved = widget.entry;
   late final _name = TextEditingController(text: _saved.title);
   late final _description = TextEditingController(text: _saved.description);
+  late final _shareTitle = TextEditingController(text: _saved.shareTitle);
+  late String? _shareImagePath = _saved.shareImagePath;
   bool _busy = false, _leaving = false;
   late String? _iconPath = _saved.iconPath;
   final _draftIcons = <String>{};
   bool get _dirty =>
       _name.text != _saved.title ||
       _description.text != _saved.description ||
-      _iconPath != _saved.iconPath;
+      _iconPath != _saved.iconPath ||
+      _shareTitle.text != _saved.shareTitle ||
+      _shareImagePath != _saved.shareImagePath;
 
   @override
   void dispose() {
@@ -49,17 +55,18 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
     }
     _name.dispose();
     _description.dispose();
+    _shareTitle.dispose();
     super.dispose();
   }
 
-  Future<void> _pickIcon() async {
+  Future<void> _pickImage({bool sharing = false}) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
       final image = await ImagePicker().pickImage(
         source: ImageSource.gallery,
-        maxWidth: 512,
-        maxHeight: 512,
+        maxWidth: sharing ? 1280 : 512,
+        maxHeight: sharing ? 1280 : 512,
         imageQuality: 90,
       );
       if (image == null || !mounted) return;
@@ -89,12 +96,18 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
         return;
       }
       _draftIcons.add(file.path);
-      setState(() => _iconPath = file.path);
+      setState(() {
+        if (sharing) {
+          _shareImagePath = file.path;
+        } else {
+          _iconPath = file.path;
+        }
+      });
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
-          SnackBar(content: Text('无法选择图标：${errorMessage(error)}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -104,10 +117,16 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
     if (_busy) return false;
     setState(() => _busy = true);
     try {
-      await MiniappMetadataStore(
-        widget.store.database,
-      ).save(_saved, _name.text, _description.text, iconPath: _iconPath);
+      await MiniappMetadataStore(widget.store.database).save(
+        _saved,
+        _name.text,
+        _description.text,
+        iconPath: _iconPath,
+        shareTitle: _shareTitle.text,
+        shareImagePath: _shareImagePath,
+      );
       _draftIcons.remove(_iconPath);
+      _draftIcons.remove(_shareImagePath);
       if (!mounted) return true;
       setState(() {
         _saved = _saved.withMetadata(
@@ -116,9 +135,13 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
           _saved.metadataRevision + 1,
           iconPath: _iconPath,
           replaceIcon: true,
+          shareTitle: _shareTitle.text.trim(),
+          shareImagePath: _shareImagePath,
+          replaceSharing: true,
         );
         _name.text = _saved.title;
         _description.text = _saved.description;
+        _shareTitle.text = _saved.shareTitle;
       });
       ScaffoldMessenger.of(
         context,
@@ -158,6 +181,7 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
     TextEditingController controller,
     int limit, {
     bool multiline = false,
+    String? hint,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: Column(
@@ -189,6 +213,7 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
           onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           style: const TextStyle(fontSize: 16),
           decoration: InputDecoration(
+            hintText: hint,
             filled: true,
             fillColor: settingsFieldColor(context),
             contentPadding: const EdgeInsets.symmetric(
@@ -245,13 +270,32 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
                   MiniappIconEditor(
                     path: _iconPath,
                     asset: _saved.iconAsset,
-                    onPick: _busy ? null : _pickIcon,
+                    onPick: _busy ? null : () => _pickImage(),
                     onRemove: _busy
                         ? null
                         : () => setState(() => _iconPath = null),
                   ),
                   _field('名称', _name, 100),
                   _field('简介', _description, 500, multiline: true),
+                  _field('分享标题', _shareTitle, 100, hint: '未填写时使用小程序名称'),
+                  MiniappShareImageEditor(
+                    share: MiniappShare.fromEntry(
+                      _saved.withMetadata(
+                        _name.text.trim(),
+                        _description.text.trim(),
+                        _saved.metadataRevision,
+                        iconPath: _iconPath,
+                        replaceIcon: true,
+                        shareTitle: _shareTitle.text.trim(),
+                        shareImagePath: _shareImagePath,
+                        replaceSharing: true,
+                      ),
+                    ),
+                    onPick: _busy ? null : () => _pickImage(sharing: true),
+                    onRemove: _busy
+                        ? null
+                        : () => setState(() => _shareImagePath = null),
+                  ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
                     child: Text(

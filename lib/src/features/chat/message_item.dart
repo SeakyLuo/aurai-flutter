@@ -2,6 +2,8 @@ import '../../storage/group_message_marks.dart';
 import 'group_favorite_marker.dart';
 import '../../app/ui_action.dart';
 import '../../html_games/miniapp_forward.dart';
+import 'miniapp_share_message.dart';
+import 'miniapp_share_notice.dart';
 import '../../html_games/miniapp_favorites.dart';
 import '../../html_games/miniapp_library_store.dart';
 import 'message_swipe_quote.dart';
@@ -47,6 +49,7 @@ import 'image_attachments.dart';
 import 'task_summary_view.dart';
 import 'reasoning_message_view.dart';
 import 'message_actions_menu.dart';
+import 'message_visibility_sheet.dart';
 import 'menu_press_highlight.dart';
 import 'html_message_more_button.dart';
 import 'source_citation_syntax.dart';
@@ -302,32 +305,62 @@ class _MessageItemState extends State<MessageItem> {
       : child;
 
   Widget _buildContent(BuildContext context) {
+    if (message.miniappShare != null)
+      return _withGroupFavorite(
+        MiniappShareMessage(
+          message: message,
+          groupBubble: widget.groupBubble,
+          onLongPress: () => _openActions(compactMenu: !widget.groupBubble),
+        ),
+      );
+
     if (message.htmlGame != null) {
-      return Padding(
-        padding: widget.groupBubble
-            ? EdgeInsets.zero
-            : const EdgeInsets.symmetric(horizontal: 18),
-        child: _withGroupFavorite(
-          Stack(
-            children: [
-              if (widget.onLocate case final locate?)
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: locate,
-                  child: IgnorePointer(child: widget.htmlView!),
-                )
-              else
-                widget.htmlView!,
-              if (!widget.readOnly)
-                Positioned(
-                  top: HtmlMessageMoreButton.top,
-                  right: HtmlMessageMoreButton.right,
-                  child: HtmlMessageMoreButton(
-                    onPressed: () =>
-                        _openActions(compactMenu: !widget.groupBubble),
-                  ),
-                ),
-            ],
+      final ownMessage = message.role == AgentMessageRole.user;
+      return LayoutBuilder(
+        builder: (context, constraints) => Align(
+          alignment: ownMessage ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: ownMessage
+                  ? widget.groupBubble
+                        ? constraints.maxWidth -
+                              GroupMessageHeading.contentInset
+                        : (constraints.maxWidth - 32) * 0.82
+                  : constraints.maxWidth - (widget.groupBubble ? 0 : 36),
+            ),
+            margin: ownMessage
+                ? EdgeInsets.fromLTRB(
+                    widget.groupBubble ? 18 : 16,
+                    widget.groupBubble ? 0 : MessageItem.userTopMargin,
+                    widget.groupBubble ? 18 : 16,
+                    widget.groupBubble ? 0 : 24,
+                  )
+                : widget.groupBubble
+                ? EdgeInsets.zero
+                : const EdgeInsets.symmetric(horizontal: 18),
+            child: _withGroupFavorite(
+              Stack(
+                children: [
+                  if (widget.onLocate case final locate?)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: locate,
+                      child: IgnorePointer(child: widget.htmlView!),
+                    )
+                  else
+                    widget.htmlView!,
+                  if (!widget.readOnly)
+                    Positioned(
+                      top: HtmlMessageMoreButton.top,
+                      right: HtmlMessageMoreButton.right,
+                      child: HtmlMessageMoreButton(
+                        onPressed: () =>
+                            _openActions(compactMenu: !widget.groupBubble),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       );
@@ -487,6 +520,15 @@ class _MessageItemState extends State<MessageItem> {
               readOnly: widget.readOnly || page?.snapshot != null,
               onClick: widget.onInteractiveClick!,
               onRetry: widget.onInteractiveRetry,
+              onStatistics: !widget.readOnly || widget.onLocate != null
+                  ? () => showInteractiveStatistics(
+                      context,
+                      database: ImageActionScope.of(
+                        context,
+                      ).groupStore.database,
+                      messageId: message.id,
+                    )
+                  : null,
               onOpenLink: (url) => _openLink(context, url),
             ),
           )

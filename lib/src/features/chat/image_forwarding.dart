@@ -51,17 +51,32 @@ extension ImageForwarding on ChatController {
     );
   }
 
-  Future<void> forwardImage(String? targetId, List<int> bytes, String text) =>
-      _inConversation(
-        activeConversation,
-        () => _enqueueForward(() => _forwardImage(targetId, bytes, text)),
-      );
+  Future<void> forwardImage(
+    String? targetId,
+    List<int> bytes,
+    String text, {
+    List<String>? audience,
+    List<String>? excludedAudience,
+  }) => _inConversation(
+    activeConversation,
+    () => _enqueueForward(
+      () => _forwardImage(
+        targetId,
+        bytes,
+        text,
+        audience: audience,
+        excludedAudience: excludedAudience,
+      ),
+    ),
+  );
 
   Future<void> _forwardImage(
     String? targetId,
     List<int> bytes,
-    String text,
-  ) async {
+    String text, {
+    List<String>? audience,
+    List<String>? excludedAudience,
+  }) async {
     MessageImage? image;
     var saved = false;
     try {
@@ -73,6 +88,8 @@ extension ImageForwarding on ChatController {
         id: newMessageId(),
         role: AgentMessageRole.user,
         senderId: MessageSender.localUser.id,
+        audience: audience,
+        excludedAudience: excludedAudience,
         text: text,
         images: [image],
         createdAt: DateTime.now(),
@@ -97,23 +114,47 @@ extension ImageForwarding on ChatController {
   Future<String> forwardMessage(
     String? targetId,
     AgentMessage source,
-    String note,
-  ) => _inConversation(
+    String note, {
+    List<String>? audience,
+    List<String>? excludedAudience,
+  }) => _inConversation(
     activeConversation,
-    () => _enqueueForward(() => _forwardMessage(targetId, source, note)),
+    () => _enqueueForward(
+      () => _forwardMessage(
+        targetId,
+        source,
+        note,
+        audience: audience,
+        excludedAudience: excludedAudience,
+      ),
+    ),
   );
 
   Future<String> _forwardMessage(
     String? targetId,
     AgentMessage source,
-    String note,
-  ) async {
+    String note, {
+    List<String>? audience,
+    List<String>? excludedAudience,
+  }) async {
     final copies = <File>[];
     var saved = false;
     try {
       var target = targetId == null
           ? Conversation.empty()
           : await _forwardTarget(targetId);
+      if (source.htmlGame != null) {
+        final entry = await MiniappLibraryStore(
+          _store.database,
+        ).entryForMessage(source.id);
+        return await _forwardMessage(
+          targetId,
+          miniappForwardMessage(entry),
+          note,
+          audience: audience,
+          excludedAudience: excludedAudience,
+        );
+      }
       final images = <MessageImage>[];
       final files = <MessageFile>[];
       Future<String> copy(String path) async {
@@ -146,55 +187,36 @@ extension ImageForwarding on ChatController {
           ),
         );
       }
-      if (source.htmlGame != null) {
-        final rows = await _store.database.query(
-          'html_games',
-          columns: ['title', 'conversation_id'],
-          where:
-              'message_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = ?)',
-          whereArgs: [source.id, 'html_game'],
-          limit: 1,
-        );
-        if (rows.isEmpty) throw StateError('原 HTML 消息已删除或撤回，无法转发');
-        final document = rows.single;
-        final application = await htmlStore.load(
-          document['conversation_id'] as String,
-          source.id,
-        );
-        if (application.state['_auraiFixedResult'] == true) {
-          return await _sendMiniappTemplate(
-            target.id,
-            MiniappTemplate(application.appId, application.title, {
-              'width': application.width, 'height': application.height,
-              'backgroundMode': application.backgroundMode,
-            }), note,
-            fixedResult: {...application.state, 'revealAt': 0},
-            fixedHtml: application.html,
-          );
-        }
-        final bytes = utf8.encode(application.html);
-        final file = File('${_imageStore.directory}/${newMessageId()}.html');
-        copies.add(file);
-        await file.writeAsBytes(bytes);
-        files.add(
-          MessageFile(
-            path: file.path,
-            name: '${document['title']}.html',
-            mimeType: 'text/html',
-            size: bytes.length,
-          ),
-        );
-      }
+      final share = source.miniappShare;
+      final copiedShare = share == null
+          ? null
+          : share.withMediaAndNote(
+              iconPath: share.iconPath == null
+                  ? null
+                  : await copy(share.iconPath!),
+              imagePath: share.imagePath == null
+                  ? null
+                  : await copy(share.imagePath!),
+              note: [
+                share.note,
+                note,
+              ].where((text) => text.isNotEmpty).join('\n\n'),
+            );
       final recipients = target.kind == ConversationKind.group
           ? (await groupStore.members(target.id))
                 .where((m) => m.sender.kind == MessageSenderKind.agent)
                 .map((m) => m.sender.id)
                 .toList()
           : const <String>[];
+      final forwardedCard = source.interactive?.forwardedFor(
+        MessageSender.localUser.id,
+      );
       final message = AgentMessage(
         id: newMessageId(),
         role: AgentMessageRole.user,
         senderId: MessageSender.localUser.id,
+        audience: audience,
+        excludedAudience: excludedAudience,
         text: [
           if (source.htmlGame == null && source.interactive == null)
             source.text,
@@ -202,9 +224,18 @@ extension ImageForwarding on ChatController {
         ].where((part) => part.isNotEmpty).join('\n\n'),
         images: images,
         files: files,
-        interactive: source.interactive?.forwardedFor(
-          MessageSender.localUser.id,
-        ),
+        miniappShare: copiedShare,
+        interactive: forwardedCard == null
+            ? null
+            : InteractiveMessage.fromJson({
+                ...forwardedCard.toJson(),
+                'participation': {
+                  ...forwardedCard.participation,
+                  if (audience != null) 'audience': audience,
+                  if (excludedAudience != null)
+                    'excludedAudience': excludedAudience,
+                },
+              }),
         createdAt: DateTime.now(),
       );
       target =
@@ -232,6 +263,19 @@ extension ImageForwarding on ChatController {
     AgentMessage message,
     List<String> recipients,
   ) => _inConversation(target, () async {
+    if (message.hasRestrictedAudience) {
+      if (target.kind != ConversationKind.group)
+        throw ArgumentError('可见范围仅支持群聊');
+      final members = await groupStore.members(target.id);
+      final scope = <String, Object?>{
+        'audience': message.audience,
+        'excludedAudience': message.excludedAudience,
+        'mentionIds': <String>[],
+      };
+      final ids = members.map((member) => member.sender.id);
+      _messageAudience(scope, ids, MessageSender.localUser.id);
+      _messageExcludedAudience(scope, ids, MessageSender.localUser.id);
+    }
     final previousPending = target.pendingGoal;
     final previousQueued = _execution.queuedUserMessageId;
     _execution.forwardingMessage = true;
@@ -246,7 +290,7 @@ extension ImageForwarding on ChatController {
         target,
         makeActive: false,
         recipients: target.kind == ConversationKind.group
-            ? {message.id: recipients}
+            ? {message.id: recipients.where(message.canView).toList()}
             : const {},
       );
     } on Object {

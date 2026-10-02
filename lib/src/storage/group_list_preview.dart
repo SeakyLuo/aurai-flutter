@@ -42,14 +42,12 @@ Future<void> loadConversationListPreviews(
   };
   if (groups.isEmpty) return;
   final rows = await database.rawQuery(
-    '''SELECT id, conversation_id, sender_id, kind, text, CASE WHEN json_extract(interactive_json, '\$.participation.presentation') = 'message' THEN NULL ELSE json_extract(interactive_json, '\$.title') END AS interactive_title, json_extract(interactive_json, '\$.body') AS interactive_body, created_at
+    '''SELECT id, conversation_id, sender_id, kind, text, json_extract(miniapp_share_json, '\$.title') AS share_title, CASE WHEN json_extract(interactive_json, '\$.participation.presentation') = 'message' THEN NULL ELSE json_extract(interactive_json, '\$.title') END AS interactive_title, json_extract(interactive_json, '\$.body') AS interactive_body, created_at
        FROM messages WHERE id IN (
          SELECT (SELECT id FROM messages
            WHERE conversation_id = conversations.id AND kind NOT IN ('commentary', 'quick_reply', 'reasoning')
              AND NOT (kind = 'system' AND text = '私密交互消息已更新')
-             AND (interactive_json IS NULL
-               OR json_extract(interactive_json, '\$.participation.audience') IS NULL
-               OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = 'user:local'))
+             AND NOT EXISTS (SELECT 1 FROM (SELECT 'user:local' AS visibility_viewer) WHERE (json_extract(interactive_json, '\$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.excludedAudience') WHERE value = visibility_viewer))
            ORDER BY created_at DESC, id DESC LIMIT 1)
          FROM conversations WHERE id IN (${_slots(groups.length)})
        )''',
@@ -105,6 +103,7 @@ Future<void> loadConversationListPreviews(
   };
   final attachments = <Object?, List<Map<String, Object?>>>{};
   for (final row in results[1]) {
+    if (row['kind'] == 'miniapp_media') continue;
     attachments.putIfAbsent(row['message_id'], () => []).add(row);
   }
   for (final row in rows) {
@@ -117,7 +116,9 @@ Future<void> loadConversationListPreviews(
         : row['text'] as String;
     final body = MessageSummary.content(
       text: text,
-      htmlTitle: row['kind'] == 'html_game' ? text : null,
+      htmlTitle: row['kind'] == 'html_game'
+          ? text
+          : row['share_title'] as String?,
       interactiveTitle: row['interactive_title'] as String?,
       attachments: [
         for (final attachment in attachments[row['id']] ?? const [])

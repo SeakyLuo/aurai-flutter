@@ -21,7 +21,7 @@ class GroupAutoReplyTool implements AgentTool, RuntimeCapabilityAgentTool {
     name: pause ? 'pauseGroupAutoReply' : 'resumeGroupAutoReply',
     description:
         '${pause ? '暂停指定群聊中指定 AI 成员的自动接话，并停止其当前执行及定时唤醒。' : '恢复指定群聊中指定 AI 成员的自动接话。triggerReply 默认 false；为 true 时立即安排该成员读取最新群聊并思考一次，不保证实际发言。恢复后会响应后续普通群消息，不是单次发言许可。'} '
-        '可在任何会话中调用；没有当前群时必须提供 groupId。只能调整已加入群中的 AI 成员。调整自己无需授权；群主可直接调整其他成员，管理员可直接调整普通成员；调整同级成员须通过工具申请用户授权。不能调整更高角色成员，也不能申请越权。授权限定调用 AI、目标群、目标成员及暂停或恢复操作；triggerReply 不改变恢复授权范围。遵守用户明确的暂停或发言安排。senderId、senderIds、all 三选一；senderIds/all 批量操作仅限群主或群管理员，普通成员不能申请越权。批量操作会先校验所有目标权限，不能调整的成员会导致整批拒绝。通过 readGroupChat 获取 groupId 和 senderId，不让用户填写。轮流发言时，先暂停上一位，再恢复下一位并触发回复。不要在已成功触发后重复调用。',
+        '可在任何会话中调用；没有当前群时必须提供 groupId。只能调整已加入群中的 AI 成员。调整自己无需授权；群主可直接调整其他成员，管理员可直接调整普通成员和其他管理员，无需审批；普通成员调整其他普通成员须通过工具申请用户授权。不能调整更高角色成员，也不能申请越权。授权限定调用 AI、目标群、目标成员及暂停或恢复操作；triggerReply 不改变恢复授权范围。遵守用户明确的暂停或发言安排。senderId、senderIds、all 三选一；senderIds/all 批量操作仅限群主或群管理员，普通成员不能申请越权。批量操作会先校验所有目标权限，不能调整的成员会导致整批拒绝。通过 readGroupChat 获取 groupId 和 senderId，不让用户填写。轮流发言时，先暂停上一位，再恢复下一位并触发回复。不要在已成功触发后重复调用。',
     capabilityId: 'local.group_chats',
     safety: ToolSafety.lowRisk,
     inputSchema: {

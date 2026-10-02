@@ -332,7 +332,9 @@ extension HtmlMessageInteraction on HtmlStore {
         card['revision'] = (card['revision'] as int) + 1;
       }
       final private =
-          card != null && (card['participation'] as Map?)?['audience'] != null;
+          card != null &&
+          ((card['participation'] as Map?)?['audience'] != null ||
+              (card['participation'] as Map?)?['excludedAudience'] != null);
       final text = private ? '私密交互消息' : title;
       await txn.update(
         'messages',

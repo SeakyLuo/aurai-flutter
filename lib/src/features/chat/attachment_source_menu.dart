@@ -1,4 +1,5 @@
 import 'settings_icon.dart';
+import '../../html_games/miniapp_symbol.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -7,13 +8,22 @@ import 'attachment_action_icon.dart';
 import 'file_tool_icon.dart';
 import 'glass_surface.dart';
 
-enum AttachmentSource { gallery, camera, file, asset, favorite, friend }
+enum AttachmentSource {
+  gallery,
+  camera,
+  file,
+  asset,
+  favorite,
+  friend,
+  miniapp,
+}
 
 Future<AttachmentSource?> showAttachmentSourceMenu(
   BuildContext context, {
   bool allowFavorites = true,
   bool allowAssets = false,
   bool allowFriendSelection = false,
+  bool allowMiniapps = false,
   Widget friendIcon = const SettingsIcon(type: SettingsIconType.personalInfo),
 }) {
   final button = context.findRenderObject()! as RenderBox;
@@ -88,6 +98,15 @@ Future<AttachmentSource?> showAttachmentSourceMenu(
                                   label: '收藏',
                                   icon: AttachmentActionIconType.file,
                                 ),
+                              if (allowMiniapps)
+                                _AttachmentSourceItem(
+                                  source: AttachmentSource.miniapp,
+                                  label: '小程序',
+                                  icon: AttachmentActionIconType.html,
+                                  customIcon: MiniappSymbol(
+                                    color: attachmentActionIconColor(context),
+                                  ),
+                                ),
                               if (allowAssets)
                                 _AttachmentSourceItem(
                                   source: AttachmentSource.asset,
@@ -95,9 +114,7 @@ Future<AttachmentSource?> showAttachmentSourceMenu(
                                   icon: AttachmentActionIconType.file,
                                   customIcon: FileToolIcon(
                                     type: FileToolIconType.library,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface,
+                                    color: attachmentActionIconColor(context),
                                   ),
                                 ),
                               if (allowFriendSelection)
@@ -151,9 +168,7 @@ class _AttachmentSourceItem extends StatelessWidget {
                 : source == AttachmentSource.favorite
                 ? SettingsIcon(
                     type: SettingsIconType.star,
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : Colors.black,
+                    color: attachmentActionIconColor(context),
                   )
                 : AttachmentActionIcon(type: icon),
             const SizedBox(width: 13),

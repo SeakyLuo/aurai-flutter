@@ -56,6 +56,7 @@ class MiniappProgramStore {
         eventId: args['eventId'] as String,
         action: args['action'] as String,
         data: args['data'],
+        expectedVersion: args['expectedVersion'] as int?,
       );
       final rows = await txn.query(
         'html_games',
@@ -83,6 +84,7 @@ class MiniappProgramStore {
     required String action,
     Object? data,
     String? cardId,
+    int? expectedVersion,
   }) async {
     final rows = await txn.query(
       'html_games',
@@ -120,6 +122,7 @@ class MiniappProgramStore {
       'actorId': actorId,
       'action': action,
       'data': data,
+      if (expectedVersion != null) 'expectedVersion': expectedVersion,
     });
     final duplicates = await txn.query(
       'html_game_events',
@@ -133,6 +136,9 @@ class MiniappProgramStore {
         throw StateError('操作编号已被使用');
       return change;
     }
+    if (expectedVersion != null && expectedVersion != row['version']) {
+      throw StateError('小程序已更新，请重新读取后提交');
+    }
     final now = DateTime.now().millisecondsSinceEpoch;
     final encoded = await _channel.invokeMethod<String>('runMiniappProgram', {
       'script': script,
@@ -141,12 +147,13 @@ class MiniappProgramStore {
         'event': {'actorId': actorId, 'action': action, 'data': data},
         'members': roster,
         'ownerId': MessageSender.localUser.id,
+        'messageId': messageId,
         'now': now,
       }),
     });
     final output = MiniappProgram.decode(encoded);
     final effects = (output['messages'] as List? ?? const []);
-    if (effects.length > 32) throw ArgumentError('单次事件最多产生 32 条消息');
+    if (effects.length > 64) throw ArgumentError('单次事件最多产生 64 条消息');
     final views = (output['privateViews'] as Map? ?? const {})
         .cast<String, Object?>();
     final memberIds = roster.map((m) => m['id']).toSet();
@@ -161,6 +168,15 @@ class MiniappProgramStore {
     var replyBefore = (runtime['replyBefore'] as Map? ?? const {})
         .cast<String, Object?>();
     if (replyStates.isNotEmpty && replyBefore.isEmpty) {
+      final controlling = await txn.query(
+        'app_state',
+        columns: ['key'],
+        where:
+            "key LIKE 'miniapp-program:%' AND key != ? AND json_extract(value, '\$.conversationId') = ? AND EXISTS (SELECT 1 FROM json_each(json_extract(value, '\$.replyBefore')))",
+        whereArgs: [MiniappProgram.key(messageId), conversationId],
+        limit: 1,
+      );
+      if (controlling.isNotEmpty) throw StateError('请先结束当前正在安排群聊发言的小程序');
       final paused = await txn.query(
         'group_participation',
         where: 'conversation_id = ?',
@@ -362,6 +378,73 @@ class MiniappProgramStore {
         ],
       );
     }
+    return change;
+  }
+
+  static Future<MiniappProgramChange?> cancel(
+    DatabaseExecutor txn,
+    String conversationId,
+    String messageId,
+  ) async {
+    final rows = await txn.query(
+      'app_state',
+      columns: ['value'],
+      where: 'key = ?',
+      whereArgs: [MiniappProgram.key(messageId)],
+    );
+    if (rows.isEmpty) return null;
+    final runtime = MiniappProgram.decode(rows.single['value']);
+    final change = MiniappProgramChange(conversationId, messageId);
+    final before = runtime['replyBefore'] as Map? ?? const {};
+    final bindings = runtime['bindings'] as Map;
+    final cards = bindings.isEmpty
+        ? const <Map<String, Object?>>[]
+        : await txn.query(
+            'messages',
+            columns: ['id', 'interactive_json'],
+            where: 'id IN (${List.filled(bindings.length, '?').join(',')})',
+            whereArgs: bindings.keys.toList(),
+          );
+    final batch = txn.batch();
+    for (final entry in before.entries) {
+      final old = entry.value as Map?;
+      batch.insert('group_participation', {
+        'conversation_id': conversationId,
+        'sender_id': entry.key,
+        'paused': old?['paused'] ?? 0,
+        'reason': old?['reason'],
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      change.replyStates[entry.key as String] = old?['paused'] != 1;
+    }
+    for (final row in cards) {
+      final card = InteractiveMessage.fromJson(
+        MiniappProgram.decode(row['interactive_json']),
+      );
+      final next = InteractiveMessage.fromJson({
+        ...card.toJson(includeParticipants: true),
+        'revision': card.revision + 1,
+        'participation': {...card.participation, 'closed': true},
+        'buttons': const [],
+        'body': '${card.body}\n\n小程序已结束。',
+      });
+      change.cards[row['id'] as String] = next;
+      batch.update(
+        'messages',
+        {
+          'interactive_json': jsonEncode(
+            next.toJson(includeParticipants: true),
+          ),
+        },
+        where: 'id = ?',
+        whereArgs: [row['id']],
+      );
+    }
+    batch.delete(
+      'app_state',
+      where: 'key = ?',
+      whereArgs: [MiniappProgram.key(messageId)],
+    );
+    await batch.commit(noResult: true);
     return change;
   }
 

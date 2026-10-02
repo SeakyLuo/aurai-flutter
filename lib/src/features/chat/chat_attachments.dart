@@ -14,8 +14,19 @@ extension _ChatAttachments on _ChatPageState {
     final source = await showAttachmentSourceMenu(
       buttonContext,
       allowAssets: true,
+      allowMiniapps: true,
     );
     if (source == null || !mounted) return;
+    if (source == AttachmentSource.miniapp) {
+      _focusNode.unfocus();
+      try {
+        final sent = await sendMiniappMessage(context, controller);
+        if (mounted && sent) _scrollToBottom();
+      } on Object catch (error) {
+        if (mounted) _imageNotice(errorMessage(error));
+      }
+      return;
+    }
     if (source == AttachmentSource.asset) {
       final target = controller.activeConversation;
       _focusNode.unfocus();

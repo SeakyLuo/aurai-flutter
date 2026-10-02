@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../utils/widget_utils.dart';
-import 'settings_appearance.dart';
 import 'glass_surface.dart';
 
 enum DialogActionRole { primary, secondary, destructive, reject }
@@ -50,7 +49,10 @@ class DialogActionButton extends StatelessWidget {
             ? Colors.transparent
             : destructive
             ? (dark ? const Color(0xff492b2b) : const Color(0xffffe9e7))
-            : dialogControlColor(context),
+            : Color.alphaBlend(
+                colors.onSurface.withValues(alpha: dark ? .14 : .10),
+                colors.surface,
+              ),
         minimumSize: const Size(0, 46),
         shape: const StadiumBorder(),
         textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),

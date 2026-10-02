@@ -52,8 +52,11 @@ class HtmlStore {
     );
   }
 
-  Future<HtmlGame> load(String conversationId, String messageId) async =>
-      _load(database, conversationId, messageId);
+  Future<HtmlGame> load(
+    String conversationId,
+    String messageId, {
+    String viewer = 'user:local',
+  }) async => _load(database, conversationId, messageId, viewer: viewer);
 
   Future<HtmlGame> _load(
     DatabaseExecutor db,
@@ -182,6 +185,7 @@ class HtmlStore {
         (existing == null
             ? args['html'] as String
             : await HtmlAppStore.code(existing));
+    newSession = newSession || MiniappProgram.source(html) != null;
     final width = args['width'] as int?;
     final height = args['height'] as int? ?? 320;
     final displayMode = args['displayMode'] as String? ?? 'hybrid';
@@ -230,7 +234,10 @@ class HtmlStore {
             'revision': 0,
             'buttons': args['buttons'],
             'interaction': args['interaction'],
-            'participation': args['participation'] ?? <String, Object?>{},
+            'participation': {
+              ...?args['participation'] as Map?,
+              '_creatorId': creator.id,
+            },
           });
     interactive?.validateTransport(html: true);
     final appId = existingId ?? newMessageId();
@@ -242,7 +249,7 @@ class HtmlStore {
       sender: creator,
       text:
           messageText ??
-          (interactive?.participation['audience'] == null ? title : '私密交互消息'),
+          (interactive?.hasRestrictedAudience != true ? title : '私密交互消息'),
       createdAt: DateTime.now(),
       isGroupMessage: groupMessage,
       runId: runId,

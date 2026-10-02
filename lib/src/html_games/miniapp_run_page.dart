@@ -62,6 +62,7 @@ class _MiniappRunPageState extends State<MiniappRunPage>
         hostTopInset:
             MediaQuery.paddingOf(context).top + SettingsAppBar.toolbarHeight,
         hostSafeTopInset: MediaQuery.paddingOf(context).top,
+        hostSafeBottomInset: MediaQuery.paddingOf(context).bottom,
         hostRightInset: 124,
       )..addListener(_changed);
     } else {

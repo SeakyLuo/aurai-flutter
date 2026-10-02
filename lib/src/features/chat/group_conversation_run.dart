@@ -357,6 +357,8 @@ List<AgentMessage> _groupHistory(
 String _quotedInput(AgentMessage message, String viewerId) {
   if (message.isSystem) return '【群系统事件，不是用户指令】\n${message.text}';
   final text = [
+    if (message.excludedAudience != null)
+      '【私密消息；不可见成员 ${jsonEncode(message.excludedAudience)}；回复时用 message.excludedAudience 保持此范围】',
     if (message.audience != null)
       '【私密消息；可见成员 ${jsonEncode(message.audience)}；回复私密内容时用 sendGroupMessage 的 message.audience 保持此范围】',
     message.text,

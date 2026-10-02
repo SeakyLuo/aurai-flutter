@@ -193,7 +193,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
 
   Widget _avatar(Conversation conversation) {
     if (conversation.kind == ConversationKind.group) {
-      return GroupAvatar(members: _groups[conversation.id]!, size: 40);
+      return GroupAvatar(members: _groups[conversation.id]!, size: 48);
     }
     final sender = _senders[conversation.defaultSenderId]!;
     return ProfileAvatar(
@@ -203,7 +203,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
         path: sender.avatarPath,
       ),
       name: sender.name,
-      size: 40,
+      size: 48,
     );
   }
 
@@ -581,9 +581,9 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
               controller: filesTab ? _filesScroll : _scroll,
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: EdgeInsets.fromLTRB(
-                filesTab || query.isEmpty ? 16 : 8,
+                16,
                 4,
-                filesTab || query.isEmpty ? 16 : 8,
+                16,
                 media.viewInsets.bottom + media.viewPadding.bottom + 104,
               ),
               itemCount: query.isEmpty

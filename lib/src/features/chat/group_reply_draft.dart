@@ -20,9 +20,10 @@ extension GroupReplyDraft on ChatController {
   void _cacheGroupMessageDraft(String senderId, Map<String, Object?>? message) {
     final text = message?['text'] as String?;
     if (text != null && text.trim().isNotEmpty) {
-      _execution.groupReplyDrafts[senderId] = message!['audience'] == null
+      _execution.groupReplyDrafts[senderId] =
+          message!['audience'] == null && message['excludedAudience'] == null
           ? text
-          : '【私密草稿；发送时 message.audience=${jsonEncode(message['audience'])}】\n$text';
+          : '【私密草稿；发送时 message.audience=${jsonEncode(message['audience'])}，message.excludedAudience=${jsonEncode(message['excludedAudience'])}】\n$text';
     } else {
       _execution.groupReplyDrafts.remove(senderId);
     }

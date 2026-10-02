@@ -68,7 +68,7 @@ extension GroupToolAccess on ChatController {
               actor.role == GroupMemberRole.member &&
                   target.role == GroupMemberRole.admin)
             throw StateError('不能调整更高角色成员的自动接话，不能申请越权');
-          approval = approval || actor.role == target.role;
+          approval = approval || !actor.role.canManage;
         }
         return (
           approval: approval,
@@ -102,15 +102,6 @@ extension GroupToolAccess on ChatController {
         }
         if (target.isMuted) throw StateError('该成员已被禁言，不能调整接话或唤醒');
       }
-      var approval = false;
-      if (tool is GroupAutoReplyTool && targetId != actorId) {
-        if (target.role == GroupMemberRole.owner ||
-            actor.role == GroupMemberRole.member &&
-                target.role == GroupMemberRole.admin) {
-          throw StateError('不能调整更高角色成员的自动接话，不能申请越权');
-        }
-        approval = actor.role == target.role;
-      }
       final action = switch (call.name) {
         'pauseGroupAutoReply' => '暂停自动接话',
         'resumeGroupAutoReply' =>
@@ -123,7 +114,7 @@ extension GroupToolAccess on ChatController {
         },
       };
       return (
-        approval: approval,
+        approval: false,
         scope: jsonEncode([
           id,
           targetId,

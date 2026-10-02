@@ -1,17 +1,47 @@
 part of 'chat_controller.dart';
 
 extension MessageSubmission on ChatController {
-  Future<bool> submitGoal(String goal, {List<String>? mentionedRecipients}) =>
-      _inConversation(
-        activeConversation,
-        () => _submitGoal(goal, mentionedRecipients),
-      );
+  Future<bool> submitGoal(
+    String goal, {
+    List<String>? mentionedRecipients,
+    List<String>? audience,
+    List<String>? excludedAudience,
+    VoidCallback? onSubmitted,
+  }) => _inConversation(
+    activeConversation,
+    () => _submitGoal(
+      goal,
+      mentionedRecipients,
+      audience,
+      excludedAudience,
+      onSubmitted,
+    ),
+  );
 
   Future<bool> _submitGoal(
     String goal,
     List<String>? mentionedRecipients,
+    List<String>? audience,
+    List<String>? excludedAudience,
+    VoidCallback? onSubmitted,
   ) async {
     if (activeConversation.kind == ConversationKind.group) {
+      final members = await groupStore.members(activeConversation.id);
+      final scope = <String, Object?>{
+        'audience': audience,
+        'excludedAudience': excludedAudience,
+        'mentionIds': <String>[],
+      };
+      audience = _messageAudience(
+        scope,
+        members.map((m) => m.sender.id),
+        MessageSender.localUser.id,
+      );
+      excludedAudience = _messageExcludedAudience(
+        scope,
+        members.map((m) => m.sender.id),
+        MessageSender.localUser.id,
+      );
       await groupStore.requireCanSpeak(
         activeConversation.id,
         MessageSender.localUser.id,
@@ -22,7 +52,13 @@ extension MessageSubmission on ChatController {
       return false;
     }
     if (canSendToRunningGroup) {
-      await _appendGroupMessage(goal, mentionedRecipients);
+      await _appendGroupMessage(
+        goal,
+        mentionedRecipients,
+        audience,
+        excludedAudience,
+        onSubmitted,
+      );
       return false;
     }
     final queueReply = hasRunningTask && !canStartPrivateDuringGroup;
@@ -47,6 +83,10 @@ extension MessageSubmission on ChatController {
                 .where(
                   (member) =>
                       member.sender.kind == MessageSenderKind.agent &&
+                      (audience == null ||
+                          audience.contains(member.sender.id)) &&
+                      !(excludedAudience?.contains(member.sender.id) ??
+                          false) &&
                       (mentionedRecipients == null ||
                           mentionedRecipients.contains(member.sender.id)),
                 )
@@ -66,6 +106,8 @@ extension MessageSubmission on ChatController {
           id: messageId,
           role: AgentMessageRole.user,
           senderId: MessageSender.localUser.id,
+          audience: audience,
+          excludedAudience: excludedAudience,
           text: goal,
           quote: previousQuote,
           images: List.unmodifiable(draftImages),
@@ -110,6 +152,7 @@ extension MessageSubmission on ChatController {
           _execution.queuedUserMessageId = previousQueued;
         rethrow;
       }
+      onSubmitted?.call();
       if (wasNew) {
         if (activeConversation.defaultSenderId == MessageSender.aurai.id) {
           _newConversation = Conversation.empty();
@@ -155,7 +198,13 @@ extension MessageSubmission on ChatController {
     }
   }
 
-  Future<void> _appendGroupMessage(String goal, List<String>? mentions) async {
+  Future<void> _appendGroupMessage(
+    String goal,
+    List<String>? mentions,
+    List<String>? audience,
+    List<String>? excludedAudience,
+    VoidCallback? onSubmitted,
+  ) async {
     final conversation = activeConversation;
     final dispatcher = _groupDispatcher!;
     dispatcher.hold();
@@ -164,6 +213,8 @@ extension MessageSubmission on ChatController {
       id: newMessageId(),
       role: AgentMessageRole.user,
       senderId: MessageSender.localUser.id,
+      audience: audience,
+      excludedAudience: excludedAudience,
       text: goal,
       quote: conversation.draftQuote,
       images: List.unmodifiable(draftImages),
@@ -184,13 +235,19 @@ extension MessageSubmission on ChatController {
         conversation,
         makeActive: false,
         saveDraft: true,
-        recipients: {message.id: mentions ?? _groupReplies.keys.toList()},
+        recipients: {
+          message.id: (mentions ?? _groupReplies.keys.toList())
+              .where(message.canView)
+              .toList(),
+        },
       );
+      onSubmitted?.call();
       dispatcher.receive(
         [message],
         mentions: {
-          ...?mentions,
-          if (goal.contains('@所有人')) ..._groupReplies.keys,
+          ...?mentions?.where(message.canView),
+          if (goal.contains('@所有人'))
+            ..._groupReplies.keys.where(message.canView),
         },
       );
       _notifyRun(conversation);

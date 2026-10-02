@@ -1,3 +1,4 @@
+import 'conversation_list_tile.dart';
 import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
@@ -11,7 +12,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../platform/preview_image_actions.dart';
 import 'chat_controller.dart';
-import 'message_preview_text.dart';
 import '../../storage/group_list_preview.dart';
 import 'image_forward_dialog.dart';
 import 'attachment_action_icon.dart';
@@ -24,15 +24,21 @@ class ImageForwardPage extends StatefulWidget {
     required ImageProvider image,
   }) : image = image,
        message = null,
-       sendMessage = null;
+       sendMessage = null,
+       pageTitle = null,
+       onSent = null;
   const ImageForwardPage.message({
     super.key,
     required this.controller,
     required AgentMessage message,
     this.sendMessage,
+    this.pageTitle,
+    this.onSent,
   }) : message = message,
        image = null;
   final ChatController controller;
+  final String? pageTitle;
+  final ValueChanged<Conversation>? onSent;
   final ImageProvider? image;
   final AgentMessage? message;
   final Future<void> Function(String? targetId, String note)? sendMessage;
@@ -152,7 +158,10 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
               avatar: _avatar(item),
             ),
     );
-    if (sent == true && mounted) Navigator.pop(context, true);
+    if (sent == true && mounted) {
+      widget.onSent?.call(item);
+      Navigator.pop(context, true);
+    }
   }
 
   Future<void> _external() async {
@@ -174,7 +183,7 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
-      title: widget.message == null ? '转发图片' : '转发消息',
+      title: widget.pageTitle ?? (widget.message == null ? '转发图片' : '转发消息'),
       onBack: () => Navigator.pop(context),
     ),
     body: SettingsPageBody(
@@ -207,7 +216,7 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
           Expanded(
             child: ListView(
               controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: [
                 if (widget.message == null)
                   _row(
@@ -218,11 +227,11 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
                     _sharing ? null : _external,
                   ),
                 for (final item in _items)
-                  _row(
-                    item.title,
-                    _avatar(item),
-                    () => _select(item),
-                    preview: item.preview,
+                  ConversationListTile(
+                    controller: widget.controller,
+                    conversation: item,
+                    avatar: _avatar(item),
+                    onTap: () => _select(item),
                   ),
                 if (_loading)
                   const Padding(
@@ -262,18 +271,13 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
     );
   }
 
-  Widget _row(
-    String title,
-    Widget icon,
-    VoidCallback? action, {
-    String? preview,
-  }) => Material(
+  Widget _row(String title, Widget icon, VoidCallback? action) => Material(
     color: Colors.transparent,
     borderRadius: BorderRadius.circular(16),
     clipBehavior: Clip.antiAlias,
     child: ListTile(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
       leading: SizedBox.square(dimension: 48, child: Center(child: icon)),
       horizontalTitleGap: 12,
       title: Text(
@@ -282,16 +286,6 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      subtitle: preview == null
-          ? null
-          : MessagePreviewText(
-              text: preview,
-              maxLines: 1,
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
       onTap: action,
     ),
   );

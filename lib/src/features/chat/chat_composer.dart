@@ -1,6 +1,35 @@
 part of 'chat_page.dart';
 
 extension _ChatComposer on _ChatPageState {
+  Future<void> _chooseDraftVisibility() async {
+    final id = _conversationId;
+    await runUiAction(context, () async {
+      final members = await widget.controller.groupStore.members(id);
+      if (!mounted || _conversationId != id) return;
+      _focusNode.unfocus();
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: false,
+        builder: (_) => SendOptionsSheet(
+          initial: _draftVisibility[id],
+          members: members.map((m) => m.sender).toList(),
+          onChanged: (result) {
+            if (!mounted || _conversationId != id) return;
+            _updateDraftVisibility(() {
+              if (result.mode == DraftVisibilityMode.everyone) {
+                _draftVisibility.remove(id);
+              } else {
+                _draftVisibility[id] = result;
+              }
+            });
+          },
+        ),
+      );
+    });
+  }
+
   Widget _buildChatComposer(bool isGroup) {
     final controller = widget.controller;
     return GroupMuteBuilder(
@@ -13,7 +42,7 @@ extension _ChatComposer on _ChatPageState {
             : _editing != null
             ? '编辑消息'
             : isGroup
-            ? ''
+            ? _draftVisibility[_conversationId]?.label ?? ''
             : '回复 ${controller.activeAi!.sender.name}',
         quote: _editing != null
             ? _editing!.message.quote
@@ -64,6 +93,9 @@ extension _ChatComposer on _ChatPageState {
         onRemoveImage: _editing != null ? _removeEditImage : _removeImage,
         stopping: controller.runState == ChatRunState.stopping,
         onSend: _editing != null ? _submitMessageEdit : _send,
+        onVisibility: isGroup && _editing == null && !muted
+            ? _chooseDraftVisibility
+            : null,
         canResume:
             !isGroup &&
             !_preparingGoal &&

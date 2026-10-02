@@ -87,6 +87,25 @@ extension GlobalTools on ChatController {
                 senderId,
                 conversation,
               );
+              if (operation == 'readHtmlProgram') {
+                final game = await htmlStore.load(
+                  target.id,
+                  args['messageId'] as String,
+                  viewer: senderId,
+                );
+                if (!game.state.containsKey('_miniapp'))
+                  throw StateError('这条消息不是程序小程序');
+                return {
+                  'messageId': args['messageId'],
+                  'version': game.version,
+                  'state': game.state,
+                };
+              }
+              if (operation == 'submitHtmlProgramEvent') {
+                return MiniappProgramStore(
+                  _store.database,
+                ).event(target.id, args['messageId'] as String, senderId, args);
+              }
               final result = await htmlStore.updateMessage(
                 operation,
                 target.id,

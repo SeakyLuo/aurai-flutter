@@ -240,7 +240,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
     final title = actor != null
         ? '参与详情'
         : _option != null
-        ? '参与者'
+        ? '参与者（${_optionParticipants(card!).length}）'
         : '参与情况';
     return PopScope(
       canPop: _atOverview || actor != null,
@@ -314,39 +314,38 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
     );
   }
 
-  Widget _participants(InteractiveMessage card) {
+  List<String> _optionParticipants(InteractiveMessage card) {
     final option = _option!;
-    final people = card.choices.entries
+    return card.choices.entries
         .where(
           (entry) => selectionEntries(entry.value).any(
             (choice) =>
                 choice['buttonId'] == option.$1 && choice['label'] == option.$2,
           ),
         )
+        .map((entry) => entry.key)
         .toList();
+  }
+
+  Widget _participants(InteractiveMessage card) {
+    final option = _option!;
+    final people = _optionParticipants(card);
     return ListView(
       key: PageStorageKey(('option', option)),
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
       children: [
         Text(
-          option.$2,
+          '选项：${option.$2}',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '${people.length} 人',
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
         ),
         const SizedBox(height: 16),
         if (people.isEmpty) const Text('暂无参与记录'),
-        for (final entry in people)
+        for (final id in people)
           InteractiveParticipantTile(
             card: card,
-            sender: statisticsSender(card, _senders, entry.key),
-            actor: entry.key,
-            onTap: () => _openParticipant(entry.key),
+            sender: statisticsSender(card, _senders, id),
+            actor: id,
+            onTap: () => _openParticipant(id),
           ),
       ],
     );

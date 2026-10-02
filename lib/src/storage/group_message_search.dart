@@ -1,5 +1,6 @@
 import 'dart:convert';
 import '../domain/agent_models.dart';
+import '../domain/miniapp_share.dart';
 import '../domain/message_image.dart';
 import '../domain/message_file.dart';
 import '../domain/interactive_message.dart';
@@ -30,6 +31,7 @@ class GroupMessageSearchResult {
     this.images = const [],
     this.files = const [],
     this.html,
+    this.miniappShare,
     this.interactive,
   });
   final AgentMessageRole role;
@@ -37,6 +39,7 @@ class GroupMessageSearchResult {
   final List<MessageImage> images;
   final List<MessageFile> files;
   final HtmlGameCard? html;
+  final MiniappShare? miniappShare;
   final InteractiveMessage? interactive;
   final String id, text;
   final DateTime createdAt;
@@ -61,14 +64,15 @@ class GroupMessageSearch {
         "EXISTS (SELECT 1 FROM attachments a WHERE a.message_id = messages.id AND a.kind = 'image')",
       GroupSearchType.file =>
         "EXISTS (SELECT 1 FROM attachments a WHERE a.message_id = messages.id AND a.kind = 'file')",
-      GroupSearchType.html => "kind = 'html_game'",
+      GroupSearchType.html =>
+        "(kind = 'html_game' OR miniapp_share_json IS NOT NULL)",
       GroupSearchType.interactive =>
         "interactive_json IS NOT NULL AND json_extract(interactive_json, '\$.participation.presentation') IS NOT 'message'",
     };
     final rows = await database.query(
       'messages',
       where:
-          '''conversation_id = ? AND (interactive_json IS NULL OR json_extract(interactive_json, '\$.participation.audience') IS NULL OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = 'user:local')) AND role IN ('user', 'assistant')
+          '''conversation_id = ? AND NOT EXISTS (SELECT 1 FROM (SELECT 'user:local' AS visibility_viewer) WHERE (json_extract(interactive_json, '\$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.excludedAudience') WHERE value = visibility_viewer)) AND role IN ('user', 'assistant')
         AND kind IN ('user', 'group_message', 'html_game')
         AND ($filter)
         ${query.isEmpty ? '' : '''AND (instr(lower(text), ?) > 0
@@ -134,6 +138,7 @@ class GroupMessageSearch {
     final images = <String, List<MessageImage>>{};
     final files = <String, List<MessageFile>>{};
     for (final row in related[1]) {
+      if (row['kind'] == 'miniapp_media') continue;
       final id = row['message_id'] as String;
       if (row['kind'] == 'image') {
         images.putIfAbsent(id, () => []).add(imageFromRow(row, directory));
@@ -163,6 +168,13 @@ class GroupMessageSearch {
         images: images[id] ?? const [],
         files: files[id] ?? const [],
         html: cards[id],
+        miniappShare: row['miniapp_share_json'] == null
+            ? null
+            : MiniappShare.fromJson(
+                (jsonDecode(row['miniapp_share_json'] as String) as Map)
+                    .cast<String, Object?>(),
+                directory,
+              ),
         interactive: metadata?.participation['presentation'] == 'message'
             ? null
             : metadata,

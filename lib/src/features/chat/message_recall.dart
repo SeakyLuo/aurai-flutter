@@ -104,7 +104,9 @@ extension MessageRecall on ChatController {
         message.senderId != MessageSender.localUser.id ||
         message.isSystem)
       return;
-    await RecalledMessageDrafts.instance.save(message);
+    if (message.miniappShare == null) {
+      await RecalledMessageDrafts.instance.save(message);
+    }
     await _recallMessageIn(conversation, message, userInitiated: true);
   }
 
@@ -168,6 +170,7 @@ extension MessageRecall on ChatController {
     final live =
         dispatcher != null && !dispatcher.closed && !dispatcher.stopped;
     if (live) dispatcher.hold();
+    MiniappProgramChange? programChange;
     try {
       final summaryRevisions = await _revisedSummariesForRecall(
         conversation,
@@ -175,12 +178,20 @@ extension MessageRecall on ChatController {
       );
       await _store.writer.mutate(() async {
         await _store.database.transaction((txn) async {
+          if (message.htmlGame != null) {
+            programChange = await MiniappProgramStore.cancel(
+              txn,
+              conversation.id,
+              message.id,
+            );
+          }
           await txn.update(
             'messages',
             {
               'text': notice.text,
               'kind': 'system',
               'quote_json': null,
+              'miniapp_share_json': null,
               'run_id': null,
               'model_turn_id': null,
               'interactive_json': notice.interactive == null
@@ -268,6 +279,7 @@ extension MessageRecall on ChatController {
         if (live) _replaceRecalled(dispatcher.history, message.id, notice);
         _store.writer.remember([notice]);
       });
+      programChange?.publish();
       await _store.writer.save(
         conversation,
         makeActive: false,
@@ -299,15 +311,15 @@ extension MessageRecall on ChatController {
     AgentMessage message,
   ) async {
     final publicKey = 'context_summary:${conversation.id}';
-    final audience = message.audience;
     final candidates = <String, ContextSummary>{
-      if (audience == null && conversation.contextSummary != null)
+      if (!message.hasRestrictedAudience && conversation.contextSummary != null)
         publicKey: conversation.contextSummary!,
-      if (audience != null)
-        for (final senderId in (audience as List).cast<String>())
-          if (conversation.privateContextSummaries[senderId] != null)
-            '$publicKey:$senderId':
-                conversation.privateContextSummaries[senderId]!,
+      if (message.hasRestrictedAudience)
+        for (final senderId in conversation.privateContextSummaries.keys.where(
+          message.canView,
+        ))
+          '$publicKey:$senderId':
+              conversation.privateContextSummaries[senderId]!,
     };
     if (candidates.isEmpty || message.text.trim().isEmpty) return const {};
 
@@ -380,6 +392,7 @@ extension MessageRecall on ChatController {
     messageId: quote.messageId,
     senderId: quote.senderId,
     audience: quote.audience,
+    excludedAudience: quote.excludedAudience,
     text: '消息已撤回',
   )..senderName = quote.senderName;
 
@@ -403,14 +416,18 @@ extension MessageRecall on ChatController {
       createdAt: message.createdAt,
       isSystem: true,
       // Preserve visibility without retaining the recalled card's content or controls.
-      interactive: audience == null
+      interactive: !message.hasRestrictedAudience
           ? null
           : InteractiveMessage(
               revision: message.messageMetadata!.revision,
               title: text,
               body: '',
               buttons: const [],
-              participation: {'audience': List<String>.from(audience as List)},
+              participation: {
+                if (audience != null) 'audience': audience,
+                if (message.excludedAudience != null)
+                  'excludedAudience': message.excludedAudience,
+              },
             ),
     );
   }
@@ -441,6 +458,7 @@ extension MessageRecall on ChatController {
           isSystem: m.isSystem,
           isGroupMessage: m.isGroupMessage,
           htmlGame: m.htmlGame,
+          miniappShare: m.miniappShare,
           interactive: m.messageMetadata,
           isFailure: m.isFailure,
           quote: _recalledQuote(m.quote!),

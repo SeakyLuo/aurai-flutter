@@ -77,8 +77,53 @@ extension _ChatProgress on _ChatPageState {
     }
     final viewport = _viewportKey.currentState;
     try {
+      final controller = widget.controller;
+      final conversationId = controller.activeConversation.id;
+      final paused = await GroupParticipation(
+        controller.groupStore.database,
+      ).paused(conversationId);
+      if (!mounted || controller.activeConversation.id != conversationId)
+        return;
+      var resumeAutoReply = false;
+      if (paused.contains(message.senderId)) {
+        final choice = await showDialog<bool>(
+          context: context,
+          builder: (context) => AppPromptDialog(
+            title: '该成员已暂停接话',
+            description: '仅重试这次回复，还是同时恢复后续自动接话？',
+            actions: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DialogActionButton(
+                  text: '仅重试本次',
+                  onPressed: () => Navigator.pop(context, false),
+                ),
+                const SizedBox(height: 10),
+                DialogActionButton(
+                  text: '恢复接话并重试',
+                  role: DialogActionRole.secondary,
+                  onPressed: () => Navigator.pop(context, true),
+                ),
+                const SizedBox(height: 10),
+                DialogActionButton(
+                  text: '取消',
+                  role: DialogActionRole.secondary,
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+        );
+        if (!mounted ||
+            controller.activeConversation.id != conversationId ||
+            choice == null)
+          return;
+        resumeAutoReply = choice;
+      }
       await widget.controller.retryFailedMessage(
         message,
+        resumeAutoReply: resumeAutoReply,
         beforeRemoval: () async => viewport?.animateRemoval(message.id),
       );
     } on Object catch (error) {

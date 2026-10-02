@@ -34,6 +34,7 @@ class GroupSearchMessageTile extends StatelessWidget {
       text: result.text,
       createdAt: result.createdAt,
       images: result.images,
+      miniappShare: result.miniappShare,
       files: result.files,
       interactive: result.interactive,
       htmlGame: result.html,

@@ -17,8 +17,10 @@ class InteractiveMessageView extends StatefulWidget {
     this.titleTrailing,
     this.historical = false,
     this.onRetry,
+    this.onStatistics,
   });
   final InteractiveMessage card;
+  final VoidCallback? onStatistics;
   final String actorId;
   final bool readOnly;
   final bool historical;
@@ -144,6 +146,11 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         : _card.hasInteraction
         ? _card.interactionView(widget.actorId)
         : null;
+    final statisticsVisible =
+        card.showStatistics &&
+        (widget.historical && _card.snapshotView != null
+            ? _card.snapshotView!['summaryVisible'] == true
+            : _card.visible('summaryVisibility', actor: widget.actorId));
     return SizedBox(
       width: double.infinity,
       child: Column(
@@ -195,9 +202,10 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               children: [
                 Expanded(
                   child: GestureDetector(
-                    onTap: () => ScaffoldMessenger.of(context).showGlassSnackBar(
-                      SnackBar(content: Text(callback!['error'] as String)),
-                    ),
+                    onTap: () =>
+                        ScaffoldMessenger.of(context).showGlassSnackBar(
+                          SnackBar(content: Text(callback!['error'] as String)),
+                        ),
                     child: Text(
                       '处理未完成',
                       style: TextStyle(
@@ -257,6 +265,19 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                   ),
               ],
             ),
+          if (statisticsVisible && widget.onStatistics != null) ...[
+            const SizedBox(height: 12),
+            InteractiveMessageButton(
+              button: const {
+                'label': '查看详情',
+                'icon': 'statistics',
+                'showArrow': true,
+              },
+              busy: false,
+              locked: false,
+              onPressed: widget.onStatistics!,
+            ),
+          ],
         ],
       ),
     );

@@ -1,7 +1,8 @@
 import 'task_playback_icon.dart';
 import '../../storage/group_chat_store.dart';
+import '../../storage/group_participation.dart';
+import '../../domain/ai_profile.dart';
 import 'group_member_header_actions.dart';
-import 'group_mute_settings_page.dart';
 import 'glass_surface.dart';
 import 'header_action_menu.dart';
 import '../../app/glass_notice.dart';
@@ -84,13 +85,9 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
     setState(() => _pausingAll = true);
     try {
       await runUiAction(context, () async {
-        final count = await widget.controller.pauseAllGroupAutoReply(
+        await widget.controller.pauseAllGroupAutoReply(
           widget.conversationId,
         );
-        if (mounted)
-          ScaffoldMessenger.of(context).showGlassSnackBar(
-            SnackBar(content: Text(count == 0 ? '群内暂无 AI 成员' : '已暂停全部成员的自动接话')),
-          );
       });
     } finally {
       if (mounted) setState(() => _pausingAll = false);
@@ -100,15 +97,9 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
   Future<void> _resumeAll() async {
     setState(() => _resumingAll = true);
     try {
-      final count = await widget.controller.resumeAllGroupAutoReply(
+      await widget.controller.resumeAllGroupAutoReply(
         widget.conversationId,
       );
-      if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
-          SnackBar(
-            content: Text(count == 0 ? '当前没有需要恢复接话的成员' : '已恢复 $count 位成员的自动接话'),
-          ),
-        );
     } on Object catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showGlassSnackBar(
@@ -139,25 +130,45 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
             ? null
             : () async {
                 var canManage = false;
+                var canPauseAll = false;
+                var canResumeAll = false;
                 final loaded = await runUiAction(context, () async {
-                  final role = await widget.controller.groupStore.memberRole(
-                    widget.conversationId,
-                    MessageSender.localUser.id,
-                  );
+                  final results = await Future.wait<Object>([
+                    widget.controller.groupStore.members(widget.conversationId),
+                    GroupParticipation(
+                      widget.controller.groupStore.database,
+                    ).paused(widget.conversationId),
+                    widget.controller.groupStore.mutedMembers(
+                      widget.conversationId,
+                    ),
+                  ]);
+                  final members = results[0] as List<ConversationMember>;
+                  final paused = results[1] as Set<String>;
+                  final muted = (results[2] as Map<String, GroupMute>).keys;
+                  final role = members
+                      .firstWhere(
+                        (member) =>
+                            member.sender.id == MessageSender.localUser.id,
+                      )
+                      .role;
                   canManage = role.canManage;
+                  final controllable = members
+                      .where(
+                        (member) =>
+                            member.sender.kind == MessageSenderKind.agent &&
+                            !muted.contains(member.sender.id),
+                      )
+                      .map((member) => member.sender.id)
+                      .toSet();
+                  canPauseAll = controllable.any(
+                    (senderId) => !paused.contains(senderId),
+                  );
+                  canResumeAll = controllable.any(paused.contains);
                 });
                 if (!mounted || !buttonContext.mounted || !loaded) return;
                 final action = await showHeaderActionMenu(
                   buttonContext,
                   items: [
-                    if (onRemove != null)
-                      (
-                        value: 'mute',
-                        label: '禁言设置',
-                        icon: const SettingsIcon(
-                          type: SettingsIconType.permission,
-                        ),
-                      ),
                     if (onRemove != null)
                       (
                         value: 'remove',
@@ -174,7 +185,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                       label: '全部唤醒',
                       icon: QuestionIcon(type: QuestionIconType.play),
                     ),
-                    if (canManage)
+                    if (canManage && canPauseAll)
                       (
                         value: 'pause',
                         label: '全部暂停接话',
@@ -183,7 +194,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    if (canManage)
+                    if (canManage && canResumeAll)
                       (
                         value: 'resume',
                         label: '全部恢复接话',
@@ -193,18 +204,6 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                 );
                 if (!mounted) return;
                 if (action == 'remove') onRemove?.call();
-                if (action == 'mute') {
-                  await Navigator.push<void>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => GroupMuteSettingsPage(
-                        controller: widget.controller,
-                        groupId: widget.conversationId,
-                      ),
-                    ),
-                  );
-                  if (mounted) setState(() => _membersRevision++);
-                }
                 if (action == 'stop') await _stopAll();
                 if (action == 'wake') await _wakeAll();
                 if (action == 'pause') await _pauseAll();
@@ -218,14 +217,9 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
   Future<void> _wakeAll() async {
     setState(() => _wakingAll = true);
     try {
-      final count = await widget.controller.wakeAllGroupMembers(
+      await widget.controller.wakeAllGroupMembers(
         widget.conversationId,
       );
-      if (mounted && count == 0) {
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(const SnackBar(content: Text('当前没有需要唤醒的成员')));
-      }
     } on Object catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showGlassSnackBar(
@@ -511,10 +505,11 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
         final visible = widget._asSheet
             ? activities.where((a) => !a.stopping && !a.waitingForUser).toList()
             : activities;
-        return visible.isEmpty
+        final body = visible.isEmpty
             ? Center(
                 child: Text(
                   widget._asSheet ? '当前没有成员在思考或睡眠' : '群内暂无 AI 成员',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -529,20 +524,31 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                       ),
                 children: [for (final activity in visible) _row(activity)],
               );
+        if (!widget._asSheet) return body;
+        final header = _ActivitySheetHeader(
+          title: '群成员状态',
+          trailing: _batchActions(),
+        );
+        return visible.isEmpty
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  body,
+                  Align(alignment: Alignment.topCenter, child: header),
+                ],
+              )
+            : Column(
+                children: [
+                  header,
+                  Expanded(child: body),
+                ],
+              );
       },
     );
     if (widget._asSheet) {
       return SizedBox(
         height: MediaQuery.sizeOf(context).height * .7,
-        child: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              _ActivitySheetHeader(title: '群成员状态', trailing: _batchActions()),
-              Expanded(child: content),
-            ],
-          ),
-        ),
+        child: SafeArea(top: false, child: content),
       );
     }
     return Scaffold(

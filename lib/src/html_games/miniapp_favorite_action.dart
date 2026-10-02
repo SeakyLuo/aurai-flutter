@@ -47,7 +47,7 @@ class _MiniappFavoriteActionState extends State<MiniappFavoriteAction> {
         items: [
           (
             value: 'forward',
-            label: '转发',
+            label: '分享',
             icon: const AttachmentActionIcon(
               type: AttachmentActionIconType.forward,
             ),

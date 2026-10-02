@@ -214,6 +214,7 @@ extension MessageQuickReplies on ChatController {
             messageId: source.id,
             senderId: source.senderId,
             audience: source.audience,
+            excludedAudience: source.excludedAudience,
             text: [
               if (source.images.isNotEmpty) '[图片]',
               for (final file in source.files) '[文件] ${file.name}',
@@ -231,6 +232,7 @@ extension MessageQuickReplies on ChatController {
       text: text,
       quote: quote,
       audience: source.audience,
+      excludedAudience: source.excludedAudience,
       quickReplyToId: source.id,
       quickReplyKey: key,
       createdAt: DateTime.now(),
@@ -331,7 +333,7 @@ extension MessageQuickReplies on ChatController {
     final rows = await _store.database.query(
       'messages',
       where:
-          "id = ? AND conversation_id = ? AND kind NOT IN ('system', 'reasoning', 'quick_reply') AND conversation_id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL) AND (interactive_json IS NULL OR json_extract(interactive_json, '\$.participation.audience') IS NULL OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = ?))",
+          "id = ? AND conversation_id = ? AND kind NOT IN ('system', 'reasoning', 'quick_reply') AND conversation_id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL) AND NOT EXISTS (SELECT 1 FROM (SELECT ? AS visibility_viewer) WHERE (json_extract(interactive_json, '\$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.excludedAudience') WHERE value = visibility_viewer))",
       whereArgs: [sourceId, conversation.id, actor, actor],
       limit: 1,
     );
@@ -353,16 +355,19 @@ extension MessageQuickReplies on ChatController {
         row['id'] as String: MessageSender.fromRow(row),
     };
     final metadata = rows.single['interactive_json'] as String?;
-    final audience = metadata == null
+    final participation = metadata == null
         ? null
-        : ((jsonDecode(metadata) as Map)['participation'] as Map)['audience']
-              as List?;
+        : (jsonDecode(metadata) as Map)['participation'] as Map;
+    final audience = participation?['audience'] as List?;
+    final excludedAudience = (participation?['excludedAudience'] as List?)
+        ?.cast<String>();
     final message = AgentMessage(
       id: newMessageId(),
       role: AgentMessageRole.assistant,
       senderId: actor,
       sender: senders[actor]!,
       audience: audience?.cast<String>(),
+      excludedAudience: excludedAudience,
       text: text,
       createdAt: DateTime.now(),
       quickReplyToId: sourceId,
@@ -371,6 +376,7 @@ extension MessageQuickReplies on ChatController {
         messageId: sourceId,
         senderId: rows.single['sender_id'] as String,
         audience: audience?.cast<String>(),
+        excludedAudience: excludedAudience,
         text: String.fromCharCodes(
           (rows.single['text'] as String).runes.take(1000),
         ),

@@ -13,7 +13,7 @@ class EmojiCategoryIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => switch (category) {
-    -1 => SettingsIcon(type: SettingsIconType.miniapps, color: color),
+    -1 => SettingsIcon(type: SettingsIconType.grid, color: color),
     1 => SettingsIcon(type: SettingsIconType.personalInfo, color: color),
     _ => CustomPaint(
       size: const Size.square(24),

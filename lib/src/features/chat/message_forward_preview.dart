@@ -5,6 +5,8 @@ import 'message_preview_text.dart';
 import 'html_message_preview.dart';
 import 'message_preview_page.dart';
 import 'settings_appearance.dart';
+import '../../html_games/miniapp_share_card.dart';
+import '../../html_games/miniapp_forward.dart';
 
 class MessageForwardPreview extends StatelessWidget {
   const MessageForwardPreview({
@@ -18,53 +20,66 @@ class MessageForwardPreview extends StatelessWidget {
   final bool fitAvailableHeight;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: dialogControlColor(context),
-    borderRadius: BorderRadius.circular(16),
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: !enabled
-          ? null
-          : () {
-              FocusScope.of(context).unfocus();
-              Navigator.push<void>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => MessagePreviewPage(message: message),
-                ),
-              );
-            },
-      child: message.htmlGame != null
-          ? HtmlMessagePreview(
-              title: message.htmlGame!.title,
-              preview: message.htmlGame!.preview,
-              fitAvailableHeight: fitAvailableHeight,
-            )
-          : Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: MessagePreviewText(
-                      text: MessageSummary.fromMessage(message),
-                      maxLines: 2,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+  Widget build(BuildContext context) => message.miniappShare != null
+      ? MiniappShareCard(
+          share: message.miniappShare!,
+          fitAvailableHeight: fitAvailableHeight,
+          onTap: enabled
+              ? () => openMiniappLink(
+                  context,
+                  Uri.parse(message.miniappShare!.uri),
+                )
+              : null,
+        )
+      : Material(
+          color: dialogControlColor(context),
+          borderRadius: BorderRadius.circular(16),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: !enabled
+                ? null
+                : () {
+                    FocusScope.of(context).unfocus();
+                    Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MessagePreviewPage(message: message),
                       ),
+                    );
+                  },
+            child: message.htmlGame != null
+                ? HtmlMessagePreview(
+                    title: message.htmlGame!.title,
+                    preview: message.htmlGame!.preview,
+                    fitAvailableHeight: fitAvailableHeight,
+                  )
+                : Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: MessagePreviewText(
+                            text: MessageSummary.fromMessage(message),
+                            maxLines: 2,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Text(
+                          '详情',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Text(
-                    '详情',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-    ),
-  );
+          ),
+        );
 }

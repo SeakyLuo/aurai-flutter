@@ -74,7 +74,7 @@ abstract final class MessageSummary {
       text: message.interactive == null
           ? message.text
           : '${message.interactive!.title}\n${message.interactive!.body}',
-      htmlTitle: message.htmlGame?.title,
+      htmlTitle: message.htmlGame?.title ?? message.miniappShare?.title,
       interactiveTitle: message.interactive?.title,
       attachments: includeAttachments
           ? [

@@ -11,6 +11,7 @@ import '../domain/message_file.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/agent_models.dart';
+import '../domain/miniapp_share.dart';
 import '../domain/message_sender.dart';
 import '../domain/message_image.dart';
 import '../domain/message_quick_reply.dart';
@@ -501,6 +502,7 @@ class ConversationReader {
     final imageMap = <String, List<MessageImage>>{};
     final fileMap = <String, List<MessageFile>>{};
     for (final image in images) {
+      if (image['kind'] == 'miniapp_media') continue;
       if (image['kind'] == 'file') {
         fileMap
             .putIfAbsent(image['message_id'] as String, () => [])
@@ -526,6 +528,13 @@ class ConversationReader {
         .map(
           (row) => AgentMessage(
             id: row['id']! as String,
+            miniappShare: row['miniapp_share_json'] == null
+                ? null
+                : MiniappShare.fromJson(
+                    (jsonDecode(row['miniapp_share_json'] as String) as Map)
+                        .cast<String, Object?>(),
+                    imageDirectory,
+                  ),
             isSystem: row['kind'] == 'system',
             isFailure: row['kind'] == 'message_failure',
             htmlGame: row['kind'] == 'html_game'

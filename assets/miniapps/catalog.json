@@ -11,9 +11,10 @@
   {
     "id": "builtin.werewolf",
     "title": "狼人杀",
-    "description": "在群聊中配置板子，自动分配身份、推进昼夜和结算投票。支持真人与 AI，身份和夜间行动仅接收人可见。",
+    "description": "自由配置角色和技能，小程序负责身份保密、行动收集、发言和计票，主持 AI 裁定结果并推进对局。支持主持 AI 自行配置开局。",
     "publisherId": "user:local",
     "asset": "assets/miniapps/werewolf.html",
-    "version": "werewolf-program-v1"
+    "iconAsset": "assets/miniapps/icons/werewolf.png",
+    "version": "bd0ba77b222955c47558c7cc481e002b6e3bfde14762f932a27385e6ad1aa934"
   }
 ]

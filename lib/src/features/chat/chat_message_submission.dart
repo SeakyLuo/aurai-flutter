@@ -4,6 +4,7 @@ extension ChatMessageSubmission on _ChatPageState {
   Future<void> _send() async {
     final conversationId = widget.controller.activeConversation.id;
     final goal = _textController.text.trim();
+    final visibility = _draftVisibility[conversationId];
     if ((goal.isEmpty &&
             widget.controller.draftImages.isEmpty &&
             widget.controller.draftFiles.isEmpty) ||
@@ -34,6 +35,16 @@ extension ChatMessageSubmission on _ChatPageState {
       final needsSettings = await widget.controller.submitGoal(
         goal,
         mentionedRecipients: _mentionedRecipients,
+        audience: visibility?.audience,
+        excludedAudience: visibility?.excludedAudience,
+        onSubmitted: () {
+          if (mounted &&
+              identical(_draftVisibility[conversationId], visibility)) {
+            _updateDraftVisibility(
+              () => _draftVisibility.remove(conversationId),
+            );
+          }
+        },
       );
       if (needsSettings && mounted) {
         _preparingGoal = true;
