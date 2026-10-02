@@ -12,12 +12,20 @@ import '../domain/error_message.dart';
 import '../features/chat/chat_controller.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/sidebar_action_icon.dart';
+import '../features/chat/search_skeleton.dart';
+import '../features/chat/pagination_listener.dart';
 import 'miniapp_detail_page.dart';
 import 'miniapp_library_store.dart';
+import 'miniapp_message_catalog.dart';
 
 class MiniappLibraryPage extends StatefulWidget {
-  const MiniappLibraryPage({super.key, required this.controller});
+  const MiniappLibraryPage({
+    super.key,
+    required this.controller,
+    this.pickingMessage = false,
+  });
   final ChatController controller;
+  final bool pickingMessage;
 
   @override
   State<MiniappLibraryPage> createState() => _MiniappLibraryPageState();
@@ -28,22 +36,25 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
   final _search = TextEditingController();
   List<MiniappEntry> _bundled = [], _apps = [], _recent = [], _locals = [];
   bool _localMore = false, _opening = false;
-  bool _loading = true, _more = false;
+  bool _loading = true, _more = false, _failed = false;
   int _generation = 0;
   Timer? _debounce;
+  final _messageCapable = <String>{};
 
   @override
   void initState() {
     super.initState();
     _load(reset: true);
-    _loadRecent();
+    if (!widget.pickingMessage) _loadRecent();
   }
 
   Future<void> _load({required bool reset}) async {
+    if (!reset && (_loading || (!_more && !_localMore))) return;
     final generation = ++_generation;
     final query = _search.text.trim();
     setState(() {
       _loading = true;
+      _failed = false;
       if (reset) {
         _apps = [];
         _locals = [];
@@ -62,10 +73,12 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
           )
         else
           Future.value((entries: <MiniappEntry>[], more: false)),
-        if (query.isNotEmpty)
+        if (query.isNotEmpty || widget.pickingMessage)
           if (reset || _localMore)
             _store.page(
-              bundledIds: const [],
+              bundledIds: widget.pickingMessage
+                  ? bundled.map((e) => e.id).toList()
+                  : const [],
               mine: true,
               after: reset || _locals.isEmpty ? null : _locals.last,
               query: query,
@@ -74,23 +87,40 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
             Future.value((entries: <MiniappEntry>[], more: false)),
       ]);
       final page = pages.first;
+      final capable = widget.pickingMessage
+          ? await _store.messageCapable([
+              ...bundled,
+              ...page.entries,
+              ...pages[1].entries,
+            ])
+          : const <String>{};
       if (!mounted || generation != _generation) return;
       setState(() {
         _bundled = bundled;
+        if (reset) _messageCapable.clear();
+        _messageCapable.addAll(capable);
         _apps = reset ? page.entries : [..._apps, ...page.entries];
         _more = page.more;
-        _locals = query.isEmpty
+        _locals = query.isEmpty && !widget.pickingMessage
             ? []
             : reset
             ? pages[1].entries
             : [..._locals, ...pages[1].entries];
-        _localMore = query.isNotEmpty && pages[1].more;
+        _localMore =
+            (query.isNotEmpty || widget.pickingMessage) && pages[1].more;
       });
     } on Object catch (error) {
       if (mounted && generation == _generation) {
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        _failed = true;
+        ScaffoldMessenger.of(context).showGlassSnackBar(
+          SnackBar(
+            content: Text(errorMessage(error)),
+            action: SnackBarAction(
+              label: '重试',
+              onPressed: () => _load(reset: reset),
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted && generation == _generation)
@@ -260,6 +290,10 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
       onTap: _opening
           ? null
           : () async {
+              if (widget.pickingMessage) {
+                Navigator.pop(context, entry);
+                return;
+              }
               if (entry.kind != MiniappKind.published) {
                 await _openRecent(entry);
                 return;
@@ -292,21 +326,28 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
       ])
         entry.publicationId: entry,
     };
-    final entries = byId.values.toList()
-      ..sort((a, b) {
-        final aTime = a.updatedAt;
-        final bTime = b.updatedAt;
-        if (aTime == null && bTime != null) return 1;
-        if (aTime != null && bTime == null) return -1;
-        final timeOrder = aTime == null ? 0 : bTime!.compareTo(aTime);
-        return timeOrder != 0
-            ? timeOrder
-            : a.publicationId.compareTo(b.publicationId);
-      });
+    final entries =
+        byId.values
+            .where(
+              (e) =>
+                  !widget.pickingMessage ||
+                  _messageCapable.contains('${e.kind.name}:${e.id}'),
+            )
+            .toList()
+          ..sort((a, b) {
+            final aTime = a.updatedAt;
+            final bTime = b.updatedAt;
+            if (aTime == null && bTime != null) return 1;
+            if (aTime != null && bTime == null) return -1;
+            final timeOrder = aTime == null ? 0 : bTime!.compareTo(aTime);
+            return timeOrder != 0
+                ? timeOrder
+                : a.publicationId.compareTo(b.publicationId);
+          });
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        title: '小程序',
+        title: widget.pickingMessage ? '选择要发送的小程序' : '小程序',
         onBack: () => Navigator.pop(context),
       ),
       body: SettingsPageBody(
@@ -343,53 +384,66 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
                     ),
                   ),
                   Expanded(
-                    child: ListView(
-                      padding: const EdgeInsets.all(16),
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      children: [
-                        if (query.isEmpty && _recent.isNotEmpty)
-                          _recentSection(),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
-                          child: Text(
-                            query.isEmpty ? '发现小程序' : '搜索结果',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        if (_loading && entries.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.all(32),
-                            child: Center(child: CircularProgressIndicator()),
-                          ),
-                        if (!_loading && entries.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Center(
-                              child: EmptyDataView(
-                                title: query.isEmpty ? '暂无已发布的小程序' : '没有匹配的小程序',
+                    child: PaginationListener(
+                      hasMore: !_loading && !_failed && (_more || _localMore),
+                      loadMore: () => _load(reset: false),
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(16),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        children: [
+                          if (!widget.pickingMessage &&
+                              query.isEmpty &&
+                              _recent.isNotEmpty)
+                            _recentSection(),
+                          if (!widget.pickingMessage)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
+                              child: Text(
+                                query.isEmpty ? '发现小程序' : '搜索结果',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
                               ),
                             ),
-                          ),
-                        for (final entry in entries)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _tile(entry),
-                          ),
-                        if (_more || _localMore)
-                          TextButton(
-                            onPressed: _loading
-                                ? null
-                                : () => _load(reset: false),
-                            child: Text(_loading ? '正在加载' : '加载更多'),
-                          ),
-                      ],
+                          if (_loading && entries.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: SearchSkeleton(
+                                label: '正在加载小程序',
+                                avatarSize: 48,
+                              ),
+                            ),
+                          if (!_loading && entries.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(32),
+                              child: Center(
+                                child: EmptyDataView(
+                                  title: query.isEmpty
+                                      ? (widget.pickingMessage
+                                            ? '暂无可发送的小程序'
+                                            : '暂无已发布的小程序')
+                                      : '没有匹配的小程序',
+                                ),
+                              ),
+                            ),
+                          for (final entry in entries)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _tile(entry),
+                            ),
+                          if (_loading && entries.isNotEmpty)
+                            const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Center(child: CircularProgressIndicator()),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

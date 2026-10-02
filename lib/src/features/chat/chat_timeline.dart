@@ -469,7 +469,6 @@ List<ChatTimelineEntry> buildChatTimeline(
                   message.interactive?.systemPresentation != true
               ? GroupMessageHeading(
                   groupId: conversation.id,
-                  showName: message.htmlGame == null,
                   isFailure: message.isFailure,
                   sender: message.sender!,
                   onMention: onMention == null

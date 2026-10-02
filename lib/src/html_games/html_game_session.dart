@@ -35,6 +35,7 @@ class HtmlGameSession extends ChangeNotifier {
     this.independent = false,
     this.hostTopInset = 0,
     this.hostSafeTopInset = 0,
+    this.hostSafeBottomInset = 0,
     this.hostRightInset = 0,
   }) {
     _readyTimeout = Timer(const Duration(seconds: 15), () {
@@ -71,6 +72,7 @@ class HtmlGameSession extends ChangeNotifier {
   final bool independent;
   final double hostTopInset;
   final double hostSafeTopInset;
+  final double hostSafeBottomInset;
   final double hostRightInset;
   late final Timer _readyTimeout;
   Future<void> _localWrite = Future.value();
@@ -108,6 +110,7 @@ class HtmlGameSession extends ChangeNotifier {
       fullscreen: fullscreen,
       hostTopInset: hostTopInset,
       hostSafeTopInset: hostSafeTopInset,
+      hostSafeBottomInset: hostSafeBottomInset,
       hostRightInset: hostRightInset,
     );
   }
@@ -203,40 +206,71 @@ class HtmlGameSession extends ChangeNotifier {
         error = 'HTML 消息运行中断：${call.arguments}';
         notifyListeners();
       } else if (call.method == 'ai') {
-        if (!_visible) return jsonEncode({'error': '请打开小程序后使用 AI', 'code': 'inactive'});
+        if (!_visible)
+          return jsonEncode({'error': '请打开小程序后使用 AI', 'code': 'inactive'});
         final args = (call.arguments as Map).cast<String, Object?>();
         final id = args['id'] as int;
-        return jsonEncode(await _ai.invoke(id, args['request'] as String, onText: (text) {
-          if (!_closed && !_closing) {
-            unawaited(channel.invokeMethod<void>('aiUpdate', jsonEncode({'id': id, 'text': text})).catchError((Object _) {}));
-          }
-        }));
+        return jsonEncode(
+          await _ai.invoke(
+            id,
+            args['request'] as String,
+            onText: (text) {
+              if (!_closed && !_closing) {
+                unawaited(
+                  channel
+                      .invokeMethod<void>(
+                        'aiUpdate',
+                        jsonEncode({'id': id, 'text': text}),
+                      )
+                      .catchError((Object _) {}),
+                );
+              }
+            },
+          ),
+        );
       } else if (call.method == 'cancelAi') {
         await _ai.cancel(call.arguments as int);
       } else if (call.method == 'appData') {
         try {
-          final args = (jsonDecode(call.arguments as String) as Map).cast<String, Object?>();
-          if (args['operation'] == 'events' || args['operation'] == 'retryEvent') {
+          final args = (jsonDecode(call.arguments as String) as Map)
+              .cast<String, Object?>();
+          if (args['operation'] == 'events' ||
+              args['operation'] == 'retryEvent') {
             if (independent) {
-              if (args['operation'] == 'retryEvent') throw StateError('请从原会话打开小程序后重试');
+              if (args['operation'] == 'retryEvent')
+                throw StateError('请从原会话打开小程序后重试');
               return jsonEncode({'events': <Object?>[]});
             }
             final eventId = args['eventId'] as String?;
             if (args['operation'] == 'retryEvent') {
-              await HtmlCallbackState.retry(store.database, game.messageId, eventId!);
+              await HtmlCallbackState.retry(
+                store.database,
+                game.messageId,
+                eventId!,
+              );
               MessageCallbacks.changes.add(null);
             }
-            return jsonEncode({'events': await HtmlCallbackState.read(
-              store.database, game.messageId, eventId: eventId)});
+            return jsonEncode({
+              'events': await HtmlCallbackState.read(
+                store.database,
+                game.messageId,
+                eventId: eventId,
+              ),
+            });
           }
           final write = args['operation'] == 'write';
           if (!['read', 'write'].contains(args['operation'])) {
             throw ArgumentError('不支持的数据操作');
           }
           final result = await HtmlAppStore(store.database).data(
-            game.appId, args['name'] as String, actor: independent ? game.creatorId : MessageSender.localUser.id,
-            messageId: independent ? null : game.messageId, write: write,
-            expectedRevision: args['expectedRevision'] as int?, value: args['value']);
+            game.appId,
+            args['name'] as String,
+            actor: independent ? game.creatorId : MessageSender.localUser.id,
+            messageId: independent ? null : game.messageId,
+            write: write,
+            expectedRevision: args['expectedRevision'] as int?,
+            value: args['value'],
+          );
           if (write) HtmlGameSignals.appChanges.add(game.appId);
           return jsonEncode(result);
         } on Object catch (failure) {
@@ -286,13 +320,21 @@ class HtmlGameSession extends ChangeNotifier {
       }
       return null;
     });
-    await channel.invokeMethod<void>('connect');
+    await channel.invokeMethod<void>('connect', {
+      'topInset': hostTopInset,
+      'safeTopInset': hostSafeTopInset,
+      'safeBottomInset': hostSafeBottomInset,
+      'rightInset': hostRightInset,
+    });
   }
 
   Future<void> _sendCallbacks() async {
     try {
       if (!_pageLoaded || _closed || _closing || independent) return;
-      final events = await HtmlCallbackState.read(store.database, game.messageId);
+      final events = await HtmlCallbackState.read(
+        store.database,
+        game.messageId,
+      );
       if (!_closed && !_closing) {
         await _channel?.invokeMethod<void>('callbacks', jsonEncode(events));
       }
@@ -325,7 +367,9 @@ class HtmlGameSession extends ChangeNotifier {
   Future<void> _reload() async {
     try {
       final next = independent
-          ? await MiniappLibraryStore(store.database).loadIndependent(game.appId)
+          ? await MiniappLibraryStore(
+              store.database,
+            ).loadIndependent(game.appId)
           : await store.load(game.conversationId, game.messageId);
       if (_closed || _closing || !_isNewer(next)) return;
       if (_editing && next.html != game.html) {
@@ -386,7 +430,8 @@ class HtmlGameSession extends ChangeNotifier {
   }
 
   Future<void> capture() async {
-    if (independent || !ready || !_visible || _closed || _closing || _capturing) return;
+    if (independent || !ready || !_visible || _closed || _closing || _capturing)
+      return;
     _capturing = true;
     final version = game.version;
     try {
@@ -416,7 +461,8 @@ class HtmlGameSession extends ChangeNotifier {
     try {
       await _ai.cancelAll();
       try {
-        await _channel?.invokeMethod<void>('flushForm')
+        await _channel
+            ?.invokeMethod<void>('flushForm')
             .timeout(const Duration(seconds: 2));
       } finally {
         await _localWrite;

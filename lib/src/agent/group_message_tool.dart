@@ -19,7 +19,7 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
     description:
         'Publish exactly one complete message as yourself to any group you have joined, from private chat or another group, per call. Call again only if you have another message to send. '
         'Send local pictures with imagePaths, with or without text; this sends existing images, not image generation. '
-        'For private text or pictures set message.audience to the exact group members allowed to read it. Omit audience for public messages. The sender is included automatically; include the host or observers explicitly when needed. Recipients outside audience cannot read or receive this message. When replying to a private message preserve its audience unless explicitly authorized to publish its content. '
+        '用 message.audience 指定可见成员，或用 message.excludedAudience 指定不可见成员，两者不能同时设置。都省略表示全部可见。不可见成员不能读取或接收消息。发送者始终可见。回复受限消息时保留原可见范围，除非明确获准公开内容。 '
         'Use member IDs from readGroupChat or the supplied roster for mentions and message IDs from readGroupMessages or '
         'the supplied history for quotes. Never invent IDs. In the current group, if new messages arrived, '
         'nothing is sent and the new messages are returned: reconsider your draft, '
@@ -78,6 +78,14 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
             },
             'quoteMessageId': {
               'type': ['string', 'null'],
+            },
+            'excludedAudience': {
+              'type': 'array',
+              'minItems': 1,
+              'uniqueItems': true,
+              'items': {'type': 'string'},
+              'description':
+                  '不可见的当前群成员，不能包含自己，也不能与 audience 同时设置。其余成员（包括以后加入的成员）可见，适用于文字及附件。',
             },
           },
           'required': ['text'],

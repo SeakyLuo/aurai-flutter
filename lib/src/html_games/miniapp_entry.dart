@@ -10,6 +10,8 @@ class MiniappEntry {
     this.publisherProfile,
     this.iconPath,
     this.iconAsset,
+    this.shareTitle = '',
+    this.shareImagePath,
     this.description = '',
     this.publishedTitle,
     this.asset,
@@ -25,7 +27,8 @@ class MiniappEntry {
   });
   final String id, title, publisher, description;
   final MessageSender? publisherProfile;
-  final String? iconPath, iconAsset;
+  final String? iconPath, iconAsset, shareImagePath;
+  final String shareTitle;
   final String? asset,
       bundleVersion,
       sourceId,
@@ -43,6 +46,9 @@ class MiniappEntry {
     int revision, {
     String? iconPath,
     bool replaceIcon = false,
+    String? shareTitle,
+    String? shareImagePath,
+    bool replaceSharing = false,
   }) => MiniappEntry(
     id: id,
     title: name,
@@ -51,6 +57,8 @@ class MiniappEntry {
     publisherProfile: publisherProfile,
     iconAsset: iconAsset,
     iconPath: replaceIcon ? iconPath : this.iconPath,
+    shareTitle: replaceSharing ? shareTitle! : this.shareTitle,
+    shareImagePath: replaceSharing ? shareImagePath : this.shareImagePath,
     publishedTitle: name,
     asset: asset,
     bundleVersion: bundleVersion,

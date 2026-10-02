@@ -72,6 +72,5 @@ class SharedResponsesContext {
     }
   }
 
-  bool _isPublic(AgentMessage message) =>
-      message.interactive?.participation['audience'] == null;
+  bool _isPublic(AgentMessage message) => !message.hasRestrictedAudience;
 }

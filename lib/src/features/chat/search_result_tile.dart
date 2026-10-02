@@ -129,7 +129,6 @@ class SearchResultTile extends StatelessWidget {
     final archivedColor = dark
         ? const Color(0xff999999)
         : const Color(0xff969696);
-    final secondary = dark ? const Color(0xffaaaaaa) : const Color(0xff666666);
     final foreground = conversation.isArchived
         ? archivedColor
         : colors.onSurface;
@@ -138,52 +137,33 @@ class SearchResultTile extends StatelessWidget {
       label: conversation.isArchived ? '已归档会话' : null,
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 76),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-              child: Row(
-                children: [
-                  avatar,
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text.rich(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w400,
-                            height: 1.45,
-                            color: foreground,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text.rich(
-                          subtitle ?? TextSpan(text: _time),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            height: 1.45,
-                            color: conversation.isArchived
-                                ? foreground
-                                : secondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 6),
+          horizontalTitleGap: 12,
+          leading: avatar,
+          title: Text.rich(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 16, color: foreground),
+          ),
+          subtitle: Text.rich(
+            subtitle ?? TextSpan(text: _time),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              color: conversation.isArchived
+                  ? foreground
+                  : colors.onSurfaceVariant,
             ),
           ),
+          onTap: onTap,
         ),
       ),
     );

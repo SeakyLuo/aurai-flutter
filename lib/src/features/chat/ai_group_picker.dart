@@ -100,11 +100,18 @@ class _AiGroupListState extends State<AiGroupList> {
           ),
         for (final group in _groups)
           ListTile(
-            contentPadding: EdgeInsets.zero,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 6),
+            horizontalTitleGap: 12,
+            minTileHeight: 72,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(16),
             ),
-            title: Text(group['title'] as String),
+            title: Text(
+              group['title'] as String,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 16),
+            ),
             leading: GroupAvatar(members: _avatars[group['id']]!, size: 48),
             onTap: () => widget.onSelected(group),
           ),

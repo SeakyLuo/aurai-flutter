@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
+Color attachmentActionIconColor(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+    ? Colors.white
+    : Colors.black;
+
 enum AttachmentActionIconType {
   html,
   gallery,
@@ -32,10 +37,7 @@ class AttachmentActionIcon extends StatelessWidget {
     size: const Size.square(24),
     painter: _AttachmentActionPainter(
       type,
-      color ??
-          (Theme.of(context).brightness == Brightness.dark
-              ? Colors.white
-              : Colors.black),
+      color ?? attachmentActionIconColor(context),
     ),
   );
 }

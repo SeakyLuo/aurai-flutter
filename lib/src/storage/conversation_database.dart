@@ -30,7 +30,7 @@ import 'tool_customization_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 75,
+  version: 76,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -397,6 +397,19 @@ Future<Database> openConversationDatabase() async => openDatabase(
       await db.execute(groupMuteMessageTrigger);
     }
     if (oldVersion < 75) await db.execute(messageMarkdownColumn);
+    if (oldVersion < 76) {
+      await db.execute(
+        'ALTER TABLE messages ADD COLUMN miniapp_share_json TEXT',
+      );
+      if (oldVersion >= 42) {
+        await db.execute(
+          "ALTER TABLE miniapp_metadata ADD COLUMN share_title TEXT NOT NULL DEFAULT ''",
+        );
+        await db.execute(
+          'ALTER TABLE miniapp_metadata ADD COLUMN share_image_path TEXT',
+        );
+      }
+    }
   },
   onCreate: (db, version) async {
     final batch = db.batch();
@@ -515,6 +528,7 @@ const _schema = [
     sender_id TEXT NOT NULL REFERENCES message_senders(id),
     quote_json TEXT,
     interactive_json TEXT,
+    miniapp_share_json TEXT,
     role TEXT NOT NULL,
     kind TEXT NOT NULL,
     text TEXT NOT NULL,

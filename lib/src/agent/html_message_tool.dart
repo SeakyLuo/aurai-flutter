@@ -3,6 +3,7 @@ import 'shared_interaction_schema.dart';
 import 'interactive_message_schema.dart';
 import '../domain/tool_models.dart';
 import 'html_message_source.dart';
+import 'miniapp_program_guide.dart';
 import '../html_games/html_message_components.dart';
 
 class HtmlMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
@@ -18,6 +19,12 @@ class HtmlMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         'Send an HTML card as yourself to the current or a specified accessible conversation using optional conversationId, without navigation. In the current private chat the card is inserted into your streamed reply; do not describe that inline card as a separate message or repeat its contents. Cross-conversation cards and group cards are separate messages. HTML 消息也称为小程序消息。 '
             'Supply a short title and HTML body fragment with inline or HTTPS-hosted CSS and JavaScript. For long code, first use shell to write a UTF-8 .html file in its working directory using a quoted heredoc, then supply sourcePath instead of html. Use a unique filename per message/contact; edit that file for later code changes and publish it with updateHtmlMessage. Shell commands are still JSON tool arguments: escape them correctly; writing a file does not bypass model output limits. Do not publish a partially written file. No folder-picker permission is needed for the private shell workspace. ' +
         htmlAppGuide +
+        miniappProgramGuide +
+        'To make an application available in the composer + > 小程序 picker, declare '
+        '<script type="application/json" id="aurai-send-action">{"type":"message","state":{}}</script> '
+        'with its initial message state; program and random-choice declarations also support message sending. '
+        'Each selection creates isolated message state and data. Library sharing sends only the reusable app entry, '
+        'never current message progress or private results. ' +
         htmlMessageComponentGuide +
         'For inline rendering use compact responsive content without a page-sized wrapper or min-height:100vh. Avoid repeated title bars and developer diagnostics. Inherit the host font and use CSS variables --aurai-text, --aurai-muted, --aurai-field, --aurai-border, --aurai-accent for light/dark themes; custom layouts and Canvas remain supported. Inline message height is measured once on load and then fixed. After an intentional layout change, call AuraiHTML.requestResize() once after updating the DOM to request a new measurement; do not call it on animation frames, timers, or routine input. There is no height cap, collapse control or internal page scrolling. Use natural document flow, no fixed-height outer wrapper, viewport-height units, or nested scrolling containers. Keep chat content concise. Use a compact summary/launcher and fullscreen for long forms, large lists or full applications; fullscreen uses the page viewport. '
             'backgroundMode defaults to message (the normal message bubble color) or can be transparent (no host card fill). Keep the HTML document and outer content wrapper transparent; do not hard-code a page/card background. Use --aurai-message-background when an inner element should match the message, while local controls and Canvas may keep their own colors. '

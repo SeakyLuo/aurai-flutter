@@ -69,6 +69,11 @@ extension GroupMessageDelivery on ChatController {
     final output = <AgentMessage>[];
     if (item != null) {
       final audience = _messageAudience(item, senders.keys, reply.senderId);
+      final excludedAudience = _messageExcludedAudience(
+        item,
+        senders.keys,
+        reply.senderId,
+      );
       final text = (item['text'] as String).trim();
       final images = item['_images'] as List<MessageImage>;
       if (text.isEmpty && images.isEmpty) throw ArgumentError('消息不能为空');
@@ -82,7 +87,11 @@ extension GroupMessageDelivery on ChatController {
         throw ArgumentError('引用消息必须来自当前群聊');
       }
       if (source != null) {
-        _checkQuoteAudience(source.audience, reply.senderId);
+        _checkQuoteAudience(
+          source.audience,
+          reply.senderId,
+          source.excludedAudience,
+        );
       }
       final quote = source == null
           ? null
@@ -90,6 +99,7 @@ extension GroupMessageDelivery on ChatController {
                 messageId: source.id,
                 senderId: source.senderId,
                 audience: source.audience,
+                excludedAudience: source.excludedAudience,
                 text: source.text,
                 markdown: source.markdown,
               )
@@ -115,6 +125,7 @@ extension GroupMessageDelivery on ChatController {
           senderId: reply.senderId,
           sender: _groupSenders[reply.senderId]!,
           audience: audience,
+          excludedAudience: excludedAudience,
           runId: member.activeRunId,
           text: [
             if (missingMentions.isNotEmpty)

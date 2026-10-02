@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'wrench_painter.dart';
 
+Color settingsIconColor(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+    ? Theme.of(context).colorScheme.onSurfaceVariant
+    : const Color(0xff222222);
+
 enum SettingsIconType {
   discover,
   home,
-  miniapps,
   star,
   starFilled,
   tools,
@@ -55,13 +59,7 @@ class SettingsIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: const Size.square(24),
-    painter: _SettingsIconPainter(
-      type,
-      color ??
-          (Theme.of(context).brightness == Brightness.dark
-              ? Theme.of(context).colorScheme.onSurfaceVariant
-              : const Color(0xff222222)),
-    ),
+    painter: _SettingsIconPainter(type, color ?? settingsIconColor(context)),
   );
 }
 
@@ -165,22 +163,6 @@ class _SettingsIconPainter extends CustomPainter {
             ..close(),
           pen,
         );
-        break;
-      case SettingsIconType.miniapps:
-        for (final offset in [
-          const Offset(4, 4),
-          const Offset(14, 4),
-          const Offset(4, 14),
-          const Offset(14, 14),
-        ]) {
-          canvas.drawRRect(
-            RRect.fromRectAndRadius(
-              offset & const Size(6, 6),
-              const Radius.circular(2),
-            ),
-            pen,
-          );
-        }
         break;
       case SettingsIconType.drag:
         canvas.drawLine(const Offset(5, 9), const Offset(19, 9), pen);

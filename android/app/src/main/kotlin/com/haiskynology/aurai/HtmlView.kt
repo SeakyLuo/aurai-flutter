@@ -248,10 +248,19 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                 }
                 "connect" -> {
                     visibilityRevision++
+                    val insets = call.arguments as Map<*, *>
+                    val display = JSONObject.quote(if (fullscreen) "fullscreen" else "inline")
+                    val layout = "const root=document.documentElement;root.dataset.auraiDisplay=$display;" +
+                        "root.style.setProperty('--aurai-host-top-inset','${insets["topInset"]}px');" +
+                        "root.style.setProperty('--aurai-host-safe-top-inset','${insets["safeTopInset"]}px');" +
+                        "root.style.setProperty('--aurai-host-safe-bottom-inset','${insets["safeBottomInset"]}px');" +
+                        "root.style.setProperty('--aurai-host-right-inset','${insets["rightInset"]}px');" +
+                        "root.style.setProperty('--aurai-host-menu-width','${if (fullscreen) 0 else 38}px');" +
+                        "root.style.setProperty('--aurai-host-menu-height','${if (fullscreen) 0 else 36}px');"
                     if (loaded) channel?.invokeMethod("ready", null)
                     else channel?.invokeMethod("requestDocument", null)
                     web.onResume()
-                    web.evaluateJavascript("window.__auraiLifecycle?.(false); document.documentElement.dataset.auraiDisplay=" + JSONObject.quote(if (fullscreen) "fullscreen" else "inline") + "; document.dispatchEvent(new Event('aurai:displaychange')); window.dispatchEvent(new Event('resize')); window.__auraiMeasure?.(); AuraiGameBridge.editing(window.__auraiEditing?.()===true);", null)
+                    web.evaluateJavascript("(()=>{$layout document.dispatchEvent(new Event('aurai:displaychange')); window.dispatchEvent(new Event('resize')); window.__auraiMeasure?.(); window.__auraiLifecycle?.(false); AuraiGameBridge.editing(window.__auraiEditing?.()===true);})()", null)
                     result.success(null)
                 }
                 "callbacks" -> {

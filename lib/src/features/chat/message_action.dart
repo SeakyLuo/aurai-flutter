@@ -13,8 +13,8 @@ enum MessageAction {
   forward,
   branch,
   fullscreen,
-  statistics,
   history,
+  visibility,
 }
 
 sealed class MessageMenuResult {

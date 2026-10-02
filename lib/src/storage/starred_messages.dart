@@ -100,11 +100,8 @@ class StarredMessages {
       where:
           '''owner_id = ? AND object_type = 'message' AND EXISTS (SELECT 1 FROM messages
         WHERE messages.id = favorites.object_id
-        AND (interactive_json IS NULL
-          OR json_extract(interactive_json, '\$.participation.audience') IS NULL
-          OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience')
-            WHERE value = ?)))
-        ${viewerId == null ? '' : "AND EXISTS (SELECT 1 FROM messages WHERE messages.id = favorites.object_id AND conversation_id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL) AND (interactive_json IS NULL OR json_extract(interactive_json, '\$.participation.audience') IS NULL OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = ?)))"}''',
+        AND NOT EXISTS (SELECT 1 FROM (SELECT ? AS visibility_viewer) WHERE (json_extract(interactive_json, '\$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.excludedAudience') WHERE value = visibility_viewer)))
+        ${viewerId == null ? '' : "AND EXISTS (SELECT 1 FROM messages WHERE messages.id = favorites.object_id AND conversation_id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL) AND NOT EXISTS (SELECT 1 FROM (SELECT ? AS visibility_viewer) WHERE (json_extract(interactive_json, '\$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.excludedAudience') WHERE value = visibility_viewer)))"}''',
       whereArgs: [
         ownerId,
         ownerId,
@@ -125,6 +122,7 @@ class StarredMessages {
         'text',
         'created_at',
         'interactive_json',
+        'miniapp_share_json',
         'kind',
       ],
       where: 'id IN (${List.filled(stars.length, '?').join(',')})',

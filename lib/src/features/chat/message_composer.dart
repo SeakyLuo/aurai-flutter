@@ -140,6 +140,7 @@ class MessageComposer extends StatelessWidget {
                                                 TextInputAction.newline,
                                             decoration: InputDecoration(
                                               hintText: hintText,
+                                              hintMaxLines: 1,
                                               isDense: true,
                                               isCollapsed: !multiline,
                                               hintStyle: style.copyWith(

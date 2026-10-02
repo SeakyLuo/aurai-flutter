@@ -87,7 +87,7 @@ class HistoryMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
           'length(text) AS text_length',
         ],
         where:
-            "id = ? AND conversation_id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL) AND (interactive_json IS NULL OR json_extract(interactive_json, '\$.participation.audience') IS NULL OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = ?))",
+            "id = ? AND conversation_id IN (SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL) AND NOT EXISTS (SELECT 1 FROM (SELECT ? AS visibility_viewer) WHERE (json_extract(interactive_json, '\$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.excludedAudience') WHERE value = visibility_viewer))",
         whereArgs: [messageId, senderId, senderId],
         limit: 1,
       );

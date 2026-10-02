@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../html_games/miniapp_library_page.dart';
+import '../../html_games/miniapp_symbol.dart';
 import '../../skills/skills_page.dart';
 import 'chat_controller.dart';
 import 'settings_appearance.dart';
@@ -67,7 +68,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
             children: [
               _entry(
                 '小程序',
-                SettingsIconType.miniapps,
+                const MiniappSymbol(),
                 () => Navigator.push<void>(
                   context,
                   MaterialPageRoute(
@@ -78,12 +79,12 @@ class _DiscoverPageState extends State<DiscoverPage> {
               ),
               _entry(
                 '技能',
-                SettingsIconType.skills,
+                const SettingsIcon(type: SettingsIconType.skills),
                 _openingSkills ? null : _skills,
               ),
               _entry(
                 '工具',
-                SettingsIconType.tools,
+                const SettingsIcon(type: SettingsIconType.tools),
                 () => Navigator.push<void>(
                   context,
                   MaterialPageRoute(
@@ -98,26 +99,25 @@ class _DiscoverPageState extends State<DiscoverPage> {
     ),
   );
 
-  Widget _entry(String title, SettingsIconType icon, VoidCallback? onTap) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Material(
-          color: settingsFieldColor(context),
-          borderRadius: BorderRadius.circular(26),
-          clipBehavior: Clip.antiAlias,
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 18),
-            minVerticalPadding: 18,
-            leading: SettingsIcon(type: icon),
-            title: Text(title),
-            trailing: onTap == null
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const SettingsIcon(type: SettingsIconType.chevron),
-            onTap: onTap,
-          ),
-        ),
-      );
+  Widget _entry(String title, Widget icon, VoidCallback? onTap) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Material(
+      color: settingsFieldColor(context),
+      borderRadius: BorderRadius.circular(26),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+        minVerticalPadding: 18,
+        leading: icon,
+        title: Text(title),
+        trailing: onTap == null
+            ? const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const SettingsIcon(type: SettingsIconType.chevron),
+        onTap: onTap,
+      ),
+    ),
+  );
 }

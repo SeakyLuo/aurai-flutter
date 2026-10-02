@@ -105,7 +105,8 @@ class ChatViewportState extends State<ChatViewport> {
           .where(
             (item) =>
                 item.index < widget.entries.length &&
-                widget.entries[item.index].id != id,
+                widget.entries[item.index].id != id &&
+                widget.entries[item.index].id != 'time:$id',
           )
           .firstOrNull;
       if (retained != null) {
@@ -256,6 +257,11 @@ class ChatViewportState extends State<ChatViewport> {
     final anchor = _anchor;
     final previousIndex = anchor == null ? null : _indices[anchor.messageId];
     if (!identical(widget.entries, oldWidget.entries)) _indexEntries();
+    _removals.removeWhere((id, completion) {
+      if (_indices.containsKey(id)) return false;
+      if (!completion.isCompleted) completion.complete();
+      return true;
+    });
     if (widget.sentMessageId != oldWidget.sentMessageId &&
         widget.sentMessageId != null) {
       _replyAnchorId = widget.sentMessageId;
@@ -275,18 +281,15 @@ class ChatViewportState extends State<ChatViewport> {
       if (previousIndex != nextIndex) {
         final revision = ++_scrollRevision;
         _restoring = true;
+        _items.jumpTo(
+          index: nextIndex,
+          alignment: _listAlignment(nextIndex, anchor.alignment),
+        );
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || revision != _scrollRevision) return;
-          _jumpToEntry(
-            index: nextIndex,
-            alignment: _listAlignment(nextIndex, anchor.alignment),
-          );
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && revision == _scrollRevision) {
-              _restoring = false;
-              _rememberPosition();
-            }
-          });
+          if (mounted && revision == _scrollRevision) {
+            _restoring = false;
+            _rememberPosition();
+          }
         });
       }
     }
@@ -334,6 +337,7 @@ class ChatViewportState extends State<ChatViewport> {
     final messages = visible.where(
       (item) => item.index < widget.entries.length,
     );
+    if (_removals.isNotEmpty) return;
     if (messages.isEmpty) return;
     final first = messages.first;
     _anchor = ChatScrollBookmark(
@@ -703,16 +707,24 @@ class _ChatEntryEntranceState extends State<_ChatEntryEntrance>
   @override
   void initState() {
     super.initState();
-    if (widget.animate) _controller.forward();
+    if (widget.removing) {
+      _remove();
+    } else if (widget.animate) {
+      _controller.forward();
+    }
+  }
+
+  void _remove() {
+    _controller.reverse().then((_) {
+      if (mounted && widget.removing) widget.onRemoved();
+    });
   }
 
   @override
   void didUpdateWidget(_ChatEntryEntrance oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.removing && !oldWidget.removing) {
-      _controller.reverse().then((_) {
-        if (mounted && widget.removing) widget.onRemoved();
-      });
+      _remove();
     } else if (!widget.removing && oldWidget.removing) {
       _controller.forward();
     }

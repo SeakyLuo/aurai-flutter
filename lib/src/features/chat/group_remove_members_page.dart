@@ -81,7 +81,7 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
     child: Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        title: '移除成员',
+        title: _selected.isEmpty ? '移除成员' : '移除成员（${_selected.length}）',
         onBack: _saving ? null : () => Navigator.pop(context),
         actions: [
           SettingsGlassAction(
@@ -107,16 +107,6 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
             24,
           ),
           children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                '已选择 ${_selected.length} 位',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
             for (final member in _members)
               GroupMemberChoice(
                 sender: member.sender,

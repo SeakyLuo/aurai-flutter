@@ -6,6 +6,7 @@ import 'message_file.dart';
 import 'message_sender.dart';
 import 'message_image.dart';
 import 'message_quick_reply.dart';
+import 'miniapp_share.dart';
 
 enum AgentMessageRole { user, assistant }
 
@@ -32,12 +33,15 @@ class AgentMessage {
     this.quote,
     InteractiveMessage? interactive,
     List<String>? audience,
+    List<String>? excludedAudience,
     this.htmlGame,
+    this.miniappShare,
     this.quickReplyToId,
     this.quickReplyKey,
     this.quickReplies = const [],
   }) : _interactive = interactive,
-       _audience = audience;
+       _audience = audience,
+       _excludedAudience = excludedAudience;
 
   AgentMessage withSender(
     MessageSender? value, {
@@ -53,6 +57,7 @@ class AgentMessage {
         : '${interactive.title}\n${interactive.body}',
     interactive: interactive ?? messageMetadata,
     htmlGame: htmlGame,
+    miniappShare: miniappShare,
     createdAt: createdAt,
     images: images,
     files: files,
@@ -80,6 +85,7 @@ class AgentMessage {
     text: text,
     interactive: messageMetadata,
     htmlGame: htmlGame,
+    miniappShare: miniappShare,
     createdAt: createdAt,
     images: images,
     files: files,
@@ -126,32 +132,53 @@ class AgentMessage {
           })
         : messageMetadata,
     htmlGame: htmlGame,
+    miniappShare: miniappShare,
     quickReplyToId: quickReplyToId,
     quickReplyKey: quickReplyKey,
     quickReplies: quickReplies,
   );
 
   final HtmlGameCard? htmlGame;
+  final MiniappShare? miniappShare;
   final InteractiveMessage? _interactive;
   final List<String>? _audience;
   List<String>? get audience =>
       _audience ??
       (_interactive?.participation['audience'] as List?)?.cast<String>();
-  bool canView(String viewer) => audience == null || audience!.contains(viewer);
+  final List<String>? _excludedAudience;
+  List<String>? get excludedAudience =>
+      _excludedAudience ??
+      (_interactive?.participation['excludedAudience'] as List?)
+          ?.cast<String>();
+  bool get hasRestrictedAudience =>
+      audience != null || excludedAudience != null;
+  String get visibilityLabel => excludedAudience != null
+      ? '部分不可见'
+      : audience != null
+      ? '部分可见'
+      : '全部可见';
+  bool canView(String viewer) =>
+      (audience == null || audience!.contains(viewer)) &&
+      !(excludedAudience?.contains(viewer) ?? false);
   InteractiveMessage? get interactive =>
       _interactive?.participation['presentation'] == 'message'
       ? null
       : _interactive;
   InteractiveMessage? get messageMetadata =>
       _interactive ??
-      (_audience == null
+      (_audience == null && _excludedAudience == null
           ? null
           : InteractiveMessage(
               revision: 1,
               title: '',
               body: '',
               buttons: const [],
-              participation: {'audience': _audience, 'presentation': 'message'},
+              participation: {
+                if (_audience != null) 'audience': _audience,
+                if (_excludedAudience != null)
+                  'excludedAudience': _excludedAudience,
+                'presentation': 'message',
+              },
             ));
   final MessageQuote? quote;
   final bool isSystem;
@@ -183,6 +210,7 @@ class AgentMessage {
     'senderId': senderId,
     if (messageMetadata != null) 'interactive': messageMetadata!.toJson(),
     if (htmlGame != null) 'htmlGameTitle': htmlGame!.title,
+    if (miniappShare != null) 'miniappShare': miniappShare!.toJson(),
     if (quote != null) 'quote': quote!.toJson(),
     if (isSystem) 'isSystem': true,
     if (isFailure) 'isFailure': true,
@@ -203,6 +231,12 @@ class AgentMessage {
     required String imageDirectory,
   }) => AgentMessage(
     id: json['id']! as String,
+    miniappShare: json['miniappShare'] == null
+        ? null
+        : MiniappShare.fromJson(
+            (json['miniappShare'] as Map).cast<String, Object?>(),
+            imageDirectory,
+          ),
     htmlGame: json['htmlGameTitle'] == null
         ? null
         : HtmlGameCard(title: json['htmlGameTitle'] as String),
@@ -521,6 +555,8 @@ String _defaultToolTitle(String name) => switch (name) {
   'writeHtmlAppData' => '保存小程序数据',
   'sendHtmlMessage' => '发送 HTML 消息',
   'readHtmlMessage' => '读取 HTML 消息',
+  'readHtmlProgram' => '读取小程序状态',
+  'submitHtmlProgramEvent' => '提交小程序行动',
   'readHtmlApp' => '读取小程序',
   'mergeProjectBranch' => '合并项目分支',
   'checkoutProjectBranch' => '切换项目分支',

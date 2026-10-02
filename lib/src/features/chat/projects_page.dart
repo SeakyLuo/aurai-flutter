@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'chat_controller.dart';
 import 'ai_contacts_page.dart';
 import 'attachment_source_menu.dart';
+import 'send_miniapp_message.dart';
 import 'chat_widgets.dart';
 import '../../app/ui_action.dart';
 import '../../domain/avatar_style.dart';
@@ -337,6 +338,7 @@ class _ProjectPageState extends State<ProjectPage> {
       buttonContext,
       allowFriendSelection: true,
       allowAssets: true,
+      allowMiniapps: true,
       friendIcon: ProfileAvatar(
         style: AvatarStyle(
           icon: _recipient!.sender.avatarIcon,
@@ -396,6 +398,11 @@ class _ProjectPageState extends State<ProjectPage> {
           if (mounted && sent == true) {
             Navigator.popUntil(context, (route) => route.isFirst);
           }
+        case AttachmentSource.miniapp:
+          _focusNode.unfocus();
+          final sent = await sendMiniappMessage(context, widget.controller);
+          if (mounted && sent)
+            Navigator.popUntil(context, (route) => route.isFirst);
         case AttachmentSource.friend:
           return;
       }

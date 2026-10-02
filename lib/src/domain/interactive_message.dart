@@ -23,8 +23,14 @@ class InteractiveMessage {
   final Map<String, Object?> session;
   final Map<String, Object?>? snapshotView;
   bool canView(String actor) =>
-      participation['audience'] == null ||
-      (participation['audience'] as List).contains(actor);
+      (hasInteraction && participation['_creatorId'] == actor) ||
+      (participation['audience'] == null ||
+              (participation['audience'] as List).contains(actor)) &&
+          !((participation['excludedAudience'] as List?)?.contains(actor) ??
+              false);
+  bool get hasRestrictedAudience =>
+      participation['audience'] != null ||
+      participation['excludedAudience'] != null;
   void requireViewer(String actor) {
     if (!canView(actor)) throw StateError('你无权查看这条交互消息');
   }
@@ -34,6 +40,14 @@ class InteractiveMessage {
       ...buttons,
       for (final state in states) ...(state['buttons'] as List).cast<Map>(),
     ];
+    if (allButtons.any(
+      (b) =>
+          b['notifyAi'] == true &&
+          (singleChoice || (b['action'] == 'submit' && b['input'] == null)),
+    ))
+      throw ArgumentError(
+        '投票回调请通过 participation.callbackEvents 注册监听，不使用按钮结果回调',
+      );
     if (!shared && allButtons.any((b) => b['selection'] != null))
       throw ArgumentError('选择列表需要 interaction 配置以保存参与者选择');
     if (!html && allButtons.any((b) => b['input'] != null))
@@ -90,7 +104,7 @@ class InteractiveMessage {
       final view = Map<String, Object?>.from(raw as Map);
       if (evaluateInteraction(view['when'] ?? true, ctx) != true) continue;
       if (view['type'] == 'distribution') {
-        if (ctx['summaryVisible'] == true && ctx['revealed'] == true)
+        if (ctx['summaryVisible'] == true)
           components.add({
             'type': 'distribution',
             'items': summary,
@@ -111,19 +125,40 @@ class InteractiveMessage {
 
   final Map<String, Object?> participation;
   final Map<String, Map<String, Object?>> participants;
-  bool get closed => participation['closed'] == true;
+  bool get closed =>
+      participation['closed'] == true ||
+      (shared &&
+          engine.phase == 'completed' &&
+          !buttons.any((button) => button['action'] == 'nextRound') &&
+          !states.any(
+            (state) => (state['buttons'] as List).any(
+              (button) => button['action'] == 'nextRound',
+            ),
+          ));
   bool get singleChoice => participation['selectionMode'] == 'singleChoice';
   bool visible(String field, {String actor = 'user:local'}) {
+    if (hasInteraction &&
+        field == 'summaryVisibility' &&
+        participation['_creatorId'] == actor)
+      return true;
     if (!canView(actor)) return false;
     final allowed = participation['${field}Actors'] as List?;
     if (allowed != null && !allowed.contains(actor)) return false;
-    if (shared && !engine.revealed) return false;
+    final timing = participation['${field}Timing'];
+    final early = participation['${field}ImmediateActors'] as List?;
+    final immediate = early?.contains(actor) == true;
+    if (!immediate) {
+      if (timing == 'onComplete' && !completed) return false;
+      if (timing == null && shared && !engine.revealed) return false;
+    }
     return switch (participation[field] ?? 'public') {
       'public' => true,
-      'afterClose' => closed || (shared && engine.phase == 'completed'),
+      'afterClose' => immediate || completed,
       _ => false,
     };
   }
+
+  bool get completed => closed || (shared && engine.phase != 'collecting');
 
   int participantRevision(String actor) =>
       participants[actor]?['revision'] as int? ?? 0;
@@ -134,7 +169,9 @@ class InteractiveMessage {
     final current = state?.containsKey('buttons') == true ? state : null;
     return InteractiveMessage(
       revision: revision,
-      showStatistics: current?['showStatistics'] as bool? ?? showStatistics,
+      showStatistics: hasInteraction && participation['_creatorId'] == actor
+          ? true
+          : current?['showStatistics'] as bool? ?? showStatistics,
       buttonColumns: current?['buttonColumns'] as int? ?? buttonColumns,
       title: current?['title'] as String? ?? title,
       body: current?['body'] as String? ?? body,
@@ -288,15 +325,37 @@ class InteractiveMessage {
       _validateButtons(stateButtons, stateIds);
     }
     final participation = json['participation'] as Map? ?? const {};
+    if (participation['audience'] != null &&
+        participation['excludedAudience'] != null) {
+      throw ArgumentError('部分可见和部分不可见不能同时设置');
+    }
+    if (participation['excludedAudience'] is List &&
+        (participation['excludedAudience'] as List).isEmpty) {
+      throw ArgumentError('不可见范围不能为空；全部可见请省略 excludedAudience');
+    }
     for (final key in [
       'audience',
+      'excludedAudience',
       'visibilityActors',
       'summaryVisibilityActors',
+      'visibilityImmediateActors',
+      'summaryVisibilityImmediateActors',
     ]) {
       if (participation[key] case final value?) {
         if (value is! List || value.any((id) => id is! String || id.isEmpty))
           throw ArgumentError('$key 必须为参与者标识列表');
       }
+    }
+    for (final field in ['visibility', 'summaryVisibility']) {
+      final timing = participation['${field}Timing'];
+      if (timing != null && !['immediate', 'onComplete'].contains(timing))
+        throw ArgumentError('$field 公布时机必须是 immediate 或 onComplete');
+    }
+    if (participation['callbackEvents'] case final events?) {
+      if (events is! List ||
+          events.any((event) => !['vote', 'complete'].contains(event)) ||
+          events.toSet().length != events.length)
+        throw ArgumentError('callbackEvents 使用不重复的 vote、complete 事件');
     }
     return InteractiveMessage.fromJson(json);
   }
@@ -436,7 +495,7 @@ class InteractiveMessage {
     'showStatistics': showStatistics,
     'buttonColumns': buttonColumns,
     if (snapshotView != null) 'snapshotView': snapshotView,
-    'participation': participation,
+    'participation': {...participation, if (closed) 'closed': true},
     if (interaction.isNotEmpty) 'interaction': interaction,
     if (includeParticipants && session.isNotEmpty) 'session': session,
     if (includeParticipants && participants.isNotEmpty)

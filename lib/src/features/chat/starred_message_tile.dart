@@ -124,7 +124,7 @@ class StarredMessageTile extends StatelessWidget {
             ),
           (
             value: 'forward',
-            label: '转发',
+            label: '分享',
             icon: AttachmentActionIcon(
               type: AttachmentActionIconType.forward,
               color: iconColor,
@@ -280,6 +280,7 @@ class StarredMessageTile extends StatelessWidget {
                           text: result.text,
                           createdAt: result.createdAt,
                           images: result.images,
+                          miniappShare: result.miniappShare,
                           files: result.files,
                           interactive: result.interactive,
                           isGroupMessage: true,

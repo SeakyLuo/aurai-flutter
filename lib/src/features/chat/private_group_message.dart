@@ -33,10 +33,16 @@ extension PrivateGroupMessage on ChatController {
     if (isGroup) await groupStore.requireCanSpeak(id, senderId);
     final images = item['_images'] as List<MessageImage>;
     final audience = _messageAudience(item, senders.keys, senderId);
+    final excludedAudience = _messageExcludedAudience(
+      item,
+      senders.keys,
+      senderId,
+    );
     final files = item['_files'] as List<MessageFile>? ?? const <MessageFile>[];
     final text = (item['text'] as String).trim();
     if (text.length > 20000) throw ArgumentError('消息文字不能超过 20000 字');
     final mentions = List<String>.from(item['mentionIds'] as List).toSet();
+    if (!isGroup && excludedAudience != null) throw ArgumentError('部分不可见仅支持群聊');
     if (!isGroup && mentions.isNotEmpty) throw ArgumentError('私聊无需 @ 成员');
     if (mentions.any((id) => !senders.containsKey(id)))
       throw ArgumentError('只能 @ 当前群成员');
@@ -57,11 +63,21 @@ extension PrivateGroupMessage on ChatController {
           ? null
           : ((jsonDecode(metadata) as Map)['participation'] as Map)['audience']
                 as List?;
-      _checkQuoteAudience(sourceAudience?.cast<String>(), senderId);
+      final sourceExcluded = metadata == null
+          ? null
+          : ((jsonDecode(metadata) as Map)['participation']
+                    as Map)['excludedAudience']
+                as List?;
+      _checkQuoteAudience(
+        sourceAudience?.cast<String>(),
+        senderId,
+        sourceExcluded?.cast<String>(),
+      );
       quote = MessageQuote(
         messageId: quoteId,
         senderId: source['sender_id'] as String,
         audience: sourceAudience?.cast<String>(),
+        excludedAudience: sourceExcluded?.cast<String>(),
         text: source['text'] as String,
         markdown: isGroup ? source['markdown'] == 1 : true,
       );
@@ -106,6 +122,7 @@ extension PrivateGroupMessage on ChatController {
       senderId: senderId,
       sender: senders[senderId]!,
       audience: audience,
+      excludedAudience: excludedAudience,
       isGroupMessage: isGroup,
       markdown: item['markdown'] == true,
       runId: inlineRunId,

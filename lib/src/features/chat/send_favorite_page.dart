@@ -7,8 +7,7 @@ import '../../domain/agent_models.dart';
 import '../../domain/error_message.dart';
 import '../../html_games/miniapp_favorites.dart';
 import '../../html_games/miniapp_forward.dart';
-import '../../html_games/miniapp_entry.dart';
-import '../../html_games/miniapp_template.dart';
+import '../../html_games/miniapp_library_store.dart';
 import '../../html_games/miniapp_icon.dart';
 import '../../storage/group_message_search.dart';
 import '../../storage/starred_messages.dart';
@@ -73,7 +72,14 @@ class _SendFavoritePageState extends State<_SendFavoritePage> {
         recipientName = sender.name;
       }
       if (!mounted) return;
-      final miniapp = item.miniapp;
+      final message = item.message.htmlGame == null
+          ? item.message
+          : miniappForwardMessage(
+              await MiniappLibraryStore(
+                controller.htmlStore.database,
+              ).entryForMessage(item.message.id),
+            );
+      if (!mounted) return;
       final sent = await showModalBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
@@ -89,26 +95,12 @@ class _SendFavoritePageState extends State<_SendFavoritePage> {
         ),
         builder: (_) => ImageForwardDialog.message(
           controller: controller,
-          message: item.message,
+          message: message,
           targetId: target.id,
           kind: target.kind,
           title: target.title,
           recipientName: recipientName,
           avatar: avatar,
-          preview: miniapp == null ? null : _MiniappPreview(entry: miniapp),
-          sendMessage: miniapp == null
-              ? null
-              : (targetId, note) async {
-                  final template = await MiniappTemplate.load(
-                    controller.groupStore.database,
-                    miniapp,
-                  );
-                  await controller.sendMiniappTemplate(
-                    targetId,
-                    template,
-                    note,
-                  );
-                },
         ),
       );
       if (sent == true && mounted) Navigator.pop(context, true);
@@ -153,51 +145,6 @@ class _SendFavoritePageState extends State<_SendFavoritePage> {
           ],
         ),
       ),
-    ),
-  );
-}
-
-class _MiniappPreview extends StatelessWidget {
-  const _MiniappPreview({required this.entry});
-  final MiniappEntry entry;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: dialogControlColor(context),
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Row(
-      children: [
-        MiniappIcon(path: entry.iconPath, asset: entry.iconAsset, size: 48),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                entry.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
-              if (entry.description.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  entry.description,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
     ),
   );
 }
@@ -303,6 +250,7 @@ class _FavoriteChoicesState extends State<_FavoriteChoices> {
                 text: result.text,
                 createdAt: result.createdAt,
                 images: result.images,
+                miniappShare: result.miniappShare,
                 files: result.files,
                 htmlGame: result.html,
                 interactive: result.interactive,

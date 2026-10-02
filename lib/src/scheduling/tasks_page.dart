@@ -132,6 +132,7 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
           _focus.unfocus();
           await showSendFavoritePage(context, widget.controller);
         case AttachmentSource.friend:
+        case AttachmentSource.miniapp:
           return;
       }
     } on Object catch (error) {

@@ -13,7 +13,7 @@ class InteractiveSelection {
   void validate() {
     if (!['single', 'multiple'].contains(config['mode']) ||
         options.isEmpty ||
-        options.length > 24 ||
+        options.length > 25 ||
         minimum < 1 ||
         maximum < minimum ||
         maximum > options.length ||

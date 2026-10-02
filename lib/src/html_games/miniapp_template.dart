@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'miniapp_library_store.dart';
+import 'miniapp_send_action.dart';
+import 'html_app_store.dart';
 
 /// A reference to reusable code and interaction rules, without a running round.
 class MiniappTemplate {
@@ -13,6 +15,10 @@ class MiniappTemplate {
     final appId = entry.bundled || entry.kind == MiniappKind.published
         ? await library.install(entry)
         : entry.runtimeId;
+    final app = await HtmlAppStore.load(db, appId);
+    if (!supportsMiniappMessage(await HtmlAppStore.code(app))) {
+      throw StateError('这个小程序不支持发送消息');
+    }
     final launchers = await db.rawQuery(
       '''SELECT g.display_width, g.display_height,
       g.display_mode, g.background_mode, m.interactive_json

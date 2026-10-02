@@ -24,6 +24,9 @@ class InteractiveStatisticsOverview extends StatelessWidget {
   Widget build(BuildContext context) {
     final summaryVisible = card.visible('summaryVisibility');
     final peopleVisible = card.visible('visibility');
+    final multiple = card.buttons.any(
+      (button) => (button['selection'] as Map?)?['mode'] == 'multiple',
+    );
     final groups = <InteractiveOptionKey, List<String>>{};
     if (peopleVisible) {
       for (final entry in card.choices.entries) {
@@ -53,7 +56,11 @@ class InteractiveStatisticsOverview extends StatelessWidget {
         const SizedBox(height: 10),
         Text(
           [
-            card.closed ? '已结束' : '进行中',
+            card.closed
+                ? '已结束'
+                : card.completed
+                ? '本轮已完成'
+                : '进行中',
             if (summaryVisible) '${card.choices.length} 人参与',
           ].join(' · '),
           style: TextStyle(
@@ -61,20 +68,36 @@ class InteractiveStatisticsOverview extends StatelessWidget {
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 24),
-        if (summaryVisible) ...[
+        if (card.hasInteraction) ...[
+          const SizedBox(height: 8),
           Text(
-            card.hasInteraction ? '选择分布' : '最近操作',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            card.hasInteraction ? '每人按最近一次选择计票' : '按每人最近一次操作汇总',
+            '投票规则：${[multiple ? '多选，每个所选项各计一票' : '单选，每人一票', if (card.engine.allowChange) '改票会替换原票', if (multiple) '比例为选择该项的人数占参与人数'].join('；')}',
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
+        ],
+        const SizedBox(height: 24),
+        if (summaryVisible) ...[
+          Text(
+            card.hasInteraction
+                ? card.completed
+                      ? '投票结果'
+                      : '实时票数'
+                : '最近操作',
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+          if (!card.hasInteraction) ...[
+            const SizedBox(height: 6),
+            Text(
+              '按每人最近一次操作汇总',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           for (final option in card.summary)
             _option(
@@ -149,69 +172,108 @@ class InteractiveStatisticsOverview extends StatelessWidget {
     final key = (option['buttonId'] as String, option['label'] as String);
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: card.visible('visibility') ? () => onOption(key) : null,
+        child: Semantics(
+          button: card.visible('visibility'),
+          label: '选项：${option['label']}，$count 人',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: Text(
-                  option['label'] as String,
-                  style: const TextStyle(fontSize: 15, height: 1.4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      option['label'] as String,
+                      style: const TextStyle(fontSize: 15, height: 1.4),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '$count 人${card.hasInteraction ? ' · ${(ratio * 100).round()}%' : ''}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+              if (card.hasInteraction) ...[
+                const SizedBox(height: 10),
+                LinearProgressIndicator(
+                  value: ratio,
+                  minHeight: 6,
+                  borderRadius: BorderRadius.circular(3),
+                  backgroundColor: colors.surfaceContainerHighest,
+                  color: colors.primary,
                 ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                '$count 人${card.hasInteraction ? ' · ${(ratio * 100).round()}%' : ''}',
-                style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
-              ),
-            ],
-          ),
-          if (card.hasInteraction) ...[
-            const SizedBox(height: 10),
-            LinearProgressIndicator(
-              value: ratio,
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(3),
-              backgroundColor: colors.surfaceContainerHighest,
-              color: colors.primary,
-            ),
-          ],
-          if (people.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 2,
-              runSpacing: 4,
-              children: [
-                for (final id in people.take(5))
-                  Tooltip(
-                    message: statisticsName(card, id),
-                    child: Semantics(
-                      button: true,
-                      label: '查看${statisticsName(card, id)}的记录',
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(22),
-                        onTap: () => onParticipant(id),
+              ],
+              if (people.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 2,
+                  runSpacing: 4,
+                  children: [
+                    for (
+                      var index = 0;
+                      index < people.length && index < 5;
+                      index++
+                    )
+                      Tooltip(
+                        message: statisticsName(card, people[index]),
                         child: Padding(
                           padding: const EdgeInsets.all(6),
-                          child: MemberAvatar(
-                            sender: statisticsSender(card, senders, id),
-                            size: 32,
+                          child: Stack(
+                            children: [
+                              MemberAvatar(
+                                sender: statisticsSender(
+                                  card,
+                                  senders,
+                                  people[index],
+                                ),
+                                size: 32,
+                              ),
+                              if (index == 4 && people.length > 5)
+                                Positioned.fill(
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(
+                                        alpha: .48,
+                                      ),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 3,
+                                      ),
+                                      child: Center(
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            '+${people.length - 5}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                if (people.length > 5)
-                  TextButton(
-                    onPressed: () => onOption(key),
-                    child: Text('查看全部 ${people.length} 人'),
-                  ),
+                  ],
+                ),
               ],
-            ),
-          ],
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

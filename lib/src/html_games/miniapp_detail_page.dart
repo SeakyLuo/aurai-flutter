@@ -126,7 +126,7 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
             (value: 'edit', label: '编辑', icon: const TaskActionIcon('edit')),
           (
             value: 'forward',
-            label: '转发',
+            label: '分享',
             icon: const AttachmentActionIcon(
               type: AttachmentActionIconType.forward,
             ),

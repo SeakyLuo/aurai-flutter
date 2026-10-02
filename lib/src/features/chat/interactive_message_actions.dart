@@ -14,6 +14,7 @@ extension InteractiveMessageActions on ChatController {
       'participation': {
         ...?definition['participation'] as Map<String, Object?>?,
         'presentation': 'system',
+        '_creatorId': callbackSenderId ?? MessageSender.localUser.id,
       },
     });
     card.validateTransport(html: false);
@@ -22,7 +23,10 @@ extension InteractiveMessageActions on ChatController {
       for (final state in card.states)
         ...(state['buttons'] as List).cast<Map>(),
     ].any((b) => b['notifyAi'] == true);
-    if (callbacks && callbackSenderId == null)
+    if ((callbacks ||
+            (card.participation['callbackEvents'] as List? ?? const [])
+                .isNotEmpty) &&
+        callbackSenderId == null)
       throw ArgumentError('配置了 AI 通知时，请指定接收回调的 AI');
     final sender = callbackSenderId == null
         ? MessageSender.localUser
@@ -32,7 +36,7 @@ extension InteractiveMessageActions on ChatController {
       role: AgentMessageRole.assistant,
       senderId: sender.id,
       sender: sender,
-      text: card.participation['audience'] == null ? card.title : '私密交互消息',
+      text: !card.hasRestrictedAudience ? card.title : '私密交互消息',
       interactive: card,
       createdAt: DateTime.now(),
       isGroupMessage: conversation.kind == ConversationKind.group,
@@ -72,7 +76,14 @@ extension InteractiveMessageActions on ChatController {
       );
       if (access.isEmpty) throw StateError('会话不存在或你无权访问该会话');
       final target = sameConversation ? source : await _forwardTarget(targetId);
-      final card = InteractiveMessage.fromDefinition({...args, 'revision': 0});
+      final card = InteractiveMessage.fromDefinition({
+        ...args,
+        'revision': 0,
+        'participation': {
+          ...?args['participation'] as Map?,
+          '_creatorId': senderId,
+        },
+      });
       card.validateTransport(html: false);
       final profile = await groupStore.loadAi(senderId);
       final message = AgentMessage(
@@ -80,7 +91,7 @@ extension InteractiveMessageActions on ChatController {
         role: AgentMessageRole.assistant,
         senderId: senderId,
         sender: profile.sender,
-        text: card.participation['audience'] == null
+        text: !card.hasRestrictedAudience
             ? '${card.title}\n${card.body}'
             : '私密交互消息',
         createdAt: DateTime.now(),
@@ -230,6 +241,7 @@ extension InteractiveMessageActions on ChatController {
       'participation': {
         ...old.participation,
         ...?args['participation'] as Map<String, Object?>?,
+        '_creatorId': senderId,
       },
       'participants': {
         for (final entry in old.participants.entries)
@@ -259,13 +271,21 @@ extension InteractiveMessageActions on ChatController {
     }
     final actor = await groupStore.loadAi(senderId);
     final notice = await _store.database.transaction((txn) async {
+      card = await enqueueInteractiveCompletion(
+        txn,
+        conversationId: source.id,
+        messageId: id,
+        creatorId: senderId,
+        previous: old,
+        current: card,
+      );
       final changed = await txn.update(
         'messages',
         {
           'interactive_json': jsonEncode(
             card.toJson(includeParticipants: true),
           ),
-          'text': card.participation['audience'] == null
+          'text': !card.hasRestrictedAudience
               ? '${card.title}\n${card.body}'
               : '私密交互消息',
         },
@@ -285,7 +305,8 @@ extension InteractiveMessageActions on ChatController {
           whereArgs: [id],
         );
       }
-      if (card.participation['audience'] != null) return null;
+      if (card.hasInteraction) return null;
+      if (card.hasRestrictedAudience) return null;
       return InteractiveMessageStore.writeNotice(
         txn,
         source.id,
@@ -298,6 +319,7 @@ extension InteractiveMessageActions on ChatController {
       );
     });
     _replaceInteractiveCard(source.id, id, card, source: source);
+    MessageCallbacks.changes.add(null);
     if (notice != null)
       _publishInteractiveChange(source.id, notice, source: source);
     return {'updated': true, 'revision': card.revision};

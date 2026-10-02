@@ -328,17 +328,7 @@ class DevelopmentProjects {
               AND message.sender_id != 'user:local'
               AND message.role = 'assistant'
               AND message.kind NOT IN ('commentary', 'system')
-              AND (
-                message.interactive_json IS NULL
-                OR json_extract(message.interactive_json, '\$.participation.audience') IS NULL
-                OR EXISTS (
-                  SELECT 1 FROM json_each(
-                    message.interactive_json,
-                    '\$.participation.audience'
-                  )
-                  WHERE value = 'user:local'
-                )
-              )
+              AND NOT EXISTS (SELECT 1 FROM (SELECT 'user:local' AS visibility_viewer) WHERE (json_extract(message.interactive_json, '\$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(message.interactive_json, '\$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(message.interactive_json, '\$.participation.excludedAudience') WHERE value = visibility_viewer))
               AND (
                 message.created_at > COALESCE(
                   json_extract(read_state.value, '\$.at'),

@@ -12,6 +12,9 @@ import 'chat_controller.dart';
 import 'dialog_action_button.dart';
 import 'settings_appearance.dart';
 import 'glass_surface.dart';
+import 'draft_visibility_sheet.dart';
+import 'send_options_sheet.dart';
+import '../../app/ui_action.dart';
 
 class ImageForwardDialog extends StatefulWidget {
   const ImageForwardDialog({
@@ -58,6 +61,29 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
   final _text = TextEditingController();
   final _messenger = GlobalKey<ScaffoldMessengerState>();
   bool _sending = false;
+  DraftVisibility? _visibility;
+
+  Future<void> _options() async {
+    await runUiAction(context, () async {
+      final members = await widget.controller.groupStore.members(
+        widget.targetId!,
+      );
+      if (!mounted) return;
+      FocusScope.of(context).unfocus();
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: false,
+        builder: (_) => SendOptionsSheet(
+          members: members.map((member) => member.sender).toList(),
+          initial: _visibility,
+          onChanged: (value) => setState(() => _visibility = value),
+        ),
+      );
+    });
+  }
+
   @override
   void dispose() {
     _text.dispose();
@@ -75,6 +101,8 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
           widget.targetId,
           message,
           _text.text.trim(),
+          audience: _visibility?.audience,
+          excludedAudience: _visibility?.excludedAudience,
         );
       } else {
         final bytes = await PreviewImageActions.readBytes(widget.image!);
@@ -82,6 +110,8 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
           widget.targetId,
           bytes,
           _text.text.trim(),
+          audience: _visibility?.audience,
+          excludedAudience: _visibility?.excludedAudience,
         );
       }
       if (mounted) Navigator.pop(context, true);
@@ -171,6 +201,15 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
       const SizedBox(height: 20),
       if (widget.preview != null)
         widget.preview!
+      else if (widget.message?.miniappShare != null)
+        SizedBox(
+          height: 260,
+          child: MessageForwardPreview(
+            message: widget.message!,
+            enabled: !_sending,
+            fitAvailableHeight: true,
+          ),
+        )
       else if (bounded)
         Flexible(
           child: MessageForwardPreview(
@@ -229,71 +268,117 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
         ),
       ),
       const SizedBox(height: 8),
+      if (widget.kind == ConversationKind.group && widget.sendMessage == null)
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          leading: const SettingsIcon(type: SettingsIconType.modelSettings),
+          title: const Text('选项', style: TextStyle(fontSize: 15)),
+          subtitle:
+              _visibility == null ||
+                  _visibility!.mode == DraftVisibilityMode.everyone
+              ? null
+              : Text(
+                  _visibility!.label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+          trailing: const SettingsIcon(type: SettingsIconType.chevron),
+          onTap: _sending ? null : _options,
+        ),
     ],
+  );
+
+  Widget _actions() => Row(
+    children: [
+      Expanded(
+        child: DialogActionButton(
+          text: '取消',
+          role: DialogActionRole.secondary,
+          onPressed: _sending ? null : () => Navigator.pop(context),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: DialogActionButton(
+          text: _sending ? '发送中…' : '发送',
+          onPressed: _sending ? null : _send,
+        ),
+      ),
+    ],
+  );
+
+  Widget _body({required bool autoHeight}) => SafeArea(
+    top: false,
+    maintainBottomViewPadding: true,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+      child: Column(
+        mainAxisSize: autoHeight ? MainAxisSize.min : MainAxisSize.max,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Flexible(
+            fit: autoHeight ? FlexFit.loose : FlexFit.tight,
+            child: widget.message?.htmlGame != null
+                ? _content(bounded: true)
+                : SingleChildScrollView(child: _content(bounded: false)),
+          ),
+          const SizedBox(height: 6),
+          _actions(),
+        ],
+      ),
+    ),
   );
 
   @override
   Widget build(BuildContext context) => Padding(
     padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
     child: LayoutBuilder(
-      builder: (context, constraints) => SizedBox(
-        height: constraints.maxHeight.clamp(
-          0.0,
-          widget.message?.htmlGame != null ? 520.0 : 400.0,
-        ),
-        child: GlassSurface(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          child: PopScope(
+      builder: (context, constraints) {
+        if (widget.message?.miniappShare != null) {
+          return PopScope(
             canPop: !_sending,
             child: ScaffoldMessenger(
               key: _messenger,
               child: Scaffold(
                 resizeToAvoidBottomInset: false,
                 backgroundColor: Colors.transparent,
-                body: SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: widget.message?.htmlGame != null
-                              ? _content(bounded: true)
-                              : SingleChildScrollView(
-                                  child: _content(bounded: false),
-                                ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: DialogActionButton(
-                                text: '取消',
-                                role: DialogActionRole.secondary,
-                                onPressed: _sending
-                                    ? null
-                                    : () => Navigator.pop(context),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: DialogActionButton(
-                                text: _sending ? '发送中…' : '发送',
-                                onPressed: _sending ? null : _send,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                body: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: GlassSurface(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(28),
                     ),
+                    child: _body(autoHeight: true),
                   ),
                 ),
               ),
             ),
+          );
+        }
+        return SizedBox(
+          height: constraints.maxHeight.clamp(
+            0.0,
+            widget.message?.htmlGame != null ? 520.0 : 400.0,
           ),
-        ),
-      ),
+          child: GlassSurface(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            child: PopScope(
+              canPop: !_sending,
+              child: ScaffoldMessenger(
+                key: _messenger,
+                child: Scaffold(
+                  resizeToAvoidBottomInset: false,
+                  backgroundColor: Colors.transparent,
+                  body: _body(autoHeight: false),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     ),
   );
 }

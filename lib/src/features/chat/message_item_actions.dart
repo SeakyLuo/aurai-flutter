@@ -76,9 +76,24 @@ extension _MessageItemActions on _MessageItemState {
       });
       if (!loaded || !mounted) return;
     }
+    var allowVisibility = false;
+    if (widget.groupBubble) {
+      final loaded = await runUiAction(context, () async {
+        final groups = await database.query(
+          'conversations',
+          columns: ['id'],
+          where:
+              'kind = ? AND id = (SELECT conversation_id FROM messages WHERE id = ?)',
+          whereArgs: ['group', snapshot.id],
+        );
+        allowVisibility = groups.isNotEmpty;
+      });
+      if (!loaded || !mounted) return;
+    }
     final result = await showMessageActionsMenu(
       context,
       message: snapshot,
+      allowVisibility: allowVisibility,
       allowStar: allowStar,
       allowGroupMarks: groupMark != null,
       pinned: groupMark?.pinned ?? false,
@@ -86,13 +101,7 @@ extension _MessageItemActions on _MessageItemState {
       allowCopy: !compactMenu,
       allowSelect: !compactMenu,
       starred: starred,
-      allowEditing: widget.onEdit != null,
-      allowStatistics:
-          snapshot.interactive
-                  ?.viewFor(MessageSender.localUser.id)
-                  .showStatistics ==
-              true &&
-          (!widget.readOnly || widget.onLocate != null),
+      allowEditing: widget.onEdit != null && snapshot.miniappShare == null,
       allowHistory: hasHistory,
       allowQuote: !compactMenu && widget.onQuote != null,
       allowRecall: widget.onRecall != null,
@@ -127,6 +136,15 @@ extension _MessageItemActions on _MessageItemState {
     }
     final action = (result as MessageActionResult).action;
     switch (action) {
+      case MessageAction.visibility:
+        await runUiAction(
+          context,
+          () => showMessageVisibilitySheet(
+            context,
+            message: snapshot,
+            database: database,
+          ),
+        );
       case MessageAction.pin:
       case MessageAction.groupFavorite:
         final mark = groupMark!;
@@ -187,20 +205,17 @@ extension _MessageItemActions on _MessageItemState {
             ),
           ),
         );
-      case MessageAction.statistics:
-        await showInteractiveStatistics(
-          context,
-          database: ImageActionScope.of(context).groupStore.database,
-          messageId: snapshot.id,
-        );
       case MessageAction.fullscreen:
         await (widget.htmlView! as HtmlView).openFullscreen(context);
       case MessageAction.forward:
-        var htmlCard = snapshot.htmlGame;
+        final htmlCard = snapshot.htmlGame;
         if (htmlCard != null) {
           try {
-            htmlCard = await (widget.htmlView! as HtmlView)
-                .captureForwardPreview();
+            final controller = ImageActionScope.of(context);
+            final entry = await MiniappLibraryStore(
+              controller.groupStore.database,
+            ).entryForMessage(snapshot.id);
+            if (mounted) await forwardMiniapp(context, entry);
           } on Object catch (error) {
             if (mounted) {
               ScaffoldMessenger.of(
@@ -209,12 +224,15 @@ extension _MessageItemActions on _MessageItemState {
             }
             return;
           }
-          if (!mounted) return;
+          return;
         }
+        late String targetConversationId;
+        final controller = ImageActionScope.of(context);
         final sent = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (_) => ImageForwardPage.message(
-              controller: ImageActionScope.of(context),
+              controller: controller,
+              onSent: (target) => targetConversationId = target.id,
               message: AgentMessage(
                 id: snapshot.id,
                 senderId: snapshot.senderId,
@@ -223,6 +241,7 @@ extension _MessageItemActions on _MessageItemState {
                 images: List.of(snapshot.images),
                 files: List.of(snapshot.files),
                 htmlGame: htmlCard,
+                miniappShare: snapshot.miniappShare,
                 interactive: snapshot.interactive,
                 createdAt: snapshot.createdAt,
               ),
@@ -230,9 +249,18 @@ extension _MessageItemActions on _MessageItemState {
           ),
         );
         if (mounted && sent == true) {
-          ScaffoldMessenger.of(
-            context,
-          ).showGlassSnackBar(const SnackBar(content: Text('已转发')));
+          if (snapshot.miniappShare != null) {
+            showMiniappShareNotice(
+              context,
+              controller,
+              targetConversationId,
+              text: '已转发',
+            );
+          } else {
+            ScaffoldMessenger.of(
+              context,
+            ).showGlassSnackBar(const SnackBar(content: Text('已转发')));
+          }
         }
       case MessageAction.branch:
         await widget.onBranch?.call(snapshot);

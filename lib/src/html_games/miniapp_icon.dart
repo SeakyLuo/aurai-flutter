@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import '../features/chat/settings_icon.dart';
+import 'miniapp_symbol.dart';
 
 class MiniappIcon extends StatelessWidget {
   const MiniappIcon({
@@ -12,12 +12,7 @@ class MiniappIcon extends StatelessWidget {
   final String? path, asset;
   final double size;
 
-  Widget _defaultIcon() => SizedBox.square(
-    dimension: size,
-    child: const FittedBox(
-      child: SettingsIcon(type: SettingsIconType.miniapps),
-    ),
-  );
+  Widget _defaultIcon() => MiniappSymbol(size: size);
 
   @override
   Widget build(BuildContext context) => path == null

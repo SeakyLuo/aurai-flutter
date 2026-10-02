@@ -1,3 +1,5 @@
+import 'conversation_list_tile.dart';
+import '../../storage/group_list_preview.dart';
 import '../../widgets/empty_data_view.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -59,8 +61,9 @@ class _AssetChatPickerState extends State<AssetChatPicker> {
         _search.text.trim(),
         _items.length,
       );
-      final values = await Future.wait<Object>([
+      final values = await Future.wait<Object?>([
         HomeConversations(controller.groupStore).senders(page),
+        loadConversationListPreviews(controller.groupStore.database, page),
         controller.groupStore.avatarMembers(
           page
               .where((item) => item.kind == ConversationKind.group)
@@ -73,7 +76,7 @@ class _AssetChatPickerState extends State<AssetChatPicker> {
         _items.addAll(page);
         _more = page.length == 30;
         _senders.addAll(values[0] as Map<String, MessageSender>);
-        _groups.addAll(values[1] as Map<String, List<MessageSender>>);
+        _groups.addAll(values[2] as Map<String, List<MessageSender>>);
       });
     } on Object catch (error) {
       if (mounted && generation == _generation) {
@@ -133,18 +136,15 @@ class _AssetChatPickerState extends State<AssetChatPicker> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               children: [
                 for (final item in _items)
-                  ListTile(
-                    leading: item.kind == ConversationKind.group
-                        ? GroupAvatar(members: _groups[item.id]!, size: 44)
+                  ConversationListTile(
+                    controller: widget.controller,
+                    conversation: item,
+                    avatar: item.kind == ConversationKind.group
+                        ? GroupAvatar(members: _groups[item.id]!, size: 48)
                         : MemberAvatar(
                             sender: _senders[item.defaultSenderId]!,
-                            size: 44,
+                            size: 48,
                           ),
-                    title: Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
                     onTap: () => Navigator.pop(context, item),
                   ),
                 if (_loading)

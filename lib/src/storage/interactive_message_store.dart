@@ -1,4 +1,5 @@
 import '../domain/message_quote.dart';
+import 'interactive_completion.dart';
 import 'package:collection/collection.dart';
 import 'dart:async';
 import '../domain/interactive_selection.dart';
@@ -162,7 +163,12 @@ class InteractiveMessageStore {
                   ),
                 )!;
       final now = DateTime.now().microsecondsSinceEpoch;
-      final callbackId = button['notifyAi'] == true ? newMessageId() : null;
+      final callbackId =
+          button['notifyAi'] == true &&
+              !card.singleChoice &&
+              (action != 'submit' || button['input'] != null)
+          ? newMessageId()
+          : null;
       final state = <String, Object?>{
         if (callbackId != null)
           'callback': {
@@ -193,7 +199,7 @@ class InteractiveMessageStore {
         },
         'updatedAt': now,
       };
-      final next = InteractiveMessage(
+      var next = InteractiveMessage(
         revision:
             nextSession != null &&
                 (nextSession.round != card.engine.round ||
@@ -291,6 +297,16 @@ class InteractiveMessageStore {
           whereArgs: [messageId],
         );
       }
+      next = await enqueueInteractiveCompletion(
+        txn,
+        conversationId: conversationId,
+        messageId: messageId,
+        creatorId: rows.single['sender_id'] as String,
+        previous: card,
+        current: next,
+        actorId: action == 'submit' || card.singleChoice ? actor.id : null,
+        actorName: actor.name,
+      );
       final encoded = jsonEncode(next.toJson(includeParticipants: true));
       await txn.update(
         'messages',
@@ -309,7 +325,7 @@ class InteractiveMessageStore {
           senderId: rows.single['sender_id'] as String,
           payload: {
             'source': 'button',
-            if (card.visible(
+            if (next.visible(
                   'visibility',
                   actor: rows.single['sender_id'] as String,
                 ) ||
@@ -328,33 +344,40 @@ class InteractiveMessageStore {
           },
         );
       }
-      final conversations = await txn.query(
-        'conversations',
-        columns: ['kind', 'archived', 'default_sender_id'],
-        where: 'id = ?',
-        whereArgs: [conversationId],
-        limit: 1,
-      );
-      final conversation = conversations.single;
-      final direct = conversation['kind'] == 'direct';
-      final notice = await writeNotice(
-        txn,
-        conversationId,
-        !card.visible('visibility', actor: actor.id) ||
-                card.participation['visibilityActors'] != null
-            ? '${actor.name}提交了“${card.title}”'
-            : '${actor.name}在“${card.title}”中选择了“${button['label']}”',
-        source: MessageQuote(
-          messageId: messageId,
-          senderId: rows.single['sender_id'] as String,
-          text: card.title,
-        ),
-        audience: (card.participation['audience'] as List?)?.cast<String>(),
-      );
-      if (callbackId == null && actor.id == MessageSender.localUser.id) {
-        if (direct && conversation['archived'] == 0) {
+      final notice = card.hasInteraction
+          ? null
+          : await writeNotice(
+              txn,
+              conversationId,
+              !card.visible('visibility', actor: actor.id) ||
+                      card.participation['visibilityActors'] != null
+                  ? '${actor.name}提交了“${card.title}”'
+                  : '${actor.name}在“${card.title}”中选择了“${button['label']}”',
+              source: MessageQuote(
+                messageId: messageId,
+                senderId: rows.single['sender_id'] as String,
+                text: card.title,
+              ),
+              audience: (card.participation['audience'] as List?)
+                  ?.cast<String>(),
+              excludedAudience:
+                  (card.participation['excludedAudience'] as List?)
+                      ?.cast<String>(),
+            );
+      if (notice != null &&
+          callbackId == null &&
+          actor.id == MessageSender.localUser.id) {
+        final conversations = await txn.query(
+          'conversations',
+          columns: ['kind', 'archived', 'default_sender_id'],
+          where: 'id = ?',
+          whereArgs: [conversationId],
+          limit: 1,
+        );
+        final conversation = conversations.single;
+        if (conversation['kind'] == 'direct' && conversation['archived'] == 0) {
           final recipient = conversation['default_sender_id'] as String;
-          if (next.canView(recipient)) {
+          if (notice.canView(recipient)) {
             await MessageCallbacks.enqueue(
               txn,
               id: newMessageId(),
@@ -389,6 +412,7 @@ class InteractiveMessageStore {
     String conversationId,
     String text, {
     List<String>? audience,
+    List<String>? excludedAudience,
     required MessageQuote source,
   }) async {
     final notice = AgentMessage(
@@ -398,14 +422,18 @@ class InteractiveMessageStore {
       text: text,
       isSystem: true,
       quote: source,
-      interactive: audience == null
+      interactive: audience == null && excludedAudience == null
           ? null
           : InteractiveMessage(
               revision: 0,
               title: text,
               body: '',
               buttons: const [],
-              participation: {'audience': audience},
+              participation: {
+                if (audience != null) 'audience': audience,
+                if (excludedAudience != null)
+                  'excludedAudience': excludedAudience,
+              },
             ),
       createdAt: DateTime.now(),
     );

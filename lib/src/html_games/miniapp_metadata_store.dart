@@ -7,6 +7,8 @@ const miniappMetadataSchema = '''CREATE TABLE miniapp_metadata (
   title TEXT NOT NULL,
   description TEXT NOT NULL,
   icon_path TEXT,
+  share_title TEXT NOT NULL DEFAULT '',
+  share_image_path TEXT,
   revision INTEGER NOT NULL
 )''';
 
@@ -49,6 +51,9 @@ class MiniappMetadataStore {
               row['revision'] as int,
               iconPath: row['icon_path'] as String?,
               replaceIcon: true,
+              shareTitle: row['share_title'] as String,
+              shareImagePath: row['share_image_path'] as String?,
+              replaceSharing: true,
             );
     }).toList();
   }
@@ -58,6 +63,8 @@ class MiniappMetadataStore {
     String title,
     String description, {
     required String? iconPath,
+    required String shareTitle,
+    required String? shareImagePath,
   }) async {
     if (!entry.canEditMetadata) throw StateError('只能编辑自己小程序的资料');
     await database.transaction(
@@ -68,6 +75,9 @@ class MiniappMetadataStore {
         description,
         updateIcon: true,
         iconPath: iconPath,
+        updateSharing: true,
+        shareTitle: shareTitle,
+        shareImagePath: shareImagePath,
       ),
     );
   }
@@ -110,8 +120,13 @@ class MiniappMetadataStore {
     String title,
     String description, {
     bool updateIcon = false,
+    bool updateSharing = false,
+    String shareTitle = '',
+    String? shareImagePath,
     String? iconPath,
   }) async {
+    shareTitle = shareTitle.trim();
+    if (shareTitle.length > 100) throw ArgumentError('分享标题最多 100 字');
     title = title.trim();
     description = description.trim();
     if (title.isEmpty ||
@@ -133,6 +148,8 @@ class MiniappMetadataStore {
       'description': description,
       'revision': revision + 1,
       if (updateIcon) 'icon_path': iconPath,
+      if (updateSharing) 'share_title': shareTitle,
+      if (updateSharing) 'share_image_path': shareImagePath,
     };
     if (rows.isEmpty) {
       await txn.insert('miniapp_metadata', {

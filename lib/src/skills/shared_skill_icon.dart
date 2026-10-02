@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../html_games/html_game_icon.dart';
+import '../html_games/miniapp_symbol.dart';
 import '../features/chat/settings_icon.dart';
 import '../features/chat/conversation_icon.dart';
 import '../features/chat/conversation_menu_icon.dart';
@@ -16,7 +17,6 @@ Widget? sharedSkillIcon(BuildContext context, String name) {
   final color = Theme.of(context).colorScheme.onSurfaceVariant;
   const settings = {
     'discover': SettingsIconType.discover,
-    'miniapp': SettingsIconType.miniapps,
     'tools': SettingsIconType.tools,
     'data': SettingsIconType.data,
     'task': SettingsIconType.tasks,
@@ -81,6 +81,7 @@ Widget? sharedSkillIcon(BuildContext context, String name) {
       ),
     );
   return switch (name) {
+    'miniapp' => MiniappSymbol(color: color),
     'conversation' => const ConversationIcon(),
     'quote' => const SizedBox.square(
       dimension: 24,

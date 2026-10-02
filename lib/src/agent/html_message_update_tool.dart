@@ -8,15 +8,24 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
   final String name;
   final Future<Map<String, Object?>> Function(String, Map<String, Object?>)
   invoke;
-  static const names = ['readHtmlMessage', 'updateHtmlMessage'];
+  static const names = [
+    'readHtmlMessage',
+    'updateHtmlMessage',
+    'readHtmlProgram',
+    'submitHtmlProgramEvent',
+  ];
   @override
   ToolDefinition get definition => ToolDefinition(
     name: name,
     capabilityId: 'local.messages',
-    safety: name == 'readHtmlMessage'
+    safety: name == 'readHtmlMessage' || name == 'readHtmlProgram'
         ? ToolSafety.readOnly
         : ToolSafety.lowRisk,
-    description: name == 'readHtmlMessage'
+    description: name == 'readHtmlProgram'
+        ? 'Read the current version, public state and ONLY your authenticated private view/action cards of a program-backed HTML message. No source or other participants private views are returned. Use this before submitHtmlProgramEvent; never publish private context in group replies.'
+        : name == 'submitHtmlProgramEvent'
+        ? 'Submit an authenticated event to the HTML miniapp host program, without opening a WebView. Requires messageId,eventId,expectedVersion,action,data. The program validates your role and allowed operations, then commits effects and state together. readHtmlProgram supplies the allowed protocol in your private view. Reuse eventId and original arguments for a retry; a version conflict requires rereading and reevaluating. Do not overwrite program state via updateHtmlMessage. This works for private role actions, ending your speech, and AI skill callbacks; it grants no authority beyond the program rules. Return skill results to the program rather than revealing identities or private actions in chat.'
+        : name == 'readHtmlMessage'
         ? 'Read an accessible HTML message by messageId. Authors receive source and state; others receive public metadata and their own interaction projection. includePrivate=true requests approval for internal content. No conversation switching needed. Read the version before updateHtmlMessage. This does not run the page or send a message.'
         : htmlAppGuide +
               htmlMessageComponentGuide +
@@ -34,6 +43,12 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
                 'Default false. Authors receive their own source and state automatically. For another author, true requests human approval to read source and internal state.',
           },
         'messageId': {'type': 'string'},
+        if (name == 'submitHtmlProgramEvent') ...{
+          'eventId': {'type': 'string', 'minLength': 1, 'maxLength': 100},
+          'expectedVersion': {'type': 'integer', 'minimum': 0},
+          'action': {'type': 'string', 'minLength': 1, 'maxLength': 100},
+          'data': {'type': 'object', 'additionalProperties': true},
+        },
         if (name == 'updateHtmlMessage') ...{
           'callbackEventId': {
             'type': 'string',
@@ -69,6 +84,12 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
       'required': [
         'messageId',
         if (name == 'updateHtmlMessage') 'expectedVersion',
+        if (name == 'submitHtmlProgramEvent') ...[
+          'eventId',
+          'expectedVersion',
+          'action',
+          'data',
+        ],
       ],
       'additionalProperties': false,
     },
@@ -76,6 +97,19 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
   @override
   Future<ToolResult> execute(ToolCall call) async {
     try {
+      if (name == 'submitHtmlProgramEvent') {
+        final args = call.arguments;
+        for (final key in ['messageId', 'eventId', 'action']) {
+          if (args[key] is! String || (args[key] as String).isEmpty) {
+            throw ArgumentError('请提供 $key');
+          }
+        }
+        if (args['expectedVersion'] is! int ||
+            (args['expectedVersion'] as int) < 0 ||
+            args['data'] is! Map) {
+          throw ArgumentError('请先读取版本，并提供事件数据对象');
+        }
+      }
       final args = name == 'updateHtmlMessage'
           ? await HtmlMessageSource.resolve(call.arguments, creating: false)
           : call.arguments;
@@ -90,9 +124,7 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
         callId: call.id,
         toolName: name,
         status: ToolResultStatus.error,
-        output: {
-          'message': error.toString(),
-        },
+        output: {'message': error.toString()},
       );
     }
   }

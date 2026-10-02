@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
 import '../features/chat/settings_appearance.dart';
+import '../features/chat/pagination_listener.dart';
 import 'html_store.dart';
 import 'miniapp_icon.dart';
 import 'miniapp_launcher.dart';
@@ -17,7 +18,7 @@ class MiniappRecentPage extends StatefulWidget {
 class _MiniappRecentPageState extends State<MiniappRecentPage> {
   late final _library = MiniappLibraryStore(widget.store.database);
   final _entries = <MiniappEntry>[];
-  bool _loading = false, _more = true, _opening = false;
+  bool _loading = false, _more = true, _opening = false, _failed = false;
   int? _time;
   String? _id;
   @override
@@ -27,8 +28,11 @@ class _MiniappRecentPageState extends State<MiniappRecentPage> {
   }
 
   Future<void> _load({bool reset = false}) async {
-    if (_loading) return;
-    setState(() => _loading = true);
+    if (_loading || (!reset && !_more)) return;
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
     try {
       final result = await _library.recent(
         beforeTime: reset ? null : _time,
@@ -43,10 +47,18 @@ class _MiniappRecentPageState extends State<MiniappRecentPage> {
         _id = result.id;
       });
     } on Object catch (error) {
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+      if (mounted) {
+        _failed = true;
+        ScaffoldMessenger.of(context).showGlassSnackBar(
+          SnackBar(
+            content: Text(errorMessage(error)),
+            action: SnackBarAction(
+              label: '重试',
+              onPressed: () => _load(reset: reset),
+            ),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -79,54 +91,59 @@ class _MiniappRecentPageState extends State<MiniappRecentPage> {
           constraints: const BoxConstraints(maxWidth: 640),
           child: _loading && _entries.isEmpty
               ? const Center(child: CircularProgressIndicator())
-              : ListView(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    MediaQuery.paddingOf(context).top +
-                        SettingsAppBar.toolbarHeight +
-                        16,
-                    16,
-                    16,
-                  ),
-                  children: [
-                    if (_entries.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Center(child: Text('还没有使用过小程序')),
-                      ),
-                    for (final entry in _entries)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Material(
-                          color: settingsFieldColor(context),
-                          borderRadius: BorderRadius.circular(22),
-                          clipBehavior: Clip.antiAlias,
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 10,
-                            ),
-                            leading: MiniappIcon(
-                              path: entry.iconPath,
-                              asset: entry.iconAsset,
-                              size: 48,
-                            ),
-                            title: Text(
-                              entry.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w500,
+              : PaginationListener(
+                  hasMore: !_loading && !_failed && _more,
+                  loadMore: _load,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      MediaQuery.paddingOf(context).top +
+                          SettingsAppBar.toolbarHeight +
+                          16,
+                      16,
+                      16,
+                    ),
+                    children: [
+                      if (_entries.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(32),
+                          child: Center(child: Text('还没有使用过小程序')),
+                        ),
+                      for (final entry in _entries)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Material(
+                            color: settingsFieldColor(context),
+                            borderRadius: BorderRadius.circular(22),
+                            clipBehavior: Clip.antiAlias,
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 10,
                               ),
+                              leading: MiniappIcon(
+                                path: entry.iconPath,
+                                asset: entry.iconAsset,
+                                size: 48,
+                              ),
+                              title: Text(
+                                entry.title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              onTap: _opening ? null : () => _open(entry),
                             ),
-                            onTap: _opening ? null : () => _open(entry),
                           ),
                         ),
-                      ),
-                    if (_more && _entries.isNotEmpty)
-                      TextButton(
-                        onPressed: _loading ? null : _load,
-                        child: Text(_loading ? '正在加载' : '加载更多'),
-                      ),
-                  ],
+                      if (_loading && _entries.isNotEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                    ],
+                  ),
                 ),
         ),
       ),

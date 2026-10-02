@@ -54,7 +54,7 @@ class GroupMessageMarks {
       columns: ['conversation_id'],
       where: '''id = ? AND kind IN ('user', 'group_message', 'html_game')
         AND conversation_id IN (SELECT id FROM conversations WHERE kind = 'group')
-        AND (interactive_json IS NULL OR json_extract(interactive_json, '\$.participation.audience') IS NULL)''',
+        AND (interactive_json IS NULL OR (json_extract(interactive_json, '\$.participation.audience') IS NULL AND json_extract(interactive_json, '\$.participation.excludedAudience') IS NULL))''',
       whereArgs: [messageId],
     );
     if (rows.isEmpty) return null;
@@ -101,7 +101,7 @@ class GroupMessageMarks {
           'messages',
           columns: ['id'],
           where:
-              r"id = ? AND conversation_id = ? AND kind IN ('user', 'group_message', 'html_game') AND (interactive_json IS NULL OR json_extract(interactive_json, '$.participation.audience') IS NULL)",
+              r"id = ? AND conversation_id = ? AND kind IN ('user', 'group_message', 'html_game') AND (interactive_json IS NULL OR (json_extract(interactive_json, '$.participation.audience') IS NULL AND json_extract(interactive_json, '$.participation.excludedAudience') IS NULL))",
           whereArgs: [messageId, groupId],
         );
         if (rows.isEmpty) throw StateError('只能操作本群对所有成员可见的消息');

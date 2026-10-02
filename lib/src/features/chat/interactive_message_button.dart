@@ -138,6 +138,7 @@ class InteractiveMessageButton extends StatelessWidget {
   }
 
   Widget _icon(String name, Color color) => switch (name) {
+    'statistics' => SettingsIcon(type: SettingsIconType.data, color: color),
     'delete' => ConversationMenuIcon(
       type: ConversationMenuIconType.delete,
       color: color,

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/agent_models.dart';
+import '../domain/message_image.dart';
 import '../domain/context_summary.dart';
 import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
@@ -85,6 +86,17 @@ class ConversationWriter {
       if (saveDraft)
         for (var i = 0; i < conversation.draftImages.length; i++)
           attachmentRow(conversation.id, conversation.draftImages[i], i),
+      for (final message in changed)
+        for (final path in message.miniappShare?.mediaPaths ?? const <String>[])
+          {
+            ...attachmentRow(
+              conversation.id,
+              MessageImage(path: path, mimeType: 'image/png'),
+              0,
+              messageId: message.id,
+            ),
+            'kind': 'miniapp_media',
+          },
       for (final message in changed)
         for (var i = 0; i < message.images.length; i++)
           attachmentRow(

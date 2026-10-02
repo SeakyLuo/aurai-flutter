@@ -9,6 +9,7 @@ import 'wrench_painter.dart';
 import 'file_tool_icon.dart';
 import 'question_icon.dart';
 import 'settings_icon.dart';
+import '../../html_games/miniapp_symbol.dart';
 import 'sidebar_action_icon.dart';
 import 'tool_semantic_icon.dart';
 
@@ -47,10 +48,9 @@ class ToolActionIcon extends StatelessWidget {
 
               'sendHtmlMessage' ||
               'readHtmlMessage' ||
-              'updateHtmlMessage' => AttachmentActionIcon(
-                type: AttachmentActionIconType.html,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+              'readHtmlProgram' ||
+              'submitHtmlProgramEvent' ||
+              'updateHtmlMessage' ||
               'listHtmlApps' ||
               'readHtmlApp' ||
               'updateHtmlApp' ||
@@ -59,9 +59,8 @@ class ToolActionIcon extends StatelessWidget {
               'publishHtmlApp' ||
               'updateHtmlAppPublication' ||
               'setHtmlAppIcon' ||
-              'withdrawHtmlApp' => SettingsIcon(
+              'withdrawHtmlApp' => MiniappSymbol(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
-                type: SettingsIconType.miniapps,
               ),
               'sendInteractiveMessage' ||
               'clickInteractiveMessage' ||

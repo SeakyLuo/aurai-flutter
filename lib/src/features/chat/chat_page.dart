@@ -1,6 +1,13 @@
+import 'draft_visibility_sheet.dart';
+import 'send_options_sheet.dart';
+import 'app_dialog.dart';
+import 'dialog_action_button.dart';
+import '../../storage/group_participation.dart';
+import '../../app/ui_action.dart';
 import 'group_announcement_banner.dart';
 import 'group_mute_builder.dart';
 import 'send_favorite_page.dart';
+import 'send_miniapp_message.dart';
 import 'asset_library_page.dart';
 import '../../domain/library_asset.dart';
 import 'workspace_changes_panel.dart';
@@ -89,6 +96,7 @@ class _ChatPageState extends State<ChatPage>
   late String _mentionText = widget.controller.activeConversation.draft;
   late String _mentionConversationId = widget.controller.activeConversation.id;
   bool _mentionOpen = false;
+  final _draftVisibility = <String, DraftVisibility>{};
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   late final _textController = MentionTextController(
     () => _mentions,
@@ -120,6 +128,7 @@ class _ChatPageState extends State<ChatPage>
   MessageEditSession? _editing;
 
   void _updateEditing(VoidCallback change) => setState(change);
+  void _updateDraftVisibility(VoidCallback change) => setState(change);
   void _clearMessageHighlight() => setState(() => _highlightedMessageId = null);
   @override
   void initState() {
@@ -213,7 +222,9 @@ class _ChatPageState extends State<ChatPage>
   void _onProgramError() {
     final error = widget.controller.programErrors.value;
     if (error != null && mounted) {
-      ScaffoldMessenger.of(context).showGlassSnackBar(SnackBar(content: Text(error)));
+      ScaffoldMessenger.of(
+        context,
+      ).showGlassSnackBar(SnackBar(content: Text(error)));
     }
   }
 

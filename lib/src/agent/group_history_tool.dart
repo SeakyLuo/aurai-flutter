@@ -70,9 +70,10 @@ class ReadGroupMessagesTool implements AgentTool, RuntimeCapabilityAgentTool {
           'text',
           'created_at',
           "json_extract(interactive_json, '\$.participation.audience') AS audience",
+          "json_extract(interactive_json, '\$.participation.excludedAudience') AS excludedAudience",
         ],
         where:
-            "conversation_id = ? AND (interactive_json IS NULL OR json_extract(interactive_json, '\$.participation.audience') IS NULL OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = ?))${query.isEmpty ? '' : ' AND instr(lower(text), ?) > 0'}",
+            "conversation_id = ? AND NOT EXISTS (SELECT 1 FROM (SELECT ? AS visibility_viewer) WHERE (json_extract(interactive_json, '\$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.excludedAudience') WHERE value = visibility_viewer))${query.isEmpty ? '' : ' AND instr(lower(text), ?) > 0'}",
         whereArgs: [groupId, senderId, if (query.isNotEmpty) query],
         orderBy: 'created_at DESC, id DESC',
         limit: limit + 1,
@@ -101,6 +102,9 @@ class ReadGroupMessagesTool implements AgentTool, RuntimeCapabilityAgentTool {
             for (final row in page)
               {
                 ...row,
+                'excludedAudience': row['excludedAudience'] == null
+                    ? null
+                    : jsonDecode(row['excludedAudience'] as String),
                 'audience': row['audience'] == null
                     ? null
                     : jsonDecode(row['audience'] as String),

@@ -32,8 +32,8 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   bool allowSelect = true,
   bool starred = false,
   bool allowEditing = true,
-  bool allowStatistics = false,
   bool allowHistory = false,
+  bool allowVisibility = false,
   bool allowQuote = false,
   bool allowRecall = false,
   bool allowRetry = false,
@@ -79,12 +79,6 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             SettingsIcon(type: SettingsIconType.tasks, color: iconColor),
             '查看历史',
           ),
-        if (allowStatistics)
-          (
-            const MessageActionResult(MessageAction.statistics),
-            SettingsIcon(type: SettingsIconType.data, color: iconColor),
-            '查看统计',
-          ),
         if (message.htmlGame != null &&
             message.htmlGame!.displayMode != 'inline')
           (
@@ -105,7 +99,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
               type: AttachmentActionIconType.forward,
               color: iconColor,
             ),
-            '转发',
+            message.htmlGame != null ? '分享' : '转发',
           ),
         if (allowBranch)
           (
@@ -116,11 +110,11 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             ),
             '在新聊天继续',
           ),
-        if (allowCopy && message.text.isNotEmpty)
+        if (allowCopy && message.htmlGame == null && message.text.isNotEmpty)
           (
             const MessageActionResult(MessageAction.copy),
             CopyIcon(color: iconColor),
-            message.htmlGame != null ? '复制标题' : '复制',
+            '复制',
           ),
         if (allowStar)
           (
@@ -155,7 +149,10 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             groupFavorite ? '取消群标记' : '添加群标记',
           ),
         ],
-        if (allowSelect && message.text.isNotEmpty)
+        if (allowSelect &&
+            message.htmlGame == null &&
+            message.miniappShare == null &&
+            message.text.isNotEmpty)
           (
             const MessageActionResult(MessageAction.select),
             TextSelectionIcon(color: iconColor),
@@ -259,11 +256,47 @@ Future<MessageMenuResult?> showMessageActionsMenu(
               ],
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-                child: Text(
-                  messageTime(message.createdAt),
-                  style: TextStyle(
+                child: DefaultTextStyle(
+                  style: Theme.of(context).textTheme.bodySmall!.copyWith(
                     fontSize: 13,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(messageTime(message.createdAt))),
+                      if (allowVisibility && message.hasRestrictedAudience)
+                        InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => Navigator.pop(
+                            context,
+                            const MessageActionResult(MessageAction.visibility),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(message.visibilityLabel),
+                                const SizedBox(width: 4),
+                                SizedBox.square(
+                                  dimension: 16,
+                                  child: FittedBox(
+                                    child: SettingsIcon(
+                                      type: SettingsIconType.chevron,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
