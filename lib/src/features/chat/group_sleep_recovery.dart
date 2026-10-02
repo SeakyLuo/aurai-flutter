@@ -1,6 +1,23 @@
 part of 'chat_controller.dart';
 
 extension GroupSleepRecovery on ChatController {
+  Future<void> manageGroupMemberSleep(
+    String groupId,
+    String senderId, {
+    Duration? duration,
+  }) async {
+    await groupStore.requireManager(
+      _store.database,
+      groupId,
+      MessageSender.localUser.id,
+    );
+    if (duration == null) {
+      await wakeGroupMember(groupId, senderId);
+    } else {
+      await _sleepInTargetGroup(groupId, senderId, duration, '', '由群主或管理员安排睡眠');
+    }
+  }
+
   Future<DateTime?> _sleepInTargetGroup(
     String groupId,
     String senderId,

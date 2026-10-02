@@ -44,7 +44,7 @@ class _AssetRenameDialogState extends State<_AssetRenameDialog> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            '重命名资产',
+            '重命名',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
           ),
@@ -57,7 +57,7 @@ class _AssetRenameDialogState extends State<_AssetRenameDialog> {
             autofocus: true,
             maxLength: 120 - _suffix.length,
             decoration: InputDecoration(
-              hintText: '资产名称',
+              hintText: '名称',
               suffixText: _suffix,
               fillColor: dialogControlColor(context),
               filled: true,

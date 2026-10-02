@@ -41,7 +41,7 @@ class GroupParticipation {
     };
   }
 
-  Future<Set<String>> pauseAll(String groupId) async {
+  Future<Set<String>> pauseAll(String groupId, {required String reason}) async {
     final ids = await database.transaction((txn) async {
       final rows = await txn.query(
         'conversation_members',
@@ -65,7 +65,7 @@ class GroupParticipation {
           'conversation_id': groupId,
           'sender_id': id,
           'paused': 1,
-          'reason': '用户暂停了全部成员的自动接话',
+          'reason': reason,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
       await batch.commit(noResult: true);

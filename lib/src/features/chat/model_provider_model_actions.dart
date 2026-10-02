@@ -1,6 +1,17 @@
 part of 'model_provider_detail.dart';
 
 extension _ProviderModelActions on _ModelProviderDetailState {
+  Future<void> _openModelManagement() async {
+    await _openModelSettings(
+      ProviderModelManagementPage(
+        controller: widget.controller,
+        service: _service,
+        readOnly: true,
+        onConfigureTypes: _configureModelTypes,
+      ),
+    );
+  }
+
   Future<void> _openWebsite() async {
     final uri = Uri.tryParse(_website.text.trim());
     if (uri == null ||

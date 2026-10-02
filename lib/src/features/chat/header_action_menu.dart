@@ -13,17 +13,21 @@ Future<String?> showHeaderActionMenu(
   Set<String> preserveIconColors = const {},
   Set<String> selectedValues = const {},
   Set<String> separatorBeforeValues = const {},
+  Offset? position,
 }) {
   final button = context.findRenderObject()! as RenderBox;
   final overlay =
       Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
-  final origin = button.localToGlobal(Offset.zero, ancestor: overlay);
+  final origin = position == null
+      ? button.localToGlobal(Offset.zero, ancestor: overlay)
+      : overlay.globalToLocal(position);
+  final anchor = origin & (position == null ? button.size : Size.zero);
   final media = MediaQuery.of(context);
   final width = math.min(
     212.0,
     media.size.width - media.padding.horizontal - 16,
   );
-  final left = (origin.dx + button.size.width - width).clamp(
+  final left = (anchor.right - width).clamp(
     media.padding.left + 8,
     media.size.width - media.padding.right - width - 8,
   );
@@ -41,7 +45,7 @@ Future<String?> showHeaderActionMenu(
           CustomSingleChildLayout(
             delegate: _MenuPosition(
               left: left,
-              anchor: origin & button.size,
+              anchor: anchor,
               width: width,
               topInset: media.padding.top + 8,
               bottomInset: media.padding.bottom + 8,

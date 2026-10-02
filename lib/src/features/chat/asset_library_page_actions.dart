@@ -78,7 +78,7 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
           context: context,
           builder: (_) => const DeleteConfirmationDialog(
             title: '清空回收站？',
-            description: '回收站中的所有资产将彻底删除，无法恢复。已发送的聊天附件会保留。',
+            description: '回收站中的所有资料将彻底删除，无法恢复。已发送的聊天附件会保留。',
             confirmLabel: '清空',
           ),
         );
@@ -88,13 +88,17 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
     }
   }
 
-  Future<void> _assetMenu(
+  Future<LibraryAsset?> _assetMenu(
     BuildContext buttonContext,
-    LibraryAsset asset,
-  ) async {
+    LibraryAsset asset, {
+    Offset? position,
+    VoidCallback? closePreview,
+  }) async {
     final action = await showHeaderActionMenu(
       buttonContext,
+      position: position,
       destructiveValues: {'delete'},
+      separatorBeforeValues: {if (!widget.trash) 'rename', 'delete'},
       items: [
         if (widget.trash)
           (
@@ -103,7 +107,30 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
             icon: const QuestionIcon(type: QuestionIconType.undo),
           )
         else ...[
-          (value: 'use', label: '用于聊天', icon: const ConversationIcon()),
+          (
+            value: 'forward',
+            label: '转发',
+            icon: const AttachmentActionIcon(
+              type: AttachmentActionIconType.forward,
+            ),
+          ),
+          (
+            value: 'save',
+            label: '下载',
+            icon: const AttachmentActionIcon(
+              type: AttachmentActionIconType.download,
+            ),
+          ),
+        ],
+        if (asset.conversationId != null && asset.messageId != null)
+          (
+            value: 'locate',
+            label: '定位消息',
+            icon: const AttachmentActionIcon(
+              type: AttachmentActionIconType.locate,
+            ),
+          ),
+        if (!widget.trash)
           (
             value: 'rename',
             label: '重命名',
@@ -111,59 +138,110 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
               type: ConversationMenuIconType.rename,
             ),
           ),
-          (
-            value: 'save',
-            label: '保存到设备',
-            icon: const AttachmentActionIcon(
-              type: AttachmentActionIconType.download,
-            ),
-          ),
-        ],
+        (
+          value: 'info',
+          label: '查看信息',
+          icon: const SettingsIcon(type: SettingsIconType.info),
+        ),
         (
           value: 'delete',
-          label: widget.trash ? '彻底删除' : '删除',
+          label: widget.trash ? '彻底删除' : '移入回收站',
           icon: const ConversationMenuIcon(
             type: ConversationMenuIconType.delete,
           ),
         ),
       ],
     );
-    if (!mounted) return;
+    if (!mounted) return null;
     switch (action) {
-      case 'use':
-        await _use([asset]);
+      case 'forward':
+        await _forward(buttonContext, [asset]);
       case 'rename':
-        await _rename(asset);
+        return _rename(asset);
       case 'save':
         await _save(asset);
       case 'restore':
         await _restore([asset.id]);
+        closePreview?.call();
       case 'delete':
-        await _delete([asset.id]);
+        await _delete([asset.id], onDeleted: closePreview);
+      case 'locate':
+        closePreview?.call();
+        await openHomeConversation(
+          context,
+          widget.controller,
+          asset.conversationId!,
+          messageId: asset.messageId!,
+        );
+      case 'info':
+        await showAssetInfo(buttonContext, asset);
     }
+    return null;
   }
 
   Future<void> _open(LibraryAsset asset) async {
+    if (!asset.isImage) {
+      await MessageFileStore.open(asset.file);
+      return;
+    }
+    final provider = localImageProvider(asset.path);
+    final size = await loadPreviewImageSize(provider, context);
+    if (!mounted) return;
+    var currentAsset = asset;
     await Navigator.push<void>(
       context,
-      MaterialPageRoute(
-        builder: (_) => AssetDetailPage(
-          asset: asset,
+      PageRouteBuilder<void>(
+        opaque: false,
+        transitionDuration: const Duration(milliseconds: 340),
+        reverseTransitionDuration: const Duration(milliseconds: 280),
+        pageBuilder: (_, _, _) => ImageActionScope(
           controller: widget.controller,
-          trash: widget.trash,
-          onUse: () => _use([asset]),
-          onSave: () => _save(asset),
-          onRestore: () => _restore([asset.id]),
+          child: ImagePreview(
+            images: [provider],
+            initialIndex: 0,
+            heroTag: 'library-asset:${asset.id}',
+            imageSize: size,
+            onActions: (previewContext, index, position) => _perform(() async {
+              final renamed = await _assetMenu(
+                previewContext,
+                currentAsset,
+                position: position,
+                closePreview: () {
+                  if (previewContext.mounted &&
+                      ModalRoute.of(previewContext)!.isCurrent) {
+                    Navigator.pop(previewContext);
+                  }
+                },
+              );
+              if (renamed != null) currentAsset = renamed;
+            }),
+          ),
+        ),
+        transitionsBuilder: (_, animation, _, child) => FadeTransition(
+          opacity: animation.drive(CurveTween(curve: Curves.easeInOutCubic)),
+          child: child,
         ),
       ),
     );
   }
 
-  Future<void> _rename(LibraryAsset asset) async {
+  Future<LibraryAsset?> _rename(LibraryAsset asset) async {
     final name = await showAssetRename(context, asset.name);
-    if (name == null || !mounted) return;
+    if (name == null || !mounted) return null;
     await _mutate(() => _library.rename(asset, name));
     if (mounted) _notice('已重命名');
+    return LibraryAsset(
+      id: asset.id,
+      name: name,
+      mimeType: asset.mimeType,
+      kind: asset.kind,
+      size: asset.size,
+      source: asset.source,
+      createdAt: asset.createdAt,
+      path: asset.path,
+      conversationId: asset.conversationId,
+      messageId: asset.messageId,
+    );
   }
 
   Future<void> _save(LibraryAsset asset, {bool notify = true}) async {
@@ -178,16 +256,16 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
     if (mounted && notify) _notice('已保存到应用下载目录');
   }
 
-  Future<void> _delete(List<String> ids) async {
+  Future<void> _delete(List<String> ids, {VoidCallback? onDeleted}) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => DeleteConfirmationDialog(
         title: widget.trash
-            ? '彻底删除 ${ids.length} 项资产？'
-            : '删除 ${ids.length} 项资产？',
+            ? '彻底删除 ${ids.length} 项资料？'
+            : '将 ${ids.length} 项资料移入回收站？',
         description: widget.trash
             ? '彻底删除后无法恢复。已发送的聊天附件会保留。'
-            : '资产将移入回收站，已发送的聊天附件会保留。',
+            : '可在回收站中恢复。已发送的聊天附件会保留。',
         confirmLabel: widget.trash ? '彻底删除' : '移入回收站',
       ),
     );
@@ -196,6 +274,7 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
       () => widget.trash ? _library.purge(ids) : _library.moveToTrash(ids),
     );
     if (!mounted) return;
+    onDeleted?.call();
     if (widget.trash) {
       _notice('已彻底删除');
       return;
@@ -231,7 +310,7 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
     }
   }
 
-  Future<void> _useSelected() async {
+  Future<void> _forwardSelected() async {
     final assets = _items
         .where((asset) => _selected.contains(asset.id))
         .toList();
@@ -239,7 +318,8 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
       Navigator.pop(context, assets);
       return;
     }
-    await _use(assets);
+    final sent = await _forward(context, assets);
+    if (sent && mounted) _closeSelection();
   }
 
   Future<void> _saveSelected() async {
@@ -257,24 +337,42 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
     }
   }
 
-  Future<void> _use(List<LibraryAsset> assets) async {
+  Future<bool> _forward(
+    BuildContext originContext,
+    List<LibraryAsset> assets,
+  ) async {
     final controller = widget.controller;
-    final target = await Navigator.push<Conversation>(
-      context,
+    final sent = await Navigator.push<bool>(
+      originContext,
       MaterialPageRoute(
-        builder: (_) => AssetChatPicker(controller: controller),
+        builder: (_) => assets.length == 1 && assets.single.isImage
+            ? ImageForwardPage(
+                controller: controller,
+                image: localImageProvider(assets.single.path),
+              )
+            : ImageForwardPage.message(
+                controller: controller,
+                pageTitle: '转发资料',
+                message: AgentMessage(
+                  id: newMessageId(),
+                  role: AgentMessageRole.user,
+                  senderId: MessageSender.localUser.id,
+                  text: '',
+                  images: [
+                    for (final asset in assets)
+                      if (asset.isImage) asset.image,
+                  ],
+                  files: [
+                    for (final asset in assets)
+                      if (!asset.isImage) asset.file,
+                  ],
+                  createdAt: DateTime.now(),
+                ),
+              ),
       ),
     );
-    if (target == null || !mounted) return;
-    _update(() => _busy = true);
-    try {
-      await controller.selectConversation(target.id);
-      await controller.addLibraryAssets(assets);
-      if (!mounted) return;
-      await openHomeConversation(context, controller, target.id);
-    } finally {
-      if (mounted) _update(() => _busy = false);
-    }
+    if (sent == true && mounted) _notice('已转发');
+    return sent == true;
   }
 
   void _notice(String message) => ScaffoldMessenger.of(

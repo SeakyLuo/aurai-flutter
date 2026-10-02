@@ -5,8 +5,9 @@ import 'chat_controller.dart';
 import 'image_action_scope.dart';
 import 'image_forward_page.dart';
 import 'home_navigation.dart';
+import 'question_icon.dart';
+import 'settings_icon.dart';
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:photo_view/photo_view.dart';
@@ -62,6 +63,7 @@ class ImagePreview extends StatefulWidget {
     required this.initialIndex,
     required this.heroTag,
     required this.imageSize,
+    this.onActions,
   });
   final List<ImageProvider> images;
   final String? originMessageId;
@@ -69,6 +71,7 @@ class ImagePreview extends StatefulWidget {
   final int initialIndex;
   final Object heroTag;
   final Size imageSize;
+  final Future<void> Function(BuildContext, int, Offset)? onActions;
 
   @override
   State<ImagePreview> createState() => _ImagePreviewState();
@@ -77,11 +80,59 @@ class ImagePreview extends StatefulWidget {
 class _ImagePreviewState extends State<ImagePreview> {
   late final _pages = PageController(initialPage: widget.initialIndex);
   late int _index = widget.initialIndex;
-  bool _zoomed = false;
 
   bool _exporting = false;
+  bool _controlsVisible = true;
+  bool _menuOpen = false;
+  int _pointers = 0;
+  Timer? _hideControls;
 
-  Future<void> _showActions(LongPressStartDetails details) async {
+  @override
+  void initState() {
+    super.initState();
+    _scheduleHide();
+  }
+
+  void _scheduleHide() {
+    _hideControls?.cancel();
+    if (_menuOpen || _pointers > 0) return;
+    _hideControls = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _controlsVisible = false);
+    });
+  }
+
+  void _showControls() {
+    if (!_controlsVisible) setState(() => _controlsVisible = true);
+    _scheduleHide();
+  }
+
+  void _pointerDown(PointerDownEvent event) {
+    _pointers++;
+    _showControls();
+  }
+
+  void _pointerEnd(PointerEvent event) {
+    _pointers--;
+    _scheduleHide();
+  }
+
+  Future<void> _openActions(Offset position) async {
+    if (_menuOpen || _exporting) return;
+    _menuOpen = true;
+    _showControls();
+    try {
+      if (widget.onActions != null) {
+        await widget.onActions!(context, _index, position);
+      } else {
+        await _showActions(position);
+      }
+    } finally {
+      _menuOpen = false;
+      if (mounted) _scheduleHide();
+    }
+  }
+
+  Future<void> _showActions(Offset position) async {
     if (_exporting) return;
     final image = widget.images[_index];
     final originMessageId = _index == widget.initialIndex
@@ -113,7 +164,7 @@ class _ImagePreviewState extends State<ImagePreview> {
     if (!mounted) return;
     final action = await showImageActionsMenu(
       context,
-      details.globalPosition,
+      position,
       canLocate: origin != null,
     );
     if (action == null || !mounted || _exporting) return;
@@ -174,6 +225,7 @@ class _ImagePreviewState extends State<ImagePreview> {
 
   @override
   void dispose() {
+    _hideControls?.cancel();
     _pages.dispose();
     super.dispose();
   }
@@ -181,191 +233,142 @@ class _ImagePreviewState extends State<ImagePreview> {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Colors.black,
-    body: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => Navigator.pop(context),
-      onLongPressStart: _showActions,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          SafeArea(
-            top: false,
-            child: PhotoViewGestureDetectorScope(
-              axis: Axis.horizontal,
-              child: PageView.builder(
-                controller: _pages,
-                physics: _zoomed ? const NeverScrollableScrollPhysics() : null,
-                itemCount: widget.images.length,
-                onPageChanged: (index) => setState(() {
-                  _index = index;
-                  _zoomed = false;
-                }),
-                itemBuilder: (context, index) => _PreviewPage(
-                  key: ValueKey(index),
-                  image: widget.images[index],
-                  initialSize: index == widget.initialIndex
-                      ? widget.imageSize
-                      : null,
-                  heroTag: widget.heroTag,
-                  heroEnabled: index == widget.initialIndex && index == _index,
-                  onZoomChanged: (zoomed) {
-                    if (index == _index && zoomed != _zoomed) {
-                      setState(() => _zoomed = zoomed);
-                    }
-                  },
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 0,
-            left: 0,
-            child: SafeArea(
-              minimum: const EdgeInsets.all(16),
-              child: GlassSurface(
-                dark: true,
-                tintOpacity: .6,
-                radius: 24,
-                shadowOpacity: .8,
-                child: RoundAction(
-                  icon: Icons.close_rounded,
-                  iconWidget: const Icon(
-                    Icons.close_rounded,
-                    size: 24,
-                    color: Colors.white,
+    body: Listener(
+      onPointerDown: _pointerDown,
+      onPointerUp: _pointerEnd,
+      onPointerCancel: _pointerEnd,
+      onPointerHover: (_) => _showControls(),
+      onPointerSignal: (_) => _showControls(),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _showControls,
+        onLongPressStart: (details) => _openActions(details.globalPosition),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            SafeArea(
+              top: false,
+              child: PhotoViewGestureDetectorScope(
+                axis: Axis.horizontal,
+                child: PageView.builder(
+                  controller: _pages,
+                  itemCount: widget.images.length,
+                  onPageChanged: (index) => setState(() {
+                    _index = index;
+                  }),
+                  itemBuilder: (context, index) => _PreviewPage(
+                    key: ValueKey(index),
+                    image: widget.images[index],
+                    heroTag: widget.heroTag,
+                    heroEnabled:
+                        index == widget.initialIndex && index == _index,
+                    onTap: _showControls,
                   ),
-                  label: '关闭预览',
-                  onPressed: () => Navigator.pop(context),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _PreviewPage extends StatefulWidget {
-  const _PreviewPage({
-    super.key,
-    required this.image,
-    required this.initialSize,
-    required this.heroTag,
-    required this.heroEnabled,
-    required this.onZoomChanged,
-  });
-  final ImageProvider image;
-  final Size? initialSize;
-  final Object heroTag;
-  final bool heroEnabled;
-  final ValueChanged<bool> onZoomChanged;
-
-  @override
-  State<_PreviewPage> createState() => _PreviewPageState();
-}
-
-class _PreviewPageState extends State<_PreviewPage> {
-  final _photoController = PhotoViewController();
-  late final StreamSubscription<PhotoViewControllerValue> _scaleSubscription;
-  double _fitScale = 1;
-  late final Future<Size?> _size = _load();
-  bool _zoomed = false;
-
-  Future<Size?> _load() async {
-    if (widget.initialSize != null) return widget.initialSize;
-    try {
-      return await loadPreviewImageSize(widget.image, context);
-    } on Object {
-      return null;
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _scaleSubscription = _photoController.outputStateStream.listen(_onScale);
-  }
-
-  void _onScale(PhotoViewControllerValue value) {
-    final scale = value.scale;
-    if (scale == null) return;
-    final zoomed = scale > _fitScale * 1.01;
-    if (zoomed == _zoomed) return;
-    _zoomed = zoomed;
-    widget.onZoomChanged(zoomed);
-  }
-
-  @override
-  void dispose() {
-    _scaleSubscription.cancel();
-    _photoController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => FutureBuilder<Size?>(
-    future: _size,
-    initialData: widget.initialSize,
-    builder: (context, snapshot) {
-      final size = snapshot.data;
-      if (size == null) {
-        return snapshot.connectionState == ConnectionState.done
-            ? const UnavailableImage(dark: true)
-            : const Center(
-                child: CircularProgressIndicator(color: Colors.white70),
-              );
-      }
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          final fitted = applyBoxFit(
-            BoxFit.contain,
-            size,
-            constraints.biggest,
-          ).destination;
-          _fitScale = fitted.width / size.width;
-          final coverScale = math.max(
-            constraints.maxWidth / size.width,
-            constraints.maxHeight / size.height,
-          );
-          final nativeScale = 1 / MediaQuery.devicePixelRatioOf(context);
-          return PhotoView.customChild(
-            controller: _photoController,
-            childSize: size,
-            initialScale: PhotoViewComputedScale.contained,
-            minScale: PhotoViewComputedScale.contained,
-            maxScale: math.max(
-              math.max(coverScale * 2, nativeScale * 2),
-              _fitScale * 3,
-            ),
-            filterQuality: FilterQuality.medium,
-            onTapUp: (_, _, _) => Navigator.pop(context),
-            child: RepaintBoundary(
-              child: HeroMode(
-                enabled: widget.heroEnabled,
-                child: Hero(
-                  tag: widget.heroTag,
-                  createRectTween: (begin, end) =>
-                      RectTween(begin: begin, end: end),
-                  flightShuttleBuilder:
-                      (flightContext, animation, direction, from, to) =>
-                          imagePreviewFlight(widget.image, animation),
-                  child: SizedBox.fromSize(
-                    size: size,
-                    child: Image(
-                      image: widget.image,
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.medium,
-                      errorBuilder: (_, _, _) =>
-                          const UnavailableImage(dark: true),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                minimum: const EdgeInsets.all(16),
+                child: IgnorePointer(
+                  ignoring: !_controlsVisible,
+                  child: AnimatedOpacity(
+                    opacity: _controlsVisible ? 1 : 0,
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 180),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _control(
+                          label: '关闭预览',
+                          icon: const QuestionIcon(
+                            type: QuestionIconType.close,
+                            color: Colors.white,
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        Builder(
+                          builder: (buttonContext) => _control(
+                            label: '更多',
+                            icon: const SettingsIcon(
+                              type: SettingsIconType.more,
+                              color: Colors.white,
+                            ),
+                            onPressed: () {
+                              final box =
+                                  buttonContext.findRenderObject()!
+                                      as RenderBox;
+                              _openActions(
+                                box.localToGlobal(
+                                  Offset(box.size.width, box.size.height + 8),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
             ),
-          );
-        },
-      );
-    },
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _control({
+    required String label,
+    required Widget icon,
+    required VoidCallback onPressed,
+  }) => GlassSurface(
+    dark: true,
+    tintOpacity: .6,
+    radius: 24,
+    shadowOpacity: .8,
+    child: RoundAction(
+      icon: Icons.more_vert,
+      iconWidget: icon,
+      label: label,
+      onPressed: onPressed,
+    ),
+  );
+}
+
+class _PreviewPage extends StatelessWidget {
+  const _PreviewPage({
+    super.key,
+    required this.image,
+    required this.heroTag,
+    required this.heroEnabled,
+    required this.onTap,
+  });
+  final ImageProvider image;
+  final Object heroTag;
+  final bool heroEnabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => PhotoView(
+    imageProvider: image,
+    wantKeepAlive: true,
+    heroAttributes: heroEnabled
+        ? PhotoViewHeroAttributes(
+            tag: heroTag,
+            createRectTween: (begin, end) => RectTween(begin: begin, end: end),
+            flightShuttleBuilder:
+                (flightContext, animation, direction, from, to) =>
+                    imagePreviewFlight(image, animation),
+          )
+        : null,
+    onTapUp: (_, _, _) => onTap(),
+    loadingBuilder: (_, _) =>
+        const Center(child: CircularProgressIndicator(color: Colors.white70)),
+    errorBuilder: (_, _, _) => const UnavailableImage(dark: true),
   );
 }

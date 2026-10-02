@@ -81,16 +81,12 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
 
   Future<void> _fetch() async {
     if (_catalog != null) return;
-    if (!widget.selectable && !widget.config.autoSyncModels) {
+    if (!_loaded && !widget.selectable && !widget.config.autoSyncModels) {
       setState(() {
         _models = widget.config.savedModels;
-        _selected
-          ..clear()
-          ..addAll(_models);
+        _selected.addAll(_models);
         _loaded = true;
-        _fetching = false;
       });
-      return;
     }
     if (!_canConnect()) {
       setState(() => _fetching = false);
@@ -106,7 +102,8 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
           _models = models;
           if (!_loaded) {
             _selected.clear();
-            _selected.addAll(_useAll ? models : widget.config.savedModels);
+            _selected.addAll(widget.config.savedModels);
+            if (_useAll) _selected.addAll(models);
           }
           _loaded = true;
           _requestFailed = false;
@@ -233,8 +230,8 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
     final query = _search.text.trim().toLowerCase();
     final available = widget.selectable || _useAll
         ? {
+            ...widget.config.savedModels,
             ..._models,
-            if (!widget.config.autoSyncModels) ...widget.config.savedModels,
             ..._selected,
             ..._selectedFilterModels,
           }

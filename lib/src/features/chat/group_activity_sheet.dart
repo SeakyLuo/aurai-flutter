@@ -1,4 +1,5 @@
 import 'task_playback_icon.dart';
+import 'menu_press_highlight.dart';
 import '../../storage/group_chat_store.dart';
 import '../../storage/group_participation.dart';
 import '../../domain/ai_profile.dart';
@@ -62,6 +63,83 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
   final _waking = <String>{};
   int? _memberCount;
   int _membersRevision = 0;
+  Map<String, GroupMemberRole> _roles = {};
+  bool get _canManage => _roles[MessageSender.localUser.id]?.canManage == true;
+
+  Future<void> _chooseParticipation(
+    GroupMemberActivity activity,
+    Offset position,
+  ) async {
+    final action = await showHeaderActionMenu(
+      context,
+      position: position,
+      items: [
+        (
+          value: 'participation',
+          label: activity.autoReplyPaused ? '恢复接话' : '暂停接话',
+          icon: QuestionIcon(
+            type: activity.autoReplyPaused
+                ? QuestionIconType.play
+                : QuestionIconType.pause,
+          ),
+        ),
+        if (!activity.autoReplyPaused) ...[
+          if (activity.sleeping)
+            (
+              value: 'wake',
+              label: '唤醒',
+              icon: const QuestionIcon(type: QuestionIconType.play),
+            ),
+          (
+            value: 'sleep',
+            label: activity.sleeping ? '调整睡眠时间' : '睡眠',
+            icon: const SettingsIcon(type: SettingsIconType.tasks),
+          ),
+        ],
+      ],
+    );
+    if (!mounted || action == null) return;
+    if (action == 'participation') {
+      await runUiAction(
+        context,
+        () => widget.controller.setGroupMemberAutoReply(
+          widget.conversationId,
+          activity.sender.id,
+          paused: !activity.autoReplyPaused,
+        ),
+      );
+    } else if (action == 'wake') {
+      await runUiAction(
+        context,
+        () => widget.controller.manageGroupMemberSleep(
+          widget.conversationId,
+          activity.sender.id,
+        ),
+      );
+    } else {
+      final minutes = await showHeaderActionMenu(
+        context,
+        position: position,
+        items: [
+          for (final minutes in [1, 5, 15, 30, 60])
+            (
+              value: '$minutes',
+              label: minutes == 60 ? '睡眠 1 小时' : '睡眠 $minutes 分钟',
+              icon: const SettingsIcon(type: SettingsIconType.tasks),
+            ),
+        ],
+      );
+      if (!mounted || minutes == null) return;
+      await runUiAction(
+        context,
+        () => widget.controller.manageGroupMemberSleep(
+          widget.conversationId,
+          activity.sender.id,
+          duration: Duration(minutes: int.parse(minutes)),
+        ),
+      );
+    }
+  }
 
   bool _wakingAll = false;
 
@@ -85,9 +163,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
     setState(() => _pausingAll = true);
     try {
       await runUiAction(context, () async {
-        await widget.controller.pauseAllGroupAutoReply(
-          widget.conversationId,
-        );
+        await widget.controller.pauseAllGroupAutoReply(widget.conversationId);
       });
     } finally {
       if (mounted) setState(() => _pausingAll = false);
@@ -97,9 +173,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
   Future<void> _resumeAll() async {
     setState(() => _resumingAll = true);
     try {
-      await widget.controller.resumeAllGroupAutoReply(
-        widget.conversationId,
-      );
+      await widget.controller.resumeAllGroupAutoReply(widget.conversationId);
     } on Object catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showGlassSnackBar(
@@ -217,9 +291,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
   Future<void> _wakeAll() async {
     setState(() => _wakingAll = true);
     try {
-      await widget.controller.wakeAllGroupMembers(
-        widget.conversationId,
-      );
+      await widget.controller.wakeAllGroupMembers(widget.conversationId);
     } on Object catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showGlassSnackBar(
@@ -312,9 +384,10 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
   Future<void> _resume(GroupMemberActivity activity) async {
     setState(() => _resuming.add(activity.sender.id));
     try {
-      await widget.controller.resumeGroupAutoReply(
+      await widget.controller.setGroupMemberAutoReply(
         widget.conversationId,
         activity.sender.id,
+        paused: false,
       );
     } on Object catch (error) {
       if (mounted)
@@ -351,6 +424,13 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
     final running = !activity.idle && !activity.sleeping;
     final colors = Theme.of(context).colorScheme;
     var description = activity.description;
+    if (description == '群成员') {
+      description = switch (_roles[activity.sender.id]) {
+        GroupMemberRole.owner => '群主',
+        GroupMemberRole.admin => '管理员',
+        _ => '群成员',
+      };
+    }
     if (activity.sleeping) {
       final until = activity.sleepingUntil!.toLocal();
       final time =
@@ -360,129 +440,151 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
     if (activity.isMuted) {
       description = '已${activity.mute!.description}';
     }
-    return Padding(
-      key: ValueKey(activity.sender.id),
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          _avatar(activity),
-          const SizedBox(width: 12),
-          Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap:
-                  running &&
-                      activity.thoughts.any((text) => text.trim().isNotEmpty)
-                  ? () => _openDetails(activity)
-                  : activity.sleeping
-                  ? () => _openSleepDetails(activity)
-                  : activity.autoReplyPaused &&
-                        activity.autoReplyPauseReason!.isNotEmpty
-                  ? () => _openPauseDetails(activity)
-                  : null,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    activity.sender.name,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  if (running && activity.preview.isEmpty)
-                    ThinkingIndicator(
-                      label: description,
-                      fontSize: 13,
-                      singleLine: true,
-                      animate: !activity.stopping && !activity.waitingForUser,
-                    )
-                  else
-                    Text(
-                      running && !activity.stopping
-                          ? activity.preview
-                          : description,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  if (running && activity.autoReplyPaused && !activity.isMuted)
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: activity.autoReplyPauseReason!.isEmpty
-                          ? null
-                          : () => _openPauseDetails(activity),
-                      child: Text(
-                        activity.autoReplyPauseReason!.isEmpty
-                            ? '自动接话已关闭'
-                            : '自动接话已关闭 · ${activity.autoReplyPauseReason}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colors.onSurfaceVariant,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: MenuPressHighlight(
+        borderRadius: BorderRadius.circular(18),
+        onLongPressStart:
+            _canManage &&
+                activity.sender.kind == MessageSenderKind.agent &&
+                !activity.isMuted
+            ? (details) =>
+                  _chooseParticipation(activity, details.globalPosition)
+            : null,
+        child: Padding(
+          key: ValueKey(activity.sender.id),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          child: Row(
+            children: [
+              _avatar(activity),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap:
+                      running &&
+                          activity.thoughts.any(
+                            (text) => text.trim().isNotEmpty,
+                          )
+                      ? () => _openDetails(activity)
+                      : activity.sleeping
+                      ? () => _openSleepDetails(activity)
+                      : activity.autoReplyPaused &&
+                            activity.autoReplyPauseReason!.isNotEmpty
+                      ? () => _openPauseDetails(activity)
+                      : null,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        activity.sender.name,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ),
-                ],
+                      const SizedBox(height: 4),
+                      if (running && activity.preview.isEmpty)
+                        ThinkingIndicator(
+                          label: description,
+                          fontSize: 13,
+                          singleLine: true,
+                          animate:
+                              !activity.stopping && !activity.waitingForUser,
+                        )
+                      else
+                        Text(
+                          running && !activity.stopping
+                              ? activity.preview
+                              : description,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      if (running &&
+                          activity.autoReplyPaused &&
+                          !activity.isMuted)
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: activity.autoReplyPauseReason!.isEmpty
+                              ? null
+                              : () => _openPauseDetails(activity),
+                          child: Text(
+                            activity.autoReplyPauseReason!.isEmpty
+                                ? '自动接话已关闭'
+                                : '自动接话已关闭 · ${activity.autoReplyPauseReason}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (activity.autoReplyPaused && !activity.isMuted)
-            SettingsGlassAction(
-              label: _resuming.contains(activity.sender.id) ? '恢复中' : '恢复接话',
-              icon: Icons.play_arrow_rounded,
-              iconWidget: _resuming.contains(activity.sender.id)
-                  ? SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 1.65,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    )
-                  : const QuestionIcon(type: QuestionIconType.play),
-              onPressed:
-                  _pausingAll ||
+              const SizedBox(width: 8),
+              if (_canManage && activity.autoReplyPaused && !activity.isMuted)
+                SettingsGlassAction(
+                  label: _resuming.contains(activity.sender.id)
+                      ? '恢复中'
+                      : '恢复接话',
+                  icon: Icons.play_arrow_rounded,
+                  iconWidget: _resuming.contains(activity.sender.id)
+                      ? SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.65,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        )
+                      : const QuestionIcon(type: QuestionIconType.play),
+                  onPressed:
+                      _pausingAll ||
+                          _resumingAll ||
+                          _wakingAll ||
+                          _resuming.contains(activity.sender.id)
+                      ? null
+                      : () => _resume(activity),
+                ),
+              if (running)
+                _StopMemberButton(
+                  controller: widget.controller,
+                  conversationId: widget.conversationId,
+                  activity: activity,
+                )
+              else if (activity.sleeping &&
+                  !activity.autoReplyPaused &&
+                  !activity.isMuted)
+                SettingsGlassAction(
+                  label: _waking.contains(activity.sender.id) ? '唤醒中' : '唤醒',
+                  icon: Icons.play_arrow_rounded,
+                  iconWidget: _waking.contains(activity.sender.id)
+                      ? SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.65,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        )
+                      : const QuestionIcon(type: QuestionIconType.play),
+                  onPressed:
                       _resumingAll ||
-                      _wakingAll ||
-                      _resuming.contains(activity.sender.id)
-                  ? null
-                  : () => _resume(activity),
-            ),
-          if (running)
-            _StopMemberButton(
-              controller: widget.controller,
-              conversationId: widget.conversationId,
-              activity: activity,
-            )
-          else if (activity.sleeping &&
-              !activity.autoReplyPaused &&
-              !activity.isMuted)
-            SettingsGlassAction(
-              label: _waking.contains(activity.sender.id) ? '唤醒中' : '唤醒',
-              icon: Icons.play_arrow_rounded,
-              iconWidget: _waking.contains(activity.sender.id)
-                  ? SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 1.65,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    )
-                  : const QuestionIcon(type: QuestionIconType.play),
-              onPressed:
-                  _resumingAll ||
-                      _wakingAll ||
-                      _waking.contains(activity.sender.id)
-                  ? null
-                  : () => _wake(activity),
-            ),
-        ],
+                          _wakingAll ||
+                          _waking.contains(activity.sender.id)
+                      ? null
+                      : () => _wake(activity),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -494,6 +596,9 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       controller: widget.controller,
       conversationId: widget.conversationId,
       includeInactive: !widget._asSheet,
+      onMembersLoaded: (members) => setState(() {
+        _roles = {for (final member in members) member.sender.id: member.role};
+      }),
       onMemberCount: widget._asSheet
           ? null
           : (count) {
@@ -517,10 +622,10 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
               )
             : ListView(
                 padding: widget._asSheet
-                    ? const EdgeInsets.fromLTRB(18, 4, 18, 24)
+                    ? const EdgeInsets.fromLTRB(8, 4, 8, 24)
                     : settingsPagePadding(
                         context,
-                        const EdgeInsets.fromLTRB(18, 4, 18, 24),
+                        const EdgeInsets.fromLTRB(8, 4, 8, 24),
                       ),
                 children: [for (final activity in visible) _row(activity)],
               );
