@@ -10,20 +10,8 @@ extension ImageForwarding on ChatController {
     return next;
   }
 
-  Future<List<Conversation>> imageForwardTargets(
-    String query,
-    int offset,
-  ) async {
-    final rows = await _store.database.query(
-      'conversations',
-      where: "archived = 0 AND instr(lower(title), ?) > 0",
-      whereArgs: [query.toLowerCase()],
-      orderBy: 'updated_at DESC, id DESC',
-      limit: 30,
-      offset: offset,
-    );
-    return rows.map(conversationFromRow).toList();
-  }
+  Future<List<Conversation>> imageForwardTargets(String query, int offset) =>
+      HomeConversations(groupStore).forwardTargets(query, offset);
 
   Future<({String conversationId, String messageId})?> imageOrigin({
     String? messageId,

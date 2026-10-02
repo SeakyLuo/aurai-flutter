@@ -1,3 +1,4 @@
+import 'provider_settings_draft.dart';
 import 'dart:convert';
 import 'dart:async';
 
@@ -20,6 +21,7 @@ class ModelContextPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.service,
+    this.draft,
     this.initialModel,
     this.fixedModel = false,
     this.readOnly = false,
@@ -27,6 +29,7 @@ class ModelContextPage extends StatefulWidget {
 
   final ChatController controller;
   final ModelService service;
+  final ProviderSettingsDraft? draft;
   final String? initialModel;
   final bool fixedModel;
   final bool readOnly;
@@ -37,8 +40,8 @@ class ModelContextPage extends StatefulWidget {
 
 class _ModelContextPageState extends State<ModelContextPage> {
   late final _initial = {
-    ...?widget.controller.modelSettings
-        .profile(widget.service)
+    ...?(widget.draft?.config ??
+            widget.controller.modelSettings.profile(widget.service))
         .details
         ?.modelContextOverrides,
   };
@@ -48,7 +51,9 @@ class _ModelContextPageState extends State<ModelContextPage> {
   final _percent = TextEditingController();
   late String _scope =
       widget.initialModel ??
-      widget.controller.modelSettings.profile(widget.service).model;
+      (widget.draft?.config ??
+              widget.controller.modelSettings.profile(widget.service))
+          .model;
   List<String> _usedModels = const [];
   bool _custom = false;
   bool _edited = false;
@@ -148,7 +153,9 @@ class _ModelContextPageState extends State<ModelContextPage> {
   }
 
   Future<void> _pickModel() async {
-    final config = widget.controller.modelSettings.profile(widget.service);
+    final config =
+        (widget.draft?.config ??
+        widget.controller.modelSettings.profile(widget.service));
     final choice = await showChoiceSheet<String>(
       context,
       title: '选择模型',
@@ -191,7 +198,9 @@ class _ModelContextPageState extends State<ModelContextPage> {
             (percent == null || percent < 65 || percent > 95))) {
       return null;
     }
-    final config = widget.controller.modelSettings.profile(widget.service);
+    final config =
+        (widget.draft?.config ??
+        widget.controller.modelSettings.profile(widget.service));
     final draft = {..._drafts};
     draft[model] = ModelContextOverride(
       contextWindow: window,
@@ -223,8 +232,12 @@ class _ModelContextPageState extends State<ModelContextPage> {
     if (!_capture()) return;
     setState(() => _saving = true);
     try {
-      final config = widget.controller.modelSettings.profile(widget.service);
-      await widget.controller.saveConfig(
+      final config =
+          (widget.draft?.config ??
+          widget.controller.modelSettings.profile(widget.service));
+      await saveProviderEditorConfig(
+        widget.controller,
+        widget.draft,
         config.copyWith(
           details: ProviderDetails(
             name: config.displayName,
@@ -245,7 +258,7 @@ class _ModelContextPageState extends State<ModelContextPage> {
         defaultService: widget.controller.modelSettings.activeService,
       );
       if (!mounted) return;
-      _notice('上下文压缩设置已保存');
+      if (widget.draft == null) _notice('上下文压缩设置已保存');
       setState(() => _allowPop = true);
       Navigator.pop(context, true);
     } on Object catch (error) {
@@ -341,8 +354,8 @@ class _ModelContextPageState extends State<ModelContextPage> {
     if (widget.readOnly) {
       final value = _drafts[_scope];
       final inherited =
-          widget.controller.modelSettings
-              .profile(widget.service)
+          (widget.draft?.config ??
+                  widget.controller.modelSettings.profile(widget.service))
               .details
               ?.modelContextOverrides['']
               ?.compactPercent ??
@@ -423,7 +436,7 @@ class _ModelContextPageState extends State<ModelContextPage> {
                     ),
                   ),
                   RoundAction(
-                    label: '保存',
+                    label: widget.draft == null ? '保存' : '完成',
                     icon: Icons.check_rounded,
                     iconWidget: const SettingsIcon(
                       type: SettingsIconType.check,
@@ -488,7 +501,7 @@ class _ModelContextPageState extends State<ModelContextPage> {
                       decoration: _fieldDecoration(
                         _providerDefault
                             ? '默认 80'
-                            : '继承默认 ${widget.controller.modelSettings.profile(widget.service).details?.modelContextOverrides['']?.compactPercent ?? 80}',
+                            : '继承默认 ${(widget.draft?.config ?? widget.controller.modelSettings.profile(widget.service)).details?.modelContextOverrides['']?.compactPercent ?? 80}',
                       ),
                       onChanged: (_) => setState(() => _edited = true),
                     ),

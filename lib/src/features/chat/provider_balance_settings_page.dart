@@ -1,3 +1,4 @@
+import 'provider_settings_draft.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/glass_notice.dart';
@@ -13,10 +14,12 @@ class ProviderBalanceSettingsPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.service,
+    this.draft,
   });
 
   final ChatController controller;
   final ModelService service;
+  final ProviderSettingsDraft? draft;
 
   @override
   State<ProviderBalanceSettingsPage> createState() =>
@@ -25,9 +28,10 @@ class ProviderBalanceSettingsPage extends StatefulWidget {
 
 class _ProviderBalanceSettingsPageState
     extends State<ProviderBalanceSettingsPage> {
-  late final ProviderBalanceConfig? _initial = widget.controller.modelSettings
-      .profile(widget.service)
-      .balanceConfig;
+  late final ProviderBalanceConfig? _initial =
+      (widget.draft?.config ??
+              widget.controller.modelSettings.profile(widget.service))
+          .balanceConfig;
   late final Map<String, TextEditingController> _fields = {
     'url': TextEditingController(text: _initial?.url ?? ''),
     'itemsPath': TextEditingController(text: _initial?.itemsPath ?? ''),
@@ -71,6 +75,14 @@ class _ProviderBalanceSettingsPageState
     super.dispose();
   }
 
+  Future<void> _saveBalance(ProviderBalanceConfig? value) async {
+    if (widget.draft case final draft?) {
+      draft.updateDetails({'balance': value?.toJson()});
+    } else {
+      await widget.controller.saveProviderBalanceConfig(widget.service, value);
+    }
+  }
+
   Future<void> _save() async {
     if (_saving) return;
     if (_value('url').isEmpty) {
@@ -79,8 +91,7 @@ class _ProviderBalanceSettingsPageState
     }
     setState(() => _saving = true);
     try {
-      await widget.controller.saveProviderBalanceConfig(
-        widget.service,
+      await _saveBalance(
         ProviderBalanceConfig(
           url: _value('url'),
           itemsPath: _value('itemsPath'),
@@ -97,7 +108,7 @@ class _ProviderBalanceSettingsPageState
         ),
       );
       if (!mounted) return;
-      _notice('账户余额设置已保存');
+      if (widget.draft == null) _notice('账户余额设置已保存');
       setState(() => _allowPop = true);
       Navigator.pop(context);
     } on Object catch (error) {
@@ -111,9 +122,9 @@ class _ProviderBalanceSettingsPageState
     if (_saving) return;
     setState(() => _saving = true);
     try {
-      await widget.controller.saveProviderBalanceConfig(widget.service, null);
+      await _saveBalance(null);
       if (!mounted) return;
-      _notice('账户余额设置已恢复');
+      if (widget.draft == null) _notice('账户余额设置已恢复');
       setState(() => _allowPop = true);
       Navigator.pop(context);
     } on Object catch (error) {
@@ -202,7 +213,7 @@ class _ProviderBalanceSettingsPageState
         onBack: _leave,
         actions: [
           SettingsGlassAction(
-            label: '保存',
+            label: widget.draft == null ? '保存' : '完成',
             icon: Icons.check_rounded,
             iconWidget: const SettingsIcon(type: SettingsIconType.check),
             onPressed: _saving || !_dirty ? null : _save,
@@ -233,8 +244,10 @@ class _ProviderBalanceSettingsPageState
                 _field('successPath', '请求成功字段', '选填，例如 status'),
                 _field('successValue', '请求成功值', '例如 true 或 0'),
                 _field('grantedLabel', '赠送余额名称', '例如 赠金或代金券'),
-                if (widget.controller.modelSettings
-                        .profile(widget.service)
+                if ((widget.draft?.config ??
+                            widget.controller.modelSettings.profile(
+                              widget.service,
+                            ))
                         .details
                         ?.balance !=
                     null)

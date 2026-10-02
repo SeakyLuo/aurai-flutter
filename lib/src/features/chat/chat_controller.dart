@@ -1,3 +1,4 @@
+import '../../storage/home_conversations.dart';
 import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 import '../../agent/private_task_tool.dart';
 import '../../storage/private_task_state.dart';
@@ -501,7 +502,9 @@ class ChatController extends ChangeNotifier {
     await MessageCallbacks(_store.database).recoverInterrupted();
     await scheduledTasks.initialize(_runScheduled);
     await _groupSleeps.initialize(_store.database, _recoverGroupSleep);
-    _programChanges = MiniappProgramStore.changes.stream.listen(_receiveProgramChange);
+    _programChanges = MiniappProgramStore.changes.stream.listen(
+      _receiveProgramChange,
+    );
     _scheduleProgramTick();
     _callbackChanges = MessageCallbacks.changes.stream.listen((_) {
       _callbacksPending = true;

@@ -168,8 +168,7 @@ class _MessageItemState extends State<MessageItem> {
                   widget.onQuote != null &&
                   !widget.readOnly &&
                   !widget.streaming &&
-                  !message.isReasoning &&
-                  message.htmlGame == null
+                  !message.isReasoning
               ? MessageSwipeQuote(
                   belowAvatar:
                       widget.groupBubble &&

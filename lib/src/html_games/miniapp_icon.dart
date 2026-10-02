@@ -12,12 +12,21 @@ class MiniappIcon extends StatelessWidget {
   final String? path, asset;
   final double size;
 
-  Widget _defaultIcon() => MiniappSymbol(size: size);
+  Widget _defaultIcon(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(size * .22),
+    ),
+    alignment: Alignment.center,
+    child: MiniappSymbol(size: size * .52),
+  );
 
   @override
   Widget build(BuildContext context) => path == null
       ? asset == null
-            ? _defaultIcon()
+            ? _defaultIcon(context)
             : ClipRRect(
                 borderRadius: BorderRadius.circular(size * .22),
                 child: Image.asset(
@@ -35,7 +44,7 @@ class MiniappIcon extends StatelessWidget {
             height: size,
             fit: BoxFit.cover,
             cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).ceil(),
-            errorBuilder: (_, _, _) => _defaultIcon(),
+            errorBuilder: (_, _, _) => _defaultIcon(context),
           ),
         );
 }

@@ -31,30 +31,16 @@ extension _ProviderModelActions on _ModelProviderDetailState {
     if (!mounted || result == null) return false;
     _modelTypeMappings = result.mappings;
     _modelPurposeField.text = result.path;
+    if (_editing) {
+      _modelDraft.updateDetails({
+        'modelPurposeField': result.path,
+        'modelTypeMappings': {
+          for (final entry in result.mappings.entries)
+            entry.key: entry.value.name,
+        },
+      });
+    }
     _changed();
     return true;
-  }
-
-  Future<void> _openModelManagement() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: false,
-      builder: (_) => ProviderModelsPage(
-        controller: widget.controller,
-        config: _saved,
-        onConfigureTypes: _saved.protocol.supportsChatModels
-            ? _configureModelTypes
-            : null,
-        onDefaultSettings: () => _openModelSettings(
-          DefaultModelSettingsPage(
-            controller: widget.controller,
-            service: _service,
-            readOnly: true,
-          ),
-        ),
-      ),
-    );
   }
 }

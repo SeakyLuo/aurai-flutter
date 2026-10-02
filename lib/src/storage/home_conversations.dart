@@ -17,10 +17,21 @@ class HomeConversations {
   Future<List<Conversation>> recent({int offset = 0}) async {
     final rows = await store.database.query(
       'conversations',
-      where:
-          'archived = 0 AND $visibleConversation AND $localUserConversation',
+      where: 'archived = 0 AND $visibleConversation AND $localUserConversation',
       orderBy: 'pinned DESC, updated_at DESC, id DESC',
       limit: pageSize,
+      offset: offset,
+    );
+    return _headers(rows);
+  }
+
+  Future<List<Conversation>> forwardTargets(String query, int offset) async {
+    final rows = await store.database.query(
+      'conversations',
+      where: "archived = 0 AND instr(lower(title), ?) > 0",
+      whereArgs: [query.toLowerCase()],
+      orderBy: 'updated_at DESC, id DESC',
+      limit: 30,
       offset: offset,
     );
     return _headers(rows);

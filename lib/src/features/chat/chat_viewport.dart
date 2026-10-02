@@ -83,6 +83,9 @@ class ChatViewportState extends State<ChatViewport> {
   bool _hasLayout = false;
   String? _replyAnchorId;
   final _entryHeights = <String, double>{};
+  // Positioned-list jumps move entries between slivers. Preserve live HTML
+  // subtrees across those parents instead of recreating their platform views.
+  final _retainedEntryKeys = <String, GlobalKey>{};
   final _enteringToolEntries = <String>{};
   bool _contentBelow = false;
   bool _bottomSyncQueued = false;
@@ -234,6 +237,14 @@ class ChatViewportState extends State<ChatViewport> {
     _indices = {
       for (var i = 0; i < widget.entries.length; i++) widget.entries[i].id: i,
     };
+    final retainedIds = {
+      for (final entry in widget.entries)
+        if (entry.preserveState) entry.id,
+    };
+    _retainedEntryKeys.removeWhere((id, _) => !retainedIds.contains(id));
+    for (final id in retainedIds) {
+      _retainedEntryKeys.putIfAbsent(id, () => GlobalKey());
+    }
   }
 
   @override
@@ -628,7 +639,9 @@ class ChatViewportState extends State<ChatViewport> {
                   final entry = widget.entries[index];
                   final animateEntrance = _enteringToolEntries.remove(entry.id);
                   return KeyedSubtree(
-                    key: PageStorageKey(entry.id),
+                    key:
+                        _retainedEntryKeys[entry.id] ??
+                        PageStorageKey(entry.id),
                     child: ChatScrollAnchor(
                       preserve: () => _preserveEntry(entry.id),
                       child: ChatEntrySize(

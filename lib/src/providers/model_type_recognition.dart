@@ -23,6 +23,31 @@ abstract final class ModelTypeRecognition {
     String configuredPath,
     Map<String, ModelPurpose> mappings,
   ) {
+    if (configuredPath.isEmpty && read(model, '').path == null) {
+      final endpoints = model['supported_endpoint_types'] as List?;
+      if (endpoints != null) {
+        final media = {
+          for (final endpoint in endpoints)
+            if (defaults['$endpoint'.replaceAll('-', '_')] case final purpose?)
+              purpose,
+        };
+        if (media.isNotEmpty) return media;
+        final id = (model['id'] as String).split('/').last;
+        if (id.startsWith('gemini-') && id.contains('-image')) {
+          return {ModelPurpose.imageGeneration};
+        }
+        if (endpoints.any(
+          (endpoint) => const {
+            'openai',
+            'anthropic',
+            'gemini',
+            'openai-response',
+          }.contains(endpoint),
+        )) {
+          return {ModelPurpose.text};
+        }
+      }
+    }
     final value = read(model, configuredPath).value;
     final values = value is List ? value : [if (value != null) value];
     final rules = mappings.isEmpty ? defaults : mappings;

@@ -660,6 +660,11 @@ class _HtmlViewState extends State<HtmlView>
                       onPressed: _retrying ? null : _retry,
                       child: const Text('重试 AI 回合'),
                     ),
+                  if (_card.displayMode == 'hybrid')
+                    TextButton(
+                      onPressed: () => widget.openFullscreen(context),
+                      child: const Text('查看详情'),
+                    ),
                 ],
               ),
             );

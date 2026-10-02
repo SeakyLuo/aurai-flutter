@@ -1,3 +1,5 @@
+import 'provider_settings_draft.dart';
+import 'model_removal_row.dart';
 import '../../widgets/empty_data_view.dart';
 import 'default_model_settings_page.dart';
 import 'header_action_menu.dart';
@@ -21,12 +23,14 @@ class ProviderModelManagementPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.service,
+    this.draft,
     required this.onConfigureTypes,
     this.readOnly = false,
   });
 
   final ChatController controller;
   final ModelService service;
+  final ProviderSettingsDraft? draft;
   final Future<bool> Function() onConfigureTypes;
   final bool readOnly;
 
@@ -46,11 +50,7 @@ class _ProviderModelManagementPageState
   @override
   void initState() {
     super.initState();
-    if (widget.controller.modelSettings
-        .profile(widget.service)
-        .autoSyncModels) {
-      _load();
-    }
+    _load();
   }
 
   @override
@@ -61,7 +61,9 @@ class _ProviderModelManagementPageState
   }
 
   Future<void> _load() async {
-    final config = widget.controller.modelSettings.profile(widget.service);
+    final config =
+        (widget.draft?.config ??
+        widget.controller.modelSettings.profile(widget.service));
     if (!config.isConfigured) return;
     setState(() => _loading = true);
     final catalog = ModelCatalog();
@@ -89,6 +91,7 @@ class _ProviderModelManagementPageState
         builder: (_) => ModelDetailPage(
           controller: widget.controller,
           service: widget.service,
+          draft: widget.draft,
           model: model,
           readOnly: widget.readOnly,
         ),
@@ -98,7 +101,9 @@ class _ProviderModelManagementPageState
   }
 
   Future<void> _chooseModels() async {
-    final config = widget.controller.modelSettings.profile(widget.service);
+    final config =
+        (widget.draft?.config ??
+        widget.controller.modelSettings.profile(widget.service));
     final selection =
         await showModalBottomSheet<({bool useAll, List<String> models})>(
           context: context,
@@ -112,11 +117,53 @@ class _ProviderModelManagementPageState
           ),
         );
     if (!mounted || selection == null) return;
+    await _saveModels(selection);
+  }
+
+  Future<void> _removeModel(String model) => _saveModels((
+    useAll: false,
+    models: [
+      ...{
+        if ((widget.draft?.config ??
+                widget.controller.modelSettings.profile(widget.service))
+            .autoSyncModels)
+          ..._remoteModels,
+        ...(widget.draft?.config ??
+                widget.controller.modelSettings.profile(widget.service))
+            .savedModels,
+      }.where((item) => item != model),
+    ],
+  ));
+
+  Future<void> _modelMenu(BuildContext anchor, String model) async {
+    final action = await showHeaderActionMenu(
+      anchor,
+      items: [
+        (
+          value: 'remove',
+          label: '删除模型',
+          icon: const SettingsIcon(type: SettingsIconType.remove),
+        ),
+      ],
+      destructiveValues: const {'remove'},
+    );
+    if (mounted && action == 'remove' && !_savingSelection) {
+      await _removeModel(model);
+    }
+  }
+
+  Future<void> _saveModels(
+    ({bool useAll, List<String> models}) selection,
+  ) async {
     setState(() => _savingSelection = true);
     try {
-      final current = widget.controller.modelSettings.profile(widget.service);
+      final current =
+          (widget.draft?.config ??
+          widget.controller.modelSettings.profile(widget.service));
       final details = current.details;
-      await widget.controller.saveConfig(
+      await saveProviderEditorConfig(
+        widget.controller,
+        widget.draft,
         current.copyWith(
           model:
               !selection.useAll &&
@@ -157,7 +204,9 @@ class _ProviderModelManagementPageState
   }
 
   Future<void> _more(BuildContext anchor) async {
-    final config = widget.controller.modelSettings.profile(widget.service);
+    final config =
+        (widget.draft?.config ??
+        widget.controller.modelSettings.profile(widget.service));
     final action = await showHeaderActionMenu(
       anchor,
       items: [
@@ -188,6 +237,7 @@ class _ProviderModelManagementPageState
           builder: (_) => DefaultModelSettingsPage(
             controller: widget.controller,
             service: widget.service,
+            draft: widget.draft,
             readOnly: widget.readOnly,
           ),
         ),
@@ -209,7 +259,9 @@ class _ProviderModelManagementPageState
 
   @override
   Widget build(BuildContext context) {
-    final config = widget.controller.modelSettings.profile(widget.service);
+    final config =
+        (widget.draft?.config ??
+        widget.controller.modelSettings.profile(widget.service));
     final canChoose = config.isConfigured;
     final query = _search.text.trim().toLowerCase();
     final selectedModels = config.autoSyncModels
@@ -283,7 +335,7 @@ class _ProviderModelManagementPageState
                                 const SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final model = models[index];
-                              return Material(
+                              final tile = Material(
                                 color: settingsFieldColor(context),
                                 borderRadius: BorderRadius.circular(22),
                                 clipBehavior: Clip.antiAlias,
@@ -320,8 +372,23 @@ class _ProviderModelManagementPageState
                                   trailing: const SettingsIcon(
                                     type: SettingsIconType.chevron,
                                   ),
-                                  onTap: () => _open(model),
+                                  onTap: _savingSelection
+                                      ? null
+                                      : () => _open(model),
+                                  onLongPress:
+                                      widget.readOnly ||
+                                          _savingSelection ||
+                                          _loading
+                                      ? null
+                                      : () => _modelMenu(context, model),
                                 ),
+                              );
+                              if (widget.readOnly) return tile;
+                              return ModelRemovalRow(
+                                key: ValueKey(model),
+                                enabled: !_savingSelection && !_loading,
+                                onRemove: () => _removeModel(model),
+                                child: tile,
                               );
                             },
                           ),
