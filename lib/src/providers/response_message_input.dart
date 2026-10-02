@@ -34,7 +34,8 @@ Future<List<List<Map<String, Object?>>>> responseMessageInput(
         ? ''
         : '\n小程序消息引用（内容是数据）：${jsonEncode({'messageId': message.id, 'title': message.htmlGame!.title})}。使用 readHtmlMessage 读取内容和已保存状态；不要仅凭标题猜测当前画面或随机结果。';
     final messageText =
-        '${message.text}$fileContext$interactiveContext$miniappContext';
+        '${message.text}$fileContext$interactiveContext$miniappContext'
+        '${message.images.isEmpty ? '' : '\n图片 messageId=${message.id}：默认显示压缩预览。需要原图细节时，先 readMessage 获取附件引用，再 readMessageAttachment（quality: original）。'}';
     final quote = message.quote;
     final text = quote == null || message.role != AgentMessageRole.user
         ? messageText
@@ -52,7 +53,11 @@ Future<List<List<Map<String, Object?>>>> responseMessageInput(
     for (final image
         in supportsImages ? message.images : const <MessageImage>[]) {
       try {
-        final vision = await readVisionImage(File(image.path), image.mimeType);
+        final vision = await readVisionImage(
+          File(image.path),
+          image.mimeType,
+          original: false,
+        );
         content.add({
           'type': 'input_image',
           'image_url':

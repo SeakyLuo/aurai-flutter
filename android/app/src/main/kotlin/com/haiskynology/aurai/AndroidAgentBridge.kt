@@ -19,6 +19,7 @@ import java.io.File
 import java.time.Instant
 
 class AndroidAgentBridge(private val context: Context) {
+    private val visionImages = VisionImageAccess()
     private val chatFiles = ChatFileAccess(context)
     private val previewImages = PreviewImageAccess(context)
     private val documents = DocumentAccess(context)
@@ -31,6 +32,7 @@ class AndroidAgentBridge(private val context: Context) {
     )
 
     fun handle(call: MethodCall, result: MethodChannel.Result): Boolean {
+        if (visionImages.handle(call, result)) return true
         if (previewImages.handle(call, result)) return true
         if (chatFiles.handle(call, result)) return true
         if (documents.handle(call, result)) return true

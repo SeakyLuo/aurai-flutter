@@ -209,7 +209,7 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
           (output.remove('_images') as List<MessageImage>?) ?? const [];
       final attachments = await Future.wait([
         for (final image in images)
-          readVisionImage(File(image.path), image.mimeType).then(
+          readVisionImage(File(image.path), image.mimeType, original: false).then(
             (vision) => ToolAttachment(
               type: ToolAttachmentType.image,
               mimeType: vision.mimeType,

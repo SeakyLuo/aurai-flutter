@@ -12,6 +12,12 @@ class AttachmentTool implements AgentTool, RuntimeCapabilityAgentTool {
     inputSchema: {
       'type': 'object',
       'properties': {
+        'quality': {
+          'type': 'string',
+          'enum': ['preview', 'original'],
+          'description':
+              '图片默认 preview（最长边 2048）；细节不清时用 original 返回保存的原文件图片内容。非图片忽略此参数。',
+        },
         'attachmentId': {'type': 'string'},
         'offset': {'type': 'integer', 'minimum': 0},
         'maxCharacters': {'type': 'integer', 'minimum': 1, 'maximum': 20000},

@@ -12,7 +12,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../platform/preview_image_actions.dart';
 import 'chat_controller.dart';
-import '../../storage/group_list_preview.dart';
 import 'image_forward_dialog.dart';
 import 'attachment_action_icon.dart';
 import 'settings_appearance.dart';
@@ -90,10 +89,6 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
               .where((c) => c.kind == ConversationKind.group)
               .map((c) => c.id)
               .toList(),
-        ),
-        loadConversationListPreviews(
-          widget.controller.groupStore.database,
-          page,
         ),
       ]);
       if (!mounted || generation != _generation) return;

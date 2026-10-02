@@ -1,6 +1,7 @@
 import 'html_app_store.dart';
 import 'miniapp_program.dart';
 import 'miniapp_program_store.dart';
+import 'miniapp_member_avatars.dart';
 import 'miniapp_send_action.dart';
 import '../domain/interactive_message.dart';
 import 'dart:convert';
@@ -112,11 +113,30 @@ class HtmlStore {
               where: 'id IN (${List.filled(ownIds.length, '?').join(',')})',
               whereArgs: ownIds,
             );
+      final roster = await MiniappProgramStore.members(
+        db,
+        conversationId,
+        avatars: viewer == MessageSender.localUser.id,
+      );
       state['_miniapp'] = {
         'viewerId': viewer,
         'ownerId': MessageSender.localUser.id,
-        'members': await MiniappProgramStore.members(db, conversationId),
+        'members': viewer == MessageSender.localUser.id
+            ? await MiniappMemberAvatars.decorate(roster)
+            : roster
+                  .map(
+                    (m) => {
+                      'id': m['id'],
+                      'name': m['name'],
+                      'kind': m['kind'],
+                    },
+                  )
+                  .toList(),
         'own': (runtime['privateViews'] as Map)[viewer],
+        if (viewer == MessageSender.localUser.id)
+          'hostView':
+              (runtime['privateViews'] as Map)[(runtime['state']
+                  as Map)['hostId']],
         'cards': [
           for (final row in ownCards)
             {

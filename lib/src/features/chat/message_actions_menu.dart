@@ -33,7 +33,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   bool starred = false,
   bool allowEditing = true,
   bool allowHistory = false,
-  bool allowVisibility = false,
+  Future<void> Function(BuildContext)? onVisibility,
   bool allowQuote = false,
   bool allowRecall = false,
   bool allowRetry = false,
@@ -264,13 +264,10 @@ Future<MessageMenuResult?> showMessageActionsMenu(
                   child: Row(
                     children: [
                       Expanded(child: Text(messageTime(message.createdAt))),
-                      if (allowVisibility && message.hasRestrictedAudience)
+                      if (onVisibility != null && message.hasRestrictedAudience)
                         InkWell(
                           borderRadius: BorderRadius.circular(12),
-                          onTap: () => Navigator.pop(
-                            context,
-                            const MessageActionResult(MessageAction.visibility),
-                          ),
+                          onTap: () => onVisibility(context),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 4,

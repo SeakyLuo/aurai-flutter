@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/painting.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:mime/mime.dart';
 
@@ -64,8 +64,21 @@ Future<Uint8List> svgToPng(Uint8List bytes, {int maxDimension = 2048}) async {
 
 Future<({Uint8List bytes, String mimeType})> readVisionImage(
   File file,
-  String mimeType,
-) async {
+  String mimeType, {
+  bool original = true,
+}) async {
+  if (!original && mimeType != 'image/svg+xml') {
+    // Preserve FileSystemException handling for missing historical attachments.
+    await file.length();
+    final result = await const MethodChannel('com.haiskynology.aurai/platform')
+        .invokeMapMethod<String, Object?>('readVisionPreview', {
+          'path': file.path,
+        });
+    return (
+      bytes: result!['bytes'] as Uint8List,
+      mimeType: result['mimeType'] as String,
+    );
+  }
   final bytes = await file.readAsBytes();
   if (mimeType == 'image/svg+xml') {
     return (bytes: await svgToPng(bytes), mimeType: 'image/png');

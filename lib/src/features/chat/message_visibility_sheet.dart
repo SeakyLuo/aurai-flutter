@@ -47,11 +47,15 @@ Future<void> showMessageVisibilitySheet(
                     ),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      '可见范围',
+                      message.excludedAudience != null
+                          ? '以下成员不可见'
+                          : audience == null
+                          ? '所有群成员可见'
+                          : '仅以下成员可见',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
                       ),
@@ -65,26 +69,6 @@ Future<void> showMessageVisibilitySheet(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                 children: [
-                  Text(
-                    message.visibilityLabel,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    message.excludedAudience != null
-                        ? '以下成员不可查看这条消息，其余群成员可见。'
-                        : audience == null
-                        ? '群内所有成员均可查看这条消息。以下为当前群成员。'
-                        : '仅以下成员可查看这条消息。',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   for (final member in members)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 10),

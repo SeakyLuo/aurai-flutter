@@ -32,6 +32,13 @@ class HistoryMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
     inputSchema: {
       'type': 'object',
       'properties': {
+        if (name == 'readMessageAttachment')
+          'quality': {
+            'type': 'string',
+            'enum': ['preview', 'original'],
+            'description':
+                '图片默认 preview（最长边 2048）；需要细节时用 original 返回保存的原文件。非图片忽略。',
+          },
         'messageId': {'type': 'string'},
         if (name == 'readMessageAttachment') 'attachmentId': {'type': 'string'},
         'offset': {'type': 'integer', 'minimum': 0},
@@ -157,7 +164,14 @@ class HistoryMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
       ].contains(mime)) {
         if (await file.length() > 10 * 1024 * 1024)
           throw StateError('图片超过 10 MB，请用户压缩后重新提供');
-        final vision = await readVisionImage(file, mime);
+        final quality = a['quality'] as String? ?? 'preview';
+        if (quality != 'preview' && quality != 'original')
+          throw ArgumentError.value(quality, 'quality');
+        final vision = await readVisionImage(
+          file,
+          mime,
+          original: quality == 'original',
+        );
         return _result(
           call,
           {
@@ -165,13 +179,17 @@ class HistoryMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
             'name': attachment['display_name'],
             'imagePath': file.path,
             'mimeType': mime,
+            'quality': quality,
+            'limitation': mime == 'image/svg+xml'
+                ? 'SVG 以栅格图返回。'
+                : 'original 指当前保存的文件；历史文件可能在导入时已压缩，模型服务也可能再次缩放。',
           },
           images: [
             ToolAttachment(
               type: ToolAttachmentType.image,
               mimeType: vision.mimeType,
               base64Data: base64Encode(vision.bytes),
-              detail: 'auto',
+              detail: quality == 'original' ? 'high' : 'auto',
             ),
           ],
         );

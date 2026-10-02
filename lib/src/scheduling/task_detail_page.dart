@@ -425,40 +425,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Builder(
-                      builder: (buttonContext) => RoundAction(
-                        icon: Icons.more_vert_rounded,
-                        iconWidget: const TaskActionIcon('more'),
-                        label: '更多',
-                        onPressed: _busy
-                            ? null
-                            : () async {
-                                final box =
-                                    buttonContext.findRenderObject()!
-                                        as RenderBox;
-                                final action = await showTaskActionMenu(
-                                  context,
-                                  box.localToGlobal(Offset(0, box.size.height)),
-                                  task,
-                                  showEdit: false,
-                                  showPauseResume: _dirty,
-                                );
-                                if (mounted && action != null)
-                                  await _action(action, task);
-                              },
-                      ),
-                    ),
                     if (_dirty ||
                         running ||
                         state == 'paused' ||
                         state == 'scheduled') ...[
-                      SizedBox(
-                        height: 18,
-                        child: VerticalDivider(
-                          width: 1,
-                          color: Theme.of(context).colorScheme.outlineVariant,
-                        ),
-                      ),
                       if (_dirty)
                         RoundAction(
                           icon: Icons.check_rounded,
@@ -484,7 +454,37 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                               ? null
                               : () => _action(control, task),
                         ),
+                      SizedBox(
+                        height: 18,
+                        child: VerticalDivider(
+                          width: 1,
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
                     ],
+                    Builder(
+                      builder: (buttonContext) => RoundAction(
+                        icon: Icons.more_vert_rounded,
+                        iconWidget: const TaskActionIcon('more'),
+                        label: '更多',
+                        onPressed: _busy
+                            ? null
+                            : () async {
+                                final box =
+                                    buttonContext.findRenderObject()!
+                                        as RenderBox;
+                                final action = await showTaskActionMenu(
+                                  context,
+                                  box.localToGlobal(Offset(0, box.size.height)),
+                                  task,
+                                  showEdit: false,
+                                  showPauseResume: _dirty,
+                                );
+                                if (mounted && action != null)
+                                  await _action(action, task);
+                              },
+                      ),
+                    ),
                   ],
                 ),
               ),

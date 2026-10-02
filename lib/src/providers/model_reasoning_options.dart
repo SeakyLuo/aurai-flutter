@@ -23,7 +23,9 @@ List<ModelReasoning> providerReasoningOptions(ModelService service) =>
         ModelReasoning.high,
         ModelReasoning.max,
       ],
-      ModelService.openAi || ModelService.openRouter => const [
+      ModelService.openAi ||
+      ModelService.openRouter ||
+      ModelService.dmxapi => const [
         ModelReasoning.automatic,
         ModelReasoning.none,
         ModelReasoning.minimal,
@@ -64,6 +66,7 @@ List<ModelReasoning> modelReasoningOptions(
         _ => _defaultOnly,
       };
     case ModelService.openAi:
+    case ModelService.dmxapi:
       return _openAiOptions(model);
     case ModelService.openRouter:
       final info = OpenRouterModels.lookup(baseUrl, model);
@@ -120,7 +123,10 @@ List<ModelReasoning> modelReasoningOptions(
 }
 
 List<ModelReasoning> _openAiOptions(String model) {
-  if (model.startsWith('gpt-6-astra')) {
+  if (model.startsWith('gpt-6-astra') ||
+      model.startsWith('gpt-6.1-sol') ||
+      model.startsWith('gpt-6-sol') ||
+      model.startsWith('gpt-6-luna')) {
     return [..._standard, ModelReasoning.xhigh, ModelReasoning.max];
   }
   if (model.startsWith('gpt-5.6')) {
@@ -190,7 +196,10 @@ Map<String, Object?> modelReasoningParameters(ModelConfig config) {
     throw const ModelProviderException('当前模型不支持所选思考设置，请在模型设置中重新选择');
   }
   return switch (config.service) {
-    ModelService.openAi || ModelService.deepSeek || ModelService.openRouter => {
+    ModelService.openAi ||
+    ModelService.deepSeek ||
+    ModelService.openRouter ||
+    ModelService.dmxapi => {
       'reasoning': {'effort': effort.name},
     },
     ModelService.qwen => {'enable_thinking': effort == ModelReasoning.enabled},

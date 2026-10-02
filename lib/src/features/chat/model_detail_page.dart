@@ -1,3 +1,4 @@
+import 'provider_settings_draft.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/glass_notice.dart';
@@ -20,12 +21,14 @@ class ModelDetailPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.service,
+    this.draft,
     required this.model,
     this.readOnly = false,
   });
 
   final ChatController controller;
   final ModelService service;
+  final ProviderSettingsDraft? draft;
   final String model;
   final bool readOnly;
 
@@ -50,7 +53,8 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
       _reasoning != _initialReasoning;
 
   ModelConfig get _config =>
-      widget.controller.modelSettings.profile(widget.service);
+      (widget.draft?.config ??
+      widget.controller.modelSettings.profile(widget.service));
 
   void _notice(String message) => ScaffoldMessenger.of(
     context,
@@ -85,7 +89,9 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
     try {
       final current = _config;
       final details = current.details;
-      await widget.controller.saveConfig(
+      await saveProviderEditorConfig(
+        widget.controller,
+        widget.draft,
         current.copyWith(
           details: ProviderDetails(
             name: current.displayName,
@@ -121,8 +127,9 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
         setState(() {
           _initialPurposes = {..._purposes};
           _initialReasoning = _reasoning;
+          _allowPop = true;
         });
-        _notice('模型设置已保存');
+        Navigator.pop(context);
       }
     } on Object catch (error) {
       if (mounted) _notice('保存失败：${errorMessage(error)}');
@@ -144,10 +151,6 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
     if (!mounted) return;
     if (action == 'save') {
       await _save();
-      if (mounted && !_dirty) {
-        setState(() => _allowPop = true);
-        Navigator.pop(context);
-      }
     } else if (action == 'discard') {
       setState(() => _allowPop = true);
       Navigator.pop(context);
@@ -161,6 +164,7 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
         builder: (_) => RequestAdapterPage(
           controller: widget.controller,
           service: widget.service,
+          draft: widget.draft,
           initialModel: widget.model,
           readOnly: widget.readOnly,
         ),
@@ -176,6 +180,7 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
         builder: (_) => ModelContextPage(
           controller: widget.controller,
           service: widget.service,
+          draft: widget.draft,
           initialModel: widget.model,
           fixedModel: true,
           readOnly: widget.readOnly,
@@ -412,7 +417,7 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
           onBack: _saving ? null : _leave,
           actions: [
             SettingsGlassAction(
-              label: '保存',
+              label: widget.draft == null ? '保存' : '完成',
               icon: Icons.check_rounded,
               iconWidget: const SettingsIcon(type: SettingsIconType.check),
               onPressed: _saving ? null : _save,

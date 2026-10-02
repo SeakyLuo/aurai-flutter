@@ -1,7 +1,7 @@
+import 'provider_settings_draft.dart';
+import '../../providers/request_adapter_runner.dart';
 import 'package:flutter/foundation.dart';
 import 'model_type_recognition_page.dart';
-import 'provider_models_page.dart';
-import 'default_model_settings_page.dart';
 import 'provider_model_management_page.dart';
 import 'model_provider_icon.dart';
 import 'provider_icon_store.dart';
@@ -55,24 +55,20 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
   late List<String> _models;
   late bool _autoSyncModels;
   String? _icon;
+  late ProviderSettingsDraft _modelDraft;
   Future<void> _openModelSettings(Widget page) async {
-    final wasEditing = _editing;
-    if (_editing && _dirty) {
-      await _save();
-      if (!mounted || _editing) return;
-    }
-    if (wasEditing && !_editing) setState(() => _editing = true);
+    _modelDraft.config = _draft;
     await Navigator.push<void>(
       context,
       MaterialPageRoute(builder: (_) => page),
     );
     if (mounted) {
       setState(() {
-        _models = [..._saved.savedModels];
-        _autoSyncModels = _saved.autoSyncModels;
-        _model = _saved.model;
-        _reasoning = _saved.reasoning;
-        _initialReasoning = _reasoning;
+        final draft = _modelDraft.config;
+        _models = [...draft.savedModels];
+        _autoSyncModels = draft.autoSyncModels;
+        _model = draft.model;
+        _reasoning = draft.reasoning;
       });
     }
   }
@@ -82,6 +78,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
       ProviderModelManagementPage(
         controller: widget.controller,
         service: _service,
+        draft: _modelDraft,
         readOnly: !_editing,
         onConfigureTypes: _configureModelTypes,
       ),
@@ -92,17 +89,19 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     ProviderBalanceSettingsPage(
       controller: widget.controller,
       service: _service,
+      draft: _modelDraft,
     ),
   );
 
   ProviderDetails get _details => ProviderDetails(
-    requestAdapters: _saved.details?.requestAdapters ?? const {},
-    modelContextOverrides: _saved.details?.modelContextOverrides ?? const {},
-    modelPurposes: _saved.details?.modelPurposes ?? const {},
+    requestAdapters: _modelDraft.config.details?.requestAdapters ?? const {},
+    modelContextOverrides:
+        _modelDraft.config.details?.modelContextOverrides ?? const {},
+    modelPurposes: _modelDraft.config.details?.modelPurposes ?? const {},
     modelPurposeField: _modelPurposeField.text.trim(),
     modelTypeMappings: _modelTypeMappings,
-    modelReasoning: _saved.details?.modelReasoning ?? const {},
-    balance: _saved.details?.balance,
+    modelReasoning: _modelDraft.config.details?.modelReasoning ?? const {},
+    balance: _modelDraft.config.details?.balance,
     icon: _icon,
     name: _name.text.trim(),
     website: _website.text.trim(),
@@ -144,6 +143,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
       : widget.controller.modelSettings.profile(_service);
   bool get _locked => _saving;
   bool get _currentDirty =>
+      _modelDraft.differsFrom(_saved) ||
       !mapEquals(
         _modelTypeMappings,
         _saved.details?.modelTypeMappings ?? const {},
@@ -167,6 +167,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     super.initState();
     final config = widget.controller.config;
     _service = widget.service;
+    _modelDraft = ProviderSettingsDraft(_saved);
     _key.clear();
     _name.text = widget.creating ? '' : _saved.displayName;
     _website.text = _saved.website;
@@ -254,12 +255,9 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
                   )
                 : SettingsIcon(
                     type: SettingsIconType.check,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(
-                      alpha:
-                          _locked || (_editing && !_dirty && !widget.creating)
-                          ? .3
-                          : 1,
-                    ),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: _locked ? .3 : 1),
                   ),
           ),
         ],
@@ -603,6 +601,16 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
           model: _model,
         );
       } else {
+        for (final entry in _details.requestAdapters.entries) {
+          if (mapEquals(
+            entry.value.toJson(),
+            _saved.details?.requestAdapters[entry.key]?.toJson(),
+          ))
+            continue;
+          await previewRequestAdapter(
+            _draft.copyWith(model: entry.key.isEmpty ? _model : entry.key),
+          );
+        }
         await widget.controller.saveConfig(
           ModelConfig(
             service: _service,
@@ -647,6 +655,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
           _obscure = true;
           _saving = false;
           _editing = false;
+          _modelDraft = ProviderSettingsDraft(_saved);
           _hasSaved = true;
         });
       }

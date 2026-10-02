@@ -93,7 +93,18 @@ extension _MessageItemActions on _MessageItemState {
     final result = await showMessageActionsMenu(
       context,
       message: snapshot,
-      allowVisibility: allowVisibility,
+      onVisibility: allowVisibility
+          ? (sheetContext) async {
+              await runUiAction(
+                sheetContext,
+                () => showMessageVisibilitySheet(
+                  sheetContext,
+                  message: snapshot,
+                  database: database,
+                ),
+              );
+            }
+          : null,
       allowStar: allowStar,
       allowGroupMarks: groupMark != null,
       pinned: groupMark?.pinned ?? false,
@@ -136,15 +147,6 @@ extension _MessageItemActions on _MessageItemState {
     }
     final action = (result as MessageActionResult).action;
     switch (action) {
-      case MessageAction.visibility:
-        await runUiAction(
-          context,
-          () => showMessageVisibilitySheet(
-            context,
-            message: snapshot,
-            database: database,
-          ),
-        );
       case MessageAction.pin:
       case MessageAction.groupFavorite:
         final mark = groupMark!;

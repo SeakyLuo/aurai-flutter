@@ -38,6 +38,7 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
   bool _requestFailed = false;
   bool _changed = false;
   bool _selectedOnly = false;
+  final _selectedFilterModels = <String>{};
   late bool _useAll = widget.config.autoSyncModels;
   ModelCatalog? _catalog;
   bool _fetching = true;
@@ -189,9 +190,14 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
     setState(() {
       if (action == 'selected') {
         _selectedOnly = !_selectedOnly;
+        _selectedFilterModels.clear();
+        if (_selectedOnly) _selectedFilterModels.addAll(_selected);
       } else {
         _useAll = !_useAll;
-        if (_useAll) _selectedOnly = false;
+        if (_useAll) {
+          _selectedOnly = false;
+          _selectedFilterModels.clear();
+        }
         _changed = true;
       }
     });
@@ -230,13 +236,14 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
             ..._models,
             if (!widget.config.autoSyncModels) ...widget.config.savedModels,
             ..._selected,
+            ..._selectedFilterModels,
           }
         : widget.config.savedModels.toSet();
     final shown = available.where((model) {
       if (widget.selectable &&
           _selectedOnly &&
           !_useAll &&
-          !_selected.contains(model)) {
+          !_selectedFilterModels.contains(model)) {
         return false;
       }
       final name = widget.config.protocol.displayModel(model);
@@ -277,6 +284,14 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      _saveAction(),
+                      SizedBox(
+                        height: 18,
+                        child: VerticalDivider(
+                          width: 1,
+                          color: colors.outlineVariant,
+                        ),
+                      ),
                       Builder(
                         builder: (anchor) => RoundAction(
                           label: '更多',
@@ -289,14 +304,6 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
                               : null,
                         ),
                       ),
-                      SizedBox(
-                        height: 18,
-                        child: VerticalDivider(
-                          width: 1,
-                          color: colors.outlineVariant,
-                        ),
-                      ),
-                      _saveAction(),
                     ],
                   ),
                 )

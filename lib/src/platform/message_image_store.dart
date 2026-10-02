@@ -34,19 +34,13 @@ class MessageImageStore {
     if (source == ImageSource.camera) {
       final photo = await _picker.pickImage(
         source: source,
-        maxWidth: 2048,
-        maxHeight: 2048,
-        imageQuality: 85,
-        requestFullMetadata: false,
+        requestFullMetadata: true,
       );
       files = photo == null ? [] : [photo];
     } else {
       files = await _picker.pickMultiImage(
-        maxWidth: 2048,
-        maxHeight: 2048,
-        imageQuality: 85,
         limit: remaining,
-        requestFullMetadata: false,
+        requestFullMetadata: true,
       );
     }
     return _store(files, remaining);

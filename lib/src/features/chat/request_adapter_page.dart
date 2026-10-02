@@ -1,3 +1,4 @@
+import 'provider_settings_draft.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../domain/model_provider.dart';
@@ -18,11 +19,13 @@ class RequestAdapterPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.service,
+    this.draft,
     this.initialModel,
     this.readOnly = false,
   });
   final ChatController controller;
   final ModelService service;
+  final ProviderSettingsDraft? draft;
   final String? initialModel;
   final bool readOnly;
   @override
@@ -31,8 +34,8 @@ class RequestAdapterPage extends StatefulWidget {
 
 class _RequestAdapterPageState extends State<RequestAdapterPage> {
   late final _initial = {
-    ...?widget.controller.modelSettings
-        .profile(widget.service)
+    ...?(widget.draft?.config ??
+            widget.controller.modelSettings.profile(widget.service))
         .details
         ?.requestAdapters,
   };
@@ -85,7 +88,9 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
     context,
   ).showGlassSnackBar(SnackBar(content: Text('$message')));
   Future<void> _scopePicker() async {
-    final config = widget.controller.modelSettings.profile(widget.service);
+    final config =
+        (widget.draft?.config ??
+        widget.controller.modelSettings.profile(widget.service));
     final selected = await showChoiceSheet<String>(
       context,
       title: '适用范围',
@@ -205,7 +210,9 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
     }
     setState(() => _busy = true);
     try {
-      final old = widget.controller.modelSettings.profile(widget.service);
+      final old =
+          (widget.draft?.config ??
+          widget.controller.modelSettings.profile(widget.service));
       final config = old.copyWith(
         model: _key.isEmpty ? old.model : _key,
         details: ProviderDetails(
@@ -241,11 +248,20 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
     }
     setState(() => _busy = true);
     try {
-      await widget.controller.saveRequestAdapters(
-        widget.service,
-        _drafts,
-        _initial,
-      );
+      if (widget.draft case final draft?) {
+        draft.updateDetails({
+          'requestAdapters': {
+            for (final entry in _drafts.entries)
+              entry.key: entry.value.toJson(),
+          },
+        });
+      } else {
+        await widget.controller.saveRequestAdapters(
+          widget.service,
+          _drafts,
+          _initial,
+        );
+      }
       if (mounted) {
         setState(() => _allowPop = true);
         Navigator.pop(context, true);
@@ -347,7 +363,7 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
                     ),
                   ),
                   RoundAction(
-                    label: '保存',
+                    label: widget.draft == null ? '保存' : '完成',
                     icon: Icons.check_rounded,
                     iconWidget: const SettingsIcon(
                       type: SettingsIconType.check,

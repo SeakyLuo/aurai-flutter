@@ -1,5 +1,4 @@
 import 'conversation_list_tile.dart';
-import '../../storage/group_list_preview.dart';
 import '../../widgets/empty_data_view.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -63,7 +62,6 @@ class _AssetChatPickerState extends State<AssetChatPicker> {
       );
       final values = await Future.wait<Object?>([
         HomeConversations(controller.groupStore).senders(page),
-        loadConversationListPreviews(controller.groupStore.database, page),
         controller.groupStore.avatarMembers(
           page
               .where((item) => item.kind == ConversationKind.group)
@@ -76,7 +74,7 @@ class _AssetChatPickerState extends State<AssetChatPicker> {
         _items.addAll(page);
         _more = page.length == 30;
         _senders.addAll(values[0] as Map<String, MessageSender>);
-        _groups.addAll(values[2] as Map<String, List<MessageSender>>);
+        _groups.addAll(values[1] as Map<String, List<MessageSender>>);
       });
     } on Object catch (error) {
       if (mounted && generation == _generation) {

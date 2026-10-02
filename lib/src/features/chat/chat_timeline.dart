@@ -20,9 +20,10 @@ import 'message_time.dart';
 import 'tool_activity_view.dart';
 
 class ChatTimelineEntry {
-  const ChatTimelineEntry(this.id, this.builder);
+  const ChatTimelineEntry(this.id, this.builder, {this.preserveState = false});
   final String id;
   final WidgetBuilder builder;
+  final bool preserveState;
 }
 
 List<ChatTimelineEntry> buildChatTimeline(
@@ -539,7 +540,7 @@ List<ChatTimelineEntry> buildChatTimeline(
             ),
             child: SizedBox(width: double.infinity, child: item),
           );
-        }),
+        }, preserveState: message.htmlGame != null),
       if (showElapsed &&
           message.id == conversation.executionUserMessageId &&
           message.id != beforeMessageId)

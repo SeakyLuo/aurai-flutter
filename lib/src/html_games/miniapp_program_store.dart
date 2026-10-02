@@ -31,10 +31,16 @@ class MiniappProgramStore {
 
   static Future<List<Map<String, Object?>>> members(
     DatabaseExecutor db,
-    String conversationId,
-  ) => db.query(
+    String conversationId, {
+    bool avatars = false,
+  }) => db.query(
     'message_senders',
-    columns: ['id', 'name', 'kind'],
+    columns: [
+      'id',
+      'name',
+      'kind',
+      if (avatars) ...['avatar_icon', 'avatar_color', 'avatar_path'],
+    ],
     where:
         'id IN (SELECT sender_id FROM conversation_members WHERE conversation_id = ? AND left_at IS NULL)',
     whereArgs: [conversationId],
