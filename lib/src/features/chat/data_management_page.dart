@@ -36,11 +36,11 @@ class _DataManagementPageState extends State<DataManagementPage> {
     });
   }
 
-  void _notice(String message) {
+  void _notice(String message, {ToastKind kind = ToastKind.info}) {
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showGlassSnackBar(SnackBar(content: Text(message)));
+    ).showToast(SnackBar(content: Text(message)), kind: kind);
   }
 
   Future<void> _loadUsage() async {
@@ -48,7 +48,7 @@ class _DataManagementPageState extends State<DataManagementPage> {
       final usage = await _channel.invokeMapMethod<Object?, Object?>('usage');
       if (mounted) setState(() => _usage = usage);
     } on Object catch (error) {
-      _notice(errorMessage(error));
+      _notice(errorMessage(error), kind: ToastKind.error);
     }
   }
 
@@ -75,7 +75,10 @@ class _DataManagementPageState extends State<DataManagementPage> {
       if (info == null) return;
       if (export) {
         final missing = info['missingFiles'] as int;
-        _notice(missing == 0 ? '备份已导出' : '备份已导出；有 $missing 个原文件此前已丢失，未能包含在备份中');
+        _notice(
+          missing == 0 ? '备份已导出' : '备份已导出；有 $missing 个原文件此前已丢失，未能包含在备份中',
+          kind: ToastKind.success,
+        );
         await _loadUsage();
         return;
       }
@@ -99,13 +102,13 @@ class _DataManagementPageState extends State<DataManagementPage> {
       await _channel.invokeMethod<void>('commitImport');
       committed = true;
     } on Object catch (error) {
-      _notice(errorMessage(error));
+      _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (staged && !committed) {
         try {
           await _channel.invokeMethod<void>('discardImport');
         } on Object catch (error) {
-          _notice(errorMessage(error));
+          _notice(errorMessage(error), kind: ToastKind.error);
         }
       }
       if (mounted && !committed) setState(() => _busy = null);
@@ -131,7 +134,7 @@ class _DataManagementPageState extends State<DataManagementPage> {
       if (mounted) setState(() => _usage = usage);
       _notice('缓存已清理');
     } on Object catch (error) {
-      _notice(errorMessage(error));
+      _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -164,10 +167,7 @@ class _DataManagementPageState extends State<DataManagementPage> {
       borderRadius: BorderRadius.circular(26),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 10,
-        ),
+        contentPadding: const EdgeInsetsDirectional.fromSTEB(18, 10, 12, 10),
         leading: icon,
         title: Text(title, style: const TextStyle(fontSize: 16)),
         subtitle: Text(

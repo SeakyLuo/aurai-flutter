@@ -8,8 +8,9 @@ extension _ChatBranching on _ChatPageState {
     } on Object catch (error) {
       if (mounted) {
         final message = errorMessage(error);
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text(message == '任务已停止' ? '已取消' : message)),
+          kind: ToastKind.success,
         );
       }
     }

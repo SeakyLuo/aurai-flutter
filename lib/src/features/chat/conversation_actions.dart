@@ -227,8 +227,13 @@ extension ConversationActions on ChatController {
     return _store.load(id);
   }
 
-  Future<List<Conversation>> archivedConversations({Conversation? after}) =>
-      _store.reader.list(after: after, archived: true);
+  Future<Conversation> conversationDetails(String id) =>
+      _targetConversation(id);
+
+  Future<List<Conversation>> archivedConversations({
+    Conversation? after,
+    int limit = ConversationReader.pageSize,
+  }) => _store.reader.list(after: after, limit: limit, archived: true);
 
   Future<void> setConversationArchived(
     String id, {

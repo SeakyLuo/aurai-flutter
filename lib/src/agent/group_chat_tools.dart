@@ -1,10 +1,15 @@
+import '../domain/tool_detail_target.dart';
 import '../storage/group_member_details.dart';
 import '../domain/tool_models.dart';
 import '../domain/ai_profile.dart';
 import '../storage/group_chat_store.dart';
 
 class GroupChatTool
-    implements AgentTool, RuntimeCapabilityAgentTool, PreflightAgentTool {
+    implements
+        AgentTool,
+        RuntimeCapabilityAgentTool,
+        PreflightAgentTool,
+        ToolConfirmationPolicyAgentTool {
   GroupChatTool(
     this.store,
     this.operation,
@@ -37,6 +42,20 @@ class GroupChatTool
   final void Function() changed;
   String _groupTitle = '';
   @override
+  bool requiresConfirmation(ToolCall call) {
+    if (operation == 'readPersonalDetails' ||
+        operation == 'updatePersonalDetails') {
+      return call.arguments['senderId'] == 'user:local' &&
+          (operation == 'readPersonalDetails' ||
+              call.arguments.containsKey('remark'));
+    }
+    return {
+      ToolSafety.sensitive,
+      ToolSafety.destructive,
+    }.contains(definition.safetyFor(call.arguments));
+  }
+
+  @override
   Future<ToolResult?> preflight(ToolCall call) async {
     if (operation == 'list' || operation == 'create') return null;
     if (!call.arguments.containsKey('id')) {
@@ -67,6 +86,17 @@ class GroupChatTool
       );
     _groupTitle = rows.single['title'] as String;
     final id = call.arguments['id'] as String? ?? currentConversationId;
+    if (operation == 'updatePersonalDetails') {
+      final target = call.arguments['senderId'] as String? ?? senderId;
+      if (target != senderId) {
+        if (call.arguments.containsKey('remark') && target != 'user:local') {
+          throw StateError('不能修改其他 AI 的个人备注');
+        }
+        if (call.arguments.containsKey('nickname')) {
+          await store.requireManager(store.database, id, senderId);
+        }
+      }
+    }
     if ({
       'setAdministrators',
       'transferOwnership',
@@ -135,9 +165,9 @@ class GroupChatTool
     },
     description: switch (operation) {
       'readPersonalDetails' =>
-        'Read your own group nickname and private remark. senderId may be your own ID or user:local when requested by the human user; never another AI.',
+        'Read any current member group nickname. Omit senderId for yourself. Only your own private remark is returned; user:local private remark requires human confirmation. Other AI private remarks are never returned.',
       'updatePersonalDetails' =>
-        'Update a group nickname and private remark requested by the human user. senderId defaults to yourself; user:local edits the human user and requires confirmation. Only these two identities are allowed. Omitted fields preserve values; empty strings clear. Remark is private to that identity. Read details first.',
+        'Update your own group nickname freely, including choosing a game nickname prefixed with your seat number (e.g. 3号 小熊). This does not change your global profile name. Only the acting group owner or administrator may change another current member nickname; no extra approval is needed. Never change another AI private remark. Editing user:local remark requires human confirmation. Omitted fields preserve values; empty strings clear. Discover members with readGroupChat.',
       'list' =>
         'Search saved Aurai group chats by title with offset pagination, at most 50. Returns internal IDs; never ask the user to enter IDs. Does not search messages; use readGroupMessages for group message contents.',
       'read' =>
@@ -162,8 +192,7 @@ class GroupChatTool
             operation == 'updatePersonalDetails')
           'senderId': {
             'type': 'string',
-            'enum': [senderId, 'user:local'].toSet().toList(),
-            'description': 'Omit for yourself.',
+            'description': 'Current group member ID. Omit for yourself.',
           },
         if (operation == 'updatePersonalDetails') ...{
           'nickname': {'type': 'string', 'maxLength': 32},
@@ -260,12 +289,18 @@ class GroupChatTool
         if (operation == 'readPersonalDetails' ||
             operation == 'updatePersonalDetails') {
           final target = a['senderId'] as String? ?? senderId;
-          if (target != senderId && target != 'user:local')
-            throw ArgumentError('只能操作自己或用户的群资料');
           final members = await store.members(id);
           if (!members.any((m) => m.sender.id == target))
             throw StateError('目标成员不在群内');
           final details = GroupMemberDetailsStore(store.database);
+          if (operation == 'updatePersonalDetails' && target != senderId) {
+            if (a.containsKey('nickname')) {
+              await store.requireManager(store.database, id, senderId);
+            }
+            if (a.containsKey('remark') && target != 'user:local') {
+              throw StateError('不能修改其他 AI 的个人备注');
+            }
+          }
           final old = await details.read(id, senderId: target);
           if (operation == 'updatePersonalDetails') {
             if (!a.containsKey('nickname') && !a.containsKey('remark'))
@@ -274,16 +309,38 @@ class GroupChatTool
             final remark = a['remark'] as String? ?? old.remark;
             if (nickname.length > 32 || remark.length > 200)
               throw ArgumentError('群昵称最多32字，备注最多200字');
-            await details.save(
-              id,
-              senderId: target,
-              nickname: nickname,
-              remark: remark,
-            );
+            if (a.containsKey('remark')) {
+              await details.save(
+                id,
+                senderId: target,
+                nickname: nickname,
+                remark: remark,
+              );
+            } else {
+              await details.setNickname(
+                id,
+                actorId: senderId,
+                senderId: target,
+                nickname: nickname,
+              );
+            }
             changed();
-            output = {'updated': true, 'nickname': nickname, 'remark': remark};
+            output = {
+              'updated': true,
+              'nickname': nickname,
+              if (target == senderId || a.containsKey('remark'))
+                'remark': remark,
+            };
           } else {
-            output = {'nickname': old.nickname, 'remark': old.remark};
+            output = {
+              'nickname': old.nickname,
+              'name': members
+                  .firstWhere((m) => m.sender.id == target)
+                  .sender
+                  .name,
+              if (target == senderId || target == 'user:local')
+                'remark': old.remark,
+            };
           }
         } else if (operation == 'read') {
           final (members, muted) = await (
@@ -338,7 +395,32 @@ class GroupChatTool
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.success,
-        output: output,
+        output: {
+          ...output,
+          if (operation != 'dissolve')
+            'detailTargets': [
+              if (operation == 'list')
+                for (final group in (output['groups'] as List).cast<Map>())
+                  ToolDetailTarget(
+                    type: ToolDetailType.group,
+                    id: group['id'] as String,
+                    name: group['title'] as String,
+                  ).toJson()
+              else
+                ToolDetailTarget(
+                  type: ToolDetailType.group,
+                  id: operation == 'create'
+                      ? output['id'] as String
+                      : call.arguments['id'] as String? ??
+                            currentConversationId,
+                  name: operation == 'create'
+                      ? output['title'] as String
+                      : operation == 'rename'
+                      ? call.arguments['title'] as String
+                      : _groupTitle,
+                ).toJson(),
+            ],
+        },
       );
     } on Object catch (error) {
       return ToolResult(

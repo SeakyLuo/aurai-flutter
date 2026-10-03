@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class StartupBrand extends StatelessWidget {
-  const StartupBrand({super.key});
+  const StartupBrand({super.key, this.onRetry});
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
@@ -17,6 +18,19 @@ class StartupBrand extends StatelessWidget {
       body: Stack(
         fit: StackFit.expand,
         children: [
+          if (onRetry != null)
+            Positioned(
+              left: 24,
+              right: 24,
+              bottom: 160,
+              child: Center(
+                child: TextButton(
+                  onPressed: onRetry,
+                  style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  child: const Text('重试加载'),
+                ),
+              ),
+            ),
           Center(
             child: ExcludeSemantics(
               child: SizedBox(

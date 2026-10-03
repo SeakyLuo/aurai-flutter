@@ -5,6 +5,8 @@ import 'contact_generator.dart';
 import 'glass_surface.dart';
 import 'random_contact.dart';
 import '../../domain/response_preferences.dart';
+import '../../domain/profile_gender.dart';
+import 'profile_gender_field.dart';
 import '../../domain/model_reasoning.dart';
 import 'personalization_controls.dart';
 import 'personality_traits_page.dart';
@@ -38,6 +40,8 @@ class AiContactEditor extends StatefulWidget {
 }
 
 class _AiContactEditorState extends State<AiContactEditor> {
+  late ProfileGender _gender =
+      widget.profile?.preferences.gender ?? ProfileGender.unknown;
   late final _name = TextEditingController(
     text: widget.profile?.sender.name ?? '',
   );
@@ -102,7 +106,11 @@ class _AiContactEditorState extends State<AiContactEditor> {
         _changed = true;
       });
     } catch (caughtError) {
-      if (mounted) _notice('生成失败，请检查头像色库是否有配色后重试：${errorMessage(caughtError)}');
+      if (mounted)
+        _notice(
+          '生成失败，请检查头像色库是否有配色后重试：${errorMessage(caughtError)}',
+          kind: ToastKind.error,
+        );
     } finally {
       if (mounted) setState(() => _rolling = false);
     }
@@ -120,9 +128,10 @@ class _AiContactEditorState extends State<AiContactEditor> {
     super.dispose();
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
   Future<void> _avatarSource(AvatarSource source) async {
     try {
       if (source == AvatarSource.custom) {
@@ -172,7 +181,8 @@ class _AiContactEditorState extends State<AiContactEditor> {
           });
       }
     } on Object catch (error) {
-      if (mounted) _notice('头像修改失败，请重试：${errorMessage(error)}');
+      if (mounted)
+        _notice('头像修改失败，请重试：${errorMessage(error)}', kind: ToastKind.error);
     }
   }
 
@@ -211,11 +221,13 @@ class _AiContactEditorState extends State<AiContactEditor> {
         description: _description.text.trim(),
         instructions: old?.instructions ?? '',
         preferences: AiPreferences(
+          gender: _gender,
           systemPrompt:
               (old?.preferences ?? const AiPreferences()).systemPrompt,
           customInstructions: _role.text.trim(),
           responses: _responses,
           screenAccess: old?.preferences.screenAccess ?? false,
+          speech: old?.preferences.speech,
           reasoning: old?.preferences.reasoning ?? ModelReasoning.inherit,
         ),
         modelSelection:
@@ -241,7 +253,8 @@ class _AiContactEditorState extends State<AiContactEditor> {
         Navigator.pop(context, ai.sender.id);
       }
     } on Object catch (error) {
-      if (mounted) _notice('保存失败，请重试：${errorMessage(error)}');
+      if (mounted)
+        _notice('保存失败，请重试：${errorMessage(error)}', kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -336,6 +349,16 @@ class _AiContactEditorState extends State<AiContactEditor> {
           const SizedBox(height: 24),
           _field('名字', _name, maxLength: AiProfile.nameMaxLength),
           const SizedBox(height: 16),
+          ProfileGenderField(
+            value: _gender,
+            onChanged: _saving || _rolling
+                ? null
+                : (value) => setState(() {
+                    _gender = value;
+                    _changed = true;
+                  }),
+          ),
+          const SizedBox(height: 16),
           _field(
             '简介',
             _description,
@@ -375,7 +398,7 @@ class _AiContactEditorState extends State<AiContactEditor> {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               child: Padding(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsetsDirectional.fromSTEB(18, 18, 12, 18),
                 child: Row(
                   children: [
                     Expanded(

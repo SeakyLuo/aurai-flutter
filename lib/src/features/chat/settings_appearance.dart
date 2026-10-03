@@ -38,6 +38,9 @@ class SettingsPageBody extends StatelessWidget {
   );
 }
 
+const double settingsCardHeight = 56;
+const settingsCardPadding = EdgeInsetsDirectional.only(start: 18, end: 12);
+
 Color settingsFieldColor(BuildContext context) =>
     GlobalUI.controlBackground(Theme.of(context));
 
@@ -45,6 +48,8 @@ Color dialogControlColor(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
     ? CupertinoColors.secondarySystemFill.resolveFrom(context)
     : settingsFieldColor(context);
+
+enum SettingsActionStyle { glass, outlined }
 
 class SettingsGlassAction extends StatelessWidget {
   static Color foregroundColor(BuildContext context, {required bool enabled}) {
@@ -58,15 +63,18 @@ class SettingsGlassAction extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.iconWidget,
+    this.style = SettingsActionStyle.glass,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback? onPressed;
   final Widget? iconWidget;
+  final SettingsActionStyle style;
 
   @override
   Widget build(BuildContext context) => SettingsGlassActionSurface(
+    style: style,
     child: RoundAction(
       label: label,
       icon: icon,
@@ -83,13 +91,30 @@ class SettingsGlassAction extends StatelessWidget {
 }
 
 class SettingsGlassActionSurface extends StatelessWidget {
-  const SettingsGlassActionSurface({super.key, required this.child});
+  const SettingsGlassActionSurface({
+    super.key,
+    required this.child,
+    this.style = SettingsActionStyle.glass,
+  });
 
   final Widget child;
+  final SettingsActionStyle style;
 
   @override
-  Widget build(BuildContext context) =>
-      GlassSurface(radius: 28, shadowOpacity: .55, child: child);
+  Widget build(BuildContext context) => switch (style) {
+    SettingsActionStyle.glass => GlassSurface(
+      radius: 28,
+      shadowOpacity: .55,
+      child: child,
+    ),
+    SettingsActionStyle.outlined => DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: child,
+    ),
+  };
 }
 
 class SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {

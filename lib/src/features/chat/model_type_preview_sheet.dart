@@ -1,10 +1,10 @@
+import 'floating_search_layout.dart';
 import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 import '../../app/ui_action.dart';
 import '../../providers/model_catalog.dart';
 import 'settings_appearance.dart';
 import 'question_icon.dart';
-import 'model_search_field.dart';
 import 'settings_icon.dart';
 
 Future<void> showModelTypePreviewSheet(
@@ -84,92 +84,92 @@ class _ModelTypePreviewSheetState extends State<_ModelTypePreviewSheet> {
         heightFactor: .8,
         child: SafeArea(
           top: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: Row(
-                  children: [
-                    SettingsGlassAction(
-                      label: '关闭',
-                      icon: Icons.close_rounded,
-                      iconWidget: const QuestionIcon(
-                        type: QuestionIconType.close,
-                      ),
-                      onPressed: () => Navigator.pop(context),
+          child: SearchSheetBody(
+            header: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  SettingsGlassAction(
+                    label: '关闭',
+                    icon: Icons.close_rounded,
+                    iconWidget: const QuestionIcon(
+                      type: QuestionIconType.close,
                     ),
-                    const Expanded(
-                      child: Text(
-                        '预览效果',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const Expanded(
+                    child: Text(
+                      '预览效果',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(width: 48),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 48),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: ModelSearchField(
-                  controller: _search,
-                  onChanged: (_) => setState(() {}),
-                  hintText: '搜索模型',
-                ),
-              ),
-              Expanded(
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _entries == null
-                    ? Center(
-                        child: TextButton(
-                          onPressed: _load,
-                          child: const Text('重试'),
-                        ),
-                      )
-                    : entries.isEmpty
-                    ? Center(
-                        child: EmptyDataView(
-                          title: query.isEmpty ? '暂无模型' : '没有匹配的模型',
-                        ),
-                      )
-                    : ListView.builder(
-                        keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-                        itemCount: entries.length,
-                        itemBuilder: (context, index) {
-                          final entry = entries[index];
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            title: Text(
-                              modelDisplayName(entry['id'] as String),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 15),
-                            ),
-                            subtitle: Text(
-                              widget.purposeLabel(entry),
-                              style: TextStyle(color: colors.onSurfaceVariant),
-                            ),
-                            trailing: const SettingsIcon(
-                              type: SettingsIconType.chevron,
-                            ),
-                            onTap: () => widget.onOpen(entry),
-                          );
-                        },
+            ),
+            child: FloatingSearchLayout(
+              itemCount: _entries?.length ?? 0,
+              controller: _search,
+              onChanged: (_) => setState(() {}),
+              hintText: '搜索模型',
+              enabled: true,
+              bottom: 16,
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _entries == null
+                  ? Center(
+                      child: TextButton(
+                        onPressed: _load,
+                        child: const Text('重试'),
                       ),
-              ),
-            ],
+                    )
+                  : entries.isEmpty
+                  ? Center(
+                      child: EmptyDataView(
+                        title: query.isEmpty ? '暂无模型' : '没有匹配的模型',
+                      ),
+                    )
+                  : ListView.builder(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(
+                        12,
+                        68,
+                        12,
+                        FloatingSearchLayout.clearance,
+                      ),
+                      itemCount: entries.length,
+                      itemBuilder: (context, index) {
+                        final entry = entries[index];
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          title: Text(
+                            modelDisplayName(entry['id'] as String),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 15),
+                          ),
+                          subtitle: Text(
+                            widget.purposeLabel(entry),
+                            style: TextStyle(color: colors.onSurfaceVariant),
+                          ),
+                          trailing: const SettingsIcon(
+                            type: SettingsIconType.chevron,
+                          ),
+                          onTap: () => widget.onOpen(entry),
+                        );
+                      },
+                    ),
+            ),
           ),
         ),
       ),

@@ -175,9 +175,7 @@ class GroupMessageSearch {
                     .cast<String, Object?>(),
                 directory,
               ),
-        interactive: metadata?.participation['presentation'] == 'message'
-            ? null
-            : metadata,
+        interactive: metadata,
       );
     }).toList();
   }

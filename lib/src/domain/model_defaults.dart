@@ -4,7 +4,8 @@ enum ModelPurpose {
   text('默认文本模型'),
   imageGeneration('图片生成模型'),
   videoGeneration('视频生成模型'),
-  musicGeneration('音乐生成模型');
+  musicGeneration('音乐生成模型'),
+  speechSynthesis('语音合成模型');
 
   const ModelPurpose(this.label);
   final String label;

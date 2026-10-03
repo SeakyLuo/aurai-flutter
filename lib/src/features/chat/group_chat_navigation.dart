@@ -14,8 +14,9 @@ Future<void> openGroupConversation(
     await openHomeConversation(context, controller, id, resetStack: resetStack);
   } on Object catch (error) {
     if (context.mounted)
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text('无法打开群聊，请重试：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
   }
 }

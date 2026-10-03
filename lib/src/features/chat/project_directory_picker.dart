@@ -99,7 +99,7 @@ class _ProjectDirectoryPickerState extends State<ProjectDirectoryPicker> {
         ListTile(
           enabled: widget.enabled && !_busy,
           minTileHeight: 60,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 12),
           leading: const FileToolIcon(type: FileToolIconType.folder),
           title: const Text('选择手机文件夹', style: TextStyle(fontSize: 15)),
           trailing: const SettingsIcon(type: SettingsIconType.chevron),

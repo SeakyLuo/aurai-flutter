@@ -14,7 +14,7 @@ Future<void> removeFavorite(
   final timestamp = await store.removeForUndo(messageId);
   onRemoved?.call();
   if (!messenger.mounted || timestamp == null) return;
-  messenger.showGlassSnackBar(
+  messenger.showToast(
     SnackBar(
       content: const Text('已取消收藏'),
       persist: false,
@@ -26,15 +26,20 @@ Future<void> removeFavorite(
             await store.set(messageId, true, starredAt: timestamp);
             onRestored?.call();
             if (messenger.mounted)
-              messenger.showGlassSnackBar(const SnackBar(content: Text('已恢复收藏')));
+              messenger.showToast(
+                const SnackBar(content: Text('已恢复收藏')),
+                kind: ToastKind.success,
+              );
           } on Object catch (error) {
             if (messenger.mounted)
-              messenger.showGlassSnackBar(
+              messenger.showToast(
                 SnackBar(content: Text('恢复收藏失败：${errorMessage(error)}')),
+                kind: ToastKind.error,
               );
           }
         },
       ),
     ),
+    kind: ToastKind.success,
   );
 }

@@ -81,9 +81,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     super.dispose();
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
 
   Future<bool> _save() async {
     if (_title.text.trim().isEmpty || _prompt.text.trim().isEmpty) {
@@ -91,7 +92,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       return false;
     }
     if (_scheduleChanged && !_at.isAfter(DateTime.now())) {
-      _notice('请选择未来的执行时间');
+      _notice('请选择未来的执行时间', kind: ToastKind.warning);
       return false;
     }
     setState(() {
@@ -120,7 +121,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         _prompt.text = result['prompt'] as String;
         _resetSchedule();
       });
-      _notice('任务已保存');
+      _notice('任务已保存', kind: ToastKind.success);
       return true;
     } on Object catch (e) {
       if (mounted)
@@ -128,6 +129,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           e is PlatformException
               ? e.message ?? '保存失败：${errorMessage(e)}'
               : '保存失败，请重试：${errorMessage(e)}',
+          kind: ToastKind.error,
         );
       return false;
     } finally {
@@ -180,7 +182,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           } on Object catch (error) {
             if (mounted) {
               setState(() => _leaving = false);
-              _notice('无法返回原会话：${errorMessage(error)}');
+              _notice('无法返回原会话：${errorMessage(error)}', kind: ToastKind.error);
             }
             return;
           }
@@ -291,7 +293,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
   Future<void> _datePicker() async {
     if (!_simple) {
-      _notice('请先在重复中选择新的执行周期');
+      _notice('请先在重复中选择新的执行周期', kind: ToastKind.warning);
       return;
     }
     final result = await showTaskDateTimeDialog(
@@ -314,7 +316,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
   Future<void> _timePicker() async {
     if (!_simple) {
-      _notice('请先在重复中选择新的执行周期');
+      _notice('请先在重复中选择新的执行周期', kind: ToastKind.warning);
       return;
     }
     final result = await showTaskDateTimeDialog(
@@ -360,7 +362,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     bool expanded = false,
     bool dropdown = false,
   }) => ListTile(
-    contentPadding: const EdgeInsets.fromLTRB(20, 2, 14, 2),
+    contentPadding: const EdgeInsetsDirectional.fromSTEB(20, 2, 12, 2),
     title: Text(title, style: _taskTextStyle),
     trailing: Row(
       mainAxisSize: MainAxisSize.min,
@@ -439,7 +441,11 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                             ),
                           ),
                           label: _saving ? '正在保存' : '保存任务',
-                          onPressed: enabled && !_busy ? () => _save() : null,
+                          onPressed: enabled && !_busy
+                              ? () async {
+                                  if (await _save() && mounted) await _close();
+                                }
+                              : null,
                         )
                       else
                         RoundAction(

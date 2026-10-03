@@ -208,7 +208,7 @@ class _ProjectGitChangesPageState extends State<ProjectGitChangesPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showGlassSnackBar(const SnackBar(content: Text('已撤销全部修改')));
+      ).showToast(const SnackBar(content: Text('已撤销全部修改')));
       await _load();
     });
     if (mounted) setState(() => _busy = false);
@@ -231,7 +231,7 @@ class _ProjectGitChangesPageState extends State<ProjectGitChangesPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showGlassSnackBar(const SnackBar(content: Text('已重做全部修改')));
+      ).showToast(const SnackBar(content: Text('已重做全部修改')));
       await _load();
     });
     if (mounted) setState(() => _busy = false);

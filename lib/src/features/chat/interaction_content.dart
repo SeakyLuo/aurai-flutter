@@ -166,7 +166,7 @@ class InteractionDistribution extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final total = data['total'] as int;
+    final total = data['total'] as num;
     final selected = data['selected'] as Map?;
     final items = data['items'] as List;
     return Column(
@@ -179,7 +179,7 @@ class InteractionDistribution extends StatelessWidget {
             ),
             child: Builder(
               builder: (context) {
-                final count = option['count'] as int;
+                final count = option['count'] as num;
                 final ratio = total == 0 ? 0.0 : count / total;
                 final mine =
                     selected != null &&

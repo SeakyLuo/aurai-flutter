@@ -39,9 +39,10 @@ class _DiscoverPageState extends State<DiscoverPage> {
       );
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
     } finally {
       if (mounted) setState(() => _openingSkills = false);
     }
@@ -106,7 +107,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       borderRadius: BorderRadius.circular(26),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+        contentPadding: const EdgeInsetsDirectional.only(start: 18, end: 12),
         minVerticalPadding: 18,
         leading: icon,
         title: Text(title),

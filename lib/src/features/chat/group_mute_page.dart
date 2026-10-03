@@ -8,7 +8,7 @@ import '../../domain/message_sender.dart';
 import 'app_confirmation_dialog.dart';
 import 'group_mute_duration_page.dart';
 import 'chat_controller.dart';
-import 'member_avatar.dart';
+import 'member_profile_avatar.dart';
 import 'group_mute_selection.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -99,7 +99,7 @@ class _GroupMutePageState extends State<GroupMutePage> {
     if (saved) {
       ScaffoldMessenger.of(
         context,
-      ).showGlassSnackBar(const SnackBar(content: Text('已解除单独禁言')));
+      ).showToast(const SnackBar(content: Text('已解除单独禁言')));
       await _load();
     }
     if (mounted) setState(() => _busy = false);
@@ -144,7 +144,7 @@ class _GroupMutePageState extends State<GroupMutePage> {
     if (saved) {
       ScaffoldMessenger.of(
         context,
-      ).showGlassSnackBar(const SnackBar(content: Text('已设置成员禁言')));
+      ).showToast(const SnackBar(content: Text('已设置成员禁言')));
       await _load();
     }
     if (mounted) setState(() => _busy = false);
@@ -230,7 +230,9 @@ class _GroupMutePageState extends State<GroupMutePage> {
                                 vertical: 8,
                               ),
                               minTileHeight: 64,
-                              leading: MemberAvatar(
+                              leading: MemberProfileAvatar(
+                                controller: widget.controller,
+                                groupId: widget.groupId,
                                 sender: member.sender,
                                 size: 42,
                               ),

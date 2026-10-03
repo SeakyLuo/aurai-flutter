@@ -17,7 +17,7 @@ extension _ChatProgress on _ChatPageState {
     _runNotice?.close();
     _runNotice = ScaffoldMessenger.of(
       context,
-    ).showGlassSnackBar(SnackBar(content: Text(message)));
+    ).showToast(SnackBar(content: Text(message)), kind: ToastKind.error);
   }
 
   Widget _buildProgress(ChatController controller) =>

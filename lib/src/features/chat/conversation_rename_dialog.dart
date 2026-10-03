@@ -35,13 +35,14 @@ class _ConversationRenameDialogState extends State<ConversationRenameDialog> {
     super.dispose();
   }
 
-  void _notice(String text) =>
-      _messenger.currentState!.showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) => _messenger
+      .currentState!
+      .showToast(SnackBar(content: Text(text)), kind: kind);
 
   Future<void> _save() async {
     if (_saving) return;
     if (_text.text.trim().isEmpty) {
-      _notice('请输入会话名称');
+      _notice('请输入会话名称', kind: ToastKind.warning);
       return;
     }
     setState(() => _saving = true);
@@ -54,7 +55,7 @@ class _ConversationRenameDialogState extends State<ConversationRenameDialog> {
     } on Object catch (error) {
       if (mounted) {
         setState(() => _saving = false);
-        _notice('重命名失败，请重试：${errorMessage(error)}');
+        _notice('重命名失败，请重试：${errorMessage(error)}', kind: ToastKind.error);
       }
     }
   }

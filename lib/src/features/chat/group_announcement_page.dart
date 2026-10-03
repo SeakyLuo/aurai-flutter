@@ -120,9 +120,10 @@ class _GroupAnnouncementPageState extends State<GroupAnnouncementPage> {
     if (uri == null ||
         !{'http', 'https'}.contains(uri.scheme) ||
         uri.host.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(const SnackBar(content: Text('无法打开此链接')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('无法打开此链接')),
+        kind: ToastKind.error,
+      );
       return;
     }
     await runUiAction(

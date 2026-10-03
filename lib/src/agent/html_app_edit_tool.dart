@@ -1,3 +1,4 @@
+import '../domain/tool_detail_target.dart';
 import '../domain/tool_models.dart';
 import 'html_app_data_tool.dart';
 import 'html_message_source.dart';
@@ -37,12 +38,24 @@ class HtmlAppEditTool implements AgentTool, RuntimeCapabilityAgentTool {
   );
 
   @override
-  Future<ToolResult> execute(ToolCall call) async => ToolResult(
-    callId: call.id,
-    toolName: name,
-    status: ToolResultStatus.success,
-    output: await invoke(name, call.arguments),
-  );
+  Future<ToolResult> execute(ToolCall call) async {
+    final output = await invoke(name, call.arguments);
+    return ToolResult(
+      callId: call.id,
+      toolName: name,
+      status: ToolResultStatus.success,
+      output: {
+        ...output,
+        'detailTargets': [
+          ToolDetailTarget(
+            type: ToolDetailType.miniapp,
+            id: output['appId'] as String,
+            name: output['title'] as String,
+          ).toJson(),
+        ],
+      },
+    );
+  }
 
   @override
   Future<void> cancel() async {}

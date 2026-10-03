@@ -89,6 +89,10 @@ class InteractiveMessage {
   int get sessionVersion => shared ? engine.version : 0;
   Map<String, Map<String, Object?>> get choices =>
       shared ? engine.submissions : participants;
+  num get totalWeight => choices.values.fold<num>(
+    0,
+    (total, choice) => total + (choice['weight'] as num? ?? 1),
+  );
   Map<String, Object?> interactionView(String actor, {String? viewer}) {
     requireViewer(viewer ?? actor);
     if (snapshotView != null) return snapshotView!;
@@ -108,7 +112,7 @@ class InteractiveMessage {
           components.add({
             'type': 'distribution',
             'items': summary,
-            'total': choices.length,
+            'total': totalWeight,
             'selected': choices[actor],
             'unit': view['unit'] ?? (singleChoice ? '票' : '人'),
           });
@@ -373,6 +377,18 @@ class InteractiveMessage {
     final interaction = Map<String, Object?>.from(
       json['interaction'] as Map? ?? const {},
     );
+    if (interaction['actorWeights'] case final Map weights) {
+      final actors = interaction['actors'] as List;
+      if (weights.entries.any(
+        (entry) =>
+            !actors.contains(entry.key) ||
+            entry.value is! num ||
+            !(entry.value as num).isFinite ||
+            (entry.value as num) <= 0,
+      )) {
+        throw ArgumentError('投票权重必须属于本轮参与者且是有限正数');
+      }
+    }
     return InteractiveMessage(
       showStatistics: json['showStatistics'] as bool? ?? true,
       buttonColumns: json['buttonColumns'] as int? ?? 1,

@@ -9,6 +9,8 @@ import 'ai_contact_actions.dart';
 import 'ai_conversations_page.dart';
 import 'home_navigation.dart';
 import 'package:flutter/material.dart';
+import '../../app/global_ui.dart';
+import '../../domain/profile_gender.dart';
 import '../../domain/ai_profile.dart';
 import '../../domain/avatar_style.dart';
 import '../../memory/memory_summary_page.dart';
@@ -17,8 +19,10 @@ import '../../utils/widget_utils.dart';
 import 'chat_controller.dart';
 import 'ai_contact_editor.dart';
 import 'ai_model_page.dart';
+import 'ai_speech_page.dart';
 import 'ai_group_picker.dart';
 import 'profile_avatar.dart';
+import 'glass_surface.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 
@@ -45,16 +49,17 @@ class _AiContactPageState extends State<AiContactPage> {
     _reload();
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
   Future<void> _reload() async {
     try {
       final ai = await widget.controller.groupStore.loadAi(widget.senderId);
       if (mounted) setState(() => _ai = ai);
     } on Object catch (error) {
       if (mounted) {
-        _notice('朋友读取失败：${errorMessage(error)}');
+        _notice('朋友读取失败：${errorMessage(error)}', kind: ToastKind.error);
         Navigator.pop(context);
       }
     }
@@ -81,7 +86,8 @@ class _AiContactPageState extends State<AiContactPage> {
         waitForClose: true,
       );
     } on Object catch (error) {
-      if (mounted) _notice('无法打开私聊，请稍后重试：${errorMessage(error)}');
+      if (mounted)
+        _notice('无法打开私聊，请稍后重试：${errorMessage(error)}', kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -112,14 +118,19 @@ class _AiContactPageState extends State<AiContactPage> {
                     ),
                   );
               } on Object catch (error) {
-                if (mounted) _notice('记忆读取失败：${errorMessage(error)}');
+                if (mounted)
+                  _notice(
+                    '记忆读取失败：${errorMessage(error)}',
+                    kind: ToastKind.error,
+                  );
               }
             },
           ),
         ),
       );
     } on Object catch (error) {
-      if (mounted) _notice('记忆读取失败：${errorMessage(error)}');
+      if (mounted)
+        _notice('记忆读取失败：${errorMessage(error)}', kind: ToastKind.error);
     }
   }
 
@@ -133,9 +144,10 @@ class _AiContactPageState extends State<AiContactPage> {
     try {
       await widget.controller.saveAi(_ai!.copyWith(isTemporary: false));
       await _reload();
-      if (mounted) _notice('已添加到通讯录');
+      if (mounted) _notice('已添加到通讯录', kind: ToastKind.success);
     } catch (caughtError) {
-      if (mounted) _notice('添加失败，请重试：${errorMessage(caughtError)}');
+      if (mounted)
+        _notice('添加失败，请重试：${errorMessage(caughtError)}', kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -200,111 +212,170 @@ class _AiContactPageState extends State<AiContactPage> {
             ),
         ],
       ),
-      body: ai == null
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                settingsHeaderHeight(context) + 12,
-                16,
-                32,
-              ),
-              children: [
-                Center(
-                  child: ProfileAvatar(
-                    style: AvatarStyle(
-                      icon: ai.sender.avatarIcon,
-                      color: ai.sender.avatarColor,
-                      path: ai.sender.avatarPath,
-                    ),
-                    name: ai.sender.name,
-                  ),
+      body: SettingsPageBody(
+        child: ai == null
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  settingsHeaderHeight(context) -
+                      (SettingsAppBar.toolbarHeight - RoundAction.defaultSize) /
+                          2,
+                  16,
+                  32,
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  ai.sender.name,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (ai.description.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      ai.description,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-                const SizedBox(height: 24),
-                _row(
-                  '个人资料',
-                  SettingsIconType.personalInfo,
-                  () => _page(
-                    AiContactEditor(controller: widget.controller, profile: ai),
-                  ),
-                ),
-                _row(
-                  '模型',
-                  SettingsIconType.model,
-                  () => _page(
-                    AiModelPage(controller: widget.controller, profile: ai),
-                  ),
-                  subtitle: widget.controller.aiConfig(ai).model,
-                ),
-                _row('记忆', SettingsIconType.memory, _memory),
-                _row('技能', SettingsIconType.skills, () async {
-                  try {
-                    final store = await widget.controller.aiSkills(
-                      widget.senderId,
-                    );
-                    if (mounted)
-                      await _page(
-                        SkillsPage(store: store, controller: widget.controller),
-                      );
-                  } on Object catch (error) {
-                    if (mounted) _notice('技能读取失败，请重试：${errorMessage(error)}');
-                  }
-                }),
-                _row(
-                  '工具授权',
-                  SettingsIconType.permission,
-                  () => _page(ToolApprovalsPage(controller: widget.controller)),
-                ),
-                const SizedBox(height: 24),
-                WidgetUtils.primaryButton(
-                  text: ai.sender.archived
-                      ? '恢复朋友'
-                      : ai.isTemporary
-                      ? '添加朋友'
-                      : '发消息',
-                  onPressed: !ai.sender.archived && !ai.isTemporary
-                      ? _message
-                      : _busy
-                      ? null
-                      : ai.sender.archived
-                      ? _archive
-                      : _addFriend,
-                ),
-                if (!ai.sender.archived && !ai.isTemporary) ...[
-                  const SizedBox(height: 12),
-                  DialogActionButton(
-                    text: '会话列表',
-                    role: DialogActionRole.secondary,
-                    onPressed: _busy
-                        ? null
-                        : () => _page(
-                            AiConversationsPage(
-                              controller: widget.controller,
-                              profile: ai,
+                children: [
+                  Center(
+                    child: Stack(
+                      children: [
+                        ProfileAvatar(
+                          style: AvatarStyle(
+                            icon: ai.sender.avatarIcon,
+                            color: ai.sender.avatarColor,
+                            path: ai.sender.avatarPath,
+                          ),
+                          name: ai.sender.name,
+                        ),
+                        if (ai.preferences.gender != ProfileGender.unknown)
+                          Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: GlassSurface(
+                              radius: 12,
+                              tintOpacity: .5,
+                              shadowOpacity: .3,
+                              child: SizedBox.square(
+                                dimension: 24,
+                                child: Center(
+                                  child: Text(
+                                    ai.preferences.gender == ProfileGender.male
+                                        ? '♂'
+                                        : '♀',
+                                    semanticsLabel: ai.preferences.gender.label,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color:
+                                          ai.preferences.gender ==
+                                              ProfileGender.male
+                                          ? GlobalUI.maleColor
+                                          : GlobalUI.femaleColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 16),
+                  Text(
+                    ai.sender.name,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (ai.description.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        ai.description,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                  const SizedBox(height: 24),
+                  _row(
+                    '个人资料',
+                    SettingsIconType.personalInfo,
+                    () => _page(
+                      AiContactEditor(
+                        controller: widget.controller,
+                        profile: ai,
+                      ),
+                    ),
+                  ),
+                  _row(
+                    '模型',
+                    SettingsIconType.model,
+                    () => _page(
+                      AiModelPage(controller: widget.controller, profile: ai),
+                    ),
+                    subtitle: widget.controller.aiConfig(ai).model,
+                  ),
+                  _row(
+                    '声音',
+                    SettingsIconType.sound,
+                    () => _page(
+                      AiSpeechPage(controller: widget.controller, profile: ai),
+                    ),
+                  ),
+                  _row('记忆', SettingsIconType.memory, _memory),
+                  _row('技能', SettingsIconType.skills, () async {
+                    try {
+                      final store = await widget.controller.aiSkills(
+                        widget.senderId,
+                      );
+                      if (mounted)
+                        await _page(
+                          SkillsPage(
+                            store: store,
+                            controller: widget.controller,
+                          ),
+                        );
+                    } on Object catch (error) {
+                      if (mounted)
+                        _notice(
+                          '技能读取失败，请重试：${errorMessage(error)}',
+                          kind: ToastKind.error,
+                        );
+                    }
+                  }),
+                  _row(
+                    '工具授权',
+                    SettingsIconType.permission,
+                    () => _page(
+                      ToolApprovalsPage(
+                        controller: widget.controller,
+                        senderId: ai.sender.id,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  WidgetUtils.primaryButton(
+                    text: ai.sender.archived
+                        ? '恢复朋友'
+                        : ai.isTemporary
+                        ? '添加朋友'
+                        : '发消息',
+                    onPressed: !ai.sender.archived && !ai.isTemporary
+                        ? _message
+                        : _busy
+                        ? null
+                        : ai.sender.archived
+                        ? _archive
+                        : _addFriend,
+                  ),
+                  if (!ai.sender.archived && !ai.isTemporary) ...[
+                    const SizedBox(height: 12),
+                    DialogActionButton(
+                      text: '会话列表',
+                      role: DialogActionRole.secondary,
+                      onPressed: _busy
+                          ? null
+                          : () => _page(
+                              AiConversationsPage(
+                                controller: widget.controller,
+                                profile: ai,
+                              ),
+                            ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
+              ),
+      ),
     );
   }
 
@@ -320,6 +391,7 @@ class _AiContactPageState extends State<AiContactPage> {
       borderRadius: BorderRadius.circular(26),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
+        contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         leading: SettingsIcon(type: icon),
         title: Text(title, style: const TextStyle(fontSize: 15)),

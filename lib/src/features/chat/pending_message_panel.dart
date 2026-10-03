@@ -45,9 +45,10 @@ class _PendingMessagePanelState extends State<PendingMessagePanel> {
       final error = queue.error!;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+          ScaffoldMessenger.of(context).showToast(
+            SnackBar(content: Text(errorMessage(error))),
+            kind: ToastKind.error,
+          );
         }
       });
     }
@@ -222,9 +223,10 @@ class _PendingMessagePanelState extends State<PendingMessagePanel> {
       await controller.removePendingMessage(messageId);
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
       }
     }
   }

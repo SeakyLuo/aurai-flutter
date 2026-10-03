@@ -240,7 +240,7 @@ class ResponsesTransport {
     required String senderName,
   }) async {
     final response = await send({
-      'model': config.model,
+      'model': config.apiModel,
       'stream': true,
       'max_output_tokens': 8192,
       if (config.service.disableReasoningForSummary)
@@ -274,7 +274,7 @@ class ResponsesTransport {
 
   Future<String> _summarizeInput(List<Map<String, Object?>> input) async {
     final response = await send({
-      'model': config.model,
+      'model': config.apiModel,
       'stream': true,
       'max_output_tokens': 8192,
       // Summarization needs the output budget for memory, not reasoning tokens.

@@ -9,18 +9,30 @@ import '../domain/model_provider.dart';
 class ModelCatalog {
   final _client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
 
-  Future<List<String>> loadFor(ModelConfig config, {bool textOnly = false}) {
-    final models = config.protocol.modelCatalog;
-    if (models.isNotEmpty) {
-      return Future.value([for (final model in models) model.id]);
+  Future<List<String>> loadFor(
+    ModelConfig config, {
+    bool textOnly = false,
+  }) async {
+    final preset = config.protocol.modelCatalog;
+    final local = [
+      for (final model in config.modelCatalog)
+        if (!textOnly ||
+            modelPurposesFor(config, model.id).contains(ModelPurpose.text))
+          model.id,
+    ];
+    if (!config.protocol.supportsChatModels ||
+        !config.isConfigured ||
+        preset.isNotEmpty) {
+      return {...preset.map((model) => model.id), ...local}.toList();
     }
-    return load(
+    final models = await load(
       config: config,
       baseUrl: Uri.parse(config.baseUrl),
       apiKey: config.apiKey,
       openRouter: config.service.usesOpenRouterCatalog,
       textOnly: textOnly,
     );
+    return {...models, ...local}.toList();
   }
 
   Future<List<String>> load({
@@ -78,13 +90,28 @@ class ModelCatalog {
     return models;
   }
 
-  Future<List<Map<String, dynamic>>> loadEntries(ModelConfig config) =>
-      _fetchEntries(
-        Uri.parse(config.baseUrl),
-        config.apiKey,
-        config.service.usesOpenRouterCatalog,
-        false,
-      ).timeout(const Duration(seconds: 20));
+  Future<List<Map<String, dynamic>>> loadEntries(ModelConfig config) async {
+    final entries =
+        !config.protocol.supportsChatModels ||
+            !config.isConfigured ||
+            config.protocol.modelCatalog.isNotEmpty
+        ? [
+            for (final model in config.protocol.modelCatalog)
+              <String, dynamic>{'id': model.id, 'name': model.name},
+          ]
+        : await _fetchEntries(
+            Uri.parse(config.baseUrl),
+            config.apiKey,
+            config.service.usesOpenRouterCatalog,
+            false,
+          ).timeout(const Duration(seconds: 20));
+    final existing = entries.map((entry) => entry['id']).toSet();
+    return [
+      ...entries,
+      for (final model in config.modelCatalog)
+        if (!existing.contains(model.id)) {'id': model.id, 'name': model.name},
+    ];
+  }
 
   Future<List<Map<String, dynamic>>> _fetchEntries(
     Uri baseUrl,

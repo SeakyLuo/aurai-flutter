@@ -13,18 +13,27 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
     'updateHtmlMessage',
     'readHtmlProgram',
     'submitHtmlProgramEvent',
+    'readHtmlData',
+    'updateHtmlData',
   ];
   @override
   ToolDefinition get definition => ToolDefinition(
     name: name,
     capabilityId: 'local.messages',
-    safety: name == 'readHtmlMessage' || name == 'readHtmlProgram'
+    safety:
+        name == 'readHtmlMessage' ||
+            name == 'readHtmlProgram' ||
+            name == 'readHtmlData'
         ? ToolSafety.readOnly
         : ToolSafety.lowRisk,
-    description: name == 'readHtmlProgram'
+    description: name == 'readHtmlData'
+        ? 'Read versioned HTML message data. Program messages return data:{state,view,privateViews}; other HTML messages return their instance state. Authors and authorized data editors can access directly, others request user approval. Read before updateHtmlData. Never expose private data in chat.'
+        : name == 'updateHtmlData'
+        ? 'Update generic HTML message data without changing source or sending a new launcher. Requires messageId, expectedVersion, eventId and complete data object. For program messages data must include complete state, public view and privateViews; keep projections consistent and secret information only in privateViews. No reducer handler is required. This edits only the sent message instance, never the application template, source or another session. Transport bindings and reply controls are preserved. Gameplay events still use submitHtmlProgramEvent. Do not bypass the data tool by editing database or files. Stale versions fail; reread before reconciling.'
+        : name == 'readHtmlProgram'
         ? 'Read the current version, public state and ONLY your authenticated private view/action cards of a program-backed HTML message. No source or other participants private views are returned. Use this before submitHtmlProgramEvent; never publish private context in group replies.'
         : name == 'submitHtmlProgramEvent'
-        ? 'Submit an authenticated event to the HTML miniapp host program, without opening a WebView. Requires messageId,eventId,expectedVersion,action,data. The program validates your role and allowed operations, then commits effects and state together. readHtmlProgram supplies the allowed protocol in your private view. Reuse eventId and original arguments for a retry; a version conflict requires rereading and reevaluating. Do not overwrite program state via updateHtmlMessage. This works for private role actions, ending your speech, and AI skill callbacks; it grants no authority beyond the program rules. Return skill results to the program rather than revealing identities or private actions in chat.'
+        ? 'Submit an authenticated event to the HTML miniapp host program, without opening a WebView. Requires messageId,eventId,expectedVersion,action,data. The program runs synchronously, validates your role and allowed operations, then commits effects and state together. A program execution error or timeout commits no changes and leaves no background task running: repeated reads cannot complete it. Report the original blocker and end the turn if it cannot be resolved; do not keep polling, announcing progress, or resubmitting unchanged failing operations. readHtmlProgram supplies the allowed protocol in your private view. Retry only after the cause has changed, reusing eventId and original arguments; a version conflict requires rereading and reevaluating. Do not overwrite program state via updateHtmlMessage. This works for private role actions, ending your speech, and AI skill callbacks; it grants no authority beyond the program rules. Return skill results to the program rather than revealing identities or private actions in chat.'
         : name == 'readHtmlMessage'
         ? 'Read an accessible HTML message by messageId. Authors receive source and state; others receive public metadata and their own interaction projection. includePrivate=true requests approval for internal content. No conversation switching needed. Read the version before updateHtmlMessage. This does not run the page or send a message.'
         : htmlAppGuide +
@@ -43,10 +52,11 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
                 'Default false. Authors receive their own source and state automatically. For another author, true requests human approval to read source and internal state.',
           },
         'messageId': {'type': 'string'},
-        if (name == 'submitHtmlProgramEvent') ...{
+        if (name == 'submitHtmlProgramEvent' || name == 'updateHtmlData') ...{
           'eventId': {'type': 'string', 'minLength': 1, 'maxLength': 100},
           'expectedVersion': {'type': 'integer', 'minimum': 0},
-          'action': {'type': 'string', 'minLength': 1, 'maxLength': 100},
+          if (name == 'submitHtmlProgramEvent')
+            'action': {'type': 'string', 'minLength': 1, 'maxLength': 100},
           'data': {'type': 'object', 'additionalProperties': true},
         },
         if (name == 'updateHtmlMessage') ...{
@@ -84,10 +94,10 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
       'required': [
         'messageId',
         if (name == 'updateHtmlMessage') 'expectedVersion',
-        if (name == 'submitHtmlProgramEvent') ...[
+        if (name == 'submitHtmlProgramEvent' || name == 'updateHtmlData') ...[
           'eventId',
           'expectedVersion',
-          'action',
+          if (name == 'submitHtmlProgramEvent') 'action',
           'data',
         ],
       ],

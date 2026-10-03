@@ -8,6 +8,33 @@ extension UserDataReadAccess on ChatController {
     String? groupId,
   ) {
     final name = tool.definition.name;
+    if (name == 'readHtmlData' || name == 'updateHtmlData') {
+      return HtmlDataAccessTool(
+        original: tool,
+        delegated: HtmlMessageUpdateTool(name, (operation, args) async {
+          await _store.writer.flush();
+          final target = await _messageConversation(
+            args['messageId'] as String,
+            MessageSender.localUser.id,
+            conversation,
+          );
+          return HtmlMessageData(
+            htmlStore,
+          ).invoke(operation, target.id, senderId, args, userApproved: true);
+        }),
+        resolve: (call) async {
+          await _store.writer.flush();
+          await _messageConversation(
+            call.arguments['messageId'] as String,
+            MessageSender.localUser.id,
+            conversation,
+          );
+          return HtmlMessageData(
+            htmlStore,
+          ).access(call.arguments['messageId'] as String, senderId);
+        },
+      );
+    }
     if (tool is GroupAnnouncementTool && tool.write) {
       return PeerAccessTool(tool, (call) async {
         final id = call.arguments['groupId'] as String? ?? tool.currentGroupId;

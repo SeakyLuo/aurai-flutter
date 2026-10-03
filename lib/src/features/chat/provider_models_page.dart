@@ -1,3 +1,5 @@
+import 'floating_search_layout.dart';
+import 'model_selection_bar.dart';
 import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 import '../../app/glass_notice.dart';
@@ -5,12 +7,12 @@ import '../../domain/model_provider.dart';
 import '../../providers/model_catalog.dart';
 import 'chat_controller.dart';
 import 'model_detail_page.dart';
+import 'model_list_skeleton.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'question_icon.dart';
 import 'glass_surface.dart';
 import 'header_action_menu.dart';
-import 'model_search_field.dart';
 
 class ProviderModelsPage extends StatefulWidget {
   const ProviderModelsPage({
@@ -50,9 +52,10 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
     });
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
 
   @override
   void dispose() {
@@ -62,7 +65,7 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
   }
 
   bool _canConnect() {
-    if (widget.config.apiKey.isEmpty) {
+    if (widget.config.apiKey.isEmpty && !widget.config.isSpeechConfigured) {
       _notice('请返回供应商页，点击编辑填写 API 密钥');
       return false;
     }
@@ -110,10 +113,10 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
         });
     } on ModelProviderException catch (error) {
       _requestFailed = true;
-      if (mounted) _notice(error.message);
+      if (mounted) _notice(error.message, kind: ToastKind.error);
     } catch (_) {
       _requestFailed = true;
-      if (mounted) _notice('读取模型失败，请下拉重试或返回检查供应商配置');
+      if (mounted) _notice('读取模型失败，请返回检查供应商配置后重新打开', kind: ToastKind.error);
     } finally {
       catalog.close();
       _catalog = null;
@@ -139,16 +142,25 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
 
   void _saveSelection() {
     if (!_useAll && _selected.isEmpty) {
-      _notice('请至少选择一个模型');
+      _notice('请至少选择一个模型', kind: ToastKind.warning);
       return;
     }
     Navigator.pop(context, (useAll: _useAll, models: _selected.toList()));
   }
 
-  Future<void> _showFilter(BuildContext anchor) async {
+  Future<void> _showFilter(BuildContext anchor, List<String> shown) async {
     final action = await showHeaderActionMenu(
       anchor,
       items: [
+        if (widget.selectable &&
+            !_useAll &&
+            _search.text.trim().isNotEmpty &&
+            shown.isNotEmpty)
+          (
+            value: 'searchResults',
+            label: shown.every(_selected.contains) ? '取消选择搜索结果' : '全选搜索结果',
+            icon: const SettingsIcon(type: SettingsIconType.check),
+          ),
         if (widget.selectable && !_useAll)
           (
             value: 'selected',
@@ -176,6 +188,10 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
       ],
     );
     if (!mounted || action == null) return;
+    if (action == 'searchResults') {
+      _selectBatch(shown);
+      return;
+    }
     if (action == 'types') {
       await widget.onConfigureTypes!();
       return;
@@ -227,7 +243,6 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final query = _search.text.trim().toLowerCase();
     final available = widget.selectable || _useAll
         ? {
             ...widget.config.savedModels,
@@ -236,6 +251,7 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
             ..._selectedFilterModels,
           }
         : widget.config.savedModels.toSet();
+    final query = _search.text.trim().toLowerCase();
     final shown = available.where((model) {
       if (widget.selectable &&
           _selectedOnly &&
@@ -243,217 +259,215 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
           !_selectedFilterModels.contains(model)) {
         return false;
       }
-      final name = widget.config.protocol.displayModel(model);
+      final name = widget.config.displayModel(model);
       return model.toLowerCase().contains(query) ||
+          widget.config.apiModelFor(model).toLowerCase().contains(query) ||
           name.toLowerCase().contains(query);
     }).toList();
-    final content = Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Row(
-            children: [
-              SettingsGlassAction(
-                label: '关闭',
-                icon: Icons.close_rounded,
-                iconWidget: const QuestionIcon(type: QuestionIconType.close),
-                onPressed: () => Navigator.pop(context),
-              ),
-              Expanded(
-                child: Text(
-                  !_loaded
-                      ? '模型管理'
-                      : widget.selectable && _selectedOnly && !_useAll
-                      ? '已选模型（${_selected.length}）'
-                      : '模型管理（${available.length}）',
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
+    final content = SearchSheetBody(
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 108),
+                child: Center(
+                  child: Text(
+                    '模型',
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
-              if (widget.selectable)
-                GlassSurface(
-                  radius: 28,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _saveAction(),
-                      SizedBox(
-                        height: 18,
-                        child: VerticalDivider(
-                          width: 1,
-                          color: colors.outlineVariant,
-                        ),
-                      ),
-                      Builder(
-                        builder: (anchor) => RoundAction(
-                          label: '更多',
-                          icon: Icons.filter_list_rounded,
-                          iconWidget: const SettingsIcon(
-                            type: SettingsIconType.more,
+            ),
+            Row(
+              children: [
+                SettingsGlassAction(
+                  label: '关闭',
+                  icon: Icons.close_rounded,
+                  iconWidget: const QuestionIcon(type: QuestionIconType.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                const Spacer(),
+                if (widget.selectable)
+                  GlassSurface(
+                    radius: 28,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _saveAction(),
+                        SizedBox(
+                          height: 18,
+                          child: VerticalDivider(
+                            width: 1,
+                            color: colors.outlineVariant,
                           ),
-                          onPressed: _loaded && !_fetching
-                              ? () => _showFilter(anchor)
-                              : null,
                         ),
-                      ),
-                    ],
-                  ),
-                )
-              else if (widget.onConfigureTypes != null ||
-                  widget.onDefaultSettings != null)
-                Builder(
-                  builder: (anchor) => SettingsGlassAction(
-                    label: '更多',
-                    icon: Icons.more_vert,
-                    iconWidget: const SettingsIcon(type: SettingsIconType.more),
-                    onPressed: () => _showFilter(anchor),
-                  ),
-                )
-              else
-                const SizedBox(width: 48),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: ModelSearchField(
-            controller: _search,
-            onChanged: (_) => setState(() {}),
-            hintText: '搜索模型',
-          ),
-        ),
-        Expanded(
-          child: _fetching && !_loaded
-              ? const Center(child: CircularProgressIndicator())
-              : RefreshIndicator(
-                  notificationPredicate: (_) => widget.selectable || _useAll,
-                  onRefresh: _fetch,
-                  child: CustomScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      if (shown.isEmpty)
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: EmptyDataView(
-                                title:
-                                    widget.selectable &&
-                                        _selectedOnly &&
-                                        query.isEmpty &&
-                                        shown.isEmpty
-                                    ? '暂无已选模型'
-                                    : _models.isNotEmpty
-                                    ? '没有匹配的模型'
-                                    : !widget.selectable && !_useAll
-                                    ? '暂无已选模型，请编辑供应商添加'
-                                    : widget.config.apiKey.isEmpty
-                                    ? '请返回供应商页配置 API 密钥'
-                                    : '暂无可用模型，可下拉重试或返回检查供应商配置',
-                              ),
+                        Builder(
+                          builder: (anchor) => RoundAction(
+                            label: '更多',
+                            icon: Icons.filter_list_rounded,
+                            iconWidget: const SettingsIcon(
+                              type: SettingsIconType.more,
                             ),
+                            onPressed: _loaded && !_fetching
+                                ? () => _showFilter(anchor, shown)
+                                : null,
                           ),
-                        )
-                      else
-                        SliverPadding(
-                          padding: EdgeInsets.fromLTRB(
-                            12,
-                            0,
-                            12,
-                            widget.selectable && !_useAll ? 72 : 16,
+                        ),
+                      ],
+                    ),
+                  )
+                else if (widget.onConfigureTypes != null ||
+                    widget.onDefaultSettings != null)
+                  Builder(
+                    builder: (anchor) => SettingsGlassAction(
+                      label: '更多',
+                      icon: Icons.more_vert,
+                      iconWidget: const SettingsIcon(
+                        type: SettingsIconType.more,
+                      ),
+                      onPressed: () => _showFilter(anchor, shown),
+                    ),
+                  )
+                else
+                  const SizedBox(width: 48),
+              ],
+            ),
+          ],
+        ),
+      ),
+      child: FloatingSearchLayout(
+        controller: _search,
+        onChanged: (_) => setState(() {}),
+        hintText: '搜索模型',
+        enabled: !(widget.selectable && !_useAll) && available.length >= 20,
+        child: _fetching && !_loaded
+            ? const ModelListSkeleton(
+                padding: EdgeInsets.fromLTRB(20, 68, 20, 80),
+              )
+            : CustomScrollView(
+                slivers: [
+                  if (shown.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: EmptyDataView(
+                            title:
+                                widget.selectable &&
+                                    _selectedOnly &&
+                                    query.isEmpty &&
+                                    shown.isEmpty
+                                ? '暂无已选模型'
+                                : _models.isNotEmpty
+                                ? '没有匹配的模型'
+                                : !widget.selectable && !_useAll
+                                ? '暂无已选模型，请编辑供应商添加'
+                                : widget.config.apiKey.isEmpty
+                                ? '请返回供应商页配置 API 密钥'
+                                : '暂无可用模型，请返回检查供应商配置',
                           ),
-                          sliver: SliverList.builder(
-                            itemCount: shown.length,
-                            itemBuilder: (_, index) {
-                              final model = shown[index];
-                              final selected = _selected.contains(model);
-                              return Theme(
-                                data: Theme.of(context).copyWith(
-                                  splashFactory: NoSplash.splashFactory,
-                                  highlightColor: Colors.transparent,
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        12,
+                        68,
+                        12,
+                        widget.selectable && !_useAll
+                            ? 80
+                            : available.length >= 20
+                            ? FloatingSearchLayout.clearance
+                            : 16,
+                      ),
+                      sliver: SliverList.builder(
+                        itemCount: shown.length,
+                        itemBuilder: (_, index) {
+                          final model = shown[index];
+                          final selected = _selected.contains(model);
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              splashFactory: NoSplash.splashFactory,
+                              highlightColor: Colors.transparent,
+                            ),
+                            child: Semantics(
+                              checked: widget.selectable && !_useAll
+                                  ? selected
+                                  : null,
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
                                 ),
-                                child: Semantics(
-                                  checked: widget.selectable && !_useAll
-                                      ? selected
-                                      : null,
-                                  child: ListTile(
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    shape: const RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.all(
-                                        Radius.circular(20),
-                                      ),
-                                    ),
-                                    leading: widget.selectable && !_useAll
-                                        ? Container(
-                                            width: 22,
-                                            height: 22,
-                                            padding: const EdgeInsets.all(3),
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: selected
-                                                  ? colors.onSurface
-                                                  : Colors.transparent,
-                                              border: Border.all(
-                                                color: selected
-                                                    ? colors.onSurface
-                                                    : colors.outline,
-                                                width: 1.4,
-                                              ),
-                                            ),
-                                            child: selected
-                                                ? SettingsIcon(
-                                                    type:
-                                                        SettingsIconType.check,
-                                                    color: colors.surface,
-                                                  )
-                                                : null,
-                                          )
-                                        : null,
-                                    title: Text(
-                                      widget.config.protocol.displayModel(
-                                        model,
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontSize: 15),
-                                    ),
-                                    subtitle:
-                                        _loaded && !_models.contains(model)
-                                        ? const Text('未在当前列表中')
-                                        : null,
-                                    trailing: widget.selectable
-                                        ? null
-                                        : const SettingsIcon(
-                                            type: SettingsIconType.chevron,
-                                          ),
-                                    onTap:
-                                        widget.selectable &&
-                                            !_useAll &&
-                                            _loaded &&
-                                            !_fetching
-                                        ? () => _toggle(model)
-                                        : widget.selectable
-                                        ? null
-                                        : () => _openModel(model),
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(20),
                                   ),
                                 ),
-                              );
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-        ),
-      ],
+                                leading: widget.selectable && !_useAll
+                                    ? Container(
+                                        width: 22,
+                                        height: 22,
+                                        padding: const EdgeInsets.all(3),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: selected
+                                              ? colors.onSurface
+                                              : Colors.transparent,
+                                          border: Border.all(
+                                            color: selected
+                                                ? colors.onSurface
+                                                : colors.outline,
+                                            width: 1.4,
+                                          ),
+                                        ),
+                                        child: selected
+                                            ? SettingsIcon(
+                                                type: SettingsIconType.check,
+                                                color: colors.surface,
+                                              )
+                                            : null,
+                                      )
+                                    : null,
+                                title: Text(
+                                  widget.config.displayModel(model),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 15),
+                                ),
+                                subtitle: _loaded && !_models.contains(model)
+                                    ? const Text('未在当前列表中')
+                                    : null,
+                                trailing: widget.selectable
+                                    ? null
+                                    : const SettingsIcon(
+                                        type: SettingsIconType.chevron,
+                                      ),
+                                onTap:
+                                    widget.selectable &&
+                                        !_useAll &&
+                                        _loaded &&
+                                        !_fetching
+                                    ? () => _toggle(model)
+                                    : widget.selectable
+                                    ? null
+                                    : () => _openModel(model),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+      ),
     );
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
@@ -469,46 +483,16 @@ class _ProviderModelsPageState extends State<ProviderModelsPage> {
                   left: 12,
                   right: 12,
                   bottom: 8,
-                  child: GlassSurface(
-                    radius: 26,
-                    tintOpacity: .65,
-                    shadowOpacity: 0,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 2, 16, 2),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _useAll && _loaded && !_requestFailed
-                                  ? '已选全部'
-                                  : '已选 ${_selected.length} 个模型',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: !_loaded || _fetching || shown.isEmpty
-                                ? null
-                                : () => _selectBatch(shown),
-                            style: TextButton.styleFrom(
-                              foregroundColor: colors.onSurface,
-                            ),
-                            child: Text(
-                              shown.isNotEmpty &&
-                                      shown.every(_selected.contains)
-                                  ? query.isEmpty
-                                        ? '取消全选'
-                                        : '取消选择搜索结果'
-                                  : query.isEmpty
-                                  ? '全选'
-                                  : '全选搜索结果',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  child: ModelSelectionBar(
+                    search: _search,
+                    onSearchChanged: (_) => setState(() {}),
+                    selectedCount: _selected.length,
+                    totalCount: available.length,
+                    allSelected:
+                        shown.isNotEmpty && shown.every(_selected.contains),
+                    onSelectAll: !_loaded || _fetching || shown.isEmpty
+                        ? null
+                        : () => _selectBatch(shown),
                   ),
                 ),
             ],

@@ -1,46 +1,89 @@
 import 'package:flutter/material.dart';
 
 import '../../agent/ask_user_tool.dart';
+import '../../app/global_ui.dart';
 import 'glass_surface.dart';
 import 'question_icon.dart';
-import 'message_composer.dart';
+import 'user_question_answer.dart';
+import 'user_question_skip_button.dart';
 import 'thinking_indicator.dart';
-import 'user_question_option_tile.dart';
+import 'member_avatar.dart';
+
+Future<void> showUserQuestionSheet(
+  BuildContext context, {
+  required UserQuestion question,
+  required bool showSender,
+  required VoidCallback onOpenSender,
+}) async {
+  final navigator = Navigator.of(context);
+  final route = ModalBottomSheetRoute<void>(
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: false,
+    backgroundColor: Colors.transparent,
+    elevation: 0,
+    constraints: const BoxConstraints(maxWidth: double.infinity),
+    capturedThemes: InheritedTheme.capture(
+      from: context,
+      to: navigator.context,
+    ),
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    modalBarrierColor: Theme.of(context).bottomSheetTheme.modalBarrierColor,
+    builder: (context) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: UserQuestionCard(
+        question: question,
+        showSender: showSender,
+        onOpenSender: onOpenSender,
+      ),
+    ),
+  );
+  question.sheetVisible.value = true;
+  try {
+    await navigator.push(route);
+    // A popped sheet still owns its input focus until its exit finishes.
+    await route.completed;
+  } finally {
+    question.sheetVisible.value = false;
+  }
+}
 
 class UserQuestionCard extends StatefulWidget {
-  const UserQuestionCard({super.key, required this.question});
+  const UserQuestionCard({
+    super.key,
+    required this.question,
+    required this.onOpenSender,
+    this.showSender = false,
+  });
   final UserQuestion question;
+  final bool showSender;
+  final VoidCallback onOpenSender;
 
   @override
   State<UserQuestionCard> createState() => _UserQuestionCardState();
 }
 
 class _UserQuestionCardState extends State<UserQuestionCard> {
-  late final _text = TextEditingController(text: widget.question.draft);
-  final _focus = FocusNode();
-  bool _submitted = false;
-
-  void _submit({bool skipped = false}) {
-    if (_submitted) return;
-    setState(() => _submitted = true);
-    FocusScope.of(context).unfocus();
-    widget.question.answer(skipped: skipped);
-  }
-
   @override
-  void dispose() {
-    _text.dispose();
-    _focus.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    widget.question.result.future.then((_) {
+      if (!mounted) return;
+      final route = ModalRoute.of(context)!;
+      if (!route.isActive) return;
+      final navigator = Navigator.of(context);
+      if (route.isCurrent) {
+        navigator.pop();
+      } else {
+        navigator.removeRoute(route);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final question = widget.question;
-    final canSend =
-        !_submitted &&
-        (_text.text.trim().isNotEmpty || question.selected != null);
     return Center(
       heightFactor: 1,
       child: ConstrainedBox(
@@ -52,11 +95,22 @@ class _UserQuestionCardState extends State<UserQuestionCard> {
         ),
         child: BackdropGroup(
           child: GlassSurface(
-            radius: 24,
+            borderRadius: GlobalUI.bottomSheetBorderRadius,
+            gradientColors: Theme.of(context).brightness == Brightness.dark
+                ? const [
+                    Color(0xe038383c),
+                    Color(0xcc29292e),
+                    Color(0xe02e2e33),
+                  ]
+                : const [
+                    Color(0xefffffff),
+                    Color(0xd6ffffff),
+                    Color(0xe6f5f5f8),
+                  ],
             child: SafeArea(
               top: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -84,94 +138,58 @@ class _UserQuestionCardState extends State<UserQuestionCard> {
                             ),
                           ),
                         ),
-                        IconButton(
-                          tooltip: question.isUserAction ? '取消等待' : '跳过问题',
-                          onPressed: _submitted
-                              ? null
-                              : () => _submit(skipped: true),
-                          icon: const QuestionIcon(
-                            type: QuestionIconType.close,
-                          ),
-                          style: IconButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
+                        const SizedBox(width: 12),
+                        UserQuestionSkipButton(question: question),
                       ],
                     ),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              child: Text(
-                                question.question,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  height: 1.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            if (question.isUserAction)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: Text(
-                                  '操作完成后，请返回 Aurai 点“已完成”。遇到问题也可以在下方说明。',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: colors.onSurfaceVariant,
+                    if (widget.showSender)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4, bottom: 4),
+                        child: Semantics(
+                          button: true,
+                          label: '查看${question.sender.name}的资料',
+                          child: InkWell(
+                            onTap: widget.onOpenSender,
+                            borderRadius: BorderRadius.circular(12),
+                            child: Row(
+                              children: [
+                                MemberAvatar(sender: question.sender, size: 24),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        TextSpan(
+                                          text: question.sender.name,
+                                          style: TextStyle(
+                                            color: GlobalUI.highlightTextColor(
+                                              context,
+                                            ),
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: question.isUserAction
+                                              ? '请你完成一个操作'
+                                              : '问了你一个问题',
+                                        ),
+                                      ],
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: colors.onSurfaceVariant,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            for (var i = 0; i < question.options.length; i++)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: UserQuestionOptionTile(
-                                  option: question.optionAt(i),
-                                  number: i + 1,
-                                  selected: question.selected == i,
-                                  onTap: _submitted
-                                      ? null
-                                      : () {
-                                          question.selected = i;
-                                          question.draft = '';
-                                          _text.clear();
-                                          _submit();
-                                        },
-                                ),
-                              ),
-                          ],
+                              ],
+                            ),
+                          ),
                         ),
+                      ),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: UserQuestionAnswer(question: question),
                       ),
                     ),
-                    if (question.allowCustomAnswer) ...[
-                      const SizedBox(height: 8),
-                      MessageComposer(
-                        embedded: true,
-                        controller: _text,
-                        focusNode: _focus,
-                        enabled: !_submitted,
-                        hintText:
-                            question.customAnswerPlaceholder ??
-                            (question.isUserAction ? '说明遇到的问题' : '或自行撰写回复'),
-                        onChanged: (value) => setState(() {
-                          question.draft = value;
-                          question.selected = null;
-                        }),
-                        action: RoundAction(
-                          label: '发送回答',
-                          inkResponse: false,
-                          primary: true,
-                          compact: true,
-                          icon: Icons.arrow_upward_rounded,
-                          onPressed: canSend ? _submit : null,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),

@@ -13,6 +13,8 @@ import 'package:flutter/material.dart';
 
 import '../../memory/memory_controller.dart';
 import 'settings_appearance.dart';
+import 'profile_gender_field.dart';
+import '../../domain/profile_gender.dart';
 
 class PersonalInfoPage extends StatefulWidget {
   const PersonalInfoPage({super.key, required this.memory});
@@ -27,11 +29,13 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
   late final _job = TextEditingController(text: widget.memory.occupation);
   late final _about = TextEditingController(text: widget.memory.about);
   late AvatarStyle _avatar = widget.memory.avatar;
+  late ProfileGender _gender = widget.memory.gender;
   final _draftPaths = <String>{};
   bool _picking = false;
   bool _saving = false;
   bool _allowPop = false;
   bool get _dirty =>
+      _gender != widget.memory.gender ||
       _avatar != widget.memory.avatar ||
       _name.text.trim() != widget.memory.nickname ||
       _job.text.trim() != widget.memory.occupation ||
@@ -83,7 +87,11 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
         ),
       );
     } catch (caughtError) {
-      if (mounted) _notice('头像读取失败，请重试：${errorMessage(caughtError)}');
+      if (mounted)
+        _notice(
+          '头像读取失败，请重试：${errorMessage(caughtError)}',
+          kind: ToastKind.error,
+        );
     } finally {
       if (mounted) setState(() => _picking = false);
     }
@@ -151,21 +159,28 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
         _job.text.trim(),
         _about.text.trim(),
         avatar: _avatar,
+        gender: _gender,
       );
       if (oldPath != null && oldPath != _avatar.path) _draftPaths.add(oldPath);
       _draftPaths.remove(_avatar.path);
       await _cleanDrafts();
-      if (mounted) _notice('个人信息已保存');
+      if (!mounted) return;
+      setState(() => _allowPop = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.pop(context);
+      });
     } on Object catch (error) {
-      if (mounted) _notice('保存失败，请重试：${errorMessage(error)}');
+      if (mounted)
+        _notice('保存失败，请重试：${errorMessage(error)}', kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
 
   Widget _profileField(
     String label,
@@ -259,6 +274,13 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
                     onSelected: _saving || _picking ? null : _pickAvatar,
                   ),
                   _profileField('你的昵称', _name, '希望 Aurai 怎么称呼你', 80),
+                  const SizedBox(height: 16),
+                  ProfileGenderField(
+                    value: _gender,
+                    onChanged: _saving
+                        ? null
+                        : (value) => setState(() => _gender = value),
+                  ),
                   const SizedBox(height: 16),
                   _profileField('你的职业', _job, '你从事什么工作', 120),
                   const SizedBox(height: 16),

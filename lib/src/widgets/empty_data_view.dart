@@ -21,7 +21,7 @@ class EmptyDataView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Align(
-    alignment: const Alignment(0, -.3),
+    alignment: Alignment.center,
     child: SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: ConstrainedBox(

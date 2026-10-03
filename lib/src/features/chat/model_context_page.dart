@@ -11,7 +11,7 @@ import '../../domain/model_provider.dart';
 import '../../providers/model_context_limits.dart';
 import '../../scheduling/task_unsaved_dialog.dart';
 import 'chat_controller.dart';
-import 'choice_sheet.dart';
+import 'model_choice_sheet.dart';
 import 'glass_surface.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -90,7 +90,8 @@ class _ModelContextPageState extends State<ModelContextPage> {
         );
       }
     } on Object catch (error) {
-      if (mounted) _notice('无法读取已使用模型：${errorMessage(error)}');
+      if (mounted)
+        _notice('无法读取已使用模型：${errorMessage(error)}', kind: ToastKind.error);
     }
   }
 
@@ -109,9 +110,10 @@ class _ModelContextPageState extends State<ModelContextPage> {
     _edited = false;
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
 
   bool _capture() {
     final model = _selectedModel;
@@ -123,7 +125,7 @@ class _ModelContextPageState extends State<ModelContextPage> {
       return true;
     }
     if (!_providerDefault && (model.isEmpty || model.length > 200)) {
-      _notice('请输入有效的模型名称');
+      _notice('请输入有效的模型名称', kind: ToastKind.warning);
       return false;
     }
     final windowText = _window.text.trim();
@@ -156,7 +158,7 @@ class _ModelContextPageState extends State<ModelContextPage> {
     final config =
         (widget.draft?.config ??
         widget.controller.modelSettings.profile(widget.service));
-    final choice = await showChoiceSheet<String>(
+    final choice = await showModelOptionsSheet(
       context,
       title: '选择模型',
       selected: _custom ? '__custom__' : _scope,
@@ -220,6 +222,10 @@ class _ModelContextPageState extends State<ModelContextPage> {
           modelPurposeField: config.details?.modelPurposeField ?? '',
           modelTypeMappings: config.details?.modelTypeMappings ?? const {},
           modelReasoning: config.details?.modelReasoning ?? const {},
+          speechApi: config.speechApi,
+          speechApiKey: config.details?.speechApiKey ?? '',
+          modelCatalog: config.details?.modelCatalog ?? const [],
+          modelApiNames: config.details?.modelApiNames ?? const {},
           balance: config.details?.balance,
           icon: config.details?.icon,
           modelContextOverrides: draft,
@@ -250,6 +256,10 @@ class _ModelContextPageState extends State<ModelContextPage> {
             modelPurposeField: config.details?.modelPurposeField ?? '',
             modelTypeMappings: config.details?.modelTypeMappings ?? const {},
             modelReasoning: config.details?.modelReasoning ?? const {},
+            speechApi: config.speechApi,
+            speechApiKey: config.details?.speechApiKey ?? '',
+            modelCatalog: config.details?.modelCatalog ?? const [],
+            modelApiNames: config.details?.modelApiNames ?? const {},
             balance: config.details?.balance,
             icon: config.details?.icon,
             modelContextOverrides: _drafts,
@@ -258,11 +268,12 @@ class _ModelContextPageState extends State<ModelContextPage> {
         defaultService: widget.controller.modelSettings.activeService,
       );
       if (!mounted) return;
-      if (widget.draft == null) _notice('上下文压缩设置已保存');
+      if (widget.draft == null) _notice('上下文压缩设置已保存', kind: ToastKind.success);
       setState(() => _allowPop = true);
       Navigator.pop(context, true);
     } on Object catch (error) {
-      if (mounted) _notice('保存失败：${errorMessage(error)}');
+      if (mounted)
+        _notice('保存失败：${errorMessage(error)}', kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -330,19 +341,22 @@ class _ModelContextPageState extends State<ModelContextPage> {
     child: InkWell(
       onTap: _pickModel,
       borderRadius: BorderRadius.circular(26),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                _custom ? '其他模型名称' : _scope,
-                style: const TextStyle(fontSize: 16),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: settingsCardHeight),
+        child: Padding(
+          padding: settingsCardPadding,
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _custom ? '其他模型名称' : _scope,
+                  style: const TextStyle(fontSize: 16),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            const SettingsIcon(type: SettingsIconType.chevron),
-          ],
+              const SizedBox(width: 12),
+              const SettingsIcon(type: SettingsIconType.chevronDown),
+            ],
+          ),
         ),
       ),
     ),

@@ -4,6 +4,9 @@ import 'package:flutter/services.dart';
 /// 全局视觉配置：品牌色及 Material 组件样式统一在此维护。
 abstract final class GlobalUI {
   static const double appBarHeight = 60;
+  static const bottomSheetBorderRadius = BorderRadius.vertical(
+    top: Radius.circular(28),
+  );
 
   static Color messageBackground(ThemeData theme) =>
       theme.brightness == Brightness.dark
@@ -16,8 +19,12 @@ abstract final class GlobalUI {
   static const Color userMessageBackground = Color(0xffe8e0f5);
   static const Color pageBackground = Color(0xfffAfAfA);
   static const Color primary = Color(0xffafa9ee);
+  static const Color maleColor = Color(0xff06a3fd);
+  static const Color femaleColor = Color(0xfff37cb6);
   static const Color primaryLight = Color(0xffddc5f7);
   static const Color primaryBackground = Color(0xfff4effb);
+  static const Color warningRed = Color(0xffe53935);
+  static const Color darkWarningRed = Color(0xffff6b6b);
   static const Color onPrimaryBackground = Color(0xff493365);
   static const Color onPrimary = Color(0xff493365);
 
@@ -162,6 +169,10 @@ abstract final class GlobalUI {
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: colors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: bottomSheetBorderRadius,
+        ),
+        clipBehavior: Clip.antiAlias,
         showDragHandle: true,
         surfaceTintColor: Colors.transparent,
       ),

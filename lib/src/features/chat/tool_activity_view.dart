@@ -1,6 +1,7 @@
 import 'private_task_history.dart';
 import 'tool_elapsed.dart';
 import 'tool_inline_detail.dart';
+import 'object_result_footer.dart';
 import '../../domain/workspace_file_changes.dart';
 import 'workspace_changes_view.dart';
 import 'tool_expand_arrow.dart';
@@ -20,6 +21,10 @@ import 'chat_scroll_anchor.dart';
 import 'tool_action_icon.dart';
 import 'tool_payload_section.dart';
 import 'user_question_history.dart';
+import 'user_question_scope.dart';
+import 'user_question_answer.dart';
+import 'user_question_skip_button.dart';
+import '../../agent/ask_user_tool.dart';
 import 'scheduled_task_history.dart';
 import 'image_generation_skeleton.dart';
 
@@ -30,6 +35,7 @@ class ToolActivityView extends StatefulWidget {
     required this.storageId,
     required this.status,
     this.toolName,
+    this.callId,
     this.requestJson,
     this.resultJson,
     this.showFileChanges = true,
@@ -43,6 +49,7 @@ class ToolActivityView extends StatefulWidget {
   final AgentStepStatus status;
   final String? requestJson;
   final String? resultJson;
+  final String? callId;
   final bool showFileChanges;
   final DateTime? startedAt;
   final DateTime? finishedAt;
@@ -53,6 +60,8 @@ class ToolActivityView extends StatefulWidget {
 
 class _ToolActivityViewState extends State<ToolActivityView> {
   bool _expanded = false;
+  UserQuestion? _lastQuestion;
+  bool _wasSheetVisible = false;
   late WorkspaceFileChanges _fileChanges = WorkspaceFileChanges.fromResults([
     widget.resultJson,
   ]);
@@ -70,6 +79,35 @@ class _ToolActivityViewState extends State<ToolActivityView> {
             )
             as bool? ??
         _failedQuestion;
+    final question = _pendingQuestion;
+    if (question != null) {
+      final visible = question.sheetVisible.value;
+      final newQuestion = !identical(question, _lastQuestion);
+      final openedSheet = visible && !_wasSheetVisible;
+      final closedSheet = !visible && !newQuestion && _wasSheetVisible;
+      if (newQuestion || openedSheet || closedSheet) {
+        final expanded = closedSheet;
+        if (_expanded != expanded) ChatScrollAnchor.beforeResize(context);
+        _expanded = expanded;
+        PageStorage.of(context).writeState(
+          context,
+          expanded,
+          identifier: 'tool-expanded:${widget.storageId}',
+        );
+      }
+      _lastQuestion = question;
+      _wasSheetVisible = visible;
+    }
+  }
+
+  UserQuestion? get _pendingQuestion {
+    final question = UserQuestionScope.of(context)?.question;
+    return question != null &&
+            !question.result.isCompleted &&
+            question.callId == widget.callId &&
+            widget.toolName == 'askUser'
+        ? question
+        : null;
   }
 
   @override
@@ -126,13 +164,16 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                 as Map?)?['pending'] ==
             true;
     final isQuestion = widget.toolName == 'askUser';
+    final pendingQuestion = _pendingQuestion;
     final canExpand = !running || isQuestion;
     final showStatus = !running;
     final questionResult = isQuestion && widget.resultJson != null
         ? jsonDecode(widget.resultJson!) as Map
         : null;
     final skipped = questionResult?['skipped'] == true;
-    final questionLabel = skipped
+    final questionLabel = questionResult?['timedOut'] == true
+        ? '已超时'
+        : skipped
         ? '已跳过'
         : widget.status == AgentStepStatus.cancelled ||
               questionResult?['cancelled'] == true
@@ -234,7 +275,9 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                   Expanded(
                     child: ThinkingIndicator(
                       leading: Semantics(
-                        label: waitingForUser
+                        label: pendingQuestion != null
+                            ? '等待你的回答'
+                            : waitingForUser
                             ? '等待你操作'
                             : switch (widget.status) {
                                 AgentStepStatus.running => '正在执行',
@@ -257,8 +300,13 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                           ),
                         ),
                       ),
-                      label: waitingForUser ? '等待你操作' : displayTitle,
-                      animate: running && !waitingForUser,
+                      label: pendingQuestion != null
+                          ? '待回答 · ${pendingQuestion.title ?? '问题'}'
+                          : waitingForUser
+                          ? '等待你操作'
+                          : displayTitle,
+                      animate:
+                          running && !waitingForUser && pendingQuestion == null,
                       singleLine: true,
                       detail: isQuestion || waitingForUser
                           ? null
@@ -273,7 +321,11 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                           : null,
                     ),
                   ),
-                  if (widget.startedAt != null &&
+                  if (toolShowsElapsed(
+                        widget.toolName,
+                        resultJson: widget.resultJson,
+                      ) &&
+                      widget.startedAt != null &&
                       (running || widget.finishedAt != null))
                     ToolElapsed(
                       startedAt: widget.startedAt!,
@@ -295,6 +347,10 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                     ),
                     const SizedBox(width: 6),
                   ],
+                  if (pendingQuestion != null &&
+                      _expanded &&
+                      !pendingQuestion.sheetVisible.value)
+                    UserQuestionSkipButton(question: pendingQuestion),
                   if (canExpand)
                     Transform.translate(
                       offset: const Offset(4, 0),
@@ -308,7 +364,17 @@ class _ToolActivityViewState extends State<ToolActivityView> {
         if (widget.showFileChanges && hasFileChanges && _expanded)
           WorkspaceChangesView(changes: _fileChanges),
         if (_expanded && canExpand)
-          if (isQuestion)
+          if (pendingQuestion != null && !pendingQuestion.sheetVisible.value)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                UserQuestionAnswer(
+                  key: ObjectKey(pendingQuestion),
+                  question: pendingQuestion,
+                ),
+              ],
+            )
+          else if (isQuestion && pendingQuestion == null)
             UserQuestionHistory(
               requestJson: widget.requestJson,
               resultJson: widget.resultJson,
@@ -333,7 +399,7 @@ class _ToolActivityViewState extends State<ToolActivityView> {
               requestJson: widget.requestJson,
               resultJson: widget.resultJson,
             )
-          else
+          else if (!isQuestion)
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -356,6 +422,10 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                 const SizedBox(height: 12),
               ],
             ),
+        if (showCard &&
+            widget.status == AgentStepStatus.completed &&
+            widget.resultJson != null)
+          ObjectResultFooter(resultJson: widget.resultJson!),
       ],
     );
     final dark = Theme.of(context).brightness == Brightness.dark;
@@ -368,7 +438,7 @@ class _ToolActivityViewState extends State<ToolActivityView> {
             Positioned(
               left: -13,
               right: -13,
-              top: -8,
+              top: 0,
               bottom: 0,
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -389,7 +459,13 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                 ),
               ),
             ),
-          KeyedSubtree(key: const ValueKey('tool-content'), child: content),
+          Padding(
+            padding: EdgeInsets.only(top: showCard ? 8 : 0),
+            child: KeyedSubtree(
+              key: const ValueKey('tool-content'),
+              child: content,
+            ),
+          ),
         ],
       ),
     );
@@ -442,7 +518,18 @@ class _ToolStatusBadge extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (showIcon) ...[
-              Icon(icon, size: 14, color: color),
+              if (status == AgentStepStatus.cancelled)
+                SizedBox.square(
+                  dimension: 14,
+                  child: FittedBox(
+                    child: QuestionIcon(
+                      type: QuestionIconType.stop,
+                      color: color,
+                    ),
+                  ),
+                )
+              else
+                Icon(icon, size: 14, color: color),
               const SizedBox(width: 4),
             ],
             Text(

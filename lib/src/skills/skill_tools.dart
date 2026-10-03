@@ -1,3 +1,4 @@
+import '../domain/tool_detail_target.dart';
 import 'skill_icon_names.dart';
 import 'dart:convert';
 import '../domain/tool_models.dart';
@@ -130,6 +131,7 @@ class SkillTool
           'visibility': {
             'type': 'string',
             'enum': ['private', 'public', 'selected'],
+            'description': 'Defaults to public when creating a skill.',
           },
           'visibleTo': {
             'type': 'array',
@@ -328,7 +330,10 @@ class SkillTool
                   (operation == 'update'
                       ? store.read(a['previousName'] as String).icon
                       : 'skill'),
-              if (operation == 'create') 'revision': 0,
+              if (operation == 'create') ...{
+                'revision': 0,
+                'visibility': a['visibility'] ?? 'public',
+              },
             }),
             previousName: operation == 'update' ? _editTarget!.id : null,
             approvedRevision: _editTarget?.revision,
@@ -350,11 +355,36 @@ class SkillTool
         default:
           throw StateError('未知技能操作');
       }
+      final target = switch (operation) {
+        'create' => store.library.singleWhere(
+          (skill) =>
+              skill.ownerId == store.ownerId &&
+              skill.name == (a['name'] as String).trim(),
+        ),
+        'update' => store.readId(_editTarget!.id),
+        'read' ||
+        'install' ||
+        'uninstall' ||
+        'enable' ||
+        'disable' => store.read(a['name'] as String),
+        _ => null,
+      };
       return ToolResult(
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.success,
-        output: {'result': result},
+        output: {
+          'result': result,
+          if (target != null)
+            'detailTargets': [
+              ToolDetailTarget(
+                type: ToolDetailType.skill,
+                id: target.id,
+                name: target.name,
+                icon: target.icon,
+              ).toJson(),
+            ],
+        },
       );
     } on Object catch (e) {
       return ToolResult(
@@ -488,7 +518,23 @@ class RunSkillTool
     );
     if (result.status == ToolResultStatus.success)
       await store.recordUse(skill.id);
-    return result;
+    return ToolResult(
+      callId: result.callId,
+      toolName: result.toolName,
+      status: result.status,
+      output: {
+        ...result.output,
+        'detailTargets': [
+          ToolDetailTarget(
+            type: ToolDetailType.skill,
+            id: skill.id,
+            name: skill.name,
+            icon: skill.icon,
+          ).toJson(),
+        ],
+      },
+      attachments: result.attachments,
+    );
   }
 
   @override

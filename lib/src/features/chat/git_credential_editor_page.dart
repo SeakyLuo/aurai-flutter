@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/glass_notice.dart';
-import 'app_confirmation_dialog.dart';
+import 'delete_confirmation_dialog.dart';
 import 'dialog_action_button.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -106,7 +106,7 @@ class _GitCredentialEditorPageState extends State<GitCredentialEditorPage> {
     final username = _github ? 'git' : _username.text.trim();
     final token = _token.text.trim();
     if (host.isEmpty || !host.contains('.')) {
-      _notice('请输入 Git 服务域名');
+      _notice('请输入 Git 服务域名', kind: ToastKind.warning);
       return;
     }
     if (widget.existingHosts.contains(host)) {
@@ -114,11 +114,11 @@ class _GitCredentialEditorPageState extends State<GitCredentialEditorPage> {
       return;
     }
     if (!_automaticUsername && username.isEmpty) {
-      _notice('请输入 HTTPS 用户名');
+      _notice('请输入 HTTPS 用户名', kind: ToastKind.warning);
       return;
     }
     if (!_editing && token.isEmpty) {
-      _notice('请输入 HTTPS 密码或访问令牌');
+      _notice('请输入 HTTPS 密码或访问令牌', kind: ToastKind.warning);
       return;
     }
     Navigator.pop(
@@ -138,11 +138,10 @@ class _GitCredentialEditorPageState extends State<GitCredentialEditorPage> {
   Future<void> _delete() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AppConfirmationDialog(
+      builder: (_) => DeleteConfirmationDialog(
         title: '删除 HTTPS 凭据？',
         description: '之后使用 ${widget.credential!.host} 拉取或推送时，需要重新配置。',
         confirmLabel: '删除',
-        confirmRole: DialogActionRole.destructive,
       ),
     );
     if (confirmed == true && mounted) {
@@ -150,9 +149,10 @@ class _GitCredentialEditorPageState extends State<GitCredentialEditorPage> {
     }
   }
 
-  void _notice(String message) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(message)));
+  void _notice(String message, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(message)), kind: kind);
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -187,11 +187,11 @@ class _GitCredentialEditorPageState extends State<GitCredentialEditorPage> {
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               children: [
                 if (_customHost) ...[
-                  _field('服务地址', _host, '例如 git.example.com'),
+                  _field('服务地址', _host, '例如 git.example.com', first: true),
                   const SizedBox(height: 16),
                 ],
                 if (!_automaticUsername) ...[
-                  _field('HTTPS 用户名', _username, '代码托管账号'),
+                  _field('HTTPS 用户名', _username, '代码托管账号', first: !_customHost),
                   const SizedBox(height: 16),
                 ],
                 _field(
@@ -203,6 +203,7 @@ class _GitCredentialEditorPageState extends State<GitCredentialEditorPage> {
                       ? '输入 Codeup 个人访问令牌'
                       : '输入密码或 Personal Access Token',
                   obscureText: _obscureToken,
+                  first: !_customHost && _automaticUsername,
                   sensitive: true,
                   suffix: IconButton(
                     tooltip: _obscureToken ? '显示令牌' : '隐藏令牌',
@@ -217,27 +218,10 @@ class _GitCredentialEditorPageState extends State<GitCredentialEditorPage> {
                 ),
                 if (_editing) ...[
                   const SizedBox(height: 28),
-                  Material(
-                    color: settingsFieldColor(context),
-                    borderRadius: BorderRadius.circular(26),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
-                      minVerticalPadding: 16,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                      ),
-                      leading: SettingsIcon(
-                        type: SettingsIconType.reset,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      title: Text(
-                        '删除凭据',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                      onTap: _delete,
-                    ),
+                  DialogActionButton(
+                    text: '删除凭据',
+                    role: DialogActionRole.destructive,
+                    onPressed: _delete,
                   ),
                 ],
               ],
@@ -252,6 +236,7 @@ class _GitCredentialEditorPageState extends State<GitCredentialEditorPage> {
     String label,
     TextEditingController controller,
     String hint, {
+    bool first = false,
     bool enabled = true,
     bool obscureText = false,
     bool sensitive = false,
@@ -260,7 +245,7 @@ class _GitCredentialEditorPageState extends State<GitCredentialEditorPage> {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Padding(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+        padding: EdgeInsets.fromLTRB(18, first ? 0 : 8, 18, 12),
         child: Text(
           label,
           style: TextStyle(

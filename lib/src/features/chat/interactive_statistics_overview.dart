@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../../domain/interactive_selection.dart';
 import '../../domain/interactive_message.dart';
 import '../../domain/message_sender.dart';
-import 'member_avatar.dart';
+import 'member_profile_avatar.dart';
+import 'chat_controller.dart';
 import 'settings_icon.dart';
 
 typedef InteractiveOptionKey = (String, String);
@@ -11,11 +12,15 @@ class InteractiveStatisticsOverview extends StatelessWidget {
   const InteractiveStatisticsOverview({
     super.key,
     required this.card,
+    required this.controller,
+    required this.groupId,
     required this.senders,
     required this.onParticipant,
     required this.onOption,
   });
   final InteractiveMessage card;
+  final ChatController controller;
+  final String groupId;
   final Map<String, MessageSender> senders;
   final ValueChanged<String> onParticipant;
   final ValueChanged<InteractiveOptionKey> onOption;
@@ -71,7 +76,11 @@ class InteractiveStatisticsOverview extends StatelessWidget {
         if (card.hasInteraction) ...[
           const SizedBox(height: 8),
           Text(
-            '投票规则：${[multiple ? '多选，每个所选项各计一票' : '单选，每人一票', if (card.engine.allowChange) '改票会替换原票', if (multiple) '比例为选择该项的人数占参与人数'].join('；')}',
+            '投票规则：${[card.interaction.containsKey('actorWeights')
+                ? '按参与者票值计票'
+                : multiple
+                ? '多选，每个所选项各计一票'
+                : '单选，每人一票', if (card.engine.allowChange) '改票会替换原票', if (multiple) '每个所选项分别计票'].join('；')}',
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -151,6 +160,8 @@ class InteractiveStatisticsOverview extends StatelessWidget {
             ),
           for (final id in people)
             InteractiveParticipantTile(
+              controller: controller,
+              groupId: groupId,
               card: card,
               sender: statisticsSender(card, senders, id),
               actor: id,
@@ -167,8 +178,8 @@ class InteractiveStatisticsOverview extends StatelessWidget {
     List<String> people,
   ) {
     final colors = Theme.of(context).colorScheme;
-    final count = option['count'] as int;
-    final ratio = card.choices.isEmpty ? 0.0 : count / card.choices.length;
+    final count = option['count'] as num;
+    final ratio = card.choices.isEmpty ? 0.0 : count / card.totalWeight;
     final key = (option['buttonId'] as String, option['label'] as String);
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
@@ -177,7 +188,8 @@ class InteractiveStatisticsOverview extends StatelessWidget {
         onTap: card.visible('visibility') ? () => onOption(key) : null,
         child: Semantics(
           button: card.visible('visibility'),
-          label: '选项：${option['label']}，$count 人',
+          label:
+              '选项：${option['label']}，$count ${card.hasInteraction ? '票' : '人'}',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -192,7 +204,7 @@ class InteractiveStatisticsOverview extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    '$count 人${card.hasInteraction ? ' · ${(ratio * 100).round()}%' : ''}',
+                    '$count ${card.hasInteraction ? '票' : '人'}${card.hasInteraction ? ' · ${(ratio * 100).round()}%' : ''}',
                     style: TextStyle(
                       fontSize: 13,
                       color: colors.onSurfaceVariant,
@@ -227,7 +239,9 @@ class InteractiveStatisticsOverview extends StatelessWidget {
                           padding: const EdgeInsets.all(6),
                           child: Stack(
                             children: [
-                              MemberAvatar(
+                              MemberProfileAvatar(
+                                controller: controller,
+                                groupId: groupId,
                                 sender: statisticsSender(
                                   card,
                                   senders,
@@ -300,18 +314,26 @@ class InteractiveParticipantTile extends StatelessWidget {
   const InteractiveParticipantTile({
     super.key,
     required this.card,
+    required this.controller,
+    required this.groupId,
     required this.sender,
     required this.actor,
     required this.onTap,
   });
   final InteractiveMessage card;
+  final ChatController controller;
+  final String groupId;
   final MessageSender sender;
   final String actor;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => ListTile(
     contentPadding: EdgeInsets.zero,
-    leading: MemberAvatar(sender: sender),
+    leading: MemberProfileAvatar(
+      controller: controller,
+      sender: sender,
+      groupId: groupId,
+    ),
     title: Text(statisticsName(card, actor)),
     subtitle: Text(
       card.shared

@@ -1,3 +1,4 @@
+import 'floating_search_layout.dart';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
 import 'group_member_choice.dart';
@@ -21,6 +22,14 @@ class GroupMuteSelection extends StatefulWidget {
 }
 
 class _GroupMuteSelectionState extends State<GroupMuteSelection> {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  final _searchController = TextEditingController();
+
   final _selected = <String>{};
   String _search = '';
   bool _choosing = false;
@@ -59,22 +68,6 @@ class _GroupMuteSelectionState extends State<GroupMuteSelection> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: '搜索群成员',
-                    filled: true,
-                    fillColor: settingsFieldColor(context),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(26),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  onChanged: (value) =>
-                      setState(() => _search = value.trim().toLowerCase()),
-                ),
-              ),
-              Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Align(
                   alignment: Alignment.centerLeft,
@@ -82,24 +75,58 @@ class _GroupMuteSelectionState extends State<GroupMuteSelection> {
                 ),
               ),
               Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    for (final member in visible)
-                      GroupMemberChoice(
-                        selected: _selected.contains(member.sender.id),
-                        sender: member.sender,
-                        onTap: () => setState(() {
-                          if (!_selected.remove(member.sender.id))
-                            _selected.add(member.sender.id);
-                        }),
+                child: FloatingSearchLayout(
+                  itemCount: widget.members.length,
+                  onChanged: (value) =>
+                      setState(() => _search = value.trim().toLowerCase()),
+                  hintText: '搜索群成员',
+                  controller: _searchController,
+                  enabled: true,
+                  bottom: 16,
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(
+                          16,
+                          16,
+                          16,
+                          FloatingSearchLayout.clearance,
+                        ),
+                        sliver: SliverMainAxisGroup(
+                          slivers: [
+                            SliverList.list(
+                              children: [
+                                for (final member in visible)
+                                  GroupMemberChoice(
+                                    selected: _selected.contains(
+                                      member.sender.id,
+                                    ),
+                                    sender: member.sender,
+                                    onTap: () => setState(() {
+                                      if (!_selected.remove(member.sender.id))
+                                        _selected.add(member.sender.id);
+                                    }),
+                                  ),
+                              ],
+                            ),
+                            if (visible.isEmpty)
+                              SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: Center(
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(32),
+                                    child: Text(
+                                      '没有找到匹配的成员',
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                    if (visible.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text('没有找到匹配的成员', textAlign: TextAlign.center),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],

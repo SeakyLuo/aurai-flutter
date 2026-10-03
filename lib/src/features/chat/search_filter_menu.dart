@@ -21,7 +21,7 @@ Future<void> showSearchFilterMenu(
     pageBuilder: (context, animation, secondaryAnimation) => Stack(
       children: [
         Positioned(
-          top: anchor.bottom + 8,
+          bottom: media.size.height - anchor.top + 8,
           right: 16,
           width: width,
           child: FadeTransition(

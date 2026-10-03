@@ -1,3 +1,4 @@
+import 'floating_search_layout.dart';
 import 'conversation_list_tile.dart';
 import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
@@ -104,8 +105,9 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
       });
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('会话加载失败，请重新搜索：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted && generation == _generation)
@@ -166,8 +168,9 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
       await PreviewImageActions.perform(widget.image!, 'share');
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('无法打开分享，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _sharing = false);
@@ -182,22 +185,12 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
       onBack: () => Navigator.pop(context),
     ),
     body: SettingsPageBody(
-      avoidHeader: true,
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: TextField(
+          Expanded(
+            child: FloatingSearchLayout(
+              itemCount: _items.length,
               controller: _search,
-              decoration: InputDecoration(
-                hintText: '搜索会话',
-                filled: true,
-                fillColor: settingsFieldColor(context),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-              ),
               onChanged: (_) {
                 _generation++;
                 _debounce?.cancel();
@@ -206,44 +199,53 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
                   () => _load(reset: true),
                 );
               },
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              children: [
-                if (widget.message == null)
-                  _row(
-                    '其他应用',
-                    const AttachmentActionIcon(
-                      type: AttachmentActionIconType.forward,
+              hintText: '搜索会话',
+              enabled: true,
+              bottom: 16,
+              child: ListView(
+                controller: _scroll,
+                padding: settingsPagePadding(
+                  context,
+                  const EdgeInsets.fromLTRB(
+                    16,
+                    8,
+                    16,
+                    FloatingSearchLayout.clearance,
+                  ),
+                ),
+                children: [
+                  if (widget.message == null)
+                    _row(
+                      '其他应用',
+                      const AttachmentActionIcon(
+                        type: AttachmentActionIconType.forward,
+                      ),
+                      _sharing ? null : _external,
                     ),
-                    _sharing ? null : _external,
-                  ),
-                for (final item in _items)
-                  ConversationListTile(
-                    controller: widget.controller,
-                    conversation: item,
-                    avatar: _avatar(item),
-                    onTap: () => _select(item),
-                  ),
-                if (_loading)
-                  const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Center(
-                      child: SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                  for (final item in _items)
+                    ConversationListTile(
+                      controller: widget.controller,
+                      conversation: item,
+                      avatar: _avatar(item),
+                      onTap: () => _select(item),
+                    ),
+                  if (_loading)
+                    const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Center(
+                        child: SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
                       ),
                     ),
-                  ),
-                if (!_loading && _items.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: EmptyDataView(title: '没有找到会话')),
-                  ),
-              ],
+                  if (!_loading && _items.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: EmptyDataView(title: '没有找到会话')),
+                    ),
+                ],
+              ),
             ),
           ),
         ],

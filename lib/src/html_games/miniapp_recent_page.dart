@@ -35,6 +35,7 @@ class _MiniappRecentPageState extends State<MiniappRecentPage> {
     });
     try {
       final result = await _library.recent(
+        limit: reset && _entries.length > 20 ? _entries.length : 20,
         beforeTime: reset ? null : _time,
         beforeId: reset ? null : _id,
       );
@@ -49,14 +50,9 @@ class _MiniappRecentPageState extends State<MiniappRecentPage> {
     } on Object catch (error) {
       if (mounted) {
         _failed = true;
-        ScaffoldMessenger.of(context).showGlassSnackBar(
-          SnackBar(
-            content: Text(errorMessage(error)),
-            action: SnackBarAction(
-              label: '重试',
-              onPressed: () => _load(reset: reset),
-            ),
-          ),
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
         );
       }
     } finally {
@@ -72,9 +68,10 @@ class _MiniappRecentPageState extends State<MiniappRecentPage> {
       if (mounted) await _load(reset: true);
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
     } finally {
       if (mounted) setState(() => _opening = false);
     }
@@ -92,56 +89,79 @@ class _MiniappRecentPageState extends State<MiniappRecentPage> {
           child: _loading && _entries.isEmpty
               ? const Center(child: CircularProgressIndicator())
               : PaginationListener(
+                  failed: _failed,
+                  onRetry: () => _load(reset: !_more),
                   hasMore: !_loading && !_failed && _more,
                   loadMore: _load,
-                  child: ListView(
+                  child: CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.fromLTRB(
-                      16,
-                      MediaQuery.paddingOf(context).top +
-                          SettingsAppBar.toolbarHeight +
+
+                    slivers: [
+                      SliverPadding(
+                        padding: EdgeInsets.fromLTRB(
                           16,
-                      16,
-                      16,
-                    ),
-                    children: [
-                      if (_entries.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.all(32),
-                          child: Center(child: Text('还没有使用过小程序')),
+                          MediaQuery.paddingOf(context).top +
+                              SettingsAppBar.toolbarHeight +
+                              16,
+                          16,
+                          16,
                         ),
-                      for (final entry in _entries)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Material(
-                            color: settingsFieldColor(context),
-                            borderRadius: BorderRadius.circular(22),
-                            clipBehavior: Clip.antiAlias,
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 10,
-                              ),
-                              leading: MiniappIcon(
-                                path: entry.iconPath,
-                                asset: entry.iconAsset,
-                                size: 48,
-                              ),
-                              title: Text(
-                                entry.title,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
+                        sliver: SliverMainAxisGroup(
+                          slivers: [
+                            SliverList.list(
+                              children: [
+                                for (final entry in _entries)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: Material(
+                                      color: settingsFieldColor(context),
+                                      borderRadius: BorderRadius.circular(22),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: ListTile(
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 18,
+                                              vertical: 10,
+                                            ),
+                                        leading: MiniappIcon(
+                                          path: entry.iconPath,
+                                          asset: entry.iconAsset,
+                                          size: 48,
+                                        ),
+                                        title: Text(
+                                          entry.title,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        onTap: _opening
+                                            ? null
+                                            : () => _open(entry),
+                                      ),
+                                    ),
+                                  ),
+                                if (_loading && _entries.isNotEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            if (_entries.isEmpty)
+                              SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: Center(
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(32),
+                                    child: Center(child: Text('还没有使用过小程序')),
+                                  ),
                                 ),
                               ),
-                              onTap: _opening ? null : () => _open(entry),
-                            ),
-                          ),
+                          ],
                         ),
-                      if (_loading && _entries.isNotEmpty)
-                        const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Center(child: CircularProgressIndicator()),
-                        ),
+                      ),
                     ],
                   ),
                 ),

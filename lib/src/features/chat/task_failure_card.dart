@@ -30,9 +30,10 @@ class TaskFailureCard extends StatelessWidget {
       () => Clipboard.setData(ClipboardData(text: error)),
     );
     if (copied && context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(const SnackBar(content: Text('已复制报错')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('已复制报错')),
+        kind: ToastKind.success,
+      );
     }
   }
 
@@ -44,18 +45,12 @@ class TaskFailureCard extends StatelessWidget {
           ? const EdgeInsets.fromLTRB(16, 6, 8, 16)
           : const EdgeInsets.fromLTRB(16, 6, 8, 6),
       decoration: BoxDecoration(
-        color: paused != null
-            ? Theme.of(context).colorScheme.surfaceContainerHighest
-            : Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xff292529)
-            : const Color(0xfffffcfd),
+        color: GlobalUI.controlBackground(Theme.of(context)),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: paused != null
-              ? Theme.of(context).colorScheme.outlineVariant
-              : Theme.of(context).brightness == Brightness.dark
-              ? const Color(0xff503940)
-              : const Color(0xfffae9ee),
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xff3a3a3a)
+              : const Color(0xffe6e6e6),
         ),
       ),
       child: paused == null

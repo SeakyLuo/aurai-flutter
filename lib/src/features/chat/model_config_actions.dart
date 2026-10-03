@@ -323,16 +323,21 @@ extension ModelConfigActions on ChatController {
   ) async {
     final account = modelSettings.profile(selection.service);
     final protocol = account.protocol;
-    if (purpose == ModelPurpose.musicGeneration
-        ? !protocol.defaultModelPurposes.contains(purpose)
-        : !protocol.supportsChatModels) {
+    if (!account.supportedModelPurposes.contains(purpose)) {
       throw ArgumentError('该供应商不提供此类模型');
     }
-    if (purpose == ModelPurpose.musicGeneration &&
-        (!protocol.modelCatalog.any((model) => model.id == selection.model) ||
+    if (!protocol.supportsChatModels &&
+        purpose != ModelPurpose.speechSynthesis &&
+        (!account.modelCatalog.any((model) => model.id == selection.model) ||
             (!account.autoSyncModels &&
                 !account.savedModels.contains(selection.model)))) {
-      throw ArgumentError('请选择该供应商的可用音乐模型');
+      throw ArgumentError('请选择该供应商的可用模型');
+    }
+    if (purpose == ModelPurpose.speechSynthesis &&
+        (!modelPurposesFor(account, selection.model).contains(purpose) ||
+            (!account.autoSyncModels &&
+                !account.savedModels.contains(selection.model)))) {
+      throw ArgumentError('请选择该供应商的可用语音模型');
     }
     final next = ModelSettings(
       activeService: purpose == ModelPurpose.text

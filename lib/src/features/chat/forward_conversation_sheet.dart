@@ -1,3 +1,4 @@
+import 'pagination_listener.dart';
 import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
 import 'package:flutter/material.dart';
@@ -34,7 +35,7 @@ class _ForwardConversationSheetState extends State<ForwardConversationSheet> {
   final _messages = <AgentMessage>[];
   final _scroll = ScrollController();
   final _messenger = GlobalKey<ScaffoldMessengerState>();
-  bool _loading = false, _more = true;
+  bool _loading = false, _more = true, _failed = false;
 
   @override
   void initState() {
@@ -44,12 +45,15 @@ class _ForwardConversationSheetState extends State<ForwardConversationSheet> {
   }
 
   void _scrolled() {
-    if (_scroll.position.extentAfter < 250) _load();
+    if (!_failed && _scroll.position.extentAfter < 250) _load();
   }
 
   Future<void> _load() async {
     if (_loading || !_more) return;
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
     try {
       final page = await widget.controller.previewConversationMessages(
         widget.conversationId,
@@ -61,12 +65,11 @@ class _ForwardConversationSheetState extends State<ForwardConversationSheet> {
         _more = page.length == 50;
       });
     } on Object catch (error) {
+      if (mounted) setState(() => _failed = true);
       if (mounted)
-        _messenger.currentState!.showGlassSnackBar(
-          SnackBar(
-            content: Text('会话读取失败：${errorMessage(error)}'),
-            action: SnackBarAction(label: '重试', onPressed: _load),
-          ),
+        _messenger.currentState!.showToast(
+          SnackBar(content: Text('会话读取失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -130,113 +133,121 @@ class _ForwardConversationSheetState extends State<ForwardConversationSheet> {
               ],
             ),
           ),
-          body: SafeArea(
-            top: false,
-            child: _messages.isEmpty
-                ? Center(
-                    child: _loading
-                        ? const CircularProgressIndicator()
-                        : const EmptyDataView(title: '暂无消息'),
-                  )
-                : ListView.builder(
-                    controller: _scroll,
-                    reverse: true,
-                    padding: const EdgeInsets.only(
-                      top: ChatHeader.toolbarHeight + 12,
-                      bottom: 16,
+          body: PaginationListener(
+            hasMore: false,
+            loadMore: _load,
+            failed: _failed,
+            onRetry: _load,
+            child: SafeArea(
+              top: false,
+              child: _messages.isEmpty
+                  ? Center(
+                      child: _loading
+                          ? const CircularProgressIndicator()
+                          : const EmptyDataView(title: '暂无消息'),
+                    )
+                  : ListView.builder(
+                      controller: _scroll,
+                      reverse: true,
+                      padding: const EdgeInsets.only(
+                        top: ChatHeader.toolbarHeight + 12,
+                        bottom: 16,
+                      ),
+                      itemCount: _messages.length + (_loading ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index == _messages.length)
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        final message = _messages[index];
+                        final group = widget.kind == ConversationKind.group;
+                        final older = index + 1 < _messages.length
+                            ? _messages[index + 1]
+                            : null;
+                        final showTime =
+                            older == null ||
+                            message.createdAt
+                                    .difference(older.createdAt)
+                                    .inMinutes >=
+                                5;
+                        final content = MessageItem(
+                          key: ValueKey(message.id),
+                          message: message,
+                          groupBubble: group,
+                          readOnly: true,
+                          onEdit: null,
+                          onInteractiveClick: (_, _, _, {value}) async => null,
+                          htmlView: message.htmlGame == null
+                              ? null
+                              : HtmlMessagePreview(
+                                  title: message.htmlGame!.title,
+                                  preview: message.htmlGame!.preview,
+                                ),
+                        );
+                        return IgnorePointer(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (showTime)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    18,
+                                    24,
+                                    18,
+                                    12,
+                                  ),
+                                  child: Text(
+                                    messageTime(message.createdAt),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      height: 1.4,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              if (message.isSystem)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 28,
+                                    vertical: 12,
+                                  ),
+                                  child: RecalledMessageNotice(
+                                    message: message,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      height: 1.6,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                )
+                              else
+                                Padding(
+                                  padding: EdgeInsets.only(top: group ? 12 : 0),
+                                  child:
+                                      group &&
+                                          message.role ==
+                                              AgentMessageRole.assistant &&
+                                          message.sender != null
+                                      ? GroupMessageHeading(
+                                          sender: message.sender!,
+                                          isFailure: message.isFailure,
+                                          showName: message.htmlGame == null,
+                                          onOpenProfile: () {},
+                                          child: content,
+                                        )
+                                      : content,
+                                ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
-                    itemCount: _messages.length + (_loading ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == _messages.length)
-                        return const Center(child: CircularProgressIndicator());
-                      final message = _messages[index];
-                      final group = widget.kind == ConversationKind.group;
-                      final older = index + 1 < _messages.length
-                          ? _messages[index + 1]
-                          : null;
-                      final showTime =
-                          older == null ||
-                          message.createdAt
-                                  .difference(older.createdAt)
-                                  .inMinutes >=
-                              5;
-                      final content = MessageItem(
-                        key: ValueKey(message.id),
-                        message: message,
-                        groupBubble: group,
-                        readOnly: true,
-                        onEdit: null,
-                        onInteractiveClick: (_, _, _, {value}) async => null,
-                        htmlView: message.htmlGame == null
-                            ? null
-                            : HtmlMessagePreview(
-                                title: message.htmlGame!.title,
-                                preview: message.htmlGame!.preview,
-                              ),
-                      );
-                      return IgnorePointer(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (showTime)
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  18,
-                                  24,
-                                  18,
-                                  12,
-                                ),
-                                child: Text(
-                                  messageTime(message.createdAt),
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    height: 1.4,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                            if (message.isSystem)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 28,
-                                  vertical: 12,
-                                ),
-                                child: RecalledMessageNotice(
-                                  message: message,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    height: 1.6,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              )
-                            else
-                              Padding(
-                                padding: EdgeInsets.only(top: group ? 12 : 0),
-                                child:
-                                    group &&
-                                        message.role ==
-                                            AgentMessageRole.assistant &&
-                                        message.sender != null
-                                    ? GroupMessageHeading(
-                                        sender: message.sender!,
-                                        isFailure: message.isFailure,
-                                        showName: message.htmlGame == null,
-                                        onOpenProfile: () {},
-                                        child: content,
-                                      )
-                                    : content,
-                              ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+            ),
           ),
         ),
       ),

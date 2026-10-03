@@ -12,16 +12,11 @@ object MiniappProgram {
     }
 
     fun run(script: String, input: String): String {
-        var deadline = Long.MAX_VALUE
         val factory = object : ContextFactory() {
             override fun makeContext(): Context = super.makeContext().apply {
                 optimizationLevel = -1
                 languageVersion = Context.VERSION_ES6
-                instructionObserverThreshold = 1000
                 setClassShutter { false }
-            }
-            override fun observeInstructionCount(cx: Context, count: Int) {
-                check(System.nanoTime() <= deadline) { "小程序事件处理超时" }
             }
         }
         return factory.call<String> { cx ->
@@ -33,8 +28,7 @@ object MiniappProgram {
                 }
             }
             ScriptableObject.putProperty(scope, "__input", input)
-            // The execution limit measures the reducer, not cold engine initialization or parsing.
-            deadline = System.nanoTime() + 100_000_000L
+            // Execute the reducer without a wall-clock timeout.
             val output = Context.toString(compiled.exec(cx, scope))
             require(output != "undefined" && output.length <= 262144) { "小程序必须返回不超过 256 KB 的 JSON" }
             output

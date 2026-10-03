@@ -38,9 +38,10 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
       .toList();
   final _selected = <String>{};
   bool _saving = false;
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
 
   Future<void> _remove() async {
     if (_saving || _selected.isEmpty) return;
@@ -60,7 +61,7 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
         _selected.toList(),
       );
       if (mounted) {
-        _notice('已移除成员');
+        _notice('已移除成员', kind: ToastKind.success);
         Navigator.pop(context);
       }
     } on Object catch (error) {
@@ -69,6 +70,7 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
           error is StateError
               ? error.message.toString()
               : '移除失败，请重试：${errorMessage(error)}',
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -116,7 +118,7 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
                     : () {
                         if (!_selected.contains(member.sender.id) &&
                             _selected.length == _members.length - 1) {
-                          _notice('群聊至少保留一位 AI');
+                          _notice('群聊至少保留一位 AI', kind: ToastKind.warning);
                           return;
                         }
                         setState(() {

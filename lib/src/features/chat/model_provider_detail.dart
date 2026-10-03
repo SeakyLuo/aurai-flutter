@@ -1,4 +1,6 @@
 import 'provider_settings_draft.dart';
+import 'provider_api_key_field.dart';
+import 'speech_api_settings_page.dart';
 import '../../providers/request_adapter_runner.dart';
 import 'package:flutter/foundation.dart';
 import 'model_type_recognition_page.dart';
@@ -64,6 +66,11 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     );
     if (mounted) {
       setState(() {
+        if (!_editing) {
+          _modelDraft = ProviderSettingsDraft(_saved);
+          _modelTypeMappings = {...?_saved.details?.modelTypeMappings};
+          _modelPurposeField.text = _saved.details?.modelPurposeField ?? '';
+        }
         final draft = _modelDraft.config;
         _models = [...draft.savedModels];
         _autoSyncModels = draft.autoSyncModels;
@@ -102,6 +109,10 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     modelTypeMappings: _modelTypeMappings,
     modelReasoning: _modelDraft.config.details?.modelReasoning ?? const {},
     balance: _modelDraft.config.details?.balance,
+    speechApi: _modelDraft.config.speechApi,
+    speechApiKey: _modelDraft.config.details?.speechApiKey ?? '',
+    modelCatalog: _modelDraft.config.details?.modelCatalog ?? const [],
+    modelApiNames: _modelDraft.config.details?.modelApiNames ?? const {},
     icon: _icon,
     name: _name.text.trim(),
     website: _website.text.trim(),
@@ -134,7 +145,6 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
   late ModelReasoning _reasoning;
   late ModelReasoning _initialReasoning;
   late bool _editing = widget.creating || widget.editing;
-  var _obscure = true;
   var _saving = false;
   var _allowPop = false;
   var _hasSaved = false;
@@ -324,6 +334,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
                         const _Label('接口协议'),
                         _ModelChoice(
                           label: _protocol.label,
+                          sheet: true,
                           onTap: _locked
                               ? null
                               : () async {
@@ -343,8 +354,10 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
                                       );
                                   if (mounted && value != null)
                                     setState(() {
-                                      if (_protocol.supportsChatModels !=
-                                          value.supportsChatModels) {
+                                      if (!setEquals(
+                                        _protocol.supportedModelPurposes,
+                                        value.supportedModelPurposes,
+                                      )) {
                                         _models = [];
                                         _autoSyncModels = true;
                                         _model = value.modelCatalog.isNotEmpty
@@ -405,6 +418,21 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
                             ),
                         ],
                         const SizedBox(height: 24),
+                        ...[
+                          const _Label('语音接口配置'),
+                          _ModelChoice(
+                            label: '请求与音频',
+                            onTap: _locked
+                                ? null
+                                : () => _openModelSettings(
+                                    SpeechApiSettingsPage(
+                                      controller: widget.controller,
+                                      draft: _modelDraft,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
                         const _Label('官网地址'),
                         TextField(
                           controller: _website,
@@ -457,7 +485,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
         _notice('当前已是默认图标');
       } else {
         setState(() => _icon = null);
-        _notice('已恢复默认图标，点击右上角保存');
+        _notice('已恢复默认图标，点击右上角保存', kind: ToastKind.success);
       }
     } else if (choice == 'pick') {
       try {
@@ -471,7 +499,8 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
         final path = await ProviderIconStore.import(image.path);
         if (mounted) setState(() => _icon = 'file:$path');
       } on Object catch (error) {
-        if (mounted) _notice('无法选择图标：${errorMessage(error)}');
+        if (mounted)
+          _notice('无法选择图标：${errorMessage(error)}', kind: ToastKind.error);
       }
     }
   }
@@ -506,42 +535,18 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     );
   }
 
-  Widget _apiKeyField() => TextField(
-    controller: _key,
-    enabled: !_locked,
-    obscureText: _obscure,
-    autocorrect: false,
-    enableSuggestions: false,
-    style: const TextStyle(fontSize: 16),
-    decoration: _fieldDecoration(
-      hint: _saved.isConfigured && _address.text.trim() == _saved.baseUrl
-          ? '已保存密钥 · 留空保持不变'
-          : '粘贴 API 密钥',
-      suffixIcon: Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: Center(
-          widthFactor: 1,
-          heightFactor: 1,
-          child: SizedBox.square(
-            dimension: 40,
-            child: IconButton(
-              style: IconButton.styleFrom(
-                shape: const CircleBorder(),
-                padding: const EdgeInsets.all(8),
-              ),
-              onPressed: _locked
-                  ? null
-                  : () => setState(() => _obscure = !_obscure),
-              tooltip: _obscure ? '显示密钥' : '隐藏密钥',
-              icon: SettingsIcon(
-                type: _obscure ? SettingsIconType.eye : SettingsIconType.eyeOff,
-              ),
-            ),
-          ),
+  Widget _apiKeyField({TextEditingController? controller, String? hint}) =>
+      ProviderApiKeyField(
+        controller: controller ?? _key,
+        enabled: !_locked,
+        decoration: _fieldDecoration(
+          hint:
+              hint ??
+              (_saved.isConfigured && _address.text.trim() == _saved.baseUrl
+                  ? '已保存密钥 · 留空保持不变'
+                  : '粘贴 API 密钥'),
         ),
-      ),
-    ),
-  );
+      );
 
   Future<bool> _discardChanges() async =>
       await showDialog<bool>(
@@ -561,7 +566,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
       : '';
   Uri? _validatedAddress({bool requireKey = true}) {
     if (requireKey && _apiKey.isEmpty) {
-      _notice('请先填写 API 密钥');
+      _notice('请先填写 API 密钥', kind: ToastKind.warning);
       return null;
     }
     final uri = Uri.tryParse(_address.text.trim());
@@ -571,7 +576,7 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
         uri.hasQuery ||
         uri.hasFragment ||
         uri.userInfo.isNotEmpty) {
-      _notice('请输入完整的 HTTPS 服务地址，不包含查询参数');
+      _notice('请输入完整的 HTTPS 服务地址，不包含查询参数', kind: ToastKind.warning);
       return null;
     }
     return uri;
@@ -581,10 +586,11 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     if (!widget.creating && !_dirty) {
       FocusScope.of(context).unfocus();
       setState(() => _editing = false);
+      await _back();
       return;
     }
     if (_name.text.trim().isEmpty) {
-      _notice('请输入供应商名称');
+      _notice('请输入供应商名称', kind: ToastKind.warning);
       return;
     }
     final uri = _validatedAddress(requireKey: false);
@@ -604,6 +610,10 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
           modelTypeMappings: _modelTypeMappings,
           icon: _icon,
           model: _model,
+          speechApi: _details.speechApi,
+          speechApiKey: _details.speechApiKey,
+          modelCatalog: _details.modelCatalog,
+          modelApiNames: _details.modelApiNames,
         );
       } else {
         for (final entry in _details.requestAdapters.entries) {
@@ -656,33 +666,35 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
           _initialReasoning = _reasoning;
           _originalDefault = widget.controller.modelSettings.activeService;
           _defaultService = _originalDefault;
-          _obscure = true;
           _saving = false;
           _editing = false;
           _modelDraft = ProviderSettingsDraft(_saved);
           _hasSaved = true;
         });
+        await _back();
       }
     } on Object catch (error) {
       if (mounted) {
         setState(() => _saving = false);
-        _notice('保存失败，请稍后重试：${errorMessage(error)}');
+        _notice('保存失败，请稍后重试：${errorMessage(error)}', kind: ToastKind.error);
       }
     }
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(context).showGlassSnackBar(
-    SnackBar(
-      content: Text(text),
-      behavior: SnackBarBehavior.floating,
-      margin: EdgeInsets.fromLTRB(
-        16,
-        0,
-        16,
-        16 + MediaQuery.paddingOf(context).bottom,
-      ),
-    ),
-  );
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(context).showToast(
+        SnackBar(
+          content: Text(text),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            16 + MediaQuery.paddingOf(context).bottom,
+          ),
+        ),
+        kind: kind,
+      );
 }
 
 class _Label extends StatelessWidget {
@@ -702,10 +714,15 @@ class _Label extends StatelessWidget {
 }
 
 class _ModelChoice extends StatelessWidget {
-  const _ModelChoice({required this.label, required this.onTap});
+  const _ModelChoice({
+    required this.label,
+    required this.onTap,
+    this.sheet = false,
+  });
 
   final String label;
   final VoidCallback? onTap;
+  final bool sheet;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -714,24 +731,31 @@ class _ModelChoice extends StatelessWidget {
     child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(26),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: onTap == null
-                      ? Theme.of(context).colorScheme.onSurfaceVariant
-                      : Theme.of(context).colorScheme.onSurface,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: settingsCardHeight),
+        child: Padding(
+          padding: settingsCardPadding,
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: onTap == null
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            const SettingsIcon(type: SettingsIconType.chevron),
-          ],
+              const SizedBox(width: 12),
+              SettingsIcon(
+                type: sheet
+                    ? SettingsIconType.chevronDown
+                    : SettingsIconType.chevron,
+              ),
+            ],
+          ),
         ),
       ),
     ),

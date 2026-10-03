@@ -50,6 +50,23 @@ extension _ProviderOverview on _ModelProviderDetailState {
         ),
         ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          title: const Text('语音接口配置'),
+          shape: _providerTileShape,
+          subtitle: _overviewValue(
+            _saved.speechApi == null ? '未设置' : '已设置',
+            unset: _saved.speechApi == null,
+          ),
+          trailing: const SettingsIcon(type: SettingsIconType.chevron),
+          onTap: () => _openModelSettings(
+            SpeechApiSettingsPage(
+              controller: widget.controller,
+              draft: _modelDraft,
+              readOnly: true,
+            ),
+          ),
+        ),
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
           title: const Text('官网地址'),
           shape: _providerTileShape,
           subtitle: _overviewValue(
@@ -62,7 +79,6 @@ extension _ProviderOverview on _ModelProviderDetailState {
           onTap: _saved.website.isEmpty ? null : _openWebsite,
         ),
         if (_saved.isConfigured) ...[
-          const SizedBox(height: 12),
           ModelBalanceTile(
             key: ValueKey(_service),
             config: _saved,

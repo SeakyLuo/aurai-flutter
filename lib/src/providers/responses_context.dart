@@ -102,9 +102,29 @@ class ResponsesContext {
           isPublic: isPublicMessage?.call(messages[i]) ?? true,
         ));
       }
+      // Replayed work after the latest user request belongs to the current task.
+      // Keep each complete exchange together, just like newly received results,
+      // so restoring a run cannot leave its tool history outside compaction.
+      final lastUser = _dialogue.lastIndexWhere(
+        (entry) => entry.message.role == AgentMessageRole.user,
+      );
+      if (lastUser >= 0) {
+        _rounds.addAll(
+          _dialogue.skip(lastUser + 1).map((entry) => entry.input),
+        );
+        _dialogue.removeRange(lastUser + 1, _dialogue.length);
+      }
       _initialized = true;
+      if (request.userMessageInput.isNotEmpty) {
+        _rounds.add(
+          supportsImages
+              ? request.userMessageInput
+              : textOnlyModelInput(request.userMessageInput),
+        );
+      }
     } else if (request.toolResults.isNotEmpty ||
-        request.userUpdates.isNotEmpty) {
+        request.userUpdates.isNotEmpty ||
+        request.userMessageInput.isNotEmpty) {
       // A complete model output and all its results are indivisible at compaction.
       _rounds.add([
         ..._pendingOutput,
@@ -112,6 +132,9 @@ class ResponsesContext {
           final output = functionCallOutput(result);
           return supportsImages ? output : textOnlyModelInput([output]).single;
         }),
+        ...supportsImages
+            ? request.userMessageInput
+            : textOnlyModelInput(request.userMessageInput),
         for (final update in request.userUpdates)
           {'role': 'user', 'content': update},
       ]);
@@ -258,7 +281,9 @@ class ResponsesContext {
         compacted = true;
       }
       if (await estimateTokens(input) + overhead > policy.inputBudget) {
-        throw const ModelProviderException('当前消息或图片超出上下文预算，请分开发送');
+        throw ModelProviderException(
+          '上下文压缩后仍超出模型输入容量（${policy.inputBudget} tokens）',
+        );
       }
       return compacted;
     } finally {
@@ -399,5 +424,6 @@ List<Map<String, Object?>> retainedRequestInput(ModelRequest request) => [
             : result.modelOutput,
       }),
     },
+  ...request.userMessageInput,
   for (final update in request.userUpdates) {'role': 'user', 'content': update},
 ];

@@ -61,6 +61,7 @@ Future<Map<String, Object?>> readResponsesStream(
   final data = <String>[];
   int? activeMessage;
   final parts = <(int, int), String>{};
+  final reportedMessages = <int>{};
   await for (final line
       in bytes
           .timeout(const Duration(seconds: 60))
@@ -128,6 +129,7 @@ Future<Map<String, Object?>> readResponsesStream(
               .join('\n');
           if (text.isNotEmpty) {
             activeMessage = event['output_index'] as int;
+            reportedMessages.add(activeMessage);
             onMessageStarted?.call(activeMessage);
             onTextChanged?.call(text);
           }
@@ -139,6 +141,7 @@ Future<Map<String, Object?>> readResponsesStream(
           event['content_index']! as int,
         );
         parts[key] = '${parts[key] ?? ''}${event['delta']! as String}';
+        reportedMessages.add(key.$1);
         if (activeMessage != key.$1) {
           activeMessage = key.$1;
           onMessageStarted?.call(key.$1);
@@ -157,6 +160,24 @@ Future<Map<String, Object?>> readResponsesStream(
           final item = output[i] as Map;
           inspectItem(item);
           readReasoningItem(item, i);
+          if (item['type'] == 'message' && !reportedMessages.contains(i)) {
+            final text = (item['content'] as List)
+                .cast<Map>()
+                .map(
+                  (part) => switch (part['type']) {
+                    'output_text' => responseTextWithCitations(
+                      part.cast<String, Object?>(),
+                    ),
+                    'refusal' => part['refusal'] as String,
+                    _ => '',
+                  },
+                )
+                .join('\n');
+            if (text.isNotEmpty) {
+              onMessageStarted?.call(i);
+              onTextChanged?.call(text);
+            }
+          }
         }
         return response;
       case 'response.failed':

@@ -46,9 +46,10 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
     if (_scroll.position.extentAfter < 300 && !_failed) _load();
   }
 
-  void _notice(Object error) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+  void _notice(Object error, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(errorMessage(error))), kind: kind);
 
   Future<void> _load({bool reset = false}) async {
     if (_loading || (!reset && !_more)) return;
@@ -67,7 +68,7 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
     } on Object catch (error) {
       if (mounted) {
         _failed = true;
-        _notice(error);
+        _notice(error, kind: ToastKind.error);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -93,7 +94,7 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
       );
       if (mounted) await _load(reset: true);
     } on Object catch (error) {
-      if (mounted) _notice(error);
+      if (mounted) _notice(error, kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _opening = null);
     }
@@ -104,7 +105,7 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
       await _store.remove(item.entry);
       if (!mounted) return;
       setState(() => _items.remove(item));
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(
           content: const Text('已取消收藏'),
           duration: const Duration(seconds: 6),
@@ -130,14 +131,14 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
                   });
                 });
               } on Object catch (error) {
-                if (mounted) _notice(error);
+                if (mounted) _notice(error, kind: ToastKind.error);
               }
             },
           ),
         ),
       );
     } on Object catch (error) {
-      if (mounted) _notice(error);
+      if (mounted) _notice(error, kind: ToastKind.error);
     }
   }
 

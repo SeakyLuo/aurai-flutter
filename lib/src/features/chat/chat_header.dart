@@ -39,30 +39,7 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
     systemOverlayStyle: Theme.of(context).brightness == Brightness.dark
         ? SystemUiOverlayStyle.light
         : SystemUiOverlayStyle.dark,
-    flexibleSpace: controller.activeConversation.kind == ConversationKind.group
-        ? const ChatHeaderBackground()
-        : Align(
-            alignment: Alignment.topCenter,
-            child: Container(
-              height:
-                  MediaQuery.paddingOf(context).top +
-                  (editing ? toolbarHeight : 18),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Theme.of(context).colorScheme.surface,
-                    Theme.of(
-                      context,
-                    ).colorScheme.surface.withValues(alpha: 0.95),
-                    Theme.of(context).colorScheme.surface.withValues(alpha: 0),
-                  ],
-                  stops: [0, 0.65, 1],
-                ),
-              ),
-            ),
-          ),
+    flexibleSpace: const ChatHeaderBackground(),
     toolbarHeight: toolbarHeight,
     titleSpacing: 18,
     title: editing

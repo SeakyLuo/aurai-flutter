@@ -1,4 +1,7 @@
 import 'dart:math';
+import 'speech_api_config.dart';
+export 'speech_api_config.dart';
+import 'speech_models.dart';
 import 'provider_details.dart';
 export 'provider_details.dart';
 import 'model_defaults.dart';
@@ -31,6 +34,9 @@ class ModelService {
     this.staticImageModelIds = const {},
     this.useOpenAiTransport = false,
     this.disableReasoningForSummary = false,
+    this.defaultSpeechApi,
+    this.defaultModelCatalog = const [],
+    this.presetModelPurposes = const {},
   });
   final String name;
   final ProviderProtocol defaultProtocol;
@@ -48,6 +54,9 @@ class ModelService {
   final Set<String> staticImageModelIds;
   final bool useOpenAiTransport;
   final bool disableReasoningForSummary;
+  final SpeechApiConfig? defaultSpeechApi;
+  final List<({String id, String name})> defaultModelCatalog;
+  final Map<String, Set<ModelPurpose>> presetModelPurposes;
   static const openAi = ModelService._(
     'openAi',
     ProviderProtocol.responses,
@@ -86,6 +95,12 @@ class ModelService {
     'qwen',
     ProviderProtocol.openaiChatCompletions,
     presetLabel: '千问',
+    defaultSpeechApi: SpeechModels.qwenApi,
+    defaultModelCatalog: SpeechModels.qwen,
+    presetModelPurposes: {
+      'qwen3-tts-flash': {ModelPurpose.speechSynthesis},
+      'qwen3-tts-instruct-flash': {ModelPurpose.speechSynthesis},
+    },
     defaultModel: 'qwen-plus',
     defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     defaultWebsite: 'https://bailian.console.aliyun.com',
@@ -162,11 +177,26 @@ class ModelService {
     defaultIcon: ProviderIcon.suno,
     defaultConsoleUrl: 'https://open.suno.cn',
   );
+  static const doubao = ModelService._(
+    'doubao',
+    ProviderProtocol.openaiChatCompletions,
+    presetLabel: '豆包',
+    defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    defaultWebsite: 'https://console.volcengine.com/ark',
+    defaultIcon: ProviderIcon.doubao,
+    defaultSpeechApi: SpeechModels.doubaoApi,
+    defaultModelCatalog: SpeechModels.doubao,
+    presetModelPurposes: {
+      'seed-tts-2.0': {ModelPurpose.speechSynthesis},
+    },
+    defaultModelPurposes: {ModelPurpose.text},
+  );
   static const values = [
     openAi,
     suno,
     deepSeek,
     qwen,
+    doubao,
     kimi,
     glm,
     openRouter,
@@ -226,6 +256,14 @@ class ModelConfig {
         apiKey: apiKey,
         model: service.defaultModel,
         baseUrl: service.defaultBaseUrl,
+        details: service.defaultSpeechApi == null
+            ? null
+            : ProviderDetails(
+                name: service.label,
+                website: service.defaultWebsite,
+                protocol: service.defaultProtocol,
+                speechApi: service.defaultSpeechApi,
+              ),
       );
 
   final ModelService service;
@@ -266,6 +304,30 @@ class ModelConfig {
   bool get usesChatCompletions =>
       protocol == ProviderProtocol.openaiChatCompletions;
   bool get autoSyncModels => details?.autoSyncModels ?? true;
+  SpeechApiConfig? get speechApi =>
+      details?.speechApi ?? service.defaultSpeechApi;
+  bool get isSpeechConfigured => speechApi != null && speechApiKey.isNotEmpty;
+  String get speechApiKey =>
+      details?.speechApiKey.isNotEmpty == true ? details!.speechApiKey : apiKey;
+  Set<ModelPurpose> get supportedModelPurposes => {
+    ...protocol.supportedModelPurposes,
+    if (speechApi != null) ModelPurpose.speechSynthesis,
+  };
+  List<({String id, String name})> get modelCatalog => [
+    ...?details?.modelCatalog,
+    ...protocol.modelCatalog,
+    ...service.defaultModelCatalog,
+  ];
+  String displayModel(String id, {String? catalogName}) {
+    for (final entry in modelCatalog) {
+      if (entry.id == id) return entry.name;
+    }
+    return catalogName ?? id;
+  }
+
+  String apiModelFor(String id) => details?.modelApiNames[id] ?? id;
+  String get apiModel => apiModelFor(model);
+
   List<String> get savedModels => details?.models ?? const [];
   ModelReasoning reasoningFor(String model) =>
       details?.modelReasoning[model] ?? reasoning;
@@ -402,15 +464,6 @@ class ModelSettings {
     final rawProfiles = (json['profiles']! as Map<Object?, Object?>)
         .cast<String, Object?>();
     final savedServices = rawProfiles.keys.map(ModelService.byName).toList();
-    for (var index = 0; index < ModelService.values.length; index++) {
-      final service = ModelService.values[index];
-      if (!savedServices.contains(service)) {
-        savedServices.insert(
-          index < savedServices.length ? index : savedServices.length,
-          service,
-        );
-      }
-    }
     final purposesByName = {
       for (final purpose in ModelPurpose.values) purpose.name: purpose,
     };
@@ -432,12 +485,10 @@ class ModelSettings {
       activeService: ModelService.byName(json['activeService']! as String),
       profiles: <ModelService, ModelConfig>{
         for (final service in savedServices)
-          service: !rawProfiles.containsKey(service.name)
-              ? ModelConfig.defaults(service)
-              : ModelConfig.fromJson(
-                  (rawProfiles[service.name]! as Map<Object?, Object?>)
-                      .cast<String, Object?>(),
-                ),
+          service: ModelConfig.fromJson(
+            (rawProfiles[service.name]! as Map<Object?, Object?>)
+                .cast<String, Object?>(),
+          ),
       },
     );
   }
@@ -473,6 +524,7 @@ class ModelRequest {
     this.onMessageStarted,
     this.toolResults = const <ToolResult>[],
     this.userUpdates = const <String>[],
+    this.userMessageInput = const <Map<String, Object?>>[],
   });
 
   final List<AgentMessage> messages;
@@ -487,6 +539,7 @@ class ModelRequest {
   final void Function(bool)? onCompactionChanged;
   final List<ToolResult> toolResults;
   final List<String> userUpdates;
+  final List<Map<String, Object?>> userMessageInput;
   final void Function(String text)? onTextChanged;
   final void Function(String text)? onReasoningChanged;
   final void Function()? onProcessingStarted;

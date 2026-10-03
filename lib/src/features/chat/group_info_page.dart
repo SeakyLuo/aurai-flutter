@@ -19,7 +19,7 @@ import 'package:flutter/services.dart';
 import '../../domain/ai_profile.dart';
 import '../../domain/message_sender.dart';
 import '../../storage/conversation_rows.dart';
-import 'ai_contact_page.dart';
+import 'member_profile_avatar.dart';
 import 'chat_controller.dart';
 import 'conversation_rename_dialog.dart';
 import 'conversation_task_navigation.dart';
@@ -111,8 +111,9 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
     } on Object catch (error) {
       if (mounted) {
         setState(() => _failed = true);
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('群聊信息加载失败，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     } finally {
@@ -170,7 +171,7 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
       ),
     );
     if (!saved || !mounted) return;
-    ScaffoldMessenger.of(context).showGlassSnackBar(
+    ScaffoldMessenger.of(context).showToast(
       SnackBar(
         content: Text(
           conversationProjectChangedMessage(_projects, selection.projectId),
@@ -180,8 +181,8 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
   });
 
   Widget _projectRow() => ListTile(
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-    minTileHeight: 60,
+    contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 12),
+    minTileHeight: settingsCardHeight,
     title: const Text('所属项目', style: TextStyle(fontSize: 15)),
     trailing: SizedBox(
       width: MediaQuery.sizeOf(context).width * .5,
@@ -218,9 +219,10 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
   Future<void> _copyConversationId() async {
     await Clipboard.setData(ClipboardData(text: _conversation.id));
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showGlassSnackBar(const SnackBar(content: Text('已复制会话 ID')));
+    ScaffoldMessenger.of(context).showToast(
+      const SnackBar(content: Text('已复制会话 ID')),
+      kind: ToastKind.success,
+    );
   }
 
   Future<void> _openManagement() async {
@@ -244,9 +246,10 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
 
   Future<void> _leave() async {
     if (_localRole == GroupMemberRole.owner) {
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(const SnackBar(content: Text('请先转让群主，或在群管理中解散群聊')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('请先转让群主，或在群管理中解散群聊')),
+        kind: ToastKind.warning,
+      );
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -264,8 +267,9 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
       if (mounted) Navigator.pop(context, true);
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('退出失败，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     } finally {
@@ -309,10 +313,11 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                         Column(
                           children: [
                             ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
+                              contentPadding: const EdgeInsetsDirectional.only(
+                                start: 16,
+                                end: 12,
                               ),
-                              minTileHeight: 60,
+                              minTileHeight: settingsCardHeight,
                               title: const Text(
                                 '群成员',
                                 style: TextStyle(fontSize: 15),
@@ -440,10 +445,12 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                           children: [
                             _section([
                               ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                minTileHeight: 60,
+                                contentPadding:
+                                    const EdgeInsetsDirectional.only(
+                                      start: 16,
+                                      end: 12,
+                                    ),
+                                minTileHeight: settingsCardHeight,
                                 title: const Text(
                                   '群名称',
                                   style: TextStyle(fontSize: 15),
@@ -476,10 +483,12 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                                 onTap: _canRename ? _rename : null,
                               ),
                               ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                minTileHeight: 60,
+                                contentPadding:
+                                    const EdgeInsetsDirectional.only(
+                                      start: 16,
+                                      end: 12,
+                                    ),
+                                minTileHeight: settingsCardHeight,
                                 title: const Text(
                                   '群公告',
                                   style: TextStyle(fontSize: 15),
@@ -683,21 +692,21 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                 conversationId: _conversation.id,
               ),
             )
-          : sender.kind == MessageSenderKind.agent
-          ? () => _open(
-              AiContactPage(
-                controller: widget.controller,
-                senderId: sender.id,
-                groupId: _conversation.id,
-              ),
-            )
           : null,
       child: Column(
         children: [
           Stack(
             alignment: Alignment.center,
             children: [
-              MemberAvatar(sender: sender, size: 48),
+              if (remaining > 0)
+                MemberAvatar(sender: sender, size: 48)
+              else
+                MemberProfileAvatar(
+                  controller: widget.controller,
+                  sender: sender,
+                  groupId: _conversation.id,
+                  size: 48,
+                ),
               if (remaining > 0)
                 Container(
                   width: 48,
@@ -734,8 +743,8 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
   );
 
   Widget _row(String title, VoidCallback onTap, {Widget? icon}) => ListTile(
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-    minTileHeight: 60,
+    contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 12),
+    minTileHeight: settingsCardHeight,
     leading: icon,
     title: Text(title, style: const TextStyle(fontSize: 15)),
     trailing: const SettingsIcon(type: SettingsIconType.chevron),

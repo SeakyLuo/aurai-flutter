@@ -3,6 +3,7 @@ import 'model_defaults.dart';
 import 'model_reasoning.dart';
 import 'provider_balance_config.dart';
 import 'music_generation_models.dart';
+import 'speech_api_config.dart';
 export 'provider_balance_config.dart';
 
 class ModelContextOverride {
@@ -26,6 +27,12 @@ class ModelContextOverride {
 enum ProviderProtocol {
   openaiChatCompletions('Chat Completions'),
   responses('Responses'),
+  speechSynthesis(
+    '语音合成',
+    supportsChatModels: false,
+    defaultModelPurposes: {ModelPurpose.speechSynthesis},
+    supportedModelPurposes: {ModelPurpose.speechSynthesis},
+  ),
   suno(
     'Suno API',
     supportsChatModels: false,
@@ -64,6 +71,7 @@ enum ProviderIcon {
   openAi('OpenAI', 'openai', monochrome: true),
   deepSeek('DeepSeek', 'deepseek-color'),
   qwen('千问', 'qwen-color'),
+  doubao('豆包', 'doubao-app'),
   kimi('Kimi', 'kimi-color'),
   glm('GLM', 'zhipu-color'),
   openRouter('OpenRouter', 'openrouter-grape'),
@@ -90,6 +98,10 @@ class ProviderDetails {
     this.autoSyncModels = true,
     this.balance,
     this.icon,
+    this.speechApi,
+    this.speechApiKey = '',
+    this.modelCatalog = const [],
+    this.modelApiNames = const {},
   });
   final Map<String, RequestAdapter> requestAdapters;
   final Map<String, ModelContextOverride> modelContextOverrides;
@@ -105,6 +117,10 @@ class ProviderDetails {
   final bool? autoSyncModels;
   final ProviderBalanceConfig? balance;
   final String? icon;
+  final SpeechApiConfig? speechApi;
+  final String speechApiKey;
+  final List<({String id, String name})> modelCatalog;
+  final Map<String, String> modelApiNames;
   Map<String, Object?> toJson() => {
     'requestAdapters': {
       for (final e in requestAdapters.entries) e.key: e.value.toJson(),
@@ -131,6 +147,12 @@ class ProviderDetails {
     'autoSyncModels': autoSyncModels ?? true,
     if (balance != null) 'balance': balance!.toJson(),
     if (icon != null) 'icon': icon,
+    if (speechApi != null) 'speechApi': speechApi!.toJson(),
+    'speechApiKey': speechApiKey,
+    'modelCatalog': [
+      for (final model in modelCatalog) {'id': model.id, 'name': model.name},
+    ],
+    'modelApiNames': modelApiNames,
   };
   factory ProviderDetails.fromJson(Map<String, dynamic> json) =>
       ProviderDetails(
@@ -165,6 +187,14 @@ class ProviderDetails {
             e.key as String: ModelReasoning.values.byName(e.value as String),
         },
         name: json['name'] as String,
+        speechApiKey: json['speechApiKey'] as String? ?? '',
+        modelCatalog: [
+          for (final model in json['modelCatalog'] as List? ?? const [])
+            (id: model['id'] as String, name: model['name'] as String),
+        ],
+        modelApiNames: Map<String, String>.from(
+          json['modelApiNames'] as Map? ?? const {},
+        ),
         website: json['website'] as String,
         protocol: ProviderProtocol.values.byName(json['protocol'] as String),
         models: List<String>.from(json['models'] as List),
@@ -175,10 +205,19 @@ class ProviderDetails {
                 Map<String, dynamic>.from(json['balance'] as Map),
               ),
         icon: json['icon'] as String?,
+        speechApi: json['speechApi'] == null
+            ? null
+            : SpeechApiConfig.fromJson(
+                Map<String, dynamic>.from(json['speechApi'] as Map),
+              ),
       );
 }
 
 void validateProviderDetails(ProviderDetails details, String baseUrl) {
+  if (details.protocol == ProviderProtocol.speechSynthesis) {
+    if (details.speechApi == null) throw ArgumentError('请先配置语音接口');
+    details.speechApi!.validate();
+  }
   if (details.name.trim().isEmpty || details.name.length > 60) {
     throw ArgumentError('供应商名称需为 1–60 字');
   }
@@ -247,8 +286,24 @@ void validateProviderDetails(ProviderDetails details, String baseUrl) {
   if (details.models.toSet().length != details.models.length) {
     throw ArgumentError('模型列表中存在重复名称');
   }
+  if (details.modelCatalog.map((model) => model.id).toSet().length !=
+          details.modelCatalog.length ||
+      details.modelCatalog.any(
+        (model) =>
+            model.id.trim().isEmpty ||
+            model.id.length > 200 ||
+            model.name.trim().isEmpty ||
+            model.name.length > 60,
+      )) {
+    throw ArgumentError('请填写有效的模型名称，且不能重复');
+  }
   if (details.models.any((m) => m.trim().isEmpty || m.length > 200)) {
     throw ArgumentError('模型名称不能为空或超过 200 字');
+  }
+  if (details.modelApiNames.values.any(
+    (name) => name.trim().isEmpty || name.length > 200,
+  )) {
+    throw ArgumentError('接口名称不能为空或超过 200 字');
   }
   for (final entry in details.modelContextOverrides.entries) {
     if (entry.key.isNotEmpty &&

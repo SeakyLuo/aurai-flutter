@@ -27,7 +27,7 @@ extension _ProviderModelActions on _ModelProviderDetailState {
         'data': uri.toString(),
       });
     } catch (_) {
-      if (mounted) _notice('无法打开官网，请稍后重试');
+      if (mounted) _notice('无法打开官网，请稍后重试', kind: ToastKind.error);
     }
   }
 

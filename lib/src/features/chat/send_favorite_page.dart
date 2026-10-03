@@ -106,9 +106,10 @@ class _SendFavoritePageState extends State<_SendFavoritePage> {
       if (sent == true && mounted) Navigator.pop(context, true);
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
     } finally {
       if (mounted) setState(() => _opening = false);
     }
@@ -281,9 +282,10 @@ class _FavoriteChoicesState extends State<_FavoriteChoices> {
     } on Object catch (error) {
       if (mounted) {
         _failed = true;
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);

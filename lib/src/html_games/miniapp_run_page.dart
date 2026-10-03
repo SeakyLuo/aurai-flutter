@@ -43,9 +43,10 @@ class _MiniappRunPageState extends State<MiniappRunPage>
       await recordMiniappOpen(widget.store.database, widget.game.appId);
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
     }
   }
 
@@ -80,7 +81,7 @@ class _MiniappRunPageState extends State<MiniappRunPage>
         if (mounted)
           ScaffoldMessenger.of(
             context,
-          ).showGlassSnackBar(SnackBar(content: Text(_lastError!)));
+          ).showToast(SnackBar(content: Text(_lastError!)));
       });
     }
     if (session.failed) {
@@ -115,9 +116,10 @@ class _MiniappRunPageState extends State<MiniappRunPage>
       await _close();
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
     } finally {
       if (mounted) Navigator.pop(context);
     }

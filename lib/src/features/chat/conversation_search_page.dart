@@ -1,3 +1,4 @@
+import 'floating_search_layout.dart';
 import '../../widgets/empty_data_view.dart';
 import 'retained_tab_view.dart';
 import '../../app/global_ui.dart';
@@ -24,7 +25,6 @@ import '../../storage/conversation_reader.dart';
 import 'chat_controller.dart';
 import 'glass_surface.dart';
 import 'pagination_listener.dart';
-import 'sidebar_action_icon.dart';
 import '../../storage/attachment_search.dart';
 import 'search_history_store.dart';
 import 'search_landing_content.dart';
@@ -175,14 +175,9 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
       if (mounted && generation == _generation) {
         setState(() => _searchFailed = true);
         if (_submitted)
-          ScaffoldMessenger.of(context).showGlassSnackBar(
-            SnackBar(
-              content: Text('搜索失败，请重试：${errorMessage(error)}'),
-              action: SnackBarAction(
-                label: '重试',
-                onPressed: () => _load(reset: reset),
-              ),
-            ),
+          ScaffoldMessenger.of(context).showToast(
+            SnackBar(content: Text('搜索失败，请重试：${errorMessage(error)}')),
+            kind: ToastKind.error,
           );
       }
     } finally {
@@ -238,10 +233,10 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
     }
   }
 
-  void _historyNotice(Object error) =>
-      ScaffoldMessenger.of(context).showGlassSnackBar(
-        SnackBar(content: Text('搜索记录保存或读取失败：${errorMessage(error)}')),
-      );
+  void _historyNotice(Object error) => ScaffoldMessenger.of(context).showToast(
+    SnackBar(content: Text('搜索记录保存或读取失败：${errorMessage(error)}')),
+    kind: ToastKind.error,
+  );
 
   Future<void> _saveHistory(List<String> values) async {
     setState(() => _history = values);
@@ -297,8 +292,9 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
       }
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('最近文件加载失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _loadingRecent = false);
@@ -334,8 +330,9 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
       );
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     }
@@ -344,7 +341,6 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
   @override
   Widget build(BuildContext context) {
     final query = _submitted ? _search.text.trim().toLowerCase() : '';
-    final media = MediaQuery.of(context);
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
       key: _scaffoldKey,
@@ -376,37 +372,6 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
         ),
         centerTitle: true,
         titleSpacing: 0,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Builder(
-              builder: (anchor) => SettingsGlassAction(
-                label: '搜索筛选',
-                icon: Icons.filter_list_rounded,
-                iconWidget: SettingsIcon(
-                  type: SettingsIconType.filter,
-                  color: _includeReasoning ? colors.primary : null,
-                ),
-                onPressed: () async {
-                  final box = anchor.findRenderObject()! as RenderBox;
-                  await showSearchFilterMenu(
-                    context,
-                    anchor: box.localToGlobal(Offset.zero) & box.size,
-                    includeReasoning: _includeReasoning,
-                    onChanged: (include) {
-                      _debounce?.cancel();
-                      _generation++;
-                      setState(() => _includeReasoning = include);
-                      if (_search.text.trim().isNotEmpty) {
-                        unawaited(_load(reset: true));
-                      }
-                    },
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
         title: query.isEmpty
             ? null
             : SearchTypeSegment(
@@ -417,136 +382,61 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
               ),
       ),
       extendBody: true,
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       backgroundColor: colors.surface,
-      bottomNavigationBar: Padding(
-        padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-        child: SafeArea(
-          top: false,
-          child: Center(
-            heightFactor: 1,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 760),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GlassSurface(
-                        radius: 28,
-                        dark: Theme.of(context).brightness == Brightness.dark,
-                        child: Padding(
-                          padding: const EdgeInsets.all(2),
-                          child: Stack(
-                            children: [
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  minHeight: 48,
-                                ),
-                                child: TextField(
-                                  controller: _search,
-                                  focusNode: _focus,
-                                  textInputAction: TextInputAction.search,
-                                  onSubmitted: (_) => _submit(),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium!
-                                      .copyWith(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w400,
-                                        height: 1.4,
-                                        color: colors.onSurface,
-                                      ),
-                                  decoration: InputDecoration(
-                                    hintText: widget.projectId == null
-                                        ? '搜索会话和文件'
-                                        : '在项目中搜索会话和文件',
-                                    hintStyle: TextStyle(
-                                      color: colors.onSurfaceVariant,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                    filled: false,
-                                    border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    contentPadding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      10,
-                                      48,
-                                      10,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              if (_search.text.isNotEmpty)
-                                Positioned(
-                                  right: 0,
-                                  bottom: 0,
-                                  child: RoundAction(
-                                    icon: Icons.cancel,
-                                    iconWidget: Icon(
-                                      Icons.cancel,
-                                      size: 19,
-                                      color: colors.onSurfaceVariant,
-                                    ),
-                                    compact: true,
-                                    label: '清空搜索',
-                                    onPressed: _clear,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    GlassSurface(
-                      radius: 28,
-                      dark: Theme.of(context).brightness == Brightness.dark,
-                      shadowOpacity: .8,
-                      child: Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: RoundAction(
-                          icon: Icons.close_rounded,
-                          iconWidget: _search.text.trim().isNotEmpty
-                              ? SidebarActionIcon(
-                                  type: SidebarActionIconType.search,
-                                  color: colors.onSurface,
-                                )
-                              : Icon(
-                                  Icons.close_rounded,
-                                  size: 25,
-                                  color: colors.onSurface,
-                                ),
-                          label: _search.text.trim().isNotEmpty ? '搜索' : '关闭搜索',
-                          onPressed: _search.text.trim().isNotEmpty
-                              ? _submit
-                              : () => Navigator.pop(context),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
           child: Column(
             children: [
-              SizedBox(height: media.padding.top + 64),
               Expanded(
-                child: RetainedTabView(
-                  index: query.isEmpty ? 0 : (_filesTab ? 1 : 0),
-                  onChanged: (index) => setState(() => _filesTab = index == 1),
-                  children: [
-                    _resultsPage(false),
-                    if (query.isNotEmpty) _resultsPage(true),
-                  ],
+                child: FloatingSearchLayout(
+                  trailingAction: Builder(
+                    builder: (anchor) => SettingsGlassAction(
+                      label: '搜索筛选',
+                      icon: Icons.filter_list_rounded,
+                      iconWidget: SettingsIcon(
+                        type: SettingsIconType.filter,
+                        color: _includeReasoning
+                            ? GlobalUI.highlightTextColor(context)
+                            : null,
+                      ),
+                      onPressed: () async {
+                        final box = anchor.findRenderObject()! as RenderBox;
+                        await showSearchFilterMenu(
+                          context,
+                          anchor: box.localToGlobal(Offset.zero) & box.size,
+                          includeReasoning: _includeReasoning,
+                          onChanged: (include) {
+                            _debounce?.cancel();
+                            _generation++;
+                            setState(() => _includeReasoning = include);
+                            if (_search.text.trim().isNotEmpty) {
+                              unawaited(_load(reset: true));
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  controller: _search,
+                  focusNode: _focus,
+                  hintText: widget.projectId == null
+                      ? '搜索会话和文件'
+                      : '在项目中搜索会话和文件',
+                  onSubmitted: (_) => _submit(),
+                  onChanged: (value) {
+                    if (value.isEmpty) _clear();
+                  },
+                  child: RetainedTabView(
+                    index: query.isEmpty ? 0 : (_filesTab ? 1 : 0),
+                    onChanged: (index) =>
+                        setState(() => _filesTab = index == 1),
+                    children: [
+                      _resultsPage(false),
+                      if (query.isNotEmpty) _resultsPage(true),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -564,17 +454,21 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
     final results = query == _query ? _results : <ConversationSearchResult>[];
     final media = MediaQuery.of(context);
     return query.isNotEmpty &&
-            filesTab &&
             !pending &&
             !_searchFailed &&
-            _files.isEmpty
+            (filesTab ? _files.isEmpty : results.isEmpty)
         ? Padding(
             padding: EdgeInsets.only(
-              bottom: media.viewInsets.bottom + media.viewPadding.bottom + 104,
+              bottom: media.viewPadding.bottom + FloatingSearchLayout.clearance,
             ),
-            child: Center(child: EmptyDataView(title: '没有找到相关文件')),
+            child: EmptyDataView(title: filesTab ? '没有找到相关文件' : '没有找到相关会话'),
           )
         : PaginationListener(
+            failed: _searchFailed,
+            retryBottomInset: FloatingSearchLayout.clearance,
+            onRetry: () => _load(
+              reset: _query != query || !(_filesTab ? _filesMore : _hasMore),
+            ),
             hasMore: query.isNotEmpty && (filesTab ? _filesMore : _hasMore),
             loadMore: () => _load(),
             child: ListView.builder(
@@ -582,9 +476,9 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: EdgeInsets.fromLTRB(
                 16,
-                4,
+                settingsHeaderHeight(context) + 4,
                 16,
-                media.viewInsets.bottom + media.viewPadding.bottom + 104,
+                media.viewPadding.bottom + FloatingSearchLayout.clearance,
               ),
               itemCount: query.isEmpty
                   ? 1
@@ -622,10 +516,6 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     child: pending
                         ? const Text('正在搜索…', textAlign: TextAlign.center)
-                        : count == 0 && !_searchFailed
-                        ? EmptyDataView(
-                            title: filesTab ? '没有找到相关文件' : '没有找到相关会话',
-                          )
                         : const SizedBox.shrink(),
                   );
                 if (filesTab) {

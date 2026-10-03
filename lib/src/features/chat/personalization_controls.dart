@@ -75,7 +75,7 @@ class _PersonalizationChoiceRowState extends State<PersonalizationChoiceRow> {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
-                            vertical: 12,
+                            vertical: 8,
                           ),
                           child: Row(
                             children: [
@@ -93,7 +93,7 @@ class _PersonalizationChoiceRowState extends State<PersonalizationChoiceRow> {
                                       ),
                                     ),
                                     if (choice.description.isNotEmpty) ...[
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 2),
                                       Text(
                                         choice.description,
                                         style: TextStyle(

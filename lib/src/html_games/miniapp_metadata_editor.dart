@@ -105,9 +105,10 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
       });
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -143,15 +144,17 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
         _description.text = _saved.description;
         _shareTitle.text = _saved.shareTitle;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(const SnackBar(content: Text('小程序资料已保存')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('小程序资料已保存')),
+        kind: ToastKind.success,
+      );
       return true;
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
       return false;
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -249,7 +252,11 @@ class _MiniappMetadataEditorState extends State<MiniappMetadataEditor> {
               opacity: _dirty && !_busy ? 1 : .3,
               child: const SettingsIcon(type: SettingsIconType.check),
             ),
-            onPressed: _dirty && !_busy ? _save : null,
+            onPressed: _dirty && !_busy
+                ? () async {
+                    if (await _save() && mounted) await _close();
+                  }
+                : null,
           ),
         ],
       ),

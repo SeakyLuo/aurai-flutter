@@ -62,12 +62,10 @@ class ModelReasoningField extends StatelessWidget {
             borderRadius: BorderRadius.circular(26),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 8,
-              ),
+              minTileHeight: settingsCardHeight,
+              contentPadding: settingsCardPadding,
               title: Text(label(value)),
-              trailing: const SettingsIcon(type: SettingsIconType.chevron),
+              trailing: const SettingsIcon(type: SettingsIconType.chevronDown),
               onTap: onChanged == null
                   ? null
                   : () async {

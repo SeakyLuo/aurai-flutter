@@ -13,9 +13,21 @@ description: 在 Aurai 群聊配合狼人杀小程序担任主持，读取私密
 
 支持用户在页面配置，也支持主持 AI 自行发起。用户要求你开局且尚无对局时，先用 listHtmlApps 查找已有狼人杀小程序，通过 sendHtmlMessage(appId, conversationId) 在目标群发送入口；使用返回的 messageId 读取程序 version，提交 configure，把 hostId 设为自己。从真实群成员选择已约定的玩家，排除主持人；规则已明确就直接配置，不要求用户再去页面操作。仅缺少影响配置或裁定的信息时集中询问。配置成功即由小程序分配身份，不再要求玩家逐个准备，也不手动分配身份。
 
-configure 的 data 含 hostId、players、roles、rules。roles 使用当前小程序的角色/技能定义，角色 id 为 r0、r1 等，技能 id 为对应角色加 s0、s1 等；各角色 count 总数须等于 players 人数。rules 包含 win、lastWords、sheriff、doubleSaveKills、notes。初始程序尚无主持 protocol 时，可以读取已有应用源码确认配置结构和预设，不重写小程序。用户可选择其他主持 AI；AI 自行配置时只能将自己设为主持，不能替其他 AI 接管。配置成功后不能再次 configure，读取原局继续。工具参数使用真实成员标识，群消息只显示姓名或座位。
+configure 的 data 含 hostId、players、roles、rules。roles 使用当前小程序的角色/技能定义，角色 id 为 r0、r1 等，技能 id 为对应角色加 s0、s1 等；各角色 count 总数须等于 players 人数。rules 包含 win、lastWords、sheriff、doubleSaveKills、notes。初始程序尚无主持 protocol 时，可以读取已有应用源码确认配置结构和预设，不重写小程序。消息发送者就是该实例的创建人，无论用户还是 AI，都可以直接配置，并按用户约定选择主持 AI；自己发出的入口不要再要求用户代配。其他成员不能自行取得配置权限。配置成功后不能再次 configure，读取原局继续。工具参数使用真实成员标识，群消息只显示姓名或座位。
 
 整局留在指定群，不另建玩家私聊、不修改群成员或人设。生成或读取秘密且会展示思考过程时先调用 hideThinking；它不代替消息权限。身份、狼队、行动和查验结果不能放进公开回复。玩家与观众的区别以本局角色和小程序实际投影为准，不因用户身份自动授予观战底牌。
+
+## 私密交流频道
+
+私密聊天通过本局小程序管理。readHtmlProgram 的主持私密投影含 channels（自己可读的频道）和 channelDefinitions（本局全部频道配置）；这些信息不能搬到公开群消息。默认有每位玩家的“询问主持”，以及非独立狼人之间的夜间讨论，不表示只有狼人可以私密沟通。
+
+每个频道的 spectatorsVisible 默认 true：当前群里不参赛且不是主持的成员作为观众，可以阅读频道消息。观众只有查看权限，不会因可见而获得发言或行动权限，也不会被频道消息自动唤醒。一般仅在观众明确要求不可见时，将对应频道设为 spectatorsVisible=false；不要替观众擅自隐藏。修改影响之后发送的消息，不撤销已经获得的历史消息可见性。
+
+按本局规则为情侣、特殊角色、独立阵营等配置频道。可以在 configure 的 data 中提供 channels，也可以通过 submitHtmlProgramEvent 提交 action=setChannels、data={channels:[...]}，携带最新 expectedVersion 和新的 eventId。每个频道包含 id、name、senders、readers、phases、livingOnly、wakeAi：发送成员必须属于可见成员；成员取实际玩家或主持人；phases 为实际阶段列表或 ['*']；livingOnly=true 时出局玩家不能再读写该频道，主持不受此限制；wakeAi 控制消息是否唤醒其他 AI 接收人。waiting 会沿用最近一次收集的 kind 判断频道阶段，尚未安排首轮收集时为 waiting。对局结束后所有频道停止发送。
+
+setChannels 替换完整频道列表，必须基于 channelDefinitions 保留仍需要的其他频道及 spectatorsVisible 设置，不能为了新增情侣频道意外删掉询问主持频道。配置名额不代表身份已确定，先依据真实分配、绑定关系及规则确定参与人。主持是否加入 readers 依本局规则，观众由 spectatorsVisible 控制，不把无权知情的参赛玩家加入私密频道。
+
+回复玩家的私密询问时，使用对应可发送频道提交 action=sendChannelMessage、data={channelId,text}。只能发送正文，不提供 audience；程序根据频道设置接收人并保留实际发言人。消息唤醒只服务于当前交流，不等于玩家完成了技能、投票或结束发言；不机械回应每条消息，不因私密讨论自行更换阶段。正常裁定与私密技能反馈继续使用 resolve，不拿聊天代替结算。
 
 ## 唯一状态与事件入口
 
@@ -30,23 +42,29 @@ configure 的 data 含 hostId、players、roles、rules。roles 使用当前小�
 
 运行中不使用 updateHtmlMessage 修改源码或覆盖程序状态，不用通用 updateInteractiveMessage 强行关闭或改写程序生成的卡。小程序状态是本局事实来源，不另建一套角色表、行动账本或主持记录卡与之竞争；跨任务继续先读取当前对局。
 
+程序执行超时或抛错时，该事件没有提交，也没有后台配置仍在进行。必要时读取一次状态确认版本与阶段；持续读取状态或源码不会让失败的事件完成。没有修复原因前，不换 eventId 反复提交，不重复发送“继续处理”或新建入口重开。原始错误和具体阻塞说明一次，然后结束本轮；用户要求继续时先判断阻塞原因是否已经改变。
+
 ## 收集与玩家调度
 
 小程序已自动分配身份、关闭过期卡、安排发言顺序，并在收集结束后私密唤醒主持人。程序生成的行动卡由玩家通过 clickInteractiveMessage 或小程序页面提交，直接进入程序 reducer；不设置按钮 notifyAi，不注册通用投票 callbackEvents，不要求 callbackEventId 写回确认。程序事件机制和通用投票回调是不同入口。
 
 在 waiting 且 pending 已处理时调用 collect；只指定本轮合法 actors 和候选人，其他参数按私密 protocol 提供。发言使用 kind=speech，purpose 区分 day、election、pk、lastWords。首次常规发言（警上竞选或白天）且尚无警长时，小程序从本轮 actors 随机选起点，再按座位编号循环发言；其他轮次保留主持提交的 actors 顺序，包括警长决定的顺序、PK 和遗言。提交后读取实际 actors、speaker，不提前宣布自己提交的第一位必然先发言。玩家先公开发言，再提交自己的“结束发言”卡；程序收到明确结束后关闭该卡并安排下一位。聊天中出现一条发言不等于其已提交结束，不手动抢先交接。
 
-程序已经管理 replyStates、发卡唤醒与结束后的状态恢复。正常流程不再手动 pause/resume，不用 @、wakeGroupMember 或重复发卡触发玩家。遇到程序未提供的紧急暂停或人工干预需求，先核对当前状态和权限，不能让人工调度与程序争夺同一批玩家。玩家只负责自己的卡、发言和声明，不替主持人 resolve 或 collect。
+程序已经管理 replyStates、发卡唤醒与结束后的状态恢复。发行动卡时先开启对应 AI，再定向发送私密事件；提交最终选择后关闭该玩家，全部收齐后开启主持人。关闭接话会停止当前运行，任何唤醒都不能绕过；开启接话不会改变消息、行动卡和记录的可见范围，后续开启的好人不能读取狼人私密记录。正常流程不再手动 pause/resume，不用 @、wakeGroupMember 或重复发卡触发玩家。遇到程序未提供的紧急暂停或人工干预需求，先核对当前状态和权限，不能让人工调度与程序争夺同一批玩家。玩家只负责自己的卡、发言和声明，不替主持人 resolve 或 collect。
 
 ## 夜间裁定
 
 按配置的技能顺序分批 collect；先处理会影响后续合法信息或选项的行动，例如需要刀口的女巫行动必须在狼队选择收齐之后安排。不要提前收集所有技能后再假装玩家当时知道应有信息。普通 night/deathSkill 可由程序生成已有技能及目标卡；特殊或多目标行动按协议提供 requests，选项必须合法，非强制行动保留“不使用”。显式 night/deathSkill 选项的 value 必须符合程序的行动结构（skill 引用已配置技能、targets 为目标列表，或 skip），不能塞入任意字符串期待自动消耗技能。custom 收集不会自动取得技能语义或次数管理能力。
+
+狼队 night 收集省略 requests，由程序直接生成每位狼人的目标投票卡，包含合法玩家和弃权。讨论走狼队频道，投票走各自私密卡；收齐后按真实票数判断刀口和平票，不再让狼人先确认“袭击”。其他只有一个可用技能且单目标的行动也直接选择目标，多技能或多目标才分步。
 
 多人夜间收集会积累 nightActions；每次收齐不等于整夜应立即判死亡。读 collection、nightActions、suggestion 和规则，安排尚未收集的行动；整夜收齐后再统一裁定。必要的查验或其他私密反馈可单独 resolve 给对应玩家，此时不设置 applySuggested/consumeSkills，以免提前清空整夜行动和消耗其他技能，不提前公开整夜死亡。已经提前发送的反馈在最终裁定时不重复发送；若 applySuggested 会再次带出这些反馈，改用显式裁定加 consumeSkills=true。
 
 suggestion 是建议，不是最终判决。它支持部分常见效果，但狼刀平票、同守同救、自救、连续守护、死亡技能资格、连锁死亡及胜负必须核对本局规则。unsupported 不为空时手动裁定，不能强行 applySuggested。只有审核建议符合本局时才用 applySuggested=true；手动结算已有技能时按协议用 consumeSkills=true 记录次数和上一目标，不能同时重复消耗。
 
 resolve 的 announcement 只写应公开信息；查验、刀口等写 privateMessages。手动死亡填写 deathCauses，使后续技能资格能正确判断。先处理本局应触发的死亡技能、警徽和遗言，再判断胜负；不能因建议没有涵盖某个特殊技能就跳过它。
+
+announcement 会以本次操作人的身份发送为普通消息。主持裁定和流程说明通过这条消息发布一次，不再用 sendGroupMessage 重复发送。自动阶段提示保留简短系统消息；操作方法写在对应行动卡里，公开公告不重复完整工具或卡片说明。
 
 ## 上警、选举与放逐
 

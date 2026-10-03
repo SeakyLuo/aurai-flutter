@@ -183,9 +183,7 @@ extension PendingMessageSubmission on ChatController {
     unawaited(
       _inConversation(conversation, () async {
         try {
-          final needsSettings = await _dispatchPendingMessages(
-            stopRunning: false,
-          );
+          final needsSettings = await _dispatchPendingMessages();
           if (needsSettings) {
             queue.paused = true;
             queue.error = StateError('请配置模型后发送待发送消息');
@@ -203,13 +201,10 @@ extension PendingMessageSubmission on ChatController {
 
   Future<bool> sendPendingMessages({String? messageId}) => _inConversation(
     activeConversation,
-    () => _dispatchPendingMessages(stopRunning: true, messageId: messageId),
+    () => _dispatchPendingMessages(messageId: messageId),
   );
 
-  Future<bool> _dispatchPendingMessages({
-    required bool stopRunning,
-    String? messageId,
-  }) async {
+  Future<bool> _dispatchPendingMessages({String? messageId}) async {
     final conversation = activeConversation;
     final queue = pendingMessageQueue;
     if (queue.busy || queue.messages.isEmpty) return false;
@@ -222,21 +217,36 @@ extension PendingMessageSubmission on ChatController {
     queue.paused = true;
     _notifyRun(conversation);
     var committed = false;
+    var historyMutated = false;
     String? previousPending;
     ChatRunState? previousState;
     String? previousError;
     final sent = <AgentMessage>[];
+    Completer<List<Map<String, Object?>>>? delivery;
+    var deliveredToRun = false;
     try {
-      if (!(await _directReplyContext(conversation)).config.isConfigured)
-        return true;
-      if (stopRunning && isBusy) {
-        final finished = identical(_privateConversation, conversation)
-            ? _execution.privateRunFinished?.future
-            : _execution.runFinished?.future;
-        await _stopConversation();
-        await finished;
+      final reply = await _directReplyContext(conversation);
+      if (!reply.config.isConfigured) return true;
+      if (isBusy) {
+        delivery = Completer<List<Map<String, Object?>>>();
+        if (_runtime == null && conversation.runState == ChatRunState.running) {
+          _execution.userInputs.add(delivery.future);
+          deliveredToRun = true;
+        } else {
+          deliveredToRun = _runtime?.enqueueUserInput(delivery.future) == true;
+        }
+        if (deliveredToRun) {
+          _execution.liveUserMessageIds.addAll(
+            batch.map((message) => message.id),
+          );
+        } else {
+          final finished = identical(_privateConversation, conversation)
+              ? _execution.privateRunFinished?.future
+              : _execution.runFinished?.future;
+          await finished;
+        }
       }
-      // No history mutation happens until the current execution has exited.
+      // Live delivery reserves the next turn before changing persisted history.
       previousPending = conversation.pendingGoal;
       previousState = conversation.runState;
       previousError = conversation.errorDetail;
@@ -257,11 +267,22 @@ extension PendingMessageSubmission on ChatController {
           ),
         );
       }
-      conversation.runState = ChatRunState.idle;
-      conversation.errorDetail = null;
+      final input = deliveredToRun
+          ? (await responseMessageInput(
+              _privateHistory(sent, reply.senderId),
+              supportsImages: configSupportsImageInput(reply.config),
+            )).expand((items) => items).toList()
+          : const <Map<String, Object?>>[];
+      if (!deliveredToRun) {
+        conversation.runState = ChatRunState.idle;
+        conversation.errorDetail = null;
+        conversation.pendingGoal = sent
+            .map((message) => message.text)
+            .join('\n');
+      }
       conversation.messages.addAll(sent);
       conversation.messageCount += sent.length;
-      conversation.pendingGoal = sent.map((message) => message.text).join('\n');
+      historyMutated = true;
       final sentIds = sent.map((message) => message.id).toSet();
       final remaining = queue.messages
           .where((message) => !sentIds.contains(message.id))
@@ -276,29 +297,38 @@ extension PendingMessageSubmission on ChatController {
         }),
       );
       committed = true;
-      conversation.steps.clear();
+      if (!deliveredToRun) conversation.steps.clear();
+      delivery?.complete(input);
       queue.messages.removeWhere((message) => sentIds.contains(message.id));
       queue.paused = remainingPaused;
       queue.error = null;
       queue.busy = false;
       _updateConversationList(conversation);
       _notifyRun(conversation);
-      await continuePending();
+      if (!deliveredToRun) await continuePending();
       return false;
     } on Object {
-      if (!committed && sent.isNotEmpty) {
+      if (!committed && historyMutated) {
         final ids = sent.map((message) => message.id).toSet();
         conversation.messages.removeWhere(
           (message) => ids.contains(message.id),
         );
         conversation.messageCount -= sent.length;
-        conversation.pendingGoal = previousPending;
-        conversation.runState = previousState!;
-        conversation.errorDetail = previousError;
+        if (!deliveredToRun) {
+          conversation.pendingGoal = previousPending;
+          conversation.runState = previousState!;
+          conversation.errorDetail = previousError;
+        }
       }
       rethrow;
     } finally {
-      if (!committed) queue.busy = false;
+      if (!committed) {
+        delivery?.complete(const []);
+        _execution.liveUserMessageIds.removeAll(
+          batch.map((message) => message.id),
+        );
+        queue.busy = false;
+      }
       _notifyRun(conversation);
     }
   }

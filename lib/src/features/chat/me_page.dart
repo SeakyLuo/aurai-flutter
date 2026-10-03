@@ -32,8 +32,9 @@ class MePage extends StatelessWidget {
         await openHomeConversation(context, controller, id);
     } on Object catch (error) {
       if (context.mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     }
   }
@@ -42,7 +43,7 @@ class MePage extends StatelessWidget {
     if (controller.addingImages) {
       ScaffoldMessenger.of(
         context,
-      ).showGlassSnackBar(const SnackBar(content: Text('正在处理图片，请稍候')));
+      ).showToast(const SnackBar(content: Text('正在处理图片，请稍候')));
       return;
     }
     await ModelSettingsSheet.show(
@@ -207,7 +208,7 @@ class MePage extends StatelessWidget {
       borderRadius: BorderRadius.circular(26),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+        contentPadding: const EdgeInsetsDirectional.only(start: 18, end: 12),
         minVerticalPadding: 18,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
         leading: icon,

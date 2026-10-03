@@ -23,6 +23,7 @@ class _AuraiStartupState extends State<AuraiStartup> {
   final _messenger = GlobalKey<ScaffoldMessengerState>();
   ChatController? _controller;
   bool _opening = false;
+  bool _failed = false;
 
   @override
   void initState() {
@@ -32,8 +33,11 @@ class _AuraiStartupState extends State<AuraiStartup> {
 
   Future<void> _open() async {
     if (_opening) return;
-    setState(() => _opening = true);
-    _messenger.currentState?.clearSnackBars();
+    setState(() {
+      _opening = true;
+      _failed = false;
+    });
+    AppToasts.dismiss();
     final controller = ChatController(AuraiPlatform.instance);
     try {
       await Future.wait([
@@ -55,15 +59,12 @@ class _AuraiStartupState extends State<AuraiStartup> {
       );
       controller.dispose();
       if (!mounted) return;
+      setState(() => _failed = true);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _messenger.currentState!.showGlassSnackBar(
-          SnackBar(
-            content: Text('无法打开会话，请重试：${errorMessage(error)}'),
-            duration: Duration(days: 365),
-            dismissDirection: DismissDirection.none,
-            action: SnackBarAction(label: '重试', onPressed: _open),
-          ),
+        _messenger.currentState!.showToast(
+          SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       });
     } finally {
@@ -76,12 +77,13 @@ class _AuraiStartupState extends State<AuraiStartup> {
       ? AuraiApp(key: const ValueKey('app'), controller: _controller!)
       : MaterialApp(
           key: const ValueKey('startup'),
+          navigatorKey: AppToasts.startupNavigatorKey,
           debugShowCheckedModeBanner: false,
           locale: const Locale('zh', 'CN'),
           supportedLocales: const [Locale('zh', 'CN')],
           localizationsDelegates: GlobalMaterialLocalizations.delegates,
           theme: GlobalUI.theme,
           scaffoldMessengerKey: _messenger,
-          home: const StartupBrand(),
+          home: StartupBrand(onRetry: _failed && !_opening ? _open : null),
         );
 }

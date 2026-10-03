@@ -6,7 +6,6 @@ import 'data_management_page.dart';
 import 'git_settings_page.dart';
 import 'package:flutter/material.dart';
 
-import '../../providers/model_catalog.dart';
 import 'capability_page.dart';
 import 'chat_controller.dart';
 import 'settings_icon.dart';
@@ -42,8 +41,9 @@ class SettingsPage extends StatelessWidget {
       await settings.setLanguage(language);
     } on Object catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('无法保存偏好语言：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     }
@@ -66,8 +66,9 @@ class SettingsPage extends StatelessWidget {
       await settings.setMode(mode);
     } on Object catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text('无法保存夜间模式，请重试：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
     }
   }
@@ -77,8 +78,9 @@ class SettingsPage extends StatelessWidget {
       await controller.openNotificationSettings();
     } on Object catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text('无法打开通知设置，请重试：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
     }
   }
@@ -88,8 +90,9 @@ class SettingsPage extends StatelessWidget {
       await controller.openBatterySettings();
     } on Object catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text('无法打开后台运行设置：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
     }
   }
@@ -147,15 +150,20 @@ class SettingsPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
+                      contentPadding: const EdgeInsetsDirectional.only(
+                        start: 18,
+                        end: 12,
+                      ),
                       leading: const SettingsIcon(
                         type: SettingsIconType.modelSettings,
                       ),
                       title: const Text('默认模型'),
                       subtitle: Text(
                         controller.modelSettings.activeConfig.isConfigured
-                            ? modelDisplayName(
-                                controller.modelSettings.activeConfig.model,
-                              )
+                            ? controller.modelSettings.activeConfig
+                                  .displayModel(
+                                    controller.modelSettings.activeConfig.model,
+                                  )
                             : '未设置',
                       ),
                       trailing: const SettingsIcon(
@@ -176,6 +184,10 @@ class SettingsPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
+                      contentPadding: const EdgeInsetsDirectional.only(
+                        start: 18,
+                        end: 12,
+                      ),
                       leading: const SettingsIcon(type: SettingsIconType.git),
                       title: const Text('Git'),
                       subtitle: const Text('提交身份、默认分支和 HTTPS 认证'),
@@ -196,6 +208,10 @@ class SettingsPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
+                      contentPadding: const EdgeInsetsDirectional.only(
+                        start: 18,
+                        end: 12,
+                      ),
                       leading: const SettingsIcon(
                         type: SettingsIconType.device,
                       ),
@@ -215,13 +231,17 @@ class SettingsPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
+                      contentPadding: const EdgeInsetsDirectional.only(
+                        start: 18,
+                        end: 12,
+                      ),
                       leading: const SettingsIcon(
                         type: SettingsIconType.language,
                       ),
                       title: const Text('偏好语言'),
                       subtitle: Text(LanguageSettings.instance.language.label),
                       trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
+                        type: SettingsIconType.chevronDown,
                       ),
                       onTap: () => _chooseLanguage(context),
                     ),
@@ -232,13 +252,17 @@ class SettingsPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
+                      contentPadding: const EdgeInsetsDirectional.only(
+                        start: 18,
+                        end: 12,
+                      ),
                       leading: const SettingsIcon(
                         type: SettingsIconType.appearance,
                       ),
                       title: const Text('夜间模式'),
                       subtitle: Text(AppearanceSettings.instance.label),
                       trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
+                        type: SettingsIconType.chevronDown,
                       ),
                       onTap: () => _chooseAppearance(context),
                     ),
@@ -249,6 +273,10 @@ class SettingsPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
+                      contentPadding: const EdgeInsetsDirectional.only(
+                        start: 18,
+                        end: 12,
+                      ),
                       leading: const SettingsIcon(
                         type: SettingsIconType.notifications,
                       ),
@@ -266,6 +294,10 @@ class SettingsPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
+                      contentPadding: const EdgeInsetsDirectional.only(
+                        start: 18,
+                        end: 12,
+                      ),
                       leading: const SettingsIcon(
                         type: SettingsIconType.device,
                       ),
@@ -283,6 +315,10 @@ class SettingsPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(26),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
+                      contentPadding: const EdgeInsetsDirectional.only(
+                        start: 18,
+                        end: 12,
+                      ),
                       leading: const SettingsIcon(type: SettingsIconType.data),
                       title: const Text('数据管理'),
                       subtitle: const Text('备份、恢复与缓存清理'),

@@ -89,33 +89,6 @@ class InteractiveMessageStore {
       } else if (button['input'] != null) {
         throw ArgumentError('请提供页面输入数据');
       }
-      if (card.participation['_programMessage'] case final String programId) {
-        card.requireViewer(actor.id);
-        programChange = await MiniappProgramStore(database).reduce(
-          txn,
-          conversationId,
-          programId,
-          actor.id,
-          eventId: '$messageId:${actor.id}:$participantRevision',
-          action: button['programEvent'] as String,
-          data: button['value'] ?? button['id'],
-          cardId: messageId,
-        );
-        final updated = await txn.query(
-          'messages',
-          columns: ['interactive_json'],
-          where: 'id = ?',
-          whereArgs: [messageId],
-        );
-        return (
-          card: InteractiveMessage.fromJson(
-            (jsonDecode(updated.single['interactive_json'] as String) as Map)
-                .cast<String, Object?>(),
-          ),
-          notice: null,
-          url: null,
-        );
-      }
       final nextSession = card.shared
           ? switch (action) {
               'submit' => card.engine.submit(actor.id, actor.name, {
@@ -296,6 +269,41 @@ class InteractiveMessageStore {
               'message_id = ? AND actor_id IS NOT NULL AND processed_at IS NULL',
           whereArgs: [messageId],
         );
+      }
+      if (card.participation['_programMessage'] case final String programId) {
+        card.requireViewer(actor.id);
+        await txn.update(
+          'messages',
+          {
+            'interactive_json': jsonEncode(
+              next.toJson(includeParticipants: true),
+            ),
+          },
+          where: 'id = ?',
+          whereArgs: [messageId],
+        );
+        programChange = await MiniappProgramStore(database).reduce(
+          txn,
+          conversationId,
+          programId,
+          actor.id,
+          eventId: '$messageId:${actor.id}:$participantRevision',
+          action: button['programEvent'] as String,
+          data: button['value'] ?? button['id'],
+          cardId: messageId,
+        );
+        final updated = await txn.query(
+          'messages',
+          columns: ['interactive_json'],
+          where: 'id = ?',
+          whereArgs: [messageId],
+        );
+        final current = InteractiveMessage.fromJson(
+          (jsonDecode(updated.single['interactive_json'] as String) as Map)
+              .cast<String, Object?>(),
+        );
+        programChange!.cards[messageId] = current;
+        return (card: current, notice: null, url: null);
       }
       next = await enqueueInteractiveCompletion(
         txn,

@@ -55,7 +55,7 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
       });
     } on Object catch (error) {
       if (!mounted) return;
-      _notice('Git 设置读取失败：${errorMessage(error)}');
+      _notice('Git 设置读取失败：${errorMessage(error)}', kind: ToastKind.error);
       setState(() => _loading = false);
     }
   }
@@ -87,15 +87,16 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
       });
       if (close) Navigator.pop(context);
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  void _notice(String message) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(message)));
+  void _notice(String message, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(message)), kind: kind);
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -136,7 +137,7 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     children: [
                       _field('提交署名', _name, '用于 Git 提交记录'),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
                       _field(
                         '提交邮箱',
                         _email,
@@ -145,7 +146,7 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
                       ),
                       const SizedBox(height: 24),
                       _field('默认分支', _branch, 'main'),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 24),
                       _credentialsHeader(),
                       const SizedBox(height: 12),
                       for (
@@ -153,7 +154,6 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
                         index < _credentials.length;
                         index++
                       ) ...[_credentialTile(index), const SizedBox(height: 12)],
-                      _addCredentialTile(),
                     ],
                   ),
           ),
@@ -171,12 +171,18 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Padding(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 15,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+        child: SizedBox(
+          height: 28,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
         ),
       ),
@@ -206,12 +212,30 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
 
   Widget _credentialsHeader() => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 18),
-    child: Text(
-      '代码托管账号',
-      style: TextStyle(
-        fontSize: 15,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            '代码托管账号',
+            style: TextStyle(
+              fontSize: 15,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: '添加代码托管账号',
+          constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+          padding: const EdgeInsets.all(2),
+          style: IconButton.styleFrom(
+            minimumSize: const Size(28, 28),
+            maximumSize: const Size(28, 28),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          icon: const SettingsIcon(type: SettingsIconType.add),
+          onPressed: _saving ? null : _addCredential,
+        ),
+      ],
     ),
   );
 
@@ -223,7 +247,7 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
       clipBehavior: Clip.antiAlias,
       child: ListTile(
         minVerticalPadding: 16,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+        contentPadding: const EdgeInsetsDirectional.only(start: 18, end: 12),
         leading: const SettingsIcon(type: SettingsIconType.git),
         title: Text(gitServiceName(credential.host)),
         subtitle: Text(
@@ -239,25 +263,11 @@ class _GitSettingsPageState extends State<GitSettingsPage> {
     );
   }
 
-  Widget _addCredentialTile() => Material(
-    color: settingsFieldColor(context),
-    borderRadius: BorderRadius.circular(26),
-    clipBehavior: Clip.antiAlias,
-    child: ListTile(
-      minVerticalPadding: 16,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18),
-      leading: const SettingsIcon(type: SettingsIconType.add),
-      title: const Text('添加代码托管账号'),
-      subtitle: const Text('Codeup、GitHub 等'),
-      onTap: _saving ? null : _addCredential,
-    ),
-  );
-
   Future<void> _addCredential() async {
     final host = await showChoiceSheet<String>(
       context,
       title: '代码托管服务',
-      selected: '',
+      showSelection: false,
       choices: [
         for (final entry in gitServiceHosts.entries)
           if (!_credentials.any((credential) => credential.host == entry.key))

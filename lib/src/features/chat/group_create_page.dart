@@ -50,9 +50,10 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
     super.dispose();
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
   Future<void> _load() async {
     try {
       final saved = await _draft.load();
@@ -68,13 +69,13 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
         _loading = false;
       });
       if (contacts.length != saved.contacts.length) {
-        _notice('已移除不可用的通讯录成员');
+        _notice('已移除不可用的通讯录成员', kind: ToastKind.success);
         await _persist();
       }
       await _loadDirectory();
     } catch (caughtError) {
       if (mounted) {
-        _notice('群聊草稿读取失败：${errorMessage(caughtError)}');
+        _notice('群聊草稿读取失败：${errorMessage(caughtError)}', kind: ToastKind.error);
         Navigator.pop(context);
       }
     }
@@ -90,7 +91,11 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
     try {
       await _persist();
     } catch (caughtError) {
-      if (mounted) _notice('草稿保存失败，请重试：${errorMessage(caughtError)}');
+      if (mounted)
+        _notice(
+          '草稿保存失败，请重试：${errorMessage(caughtError)}',
+          kind: ToastKind.error,
+        );
     }
   }
 
@@ -149,7 +154,11 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
       );
       await _change(_contacts, [..._members, ai]);
     } catch (caughtError) {
-      if (mounted) _notice('添加失败，请检查头像色库是否有配色后重试：${errorMessage(caughtError)}');
+      if (mounted)
+        _notice(
+          '添加失败，请检查头像色库是否有配色后重试：${errorMessage(caughtError)}',
+          kind: ToastKind.error,
+        );
     } finally {
       if (mounted) setState(() => _changing = false);
     }
@@ -173,7 +182,10 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
     } catch (caughtError) {
       if (mounted) {
         setState(() => _directoryFailed = true);
-        _notice('通讯录读取失败，请重试：${errorMessage(caughtError)}');
+        _notice(
+          '通讯录读取失败，请重试：${errorMessage(caughtError)}',
+          kind: ToastKind.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _directoryLoading = false);
@@ -197,7 +209,11 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
         _members,
       );
     } catch (caughtError) {
-      if (mounted) _notice('成员保存失败，请重试：${errorMessage(caughtError)}');
+      if (mounted)
+        _notice(
+          '成员保存失败，请重试：${errorMessage(caughtError)}',
+          kind: ToastKind.error,
+        );
     }
   }
 
@@ -238,7 +254,11 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
       );
       if (mounted) setState(() => _excluded = excluded);
     } catch (caughtError) {
-      if (mounted) _notice('成员保存失败，请重试：${errorMessage(caughtError)}');
+      if (mounted)
+        _notice(
+          '成员保存失败，请重试：${errorMessage(caughtError)}',
+          kind: ToastKind.error,
+        );
     } finally {
       if (mounted) setState(() => _changing = false);
     }
@@ -259,13 +279,17 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
       try {
         await _draft.clear();
       } catch (caughtError) {
-        if (mounted) _notice('群聊已创建，但草稿清理失败：${errorMessage(caughtError)}');
+        if (mounted)
+          _notice(
+            '群聊已创建，但草稿清理失败：${errorMessage(caughtError)}',
+            kind: ToastKind.error,
+          );
       }
       if (mounted) Navigator.pop(context, group.id);
     } catch (caughtError) {
       if (mounted) {
         setState(() => _saving = false);
-        _notice('创建失败，请重试：${errorMessage(caughtError)}');
+        _notice('创建失败，请重试：${errorMessage(caughtError)}', kind: ToastKind.error);
       }
     }
   }
@@ -355,7 +379,10 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
     } catch (caughtError) {
       if (mounted) {
         setState(() => _leaving = false);
-        _notice('草稿清理失败，请重试：${errorMessage(caughtError)}');
+        _notice(
+          '草稿清理失败，请重试：${errorMessage(caughtError)}',
+          kind: ToastKind.error,
+        );
       }
     }
   }
@@ -387,101 +414,130 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 640),
-                    child: ListView(
-                      padding: settingsPagePadding(
-                        context,
-                        const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                      ),
+                    child: CustomScrollView(
                       keyboardDismissBehavior:
                           ScrollViewKeyboardDismissBehavior.onDrag,
-                      children: [
-                        TextField(
-                          controller: _name,
-                          enabled: _enabled,
-                          maxLength: 80,
-                          onChanged: (_) => _changedName(),
-                          style: const TextStyle(fontSize: 16),
-                          decoration: InputDecoration(
-                            hintText: '群名称（选填）',
-                            counterText: '',
-                            contentPadding: const EdgeInsets.all(18),
-                            filled: true,
-                            fillColor: settingsFieldColor(context),
-                            border: OutlineInputBorder(
-                              borderSide: BorderSide.none,
-                              borderRadius: BorderRadius.circular(26),
-                            ),
+
+                      slivers: [
+                        SliverPadding(
+                          padding: settingsPagePadding(
+                            context,
+                            const EdgeInsets.fromLTRB(16, 8, 16, 32),
                           ),
-                        ),
-                        const SizedBox(height: 24),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  '选择成员',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
+                          sliver: SliverMainAxisGroup(
+                            slivers: [
+                              SliverList.list(
+                                children: [
+                                  TextField(
+                                    controller: _name,
+                                    enabled: _enabled,
+                                    maxLength: 80,
+                                    onChanged: (_) => _changedName(),
+                                    style: const TextStyle(fontSize: 16),
+                                    decoration: InputDecoration(
+                                      hintText: '群名称（选填）',
+                                      counterText: '',
+                                      contentPadding: const EdgeInsets.all(18),
+                                      filled: true,
+                                      fillColor: settingsFieldColor(context),
+                                      border: OutlineInputBorder(
+                                        borderSide: BorderSide.none,
+                                        borderRadius: BorderRadius.circular(26),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 4),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '选择成员',
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ),
+                                        IconButton(
+                                          tooltip: '随机添加成员',
+                                          onPressed:
+                                              _enabled &&
+                                                  _count <
+                                                      GroupChatStore
+                                                          .maxAiMembers
+                                              ? _roll
+                                              : null,
+                                          icon: SettingsIcon(
+                                            type: SettingsIconType.add,
+                                            color:
+                                                _enabled &&
+                                                    _count <
+                                                        GroupChatStore
+                                                            .maxAiMembers
+                                                ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.onSurfaceVariant
+                                                : Theme.of(
+                                                    context,
+                                                  ).disabledColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  for (final ai in _members) _member(ai),
+                                  for (final ai in [
+                                    ..._contacts.where(
+                                      (selected) => !_directory.any(
+                                        (p) =>
+                                            p.sender.id == selected.sender.id,
+                                      ),
+                                    ),
+                                    ..._directory,
+                                  ])
+                                    GroupMemberChoice(
+                                      selected: _contacts.any(
+                                        (p) => p.sender.id == ai.sender.id,
+                                      ),
+                                      sender: ai.sender,
+                                      onTap: _enabled
+                                          ? () => _toggle(ai)
+                                          : null,
+                                    ),
+                                  if (_directoryLoading)
+                                    const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  if (!_directoryLoading && _directoryMore)
+                                    TextButton(
+                                      onPressed: _loadDirectory,
+                                      child: Text(
+                                        _directoryFailed ? '重试' : '加载更多朋友',
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              if (!_directoryLoading &&
+                                  !_directoryFailed &&
+                                  _directory.isEmpty &&
+                                  _contacts.isEmpty &&
+                                  _members.isEmpty)
+                                SliverFillRemaining(
+                                  hasScrollBody: false,
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 16),
+                                    child: EmptyDataView(
+                                      title: '暂无成员，点击右上方＋添加',
+                                    ),
                                   ),
                                 ),
-                              ),
-                              IconButton(
-                                tooltip: '随机添加成员',
-                                onPressed:
-                                    _enabled &&
-                                        _count < GroupChatStore.maxAiMembers
-                                    ? _roll
-                                    : null,
-                                icon: SettingsIcon(
-                                  type: SettingsIconType.add,
-                                  color:
-                                      _enabled &&
-                                          _count < GroupChatStore.maxAiMembers
-                                      ? Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant
-                                      : Theme.of(context).disabledColor,
-                                ),
-                              ),
                             ],
                           ),
                         ),
-                        for (final ai in _members) _member(ai),
-                        for (final ai in [
-                          ..._contacts.where(
-                            (selected) => !_directory.any(
-                              (p) => p.sender.id == selected.sender.id,
-                            ),
-                          ),
-                          ..._directory,
-                        ])
-                          GroupMemberChoice(
-                            selected: _contacts.any(
-                              (p) => p.sender.id == ai.sender.id,
-                            ),
-                            sender: ai.sender,
-                            onTap: _enabled ? () => _toggle(ai) : null,
-                          ),
-                        if (_directoryLoading)
-                          const Center(child: CircularProgressIndicator()),
-                        if (!_directoryLoading && _directoryMore)
-                          TextButton(
-                            onPressed: _loadDirectory,
-                            child: Text(_directoryFailed ? '重试' : '加载更多朋友'),
-                          ),
-                        if (!_directoryLoading &&
-                            !_directoryFailed &&
-                            _directory.isEmpty &&
-                            _contacts.isEmpty &&
-                            _members.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            child: EmptyDataView(title: '暂无成员，点击右上方＋添加'),
-                          ),
                       ],
                     ),
                   ),

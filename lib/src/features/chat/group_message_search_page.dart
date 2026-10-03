@@ -1,3 +1,4 @@
+import 'floating_search_layout.dart';
 import '../../widgets/empty_data_view.dart';
 import 'retained_tab_view.dart';
 import '../../app/glass_notice.dart';
@@ -15,7 +16,6 @@ import 'group_search_results.dart';
 import 'package:path_provider/path_provider.dart';
 import 'search_skeleton.dart';
 import 'settings_appearance.dart';
-import 'question_icon.dart';
 
 class GroupMessageSearchPage extends StatefulWidget {
   const GroupMessageSearchPage({
@@ -110,17 +110,9 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
     } on Object catch (error) {
       if (!mounted || generation != _generation) return;
       setState(() => page.failed = true);
-      ScaffoldMessenger.of(context).showGlassSnackBar(
-        SnackBar(
-          content: Text('搜索失败：${errorMessage(error)}'),
-          action: SnackBarAction(
-            label: '重试',
-            onPressed: () {
-              setState(() => _type = type);
-              _load();
-            },
-          ),
-        ),
+      ScaffoldMessenger.of(context).showToast(
+        SnackBar(content: Text('搜索失败：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
     } finally {
       if (mounted && generation == _generation)
@@ -164,8 +156,9 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
       );
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('无法定位消息：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     }
   }
@@ -194,12 +187,15 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: TextField(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: GroupSearchTypeSegment(value: _type, onChanged: _select),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: FloatingSearchLayout(
                   controller: _input,
                   focusNode: _focus,
                   onChanged: _changed,
-                  textInputAction: TextInputAction.search,
                   onSubmitted: (_) {
                     final pending = _debounce?.isActive == true;
                     _debounce?.cancel();
@@ -209,63 +205,26 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
                       _load();
                     }
                   },
-                  decoration: InputDecoration(
-                    hintText: widget.group ? '搜索群消息和文件名' : '搜索聊天消息和文件名',
-                    filled: true,
-                    fillColor: settingsFieldColor(context),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    suffixIcon: _input.text.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: '清空',
-                            onPressed: () {
-                              _input.clear();
-                              _changed('');
-                              _focus.requestFocus();
-                            },
-                            icon: const QuestionIcon(
-                              type: QuestionIconType.close,
-                            ),
-                          ),
+                  hintText: widget.group ? '搜索群消息和文件名' : '搜索聊天消息和文件名',
+                  enabled: true,
+                  bottom: 16,
+                  child: RetainedTabView(
+                    index: _type.index,
+                    onChanged: (index) =>
+                        _select(GroupSearchType.values[index]),
+                    children: [
+                      for (final type in GroupSearchType.values)
+                        TickerMode(
+                          enabled: type == _type,
+                          child:
+                              type == _type ||
+                                  _pages[type]!.loaded ||
+                                  _pages[type]!.loading
+                              ? _results(context, type)
+                              : const SizedBox.expand(),
+                        ),
+                    ],
                   ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: GroupSearchTypeSegment(value: _type, onChanged: _select),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: RetainedTabView(
-                  index: _type.index,
-                  onChanged: (index) => _select(GroupSearchType.values[index]),
-                  children: [
-                    for (final type in GroupSearchType.values)
-                      TickerMode(
-                        enabled: type == _type,
-                        child:
-                            type == _type ||
-                                _pages[type]!.loaded ||
-                                _pages[type]!.loading
-                            ? _results(context, type)
-                            : const SizedBox.expand(),
-                      ),
-                  ],
                 ),
               ),
             ],

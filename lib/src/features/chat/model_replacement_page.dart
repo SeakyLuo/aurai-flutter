@@ -10,7 +10,7 @@ import '../../providers/model_purpose_catalog.dart';
 import '../../providers/openrouter_models.dart';
 import 'app_confirmation_dialog.dart';
 import 'chat_controller.dart';
-import 'choice_sheet.dart';
+import 'model_choice_sheet.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 
@@ -54,9 +54,10 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
     super.dispose();
   }
 
-  void _notice(String message) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(message)));
+  void _notice(String message, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(message)), kind: kind);
 
   Future<void> _loadUsedModels() async {
     try {
@@ -70,7 +71,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
         _scope = results[1] as ModelReplacementImpact;
       });
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _loadingUsedModels = false);
     }
@@ -87,6 +88,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
     ModelPurpose.imageGeneration => '图片生成',
     ModelPurpose.videoGeneration => '视频生成',
     ModelPurpose.musicGeneration => '音乐生成',
+    ModelPurpose.speechSynthesis => '语音合成',
   };
 
   String get _allModelsLabel => widget.purpose == ModelPurpose.text
@@ -102,6 +104,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
           ModelPurpose.imageGeneration => '默认图片生成模型',
           ModelPurpose.videoGeneration => '默认视频生成模型',
           ModelPurpose.musicGeneration => '默认音乐生成模型',
+          ModelPurpose.speechSynthesis => '默认语音合成模型',
         },
   ].join('、');
 
@@ -112,7 +115,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
       _from!.model == _to!.model.model;
 
   Future<void> _selectCurrentModel() async {
-    final selected = await showChoiceSheet<String>(
+    final selected = await showModelOptionsSheet(
       context,
       title: '当前模型',
       selected: _from == null ? '*' : _key(_from!),
@@ -152,7 +155,8 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
         setState(() => _scope = scope);
       }
     } on Object catch (error) {
-      if (mounted && revision == _impactRevision) _notice(errorMessage(error));
+      if (mounted && revision == _impactRevision)
+        _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted && revision == _impactRevision) {
         setState(() => _loadingImpact = false);
@@ -170,11 +174,12 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
         )
         .toList();
     if (accounts.isEmpty) {
-      _notice('请先配置可用的模型供应商');
+      _notice('请先配置可用的模型供应商', kind: ToastKind.warning);
       return;
     }
-    final service = await showChoiceSheet<ModelService>(
+    final service = await showProviderChoiceSheet(
       context,
+      profiles: widget.controller.modelSettings.profiles,
       title: '选择新供应商',
       selected: _to?.model.service ?? accounts.first.service,
       choices: [
@@ -204,7 +209,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
         setState(() => _noCandidates = true);
         return;
       }
-      final selected = await showChoiceSheet<String>(
+      final selected = await showModelOptionsSheet(
         context,
         title: '选择新模型',
         selected: _to?.model.service == service
@@ -221,7 +226,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
       });
       await _refreshImpact();
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       catalog.close();
       imageClient.close();
@@ -290,7 +295,10 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
           model: DefaultModelSelection(
             service: service,
             model: id,
-            name: info?.name ?? imageModels[id]?.name ?? modelDisplayName(id),
+            name: account.displayModel(
+              id,
+              catalogName: info?.name ?? imageModels[id]?.name,
+            ),
           ),
           supportedPurposes: supportedPurposes,
           supportsText: supportsText,
@@ -320,7 +328,8 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
         setState(() => _impact = impact);
       }
     } on Object catch (error) {
-      if (mounted && revision == _impactRevision) _notice(errorMessage(error));
+      if (mounted && revision == _impactRevision)
+        _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted && revision == _impactRevision) {
         setState(() => _loadingImpact = false);
@@ -354,7 +363,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
       );
       if (mounted) Navigator.pop(context, result);
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _replacing = false);
     }
@@ -409,10 +418,10 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
             child: ListView(
               padding: settingsPagePadding(
                 context,
-                const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                const EdgeInsets.fromLTRB(16, 12, 16, 32),
               ),
               children: [
-                _label('当前模型'),
+                _label('当前模型', first: true),
                 _choice(
                   _from == null ? _allModelsLabel : _modelLabel(_from!),
                   _loadingUsedModels ||
@@ -478,8 +487,8 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
     ),
   );
 
-  Widget _label(String text) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+  Widget _label(String text, {bool first = false}) => Padding(
+    padding: EdgeInsets.fromLTRB(18, first ? 0 : 8, 18, 12),
     child: Text(
       text,
       style: TextStyle(
@@ -495,13 +504,11 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
         borderRadius: BorderRadius.circular(26),
         clipBehavior: Clip.antiAlias,
         child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 18,
-            vertical: 8,
-          ),
+          minTileHeight: settingsCardHeight,
+          contentPadding: settingsCardPadding,
           title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
           subtitle: subtitle == null ? null : Text(subtitle),
-          trailing: const SettingsIcon(type: SettingsIconType.chevron),
+          trailing: const SettingsIcon(type: SettingsIconType.chevronDown),
           onTap: onTap,
         ),
       );

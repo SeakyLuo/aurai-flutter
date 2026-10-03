@@ -69,6 +69,7 @@ class Conversation {
       draftImages.isEmpty &&
       (_previewMessage?.isSystem ?? storedPreviewIsSystem);
   DateTime? storedUpdatedAt;
+  DateTime? draftUpdatedAt;
   DateTime? lastMessageAt;
   String? activeRunId;
   String? replyingSenderName;
@@ -119,6 +120,11 @@ class Conversation {
     final latest = messages.isEmpty ? createdAt : messages.last.createdAt;
     final stored = storedUpdatedAt;
     return stored != null && stored.isAfter(latest) ? stored : latest;
+  }
+
+  DateTime get listUpdatedAt {
+    final edited = draftPreview == null ? null : draftUpdatedAt;
+    return edited != null && edited.isAfter(updatedAt) ? edited : updatedAt;
   }
 
   String get title => storedTitle != null
@@ -181,6 +187,7 @@ class Conversation {
     'isScheduledTask': isScheduledTask,
     'projectId': projectId,
     'draft': draft,
+    'draftUpdatedAt': draftUpdatedAt?.toIso8601String(),
     'draftFiles': draftFiles.map((file) => file.toJson()).toList(),
     'draftImages': draftImages.map((image) => image.toJson()).toList(),
     'pendingGoal': pendingGoal,
@@ -235,6 +242,9 @@ class Conversation {
         : state;
     if (!legacy) {
       conversation.draft = json['draft']! as String;
+      conversation.draftUpdatedAt = json['draftUpdatedAt'] == null
+          ? null
+          : DateTime.parse(json['draftUpdatedAt']! as String);
       conversation.draftFiles.addAll(
         (json['draftFiles'] as List? ?? const []).map(
           (file) => MessageFile.fromJson(

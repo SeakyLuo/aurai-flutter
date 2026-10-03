@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../domain/source_reference.dart';
 import 'copy_icon.dart';
+import 'speech_readout_button.dart';
 import 'message_quote_view.dart';
 import 'message_time.dart';
 import 'source_citation_view.dart';
@@ -9,18 +10,22 @@ class MessageReplyFooter extends StatelessWidget {
   const MessageReplyFooter({
     super.key,
     required this.copied,
+    required this.messageKey,
     required this.onCopy,
     required this.createdAt,
     required this.sources,
     required this.onOpenLink,
     this.onQuote,
     this.onMore,
+    this.onReadAloud,
   });
 
   final bool copied;
+  final Object messageKey;
   final VoidCallback onCopy;
   final VoidCallback? onQuote;
   final VoidCallback? onMore;
+  final VoidCallback? onReadAloud;
   final DateTime createdAt;
   final List<SourceReference> sources;
   final ValueChanged<String?> onOpenLink;
@@ -56,6 +61,8 @@ class MessageReplyFooter extends StatelessWidget {
               padding: const EdgeInsets.all(4),
             ),
           ),
+        if (onReadAloud != null)
+          SpeechReadoutButton(messageKey: messageKey, onPressed: onReadAloud!),
         if (onMore != null)
           IconButton(
             tooltip: '更多',

@@ -34,15 +34,19 @@ class ModelContextLimits {
 
   static ModelContextLimits forConfig(ModelConfig config) {
     final info = OpenRouterModels.forConfig(config);
-    final base = info == null ? forModel(config.model) : _forOpenRouter(info);
+    final base = info == null
+        ? forModel(config.apiModel)
+        : _forOpenRouter(info);
     return _applyOverride(base, config);
   }
 
   static ModelContextLimits previewForConfig(ModelConfig config) {
     final info = config.service.usesOpenRouterCatalog
-        ? OpenRouterModels.lookup(config.baseUrl, config.model)
+        ? OpenRouterModels.lookup(config.baseUrl, config.apiModel)
         : null;
-    final base = info == null ? forModel(config.model) : _forOpenRouter(info);
+    final base = info == null
+        ? forModel(config.apiModel)
+        : _forOpenRouter(info);
     return _applyOverride(base, config);
   }
 
@@ -76,6 +80,7 @@ class ModelContextLimits {
   // Unknown models use an estimated 64K window until their capacity is known.
   static ModelContextLimits forModel(String model) => switch (model) {
     // https://developers.openai.com/api/docs/models/compare
+    'gpt-6.1-sol' ||
     'gpt-6-astra' ||
     'gpt-6-sol' ||
     'gpt-6-luna' ||
@@ -88,6 +93,20 @@ class ModelContextLimits {
     'gpt-5.6-luna' => const ModelContextLimits(
       contextWindow: 1050000,
       outputTokens: 128000,
+    ),
+    // https://platform.claude.com/docs/en/models/overview
+    'claude-opus-5-5' || 'claude-sonnet-5-5' || 'claude-fable-5-1' =>
+      const ModelContextLimits(contextWindow: 1000000, outputTokens: 128000),
+    // https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash
+    'gemini-3.8-flash' => const ModelContextLimits(
+      contextWindow: 1048576,
+      outputTokens: 65536,
+    ),
+    // https://docs.x.ai/developers/models/grok-4.7
+    'grok-4.7' => const ModelContextLimits(
+      contextWindow: 500000,
+      // The model page only specifies context; retain the app's 8K output cap.
+      outputTokens: 8192,
     ),
     // https://developers.openai.com/api/docs/models/gpt-4o-mini
     'gpt-4o-mini' || 'gpt-4o-mini-2024-07-18' => const ModelContextLimits(

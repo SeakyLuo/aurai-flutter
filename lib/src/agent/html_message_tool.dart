@@ -21,10 +21,10 @@ class HtmlMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         htmlAppGuide +
         miniappProgramGuide +
         'To make an application available in the composer + > 小程序 picker, declare '
-        '<script type="application/json" id="aurai-send-action">{"type":"message","state":{}}</script> '
-        'with its initial message state; program and random-choice declarations also support message sending. '
-        'Each selection creates isolated message state and data. Library sharing sends only the reusable app entry, '
-        'never current message progress or private results. ' +
+            '<script type="application/json" id="aurai-send-action">{"type":"message","state":{}}</script> '
+            'with its initial message state; program and random-choice declarations also support message sending. '
+            'Each selection creates isolated message state and data. Library sharing sends only the reusable app entry, '
+            'never current message progress or private results. ' +
         htmlMessageComponentGuide +
         'For inline rendering use compact responsive content without a page-sized wrapper or min-height:100vh. Avoid repeated title bars and developer diagnostics. Inherit the host font and use CSS variables --aurai-text, --aurai-muted, --aurai-field, --aurai-border, --aurai-accent for light/dark themes; custom layouts and Canvas remain supported. Inline message height is measured once on load and then fixed. After an intentional layout change, call AuraiHTML.requestResize() once after updating the DOM to request a new measurement; do not call it on animation frames, timers, or routine input. There is no height cap, collapse control or internal page scrolling. Use natural document flow, no fixed-height outer wrapper, viewport-height units, or nested scrolling containers. Keep chat content concise. Use a compact summary/launcher and fullscreen for long forms, large lists or full applications; fullscreen uses the page viewport. '
             'backgroundMode defaults to message (the normal message bubble color) or can be transparent (no host card fill). Keep the HTML document and outer content wrapper transparent; do not hard-code a page/card background. Use --aurai-message-background when an inner element should match the message, while local controls and Canvas may keep their own colors. '
@@ -43,10 +43,22 @@ class HtmlMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
     inputSchema: {
       'type': 'object',
       'properties': {
+        'entryKind': {
+          'type': 'string',
+          'enum': ['draft', 'published', 'installed'],
+          'description':
+              'Exact entryKind returned by listHtmlApps. Required for sending library entries, including builtins and favorites.',
+        },
+        'sendMode': {
+          'type': 'string',
+          'enum': ['message', 'share'],
+          'description':
+              'With entryKind: message uses the composer + send action and fresh isolated data; share sends the reusable library card, as in the library share action. Default message. Use only a mode included in the listing sendModes.',
+        },
         'appId': {
           'type': 'string',
           'description':
-              'Existing app from listHtmlApps; sends a new launcher for the same application and saved data. Omit html/sourcePath/interaction/buttons/participation/stateful when reopening.',
+              'Existing app reference. For a listHtmlApps library result also supply its entryKind and choose sendMode: message creates an independent instance using the template display settings; share sends the library card. Without entryKind, reopens your own application with saved data. Omit html/sourcePath/interaction/buttons/participation/stateful when reusing an application.',
         },
         'conversationId': {
           'type': 'string',
@@ -101,6 +113,12 @@ class HtmlMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         call.arguments,
         creating: true,
       );
+      if (args['entryKind'] != null && args['appId'] == null) {
+        throw ArgumentError('发送资料库条目需要 appId');
+      }
+      if (args['sendMode'] != null && args['entryKind'] == null) {
+        throw ArgumentError('发送方式需要资料库 entryKind');
+      }
       if (args['appId'] != null &&
           [
             'interaction',

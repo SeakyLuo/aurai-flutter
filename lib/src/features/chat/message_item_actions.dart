@@ -1,7 +1,111 @@
 part of 'message_item.dart';
 
 extension _MessageItemActions on _MessageItemState {
-  Future<void> _openActions({bool compactMenu = false}) async {
+  Widget _selectableContent() {
+    if (message.interactive != null) return _content;
+    if (_hasBubble && message.htmlGame == null) {
+      if (_bubbleTextSelection) {
+        return GroupMessageSelection(
+          onChanged: (text) => _selectedText = text,
+          onOpenMenu: () async {
+            var acted = false;
+            await _openActions(
+              preserveSelection: true,
+              onActionSelected: () => acted = true,
+            );
+            return acted;
+          },
+          onQuote: widget.onQuote == null
+              ? null
+              : (text) => widget.onQuote!(message, selectedText: text),
+          onStar: !widget.readOnly || widget.onLocate != null
+              ? () => _openActions(directAction: MessageAction.star)
+              : null,
+          onForward: () => _openActions(directAction: MessageAction.forward),
+          onReadAloud: _canReadAloud
+              ? (text) => _readAloud(message, text: text)
+              : null,
+          child: _content,
+        );
+      }
+      return message.isReasoning ? _withActions(_content) : _content;
+    }
+    if (widget.streaming) return _withActions(_content);
+    if (message.htmlGame != null) {
+      return widget.onQuote == null && widget.onQuickReply == null
+          ? _content
+          : _withActions(_content);
+    }
+    final content = SelectionArea(
+      onSelectionChanged: (selection) => _selectedText = selection?.plainText,
+      contextMenuBuilder: (context, selection) =>
+          AdaptiveTextSelectionToolbar.buttonItems(
+            anchors: selection.contextMenuAnchors,
+            buttonItems: [
+              ...selection.contextMenuButtonItems,
+              if (widget.onQuote != null)
+                ContextMenuButtonItem(
+                  label: '引用',
+                  onPressed: () {
+                    final text = _selectedText;
+                    selection.hideToolbar();
+                    selection.clearSelection();
+                    widget.onQuote!(message, selectedText: text);
+                  },
+                ),
+            ],
+          ),
+      child: _content,
+    );
+    return content;
+  }
+
+  bool get _hasBubble =>
+      widget.groupBubble ||
+      message.role == AgentMessageRole.user ||
+      message.interactive != null ||
+      message.htmlGame != null ||
+      message.miniappShare != null;
+
+  bool get _bubbleTextSelection =>
+      _hasBubble &&
+      !widget.streaming &&
+      !message.isReasoning &&
+      !message.isFailure &&
+      !message.isSystem &&
+      message.htmlGame == null &&
+      message.interactive == null &&
+      message.miniappShare == null &&
+      message.text.isNotEmpty;
+
+  bool get _canReadAloud =>
+      !widget.streaming &&
+      message.role == AgentMessageRole.assistant &&
+      !message.isSystem &&
+      !message.isReasoning &&
+      !message.isFailure &&
+      message.htmlGame == null &&
+      message.text.isNotEmpty;
+
+  Future<void> _readAloud(AgentMessage snapshot, {String? text}) async {
+    await runUiAction(
+      context,
+      () => toggleSpeechReadout(
+        context,
+        key: snapshot.id,
+        controller: ImageActionScope.of(context),
+        senderId: snapshot.senderId,
+        text: _copyableText(text ?? snapshot.text),
+      ),
+    );
+  }
+
+  Future<void> _openActions({
+    MessageAction? directAction,
+    bool compactMenu = false,
+    bool preserveSelection = false,
+    VoidCallback? onActionSelected,
+  }) async {
     final snapshot = message;
     var hasHistory = false;
     var allowRetry = widget.onRetry != null && snapshot.isFailure;
@@ -17,9 +121,10 @@ extension _MessageItemActions on _MessageItemState {
         allowRetry = runs.isNotEmpty && runs.single['status'] == 'failed';
       } on Object catch (error) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+          ScaffoldMessenger.of(context).showToast(
+            SnackBar(content: Text(errorMessage(error))),
+            kind: ToastKind.error,
+          );
         }
         return;
       }
@@ -42,9 +147,10 @@ extension _MessageItemActions on _MessageItemState {
         }
       } on Object catch (error) {
         if (mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+          ScaffoldMessenger.of(context).showToast(
+            SnackBar(content: Text(errorMessage(error))),
+            kind: ToastKind.error,
+          );
         return;
       }
       if (!mounted) return;
@@ -59,9 +165,10 @@ extension _MessageItemActions on _MessageItemState {
         );
       } on Object catch (error) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+          ScaffoldMessenger.of(context).showToast(
+            SnackBar(content: Text(errorMessage(error))),
+            kind: ToastKind.error,
+          );
         }
         return;
       }
@@ -90,57 +197,67 @@ extension _MessageItemActions on _MessageItemState {
       });
       if (!loaded || !mounted) return;
     }
-    final result = await showMessageActionsMenu(
-      context,
-      message: snapshot,
-      onVisibility: allowVisibility
-          ? (sheetContext) async {
-              await runUiAction(
-                sheetContext,
-                () => showMessageVisibilitySheet(
-                  sheetContext,
-                  message: snapshot,
-                  database: database,
-                ),
-              );
-            }
-          : null,
-      allowStar: allowStar,
-      allowGroupMarks: groupMark != null,
-      pinned: groupMark?.pinned ?? false,
-      groupFavorite: groupMark?.favorite ?? false,
-      allowCopy: !compactMenu,
-      allowSelect: !compactMenu,
-      starred: starred,
-      allowEditing: widget.onEdit != null && snapshot.miniappShare == null,
-      allowHistory: hasHistory,
-      allowQuote: !compactMenu && widget.onQuote != null,
-      allowRecall: widget.onRecall != null,
-      allowRetry: allowRetry,
-      allowForward:
-          !widget.streaming &&
-          (message.htmlGame != null ||
-              message.text.isNotEmpty ||
-              message.images.isNotEmpty ||
-              message.files.isNotEmpty),
-      allowBranch: compactMenu && widget.onBranch != null,
-      allowQuickReply:
-          widget.onQuickReply != null &&
-          (!widget.streaming ||
-              snapshot.senderId == MessageSender.localUser.id) &&
-          !snapshot.isSystem &&
-          !snapshot.isReasoning &&
-          (snapshot.role == AgentMessageRole.assistant ||
-              snapshot.senderId == MessageSender.localUser.id),
-      sentQuickReplyKeys:
-          !widget.groupBubble && snapshot.role == AgentMessageRole.assistant
-          ? const {}
-          : snapshot.quickReplies
-                .where((reply) => reply.senderId == MessageSender.localUser.id)
-                .map((reply) => reply.key)
-                .toSet(),
-    );
+    final result = directAction != null
+        ? MessageActionResult(directAction)
+        : await showMessageActionsMenu(
+            context,
+            message: snapshot,
+            groupMenu: true,
+            preserveSelection: preserveSelection,
+            allowReadAloud: _canReadAloud,
+            onVisibility: allowVisibility
+                ? (sheetContext) async {
+                    await runUiAction(
+                      sheetContext,
+                      () => showMessageVisibilitySheet(
+                        sheetContext,
+                        message: snapshot,
+                        database: database,
+                      ),
+                    );
+                  }
+                : null,
+            allowStar: allowStar,
+            allowGroupMarks: groupMark != null,
+            pinned: groupMark?.pinned ?? false,
+            groupFavorite: groupMark?.favorite ?? false,
+            allowCopy: true,
+            allowSelect: !compactMenu && !_hasBubble,
+            starred: starred,
+            allowEditing:
+                widget.onEdit != null && snapshot.miniappShare == null,
+            allowHistory: hasHistory,
+            allowQuote: widget.onQuote != null,
+            allowRecall: widget.onRecall != null,
+            allowRetry: allowRetry,
+            allowForward:
+                !widget.streaming &&
+                (message.htmlGame != null ||
+                    message.text.isNotEmpty ||
+                    message.images.isNotEmpty ||
+                    message.files.isNotEmpty),
+            allowBranch: compactMenu && widget.onBranch != null,
+            allowQuickReply:
+                widget.onQuickReply != null &&
+                (!widget.streaming ||
+                    snapshot.senderId == MessageSender.localUser.id) &&
+                !snapshot.isSystem &&
+                !snapshot.isReasoning &&
+                (snapshot.role == AgentMessageRole.assistant ||
+                    snapshot.senderId == MessageSender.localUser.id),
+            sentQuickReplyKeys:
+                !widget.groupBubble &&
+                    snapshot.role == AgentMessageRole.assistant
+                ? const {}
+                : snapshot.quickReplies
+                      .where(
+                        (reply) => reply.senderId == MessageSender.localUser.id,
+                      )
+                      .map((reply) => reply.key)
+                      .toSet(),
+          );
     if (!mounted || result == null) return;
+    onActionSelected?.call();
     if (result case MessageQuickReplyResult(:final option)) {
       await widget.onQuickReply?.call(snapshot, option.key);
       return;
@@ -174,8 +291,9 @@ extension _MessageItemActions on _MessageItemState {
               await favorites.add(miniapp);
             }
             if (mounted)
-              ScaffoldMessenger.of(context).showGlassSnackBar(
+              ScaffoldMessenger.of(context).showToast(
                 SnackBar(content: Text(starred ? '已取消收藏' : '已收藏小程序')),
+                kind: ToastKind.success,
               );
             return;
           }
@@ -189,14 +307,20 @@ extension _MessageItemActions on _MessageItemState {
             if (mounted)
               ScaffoldMessenger.of(
                 context,
-              ).showGlassSnackBar(const SnackBar(content: Text('已收藏')));
+              ).showToast(const SnackBar(content: Text('已收藏')));
           }
         } on Object catch (error) {
           if (mounted)
-            ScaffoldMessenger.of(
-              context,
-            ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+            ScaffoldMessenger.of(context).showToast(
+              SnackBar(content: Text(errorMessage(error))),
+              kind: ToastKind.error,
+            );
         }
+      case MessageAction.readAloud:
+        await _readAloud(
+          snapshot,
+          text: preserveSelection ? _selectedText : null,
+        );
       case MessageAction.history:
         await Navigator.push<void>(
           context,
@@ -220,9 +344,10 @@ extension _MessageItemActions on _MessageItemState {
             if (mounted) await forwardMiniapp(context, entry);
           } on Object catch (error) {
             if (mounted) {
-              ScaffoldMessenger.of(
-                context,
-              ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+              ScaffoldMessenger.of(context).showToast(
+                SnackBar(content: Text(errorMessage(error))),
+                kind: ToastKind.error,
+              );
             }
             return;
           }
@@ -261,7 +386,7 @@ extension _MessageItemActions on _MessageItemState {
           } else {
             ScaffoldMessenger.of(
               context,
-            ).showGlassSnackBar(const SnackBar(content: Text('已转发')));
+            ).showToast(const SnackBar(content: Text('已转发')));
           }
         }
       case MessageAction.branch:
@@ -269,9 +394,19 @@ extension _MessageItemActions on _MessageItemState {
       case MessageAction.recall:
         await widget.onRecall?.call(snapshot);
       case MessageAction.quote:
-        widget.onQuote?.call(snapshot);
+        widget.onQuote?.call(
+          snapshot,
+          selectedText: preserveSelection ? _selectedText : null,
+        );
       case MessageAction.copy:
-        await _copy(context, _copyableText(snapshot.text));
+        await _copy(
+          context,
+          _copyableText(
+            preserveSelection
+                ? (_selectedText ?? snapshot.text)
+                : snapshot.text,
+          ),
+        );
       case MessageAction.select:
         await Navigator.of(context).push<void>(
           MaterialPageRoute(

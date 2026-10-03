@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 import '../domain/tool_models.dart';
+import '../domain/message_sender.dart';
 
 class UserQuestionOption {
   const UserQuestionOption({this.title, required this.content});
@@ -22,14 +24,28 @@ class UserQuestionOption {
 class UserQuestion {
   UserQuestion({
     required this.conversationId,
+    required this.sender,
     required this.question,
     required this.options,
     required this.allowCustomAnswer,
     this.title,
     this.customAnswerPlaceholder,
     this.isUserAction = false,
-  });
+    this.callId,
+    Duration timeout = responseTimeout,
+  }) : expiresAt = DateTime.now().add(timeout) {
+    _timeout = Timer(timeout, () {
+      result.complete({'cancelled': true, 'timedOut': true});
+    });
+    result.future.then((_) => _timeout.cancel());
+  }
+  static const responseTimeout = Duration(days: 1);
+  final String? callId;
+  final DateTime expiresAt;
+  late final Timer _timeout;
+  final sheetVisible = ValueNotifier(false);
   final String conversationId;
+  final MessageSender sender;
   final String? title;
   final String question;
   final List<Object> options;
@@ -58,8 +74,9 @@ class UserQuestion {
 }
 
 class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
-  AskUserTool(this.conversationId, this.onQuestion);
+  AskUserTool(this.conversationId, this.onQuestion, {required this.sender});
   final String conversationId;
+  final MessageSender sender;
   final void Function(UserQuestion?) onQuestion;
   UserQuestion? _pending;
   final _updates = <ToolResult>[];
@@ -79,6 +96,7 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
   Future<Map<String, Object?>> waitForUserAction(String instruction) async {
     final question = UserQuestion(
       conversationId: conversationId,
+      sender: sender,
       question: instruction,
       options: const ['已完成', '取消'],
       allowCustomAnswer: true,
@@ -87,10 +105,7 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
     _pending = question;
     onQuestion(question);
     try {
-      return await question.result.future.timeout(const Duration(days: 1));
-    } on TimeoutException {
-      await cancel();
-      return {'cancelled': true, 'timedOut': true};
+      return await question.result.future;
     } finally {
       _pending = null;
       onQuestion(null);
@@ -106,6 +121,12 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
     inputSchema: {
       'type': 'object',
       'properties': {
+        'timeoutSeconds': {
+          'type': ['integer', 'null'],
+          'minimum': 1,
+          'description':
+              'Optional response timeout in seconds. Omit or set null for 24 hours. Expiration cancels the pending question with timedOut=true; it is not a user skip or consent.',
+        },
         'waitForResponse': {
           'type': ['boolean', 'null'],
           'description':
@@ -167,7 +188,7 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
     },
     safety: ToolSafety.lowRisk,
     capabilityId: 'user.question',
-    executionTimeout: Duration(days: 1),
+    executionTimeout: UserQuestion.responseTimeout,
   );
 
   @override
@@ -187,7 +208,14 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
       );
     }
     final question = UserQuestion(
+      callId: call.id,
+      timeout: Duration(
+        seconds:
+            call.arguments['timeoutSeconds'] as int? ??
+            UserQuestion.responseTimeout.inSeconds,
+      ),
       conversationId: conversationId,
+      sender: sender,
       title: call.arguments['title'] as String?,
       customAnswerPlaceholder:
           call.arguments['customAnswerPlaceholder'] as String?,

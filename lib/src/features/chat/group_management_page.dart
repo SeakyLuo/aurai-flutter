@@ -12,6 +12,7 @@ import 'delete_confirmation_dialog.dart';
 import 'dialog_action_button.dart';
 import 'group_administrators_page.dart';
 import 'group_mute_settings_page.dart';
+import 'group_member_nicknames_page.dart';
 import 'group_owner_transfer_page.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -87,8 +88,9 @@ class _GroupManagementPageState extends State<GroupManagementPage> {
       });
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('设置失败，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     } finally {
@@ -124,15 +126,17 @@ class _GroupManagementPageState extends State<GroupManagementPage> {
       if (mounted) Navigator.pop(context, true);
     } on FileSystemException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('群聊已解散，部分图片清理失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
         Navigator.pop(context, true);
       }
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('解散失败，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     } finally {
@@ -245,6 +249,17 @@ class _GroupManagementPageState extends State<GroupManagementPage> {
                                     )
                                   : null,
                             ),
+                            _row(
+                              '成员群昵称',
+                              _role.canManage
+                                  ? () => _open(
+                                      GroupMemberNicknamesPage(
+                                        controller: widget.controller,
+                                        groupId: widget.groupId,
+                                      ),
+                                    )
+                                  : null,
+                            ),
                           ],
                         ),
                       ),
@@ -274,8 +289,8 @@ class _GroupManagementPageState extends State<GroupManagementPage> {
   );
 
   Widget _row(String title, VoidCallback? onTap, {String? detail}) => ListTile(
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-    minTileHeight: 60,
+    contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 12),
+    minTileHeight: settingsCardHeight,
     title: Text(title, style: const TextStyle(fontSize: 15)),
     trailing: Row(
       mainAxisSize: MainAxisSize.min,

@@ -80,13 +80,13 @@ List<Map<String, Object?>> interactionSummary(
   Iterable<Map<String, Object?>> choices,
 ) {
   final counts = <(String, String), Map<String, Object?>>{};
-  void add(Map<String, Object?> option, int count) {
+  void add(Map<String, Object?> option, num count) {
     final key = (option['buttonId'] as String, option['label'] as String);
     final entry = counts.putIfAbsent(
       key,
       () => {'buttonId': key.$1, 'label': key.$2, 'count': 0},
     );
-    entry['count'] = (entry['count'] as int) + count;
+    entry['count'] = (entry['count'] as num) + count;
   }
 
   for (final button in buttons) {
@@ -103,7 +103,7 @@ List<Map<String, Object?>> interactionSummary(
   }
   for (final choice in choices) {
     for (final option in selectionEntries(choice)) {
-      add(option, 1);
+      add(option, choice['weight'] as num? ?? 1);
     }
   }
   return counts.values.toList();

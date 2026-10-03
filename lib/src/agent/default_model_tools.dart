@@ -1,3 +1,5 @@
+import 'dart:convert';
+import '../domain/tool_detail_target.dart';
 import '../domain/model_provider.dart';
 import '../domain/image_generation_config.dart';
 import '../domain/tool_models.dart';
@@ -122,7 +124,19 @@ class DefaultModelTool implements AgentTool, RuntimeCapabilityAgentTool {
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.success,
-        output: output,
+        output: {
+          ...output,
+          if (update)
+            'detailTargets': [
+              ToolDetailTarget(
+                type: ToolDetailType.model,
+                id: jsonEncode([output['provider'], output['model']]),
+                name: settings()
+                    .profile(ModelService.byName(output['provider'] as String))
+                    .displayModel(output['model'] as String),
+              ).toJson(),
+            ],
+        },
       );
     } on Object catch (error) {
       return ToolResult(

@@ -108,11 +108,11 @@ class _ProviderBalanceSettingsPageState
         ),
       );
       if (!mounted) return;
-      if (widget.draft == null) _notice('账户余额设置已保存');
+      if (widget.draft == null) _notice('账户余额设置已保存', kind: ToastKind.success);
       setState(() => _allowPop = true);
       Navigator.pop(context);
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -124,11 +124,11 @@ class _ProviderBalanceSettingsPageState
     try {
       await _saveBalance(null);
       if (!mounted) return;
-      if (widget.draft == null) _notice('账户余额设置已恢复');
+      if (widget.draft == null) _notice('账户余额设置已恢复', kind: ToastKind.success);
       setState(() => _allowPop = true);
       Navigator.pop(context);
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -154,9 +154,10 @@ class _ProviderBalanceSettingsPageState
     }
   }
 
-  void _notice(String message) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(message)));
+  void _notice(String message, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(message)), kind: kind);
 
   Widget _field(String name, String label, String hint) => Padding(
     padding: const EdgeInsets.only(bottom: 18),

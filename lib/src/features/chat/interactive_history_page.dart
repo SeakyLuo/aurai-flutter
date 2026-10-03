@@ -50,9 +50,10 @@ class _InteractiveHistoryPageState extends State<InteractiveHistoryPage> {
       });
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
         if (_events.isEmpty) Navigator.pop(context);
       }
     } finally {
@@ -191,9 +192,10 @@ class InteractiveHistoryTile extends StatelessWidget {
       );
     } on Object catch (error) {
       if (context.mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
     }
   }
 

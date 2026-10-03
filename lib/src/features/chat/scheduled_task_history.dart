@@ -49,13 +49,14 @@ class ScheduledTaskHistory extends StatelessWidget {
       content = Align(
         alignment: Alignment.centerLeft,
         child: TextButton(
-          onPressed: () => ScaffoldMessenger.of(context).showGlassSnackBar(
+          onPressed: () => ScaffoldMessenger.of(context).showToast(
             SnackBar(
               content: Text(
                 (output?['message'] ?? output?['error'] ?? '此记录未保存未完成原因')
                     as String,
               ),
             ),
+            kind: ToastKind.error,
           ),
           child: const Text('查看未完成原因'),
         ),

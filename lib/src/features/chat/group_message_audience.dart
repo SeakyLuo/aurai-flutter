@@ -1,6 +1,22 @@
 part of 'chat_controller.dart';
 
 extension GroupMessageAudience on ChatController {
+  Future<List<AgentMessage>> _loadPrivateRunHistory(
+    Conversation conversation,
+    _ReplyContext reply,
+  ) async {
+    final history = await _store.reader.messages(
+      conversation.id,
+      forModel: true,
+      modelConfig: reply.config,
+      afterCheckpoint: conversation.contextSummary?.throughMessageId,
+    );
+    return [
+      for (final message in history)
+        if (!_execution.liveUserMessageIds.contains(message.id)) message,
+    ];
+  }
+
   List<AgentMessage> _privateHistory(
     Iterable<AgentMessage> messages,
     String viewerId,

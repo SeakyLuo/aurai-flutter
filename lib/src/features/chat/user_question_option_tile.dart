@@ -27,9 +27,9 @@ class UserQuestionOptionTile extends StatelessWidget {
       child: Material(
         color: selected
             ? colors.primary.withValues(alpha: dark ? .19 : .14)
-            : colors.onSurface.withValues(alpha: dark ? .055 : .035),
+            : colors.onSurface.withValues(alpha: dark ? .08 : .045),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           side: BorderSide(
             color: selected
                 ? accent.withValues(alpha: .38)
@@ -37,29 +37,32 @@ class UserQuestionOptionTile extends StatelessWidget {
           ),
         ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
-                  width: 24,
-                  height: 24,
+                  width: MediaQuery.textScalerOf(context).scale(22),
+                  height: MediaQuery.textScalerOf(context).scale(22),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: selected
                         ? colors.primary.withValues(alpha: .25)
-                        : colors.onSurface.withValues(alpha: .045),
+                        : colors.onSurface.withValues(alpha: dark ? .12 : .08),
                   ),
                   child: Text(
                     '$number',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: selected ? accent : colors.onSurfaceVariant,
+                      color: selected
+                          ? accent
+                          : colors.onSurface.withValues(alpha: .72),
                     ),
                   ),
                 ),
@@ -83,7 +86,7 @@ class UserQuestionOptionTile extends StatelessWidget {
                       Text(
                         option.content,
                         style: TextStyle(
-                          fontSize: option.title == null ? 15 : 14,
+                          fontSize: option.title == null ? 16 : 14,
                           height: 1.45,
                           color: option.title == null
                               ? colors.onSurface

@@ -87,15 +87,17 @@ class _ToolPayloadSectionState extends State<ToolPayloadSection> {
                         try {
                           await Clipboard.setData(ClipboardData(text: text));
                           if (!context.mounted) return;
-                          messenger.showGlassSnackBar(
+                          messenger.showToast(
                             SnackBar(content: Text('已复制${widget.title}')),
+                            kind: ToastKind.success,
                           );
                         } on Object catch (error) {
                           if (!context.mounted) return;
-                          messenger.showGlassSnackBar(
+                          messenger.showToast(
                             SnackBar(
                               content: Text('复制失败，请重试：${errorMessage(error)}'),
                             ),
+                            kind: ToastKind.error,
                           );
                         }
                       },

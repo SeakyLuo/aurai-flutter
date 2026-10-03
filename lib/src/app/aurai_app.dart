@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'global_ui.dart';
+import 'glass_notice.dart';
 import 'appearance_settings.dart';
 import 'package:flutter/services.dart';
 import '../features/chat/chat_controller.dart';
@@ -21,6 +22,7 @@ class AuraiApp extends StatelessWidget {
     listenable: AppearanceSettings.instance,
     builder: (context, child) => MaterialApp(
       title: 'Aurai',
+      navigatorKey: AppToasts.navigatorKey,
       navigatorObservers: [homeRouteObserver, htmlRouteObserver],
       debugShowCheckedModeBanner: false,
       locale: const Locale('zh', 'CN'),

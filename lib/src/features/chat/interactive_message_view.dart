@@ -92,7 +92,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
       if (mounted && error is InteractiveMessageChanged)
         setState(() => _acceptCard(error.card));
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(
             content: Text(
               error is StateError
@@ -100,6 +100,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                   : '操作失败，请重试：${errorMessage(error)}',
             ),
           ),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _busy = null);
@@ -117,9 +118,10 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         });
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -202,10 +204,10 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               children: [
                 Expanded(
                   child: GestureDetector(
-                    onTap: () =>
-                        ScaffoldMessenger.of(context).showGlassSnackBar(
-                          SnackBar(content: Text(callback!['error'] as String)),
-                        ),
+                    onTap: () => ScaffoldMessenger.of(context).showToast(
+                      SnackBar(content: Text(callback!['error'] as String)),
+                      kind: ToastKind.error,
+                    ),
                     child: Text(
                       '处理未完成',
                       style: TextStyle(

@@ -31,6 +31,7 @@ import '../../platform/message_file_store.dart';
 import 'keyboard_inset.dart';
 import 'operation_request_sheet.dart';
 import 'dart:async';
+import '../../agent/ask_user_tool.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -43,6 +44,7 @@ import '../../domain/agent_models.dart';
 import 'message_editor.dart';
 
 import 'user_question_card.dart';
+import 'user_question_scope.dart';
 import 'search_aurora_background.dart';
 import 'accessibility_request_sheet.dart';
 import 'chat_controller.dart';
@@ -124,8 +126,11 @@ class _ChatPageState extends State<ChatPage>
   Timer? _highlightTimer;
   bool _temporaryExitPending = false;
   bool _temporaryExitReady = false;
-  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? _runNotice;
+  ToastHandle? _runNotice;
   MessageEditSession? _editing;
+  UserQuestion? _shownQuestion;
+  bool _questionSheetShowing = false;
+  bool _questionSheetScheduled = false;
 
   void _updateEditing(VoidCallback change) => setState(change);
   void _updateDraftVisibility(VoidCallback change) => setState(change);
@@ -174,9 +179,10 @@ class _ChatPageState extends State<ChatPage>
           Object error,
         ) {
           if (mounted)
-            ScaffoldMessenger.of(
-              context,
-            ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+            ScaffoldMessenger.of(context).showToast(
+              SnackBar(content: Text(errorMessage(error))),
+              kind: ToastKind.error,
+            );
         }),
       );
     });
@@ -185,9 +191,14 @@ class _ChatPageState extends State<ChatPage>
   @override
   void didPush() => _recordPagePosition();
   @override
-  void didPopNext() => _recordPagePosition();
+  void didPopNext() {
+    _recordPagePosition();
+    setState(() {});
+  }
+
   @override
   void didPushNext() {
+    if (!_questionSheetShowing) _shownQuestion = null;
     _runNotice?.close();
     _runNotice = null;
     _recordPagePosition();
@@ -224,7 +235,7 @@ class _ChatPageState extends State<ChatPage>
     if (error != null && mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showGlassSnackBar(SnackBar(content: Text(error)));
+      ).showToast(SnackBar(content: Text(error)), kind: ToastKind.error);
     }
   }
 
@@ -251,6 +262,41 @@ class _ChatPageState extends State<ChatPage>
         controller.pendingQuestion?.conversationId == conversationId
         ? controller.pendingQuestion
         : null;
+    if (pendingQuestion != null &&
+        !identical(_shownQuestion, pendingQuestion) &&
+        !_questionSheetShowing &&
+        !_questionSheetScheduled &&
+        ModalRoute.of(context)!.isCurrent) {
+      _questionSheetScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        _questionSheetScheduled = false;
+        if (!mounted ||
+            !identical(controller.pendingQuestion, pendingQuestion) ||
+            !ModalRoute.of(context)!.isCurrent)
+          return;
+        _shownQuestion = pendingQuestion;
+        _focusNode.unfocus();
+        setState(() => _questionSheetShowing = true);
+        try {
+          await showUserQuestionSheet(
+            context,
+            question: pendingQuestion,
+            showSender: isGroup,
+            onOpenSender: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) => AiContactPage(
+                  controller: controller,
+                  senderId: pendingQuestion.sender.id,
+                  groupId: isGroup ? pendingQuestion.conversationId : null,
+                ),
+              ),
+            ),
+          );
+        } finally {
+          if (mounted) setState(() => _questionSheetShowing = false);
+        }
+      });
+    }
     final timeline = buildChatTimeline(
       controller,
       onEdit: _beginMessageEdit,
@@ -297,243 +343,238 @@ class _ChatPageState extends State<ChatPage>
         ),
       );
     }
-    return PopScope(
-      canPop:
-          _editing == null &&
-          !controller.creatingConversationBranch &&
-          (!active.isTemporary || _temporaryExitReady),
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) unawaited(_saveDraft());
-        if (!didPop && controller.creatingConversationBranch) {
-          unawaited(controller.cancelConversationBranch());
-        } else if (!didPop && _editing != null) {
-          _cancelMessageEdit();
-        } else if (!didPop && active.isTemporary) {
-          unawaited(_exitTemporaryConversation());
-        }
-      },
-      child: AbsorbPointer(
-        absorbing: controller.changingConversation,
-        child: BackdropGroup(
-          child: Scaffold(
-            key: _scaffoldKey,
-            backgroundColor: timeline.isEmpty && !isGroup
-                ? Colors.transparent
-                : null,
-            extendBody: true,
-            extendBodyBehindAppBar: true,
-            resizeToAvoidBottomInset: false,
-            appBar: ChatHeader(
-              onBack: () => Navigator.maybePop(context),
-              editing: _editing != null,
-              onCancelEdit:
-                  (_editing?.saving == true || _editing?.picking == true)
-                  ? null
-                  : _cancelMessageEdit,
-              controller: controller,
-              beforeDelete: _beforeDeleteConversation,
-              originTaskId: widget.originTaskId,
-            ),
-            bottomNavigationBar: AnnotatedRegion<SystemUiOverlayStyle>(
-              value: const SystemUiOverlayStyle(
-                systemNavigationBarColor: Colors.transparent,
-                systemNavigationBarDividerColor: Colors.transparent,
-                systemNavigationBarIconBrightness: Brightness.dark,
-                systemNavigationBarContrastEnforced: false,
+    return UserQuestionScope(
+      question: pendingQuestion,
+      onOpen: () => setState(() => _shownQuestion = null),
+      child: PopScope(
+        canPop:
+            _editing == null &&
+            !controller.creatingConversationBranch &&
+            (!active.isTemporary || _temporaryExitReady),
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) unawaited(_saveDraft());
+          if (!didPop && controller.creatingConversationBranch) {
+            unawaited(controller.cancelConversationBranch());
+          } else if (!didPop && _editing != null) {
+            _cancelMessageEdit();
+          } else if (!didPop && active.isTemporary) {
+            unawaited(_exitTemporaryConversation());
+          }
+        },
+        child: AbsorbPointer(
+          absorbing: controller.changingConversation,
+          child: BackdropGroup(
+            child: Scaffold(
+              key: _scaffoldKey,
+              backgroundColor: timeline.isEmpty && !isGroup
+                  ? Colors.transparent
+                  : null,
+              extendBody: true,
+              extendBodyBehindAppBar: true,
+              resizeToAvoidBottomInset: false,
+              appBar: ChatHeader(
+                onBack: () => Navigator.maybePop(context),
+                editing: _editing != null,
+                onCancelEdit:
+                    (_editing?.saving == true || _editing?.picking == true)
+                    ? null
+                    : _cancelMessageEdit,
+                controller: controller,
+                beforeDelete: _beforeDeleteConversation,
+                originTaskId: widget.originTaskId,
               ),
-              child: KeyboardInset(
-                child: Stack(
-                  alignment: Alignment.bottomCenter,
-                  children: [
-                    ExcludeSemantics(
-                      excluding: pendingQuestion != null,
-                      child: IgnorePointer(
-                        ignoring: pendingQuestion != null,
-                        child: WorkspaceChangesPanel(
-                          controller: controller,
-                          child: PendingMessagePanel(
-                            controller: controller,
-                            onSend: _sendQueuedMessages,
-                            onEdit: _editing == null && !controller.addingImages
-                                ? _editQueuedMessage
-                                : null,
-                            child: _buildChatComposer(isGroup),
-                          ),
-                        ),
-                      ),
+              bottomNavigationBar: AnnotatedRegion<SystemUiOverlayStyle>(
+                value: const SystemUiOverlayStyle(
+                  systemNavigationBarColor: Colors.transparent,
+                  systemNavigationBarDividerColor: Colors.transparent,
+                  systemNavigationBarIconBrightness: Brightness.dark,
+                  systemNavigationBarContrastEnforced: false,
+                ),
+                child: KeyboardInset(
+                  enabled: !_questionSheetShowing,
+                  child: WorkspaceChangesPanel(
+                    controller: controller,
+                    child: PendingMessagePanel(
+                      controller: controller,
+                      onSend: _sendQueuedMessages,
+                      onEdit: _editing == null && !controller.addingImages
+                          ? _editQueuedMessage
+                          : null,
+                      child: _buildChatComposer(isGroup),
                     ),
-                    if (pendingQuestion != null)
-                      UserQuestionCard(
-                        key: ObjectKey(pendingQuestion),
-                        question: pendingQuestion,
-                      ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-            body: GroupAnnouncementBanner(
-              controller: controller,
-              groupId: isGroup ? _conversationId : null,
-              onLocate: _locateSearchMessage,
-              builder: (context, announcementHeight) {
-                final top = isGroup
-                    ? View.of(context).padding.top /
-                              View.of(context).devicePixelRatio +
-                          ChatHeader.toolbarHeight +
-                          announcementHeight
-                    : MediaQuery.paddingOf(context).top;
-                final bottom = MediaQuery.paddingOf(context).bottom;
-                return Stack(
-                  children: [
-                    if (timeline.isEmpty && !isGroup)
-                      const Positioned.fill(child: SearchAuroraBackground()),
-                    Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 760),
-                        child: ScrollAwareJumpStack(
-                          messages: controller.messages,
-                          acknowledgedRunId:
-                              !isGroup &&
-                                  controller.pendingQuestion?.conversationId ==
-                                      _conversationId
-                              ? controller.activeConversation.activeRunId
-                              : null,
-                          atBottom:
-                              (_followOutput || !_contentBelow) &&
-                              !(controller.hasSearchWindow &&
-                                  controller.activeConversation.searchHasLater),
-                          key: ValueKey(_conversationId),
-                          children: [
-                            Positioned.fill(
-                              child: timeline.isEmpty && isGroup
-                                  ? const SizedBox.expand()
-                                  : timeline.isEmpty
-                                  ? RepaintBoundary(
-                                      child: EmptyConversation(
-                                        contentPadding: EdgeInsets.only(
-                                          top: top,
-                                        ),
-                                        onUseExample: _useExample,
-                                      ),
-                                    )
-                                  : isGroup &&
-                                        controller.visibleMessages.every(
-                                          (message) => message.isSystem,
-                                        )
-                                  ? _groupIntroduction(timeline, top, bottom)
-                                  : RepaintBoundary(
-                                      key: PageStorageKey(
-                                        'conversation:$_conversationId',
-                                      ),
-                                      child: ChatViewport(
-                                        key: _viewportKey,
-                                        entries: timeline,
-                                        showScrollbar: true,
-                                        onScrollToLatest: _scrollToBottom,
-                                        bookmark:
-                                            _scrollBookmarks[_conversationId],
-                                        followOutput: _followOutput,
-                                        sentMessageId: _sentMessageId,
-                                        sentMessageTop:
-                                            top + 8 - MessageItem.userTopMargin,
-                                        onContentBelowChanged: (value) {
-                                          if (mounted &&
-                                              _conversationId ==
-                                                  conversationId) {
-                                            setState(
-                                              () => _contentBelow = value,
-                                            );
-                                          }
-                                        },
-                                        padding: EdgeInsets.only(
-                                          top: top + 12,
-                                          bottom:
-                                              bottom +
-                                              (isGroup
-                                                  ? GroupActivityAvatars.height
-                                                  : 16),
-                                        ),
-                                        hasEarlierMessages:
-                                            controller.visibleHasEarlier,
-                                        hasLaterMessages:
-                                            controller.hasSearchWindow &&
-                                            controller
-                                                .activeConversation
-                                                .searchHasLater,
-                                        loadLaterMessages:
-                                            controller.loadVisibleLaterMessages,
-                                        loadEarlierMessages: controller
-                                            .loadVisibleEarlierMessages,
-                                        onUserScroll: _dismissReachedUnread,
-                                        onBookmark: (bookmark) {
-                                          if (_editing == null)
-                                            _scrollBookmarks[conversationId] =
-                                                bookmark;
-                                        },
-                                        onFollowOutputChanged: (value) {
-                                          if (mounted)
-                                            setState(
-                                              () => _followOutput =
-                                                  controller.hasSearchWindow
-                                                  ? false
-                                                  : value,
-                                            );
-                                        },
-                                        summaryOwners: chatSummaryOwners(
-                                          controller,
-                                        ),
-                                      ),
-                                    ),
-                            ),
-                            if (controller.changingConversation)
+              body: GroupAnnouncementBanner(
+                controller: controller,
+                groupId: isGroup ? _conversationId : null,
+                onLocate: _locateSearchMessage,
+                builder: (context, announcementHeight) {
+                  final top = isGroup
+                      ? View.of(context).padding.top /
+                                View.of(context).devicePixelRatio +
+                            ChatHeader.toolbarHeight +
+                            announcementHeight
+                      : MediaQuery.paddingOf(context).top;
+                  final bottom = MediaQuery.paddingOf(context).bottom;
+                  return Stack(
+                    children: [
+                      if (timeline.isEmpty && !isGroup)
+                        const Positioned.fill(child: SearchAuroraBackground()),
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 760),
+                          child: ScrollAwareJumpStack(
+                            messages: controller.messages,
+                            acknowledgedRunId:
+                                !isGroup &&
+                                    controller
+                                            .pendingQuestion
+                                            ?.conversationId ==
+                                        _conversationId
+                                ? controller.activeConversation.activeRunId
+                                : null,
+                            atBottom:
+                                (_followOutput || !_contentBelow) &&
+                                !(controller.hasSearchWindow &&
+                                    controller
+                                        .activeConversation
+                                        .searchHasLater),
+                            key: ValueKey(_conversationId),
+                            children: [
                               Positioned.fill(
-                                child: ColoredBox(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.surface.withValues(alpha: 0.81),
-                                  child: Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.all(24),
-                                      child: const ThinkingIndicator(
-                                        label: '正在打开会话',
+                                child: timeline.isEmpty && isGroup
+                                    ? const SizedBox.expand()
+                                    : timeline.isEmpty
+                                    ? RepaintBoundary(
+                                        child: EmptyConversation(
+                                          contentPadding: EdgeInsets.only(
+                                            top: top,
+                                          ),
+                                          onUseExample: _useExample,
+                                        ),
+                                      )
+                                    : isGroup &&
+                                          controller.visibleMessages.every(
+                                            (message) => message.isSystem,
+                                          )
+                                    ? _groupIntroduction(timeline, top, bottom)
+                                    : RepaintBoundary(
+                                        key: PageStorageKey(
+                                          'conversation:$_conversationId',
+                                        ),
+                                        child: ChatViewport(
+                                          key: _viewportKey,
+                                          entries: timeline,
+                                          showScrollbar: true,
+                                          onScrollToLatest: _scrollToBottom,
+                                          bookmark:
+                                              _scrollBookmarks[_conversationId],
+                                          followOutput: _followOutput,
+                                          sentMessageId: _sentMessageId,
+                                          sentMessageTop:
+                                              top +
+                                              8 -
+                                              MessageItem.userTopMargin,
+                                          onContentBelowChanged: (value) {
+                                            if (mounted &&
+                                                _conversationId ==
+                                                    conversationId) {
+                                              setState(
+                                                () => _contentBelow = value,
+                                              );
+                                            }
+                                          },
+                                          padding: EdgeInsets.only(
+                                            top: top + 12,
+                                            bottom:
+                                                bottom +
+                                                (isGroup
+                                                    ? GroupActivityAvatars
+                                                          .height
+                                                    : 16),
+                                          ),
+                                          hasEarlierMessages:
+                                              controller.visibleHasEarlier,
+                                          hasLaterMessages:
+                                              controller.hasSearchWindow &&
+                                              controller
+                                                  .activeConversation
+                                                  .searchHasLater,
+                                          loadLaterMessages: controller
+                                              .loadVisibleLaterMessages,
+                                          loadEarlierMessages: controller
+                                              .loadVisibleEarlierMessages,
+                                          onUserScroll: _dismissReachedUnread,
+                                          onBookmark: (bookmark) {
+                                            if (_editing == null)
+                                              _scrollBookmarks[conversationId] =
+                                                  bookmark;
+                                          },
+                                          onFollowOutputChanged: (value) {
+                                            if (mounted)
+                                              setState(
+                                                () => _followOutput =
+                                                    controller.hasSearchWindow
+                                                    ? false
+                                                    : value,
+                                              );
+                                          },
+                                          summaryOwners: chatSummaryOwners(
+                                            controller,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                              if (controller.changingConversation)
+                                Positioned.fill(
+                                  child: ColoredBox(
+                                    color: Theme.of(context).colorScheme.surface
+                                        .withValues(alpha: 0.81),
+                                    child: Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.all(24),
+                                        child: const ThinkingIndicator(
+                                          label: '正在打开会话',
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            Positioned(
-                              right: 16,
-                              bottom: bottom + 8,
-                              child: Center(
-                                child: JumpToBottomButton(
-                                  newMessagesOnly: true,
-                                  visible:
-                                      !_followOutput &&
-                                      (_contentBelow ||
-                                          (controller.hasSearchWindow &&
-                                              controller
-                                                  .activeConversation
-                                                  .searchHasLater)) &&
-                                      timeline.isNotEmpty,
-                                  onPressed: _scrollToBottom,
+                              Positioned(
+                                right: 16,
+                                bottom: bottom + 8,
+                                child: Center(
+                                  child: JumpToBottomButton(
+                                    newMessagesOnly: true,
+                                    visible:
+                                        !_followOutput &&
+                                        (_contentBelow ||
+                                            (controller.hasSearchWindow &&
+                                                controller
+                                                    .activeConversation
+                                                    .searchHasLater)) &&
+                                        timeline.isNotEmpty,
+                                    onPressed: _scrollToBottom,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    _unreadPositionHint(top),
-                    if (isGroup)
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: bottom,
-                        child: _groupStatus(active),
-                      ),
-                  ],
-                );
-              },
+                      _unreadPositionHint(top),
+                      if (isGroup)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: bottom,
+                          child: _groupStatus(active),
+                        ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -559,6 +600,7 @@ class _ChatPageState extends State<ChatPage>
     }
     final conversation = widget.controller.activeConversation;
     if (_conversationId != conversation.id) {
+      _shownQuestion = null;
       final editing = _editing;
       _editing = null;
       if (editing != null) unawaited(_discardEditImages(editing));
@@ -649,8 +691,9 @@ class _ChatPageState extends State<ChatPage>
       await widget.controller.saveDraft();
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('草稿保存失败，请稍后重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     }

@@ -160,15 +160,17 @@ class StarredMessageTile extends StatelessWidget {
           await favorites.add(entry);
         }
         if (messenger.mounted) {
-          messenger.showGlassSnackBar(
+          messenger.showToast(
             SnackBar(content: Text(starred ? '已取消收藏小程序' : '已收藏小程序')),
+            kind: ToastKind.success,
           );
         }
       }
     } on Object catch (error) {
       if (messenger.mounted) {
-        messenger.showGlassSnackBar(
+        messenger.showToast(
           SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
         );
       }
     }

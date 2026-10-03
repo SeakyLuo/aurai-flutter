@@ -21,6 +21,7 @@ class _GroupThoughtDetails extends StatefulWidget {
 class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
   final _scroll = ScrollController();
   late GroupMemberActivity _activity = widget.activity;
+  late var _activities = widget.activity.activities;
   late final _updates = Listenable.merge([
     widget.controller,
     widget.controller.groupActivityChanges,
@@ -46,6 +47,14 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
     setState(() {
       _running = current != null;
       if (current != null) _activity = current;
+      _activities =
+          current?.activities ??
+          widget.controller.groupRunActivities(
+            widget.conversationId,
+            widget.activity.sender.id,
+            widget.activity.runId,
+          ) ??
+          _activities;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scroll.hasClients) return;
@@ -99,24 +108,13 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
           children: [
             _ActivitySheetHeader(
               title: _activity.sender.name,
-              avatar: Semantics(
-                button: true,
-                label: '查看${_activity.sender.name}的资料',
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(
-                      builder: (_) => AiContactPage(
-                        controller: widget.controller,
-                        senderId: _activity.sender.id,
-                        groupId: widget.conversationId,
-                      ),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: MemberAvatar(sender: _activity.sender, size: 24),
-                  ),
+              avatar: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: MemberProfileAvatar(
+                  controller: widget.controller,
+                  sender: _activity.sender,
+                  groupId: widget.conversationId,
+                  size: 24,
                 ),
               ),
               trailing: _running
@@ -137,6 +135,15 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
                       controller: _scroll,
                       padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
                       children: [
+                        if (widget.reason == null && _activities.isEmpty)
+                          ThinkingIndicator(
+                            label: _running ? _activity.description : '本轮已结束',
+                            fontSize: 15,
+                            animate:
+                                _running &&
+                                !_activity.stopping &&
+                                !_activity.waitingForUser,
+                          ),
                         if (widget.reason != null) ...[
                           Text(
                             widget.reasonTitle!,
@@ -151,15 +158,31 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
                             style: const TextStyle(fontSize: 15, height: 1.65),
                           ),
                         ],
-                        if (_activity.thoughts.isNotEmpty)
-                          SelectableText(
-                            _activity.thoughts.join('\n\n'),
-                            style: TextStyle(
-                              fontSize: 15,
-                              height: 1.65,
-                              color: colors.onSurfaceVariant,
+                        for (final (index, activity) in _activities.indexed)
+                          if (activity.toolName != null)
+                            ToolActivityView(
+                              key: ValueKey('${_activity.runId}:$index'),
+                              storageId: '${_activity.runId}:$index',
+                              title: activity.text,
+                              toolName: activity.toolName,
+                              status: activity.status!,
+                              requestJson: activity.requestJson,
+                              resultJson: activity.resultJson,
+                              startedAt: activity.startedAt,
+                              finishedAt: activity.finishedAt,
+                            )
+                          else
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: SelectableText(
+                                activity.text,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  height: 1.65,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
                             ),
-                          ),
                       ],
                     ),
                   ),

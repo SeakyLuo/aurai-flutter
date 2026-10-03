@@ -9,9 +9,17 @@ class PaginationListener extends StatefulWidget {
     required this.loadMore,
     required this.child,
     this.loadAtStart = false,
+    this.failed = false,
+    this.onRetry,
+    this.preloadExtent = 240,
+    this.retryBottomInset = 0,
   });
   final bool hasMore;
+  final bool failed;
+  final Future<void> Function()? onRetry;
   final bool loadAtStart;
+  final double preloadExtent;
+  final double retryBottomInset;
   final Future<void> Function() loadMore;
   final Widget child;
 
@@ -21,23 +29,27 @@ class PaginationListener extends StatefulWidget {
 
 class _PaginationListenerState extends State<PaginationListener> {
   bool _loading = false;
+  bool _failed = false;
 
-  Future<void> _load() async {
-    if (_loading || !widget.hasMore) return;
-    _loading = true;
+  Future<void> _load({bool retry = false}) async {
+    if (_loading || !widget.hasMore || ((_failed || widget.failed) && !retry))
+      return;
+    setState(() {
+      _failed = false;
+      _loading = true;
+    });
     try {
       await widget.loadMore();
     } on Object catch (error) {
+      _failed = true;
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
-          SnackBar(
-            content: Text('加载失败，请重试：${errorMessage(error)}'),
-            action: SnackBarAction(label: '重试', onPressed: _load),
-          ),
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text('加载失败，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     } finally {
-      _loading = false;
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -45,20 +57,50 @@ class _PaginationListenerState extends State<PaginationListener> {
   Widget build(BuildContext context) =>
       NotificationListener<ScrollNotification>(
         onNotification: (notification) {
+          final delta = switch (notification) {
+            ScrollUpdateNotification() => notification.scrollDelta ?? 0,
+            OverscrollNotification() => notification.overscroll,
+            _ => 0.0,
+          };
           if (notification.depth == 0 &&
               notification.metrics.axis == Axis.vertical &&
-              ((notification is ScrollUpdateNotification &&
-                      notification.dragDetails != null) ||
-                  (notification is OverscrollNotification &&
-                      notification.dragDetails != null)) &&
+              (widget.loadAtStart ? delta < 0 : delta > 0) &&
               (widget.loadAtStart
                       ? notification.metrics.extentBefore
                       : notification.metrics.extentAfter) <
-                  240) {
+                  widget.preloadExtent) {
             _load();
           }
           return false;
         },
-        child: widget.child,
+        child: Column(
+          children: [
+            Expanded(child: widget.child),
+            if (_failed || widget.failed)
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    12,
+                    12,
+                    12,
+                    12 + widget.retryBottomInset,
+                  ),
+                  child: TextButton(
+                    onPressed: _loading
+                        ? null
+                        : () async {
+                            if (widget.onRetry != null) {
+                              await widget.onRetry!();
+                            } else {
+                              await _load(retry: true);
+                            }
+                          },
+                    child: const Text('重试加载'),
+                  ),
+                ),
+              ),
+          ],
+        ),
       );
 }

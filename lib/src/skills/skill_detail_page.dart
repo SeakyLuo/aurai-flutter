@@ -34,12 +34,13 @@ class SkillDetailPage extends StatefulWidget {
 
 class _SkillDetailPageState extends State<SkillDetailPage> {
   bool _busy = false;
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
   Future<void> _copyName(String name) async {
     await Clipboard.setData(ClipboardData(text: name));
-    if (mounted) _notice('技能名称已复制');
+    if (mounted) _notice('技能名称已复制', kind: ToastKind.success);
   }
 
   Future<void> _act(Future<void> Function() action, String success) async {
@@ -48,7 +49,7 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
       await action();
       if (mounted) _notice(success);
     } on Object catch (e) {
-      if (mounted) _notice(errorMessage(e));
+      if (mounted) _notice(errorMessage(e), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

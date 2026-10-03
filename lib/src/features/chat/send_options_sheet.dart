@@ -4,7 +4,7 @@ import '../../domain/message_sender.dart';
 import 'draft_visibility_sheet.dart';
 import 'question_icon.dart';
 import 'settings_appearance.dart';
-import 'settings_icon.dart';
+import 'visibility_option_tile.dart';
 
 class SendOptionsSheet extends StatefulWidget {
   const SendOptionsSheet({
@@ -24,6 +24,9 @@ class SendOptionsSheet extends StatefulWidget {
 
 class _SendOptionsSheetState extends State<SendOptionsSheet> {
   late DraftVisibility? _visibility = widget.initial;
+  late final _selections = <DraftVisibilityMode, DraftVisibility>{
+    if (widget.initial case final initial?) initial.mode: initial,
+  };
 
   Future<void> _edit(DraftVisibilityMode mode) async {
     final result = await showModalBottomSheet<DraftVisibility>(
@@ -38,12 +41,15 @@ class _SendOptionsSheetState extends State<SendOptionsSheet> {
         child: DraftVisibilitySheet(
           mode: mode,
           members: widget.members,
-          initial: _visibility?.mode == mode ? _visibility : null,
+          initial: _selections[mode],
         ),
       ),
     );
     if (!mounted || result == null) return;
-    setState(() => _visibility = result);
+    setState(() {
+      _visibility = result;
+      _selections[mode] = result;
+    });
     widget.onChanged(result);
   }
 
@@ -75,39 +81,20 @@ class _SendOptionsSheetState extends State<SendOptionsSheet> {
           ),
           const SizedBox(height: 12),
           for (final mode in DraftVisibilityMode.values)
-            ListTile(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-              title: Text(switch (mode) {
+            VisibilityOptionTile(
+              selected:
+                  (_visibility?.mode ?? DraftVisibilityMode.everyone) == mode,
+              opensMembers: mode != DraftVisibilityMode.everyone,
+              title: switch (mode) {
                 DraftVisibilityMode.everyone => '所有人可见',
                 DraftVisibilityMode.included => '部分人可见',
                 DraftVisibilityMode.excluded => '部分人不可见',
-              }),
+              },
               subtitle:
                   _visibility?.mode == mode &&
                       mode != DraftVisibilityMode.everyone
-                  ? Text(
-                      _visibility!.members
-                          .map((member) => member.name)
-                          .join('、'),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    )
+                  ? _visibility!.members.map((member) => member.name).join('、')
                   : null,
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if ((_visibility?.mode ?? DraftVisibilityMode.everyone) ==
-                      mode)
-                    const SettingsIcon(type: SettingsIconType.check),
-                  if (mode != DraftVisibilityMode.everyone) ...[
-                    const SizedBox(width: 8),
-                    const SettingsIcon(type: SettingsIconType.chevron),
-                  ],
-                ],
-              ),
               onTap: () {
                 if (mode == DraftVisibilityMode.everyone) {
                   const value = DraftVisibility(

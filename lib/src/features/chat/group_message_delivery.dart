@@ -2,6 +2,25 @@ part of 'chat_controller.dart';
 
 /// This is the publication boundary: model text remains private until this call.
 extension GroupMessageDelivery on ChatController {
+  List<String> _takeGroupRunUpdates(
+    String senderId,
+    List<AgentMessage> observed,
+  ) {
+    final dispatcher = _groupDispatcher!;
+    final seen = {for (final message in observed) message.id: message};
+    final updates = dispatcher.history
+        .where(
+          (message) =>
+              !seen.containsKey(message.id) ||
+              seen[message.id]!.isSystem != message.isSystem,
+        )
+        .toList();
+    observed.removeWhere((message) => updates.any((m) => m.id == message.id));
+    observed.addAll(updates);
+    dispatcher.acknowledge(senderId);
+    return _groupHistory(updates, senderId).map((m) => m.text).toList();
+  }
+
   Future<Map<String, Object?>> _deliverGroupMessage({
     required Map<String, Object?> arguments,
     required Conversation member,

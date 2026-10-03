@@ -1,3 +1,4 @@
+import '../domain/tool_detail_target.dart';
 import '../domain/tool_models.dart';
 import 'scheduled_tasks.dart';
 
@@ -86,8 +87,15 @@ class ScheduleTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
             'requestKey': '$conversationId:${call.id}',
           });
         case 'pause' || 'resume' || 'delete':
+          final task = tasks.tasks.singleWhere((task) => task['id'] == a['id']);
           await tasks.manage(a['id'] as String, operation);
-          output = {'updated': true};
+          output = {
+            'updated': true,
+            if (operation != 'delete') ...{
+              'id': task['id'],
+              'title': task['title'],
+            },
+          };
         default:
           throw StateError('未知任务操作');
       }
@@ -95,7 +103,21 @@ class ScheduleTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.success,
-        output: {'result': output},
+        output: {
+          'result': output,
+          if (operation != 'delete')
+            'detailTargets': [
+              for (final task
+                  in operation == 'list'
+                      ? ((output as Map)['tasks'] as List).cast<Map>()
+                      : [output as Map])
+                ToolDetailTarget(
+                  type: ToolDetailType.scheduledTask,
+                  id: task['id'] as String,
+                  name: task['title'] as String,
+                ).toJson(),
+            ],
+        },
       );
     } on Object catch (error) {
       return ToolResult(

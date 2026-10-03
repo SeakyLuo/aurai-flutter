@@ -63,9 +63,9 @@ class _MiniappFavoriteActionState extends State<MiniappFavoriteAction> {
             ),
           ),
           (
-          value: 'details',
-          label: '小程序详情',
-          icon: const SettingsIcon(type: SettingsIconType.info),
+            value: 'details',
+            label: '小程序详情',
+            icon: const SettingsIcon(type: SettingsIconType.info),
           ),
         ],
       );
@@ -96,7 +96,7 @@ class _MiniappFavoriteActionState extends State<MiniappFavoriteAction> {
         await favorites.add(entry);
       }
       if (!messenger.mounted) return;
-      messenger.showGlassSnackBar(
+      messenger.showToast(
         SnackBar(
           content: Text(starred ? '已取消收藏' : '已收藏小程序'),
           persist: false,
@@ -110,18 +110,21 @@ class _MiniappFavoriteActionState extends State<MiniappFavoriteAction> {
                       await favorites.add(entry, starredAt: removedAt);
                     } on Object catch (error) {
                       if (messenger.mounted)
-                        messenger.showGlassSnackBar(
+                        messenger.showToast(
                           SnackBar(content: Text(errorMessage(error))),
+                          kind: ToastKind.error,
                         );
                     }
                   },
                 ),
         ),
+        kind: ToastKind.success,
       );
     } on Object catch (error) {
       if (messenger.mounted)
-        messenger.showGlassSnackBar(
+        messenger.showToast(
           SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _busy = false);

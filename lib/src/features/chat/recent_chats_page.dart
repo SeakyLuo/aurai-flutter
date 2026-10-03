@@ -79,6 +79,9 @@ class RecentChatsPageState extends State<RecentChatsPage> {
 
   Future<void> reload() => _load(reset: true);
   Future<void> _load({bool reset = false}) async {
+    final limit = reset && _items.length > HomeConversations.pageSize
+        ? _items.length
+        : HomeConversations.pageSize;
     if (_loading) return;
     setState(() => _loading = true);
     try {
@@ -87,13 +90,19 @@ class RecentChatsPageState extends State<RecentChatsPage> {
       var groupCount = _groupCount;
       if (widget.groupsOnly) {
         final results = await Future.wait<Object>([
-          reader.groups(after: reset || _items.isEmpty ? null : _items.last),
+          reader.groups(
+            after: reset || _items.isEmpty ? null : _items.last,
+            limit: limit,
+          ),
           reader.groupCount(),
         ]);
         page = results[0] as List<Conversation>;
         groupCount = results[1] as int;
       } else {
-        page = await reader.recent(offset: reset ? 0 : _items.length);
+        page = await reader.recent(
+          offset: reset ? 0 : _items.length,
+          limit: limit,
+        );
       }
       final avatars = await Future.wait<Object>([
         reader.senders(page),
@@ -118,20 +127,15 @@ class RecentChatsPageState extends State<RecentChatsPage> {
         _senders.addAll(avatars[0] as Map<String, MessageSender>);
         _groups.addAll(avatars[1] as Map<String, List<MessageSender>>);
         _projects.addAll(avatars[2] as Map<String, DevelopmentProject>);
-        _more = page.length == HomeConversations.pageSize;
+        _more = page.length == limit;
         _loaded = true;
         _groupCount = groupCount;
       });
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
-          SnackBar(
-            content: Text('会话加载失败：${errorMessage(error)}'),
-            action: SnackBarAction(
-              label: '重试',
-              onPressed: () => _load(reset: reset),
-            ),
-          ),
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text('会话加载失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -166,8 +170,9 @@ class RecentChatsPageState extends State<RecentChatsPage> {
       );
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('无法新建会话，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       _opening = false;
@@ -427,8 +432,9 @@ class RecentChatsPageState extends State<RecentChatsPage> {
           );
         } on Object catch (error) {
           if (mounted)
-            ScaffoldMessenger.of(context).showGlassSnackBar(
+            ScaffoldMessenger.of(context).showToast(
               SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
+              kind: ToastKind.error,
             );
         }
         if (mounted) reload();

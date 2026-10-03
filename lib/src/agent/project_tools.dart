@@ -1,3 +1,4 @@
+import '../domain/tool_detail_target.dart';
 import '../domain/tool_models.dart';
 import '../features/chat/conversation.dart';
 import '../storage/development_projects.dart';
@@ -223,7 +224,29 @@ class ProjectTool
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.success,
-        output: output,
+        output: {
+          ...output,
+          if (operation == 'list')
+            'detailTargets': [
+              for (final p in (output['projects'] as List).cast<Map>())
+                ToolDetailTarget(
+                  type: ToolDetailType.project,
+                  id: p['projectId'] as String,
+                  name: p['name'] as String,
+                  icon: p['icon'] as String,
+                ).toJson(),
+            ],
+          if (operation != 'list' &&
+              (operation != 'setCurrentConversation' ||
+                  call.arguments['projectId'] != null))
+            'detailTargets': [
+              await _resultProject(
+                operation == 'create'
+                    ? output['projectId'] as String
+                    : call.arguments['projectId'] as String,
+              ),
+            ],
+        },
       );
     } on Object catch (error) {
       return ToolResult(
@@ -237,4 +260,14 @@ class ProjectTool
 
   @override
   Future<void> cancel() async {}
+
+  Future<Map<String, Object?>> _resultProject(String id) async {
+    final project = await projects.read(id);
+    return ToolDetailTarget(
+      type: ToolDetailType.project,
+      id: project.id,
+      name: project.name,
+      icon: project.icon,
+    ).toJson();
+  }
 }

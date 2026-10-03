@@ -48,15 +48,17 @@ class _RepeatDialogState extends State<_RepeatDialog> {
   void _done() {
     final interval = int.tryParse(_interval.text);
     if (interval == null || interval < 1 || interval > 99) {
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(const SnackBar(content: Text('间隔请输入 1 到 99')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('间隔请输入 1 到 99')),
+        kind: ToastKind.warning,
+      );
       return;
     }
     if (_value.frequency == 'WEEKLY' && _value.weekdays.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(const SnackBar(content: Text('至少选择一天')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('至少选择一天')),
+        kind: ToastKind.warning,
+      );
       return;
     }
     _value.interval = interval;
@@ -74,6 +76,7 @@ class _RepeatDialogState extends State<_RepeatDialog> {
       color: dialogControlColor(context),
       borderRadius: BorderRadius.circular(16),
       child: ListTile(
+        contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 12),
         dense: true,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
@@ -302,10 +305,7 @@ class _RepeatDialogState extends State<_RepeatDialog> {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: DialogActionButton(
-                      text: '完成',
-                      onPressed: _done,
-                    ),
+                    child: DialogActionButton(text: '完成', onPressed: _done),
                   ),
                 ],
               ),

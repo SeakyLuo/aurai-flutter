@@ -1,3 +1,4 @@
+import '../features/chat/floating_search_layout.dart';
 import '../widgets/empty_data_view.dart';
 import 'miniapp_recent_page.dart';
 import 'miniapp_launcher.dart';
@@ -11,7 +12,6 @@ import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
 import '../features/chat/chat_controller.dart';
 import '../features/chat/settings_appearance.dart';
-import '../features/chat/sidebar_action_icon.dart';
 import '../features/chat/search_skeleton.dart';
 import '../features/chat/pagination_listener.dart';
 import 'miniapp_detail_page.dart';
@@ -48,8 +48,11 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
     if (!widget.pickingMessage) _loadRecent();
   }
 
-  Future<void> _load({required bool reset}) async {
-    if (!reset && (_loading || (!_more && !_localMore))) return;
+  Future<void> _load({required bool reset, bool refresh = false}) async {
+    if (!reset && !refresh && (_loading || (!_more && !_localMore))) return;
+    final replace = reset || refresh;
+    final appLimit = refresh && _apps.length > 50 ? _apps.length : 50;
+    final localLimit = refresh && _locals.length > 50 ? _locals.length : 50;
     final generation = ++_generation;
     final query = _search.text.trim();
     setState(() {
@@ -65,22 +68,24 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
     try {
       final bundled = await _store.bundled();
       final pages = await Future.wait([
-        if (reset || _more)
+        if (replace || _more)
           _store.page(
             bundledIds: bundled.map((e) => e.id).toList(),
-            after: reset || _apps.isEmpty ? null : _apps.last,
+            after: replace || _apps.isEmpty ? null : _apps.last,
+            limit: appLimit,
             query: query,
           )
         else
           Future.value((entries: <MiniappEntry>[], more: false)),
         if (query.isNotEmpty || widget.pickingMessage)
-          if (reset || _localMore)
+          if (replace || _localMore)
             _store.page(
               bundledIds: widget.pickingMessage
                   ? bundled.map((e) => e.id).toList()
                   : const [],
               mine: true,
-              after: reset || _locals.isEmpty ? null : _locals.last,
+              after: replace || _locals.isEmpty ? null : _locals.last,
+              limit: localLimit,
               query: query,
             )
           else
@@ -97,13 +102,13 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
       if (!mounted || generation != _generation) return;
       setState(() {
         _bundled = bundled;
-        if (reset) _messageCapable.clear();
+        if (replace) _messageCapable.clear();
         _messageCapable.addAll(capable);
-        _apps = reset ? page.entries : [..._apps, ...page.entries];
+        _apps = replace ? page.entries : [..._apps, ...page.entries];
         _more = page.more;
         _locals = query.isEmpty && !widget.pickingMessage
             ? []
-            : reset
+            : replace
             ? pages[1].entries
             : [..._locals, ...pages[1].entries];
         _localMore =
@@ -112,14 +117,9 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
     } on Object catch (error) {
       if (mounted && generation == _generation) {
         _failed = true;
-        ScaffoldMessenger.of(context).showGlassSnackBar(
-          SnackBar(
-            content: Text(errorMessage(error)),
-            action: SnackBarAction(
-              label: '重试',
-              onPressed: () => _load(reset: reset),
-            ),
-          ),
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
         );
       }
     } finally {
@@ -134,9 +134,10 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
       if (mounted) setState(() => _recent = result.entries);
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
     }
   }
 
@@ -148,9 +149,10 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
       if (mounted) await _loadRecent();
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
     } finally {
       if (mounted) setState(() => _opening = false);
     }
@@ -165,7 +167,10 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
       child: Column(
         children: [
           ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+            contentPadding: const EdgeInsetsDirectional.only(
+              start: 18,
+              end: 12,
+            ),
             title: const Text(
               '最近使用',
               style: TextStyle(fontWeight: FontWeight.w600),
@@ -308,7 +313,7 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
                 ),
               );
               if (mounted) {
-                _load(reset: true);
+                _load(reset: false, refresh: true);
                 _loadRecent();
               }
             },
@@ -351,7 +356,6 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
         onBack: () => Navigator.pop(context),
       ),
       body: SettingsPageBody(
-        avoidHeader: true,
         child: SafeArea(
           top: false,
           child: Center(
@@ -359,90 +363,116 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
               constraints: const BoxConstraints(maxWidth: 640),
               child: Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                    child: TextField(
+                  Expanded(
+                    child: FloatingSearchLayout(
+                      itemCount: {
+                        for (final entry in [..._bundled, ..._apps, ..._locals])
+                          if (!widget.pickingMessage ||
+                              _messageCapable.contains(
+                                '${entry.kind.name}:${entry.id}',
+                              ))
+                            entry.publicationId,
+                      }.length,
                       controller: _search,
                       onChanged: _queryChanged,
-                      onTapOutside: (_) =>
-                          FocusManager.instance.primaryFocus?.unfocus(),
-                      decoration: InputDecoration(
-                        hintText: '搜索小程序',
-                        filled: true,
-                        fillColor: settingsFieldColor(context),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(26),
-                          borderSide: BorderSide.none,
-                        ),
-                        prefixIcon: const Padding(
-                          padding: EdgeInsets.all(13),
-                          child: SidebarActionIcon(
-                            type: SidebarActionIconType.search,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: PaginationListener(
-                      hasMore: !_loading && !_failed && (_more || _localMore),
-                      loadMore: () => _load(reset: false),
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.all(16),
-                        keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
-                        children: [
-                          if (!widget.pickingMessage &&
-                              query.isEmpty &&
-                              _recent.isNotEmpty)
-                            _recentSection(),
-                          if (!widget.pickingMessage)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
-                              child: Text(
-                                query.isEmpty ? '发现小程序' : '搜索结果',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
+                      hintText: '搜索小程序',
+                      enabled: true,
+                      bottom: 16,
+                      child: PaginationListener(
+                        failed: _failed,
+                        onRetry: () => _load(reset: !_more && !_localMore),
+                        hasMore: !_loading && !_failed && (_more || _localMore),
+                        loadMore: () => _load(reset: false),
+                        child: CustomScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+
+                          slivers: [
+                            SliverPadding(
+                              padding: settingsPagePadding(
+                                context,
+                                const EdgeInsets.fromLTRB(
+                                  16,
+                                  16,
+                                  16,
+                                  FloatingSearchLayout.clearance,
                                 ),
                               ),
-                            ),
-                          if (_loading && entries.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.all(16),
-                              child: SearchSkeleton(
-                                label: '正在加载小程序',
-                                avatarSize: 48,
+                              sliver: SliverMainAxisGroup(
+                                slivers: [
+                                  SliverList.list(
+                                    children: [
+                                      if (!widget.pickingMessage &&
+                                          query.isEmpty &&
+                                          _recent.isNotEmpty)
+                                        _recentSection(),
+                                      if (!widget.pickingMessage)
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                            8,
+                                            0,
+                                            8,
+                                            14,
+                                          ),
+                                          child: Text(
+                                            query.isEmpty ? '发现小程序' : '搜索结果',
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w600,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ),
+                                      if (_loading && entries.isEmpty)
+                                        const Padding(
+                                          padding: EdgeInsets.all(16),
+                                          child: SearchSkeleton(
+                                            label: '正在加载小程序',
+                                            avatarSize: 48,
+                                          ),
+                                        ),
+
+                                      for (final entry in entries)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 12,
+                                          ),
+                                          child: _tile(entry),
+                                        ),
+                                      if (_loading && entries.isNotEmpty)
+                                        const Padding(
+                                          padding: EdgeInsets.all(16),
+                                          child: Center(
+                                            child: CircularProgressIndicator(),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  if (!_loading && entries.isEmpty)
+                                    SliverFillRemaining(
+                                      hasScrollBody: false,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(32),
+                                        child: Center(
+                                          child: EmptyDataView(
+                                            title: query.isEmpty
+                                                ? (widget.pickingMessage
+                                                      ? '暂无可发送的小程序'
+                                                      : '暂无已发布的小程序')
+                                                : '没有匹配的小程序',
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
-                          if (!_loading && entries.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.all(32),
-                              child: Center(
-                                child: EmptyDataView(
-                                  title: query.isEmpty
-                                      ? (widget.pickingMessage
-                                            ? '暂无可发送的小程序'
-                                            : '暂无已发布的小程序')
-                                      : '没有匹配的小程序',
-                                ),
-                              ),
-                            ),
-                          for (final entry in entries)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _tile(entry),
-                            ),
-                          if (_loading && entries.isNotEmpty)
-                            const Padding(
-                              padding: EdgeInsets.all(16),
-                              child: Center(child: CircularProgressIndicator()),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),

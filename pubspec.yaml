@@ -45,6 +45,8 @@ dependencies:
   sqflite: ^2.4.2+1
   flutter_svg: ^2.3.0
   photo_view: ^0.15.0
+  just_audio: ^0.10.6
+  audio_session: ^0.2.4
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -70,6 +72,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
+    - assets/avatars/
     - assets/illustrations/
     - assets/miniapps/
     - assets/miniapps/icons/

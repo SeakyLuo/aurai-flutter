@@ -5,6 +5,7 @@ import 'ai_contacts_page.dart';
 import 'me_page.dart';
 import 'discover_page.dart';
 import 'home_tab_bar.dart';
+import 'contacts_search_bar.dart';
 
 final homeRouteObserver = RouteObserver<PageRoute<dynamic>>();
 
@@ -27,13 +28,26 @@ class _HomePageState extends State<HomePage> with RouteAware {
   final _recentKey = GlobalKey<RecentChatsPageState>();
   int _tab = 0;
   final _pages = PageController();
+  final _contactSearch = TextEditingController();
+  final _contactSearchFocus = FocusNode();
+  bool _searchingContacts = false;
+
+  void _toggleContactSearch() {
+    _contactSearchFocus.unfocus();
+    setState(() => _searchingContacts = !_searchingContacts);
+  }
 
   late final List<Widget> _tabPages = [
     _HomeTabPage(
       child: RecentChatsPage(key: _recentKey, controller: widget.controller),
     ),
     _HomeTabPage(
-      child: AiContactsPage(controller: widget.controller, root: true),
+      child: AiContactsPage(
+        controller: widget.controller,
+        root: true,
+        searchController: _contactSearch,
+        onToggleSearch: _toggleContactSearch,
+      ),
     ),
     _HomeTabPage(child: DiscoverPage(controller: widget.controller)),
     _HomeTabPage(child: MePage(controller: widget.controller)),
@@ -54,6 +68,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
   @override
   void dispose() {
     _pages.dispose();
+    _contactSearch.dispose();
+    _contactSearchFocus.dispose();
     homeRouteObserver.unsubscribe(this);
     super.dispose();
   }
@@ -70,14 +86,23 @@ class _HomePageState extends State<HomePage> with RouteAware {
 
   void _pageChanged(int tab) {
     FocusManager.instance.primaryFocus?.unfocus();
-    setState(() => _tab = tab);
+    setState(() {
+      _tab = tab;
+      if (tab != 1) _searchingContacts = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) => PopScope(
-    canPop: _tab == 0,
+    canPop: _tab == 0 && !_searchingContacts,
     onPopInvokedWithResult: (didPop, result) {
-      if (!didPop && _tab != 0) _select(0);
+      if (!didPop) {
+        if (_searchingContacts) {
+          _toggleContactSearch();
+        } else if (_tab != 0) {
+          _select(0);
+        }
+      }
     },
     child: Scaffold(
       extendBody: true,
@@ -86,10 +111,58 @@ class _HomePageState extends State<HomePage> with RouteAware {
         onPageChanged: _pageChanged,
         children: _tabPages,
       ),
-      bottomNavigationBar: HomeTabBar(
-        selected: _tab,
-        pages: _pages,
-        onSelected: _select,
+      bottomNavigationBar: AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        padding: EdgeInsets.only(
+          bottom: _searchingContacts
+              ? MediaQuery.viewInsetsOf(context).bottom
+              : 0,
+        ),
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            IgnorePointer(
+              ignoring: _searchingContacts,
+              child: AnimatedSlide(
+                offset: _searchingContacts ? const Offset(0, 1.5) : Offset.zero,
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeInOutCubic,
+                child: ExcludeSemantics(
+                  excluding: _searchingContacts,
+                  child: HomeTabBar(
+                    selected: _tab,
+                    pages: _pages,
+                    onSelected: _select,
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
+                ignoring: !_searchingContacts,
+                child: ExcludeSemantics(
+                  excluding: !_searchingContacts,
+                  child: AnimatedSlide(
+                    offset: _searchingContacts
+                        ? Offset.zero
+                        : const Offset(0, 1.5),
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeInOutCubic,
+                    onEnd: () {
+                      if (_searchingContacts)
+                        _contactSearchFocus.requestFocus();
+                    },
+                    child: ContactsSearchBar(
+                      controller: _contactSearch,
+                      focusNode: _contactSearchFocus,
+                      onClose: _toggleContactSearch,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );

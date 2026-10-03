@@ -246,6 +246,7 @@ class _ModelTypeRecognitionPageState extends State<ModelTypeRecognitionPage> {
     ModelPurpose.imageGeneration => '图片',
     ModelPurpose.videoGeneration => '视频',
     ModelPurpose.musicGeneration => '音乐',
+    ModelPurpose.speechSynthesis => '语音合成',
   };
 
   Widget _ruleField(ModelPurpose type) => Padding(

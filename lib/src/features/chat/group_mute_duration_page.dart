@@ -66,7 +66,7 @@ class _GroupMuteDurationPageState extends State<GroupMuteDurationPage> {
               _choice('12 小时', const Duration(hours: 12)),
               _choice('1 天', const Duration(days: 1)),
               ListTile(
-                minTileHeight: 60,
+                minTileHeight: settingsCardHeight,
                 title: const Text('自定义', style: TextStyle(fontSize: 15)),
                 trailing: _custom
                     ? const SettingsIcon(type: SettingsIconType.check)
@@ -75,7 +75,11 @@ class _GroupMuteDurationPageState extends State<GroupMuteDurationPage> {
               ),
               if (_custom)
                 ListTile(
-                  minTileHeight: 60,
+                  contentPadding: const EdgeInsetsDirectional.only(
+                    start: 16,
+                    end: 12,
+                  ),
+                  minTileHeight: settingsCardHeight,
                   title: const Text('禁言时长', style: TextStyle(fontSize: 15)),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -84,7 +88,7 @@ class _GroupMuteDurationPageState extends State<GroupMuteDurationPage> {
                         '${_customDuration!.inDays} 天 ${_customDuration!.inHours % 24} 小时 ${_customDuration!.inMinutes % 60} 分钟',
                       ),
                       const SizedBox(width: 8),
-                      const SettingsIcon(type: SettingsIconType.chevron),
+                      const SettingsIcon(type: SettingsIconType.chevronDown),
                     ],
                   ),
                   onTap: _pickCustom,

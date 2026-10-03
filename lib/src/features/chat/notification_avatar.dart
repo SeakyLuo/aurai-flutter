@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../domain/message_sender.dart';
+import '../../domain/avatar_portraits.dart';
 import '../../storage/group_chat_store.dart';
 import 'group_avatar.dart';
 import 'member_avatar.dart';
@@ -71,6 +72,11 @@ class NotificationAvatar {
               FileImage(File(sender.avatarPath!)),
               root,
               onError: (_, _) {},
+            )
+          else if (avatarPortraits.containsKey(sender.avatarIcon))
+            precacheImage(
+              AssetImage(avatarPortraits[sender.avatarIcon]!.asset),
+              root,
             )
           else if (sender.avatarIcon == 'app_logo' ||
               sender.avatarIcon == 'app_logo_white')

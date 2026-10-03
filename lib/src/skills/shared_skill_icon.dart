@@ -27,6 +27,7 @@ Widget? sharedSkillIcon(BuildContext context, String name) {
     'balance': SettingsIconType.balance,
     'appearance': SettingsIconType.appearance,
     'model': SettingsIconType.model,
+    'speech': SettingsIconType.sound,
     'device': SettingsIconType.device,
     'chevron': SettingsIconType.chevron,
     'back': SettingsIconType.back,

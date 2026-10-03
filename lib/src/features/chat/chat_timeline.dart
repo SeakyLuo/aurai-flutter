@@ -61,8 +61,12 @@ List<ChatTimelineEntry> buildChatTimeline(
   final isGroup = conversation.kind == ConversationKind.group;
   final noticeNameIds = <String, String>{};
   final ambiguousNoticeNames = <String>{};
-  for (final sender in conversation.noticeMembers.values) {
-    if (noticeNameIds.containsKey(sender.name)) {
+  for (final sender in [
+    ...mentionSenders.values,
+    ...conversation.noticeMembers.values,
+  ]) {
+    if (noticeNameIds.containsKey(sender.name) &&
+        noticeNameIds[sender.name] != sender.id) {
       ambiguousNoticeNames.add(sender.name);
     }
     noticeNameIds[sender.name] = sender.id;
@@ -90,8 +94,7 @@ List<ChatTimelineEntry> buildChatTimeline(
   final showElapsed =
       !isGroup &&
       watch != null &&
-      conversation.hasExecutionProcess &&
-      (watch.isRunning ||
+      ((conversation.hasExecutionProcess && watch.isRunning) ||
           conversation.runState == ChatRunState.failed ||
           conversation.runState == ChatRunState.interrupted) &&
       !controller.visibleMessages.any(
@@ -111,6 +114,19 @@ List<ChatTimelineEntry> buildChatTimeline(
             id,
   };
   final toolsByMessage = <String, List<ChatTimelineEntry>>{};
+  final followingToolsByMessage = <String, List<ChatTimelineEntry>>{};
+  final messagesById = {
+    for (final message in controller.visibleMessages) message.id: message,
+  };
+  List<ChatTimelineEntry> activitiesAfter(String messageId, String runId) {
+    final anchor = messagesById[messageId];
+    final target =
+        anchor?.role == AgentMessageRole.assistant && anchor!.runId != runId
+        ? followingToolsByMessage
+        : toolsByMessage;
+    return target.putIfAbsent(messageId, () => []);
+  }
+
   // Completed summaries render their saved activities; keep the source records.
   final summarizedRuns = {
     for (final message in controller.visibleMessages)
@@ -168,20 +184,30 @@ List<ChatTimelineEntry> buildChatTimeline(
     for (final (index, entry) in liveSteps.indexed) entry.runId: index,
   };
   final elapsedRuns = <String>{};
+  final liveElapsed = showElapsed
+      ? ChatTimelineEntry(
+          'elapsed:${conversation.activeRunId}',
+          (_) => TaskElapsed(
+            key: ValueKey(conversation.activeRunId),
+            watch: watch,
+            restoredElapsed: conversation.restoredExecutionElapsed,
+            failed: conversation.runState == ChatRunState.failed,
+          ),
+        )
+      : null;
+  var liveElapsedPlaced = false;
   if (!isGroup) {
     for (final entry in conversation.cancelledRunMessages.entries) {
       elapsedRuns.add(entry.key);
-      toolsByMessage
-          .putIfAbsent(entry.value, () => [])
-          .add(
-            ChatTimelineEntry(
-              'run-elapsed:${entry.key}',
-              (_) => _StoppedRunElapsed(
-                elapsed: conversation.unfinishedRunElapsed[entry.key]!,
-                cancelled: true,
-              ),
-            ),
-          );
+      activitiesAfter(entry.value, entry.key).add(
+        ChatTimelineEntry(
+          'run-elapsed:${entry.key}',
+          (_) => _StoppedRunElapsed(
+            elapsed: conversation.unfinishedRunElapsed[entry.key]!,
+            cancelled: true,
+          ),
+        ),
+      );
     }
   }
   for (final group in groups) {
@@ -189,71 +215,73 @@ List<ChatTimelineEntry> buildChatTimeline(
     final latest = liveSteps[group.end - 1];
     final storageId = 'tool:${entry.runId}:${entry.ordinal}';
     final runElapsed = conversation.unfinishedRunElapsed[entry.runId];
+    if (liveElapsed != null &&
+        !liveElapsedPlaced &&
+        entry.runId == conversation.activeRunId) {
+      activitiesAfter(entry.afterMessageId, entry.runId).add(liveElapsed);
+      liveElapsedPlaced = true;
+    }
     if (runElapsed != null &&
         elapsedRuns.add(entry.runId) &&
         (entry.runId != conversation.activeRunId || !showElapsed)) {
-      toolsByMessage
-          .putIfAbsent(entry.afterMessageId, () => [])
-          .add(
-            ChatTimelineEntry(
-              'run-elapsed:${entry.runId}',
-              (_) => _StoppedRunElapsed(elapsed: runElapsed),
-            ),
-          );
+      activitiesAfter(entry.afterMessageId, entry.runId).add(
+        ChatTimelineEntry(
+          'run-elapsed:${entry.runId}',
+          (_) => _StoppedRunElapsed(elapsed: runElapsed),
+        ),
+      );
     }
-    toolsByMessage
-        .putIfAbsent(entry.afterMessageId, () => [])
-        .add(
-          ChatTimelineEntry(
-            storageId,
-            (_) =>
-                entry.step.toolName == 'askUser' || group.end - group.start == 1
-                ? _ToolActivity(
-                    storageId: storageId,
-                    step: entry.step,
-                    senderName: entry.senderName,
-                  )
-                : Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
-                    child: ToolActivityGroup(
-                      key: ValueKey(storageId),
-                      storageId: storageId,
-                      toolName: entry.step.toolName,
-                      active:
-                          activeRunIds.contains(entry.runId) &&
-                          lastStepByRun[entry.runId] == group.end - 1,
-                      activeLabel: _activeToolActivityTitle(
-                        latest.step,
-                        latest.senderName,
-                      ),
-                      startedAt: latest.step.startedAt,
-                      finishedAt: latest.step.finishedAt,
-                      fileResults:
-                          entry.step.toolName == 'executeAndroidScript' ||
-                              entry.step.toolName == 'runSkill'
-                          ? [
-                              for (var i = group.start; i < group.end; i++)
-                                liveSteps[i].step.resultJson,
-                            ]
-                          : const [],
-                      statuses: [
-                        for (var i = group.start; i < group.end; i++)
-                          liveSteps[i].step.status,
-                      ],
-                      children: [
-                        for (var i = group.start; i < group.end; i++)
-                          _ToolActivity(
-                            storageId:
-                                'tool:${liveSteps[i].runId}:${liveSteps[i].ordinal}',
-                            senderName: liveSteps[i].senderName,
-                            step: liveSteps[i].step,
-                            grouped: true,
-                          ),
-                      ],
-                    ),
+    activitiesAfter(entry.afterMessageId, entry.runId).add(
+      ChatTimelineEntry(
+        storageId,
+        (_) => entry.step.toolName == 'askUser' || group.end - group.start == 1
+            ? _ToolActivity(
+                storageId: storageId,
+                step: entry.step,
+                senderName: entry.senderName,
+              )
+            : Padding(
+                padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
+                child: ToolActivityGroup(
+                  key: ValueKey(storageId),
+                  storageId: storageId,
+                  toolName: entry.step.toolName,
+                  active:
+                      activeRunIds.contains(entry.runId) &&
+                      lastStepByRun[entry.runId] == group.end - 1,
+                  activeLabel: _activeToolActivityTitle(
+                    latest.step,
+                    latest.senderName,
                   ),
-          ),
-        );
+                  startedAt: latest.step.startedAt,
+                  finishedAt: latest.step.finishedAt,
+                  activeResultJson: latest.step.resultJson,
+                  fileResults:
+                      entry.step.toolName == 'executeAndroidScript' ||
+                          entry.step.toolName == 'runSkill'
+                      ? [
+                          for (var i = group.start; i < group.end; i++)
+                            liveSteps[i].step.resultJson,
+                        ]
+                      : const [],
+                  statuses: [
+                    for (var i = group.start; i < group.end; i++)
+                      liveSteps[i].step.status,
+                  ],
+                  children: [
+                    for (var i = group.start; i < group.end; i++)
+                      _ToolActivity(
+                        storageId:
+                            'tool:${liveSteps[i].runId}:${liveSteps[i].ordinal}',
+                        senderName: liveSteps[i].senderName,
+                        step: liveSteps[i].step,
+                        grouped: true,
+                      ),
+                  ],
+                ),
+              ),
+      ),
+    );
   }
   final visibleMessages = controller.visibleMessages
       .where(
@@ -264,6 +292,17 @@ List<ChatTimelineEntry> buildChatTimeline(
                 message.id == conversation.searchMessageId),
       )
       .toList();
+  if (liveElapsed != null && !liveElapsedPlaced) {
+    final firstRunMessage = visibleMessages.indexWhere(
+      (message) => message.runId == conversation.activeRunId,
+    );
+    final anchor = firstRunMessage > 0
+        ? visibleMessages[firstRunMessage - 1]
+        : firstRunMessage == 0
+        ? visibleMessages.first
+        : visibleMessages.last;
+    activitiesAfter(anchor.id, conversation.activeRunId!).add(liveElapsed);
+  }
   final end = beforeMessageId == null
       ? visibleMessages.length
       : visibleMessages.indexWhere((message) => message.id == beforeMessageId);
@@ -471,7 +510,9 @@ List<ChatTimelineEntry> buildChatTimeline(
               ? GroupMessageHeading(
                   groupId: conversation.id,
                   isFailure: message.isFailure,
-                  sender: message.sender!,
+                  sender:
+                      conversation.noticeMembers[message.senderId] ??
+                      message.sender!,
                   onMention: onMention == null
                       ? null
                       : () => onMention(message.sender!),
@@ -541,24 +582,14 @@ List<ChatTimelineEntry> buildChatTimeline(
             child: SizedBox(width: double.infinity, child: item),
           );
         }, preserveState: message.htmlGame != null),
-      if (showElapsed &&
-          message.id == conversation.executionUserMessageId &&
-          message.id != beforeMessageId)
-        ChatTimelineEntry(
-          'elapsed:${conversation.activeRunId}',
-          (_) => TaskElapsed(
-            key: ValueKey(conversation.activeRunId),
-            watch: watch,
-            restoredElapsed: conversation.restoredExecutionElapsed,
-            failed: conversation.runState == ChatRunState.failed,
-          ),
-        ),
       if (!isGroup &&
           message.id != beforeMessageId &&
           (message.role != AgentMessageRole.assistant ||
               message.isReasoning ||
               message.isSystem))
         ...?toolsByMessage[message.id],
+      if (!isGroup && message.id != beforeMessageId)
+        ...?followingToolsByMessage[message.id],
     ],
   ];
 }
@@ -641,6 +672,7 @@ class _ToolActivity extends StatelessWidget {
           ? const EdgeInsets.symmetric(vertical: 5)
           : const EdgeInsets.fromLTRB(18, 4, 18, 8),
       child: ToolActivityView(
+        callId: step.callId,
         showFileChanges: !grouped,
         toolName: step.toolName,
         storageId: storageId,

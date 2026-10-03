@@ -45,6 +45,8 @@ abstract final class DetectedModelPurposes {
 Set<ModelPurpose> modelPurposesFor(ModelConfig config, String model) {
   final configured = config.details?.modelPurposes[model];
   if (configured != null) return configured;
+  final preset = config.service.presetModelPurposes[model];
+  if (preset != null) return preset;
   final name = model.split('/').last;
   if (name.startsWith('gpt-image-') || name == 'chatgpt-image-latest') {
     return {ModelPurpose.imageGeneration};

@@ -1,3 +1,4 @@
+import '../app/glass_notice.dart';
 import '../features/chat/delete_confirmation_dialog.dart';
 import '../domain/error_message.dart';
 import 'package:flutter/material.dart';
@@ -62,7 +63,7 @@ class MemoryEditorState extends State<MemoryEditor> {
         original: widget.entry,
       );
       if (!mounted) return;
-      memoryToast(context, '记忆已保存');
+      memoryToast(context, '记忆已保存', kind: ToastKind.success);
       _close();
     } on Object catch (error) {
       if (mounted) {
@@ -71,6 +72,7 @@ class MemoryEditorState extends State<MemoryEditor> {
           error is StateError
               ? error.message
               : '操作失败，请重试：${errorMessage(error)}',
+          kind: ToastKind.error,
         );
         setState(() => busy = false);
       }

@@ -115,9 +115,10 @@ class _ImageAttachmentState extends State<ImageAttachment> {
       try {
         if (!await File(widget.image.path).exists()) {
           if (mounted)
-            ScaffoldMessenger.of(
-              context,
-            ).showGlassSnackBar(const SnackBar(content: Text('图片文件已丢失，无法打开')));
+            ScaffoldMessenger.of(context).showToast(
+              const SnackBar(content: Text('图片文件已丢失，无法打开')),
+              kind: ToastKind.error,
+            );
           return;
         }
         if (!mounted) return;
@@ -127,8 +128,9 @@ class _ImageAttachmentState extends State<ImageAttachment> {
         );
       } on Object catch (error) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showGlassSnackBar(
+          ScaffoldMessenger.of(context).showToast(
             SnackBar(content: Text('图片无法打开，请重试：${errorMessage(error)}')),
+            kind: ToastKind.error,
           );
         }
         return;

@@ -73,28 +73,32 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     try {
       final next = _profile.copyWith(
         preferences: AiPreferences(
+          gender: _profile.preferences.gender,
           systemPrompt: _prompt.text,
           customInstructions: _instructions.text,
           responses: _preferences,
           screenAccess: _profile.preferences.screenAccess,
+          speech: _profile.preferences.speech,
           reasoning: _profile.preferences.reasoning,
         ),
       );
       await widget.controller.saveAi(next);
       _profile = next;
-      if (mounted) _notice('个性化设置已保存');
+      if (mounted) _notice('个性化设置已保存', kind: ToastKind.success);
       return true;
     } on Object catch (error) {
-      if (mounted) _notice('保存失败，请重试：${errorMessage(error)}');
+      if (mounted)
+        _notice('保存失败，请重试：${errorMessage(error)}', kind: ToastKind.error);
       return false;
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
 
   void _editTraits() {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -114,8 +118,8 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     );
   }
 
-  Widget _label(String text) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+  Widget _label(String text, {bool first = false}) => Padding(
+    padding: EdgeInsets.fromLTRB(18, first ? 0 : 8, 18, 12),
     child: Text(
       text,
       style: TextStyle(
@@ -175,7 +179,15 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
           SettingsGlassAction(
             label: _saving ? '正在保存' : '保存',
             icon: Icons.check_rounded,
-            onPressed: _dirty && !_saving ? _save : null,
+            onPressed: _dirty && !_saving
+                ? () async {
+                    if (!await _save() || !mounted) return;
+                    setState(() => _allowPop = true);
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) Navigator.pop(context);
+                    });
+                  }
+                : null,
             iconWidget: _saving
                 ? const SizedBox.square(
                     dimension: 20,
@@ -194,12 +206,12 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
               child: ListView(
                 padding: settingsPagePadding(
                   context,
-                  const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                  const EdgeInsets.fromLTRB(16, 12, 16, 32),
                 ),
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 children: [
-                  _label('基础风格和语气'),
+                  _label('基础风格和语气', first: true),
                   PersonalizationChoiceRow(
                     title: _preferences.style.label,
                     selected: _preferences.style.name,

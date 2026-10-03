@@ -125,7 +125,7 @@ class ImageGenerationClient {
     if (selection.service.usesOpenRouterCatalog) {
       endpoint = _endpoint(account, 'images');
       body = {
-        'model': selection.model.id,
+        'model': account.apiModelFor(selection.model.id),
         'prompt': prompt,
         'n': count,
         if (selection.model.outputFormat != null)
@@ -154,7 +154,7 @@ class ImageGenerationClient {
             '${path.substring(0, path.length - compatible.length)}/api/v1/services/aigc/multimodal-generation/generation',
       );
       body = {
-        'model': selection.model.id,
+        'model': account.apiModelFor(selection.model.id),
         'input': {
           'messages': [
             {

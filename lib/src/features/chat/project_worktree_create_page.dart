@@ -121,6 +121,10 @@ class _ProjectWorktreeCreatePageState extends State<ProjectWorktreeCreatePage> {
                   borderRadius: BorderRadius.circular(26),
                   clipBehavior: Clip.antiAlias,
                   child: ListTile(
+                    contentPadding: const EdgeInsetsDirectional.only(
+                      start: 16,
+                      end: 12,
+                    ),
                     leading: const SettingsIcon(type: SettingsIconType.git),
                     title: const Text('起始分支', style: TextStyle(fontSize: 15)),
                     subtitle: Text(

@@ -16,6 +16,10 @@ extension ProviderConfigurationActions on ChatController {
           modelPurposeField: old.details?.modelPurposeField ?? '',
           modelTypeMappings: old.details?.modelTypeMappings ?? const {},
           modelReasoning: old.details?.modelReasoning ?? const {},
+          speechApi: old.speechApi,
+          speechApiKey: old.details?.speechApiKey ?? '',
+          modelCatalog: old.details?.modelCatalog ?? const [],
+          modelApiNames: old.details?.modelApiNames ?? const {},
           balance: old.details?.balance,
           icon: icon,
         );
@@ -42,6 +46,10 @@ extension ProviderConfigurationActions on ChatController {
       modelPurposeField: old.details?.modelPurposeField ?? '',
       modelTypeMappings: old.details?.modelTypeMappings ?? const {},
       modelReasoning: old.details?.modelReasoning ?? const {},
+      speechApi: old.speechApi,
+      speechApiKey: old.details?.speechApiKey ?? '',
+      modelCatalog: old.details?.modelCatalog ?? const [],
+      modelApiNames: old.details?.modelApiNames ?? const {},
       balance: balance,
       icon: old.details?.icon,
     );
@@ -69,7 +77,6 @@ extension ProviderConfigurationActions on ChatController {
       );
       return;
     }
-    if (!service.isCustom) throw StateError('内置供应商不能删除，可以清除密钥');
     if (modelSettings.activeService == service ||
         modelSettings.modelDefaults.values.any(
           (value) => value.service == service,
@@ -89,12 +96,15 @@ extension ProviderConfigurationActions on ChatController {
     await _store.database.transaction((txn) async {
       final profiles = await txn.query(
         'ai_profiles',
-        columns: ['sender_id'],
-        where: 'provider = ?',
-        whereArgs: [service.name],
-        limit: 1,
+        columns: ['provider', 'preferences'],
       );
-      if (profiles.isNotEmpty)
+      if (profiles.any(
+        (profile) =>
+            profile['provider'] == service.name ||
+            (jsonDecode(profile['preferences'] as String)
+                    as Map)['speech']?['service'] ==
+                service.name,
+      ))
         throw StateError('还有 AI 使用该供应商，请先在 AI 的模型设置中更换供应商');
       final runs = await txn.query(
         'agent_runs',
@@ -125,6 +135,10 @@ extension ProviderConfigurationActions on ChatController {
     Map<String, ModelPurpose> modelTypeMappings = const {},
     String? icon,
     String model = '',
+    SpeechApiConfig? speechApi,
+    String speechApiKey = '',
+    List<({String id, String name})> modelCatalog = const [],
+    Map<String, String> modelApiNames = const {},
   }) => _serializeModelSettings(() async {
     final details = ProviderDetails(
       name: name.trim(),
@@ -134,6 +148,10 @@ extension ProviderConfigurationActions on ChatController {
       autoSyncModels: autoSyncModels,
       modelPurposeField: modelPurposeField,
       modelTypeMappings: modelTypeMappings,
+      speechApi: speechApi,
+      speechApiKey: speechApiKey,
+      modelCatalog: modelCatalog,
+      modelApiNames: modelApiNames,
       icon: icon,
     );
     validateProviderDetails(details, baseUrl);
@@ -190,6 +208,14 @@ extension ProviderConfigurationActions on ChatController {
   ) async {
     if (operation == 'listModelProviders') {
       return {
+        'detailTargets': [
+          for (final config in modelSettings.profiles.values)
+            ToolDetailTarget(
+              type: ToolDetailType.provider,
+              id: config.service.name,
+              name: config.displayName,
+            ).toJson(),
+        ],
         'providers': modelSettings.profiles.values
             .map(_providerSummary)
             .toList(),
@@ -242,6 +268,10 @@ extension ProviderConfigurationActions on ChatController {
           modelReasoning: old?.details?.modelReasoning ?? const {},
           modelContextOverrides:
               old?.details?.modelContextOverrides ?? const {},
+          speechApi: old?.speechApi,
+          speechApiKey: old?.details?.speechApiKey ?? '',
+          modelCatalog: old?.details?.modelCatalog ?? const [],
+          modelApiNames: old?.details?.modelApiNames ?? const {},
           balance: old?.details?.balance,
           icon: old?.details?.icon,
           name: name,

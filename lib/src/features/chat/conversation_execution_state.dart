@@ -14,6 +14,8 @@ class _ConversationExecutionState {
   Completer<void>? runFinished;
   Completer<void>? privateRunFinished;
   AgentRuntime? runtime;
+  final userInputs = <Future<List<Map<String, Object?>>>>[];
+  final liveUserMessageIds = <String>{};
   bool systemEventLoading = false;
   GroupDispatcher? groupDispatcher;
   String? groupNotificationStep;
@@ -110,6 +112,7 @@ extension ConversationExecutionState on ChatController {
   Future<void> _stopConversation() async {
     pendingMessageQueue.paused = true;
     _execution.queuedUserMessageId = null;
+    _execution.userInputs.clear();
     if (identical(activeConversation, _privateConversation)) {
       _privateConversation!.runState = ChatRunState.stopping;
       await _runtime?.cancel();
@@ -168,6 +171,10 @@ extension ConversationExecutionState on ChatController {
     if (value != null) {
       _execution.runFinished ??= Completer<void>();
     } else {
+      if (_execution.runningConversation?.kind == ConversationKind.direct) {
+        _execution.userInputs.clear();
+        _execution.liveUserMessageIds.clear();
+      }
       _execution.runFinished?.complete();
       _execution.runFinished = null;
     }
@@ -180,6 +187,8 @@ extension ConversationExecutionState on ChatController {
     if (value != null) {
       _execution.privateRunFinished ??= Completer<void>();
     } else {
+      _execution.userInputs.clear();
+      _execution.liveUserMessageIds.clear();
       _execution.privateRunFinished?.complete();
       _execution.privateRunFinished = null;
     }

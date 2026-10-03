@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../../domain/avatar_style.dart';
 import '../../domain/emoji_catalog.dart';
 import '../../domain/response_preferences.dart';
-import 'avatar_background.dart';
+import '../../domain/avatar_portraits.dart';
 import 'avatar_symbol.dart';
 import 'avatar_palette_store.dart';
 
@@ -24,7 +24,7 @@ class RandomContact {
   static final _candidateBag = <int>[];
   static Future<String> savedAvatarColor() async {
     final palette = await AvatarPaletteStore().load();
-    final colors = [...palette.solids, ...palette.gradients];
+    final colors = [...palette.solids, ...palette.softs, ...palette.gradients];
     if (colors.isEmpty) throw StateError('头像色库为空，请先添加或重置配色');
     return colors[_random.nextInt(colors.length)];
   }
@@ -37,26 +37,25 @@ class RandomContact {
       );
     }
     final candidate = offlineContactCandidates[_candidateBag.removeLast()];
-    final colors = [
-      ...avatarColors.keys,
-      for (final key in avatarGradients.keys) 'gradient:$key',
-    ];
     final symbols = avatarSymbols.keys
-        .where((key) => !key.startsWith('app_logo'))
+        .where(
+          (key) =>
+              !key.startsWith('app_logo') && !avatarPortraits.containsKey(key),
+        )
         .toList();
     final emojiCategories = (await EmojiCatalog.load()).categories;
     final emojis = [for (final category in emojiCategories) ...category];
-    final icon = _random.nextBool()
-        ? symbols[_random.nextInt(symbols.length)]
-        : 'emoji:${emojis[_random.nextInt(emojis.length)].emoji}';
+    final portraits = avatarPortraits.keys.toList();
+    final icon = switch (_random.nextInt(3)) {
+      0 => symbols[_random.nextInt(symbols.length)],
+      1 => 'emoji:${emojis[_random.nextInt(emojis.length)].emoji}',
+      _ => portraits[_random.nextInt(portraits.length)],
+    };
     return RandomContact(
       candidate.name,
       candidate.description,
       candidate.role,
-      AvatarStyle(
-        icon: icon,
-        color: avatarColor ?? colors[_random.nextInt(colors.length)],
-      ),
+      AvatarStyle(icon: icon, color: avatarColor ?? await savedAvatarColor()),
       ResponsePreferences(
         style:
             ResponseStyle.values[_random.nextInt(ResponseStyle.values.length)],

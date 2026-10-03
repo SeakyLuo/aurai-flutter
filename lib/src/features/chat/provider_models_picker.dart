@@ -1,3 +1,4 @@
+import 'floating_search_layout.dart';
 import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 import 'settings_appearance.dart';
@@ -64,87 +65,82 @@ class _ProviderModelsPickerState extends State<ProviderModelsPicker> {
         ],
       ),
       body: SettingsPageBody(
-        avoidHeader: true,
         child: SafeArea(
           top: false,
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextField(
+              Expanded(
+                child: FloatingSearchLayout(
+                  itemCount: widget.models.length,
                   controller: _search,
                   onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: '搜索模型',
-                    filled: true,
-                    fillColor: settingsFieldColor(context),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 14,
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: shown.isEmpty
-                    ? Center(child: EmptyDataView(title: '没有匹配的模型'))
-                    : ListView.builder(
-                        itemCount: shown.length,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        itemBuilder: (_, index) {
-                          final model = shown[index];
-                          final exists = widget.existing.contains(model);
-                          final selected = _selected.contains(model);
-                          return Semantics(
-                            checked: exists || selected,
-                            enabled: !exists,
-                            child: ListTile(
-                              title: Text(
-                                model,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                  hintText: '搜索模型',
+                  enabled: true,
+                  bottom: 16,
+                  child: shown.isEmpty
+                      ? Center(child: EmptyDataView(title: '没有匹配的模型'))
+                      : ListView.builder(
+                          itemCount: shown.length,
+                          padding: settingsPagePadding(
+                            context,
+                            const EdgeInsets.fromLTRB(
+                              12,
+                              0,
+                              12,
+                              FloatingSearchLayout.clearance,
+                            ),
+                          ),
+                          itemBuilder: (_, index) {
+                            final model = shown[index];
+                            final exists = widget.existing.contains(model);
+                            final selected = _selected.contains(model);
+                            return Semantics(
+                              checked: exists || selected,
                               enabled: !exists,
-                              onTap: exists ? null : () => _toggle(model),
-                              trailing: exists
-                                  ? Text(
-                                      '已添加',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: colors.onSurfaceVariant,
-                                      ),
-                                    )
-                                  : Container(
-                                      width: 22,
-                                      height: 22,
-                                      padding: const EdgeInsets.all(3),
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: selected
-                                            ? colors.onSurface
-                                            : Colors.transparent,
-                                        border: Border.all(
+                              child: ListTile(
+                                title: Text(
+                                  model,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                enabled: !exists,
+                                onTap: exists ? null : () => _toggle(model),
+                                trailing: exists
+                                    ? Text(
+                                        '已添加',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                      )
+                                    : Container(
+                                        width: 22,
+                                        height: 22,
+                                        padding: const EdgeInsets.all(3),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
                                           color: selected
                                               ? colors.onSurface
-                                              : colors.outline,
-                                          width: 1.4,
+                                              : Colors.transparent,
+                                          border: Border.all(
+                                            color: selected
+                                                ? colors.onSurface
+                                                : colors.outline,
+                                            width: 1.4,
+                                          ),
                                         ),
+                                        child: selected
+                                            ? SettingsIcon(
+                                                type: SettingsIconType.check,
+                                                color: colors.surface,
+                                              )
+                                            : null,
                                       ),
-                                      child: selected
-                                          ? SettingsIcon(
-                                              type: SettingsIconType.check,
-                                              color: colors.surface,
-                                            )
-                                          : null,
-                                    ),
-                            ),
-                          );
-                        },
-                      ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),

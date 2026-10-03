@@ -108,6 +108,7 @@ class GlassSurface extends StatelessWidget {
 }
 
 class RoundAction extends StatelessWidget {
+  static const double defaultSize = 40;
   const RoundAction({
     super.key,
     required this.icon,
@@ -142,7 +143,7 @@ class RoundAction extends StatelessWidget {
           ? TooltipTriggerMode.longPress
           : TooltipTriggerMode.manual,
       child: SizedBox.square(
-        dimension: compact ? 48 : 40,
+        dimension: compact ? 48 : defaultSize,
         child: Padding(
           padding: EdgeInsets.all(insetResponse ? 6 : 0),
           child: Material(

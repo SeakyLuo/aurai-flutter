@@ -23,7 +23,7 @@ extension _ChatAttachments on _ChatPageState {
         final sent = await sendMiniappMessage(context, controller);
         if (mounted && sent) _scrollToBottom();
       } on Object catch (error) {
-        if (mounted) _imageNotice(errorMessage(error));
+        if (mounted) _imageNotice(errorMessage(error), kind: ToastKind.error);
       }
       return;
     }
@@ -41,7 +41,7 @@ extension _ChatAttachments on _ChatPageState {
       try {
         await controller.addLibraryAssets(assets, target: target);
       } on Object catch (error) {
-        if (mounted) _imageNotice(errorMessage(error));
+        if (mounted) _imageNotice(errorMessage(error), kind: ToastKind.error);
       }
       return;
     }
@@ -66,11 +66,12 @@ extension _ChatAttachments on _ChatPageState {
             error is PlatformException
                 ? error.message ?? '附件添加失败：${errorMessage(error)}'
                 : '附件添加失败，请重试：${errorMessage(error)}',
+            kind: ToastKind.error,
           );
       }
     } else {
       if (controller.draftImages.length == MessageImageStore.maxImages) {
-        _imageNotice('每条消息最多添加 4 张图片，请先移除一张');
+        _imageNotice('每条消息最多添加 4 张图片，请先移除一张', kind: ToastKind.warning);
         return;
       }
       await _loadImages(
@@ -114,6 +115,7 @@ extension _ChatAttachments on _ChatPageState {
                     if (mounted)
                       _imageNotice(
                         '无法打开设置，请在系统设置中找到 Aurai：${errorMessage(settingsError)}',
+                        kind: ToastKind.error,
                       );
                   }
                 },
@@ -127,12 +129,20 @@ extension _ChatAttachments on _ChatPageState {
     try {
       await widget.controller.removeDraftImage(image);
     } on Object catch (caughtError) {
-      if (mounted) _imageNotice('图片移除后保存失败，请重试：${errorMessage(caughtError)}');
+      if (mounted)
+        _imageNotice(
+          '图片移除后保存失败，请重试：${errorMessage(caughtError)}',
+          kind: ToastKind.error,
+        );
     }
   }
 
-  void _imageNotice(String message, {SnackBarAction? action}) =>
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(SnackBar(content: Text(message), action: action));
+  void _imageNotice(
+    String message, {
+    SnackBarAction? action,
+    ToastKind kind = ToastKind.info,
+  }) => ScaffoldMessenger.of(context).showToast(
+    SnackBar(content: Text(message), action: action),
+    kind: kind,
+  );
 }

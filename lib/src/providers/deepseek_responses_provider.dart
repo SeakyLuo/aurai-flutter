@@ -58,7 +58,7 @@ class DeepSeekResponsesProvider implements ModelProvider {
   }
 
   Map<String, Object?> _requestBody(ModelRequest request) => <String, Object?>{
-    'model': config.model,
+    'model': config.apiModel,
     'stream': true,
     'max_output_tokens': _context.limits.outputTokens,
     'instructions':

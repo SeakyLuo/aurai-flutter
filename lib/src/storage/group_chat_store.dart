@@ -83,6 +83,7 @@ class GroupChatStore {
     String query, {
     required bool archived,
     int offset = 0,
+    int limit = pageSize,
     String ownerId = 'user:local',
   }) async {
     final rows = await database.query(
@@ -91,7 +92,7 @@ class GroupChatStore {
           'sender_id IN (SELECT friend_id FROM contact_friendships WHERE owner_id = ?) AND sender_id IN (SELECT id FROM message_senders WHERE archived = ? AND instr(lower(name), ?) > 0)',
       whereArgs: [ownerId, archived ? 1 : 0, query.toLowerCase()],
       orderBy: 'created_at DESC, sender_id DESC',
-      limit: pageSize,
+      limit: limit,
       offset: offset,
     );
     if (rows.isEmpty) return [];
@@ -619,7 +620,12 @@ class GroupChatStore {
           'id IN (SELECT sender_id FROM conversation_members WHERE conversation_id = ?)',
       whereArgs: [conversationId],
     );
-    return rows.map(MessageSender.fromRow).toList();
+    final senders = {
+      for (final row in rows) row['id'] as String: MessageSender.fromRow(row),
+    };
+    return (await GroupMemberDetailsStore(
+      database,
+    ).applyNames(conversationId, senders)).values.toList();
   }
 
   // Capture the resolved @ targets once; later roster changes do not rewrite them.

@@ -1,6 +1,10 @@
 part of 'chat_controller.dart';
 
 extension GroupSystemEvents on ChatController {
+  List<String>? _programWakeMembers(AgentMessage message) =>
+      (message.messageMetadata?.participation['_programWakeMembers'] as List?)
+          ?.cast<String>();
+
   void _dispatchGroupNotice(GroupDispatcher dispatcher, AgentMessage notice) {
     if (notice.audience == null) {
       dispatcher.receive([notice], mentions: _groupNoticeMentions([notice]));
@@ -9,9 +13,13 @@ extension GroupSystemEvents on ChatController {
         [notice],
         {
           for (final id in _groupReplies.keys)
-            if (notice.canView(id) &&
+            if (id != notice.senderId &&
+                notice.canView(id) &&
+                _programWakeMembers(notice)?.contains(id) != false &&
                 (!dispatcher.paused.contains(id) ||
-                    notice.messageMetadata?.participation['_programWake'] == true)) id,
+                    notice.messageMetadata?.participation['_programWake'] ==
+                        true))
+              id,
         },
       );
     }
@@ -160,12 +168,20 @@ extension GroupSystemEvents on ChatController {
           }
           _store.writer.remember(notices);
           _notifyRun(target);
-          final programNotices = notices.where((m) =>
-            m.messageMetadata?.participation['_programWake'] == true);
-          await _executeGroupChat(target,
-            wakeMembers: programNotices.isEmpty ? null : {
-              for (final notice in programNotices) ...notice.audience!,
-            });
+          final programNotices = notices.where(
+            (m) => m.messageMetadata?.participation['_programWake'] == true,
+          );
+          await _executeGroupChat(
+            target,
+            wakeMembers: programNotices.isEmpty
+                ? null
+                : {
+                    for (final notice in programNotices)
+                      for (final id
+                          in _programWakeMembers(notice) ?? notice.audience!)
+                        if (id != notice.senderId) id,
+                  },
+          );
         } finally {
           _runningConversation = null;
           _resumeForwardedReply();

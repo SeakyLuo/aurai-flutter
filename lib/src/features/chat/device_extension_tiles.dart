@@ -55,11 +55,11 @@ class _DeviceExtensionTilesState extends State<DeviceExtensionTiles>
     super.dispose();
   }
 
-  void _notice(String message) {
+  void _notice(String message, {ToastKind kind = ToastKind.info}) {
     if (mounted)
       ScaffoldMessenger.of(
         context,
-      ).showGlassSnackBar(SnackBar(content: Text(message)));
+      ).showToast(SnackBar(content: Text(message)), kind: kind);
   }
 
   Future<void> _load() async {
@@ -70,7 +70,10 @@ class _DeviceExtensionTilesState extends State<DeviceExtensionTiles>
       if (mounted) setState(() => _state = state);
     } on PlatformException catch (error) {
       _timer?.cancel();
-      _notice(error.message ?? '无法读取设备能力：${errorMessage(error)}');
+      _notice(
+        error.message ?? '无法读取设备能力：${errorMessage(error)}',
+        kind: ToastKind.error,
+      );
     } finally {
       _loading = false;
     }
@@ -82,7 +85,7 @@ class _DeviceExtensionTilesState extends State<DeviceExtensionTiles>
       await action();
       await _load();
     } on PlatformException catch (error) {
-      _notice(errorMessage(error));
+      _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _busy.remove(id));
     }

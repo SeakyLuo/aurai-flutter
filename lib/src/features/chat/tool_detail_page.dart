@@ -43,9 +43,10 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
   Future<void> _copyName() async {
     await Clipboard.setData(ClipboardData(text: _savedTitle));
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(const SnackBar(content: Text('工具名称已复制')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('工具名称已复制')),
+        kind: ToastKind.success,
+      );
     }
   }
 
@@ -130,7 +131,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
       });
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(
             content: Text(
               error is FormatException
@@ -138,6 +139,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
                   : '保存失败：$error',
             ),
           ),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -199,7 +201,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
                   ),
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+                      padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
                       child: Text(
                         '名称',
                         style: TextStyle(

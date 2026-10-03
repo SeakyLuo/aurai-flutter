@@ -52,13 +52,7 @@ extension ConversationRun on ChatController {
     if (callbacksOnly && callbackEvents.isEmpty) return;
     await _persistMember(runConversation, groupParent);
     final history =
-        groupHistory ??
-        await _store.reader.messages(
-          runConversation.id,
-          forModel: true,
-          modelConfig: runConfig,
-          afterCheckpoint: runConversation.contextSummary?.throughMessageId,
-        );
+        groupHistory ?? await _loadPrivateRunHistory(runConversation, reply);
     final lastUser = history.lastIndexWhere(
       (message) => message.role == AgentMessageRole.user,
     );
@@ -79,17 +73,10 @@ extension ConversationRun on ChatController {
             runConfig,
           )
         : const <Map<String, Object?>>[];
-    final previousWatch = runConversation.executionWatch;
-    final continuingElapsed =
-        runConversation.executionUserMessageId == userMessage.id
-        ? runConversation.restoredExecutionElapsed +
-              (previousWatch?.elapsed ?? Duration.zero)
-        : Duration.zero;
     final executionWatch = Stopwatch()..start();
     runConversation.executionWatch = executionWatch;
-    runConversation.restoredExecutionElapsed = continuingElapsed;
-    runConversation.hasExecutionProcess =
-        continuingElapsed > Duration.zero || continuationProtocol.isNotEmpty;
+    runConversation.restoredExecutionElapsed = Duration.zero;
+    runConversation.hasExecutionProcess = continuationProtocol.isNotEmpty;
     runConversation.executionUserMessageId = userMessage.id;
     final runId = await _store.runs.start(
       runConversation.id,
@@ -207,7 +194,7 @@ extension ConversationRun on ChatController {
             );
           }
           _notifyMember(runConversation, groupParent);
-        }),
+        }, sender: reply.sender),
       )..addAll(_thinkingTools(runConversation, groupParent, reply));
       if (groupParent != null) {
         _bindGroupRunTools(
@@ -258,6 +245,7 @@ extension ConversationRun on ChatController {
         provider: provider,
         registry: registry,
         executor: executor,
+        userInputs: groupParent == null ? _execution.userInputs : null,
       );
       if (groupParent == null) {
         _runtime = runtime;
@@ -352,6 +340,9 @@ extension ConversationRun on ChatController {
           _setMemberStreaming(reply.senderId, null, groupParent);
           _notifyMember(runConversation, groupParent);
         },
+        takeUserUpdates: groupParent == null
+            ? null
+            : () => _takeGroupRunUpdates(reply.senderId, observed),
         onTurnCompleted: (turn) async {
           await _persistMember(runConversation, groupParent);
           await _store.runs.finishTurn(modelTurnId, turn);
@@ -365,25 +356,14 @@ extension ConversationRun on ChatController {
             call,
           );
         },
-        onToolCompleted: (result) async {
-          await _store.runs.finishTool(runId, result);
-          await _updateLiveProjectChanges(gitSnapshots, result, runId);
-          final shape = diagnosticCalls.remove(result.callId);
-          if (result.status == ToolResultStatus.error) {
-            await ExecutionLog.write({
-              'event': 'tool_error',
-              'conversationId': runConversation.id,
-              'senderId': reply.senderId,
-              'senderName': reply.sender.name,
-              'runId': runId,
-              'model': runConfig.model,
-              'callId': result.callId,
-              'tool': result.toolName,
-              'argumentShape': shape,
-              'result': result.output,
-            }, apiKey: runConfig.apiKey);
-          }
-        },
+        onToolCompleted: _runToolCompletionListener(
+          runConversation,
+          reply,
+          runConfig,
+          runId,
+          gitSnapshots,
+          diagnosticCalls,
+        ),
         onReconnect: (attempt) {
           if (runConversation.reconnectAttempt == attempt) return;
           runConversation.reconnectAttempt = attempt;
@@ -519,6 +499,9 @@ extension ConversationRun on ChatController {
         },
         onStepsChanged: (newSteps) {
           if (groupParent != null) {
+            _recordGroupSteps(reply.senderId, runId, newSteps);
+          }
+          if (groupParent != null) {
             newSteps = newSteps
                 .where((s) => s.toolName != 'sendGroupMessage')
                 .toList();
@@ -611,7 +594,7 @@ extension ConversationRun on ChatController {
           text: answer.text,
           createdAt: answer.createdAt,
           images: answer.images,
-          interactive: answer.interactive,
+          interactive: answer.messageMetadata,
           htmlGame: answer.htmlGame,
           quote: answer.quote,
           taskSummary: AgentTaskSummary(
@@ -773,6 +756,7 @@ extension ConversationRun on ChatController {
         }
         if (groupParent == null) {
           _runtime = null;
+          _execution.liveUserMessageIds.clear();
         } else {
           _groupRuntimes.remove(reply.senderId);
         }

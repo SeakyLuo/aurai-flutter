@@ -92,6 +92,7 @@ class StarredMessages {
 
   Future<List<Map<String, Object?>>> page({
     required int offset,
+    int limit = 50,
     String? viewerId,
   }) async {
     final stars = await database.query(
@@ -108,7 +109,7 @@ class StarredMessages {
         if (viewerId != null) ...[viewerId, viewerId],
       ],
       orderBy: 'starred_at DESC, object_id DESC',
-      limit: 50,
+      limit: limit,
       offset: offset,
     );
     if (stars.isEmpty) return [];

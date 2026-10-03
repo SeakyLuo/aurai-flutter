@@ -17,8 +17,9 @@ class WebPageToolDetails extends StatelessWidget {
       });
     } on Object catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('无法打开链接，请稍后再试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     }

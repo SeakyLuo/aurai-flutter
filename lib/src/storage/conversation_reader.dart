@@ -1,4 +1,5 @@
 import 'group_unread_messages.dart';
+import 'group_member_details.dart';
 import '../html_games/html_store.dart';
 import '../html_games/html_game.dart';
 import '../domain/interactive_message.dart';
@@ -38,26 +39,27 @@ class ConversationReader {
 
   Future<List<Conversation>> list({
     Conversation? after,
+    int limit = pageSize,
     bool archived = false,
     ConversationKind? kind,
   }) async {
     final rows = await database.query(
       'conversations',
       where:
-          '$visibleConversation AND $localUserConversation AND archived = ?${kind == null ? '' : ' AND kind = ?'}${after == null ? '' : ' AND (pinned < ? OR (pinned = ? AND (updated_at < ? OR (updated_at = ? AND id < ?))))'}',
+          '$visibleConversation AND $localUserConversation AND archived = ?${kind == null ? '' : ' AND kind = ?'}${after == null ? '' : ' AND (pinned < ? OR (pinned = ? AND (MAX(updated_at, draft_updated_at) < ? OR (MAX(updated_at, draft_updated_at) = ? AND id < ?))))'}',
       whereArgs: [
         archived ? 1 : 0,
         if (kind != null) kind.name,
         if (after != null) ...[
           after.isPinned ? 1 : 0,
           after.isPinned ? 1 : 0,
-          after.updatedAt.microsecondsSinceEpoch,
-          after.updatedAt.microsecondsSinceEpoch,
+          after.listUpdatedAt.microsecondsSinceEpoch,
+          after.listUpdatedAt.microsecondsSinceEpoch,
           after.id,
         ],
       ],
-      orderBy: 'pinned DESC, updated_at DESC, id DESC',
-      limit: pageSize,
+      orderBy: 'pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC',
+      limit: limit,
     );
     final values = rows.map(conversationFromRow).toList();
     if (values.isNotEmpty) {
@@ -163,11 +165,13 @@ class ConversationReader {
           'id IN (SELECT sender_id FROM conversation_members WHERE conversation_id = ?)',
       whereArgs: [conversation.id],
     );
-    conversation.noticeMembers.addEntries(
-      rows.map((row) {
-        final sender = MessageSender.fromRow(row);
-        return MapEntry(sender.id, sender);
-      }),
+    final senders = {
+      for (final row in rows) row['id'] as String: MessageSender.fromRow(row),
+    };
+    conversation.noticeMembers.addAll(
+      await GroupMemberDetailsStore(
+        database,
+      ).applyNames(conversation.id, senders),
     );
   }
 
@@ -217,24 +221,12 @@ class ConversationReader {
       final run = unfinishedRuns
           .where((row) => row['id'] == conversation.activeRunId)
           .firstOrNull;
-      final taskRuns = run == null
-          ? const <Map<String, Object?>>[]
-          : unfinishedRuns
-                .where(
-                  (row) =>
-                      row['user_message_id'] == run['user_message_id'] &&
-                      row['elapsed_ms'] != null,
-                )
-                .toList();
-      if (taskRuns.isNotEmpty) {
+      if (run != null && run['elapsed_ms'] != null) {
         conversation.hasExecutionProcess = true;
-        conversation.executionUserMessageId = run!['user_message_id'] as String;
+        conversation.executionUserMessageId = run['user_message_id'] as String;
         conversation.executionWatch = Stopwatch();
         conversation.restoredExecutionElapsed = Duration(
-          milliseconds: taskRuns.fold(
-            0,
-            (elapsed, row) => elapsed + (row['elapsed_ms']! as int),
-          ),
+          milliseconds: run['elapsed_ms'] as int,
         );
       }
     }
@@ -471,10 +463,11 @@ class ConversationReader {
         .map((row) => row['run_id'])
         .toSet();
     final images = attachmentsAndSenders[0];
-    final senders = {
-      for (final row in attachmentsAndSenders[1])
-        row['id'] as String: MessageSender.fromRow(row),
-    };
+    final senders = await GroupMemberDetailsStore(database)
+        .applyNames(conversationId, {
+          for (final row in attachmentsAndSenders[1])
+            row['id'] as String: MessageSender.fromRow(row),
+        });
     final quickReplyRelations = {
       for (final row in attachmentsAndSenders[3])
         row['message_id'] as String: row,

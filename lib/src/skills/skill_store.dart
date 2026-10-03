@@ -14,7 +14,7 @@ class SavedSkill {
   const SavedSkill({
     this.id = '',
     this.ownerId = '',
-    this.visibility = 'private',
+    this.visibility = 'public',
     this.visibleTo = const [],
     this.dependencyIds = const [],
     required this.name,

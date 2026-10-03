@@ -49,6 +49,8 @@ class ToolActionIcon extends StatelessWidget {
               'sendHtmlMessage' ||
               'readHtmlMessage' ||
               'readHtmlProgram' ||
+              'readHtmlData' ||
+              'updateHtmlData' ||
               'submitHtmlProgramEvent' ||
               'updateHtmlMessage' ||
               'listHtmlApps' ||

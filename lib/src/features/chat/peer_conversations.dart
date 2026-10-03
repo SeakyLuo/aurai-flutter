@@ -173,7 +173,7 @@ extension PeerConversations on ChatController {
         questionTool: AskUserTool(conversation.id, (question) {
           pendingQuestion = question;
           _conversationChanged();
-        }),
+        }, sender: profile.sender),
       ),
       capabilities: capabilities,
     );

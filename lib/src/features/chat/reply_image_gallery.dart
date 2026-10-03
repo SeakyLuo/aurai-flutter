@@ -96,9 +96,10 @@ class _ReplyImageCardState extends State<_ReplyImageCard> {
   NetworkImage get _provider => NetworkImage(_image.url);
 
   void _notice() {
-    ScaffoldMessenger.of(
-      context,
-    ).showGlassSnackBar(const SnackBar(content: Text('图片加载失败，点按图片重试')));
+    ScaffoldMessenger.of(context).showToast(
+      const SnackBar(content: Text('图片加载失败，点按图片重试')),
+      kind: ToastKind.error,
+    );
   }
 
   Future<void> _open() async {

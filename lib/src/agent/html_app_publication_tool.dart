@@ -1,3 +1,4 @@
+import '../domain/tool_detail_target.dart';
 import 'dart:io';
 
 import '../html_games/miniapp_release_notes.dart';
@@ -121,6 +122,14 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
           toolName: name,
           status: ToolResultStatus.success,
           output: {
+            'detailTargets': [
+              for (final app in apps)
+                ToolDetailTarget(
+                  type: ToolDetailType.miniapp,
+                  id: app['id'] as String,
+                  name: app['title'] as String,
+                ).toJson(),
+            ],
             'apps': [
               for (final app in apps)
                 {
@@ -209,6 +218,13 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
           'hasCustomIcon': entry.iconPath != null,
           'published': entry.listed,
           'scope': 'local',
+          'detailTargets': [
+            ToolDetailTarget(
+              type: ToolDetailType.miniapp,
+              id: id,
+              name: entry.publishedTitle ?? entry.title,
+            ).toJson(),
+          ],
           'changeLog': notes.firstOrNull?.notes,
           'changeLogRevision': notes.firstOrNull?.revision,
           'publisherId': rows.single['creator_id'],
@@ -219,9 +235,7 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
         callId: call.id,
         toolName: name,
         status: ToolResultStatus.error,
-        output: {
-          'message': error.toString(),
-        },
+        output: {'message': error.toString()},
       );
     }
   }
