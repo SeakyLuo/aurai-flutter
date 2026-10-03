@@ -13,6 +13,7 @@ import 'question_icon.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'choice_sheet.dart';
+import 'model_choice_sheet.dart';
 
 class RequestAdapterPage extends StatefulWidget {
   const RequestAdapterPage({
@@ -84,14 +85,15 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
     _preview = null;
   }
 
-  void _notice(Object message) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text('$message')));
+  void _notice(Object message, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text('$message')), kind: kind);
   Future<void> _scopePicker() async {
     final config =
         (widget.draft?.config ??
         widget.controller.modelSettings.profile(widget.service));
-    final selected = await showChoiceSheet<String>(
+    final selected = await showModelOptionsSheet(
       context,
       title: '适用范围',
       selected: _scope,
@@ -178,14 +180,19 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
     child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(26),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
-        child: Row(
-          children: [
-            Expanded(child: Text(label, style: const TextStyle(fontSize: 16))),
-            const SizedBox(width: 12),
-            const SettingsIcon(type: SettingsIconType.chevron),
-          ],
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: settingsCardHeight),
+        child: Padding(
+          padding: settingsCardPadding,
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(label, style: const TextStyle(fontSize: 16)),
+              ),
+              const SizedBox(width: 12),
+              const SettingsIcon(type: SettingsIconType.chevronDown),
+            ],
+          ),
         ),
       ),
     ),
@@ -221,6 +228,10 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
           modelPurposeField: old.details?.modelPurposeField ?? '',
           modelTypeMappings: old.details?.modelTypeMappings ?? const {},
           modelReasoning: old.details?.modelReasoning ?? const {},
+          speechApi: old.speechApi,
+          speechApiKey: old.details?.speechApiKey ?? '',
+          modelCatalog: old.details?.modelCatalog ?? const [],
+          modelApiNames: old.details?.modelApiNames ?? const {},
           balance: old.details?.balance,
           icon: old.details?.icon,
           name: old.displayName,
@@ -234,7 +245,7 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
       final result = await previewRequestAdapter(config);
       if (mounted) setState(() => _preview = result);
     } catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -267,7 +278,7 @@ class _RequestAdapterPageState extends State<RequestAdapterPage> {
         Navigator.pop(context, true);
       }
     } catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

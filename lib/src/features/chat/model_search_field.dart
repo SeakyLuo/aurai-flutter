@@ -28,9 +28,12 @@ class ModelSearchField extends StatelessWidget {
         borderRadius: BorderRadius.circular(26),
         borderSide: BorderSide.none,
       ),
-      prefixIcon: const Padding(
-        padding: EdgeInsets.all(13),
-        child: SidebarActionIcon(type: SidebarActionIconType.search),
+      prefixIcon: Padding(
+        padding: const EdgeInsets.all(13),
+        child: SidebarActionIcon(
+          type: SidebarActionIconType.search,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     ),
   );

@@ -1,3 +1,4 @@
+import 'settings_appearance.dart';
 import 'group_nickname_visibility.dart';
 import 'package:flutter/material.dart';
 import '../../app/ui_action.dart';
@@ -50,10 +51,12 @@ class _GroupPersonalDetailsState extends State<GroupPersonalDetails> {
     final current = _details!;
     final value = await showDialog<String>(
       context: context,
-      builder: (_) => _GroupDetailEditor(
+      builder: (_) => GroupDetailEditor(
         title: nickname ? '我在群里的昵称' : '备注',
         description: nickname ? '仅在这个群使用，清空后使用原名。' : '仅自己可见，不修改群名称。',
-        initialValue: nickname ? current.nickname : current.remark,
+        initialValue: nickname
+            ? (current.nickname.isEmpty ? widget.defaultName : current.nickname)
+            : current.remark,
         maxLength: nickname ? 32 : 200,
       ),
     );
@@ -73,8 +76,8 @@ class _GroupPersonalDetailsState extends State<GroupPersonalDetails> {
   }
 
   Widget _row(String title, String value, {VoidCallback? onTap}) => ListTile(
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-    minTileHeight: 60,
+    contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 12),
+    minTileHeight: settingsCardHeight,
     title: Text(title, style: const TextStyle(fontSize: 15)),
     trailing: SizedBox(
       width: MediaQuery.sizeOf(context).width * .43,
@@ -151,8 +154,9 @@ class _GroupPersonalDetailsState extends State<GroupPersonalDetails> {
   }
 }
 
-class _GroupDetailEditor extends StatefulWidget {
-  const _GroupDetailEditor({
+class GroupDetailEditor extends StatefulWidget {
+  const GroupDetailEditor({
+    super.key,
     required this.title,
     required this.description,
     required this.initialValue,
@@ -161,10 +165,10 @@ class _GroupDetailEditor extends StatefulWidget {
   final String title, description, initialValue;
   final int maxLength;
   @override
-  State<_GroupDetailEditor> createState() => _GroupDetailEditorState();
+  State<GroupDetailEditor> createState() => _GroupDetailEditorState();
 }
 
-class _GroupDetailEditorState extends State<_GroupDetailEditor> {
+class _GroupDetailEditorState extends State<GroupDetailEditor> {
   late final _text = TextEditingController(text: widget.initialValue);
   @override
   void dispose() {

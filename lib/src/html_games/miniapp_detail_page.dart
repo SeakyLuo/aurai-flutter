@@ -51,7 +51,7 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
     try {
       await _reload();
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -65,9 +65,10 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
       });
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
 
   Future<void> _open() async {
     if (_busy) return;
@@ -84,7 +85,7 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
       );
       if (mounted) await _reload();
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted)
         setState(() {
@@ -106,7 +107,7 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
       );
       if (mounted) await _reload();
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -155,10 +156,11 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
           } else {
             await favorites.add(_entry);
           }
-          if (mounted) _notice(starred ? '已取消收藏' : '已收藏小程序');
+          if (mounted)
+            _notice(starred ? '已取消收藏' : '已收藏小程序', kind: ToastKind.success);
       }
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _menuBusy = false);
     }

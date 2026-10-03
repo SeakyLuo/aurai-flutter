@@ -89,6 +89,7 @@ Future<ProjectActionResult?> showProjectActions(
           _notice(
             context,
             result['existing'] == true ? '主屏幕快捷方式已更新' : '已请求添加，请按桌面提示确认',
+            kind: ToastKind.success,
           );
         return null;
       case 'pin':
@@ -113,11 +114,16 @@ Future<ProjectActionResult?> showProjectActions(
         return ProjectActionResult.removed;
     }
   } on Object catch (error) {
-    if (context.mounted) _notice(context, errorMessage(error));
+    if (context.mounted)
+      _notice(context, errorMessage(error), kind: ToastKind.error);
   }
   return null;
 }
 
-void _notice(BuildContext context, String text) => ScaffoldMessenger.of(
+void _notice(
+  BuildContext context,
+  String text, {
+  ToastKind kind = ToastKind.info,
+}) => ScaffoldMessenger.of(
   context,
-).showGlassSnackBar(SnackBar(content: Text(text)));
+).showToast(SnackBar(content: Text(text)), kind: kind);

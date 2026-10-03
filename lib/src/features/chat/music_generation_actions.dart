@@ -74,7 +74,7 @@ extension MusicGenerationActions on ChatController {
     final generated = await client.generate(
       key: config.apiKey,
       baseUrl: config.baseUrl,
-      model: selection.model,
+      model: config.apiModelFor(selection.model),
       prompt: prompt,
       title: title,
       instrumental: args['instrumental'] as bool,

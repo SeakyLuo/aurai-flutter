@@ -54,9 +54,10 @@ class _ProjectEditorPageState extends State<ProjectEditorPage> {
     super.dispose();
   }
 
-  void _notice(String message) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(message)));
+  void _notice(String message, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(message)), kind: kind);
 
   Future<void> _chooseIcon() async {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -143,7 +144,7 @@ class _ProjectEditorPageState extends State<ProjectEditorPage> {
             );
       if (mounted) Navigator.pop(context, project);
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

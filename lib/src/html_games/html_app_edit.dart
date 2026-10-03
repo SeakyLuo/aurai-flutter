@@ -36,6 +36,7 @@ extension HtmlAppEdit on HtmlAppStore {
       return {
         ...await HtmlAppStore.reference(app),
         'updated': false,
+        'title': app['title'],
         'version': version,
       };
     }
@@ -62,6 +63,7 @@ extension HtmlAppEdit on HtmlAppStore {
     return {
       ...await HtmlAppStore.reference({...app, 'source_path': path}),
       'updated': true,
+      'title': app['title'],
       'version': version + 1,
       ...htmlCodeChanges(id, app['title'] as String, source, html),
     };

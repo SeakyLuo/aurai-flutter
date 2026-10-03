@@ -87,8 +87,9 @@ class _DirectConversationInfoPageState
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _failed = true);
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text('会话详情加载失败，请重试：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -130,9 +131,10 @@ class _DirectConversationInfoPageState
   Future<void> _copyConversationId() async {
     await Clipboard.setData(ClipboardData(text: _conversation.id));
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showGlassSnackBar(const SnackBar(content: Text('已复制会话 ID')));
+    ScaffoldMessenger.of(context).showToast(
+      const SnackBar(content: Text('已复制会话 ID')),
+      kind: ToastKind.success,
+    );
   }
 
   Future<void> _openProfile() async {
@@ -161,7 +163,7 @@ class _DirectConversationInfoPageState
       selection.projectId,
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showGlassSnackBar(
+    ScaffoldMessenger.of(context).showToast(
       SnackBar(
         content: Text(
           conversationProjectChangedMessage(_projects, selection.projectId),
@@ -219,10 +221,13 @@ class _DirectConversationInfoPageState
                       children: [
                         _surface(
                           ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
+                            contentPadding:
+                                const EdgeInsetsDirectional.fromSTEB(
+                                  16,
+                                  8,
+                                  12,
+                                  8,
+                                ),
                             leading: MemberAvatar(
                               sender: _profile!.sender,
                               size: 48,
@@ -250,10 +255,11 @@ class _DirectConversationInfoPageState
                         const SizedBox(height: 12),
                         _surface(
                           ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
+                            contentPadding: const EdgeInsetsDirectional.only(
+                              start: 16,
+                              end: 12,
                             ),
-                            minTileHeight: 60,
+                            minTileHeight: settingsCardHeight,
                             title: const Text(
                               '会话名称',
                               style: TextStyle(fontSize: 15),
@@ -292,10 +298,12 @@ class _DirectConversationInfoPageState
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                minTileHeight: 60,
+                                contentPadding:
+                                    const EdgeInsetsDirectional.only(
+                                      start: 16,
+                                      end: 12,
+                                    ),
+                                minTileHeight: settingsCardHeight,
                                 title: const Text(
                                   '所属项目',
                                   style: TextStyle(fontSize: 15),
@@ -440,8 +448,8 @@ class _DirectConversationInfoPageState
   );
 
   Widget _row(String title, VoidCallback onTap, {Widget? icon}) => ListTile(
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-    minTileHeight: 60,
+    contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 12),
+    minTileHeight: settingsCardHeight,
     leading: icon,
     title: Text(title, style: const TextStyle(fontSize: 15)),
     trailing: const SettingsIcon(type: SettingsIconType.chevron),

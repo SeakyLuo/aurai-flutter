@@ -1,6 +1,62 @@
 part of 'chat_controller.dart';
 
 extension MiniappTemplateSending on ChatController {
+  Future<AgentMessage> _sendAgentMiniappShare(
+    Conversation target,
+    MiniappEntry entry,
+    String senderId,
+  ) async {
+    final source = miniappForwardMessage(entry);
+    final copies = <File>[];
+    var saved = false;
+    AgentMessage? message;
+    Future<String> copy(String path) async {
+      final original = File(path);
+      final destination = File(
+        '${_imageStore.directory}/${newMessageId()}_${original.uri.pathSegments.last}',
+      );
+      copies.add(destination);
+      await original.copy(destination.path);
+      return destination.path;
+    }
+
+    try {
+      final share = source.miniappShare!;
+      final copiedShare = share.withMediaAndNote(
+        iconPath: share.iconPath == null ? null : await copy(share.iconPath!),
+        imagePath: share.imagePath == null
+            ? null
+            : await copy(share.imagePath!),
+        note: share.note,
+      );
+      message = AgentMessage(
+        id: source.id,
+        role: AgentMessageRole.assistant,
+        senderId: senderId,
+        text: source.text,
+        miniappShare: copiedShare,
+        createdAt: source.createdAt,
+      );
+      target.messages.add(message);
+      target.messageCount++;
+      await _store.writer.save(target, makeActive: false);
+      saved = true;
+      _publishInteractiveChange(target.id, message, source: target);
+      _updateConversationList(target);
+      return message;
+    } finally {
+      if (!saved) {
+        if (message != null) {
+          target.messages.removeWhere((item) => item.id == message!.id);
+          target.messageCount--;
+        }
+        for (final file in copies) {
+          if (await file.exists()) await file.delete();
+        }
+      }
+    }
+  }
+
   Future<void> sendMiniappTemplate(
     String? targetId,
     MiniappTemplate template,

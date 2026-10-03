@@ -23,7 +23,7 @@ Future<({String path, Map<String, Object?> body})> transformRequest(
   try {
     final raw = await channel.invokeMethod<String>('transformModelRequest', {
       'script': script,
-      'input': jsonEncode({'model': config.model, 'path': path, 'body': body}),
+      'input': jsonEncode({'model': config.apiModel, 'path': path, 'body': body}),
     });
     final result = jsonDecode(raw!) as Map;
     final nextPath = result['path'] as String;
@@ -51,7 +51,7 @@ Future<Map<String, Object?>> previewRequestAdapter(ModelConfig config) async {
   final chat =
       requestProtocol(config) == ProviderProtocol.openaiChatCompletions;
   final before = <String, Object?>{
-    'model': config.model,
+    'model': config.apiModel,
     'stream': true,
     if (chat)
       'messages': [

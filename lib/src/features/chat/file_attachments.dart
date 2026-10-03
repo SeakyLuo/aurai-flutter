@@ -107,10 +107,11 @@ class FileAttachmentCard extends StatelessWidget {
           await MessageFileStore.open(file);
         } on PlatformException catch (error) {
           if (context.mounted)
-            ScaffoldMessenger.of(context).showGlassSnackBar(
+            ScaffoldMessenger.of(context).showToast(
               SnackBar(
                 content: Text(error.message ?? '附件无法打开：${errorMessage(error)}'),
               ),
+              kind: ToastKind.error,
             );
         }
       },

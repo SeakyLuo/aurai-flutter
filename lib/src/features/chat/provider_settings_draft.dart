@@ -18,6 +18,10 @@ class ProviderSettingsDraft {
       config.details?.modelPurposes ?? {},
       config.details?.modelReasoning ?? {},
       config.details?.balance?.toJson(),
+      config.speechApi?.toJson(),
+      config.details?.speechApiKey ?? '',
+      config.details?.modelCatalog ?? const [],
+      config.details?.modelApiNames ?? const {},
     ],
     [
       saved.details?.requestAdapters.map((k, v) => MapEntry(k, v.toJson())) ??
@@ -29,6 +33,10 @@ class ProviderSettingsDraft {
       saved.details?.modelPurposes ?? {},
       saved.details?.modelReasoning ?? {},
       saved.details?.balance?.toJson(),
+      saved.speechApi?.toJson(),
+      saved.details?.speechApiKey ?? '',
+      saved.details?.modelCatalog ?? const [],
+      saved.details?.modelApiNames ?? const {},
     ],
   );
 

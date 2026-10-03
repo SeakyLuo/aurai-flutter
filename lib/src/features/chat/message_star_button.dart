@@ -41,7 +41,7 @@ class _MessageStarButtonState extends State<MessageStarButton> {
       final value = await _store.containsBatched(widget.messageId);
       if (mounted && revision == _revision) setState(() => _starred = value);
     } on Object catch (error) {
-      if (mounted) _notice(error);
+      if (mounted) _notice(error, kind: ToastKind.error);
     }
   }
 
@@ -54,9 +54,10 @@ class _MessageStarButtonState extends State<MessageStarButton> {
     }
   }
 
-  void _notice(Object error) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+  void _notice(Object error, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(errorMessage(error))), kind: kind);
 
   Future<void> _toggle() async {
     setState(() => _busy = true);
@@ -71,12 +72,10 @@ class _MessageStarButtonState extends State<MessageStarButton> {
       await _store.set(id, true);
       if (mounted) {
         if (widget.messageId == id) setState(() => _starred = value);
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text('已收藏')));
+        ScaffoldMessenger.of(context).showToast(SnackBar(content: Text('已收藏')));
       }
     } on Object catch (error) {
-      if (mounted) _notice(error);
+      if (mounted) _notice(error, kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

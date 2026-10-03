@@ -11,6 +11,7 @@ class AssetLibrary {
 
   Future<List<LibraryAsset>> page({
     required int offset,
+    int limit = pageSize,
     String query = '',
     AssetSource? source,
     AssetType? type,
@@ -48,7 +49,7 @@ class AssetLibrary {
         if (query.isNotEmpty) query.toLowerCase(),
       ],
       orderBy: sort.orderBy,
-      limit: pageSize,
+      limit: limit,
       offset: offset,
     );
     return rows.map((row) => LibraryAsset.fromRow(row, directory)).toList();

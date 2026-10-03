@@ -1,8 +1,25 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
 import 'task_elapsed.dart';
+
+bool toolShowsElapsed(String? toolName, {String? resultJson}) {
+  // User response and permission waits do not measure tool execution time.
+  if (const {
+    'askUser',
+    'requestAccessibilityAccess',
+    'requestShizukuAccess',
+    'startNetworkCapture',
+    'requestDocumentFolder',
+    'requestModelProviderKey',
+  }.contains(toolName)) {
+    return false;
+  }
+  return resultJson == null ||
+      !(jsonDecode(resultJson) as Map).containsKey('userAction');
+}
 
 class ToolElapsed extends StatefulWidget {
   const ToolElapsed({

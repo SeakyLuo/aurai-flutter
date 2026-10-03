@@ -33,8 +33,9 @@ class CapabilityPage extends StatefulWidget {
       await controller.refreshCapabilities();
     } on Object catch (error) {
       if (context.mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('无法读取设备能力，请稍后再试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       return;
     }
@@ -121,7 +122,7 @@ class _CapabilityPageState extends State<CapabilityPage>
       await action();
     } on Object {
       if (mounted)
-        _messenger.currentState!.showGlassSnackBar(
+        _messenger.currentState!.showToast(
           const SnackBar(content: Text('操作未完成，请稍后重试')),
         );
     }

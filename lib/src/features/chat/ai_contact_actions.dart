@@ -18,8 +18,9 @@ Future<void> openAiChat(
       await openHomeConversation(context, controller, id, resetStack: true);
   } on Object catch (error) {
     if (context.mounted)
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text('无法打开会话，请稍后重试：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
   }
 }
@@ -82,13 +83,15 @@ Future<void> changeAiArchive(
       await controller.groupStore.archiveAi(ai.sender.id);
     }
     if (context.mounted)
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text(ai.sender.archived ? '已恢复朋友' : '已归档朋友')),
+        kind: ToastKind.success,
       );
   } on Object catch (error) {
     if (context.mounted)
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text('操作失败，请重试：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
   }
 }

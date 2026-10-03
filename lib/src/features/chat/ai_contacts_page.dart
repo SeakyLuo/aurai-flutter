@@ -1,3 +1,5 @@
+import 'floating_search_layout.dart';
+import 'glass_surface.dart';
 import '../../widgets/empty_data_view.dart';
 import 'search_skeleton.dart';
 import '../../app/glass_notice.dart';
@@ -33,6 +35,8 @@ class AiContactsPage extends StatefulWidget {
     this.selectForConversation = false,
     this.returnSelection = false,
     this.conversationMode = ConversationMode.normal,
+    this.searchController,
+    this.onToggleSearch,
   });
   final ChatController controller;
   final bool archived;
@@ -41,37 +45,57 @@ class AiContactsPage extends StatefulWidget {
   final bool selectForConversation;
   final bool returnSelection;
   final ConversationMode conversationMode;
+  final TextEditingController? searchController;
+  final VoidCallback? onToggleSearch;
   @override
   State<AiContactsPage> createState() => _AiContactsPageState();
 }
 
 class _AiContactsPageState extends State<AiContactsPage> {
-  final _search = TextEditingController();
+  late final _search = widget.searchController ?? TextEditingController();
+  late String _searchQuery;
   final _items = <AiProfile>[];
   Timer? _debounce;
   int _generation = 0;
   int? _count;
-  bool _loading = false, _more = true;
+  bool _loading = false, _more = true, _failed = false;
   late bool _archived;
   @override
   void initState() {
     super.initState();
     _archived = widget.archived;
+    _searchQuery = _search.text;
+    _search.addListener(_searchChanged);
     _load(reset: true);
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
-    _search.dispose();
+    _search.removeListener(_searchChanged);
+    if (widget.searchController == null) _search.dispose();
     super.dispose();
   }
 
-  Future<void> _load({bool reset = false}) async {
-    if (!reset && (_loading || !_more)) return;
-    final generation = reset ? ++_generation : _generation;
+  void _searchChanged() {
+    if (_search.text == _searchQuery) return;
+    _searchQuery = _search.text;
+    _generation++;
+    _debounce?.cancel();
+    _debounce = Timer(
+      const Duration(milliseconds: 250),
+      () => _load(reset: true),
+    );
+  }
+
+  Future<void> _load({bool reset = false, bool refresh = false}) async {
+    if (!reset && !refresh && (_loading || !_more)) return;
+    final replace = reset || refresh;
+    final limit = refresh && _items.length > 50 ? _items.length : 50;
+    final generation = replace ? ++_generation : _generation;
     setState(() {
       _loading = true;
+      _failed = false;
       if (reset) {
         _items.clear();
         _count = null;
@@ -83,9 +107,10 @@ class _AiContactsPageState extends State<AiContactsPage> {
         widget.controller.groupStore.contacts(
           query,
           archived: _archived,
-          offset: _items.length,
+          offset: replace ? 0 : _items.length,
+          limit: limit,
         ),
-        reset
+        replace
             ? widget.controller.groupStore.contactCount(
                 query,
                 archived: _archived,
@@ -94,20 +119,18 @@ class _AiContactsPageState extends State<AiContactsPage> {
       ).wait;
       if (!mounted || generation != _generation) return;
       setState(() {
+        if (replace) _items.clear();
         _items.addAll(page);
         _count = count;
-        _more = page.length == 50;
+        _more = page.length == limit;
       });
     } on Object catch (error) {
+      if (mounted && generation != _generation) return;
+      if (mounted) setState(() => _failed = true);
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
-          SnackBar(
-            content: Text('朋友加载失败：${errorMessage(error)}'),
-            action: SnackBarAction(
-              label: '重试',
-              onPressed: () => _load(reset: true),
-            ),
-          ),
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text('朋友加载失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted && generation == _generation)
@@ -123,7 +146,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
             AiContactPage(controller: widget.controller, senderId: id),
       ),
     );
-    if (mounted) _load(reset: true);
+    if (mounted) _load(refresh: true);
   }
 
   bool _openingConversation = false;
@@ -151,8 +174,9 @@ class _AiContactsPageState extends State<AiContactsPage> {
       );
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('无法新建会话，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     } finally {
@@ -225,12 +249,12 @@ class _AiContactsPageState extends State<AiContactsPage> {
     if (!mounted || action == null) return;
     if (action == 'message') {
       await openAiChat(context, widget.controller, ai);
-      if (mounted) _load(reset: true);
+      if (mounted) _load(refresh: true);
       return;
     }
     if (action == 'archive') {
       await changeAiArchive(context, widget.controller, ai);
-      if (mounted) _load(reset: true);
+      if (mounted) _load(refresh: true);
       return;
     }
     if (action == 'edit') {
@@ -241,7 +265,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
               AiContactEditor(controller: widget.controller, profile: ai),
         ),
       );
-      if (mounted) _load(reset: true);
+      if (mounted) _load(refresh: true);
     } else {
       await _open(ai.sender.id);
     }
@@ -265,7 +289,38 @@ class _AiContactsPageState extends State<AiContactsPage> {
             root: widget.root,
             onBack: () => Navigator.pop(context),
             actions: [
-              if (!_archived)
+              if (widget.onToggleSearch != null && !_archived)
+                SettingsGlassActionSurface(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RoundAction(
+                        label: '搜索朋友',
+                        icon: Icons.search_rounded,
+                        iconWidget: const SidebarActionIcon(
+                          type: SidebarActionIconType.search,
+                        ),
+                        onPressed: widget.onToggleSearch,
+                      ),
+                      SizedBox(
+                        height: 18,
+                        child: VerticalDivider(
+                          width: 1,
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                      RoundAction(
+                        label: '添加朋友',
+                        icon: Icons.add_rounded,
+                        iconWidget: const SettingsIcon(
+                          type: SettingsIconType.add,
+                        ),
+                        onPressed: _create,
+                      ),
+                    ],
+                  ),
+                )
+              else if (!_archived)
                 SettingsGlassAction(
                   label: '添加朋友',
                   icon: Icons.add_rounded,
@@ -274,178 +329,178 @@ class _AiContactsPageState extends State<AiContactsPage> {
                 ),
             ],
           ),
-          body: SettingsPageBody(avoidHeader: true, child: _body()),
+          body: SettingsPageBody(child: _body()),
         );
 
   Widget _body() => Column(
     children: [
-      if (!_archived)
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: TextField(
-            controller: _search,
-            decoration: InputDecoration(
-              hintText: '搜索朋友',
-              filled: true,
-              fillColor: settingsFieldColor(context),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(26),
-                borderSide: BorderSide.none,
-              ),
-            ),
-            onChanged: (_) {
-              _generation++;
-              _debounce?.cancel();
-              _debounce = Timer(
-                const Duration(milliseconds: 250),
-                () => _load(reset: true),
-              );
-            },
-          ),
-        ),
       Expanded(
-        child: PaginationListener(
-          hasMore: _more,
-          loadMore: _load,
-          child: CustomScrollView(
-            slivers: [
-              if (!_archived && !widget.selectForConversation)
+        child: FloatingSearchLayout(
+          itemCount: _items.length,
+          controller: _search,
+          hintText: '搜索朋友',
+          enabled: !_archived && widget.onToggleSearch == null,
+          bottom: 16,
+          child: PaginationListener(
+            hasMore: _more && !_failed,
+            failed: _failed,
+            onRetry: () => _load(reset: _count == null),
+            loadMore: _load,
+            child: CustomScrollView(
+              slivers: [
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 6),
-                      horizontalTitleGap: 12,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      leading: Container(
-                        width: 44,
-                        height: 44,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: settingsFieldColor(context),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const SidebarActionIcon(
-                          type: SidebarActionIconType.group,
-                        ),
-                      ),
-                      title: const Text('群聊', style: TextStyle(fontSize: 16)),
-                      trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
-                      ),
-                      onTap: () => Navigator.push<void>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => RecentChatsPage(
-                            controller: widget.controller,
-                            groupsOnly: true,
-                          ),
-                        ),
-                      ),
-                    ),
+                  child: SizedBox(
+                    height: widget.embedded ? 0 : settingsHeaderHeight(context),
                   ),
                 ),
-              if (_items.isEmpty && _archived && !_loading)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(child: EmptyDataView(title: '没有已归档朋友')),
-                )
-              else if (_items.isEmpty)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-                    child: _archived && _loading
-                        ? const SearchSkeleton(
-                            label: '正在加载归档朋友',
-                            avatarSize: 44,
-                            rowGap: 32,
-                          )
-                        : Center(
-                            child: _loading
-                                ? const CircularProgressIndicator()
-                                : EmptyDataView(
-                                    title: _search.text.isNotEmpty
-                                        ? '没有找到朋友'
-                                        : _archived
-                                        ? '没有已归档朋友'
-                                        : '点击右上角，创建你的第一个 AI',
-                                  ),
-                          ),
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  sliver: SliverList.builder(
-                    itemCount: _items.length,
-                    itemBuilder: (context, index) {
-                      final ai = _items[index];
-                      return Builder(
-                        builder: (anchorContext) => MenuPressHighlight(
-                          onLongPressStart: widget.selectForConversation
-                              ? null
-                              : (_) => _menu(ai, anchorContext),
-                          borderRadius: BorderRadius.circular(22),
-                          child: ListTile(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(22),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 0,
-                            ),
-                            horizontalTitleGap: 12,
-                            leading: ProfileAvatar(
-                              style: AvatarStyle(
-                                icon: ai.sender.avatarIcon,
-                                color: ai.sender.avatarColor,
-                                path: ai.sender.avatarPath,
-                              ),
-                              name: ai.sender.name,
-                              size: 44,
-                            ),
-                            title: Text(
-                              ai.sender.name,
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            subtitle: ai.description.isEmpty
-                                ? null
-                                : Text(
-                                    ai.description,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                            onTap: () => widget.selectForConversation
-                                ? _startConversation(ai)
-                                : _open(ai.sender.id),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              if (_count != null && (!_archived || _items.isNotEmpty))
-                SliverToBoxAdapter(
-                  child: SafeArea(
-                    top: false,
+                if (!_archived && !widget.selectForConversation)
+                  SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      child: Text(
-                        _archived ? '共 $_count 位已归档朋友' : '共 $_count 位朋友',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                        ),
+                        horizontalTitleGap: 12,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        leading: Container(
+                          width: 44,
+                          height: 44,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: settingsFieldColor(context),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const SidebarActionIcon(
+                            type: SidebarActionIconType.group,
+                          ),
+                        ),
+                        title: const Text('群聊', style: TextStyle(fontSize: 16)),
+                        trailing: const SettingsIcon(
+                          type: SettingsIconType.chevron,
+                        ),
+                        onTap: () => Navigator.push<void>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => RecentChatsPage(
+                              controller: widget.controller,
+                              groupsOnly: true,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              if (!_archived || _items.isNotEmpty || _loading)
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
-            ],
+                if (_items.isEmpty && _archived && !_loading)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(child: EmptyDataView(title: '没有已归档朋友')),
+                  )
+                else if (_items.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+                      child: _archived && _loading
+                          ? const SearchSkeleton(
+                              label: '正在加载归档朋友',
+                              avatarSize: 44,
+                              rowGap: 32,
+                            )
+                          : Center(
+                              child: _loading
+                                  ? const CircularProgressIndicator()
+                                  : EmptyDataView(
+                                      title: _search.text.isNotEmpty
+                                          ? '没有找到朋友'
+                                          : _archived
+                                          ? '没有已归档朋友'
+                                          : '点击右上角，创建你的第一个 AI',
+                                    ),
+                            ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    sliver: SliverList.builder(
+                      itemCount: _items.length,
+                      itemBuilder: (context, index) {
+                        final ai = _items[index];
+                        return Builder(
+                          builder: (anchorContext) => MenuPressHighlight(
+                            onLongPressStart: widget.selectForConversation
+                                ? null
+                                : (_) => _menu(ai, anchorContext),
+                            borderRadius: BorderRadius.circular(22),
+                            child: ListTile(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(22),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 0,
+                              ),
+                              horizontalTitleGap: 12,
+                              leading: ProfileAvatar(
+                                style: AvatarStyle(
+                                  icon: ai.sender.avatarIcon,
+                                  color: ai.sender.avatarColor,
+                                  path: ai.sender.avatarPath,
+                                ),
+                                name: ai.sender.name,
+                                size: 44,
+                              ),
+                              title: Text(
+                                ai.sender.name,
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                              subtitle: ai.description.isEmpty
+                                  ? null
+                                  : Text(
+                                      ai.description,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                              onTap: () => widget.selectForConversation
+                                  ? _startConversation(ai)
+                                  : _open(ai.sender.id),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                if (_count != null && (!_archived || _items.isNotEmpty))
+                  SliverToBoxAdapter(
+                    child: SafeArea(
+                      top: false,
+                      bottom: !widget.embedded,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 20),
+                        child: Text(
+                          _archived ? '共 $_count 位已归档朋友' : '共 $_count 位朋友',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (!_archived &&
+                    widget.onToggleSearch == null &&
+                    (_items.length >= 20 || _search.text.isNotEmpty))
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: FloatingSearchLayout.clearance),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

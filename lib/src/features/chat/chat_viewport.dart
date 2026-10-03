@@ -6,6 +6,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'chat_timeline.dart';
 import 'chat_scrollbar.dart';
 import 'chat_entry_size.dart';
+import 'chat_entry_entrance.dart';
 import 'chat_scroll_anchor.dart';
 import 'pagination_listener.dart';
 
@@ -89,9 +90,15 @@ class ChatViewportState extends State<ChatViewport> {
   final _enteringToolEntries = <String>{};
   bool _contentBelow = false;
   bool _bottomSyncQueued = false;
+  int _bottomSyncRevision = 0;
   bool _keepSentMessageAtTop = false;
   bool _sentSyncQueued = false;
   final _removals = <String, Completer<void>>{};
+  double _messageMenuSpace = 0;
+
+  void reserveMessageMenuSpace(double height) {
+    setState(() => _messageMenuSpace = height);
+  }
 
   Future<void> animateRemoval(String id) async {
     final index = _indices[id];
@@ -123,6 +130,7 @@ class ChatViewportState extends State<ChatViewport> {
       _keepSentMessageAtTop = false;
     }
     final completion = Completer<void>();
+    _bottomSyncRevision++;
     setState(() => _removals[id] = completion);
     await completion.future;
   }
@@ -145,12 +153,12 @@ class ChatViewportState extends State<ChatViewport> {
 
   void _measureEntry(String id, double height) {
     if (!mounted || _entryHeights[id] == height) return;
-    final previousHeight = _entryHeights[id];
     final previousFooter = _footerHeight;
     _entryHeights[id] = height;
     if (_footerHeight != previousFooter) setState(() {});
+    if (_removals.containsKey(id) || !_indices.containsKey(id)) return;
     if (_keepSentMessageAtTop) _scheduleSentSync();
-    if (_following && previousHeight != null) _scheduleBottomSync();
+    if (_following) _scheduleBottomSync();
   }
 
   double _listAlignment(int index, double itemAlignment) {
@@ -268,6 +276,9 @@ class ChatViewportState extends State<ChatViewport> {
     final anchor = _anchor;
     final previousIndex = anchor == null ? null : _indices[anchor.messageId];
     if (!identical(widget.entries, oldWidget.entries)) _indexEntries();
+    final removedAnimatedEntry = _removals.keys.any(
+      (id) => !_indices.containsKey(id),
+    );
     _removals.removeWhere((id, completion) {
       if (_indices.containsKey(id)) return false;
       if (!completion.isCompleted) completion.complete();
@@ -277,6 +288,14 @@ class ChatViewportState extends State<ChatViewport> {
         widget.sentMessageId != null) {
       _replyAnchorId = widget.sentMessageId;
       _pinSentMessage();
+      return;
+    }
+    if (removedAnimatedEntry) {
+      // The collapse already laid out the remaining messages. Do not scroll
+      // again when the zero-height entry is removed from the data source.
+      _bottomSyncRevision++;
+      _anchor = null;
+      if (_following) _scheduleBottomSync();
       return;
     }
     if (_following &&
@@ -339,8 +358,17 @@ class ChatViewportState extends State<ChatViewport> {
         if (mounted) widget.onContentBelowChanged(_contentBelow);
       });
     }
-    if (_userScrolling && _following == contentBelow) {
-      _following = !contentBelow;
+    // Content changes must not release bottom following. Only a user's
+    // scroll away from the end does; reaching the end enables it again.
+    final following = _userScrolling
+        ? !contentBelow
+        : _following || (!_keepSentMessageAtTop && !contentBelow);
+    if (_following != following) {
+      _following = following;
+      if (following) {
+        _keepSentMessageAtTop = false;
+        _scheduleBottomSync();
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) widget.onFollowOutputChanged(_following);
       });
@@ -454,6 +482,10 @@ class ChatViewportState extends State<ChatViewport> {
   }
 
   void _preserveEntry(String id) {
+    if (_following && !_userScrolling) {
+      _scheduleBottomSync();
+      return;
+    }
     final revision = ++_scrollRevision;
     _keepSentMessageAtTop = false;
     final position = _positions.itemPositions.value.firstWhere(
@@ -509,11 +541,24 @@ class ChatViewportState extends State<ChatViewport> {
   }
 
   void _scheduleBottomSync() {
-    if (_bottomSyncQueued) return;
+    if (_bottomSyncQueued || _messageMenuSpace > 0) return;
     _bottomSyncQueued = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    final revision = _bottomSyncRevision;
+    // PositionedList publishes item positions in a post-frame callback. Wait
+    // until all of those callbacks finish before matching the new footer index;
+    // after a removal, that index can still refer to an old message otherwise.
+    WidgetsBinding.instance.endOfFrame.then((_) {
       _bottomSyncQueued = false;
-      if (!mounted || !_following || _userScrolling || _restoring) return;
+      if (revision != _bottomSyncRevision) {
+        if (mounted && _following) _scheduleBottomSync();
+        return;
+      }
+      if (!mounted ||
+          !_following ||
+          _userScrolling ||
+          _restoring ||
+          _messageMenuSpace > 0)
+        return;
       final footer = _positions.itemPositions.value
           .where((item) => item.index == widget.entries.length)
           .firstOrNull;
@@ -579,9 +624,11 @@ class ChatViewportState extends State<ChatViewport> {
           hasMore: widget.hasEarlierMessages,
           loadMore: widget.loadEarlierMessages,
           loadAtStart: true,
+          preloadExtent: (_height * .75).clamp(240.0, double.infinity),
           child: PaginationListener(
             hasMore: widget.hasLaterMessages,
             loadMore: widget.loadLaterMessages,
+            preloadExtent: (_height * .75).clamp(240.0, double.infinity),
             child: NotificationListener<ScrollNotification>(
               onNotification: (notification) {
                 if (notification.depth == 0) {
@@ -590,8 +637,6 @@ class ChatViewportState extends State<ChatViewport> {
                     _scrollRevision++;
                     _restoring = false;
                     _keepSentMessageAtTop = false;
-                    _following = false;
-                    widget.onFollowOutputChanged(false);
                     _userScrolling = true;
                     FocusManager.instance.primaryFocus?.unfocus();
                   }
@@ -601,8 +646,13 @@ class ChatViewportState extends State<ChatViewport> {
                     widget.onUserScroll?.call();
                   }
                   if (notification is ScrollEndNotification && _userScrolling) {
-                    _rememberPosition();
-                    _userScrolling = false;
+                    final revision = _scrollRevision;
+                    WidgetsBinding.instance.endOfFrame.then((_) {
+                      if (!mounted || revision != _scrollRevision) return;
+                      _rememberPosition();
+                      _userScrolling = false;
+                      if (_following) _scheduleBottomSync();
+                    });
                   }
                 }
                 return false;
@@ -632,7 +682,9 @@ class ChatViewportState extends State<ChatViewport> {
                     return Builder(
                       builder: (context) {
                         _listScrollPosition = Scrollable.of(context).position;
-                        return SizedBox(height: _footerHeight);
+                        return SizedBox(
+                          height: _footerHeight + _messageMenuSpace,
+                        );
                       },
                     );
                   }
@@ -651,7 +703,7 @@ class ChatViewportState extends State<ChatViewport> {
                             _listScrollPosition = Scrollable.of(
                               context,
                             ).position;
-                            return _ChatEntryEntrance(
+                            return ChatEntryEntrance(
                               animate: animateEntrance,
                               removing: _removals.containsKey(entry.id),
                               onRemoved: () {
@@ -684,76 +736,5 @@ class ChatViewportState extends State<ChatViewport> {
         );
       },
     ),
-  );
-}
-
-class _ChatEntryEntrance extends StatefulWidget {
-  const _ChatEntryEntrance({
-    required this.animate,
-    required this.child,
-    required this.removing,
-    required this.onRemoved,
-  });
-
-  final bool animate;
-  final Widget child;
-  final bool removing;
-  final VoidCallback onRemoved;
-
-  @override
-  State<_ChatEntryEntrance> createState() => _ChatEntryEntranceState();
-}
-
-class _ChatEntryEntranceState extends State<_ChatEntryEntrance>
-    with SingleTickerProviderStateMixin {
-  static const _duration = Duration(milliseconds: 260);
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: _duration,
-    value: widget.animate ? 0 : 1,
-  );
-  late final Animation<double> _animation = CurvedAnimation(
-    parent: _controller,
-    curve: Curves.easeInOutCubic,
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.removing) {
-      _remove();
-    } else if (widget.animate) {
-      _controller.forward();
-    }
-  }
-
-  void _remove() {
-    _controller.reverse().then((_) {
-      if (mounted && widget.removing) widget.onRemoved();
-    });
-  }
-
-  @override
-  void didUpdateWidget(_ChatEntryEntrance oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.removing && !oldWidget.removing) {
-      _remove();
-    } else if (!widget.removing && oldWidget.removing) {
-      _controller.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    if (widget.removing) widget.onRemoved();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => SizeTransition(
-    sizeFactor: _animation,
-    alignment: Alignment.topCenter,
-    child: FadeTransition(opacity: _animation, child: widget.child),
   );
 }

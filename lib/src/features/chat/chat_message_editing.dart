@@ -8,7 +8,7 @@ extension _ChatMessageEditing on _ChatPageState {
         controller.changingConversation ||
         controller.loadingEarlierMessages ||
         _preparingGoal) {
-      _imageNotice('请先结束当前操作，再编辑消息');
+      _imageNotice('请先结束当前操作，再编辑消息', kind: ToastKind.warning);
       return;
     }
     _draftTimer?.cancel();
@@ -132,6 +132,7 @@ extension _ChatMessageEditing on _ChatPageState {
               : error is PlatformException
               ? error.message ?? '附件添加失败：${errorMessage(error)}'
               : '附件添加失败，请重试：${errorMessage(error)}',
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted && identical(_editing, session))
@@ -154,7 +155,11 @@ extension _ChatMessageEditing on _ChatPageState {
       await widget.controller.removeEditImages(images);
       await MessageFileStore.remove(files);
     } on Object catch (caughtError) {
-      if (mounted) _imageNotice('部分临时图片清理失败：${errorMessage(caughtError)}');
+      if (mounted)
+        _imageNotice(
+          '部分临时图片清理失败：${errorMessage(caughtError)}',
+          kind: ToastKind.error,
+        );
     }
   }
 
@@ -172,7 +177,7 @@ extension _ChatMessageEditing on _ChatPageState {
         controller.changingConversation ||
         controller.loadingEarlierMessages ||
         _preparingGoal) {
-      _imageNotice('请先结束当前操作，再编辑消息');
+      _imageNotice('请先结束当前操作，再编辑消息', kind: ToastKind.warning);
       return;
     }
     _updateEditing(() => session.saving = true);
@@ -198,12 +203,15 @@ extension _ChatMessageEditing on _ChatPageState {
         _followOutput = false;
         _contentBelow = false;
       });
-      if (!cleaned) _imageNotice('消息已更新，部分旧图片清理失败');
+      if (!cleaned) _imageNotice('消息已更新，部分旧图片清理失败', kind: ToastKind.error);
       await _continuePending();
     } on Object catch (caughtError) {
       if (!mounted || !identical(_editing, session)) return;
       _updateEditing(() => session.saving = false);
-      _imageNotice('消息保存失败，请重试：${errorMessage(caughtError)}');
+      _imageNotice(
+        '消息保存失败，请重试：${errorMessage(caughtError)}',
+        kind: ToastKind.error,
+      );
     }
   }
 }

@@ -65,8 +65,9 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
       if (mounted) setState(() => _localPath = '${directories.length} 个目录');
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('本地路径读取失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     }
@@ -115,8 +116,9 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
       if (mounted) await _loadPath();
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('无法打开本地路径：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     }
@@ -148,8 +150,9 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
       }
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('默认处理人保存失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     } finally {
@@ -160,9 +163,10 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
   Future<void> _copyProjectId() async {
     await Clipboard.setData(ClipboardData(text: _project.id));
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(const SnackBar(content: Text('已复制项目 ID')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('已复制项目 ID')),
+        kind: ToastKind.success,
+      );
     }
   }
 
@@ -322,6 +326,7 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
       borderRadius: BorderRadius.circular(26),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
+        contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         leading: icon,
         title: Text(title, style: const TextStyle(fontSize: 15)),
@@ -366,8 +371,9 @@ class _ProjectMemoryPageState extends State<ProjectMemoryPage> {
       if (mounted) setState(() => _memory = memory);
     } on Object catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text('记忆读取失败：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
       Navigator.pop(context, _project);
     }
@@ -391,8 +397,9 @@ class _ProjectMemoryPageState extends State<ProjectMemoryPage> {
       if (mounted) setState(() => _project = project);
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('记忆范围保存失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     } finally {

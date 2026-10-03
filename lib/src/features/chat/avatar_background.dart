@@ -1,7 +1,23 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+const softAvatarColors = <String, (String, Color)>{
+  'soft_rose': ('藕粉', Color(0xfff2cdd0)),
+  'soft_pink': ('浅粉', Color(0xfff7d8e7)),
+  'soft_peach': ('蜜桃', Color(0xffffddbd)),
+  'soft_sand': ('燕麦', Color(0xffeadcc4)),
+  'soft_lemon': ('奶黄', Color(0xfff6eab0)),
+  'soft_sage': ('鼠尾草', Color(0xffdeebc4)),
+  'soft_mint': ('薄荷', Color(0xffc5e8cc)),
+  'soft_aqua': ('浅青', Color(0xffc1e9e6)),
+  'soft_blue': ('浅蓝', Color(0xffcddffc)),
+  'soft_lavender': ('浅紫', Color(0xffded5f5)),
+  'soft_lilac': ('丁香', Color(0xffecd5ef)),
+  'soft_slate': ('雾灰', Color(0xffdce0e5)),
+};
+
 const avatarColors = <String, (String, Color)>{
+  ...softAvatarColors,
   'red': ('红色', Color(0xffc85f63)),
   'rose': ('玫瑰', Color(0xffc66d9b)),
   'orange': ('橙色', Color(0xffd18442)),

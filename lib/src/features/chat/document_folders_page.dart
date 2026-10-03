@@ -44,15 +44,15 @@ class _DocumentFoldersPageState extends State<DocumentFoldersPage>
     if (state == AppLifecycleState.resumed && !_busy) _perform(_load);
   }
 
-  void _notice(String message) => _messenger.currentState!.showGlassSnackBar(
-    SnackBar(content: Text(message)),
-  );
+  void _notice(String message, {ToastKind kind = ToastKind.info}) => _messenger
+      .currentState!
+      .showToast(SnackBar(content: Text(message)), kind: kind);
   Future<void> _perform(Future<void> Function() action) async {
     setState(() => _busy = true);
     try {
       await action();
     } on PlatformException catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -106,7 +106,7 @@ class _DocumentFoldersPageState extends State<DocumentFoldersPage>
         folder['uri'] as String,
       );
       await _load();
-      if (mounted) _notice('已移除授权');
+      if (mounted) _notice('已移除授权', kind: ToastKind.success);
     });
   }
 

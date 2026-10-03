@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import '../domain/message_sender.dart';
+import '../domain/avatar_portraits.dart';
 import '../features/chat/member_avatar.dart';
 
 /// Reuse the IM avatar widget so miniapps display the same photos and symbols.
@@ -73,6 +74,11 @@ class MiniappMemberAvatars {
         for (final sender in senders)
           if (sender.avatarPath != null)
             _precache(FileImage(File(sender.avatarPath!)), root)
+          else if (avatarPortraits.containsKey(sender.avatarIcon))
+            _precache(
+              AssetImage(avatarPortraits[sender.avatarIcon]!.asset),
+              root,
+            )
           else if (sender.avatarIcon == 'app_logo' ||
               sender.avatarIcon == 'app_logo_white')
             _precache(

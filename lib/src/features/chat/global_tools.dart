@@ -61,9 +61,9 @@ extension GlobalTools on ChatController {
             HtmlAppDataTool(name, (operation, args) async {
               final apps = HtmlAppStore(_store.database);
               if (operation == 'listHtmlApps') {
-                return {
-                  'apps': await apps.list(senderId, args['query'] as String),
-                };
+                return MiniappAgentCatalog(
+                  MiniappLibraryStore(_store.database),
+                ).list(args);
               }
               final appId = args['appId'] as String;
               final result = await apps.data(
@@ -87,6 +87,12 @@ extension GlobalTools on ChatController {
                 senderId,
                 conversation,
               );
+              if (operation == 'readHtmlData' ||
+                  operation == 'updateHtmlData') {
+                return HtmlMessageData(
+                  htmlStore,
+                ).invoke(operation, target.id, senderId, args);
+              }
               if (operation == 'readHtmlProgram') {
                 final game = await htmlStore.load(
                   target.id,
@@ -184,8 +190,29 @@ extension GlobalTools on ChatController {
               if (_removedGroupMembers.contains(senderId))
                 throw const AgentCancelled();
             }
+            MiniappTemplate? template;
+            if (args['entryKind'] != null) {
+              final entry = await MiniappAgentCatalog(
+                MiniappLibraryStore(_store.database),
+              ).resolve(args['appId'] as String, args['entryKind'] as String);
+              if (args['sendMode'] == 'share') {
+                final message = await _sendAgentMiniappShare(
+                  target,
+                  entry,
+                  senderId,
+                );
+                return {
+                  'sent': true,
+                  'messageId': message.id,
+                  'conversationId': target.id,
+                  'sendMode': 'share',
+                };
+              }
+              template = await MiniappTemplate.load(_store.database, entry);
+            }
             final profile = await groupStore.loadAi(senderId);
             final message = await htmlStore.create(
+              newSession: template != null,
               conversationId: target.id,
               creator: profile.sender,
               runId:
@@ -197,8 +224,17 @@ extension GlobalTools on ChatController {
               groupMessage: target.kind == ConversationKind.group,
               args: {
                 ...args,
+                if (template != null) ...{
+                  ...template.definition,
+                  'appId': template.appId,
+                  'title': template.title,
+                },
                 'state': <String, Object?>{},
-                'participants': [senderId, MessageSender.localUser.id],
+                'participants': target.kind == ConversationKind.group
+                    ? (await groupStore.members(
+                        target.id,
+                      )).map((m) => m.sender.id).toList()
+                    : [senderId, MessageSender.localUser.id],
                 'turnSenderId': null,
               },
             );
@@ -507,7 +543,11 @@ extension GlobalTools on ChatController {
       skills: skills,
       documents: AiDocumentScope(_store.database, MessageSender.aurai.id),
       history: conversation.messages,
-      questionTool: AskUserTool(conversation.id, (_) {}),
+      questionTool: AskUserTool(
+        conversation.id,
+        (_) {},
+        sender: MessageSender.aurai,
+      ),
       webSources: WebSourceRegistry(),
     );
     return ToolRegistry(tools: tools, capabilities: capabilities).catalog;

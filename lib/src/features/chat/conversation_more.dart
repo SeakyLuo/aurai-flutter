@@ -49,20 +49,20 @@ class _ConversationMoreState extends State<ConversationMore> {
   Conversation get _conversation =>
       widget.conversation ?? widget.controller.activeConversation;
 
-  void _notice(String message) {
+  void _notice(String message, {ToastKind kind = ToastKind.info}) {
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showGlassSnackBar(SnackBar(content: Text(message)));
+    ).showToast(SnackBar(content: Text(message)), kind: kind);
   }
 
   Future<void> _saveChat() async {
     setState(() => _saving = true);
     try {
       await widget.controller.saveTemporaryConversation(_conversation.id);
-      _notice('已保存为正式会话');
+      _notice('已保存为正式会话', kind: ToastKind.success);
     } on Object catch (error) {
-      _notice('聊天保存失败，请重试：${errorMessage(error)}');
+      _notice('聊天保存失败，请重试：${errorMessage(error)}', kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -73,7 +73,7 @@ class _ConversationMoreState extends State<ConversationMore> {
     try {
       await widget.controller.toggleConversationPin(_conversation.id);
     } on Object catch (error) {
-      _notice('置顶保存失败，请重试：${errorMessage(error)}');
+      _notice('置顶保存失败，请重试：${errorMessage(error)}', kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -94,15 +94,20 @@ class _ConversationMoreState extends State<ConversationMore> {
       if (!mounted || confirmed != true) return;
     }
     final messenger = ScaffoldMessenger.of(context);
-    void notice(String message, {SnackBarAction? action}) {
+    void notice(
+      String message, {
+      SnackBarAction? action,
+      ToastKind kind = ToastKind.info,
+    }) {
       if (messenger.mounted) {
-        messenger.showGlassSnackBar(
+        messenger.showToast(
           SnackBar(
             content: Text(message),
             action: action,
             persist: false,
             duration: const Duration(seconds: 6),
           ),
+          kind: kind,
         );
       }
     }
@@ -114,7 +119,10 @@ class _ConversationMoreState extends State<ConversationMore> {
           await controller.setConversationArchived(target.id, archived: false);
           notice('已撤销归档');
         } on Object catch (error) {
-          notice('撤销归档失败，请在已归档会话中重试：${errorMessage(error)}');
+          notice(
+            '撤销归档失败，请在已归档会话中重试：${errorMessage(error)}',
+            kind: ToastKind.error,
+          );
         }
       },
     );
@@ -126,7 +134,7 @@ class _ConversationMoreState extends State<ConversationMore> {
         archived: !wasArchived,
       );
     } on Object catch (error) {
-      notice('归档保存失败，请重试：${errorMessage(error)}');
+      notice('归档保存失败，请重试：${errorMessage(error)}', kind: ToastKind.error);
       if (mounted) setState(() => _saving = false);
       return;
     }
@@ -138,9 +146,10 @@ class _ConversationMoreState extends State<ConversationMore> {
       notice(
         wasArchived ? '已取消归档' : '会话已归档',
         action: wasArchived ? null : undo,
+        kind: ToastKind.success,
       );
     } on Object {
-      notice('会话已归档，请返回会话列表', action: undo);
+      notice('会话已归档，请返回会话列表', action: undo, kind: ToastKind.success);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -163,12 +172,12 @@ class _ConversationMoreState extends State<ConversationMore> {
     final deletedId = _conversation.id;
     try {
       await widget.controller.deleteConversation(deletedId);
-      _notice('会话已删除');
+      _notice('会话已删除', kind: ToastKind.success);
       if (mounted && widget.conversation == null) _closeDetails();
     } on FileSystemException catch (error) {
-      _notice('会话已删除，部分图片文件清理失败：${errorMessage(error)}');
+      _notice('会话已删除，部分图片文件清理失败：${errorMessage(error)}', kind: ToastKind.error);
     } on Object catch (error) {
-      _notice('删除失败，请重试：${errorMessage(error)}');
+      _notice('删除失败，请重试：${errorMessage(error)}', kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

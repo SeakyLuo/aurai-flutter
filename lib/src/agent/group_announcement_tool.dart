@@ -1,3 +1,4 @@
+import '../domain/tool_detail_target.dart';
 import '../domain/tool_models.dart';
 import '../storage/group_announcement_store.dart';
 
@@ -49,11 +50,25 @@ class GroupAnnouncementTool implements AgentTool, RuntimeCapabilityAgentTool {
         accessActorId: accessActorId,
       );
     final value = await store.read(id, accessActorId ?? actorId);
+    final group = (await store.groups.database.query(
+      'conversations',
+      columns: ['title'],
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    )).single;
     return ToolResult(
       callId: call.id,
       toolName: call.name,
       status: ToolResultStatus.success,
       output: {
+        'detailTargets': [
+          ToolDetailTarget(
+            type: ToolDetailType.group,
+            id: id,
+            name: group['title'] as String,
+          ).toJson(),
+        ],
         'content': value?.content ?? '',
         'editor': value?.editorName,
         'updatedAt': value?.updatedAt.toIso8601String(),

@@ -72,6 +72,10 @@ class _ProjectDirectorySheetState extends State<ProjectDirectorySheet> {
             excluded: widget.excluded,
             onChanged: (value) => setState(() => _selected = value),
             header: ListTile(
+              contentPadding: const EdgeInsetsDirectional.only(
+                start: 16,
+                end: 12,
+              ),
               leading: const FileToolIcon(type: FileToolIconType.folder),
               title: const Text('新建目录', style: TextStyle(fontSize: 15)),
               trailing: const SettingsIcon(type: SettingsIconType.chevron),

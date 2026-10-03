@@ -1,12 +1,47 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'settings_icon.dart';
+import '../../domain/avatar_portraits.dart';
 import '../../html_games/html_game_icon.dart';
 import '../../skills/extra_skill_icon.dart';
 
 const avatarSymbols = <String, String>{
   'app_logo_white': 'App Logo',
   'initial': '首字',
+  'portrait:dark_hair_boy': '棕发小哥',
+  'portrait:brown_hair_boy': '皮衣墨镜男生',
+  'portrait:basketball_boy': '篮球男生',
+  'portrait:navy_suit_man': '西装眼镜男生',
+  'portrait:brown_hair_girl': '棕发女生',
+  'portrait:pink_hair_girl': '粉发女孩',
+  'portrait:blonde_ponytail_girl': '金发马尾女生',
+  'portrait:silver_hair_girl': '银发女生',
+  'portrait:blue_cat': '蓝帽猫咪',
+  'portrait:shiba_inu': '柴犬',
+  'portrait:fox': '小狐狸',
+  'portrait:lynx': '猞猁',
+  'portrait:raccoon': '浣熊',
+  'portrait:panda': '大熊猫',
+  'portrait:polar_bear': '白熊',
+  'portrait:lion': '小狮子',
+  'portrait:capybara': '水豚',
+  'portrait:hippo': '河马',
+  'portrait:buffalo': '美洲野牛',
+  'portrait:camel': '骆驼',
+  'portrait:giraffe': '长颈鹿',
+  'portrait:magician_pig': '魔术师小猪',
+  'portrait:duck': '小鸭子',
+  'portrait:turkey': '火鸡',
+  'portrait:toucan': '巨嘴鸟',
+  'portrait:frog': '小青蛙',
+  'portrait:turtle': '乌龟',
+  'portrait:seal': '小海豹',
+  'portrait:shark': '鲨鱼',
+  'portrait:sunflower': '向日葵',
+  'portrait:cactus': '小仙人掌',
+  'portrait:eggplant': '茄子',
+  'portrait:red_dragon_fruit': '红心火龙果',
+  'portrait:little_robot': '小机器人',
   'person': '人物',
   'spark': '灵感',
   'puzzle': '拼图',
@@ -69,6 +104,10 @@ class AvatarSymbol extends StatelessWidget {
   final Color color;
   @override
   Widget build(BuildContext context) {
+    final portrait = avatarPortraits[symbol];
+    if (portrait != null) {
+      return Image.asset(portrait.asset, width: 24, height: 24);
+    }
     if (symbol.startsWith('emoji:')) {
       return Text(
         symbol.substring(6),
@@ -81,6 +120,8 @@ class AvatarSymbol extends StatelessWidget {
     if (symbol == 'app_logo_white') {
       return Image.asset(
         'assets/branding/symbol_white.png',
+        color: color,
+        colorBlendMode: BlendMode.srcIn,
         width: 24,
         height: 24,
         fit: BoxFit.contain,

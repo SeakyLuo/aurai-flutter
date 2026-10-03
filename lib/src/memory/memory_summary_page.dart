@@ -1,3 +1,4 @@
+import '../app/glass_notice.dart';
 import '../widgets/empty_data_view.dart';
 import '../features/chat/retained_tab_view.dart';
 import '../domain/error_message.dart';
@@ -119,9 +120,14 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
     setState(() => _saving = true);
     try {
       await memory.deleteEntry(entry['id'] as String);
-      if (mounted) memoryToast(context, '记忆已删除');
+      if (mounted) memoryToast(context, '记忆已删除', kind: ToastKind.success);
     } on Object catch (error) {
-      if (mounted) memoryToast(context, '删除失败，请重试：${errorMessage(error)}');
+      if (mounted)
+        memoryToast(
+          context,
+          '删除失败，请重试：${errorMessage(error)}',
+          kind: ToastKind.error,
+        );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -151,6 +157,7 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
           error is StateError
               ? error.message
               : '无法生成建议，请检查模型配置后重试：${errorMessage(error)}',
+          kind: ToastKind.error,
         );
       }
     } finally {
@@ -168,7 +175,7 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
       if (!mounted) return;
       setState(() => _plan = null);
       _text.clear();
-      memoryToast(context, '记忆已更新');
+      memoryToast(context, '记忆已更新', kind: ToastKind.success);
     } on Object catch (error) {
       if (mounted) {
         setState(() => _plan = null);
@@ -177,6 +184,7 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
           error is StateError
               ? error.message
               : '无法应用，请重新整理后重试：${errorMessage(error)}',
+          kind: ToastKind.error,
         );
       }
     } finally {
@@ -237,58 +245,66 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 640),
-                      child: ListView(
-                        keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
-                        padding: EdgeInsets.fromLTRB(
-                          8,
-                          MediaQuery.paddingOf(context).top + 8,
-                          8,
-                          MediaQuery.paddingOf(context).bottom + 28,
-                        ),
-                        children: [
-                          if (_plan != null)
-                            MemoryPlanPreview(plan: _plan!)
-                          else ...[
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
+                      child: _plan == null && memory.entries.isEmpty
+                          ? Padding(
+                              padding: EdgeInsets.only(
+                                top: settingsHeaderHeight(context),
+                                bottom: MediaQuery.paddingOf(context).bottom,
                               ),
-                              child: memory.entries.isEmpty
-                                  ? EmptyDataView(
-                                      title: '还没有记忆',
-                                      description: memory.projectShared
-                                          ? '这里会记录项目中所有 AI 共享的背景与约定。你可以在下方补充信息。'
-                                          : memory.scope.isEmpty
-                                          ? '这里会逐渐记录对你的了解。你可以在下方补充希望记住的信息。'
-                                          : '这里会记录在这个群聊中形成的记忆。你可以在下方补充信息。',
-                                    )
-                                  : const Text(
+                              child: EmptyDataView(
+                                title: '还没有记忆',
+                                description: memory.projectShared
+                                    ? '这里会记录项目中所有 AI 共享的背景与约定。你可以在下方补充信息。'
+                                    : memory.scope.isEmpty
+                                    ? '这里会逐渐记录对你的了解。你可以在下方补充希望记住的信息。'
+                                    : '这里会记录在这个群聊中形成的记忆。你可以在下方补充信息。',
+                              ),
+                            )
+                          : ListView(
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              padding: EdgeInsets.fromLTRB(
+                                8,
+                                MediaQuery.paddingOf(context).top + 8,
+                                8,
+                                MediaQuery.paddingOf(context).bottom + 28,
+                              ),
+                              children: [
+                                if (_plan != null)
+                                  MemoryPlanPreview(plan: _plan!)
+                                else ...[
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                    child: const Text(
                                       '以下是对话中形成、或主动保存的记忆。',
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: Color(0xFF6B6B6B),
                                       ),
                                     ),
-                            ),
-                            if (memory.entries.isNotEmpty) ...[
-                              const SizedBox(height: 20),
-                              for (final entry in memory.entries)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: MemoryEntryTile(
-                                    key: ValueKey(entry['id']),
-                                    text: entry['text'] as String,
-                                    enabled: !_saving && !_planning,
-                                    onEdit: () => _edit(entry),
-                                    onMenu: (position) =>
-                                        _menu(entry, position),
                                   ),
-                                ),
-                            ],
-                          ],
-                        ],
-                      ),
+                                  if (memory.entries.isNotEmpty) ...[
+                                    const SizedBox(height: 20),
+                                    for (final entry in memory.entries)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 8,
+                                        ),
+                                        child: MemoryEntryTile(
+                                          key: ValueKey(entry['id']),
+                                          text: entry['text'] as String,
+                                          enabled: !_saving && !_planning,
+                                          onEdit: () => _edit(entry),
+                                          onMenu: (position) =>
+                                              _menu(entry, position),
+                                        ),
+                                      ),
+                                  ],
+                                ],
+                              ],
+                            ),
                     ),
                   ),
                 ),

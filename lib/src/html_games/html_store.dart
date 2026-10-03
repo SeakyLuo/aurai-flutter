@@ -72,7 +72,7 @@ class HtmlStore {
     if (rows.isEmpty) throw StateError('游戏已被删除或撤回');
     final messages = await db.query(
       'messages',
-      columns: ['interactive_json'],
+      columns: ['interactive_json', 'sender_id'],
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -118,9 +118,25 @@ class HtmlStore {
         conversationId,
         avatars: viewer == MessageSender.localUser.id,
       );
+      final actionCards = <Map<String, Object?>>[];
+      for (final row in ownCards) {
+        final actionCard = InteractiveMessage.fromJson(
+          MiniappProgram.decode(row['interactive_json']),
+        );
+        if (actionCard.closed ||
+            (actionCard.shared &&
+                actionCard.engine.phase == 'collecting' &&
+                !actionCard.engine.allowChange &&
+                actionCard.choices.containsKey(viewer)))
+          continue;
+        actionCards.add({
+          'messageId': row['id'],
+          ...actionCard.readFor(viewer),
+        });
+      }
       state['_miniapp'] = {
         'viewerId': viewer,
-        'ownerId': MessageSender.localUser.id,
+        'ownerId': messages.single['sender_id'],
         'members': viewer == MessageSender.localUser.id
             ? await MiniappMemberAvatars.decorate(roster)
             : roster
@@ -137,15 +153,7 @@ class HtmlStore {
           'hostView':
               (runtime['privateViews'] as Map)[(runtime['state']
                   as Map)['hostId']],
-        'cards': [
-          for (final row in ownCards)
-            {
-              'messageId': row['id'],
-              ...InteractiveMessage.fromJson(
-                MiniappProgram.decode(row['interactive_json']),
-              ).readFor(viewer),
-            },
-        ],
+        'cards': actionCards,
       };
     }
     return HtmlGame.fromRow({

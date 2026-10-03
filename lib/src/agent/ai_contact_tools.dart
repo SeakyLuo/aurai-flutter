@@ -1,3 +1,4 @@
+import '../domain/tool_detail_target.dart';
 import '../domain/agent_models.dart';
 import '../domain/ai_profile.dart';
 import '../domain/message_sender.dart';
@@ -293,7 +294,21 @@ class AiContactTool
         callId: call.id,
         toolName: call.name,
         status: ToolResultStatus.success,
-        output: output,
+        output: {
+          ...output,
+          if (operation != 'delete')
+            'detailTargets': [
+              for (final p
+                  in operation == 'list'
+                      ? (output['contacts'] as List).cast<Map>()
+                      : [output])
+                ToolDetailTarget(
+                  type: ToolDetailType.aiContact,
+                  id: p['id'] as String,
+                  name: p['name'] as String,
+                ).toJson(),
+            ],
+        },
       );
     } on Object catch (error) {
       return ToolResult(

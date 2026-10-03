@@ -73,30 +73,30 @@ class _AiConversationsPageState extends State<AiConversationsPage>
   }
 
   Future<void> _load({bool reset = false}) async {
+    final limit = reset && _items.length > HomeConversations.pageSize
+        ? _items.length
+        : HomeConversations.pageSize;
     if (_loading) return;
     setState(() => _loading = true);
     try {
-      final page = await HomeConversations(
-        widget.controller.groupStore,
-      ).forAi(widget.profile.sender.id, offset: reset ? 0 : _items.length);
+      final page = await HomeConversations(widget.controller.groupStore).forAi(
+        widget.profile.sender.id,
+        offset: reset ? 0 : _items.length,
+        limit: limit,
+      );
       if (!mounted) return;
       setState(() {
         if (reset) _items.clear();
         _items.addAll(page);
-        _more = page.length == HomeConversations.pageSize;
+        _more = page.length == limit;
         _failed = false;
       });
     } on Object catch (error) {
       if (mounted) setState(() => _failed = true);
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
-          SnackBar(
-            content: Text('会话加载失败：${errorMessage(error)}'),
-            action: SnackBarAction(
-              label: '重试',
-              onPressed: () => _load(reset: true),
-            ),
-          ),
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text('会话加载失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -131,8 +131,9 @@ class _AiConversationsPageState extends State<AiConversationsPage>
       if (mounted) await _load(reset: true);
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _opening = false);
@@ -163,14 +164,14 @@ class _AiConversationsPageState extends State<AiConversationsPage>
         case AttachmentSource.gallery:
           if (widget.controller.draftImages.length ==
               MessageImageStore.maxImages) {
-            _notice('每条消息最多添加 4 张图片，请先移除一张');
+            _notice('每条消息最多添加 4 张图片，请先移除一张', kind: ToastKind.warning);
             return;
           }
           await widget.controller.addImages(ImageSource.gallery);
         case AttachmentSource.camera:
           if (widget.controller.draftImages.length ==
               MessageImageStore.maxImages) {
-            _notice('每条消息最多添加 4 张图片，请先移除一张');
+            _notice('每条消息最多添加 4 张图片，请先移除一张', kind: ToastKind.warning);
             return;
           }
           await widget.controller.addImages(ImageSource.camera);
@@ -206,13 +207,15 @@ class _AiConversationsPageState extends State<AiConversationsPage>
           return;
       }
     } on Object catch (error) {
-      if (mounted) _notice('附件添加失败，请重试：${errorMessage(error)}');
+      if (mounted)
+        _notice('附件添加失败，请重试：${errorMessage(error)}', kind: ToastKind.error);
     }
   }
 
-  void _notice(String message) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(message)));
+  void _notice(String message, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(message)), kind: kind);
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -314,7 +317,10 @@ class _AiConversationsPageState extends State<AiConversationsPage>
                 await widget.controller.removeDraftImage(image);
               } on Object catch (error) {
                 if (mounted) {
-                  _notice('附件移除失败，请重试：${errorMessage(error)}');
+                  _notice(
+                    '附件移除失败，请重试：${errorMessage(error)}',
+                    kind: ToastKind.error,
+                  );
                 }
               }
             },
@@ -323,7 +329,10 @@ class _AiConversationsPageState extends State<AiConversationsPage>
                 await widget.controller.removeDraftFile(file);
               } on Object catch (error) {
                 if (mounted) {
-                  _notice('附件移除失败，请重试：${errorMessage(error)}');
+                  _notice(
+                    '附件移除失败，请重试：${errorMessage(error)}',
+                    kind: ToastKind.error,
+                  );
                 }
               }
             },

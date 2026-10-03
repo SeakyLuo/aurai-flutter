@@ -77,7 +77,8 @@ class _ModelBalanceTileState extends State<ModelBalanceTile>
       final balance = await _client.load(widget.config);
       if (mounted && revision == _revision) setState(() => _balance = balance);
     } on ModelProviderException catch (error) {
-      if (mounted && revision == _revision) _notice(error.message);
+      if (mounted && revision == _revision)
+        _notice(error.message, kind: ToastKind.error);
     } finally {
       if (mounted && revision == _revision) setState(() => _loading = false);
     }
@@ -91,15 +92,20 @@ class _ModelBalanceTileState extends State<ModelBalanceTile>
       await ModelTopUp.open(widget.config);
     } on Object catch (error) {
       _awaitingReturn = false;
-      if (mounted) _notice('无法打开服务商后台，请稍后再试：${errorMessage(error)}');
+      if (mounted)
+        _notice(
+          '无法打开服务商后台，请稍后再试：${errorMessage(error)}',
+          kind: ToastKind.error,
+        );
     } finally {
       if (mounted) setState(() => _opening = false);
     }
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
 
   @override
   void dispose() {
@@ -162,11 +168,12 @@ class _ModelBalanceTileState extends State<ModelBalanceTile>
             ],
           );
     final tile = ListTile(
-      minVerticalPadding: widget.overview ? 0 : null,
-      minTileHeight: widget.overview ? null : 64,
-      contentPadding: EdgeInsets.symmetric(
-        horizontal: widget.overview ? 8 : 18,
-        vertical: widget.overview || !official || balance == null ? 0 : 14,
+      minTileHeight: widget.overview ? null : settingsCardHeight,
+      contentPadding: EdgeInsetsDirectional.only(
+        start: widget.overview ? 8 : 18,
+        end: widget.overview ? 8 : 12,
+        top: widget.overview || !official || balance == null ? 0 : 14,
+        bottom: widget.overview || !official || balance == null ? 0 : 14,
       ),
       shape: widget.overview
           ? const RoundedRectangleBorder(

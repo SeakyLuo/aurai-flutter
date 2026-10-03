@@ -14,12 +14,15 @@ class HomeConversations {
   static const _groupsWhere =
       "kind = 'group' AND archived = 0 AND $visibleConversation AND $localUserConversation";
 
-  Future<List<Conversation>> recent({int offset = 0}) async {
+  Future<List<Conversation>> recent({
+    int offset = 0,
+    int limit = pageSize,
+  }) async {
     final rows = await store.database.query(
       'conversations',
       where: 'archived = 0 AND $visibleConversation AND $localUserConversation',
-      orderBy: 'pinned DESC, updated_at DESC, id DESC',
-      limit: pageSize,
+      orderBy: 'pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC',
+      limit: limit,
       offset: offset,
     );
     return _headers(rows);
@@ -30,7 +33,7 @@ class HomeConversations {
       'conversations',
       where: "archived = 0 AND instr(lower(title), ?) > 0",
       whereArgs: [query.toLowerCase()],
-      orderBy: 'updated_at DESC, id DESC',
+      orderBy: 'MAX(updated_at, draft_updated_at) DESC, id DESC',
       limit: 30,
       offset: offset,
     );
@@ -49,48 +52,56 @@ class HomeConversations {
   Future<List<Conversation>> forProject(
     String projectId, {
     int offset = 0,
+    int limit = pageSize,
   }) async {
     final rows = await store.database.query(
       'conversations',
       where:
           'project_id = ? AND archived = 0 AND $visibleConversation AND $localUserConversation',
       whereArgs: [projectId],
-      orderBy: 'pinned DESC, updated_at DESC, id DESC',
-      limit: pageSize,
+      orderBy: 'pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC',
+      limit: limit,
       offset: offset,
     );
     return _headers(rows);
   }
 
-  Future<List<Conversation>> groups({Conversation? after}) async {
+  Future<List<Conversation>> groups({
+    Conversation? after,
+    int limit = pageSize,
+  }) async {
     final rows = await store.database.query(
       'conversations',
       where:
           '$_groupsWhere'
-          "${after == null ? '' : ' AND (pinned < ? OR (pinned = ? AND (updated_at < ? OR (updated_at = ? AND id < ?))))'}",
+          "${after == null ? '' : ' AND (pinned < ? OR (pinned = ? AND (MAX(updated_at, draft_updated_at) < ? OR (MAX(updated_at, draft_updated_at) = ? AND id < ?))))'}",
       whereArgs: after == null
           ? null
           : [
               after.isPinned ? 1 : 0,
               after.isPinned ? 1 : 0,
-              after.updatedAt.microsecondsSinceEpoch,
-              after.updatedAt.microsecondsSinceEpoch,
+              after.listUpdatedAt.microsecondsSinceEpoch,
+              after.listUpdatedAt.microsecondsSinceEpoch,
               after.id,
             ],
-      orderBy: 'pinned DESC, updated_at DESC, id DESC',
-      limit: pageSize,
+      orderBy: 'pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC',
+      limit: limit,
     );
     return _headers(rows);
   }
 
-  Future<List<Conversation>> forAi(String senderId, {int offset = 0}) async {
+  Future<List<Conversation>> forAi(
+    String senderId, {
+    int offset = 0,
+    int limit = pageSize,
+  }) async {
     final rows = await store.database.query(
       'conversations',
       where:
           "kind = 'direct' AND default_sender_id = ? AND archived = 0 AND $visibleConversation AND $localUserConversation",
       whereArgs: [senderId],
-      orderBy: 'pinned DESC, updated_at DESC, id DESC',
-      limit: pageSize,
+      orderBy: 'pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC',
+      limit: limit,
       offset: offset,
     );
     return _headers(rows);
@@ -104,7 +115,7 @@ class HomeConversations {
         'app_state',
         where: 'key IN (${List.filled(items.length, '?').join(',')})',
         whereArgs: items.map((c) => 'seen_run:${c.id}').toList(),
-        limit: pageSize,
+        limit: items.length,
       ),
       loadConversationListPreviews(store.database, items),
       loadPendingQuestionPreviews(store.database, items),
@@ -146,7 +157,7 @@ class HomeConversations {
       'message_senders',
       where: 'id IN (${List.filled(ids.length, '?').join(',')})',
       whereArgs: ids,
-      limit: pageSize,
+      limit: ids.length,
     );
     return {
       for (final row in rows) row['id'] as String: MessageSender.fromRow(row),
@@ -162,7 +173,7 @@ class HomeConversations {
       'development_projects',
       where: 'id IN (${List.filled(ids.length, '?').join(',')})',
       whereArgs: ids,
-      limit: pageSize,
+      limit: ids.length,
     );
     return {
       for (final row in rows)

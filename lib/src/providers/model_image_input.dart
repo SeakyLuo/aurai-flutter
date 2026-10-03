@@ -46,4 +46,4 @@ List<Object?> _textOnlyParts(List parts) => [
 
 bool configSupportsImageInput(ModelConfig config) =>
     OpenRouterModels.forConfig(config)?.supportsImages ??
-    modelSupportsImageInput(config.model);
+    modelSupportsImageInput(config.apiModel);

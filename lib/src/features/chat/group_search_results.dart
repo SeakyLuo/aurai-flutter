@@ -8,6 +8,7 @@ import 'image_attachments.dart';
 import 'member_avatar.dart';
 import 'message_preview_text.dart';
 import 'message_content_preview.dart';
+import 'floating_search_layout.dart';
 
 class GroupSearchResults extends StatelessWidget {
   const GroupSearchResults({
@@ -257,7 +258,7 @@ class GroupSearchResults extends StatelessWidget {
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.only(bottom: 24),
+          padding: const EdgeInsets.only(bottom: FloatingSearchLayout.clearance),
           sliver: SliverMainAxisGroup(slivers: slivers),
         ),
       ],

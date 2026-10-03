@@ -1,4 +1,8 @@
 import 'private_task_state.dart';
+import 'speech_provider_migration.dart';
+import 'speech_configuration_migration.dart';
+import 'speech_voice_catalog_migration.dart';
+import 'speech_voice_details_migration.dart';
 import 'group_mute_schema.dart';
 import 'asset_library_schema.dart';
 import 'group_notice_dismissals.dart';
@@ -30,12 +34,17 @@ import 'tool_customization_schema.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 76,
+  version: 82,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion >= 2 && oldVersion < 77) {
+      await db.execute(
+        "ALTER TABLE memory_settings ADD COLUMN gender TEXT NOT NULL DEFAULT 'unknown' CHECK(gender IN ('male', 'female', 'unknown'))",
+      );
+    }
     if (oldVersion >= 18 && oldVersion < 67) {
       await db.execute(
         'ALTER TABLE group_participation ADD COLUMN reason TEXT',
@@ -410,6 +419,31 @@ Future<Database> openConversationDatabase() async => openDatabase(
         );
       }
     }
+    if (oldVersion < 78) await migrateSpeechProviders(db);
+    if (oldVersion < 79) await migrateSpeechConfiguration(db);
+    if (oldVersion < 80) await migrateSpeechVoiceCatalog(db);
+    if (oldVersion < 81) await migrateSpeechVoiceDetails(db);
+    if (oldVersion < 82) {
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN draft_updated_at INTEGER NOT NULL DEFAULT 0',
+      );
+      for (final index in [
+        'conversation_order',
+        'conversation_archive_order',
+        'conversation_project_order',
+      ]) {
+        await db.execute('DROP INDEX $index');
+      }
+      await db.execute(
+        'CREATE INDEX conversation_order ON conversations(pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC)',
+      );
+      await db.execute(
+        'CREATE INDEX conversation_archive_order ON conversations(archived, pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC)',
+      );
+      await db.execute(
+        'CREATE INDEX conversation_project_order ON conversations(project_id, pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC)',
+      );
+    }
   },
   onCreate: (db, version) async {
     final batch = db.batch();
@@ -472,6 +506,7 @@ const _schema = [
     id TEXT PRIMARY KEY,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
+    draft_updated_at INTEGER NOT NULL DEFAULT 0,
     title TEXT NOT NULL,
     kind TEXT NOT NULL DEFAULT 'direct',
     mode TEXT NOT NULL DEFAULT 'normal',
@@ -580,9 +615,9 @@ const _schema = [
     legacy_text TEXT,
     legacy_status TEXT
   )''',
-  'CREATE INDEX conversation_archive_order ON conversations(archived, pinned DESC, updated_at DESC, id DESC)',
-  'CREATE INDEX conversation_order ON conversations(pinned DESC, updated_at DESC, id DESC)',
-  'CREATE INDEX conversation_project_order ON conversations(project_id, pinned DESC, updated_at DESC, id DESC)',
+  'CREATE INDEX conversation_archive_order ON conversations(archived, pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC)',
+  'CREATE INDEX conversation_order ON conversations(pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC)',
+  'CREATE INDEX conversation_project_order ON conversations(project_id, pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC)',
   'CREATE INDEX message_history ON messages(conversation_id, created_at DESC, id DESC)',
   'CREATE INDEX message_run ON messages(run_id)',
   'CREATE INDEX attachment_conversation ON attachments(conversation_id, message_id)',

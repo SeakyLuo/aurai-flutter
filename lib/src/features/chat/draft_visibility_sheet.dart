@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'floating_search_layout.dart';
 import '../../domain/message_sender.dart';
 import 'group_member_choice.dart';
 import 'settings_appearance.dart';
@@ -46,14 +47,22 @@ class _DraftVisibilitySheetState extends State<DraftVisibilitySheet> {
     if (widget.mode == DraftVisibilityMode.included) MessageSender.localUser.id,
   };
   String _search = '';
+  final _input = TextEditingController();
   @override
-  Widget build(BuildContext context) => FractionallySizedBox(
-    heightFactor: .8,
-    child: SafeArea(
-      top: false,
-      child: Column(
-        children: [
-          Padding(
+  void dispose() {
+    _input.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: FractionallySizedBox(
+      heightFactor: .8,
+      child: SafeArea(
+        top: false,
+        child: SearchSheetBody(
+          header: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(
               children: [
@@ -95,49 +104,65 @@ class _DraftVisibilitySheetState extends State<DraftVisibilitySheet> {
               ],
             ),
           ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-              children: [
-                const SizedBox(height: 12),
-                TextField(
-                  decoration: InputDecoration(
-                    hintText: '搜索群成员',
-                    filled: true,
-                    fillColor: settingsFieldColor(context),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(26),
-                      borderSide: BorderSide.none,
-                    ),
+          child: FloatingSearchLayout(
+            itemCount: widget.members.length,
+            controller: _input,
+            hintText: '搜索群成员',
+            onChanged: (text) =>
+                setState(() => _search = text.trim().toLowerCase()),
+            child: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(
+                    20,
+                    4,
+                    20,
+                    FloatingSearchLayout.clearance,
                   ),
-                  onChanged: (text) =>
-                      setState(() => _search = text.trim().toLowerCase()),
+                  sliver: SliverMainAxisGroup(
+                    slivers: [
+                      SliverList.list(
+                        children: [
+                          const SizedBox(height: 12),
+
+                          const SizedBox(height: 8),
+                          for (final member in widget.members.where(
+                            (m) => m.name.toLowerCase().contains(_search),
+                          ))
+                            GroupMemberChoice(
+                              selected: _selected.contains(member.id),
+                              sender: member,
+                              onTap: member.id == MessageSender.localUser.id
+                                  ? null
+                                  : () => setState(() {
+                                      if (!_selected.remove(member.id))
+                                        _selected.add(member.id);
+                                    }),
+                            ),
+                        ],
+                      ),
+                      if (!widget.members.any(
+                        (m) => m.name.toLowerCase().contains(_search),
+                      ))
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(
+                            child: const Padding(
+                              padding: EdgeInsets.all(24),
+                              child: Text(
+                                '没有找到匹配的成员',
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                for (final member in widget.members.where(
-                  (m) => m.name.toLowerCase().contains(_search),
-                ))
-                  GroupMemberChoice(
-                    selected: _selected.contains(member.id),
-                    sender: member,
-                    onTap: member.id == MessageSender.localUser.id
-                        ? null
-                        : () => setState(() {
-                            if (!_selected.remove(member.id))
-                              _selected.add(member.id);
-                          }),
-                  ),
-                if (!widget.members.any(
-                  (m) => m.name.toLowerCase().contains(_search),
-                ))
-                  const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text('没有找到匹配的成员', textAlign: TextAlign.center),
-                  ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     ),
   );

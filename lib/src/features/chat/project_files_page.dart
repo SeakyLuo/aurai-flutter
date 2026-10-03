@@ -29,9 +29,10 @@ class _ProjectFilesPageState extends State<ProjectFilesPage> {
     _load();
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
 
   Future<void> _load() async {
     try {
@@ -46,7 +47,8 @@ class _ProjectFilesPageState extends State<ProjectFilesPage> {
         );
       }
     } on Object catch (error) {
-      if (mounted) _notice('项目资料读取失败：${errorMessage(error)}');
+      if (mounted)
+        _notice('项目资料读取失败：${errorMessage(error)}', kind: ToastKind.error);
     }
   }
 
@@ -58,7 +60,8 @@ class _ProjectFilesPageState extends State<ProjectFilesPage> {
       });
       if (result['cancelled'] != true) await _load();
     } on Object catch (error) {
-      if (mounted) _notice('项目资料添加失败：${errorMessage(error)}');
+      if (mounted)
+        _notice('项目资料添加失败：${errorMessage(error)}', kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -8,7 +8,7 @@ import '../../domain/model_provider.dart';
 import 'chat_controller.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
-import 'choice_sheet.dart';
+import 'model_choice_sheet.dart';
 import 'model_balance_tile.dart';
 import 'model_settings_sheet.dart';
 import 'model_reasoning_field.dart';
@@ -78,8 +78,9 @@ class _AiModelPageState extends State<AiModelPage> {
       }
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('保存失败，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -124,16 +125,20 @@ class _AiModelPageState extends State<AiModelPage> {
       ),
       body: SettingsPageBody(
         child: ListView(
-          padding: settingsPagePadding(context, const EdgeInsets.all(16)),
+          padding: settingsPagePadding(
+            context,
+            const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          ),
           children: [
-            _label('供应商'),
+            _label('供应商', first: true),
             _choice(
               widget.controller.modelSettings.profile(_service).displayName,
               _saving || _loading
                   ? null
                   : () async {
-                      final value = await showChoiceSheet<ModelService>(
+                      final value = await showProviderChoiceSheet(
                         context,
+                        profiles: widget.controller.modelSettings.profiles,
                         title: '供应商',
                         selected: _service,
                         choices: [
@@ -169,7 +174,11 @@ class _AiModelPageState extends State<AiModelPage> {
             const SizedBox(height: 16),
             _label('模型名称'),
             _choice(
-              _model.text.isEmpty ? '选择模型' : modelDisplayName(_model.text),
+              _model.text.isEmpty
+                  ? '选择模型'
+                  : widget.controller.modelSettings
+                        .profile(_service)
+                        .displayModel(_model.text),
               _saving || _loading ? null : _selectModel,
             ),
             ModelReasoningField(
@@ -208,9 +217,10 @@ class _AiModelPageState extends State<AiModelPage> {
       ),
     ),
   );
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
 
   Future<void> _selectModel() async {
     if (_loading) return;
@@ -245,14 +255,11 @@ class _AiModelPageState extends State<AiModelPage> {
         _notice('没有可用的文本模型，请到供应商的模型管理中设置用途');
         return;
       }
-      final value = await showChoiceSheet<String>(
+      final value = await showModelChoiceSheet(
         context,
-        title: '模型名称',
+        config: profile,
+        models: models,
         selected: _model.text,
-        choices: [
-          for (final model in models)
-            (value: model, label: modelDisplayName(model)),
-        ],
       );
       if (!mounted || value == null) return;
       setState(() {
@@ -262,9 +269,13 @@ class _AiModelPageState extends State<AiModelPage> {
         _changed = true;
       });
     } on ModelProviderException catch (error) {
-      if (mounted) _notice(error.message);
+      if (mounted) _notice(error.message, kind: ToastKind.error);
     } on Object catch (error) {
-      if (mounted) _notice('无法获取模型，请检查设置中的供应商配置：${errorMessage(error)}');
+      if (mounted)
+        _notice(
+          '无法获取模型，请检查设置中的供应商配置：${errorMessage(error)}',
+          kind: ToastKind.error,
+        );
     } finally {
       catalog.close();
       _catalog = null;
@@ -272,8 +283,8 @@ class _AiModelPageState extends State<AiModelPage> {
     }
   }
 
-  Widget _label(String title) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+  Widget _label(String title, {bool first = false}) => Padding(
+    padding: EdgeInsets.fromLTRB(18, first ? 0 : 8, 18, 12),
     child: Text(
       title,
       style: TextStyle(
@@ -287,11 +298,10 @@ class _AiModelPageState extends State<AiModelPage> {
     borderRadius: BorderRadius.circular(26),
     clipBehavior: Clip.antiAlias,
     child: ListTile(
+      minTileHeight: settingsCardHeight,
+      contentPadding: settingsCardPadding,
       title: Text(value, style: const TextStyle(fontSize: 15)),
-      trailing: const RotatedBox(
-        quarterTurns: 1,
-        child: SettingsIcon(type: SettingsIconType.chevron),
-      ),
+      trailing: const SettingsIcon(type: SettingsIconType.chevronDown),
       onTap: onTap,
     ),
   );

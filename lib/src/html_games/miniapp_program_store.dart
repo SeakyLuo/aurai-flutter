@@ -6,6 +6,7 @@ import '../domain/agent_models.dart';
 import '../domain/interactive_message.dart';
 import '../domain/message_sender.dart';
 import '../storage/conversation_rows.dart';
+import '../storage/group_member_details.dart';
 import 'html_app_store.dart';
 import 'html_game_session.dart';
 import 'miniapp_program.dart';
@@ -16,6 +17,7 @@ class MiniappProgramChange {
   final messages = <({AgentMessage message, bool wakeAi})>[];
   final cards = <String, InteractiveMessage>{};
   final replyStates = <String, bool>{};
+  bool memberNamesChanged = false;
   void publish() {
     HtmlGameSignals.changes.add(messageId);
     MiniappProgramStore.changes.add(this);
@@ -33,18 +35,37 @@ class MiniappProgramStore {
     DatabaseExecutor db,
     String conversationId, {
     bool avatars = false,
-  }) => db.query(
-    'message_senders',
-    columns: [
-      'id',
-      'name',
-      'kind',
-      if (avatars) ...['avatar_icon', 'avatar_color', 'avatar_path'],
-    ],
-    where:
-        'id IN (SELECT sender_id FROM conversation_members WHERE conversation_id = ? AND left_at IS NULL)',
-    whereArgs: [conversationId],
-  );
+  }) async {
+    final roster = await db.query(
+      'message_senders',
+      columns: [
+        'id',
+        'name',
+        'kind',
+        if (avatars) ...['avatar_icon', 'avatar_color', 'avatar_path'],
+      ],
+      where:
+          'id IN (SELECT sender_id FROM conversation_members WHERE conversation_id = ? AND left_at IS NULL)',
+      whereArgs: [conversationId],
+    );
+    final details = await db.query(
+      'group_member_details',
+      columns: ['sender_id', 'nickname'],
+      where: "conversation_id = ? AND nickname != ''",
+      whereArgs: [conversationId],
+    );
+    final names = {
+      for (final row in details) row['sender_id']: row['nickname'],
+    };
+    return [
+      for (final member in roster)
+        {
+          ...member,
+          'originalName': member['name'],
+          'name': names[member['id']] ?? member['name'],
+        },
+    ];
+  }
 
   Future<Map<String, Object?>> event(
     String conversationId,
@@ -100,10 +121,20 @@ class MiniappProgramStore {
     );
     if (rows.isEmpty) throw StateError('小程序消息已撤回或删除');
     final row = rows.single;
+    final messages = await txn.query(
+      'messages',
+      columns: ['sender_id'],
+      where: 'id = ?',
+      whereArgs: [messageId],
+    );
     final app = await HtmlAppStore.load(txn, row['app_id'] as String);
     final script = MiniappProgram.source(await HtmlAppStore.code(app));
     if (script == null) throw StateError('小程序没有事件处理程序');
-    final roster = await members(txn, conversationId);
+    final roster = await members(txn, conversationId, avatars: true);
+    final senders = {
+      for (final member in roster)
+        member['id'] as String: MessageSender.fromRow(member),
+    };
     if (actorId != 'system:timer' && !roster.any((m) => m['id'] == actorId)) {
       throw StateError('你不是当前群成员');
     }
@@ -115,6 +146,14 @@ class MiniappProgramStore {
     );
     final runtime = MiniappProgram.decode(saved.single['value']);
     final bindings = (runtime['bindings'] as Map).cast<String, Object?>();
+    if (cardId == null &&
+        bindings.values.any((raw) {
+          final binding = raw as Map;
+          return binding['action'] == action &&
+              (binding['actors'] as List).contains(actorId);
+        })) {
+      throw StateError('请操作对应的交互消息，提交会同时更新消息和小程序');
+    }
     if (cardId != null) {
       final binding = bindings[cardId] as Map?;
       if (binding == null ||
@@ -152,12 +191,21 @@ class MiniappProgramStore {
         'state': runtime['state'],
         'event': {'actorId': actorId, 'action': action, 'data': data},
         'members': roster,
-        'ownerId': MessageSender.localUser.id,
+        'ownerId': messages.single['sender_id'],
         'messageId': messageId,
         'now': now,
       }),
     });
     final output = MiniappProgram.decode(encoded);
+    final nicknames = (output['memberNicknames'] as Map? ?? const {})
+        .cast<String, String>();
+    await GroupMemberDetailsStore.setNicknames(
+      txn,
+      conversationId,
+      actorId: actorId,
+      nicknames: nicknames,
+    );
+    change.memberNamesChanged = nicknames.isNotEmpty;
     final effects = (output['messages'] as List? ?? const []);
     if (effects.length > 64) throw ArgumentError('单次事件最多产生 64 条消息');
     final views = (output['privateViews'] as Map? ?? const {})
@@ -241,7 +289,10 @@ class MiniappProgramStore {
           ...card.toJson(includeParticipants: true),
           'revision': card.revision + 1,
           'participation': {...card.participation, 'closed': true},
-          'buttons': const <Object?>[],
+          if (card.shared)
+            'session': card.engine.settle(closed: true).runtime
+          else
+            'buttons': const <Object?>[],
           'body': '${card.body}\n\n本次操作已结束。',
         });
         change.cards[row['id'] as String] = next;
@@ -262,6 +313,10 @@ class MiniappProgramStore {
     final batch = txn.batch();
     for (final raw in effects) {
       final effect = (raw as Map).cast<String, Object?>();
+      final senderId = effect['senderId'] as String?;
+      if (senderId != null && senderId != actorId) {
+        throw ArgumentError('程序消息只能以当前操作人身份发送');
+      }
       final audience = (effect['audience'] as List?)?.cast<String>();
       if (audience != null &&
           (audience.isEmpty || audience.any((id) => !memberIds.contains(id)))) {
@@ -271,12 +326,19 @@ class MiniappProgramStore {
       final definition = effect['card'] as Map?;
       final wakeAi = effect['wakeAi'] == true;
       if (wakeAi && audience == null) throw ArgumentError('触发 AI 回复需要明确接收人');
+      final wakeMemberIds = (effect['wakeMemberIds'] as List?)?.cast<String>();
+      if (wakeMemberIds != null &&
+          wakeMemberIds.any(
+            (id) => !agents.contains(id) || !(audience ?? []).contains(id),
+          )) {
+        throw ArgumentError('唤醒成员必须是消息可见范围内的 AI');
+      }
       final card = definition == null
           ? null
           : InteractiveMessage.fromDefinition({
               ...definition.cast<String, Object?>(),
               'revision': 0,
-              'showStatistics': false,
+              'showStatistics': definition['showStatistics'] ?? false,
               'buttons': [
                 for (final button in definition['buttons'] as List)
                   {
@@ -285,12 +347,14 @@ class MiniappProgramStore {
                   },
               ],
               'participation': {
+                'visibility': 'private',
+                'summaryVisibility': 'private',
                 ...?definition['participation'] as Map?,
                 if (audience != null) 'audience': audience,
                 '_programMessage': messageId,
                 if (wakeAi) '_programWake': true,
-                'visibility': 'private',
-                'summaryVisibility': 'private',
+                if (wakeMemberIds != null) '_programWakeMembers': wakeMemberIds,
+                if (senderId != null) '_creatorId': senderId,
               },
             });
       card?.validateTransport(html: false);
@@ -299,11 +363,16 @@ class MiniappProgramStore {
           throw ArgumentError('行动卡需要事件和明确的接收人');
         if (card.buttons.any((b) => b['notifyAi'] == true))
           throw ArgumentError('行动卡回调由小程序处理');
+        if ((card.participation['callbackEvents'] as List?)?.isNotEmpty == true)
+          throw ArgumentError('行动卡回调由小程序处理');
+        final eligible = card.interaction['actors'] as List?;
+        if (eligible != null && eligible.any((id) => !audience.contains(id)))
+          throw ArgumentError('行动卡参与者必须在消息可见范围内');
         bindings[id] = {
           'key': effect['key'],
           'action': effect['event'],
           'data': effect['data'],
-          'actors': audience,
+          'actors': card.interaction['actors'] ?? audience,
         };
       }
       final metadata =
@@ -318,17 +387,22 @@ class MiniappProgramStore {
                     'audience': audience,
                     'presentation': 'message',
                     '_programWake': true,
+                    if (wakeMemberIds != null)
+                      '_programWakeMembers': wakeMemberIds,
                   },
                 )
               : null);
       final message = AgentMessage(
         id: id,
-        role: AgentMessageRole.user,
-        senderId: MessageSender.localUser.id,
+        role: senderId != null && agents.contains(senderId)
+            ? AgentMessageRole.assistant
+            : AgentMessageRole.user,
+        senderId: senderId ?? MessageSender.localUser.id,
+        sender: senderId == null ? MessageSender.localUser : senders[senderId]!,
         text: effect['text'] as String? ?? card!.title,
         interactive: metadata,
         audience: audience,
-        isSystem: card == null,
+        isSystem: card == null && senderId == null,
         isGroupMessage: true,
         createdAt: DateTime.now(),
       );
@@ -430,7 +504,10 @@ class MiniappProgramStore {
         ...card.toJson(includeParticipants: true),
         'revision': card.revision + 1,
         'participation': {...card.participation, 'closed': true},
-        'buttons': const [],
+        if (card.shared)
+          'session': card.engine.settle(closed: true).runtime
+        else
+          'buttons': const [],
         'body': '${card.body}\n\n小程序已结束。',
       });
       change.cards[row['id'] as String] = next;

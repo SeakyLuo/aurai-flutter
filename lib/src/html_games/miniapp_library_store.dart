@@ -80,6 +80,8 @@ class MiniappLibraryStore {
     String query = '',
     bool mine = false,
     bool? installed,
+    int offset = 0,
+    int limit = 50,
   }) async {
     final key = mine ? 'id' : 'app_id';
     final metadataKey = mine
@@ -103,14 +105,15 @@ class MiniappLibraryStore {
         if (after != null) ...[after.updatedAt, after.updatedAt, after.id],
       ],
       orderBy: 'updated_at DESC, $key',
-      limit: 51,
+      limit: limit + 1,
+      offset: offset,
     );
-    final slice = rows.take(50).toList();
+    final slice = rows.take(limit).toList();
     return (
       entries: await MiniappMetadataStore(
         database,
       ).apply(mine ? await _mine(slice) : await _published(slice)),
-      more: rows.length > 50,
+      more: rows.length > limit,
     );
   }
 

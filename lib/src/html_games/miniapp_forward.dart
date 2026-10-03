@@ -74,8 +74,9 @@ Future<void> openMiniappLink(BuildContext context, Uri uri) async {
     await openMiniapp(context, entry, controller.htmlStore);
   } on Object catch (error) {
     if (context.mounted)
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+      ScaffoldMessenger.of(context).showToast(
+        SnackBar(content: Text(errorMessage(error))),
+        kind: ToastKind.error,
+      );
   }
 }

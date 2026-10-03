@@ -82,11 +82,9 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
     } on Object catch (error) {
       if (mounted) {
         setState(() => _failed = true);
-        ScaffoldMessenger.of(context).showGlassSnackBar(
-          SnackBar(
-            content: Text('成员状态加载失败：${errorMessage(error)}'),
-            action: SnackBarAction(label: '重新加载', onPressed: _load),
-          ),
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text('成员状态加载失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     }
@@ -164,8 +162,8 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
                     ? '已${_mutedUntil[member.id]!.description}'
                     : _paused.contains(member.id)
                     ? _pauseReasons[member.id]!.isEmpty
-                          ? '自动接话已关闭'
-                          : '自动接话已关闭 · ${_pauseReasons[member.id]}'
+                          ? '接话已关闭'
+                          : '接话已关闭 · ${_pauseReasons[member.id]}'
                     : sleeps.containsKey(member.id)
                     ? '睡眠中'
                     : '等待新消息',

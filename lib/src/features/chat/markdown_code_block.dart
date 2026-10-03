@@ -47,13 +47,15 @@ class _MarkdownCodeBlock extends StatelessWidget {
     try {
       await Clipboard.setData(ClipboardData(text: code));
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(const SnackBar(content: Text('代码已复制')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('代码已复制')),
+        kind: ToastKind.success,
+      );
     } on Object catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text('复制失败，请重试：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
     }
   }

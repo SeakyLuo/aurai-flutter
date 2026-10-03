@@ -127,9 +127,7 @@ class _GroupAdministratorsPageState extends State<GroupAdministratorsPage> {
                                 if (!_selected.remove(member.sender.id)) {
                                   if (_selected.length >=
                                       GroupChatStore.maxAdministrators) {
-                                    ScaffoldMessenger.of(
-                                      context,
-                                    ).showGlassSnackBar(
+                                    ScaffoldMessenger.of(context).showToast(
                                       const SnackBar(
                                         content: Text('最多可设置 3 位管理员'),
                                       ),

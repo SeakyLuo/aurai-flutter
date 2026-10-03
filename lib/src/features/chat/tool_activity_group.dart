@@ -20,6 +20,7 @@ class ToolActivityGroup extends StatefulWidget {
     this.activeLabel,
     this.startedAt,
     this.finishedAt,
+    this.activeResultJson,
   });
   final String storageId;
   final String toolName;
@@ -30,6 +31,7 @@ class ToolActivityGroup extends StatefulWidget {
   final String? activeLabel;
   final DateTime? startedAt;
   final DateTime? finishedAt;
+  final String? activeResultJson;
   @override
   State<ToolActivityGroup> createState() => _ToolActivityGroupState();
 }
@@ -88,7 +90,12 @@ class _ToolActivityGroupState extends State<ToolActivityGroup> {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  if (widget.active && widget.startedAt != null)
+                  if (widget.active &&
+                      toolShowsElapsed(
+                        widget.toolName,
+                        resultJson: widget.activeResultJson,
+                      ) &&
+                      widget.startedAt != null)
                     ToolElapsed(
                       startedAt: widget.startedAt!,
                       finishedAt: widget.finishedAt,

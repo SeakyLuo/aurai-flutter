@@ -197,12 +197,7 @@ extension GroupConversationRun on ChatController {
           if ((wakeMembers == null || wakeMembers.contains(id)) &&
               (wakeMembers != null || user.canView(id)) &&
               (wakeMembers != null || id != user.senderId) &&
-              (!paused.contains(id) ||
-                  user.messageMetadata?.participation['_programWake'] == true ||
-                  wakeMembers != null ||
-                  (wakeMembers == null &&
-                      !user.isSystem &&
-                      mentioned.contains(id))))
+              !paused.contains(id))
             id,
       ]);
       final queued = _queuedSystemNotices.remove(conversation.id) ?? [];

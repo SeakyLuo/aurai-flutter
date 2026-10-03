@@ -137,10 +137,10 @@ class _GroupMuteSettingsPageState extends State<GroupMuteSettingsPage> {
                 child: ListView(
                   padding: settingsPagePadding(
                     context,
-                    const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                    const EdgeInsets.fromLTRB(16, 12, 16, 32),
                   ),
                   children: [
-                    _note('设置禁言类型'),
+                    _note('设置禁言类型', first: true),
                     _surface(
                       Column(
                         children: [
@@ -173,7 +173,11 @@ class _GroupMuteSettingsPageState extends State<GroupMuteSettingsPage> {
                     _note('设置单独禁言群成员'),
                     _surface(
                       ListTile(
-                        minTileHeight: 60,
+                        contentPadding: const EdgeInsetsDirectional.only(
+                          start: 16,
+                          end: 12,
+                        ),
+                        minTileHeight: settingsCardHeight,
                         title: const Text(
                           '单独禁言群成员',
                           style: TextStyle(fontSize: 15),
@@ -213,8 +217,8 @@ class _GroupMuteSettingsPageState extends State<GroupMuteSettingsPage> {
     clipBehavior: Clip.antiAlias,
     child: child,
   );
-  Widget _note(String text) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+  Widget _note(String text, {bool first = false}) => Padding(
+    padding: EdgeInsets.fromLTRB(16, first ? 0 : 12, 16, 12),
     child: Text(
       text,
       style: TextStyle(

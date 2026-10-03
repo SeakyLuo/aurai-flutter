@@ -85,7 +85,11 @@ extension _ChatComposer on _ChatPageState {
           try {
             await controller.removeDraftFile(file);
           } on Object catch (error) {
-            if (mounted) _imageNotice('附件移除失败，请重试：${errorMessage(error)}');
+            if (mounted)
+              _imageNotice(
+                '附件移除失败，请重试：${errorMessage(error)}',
+                kind: ToastKind.error,
+              );
           }
         },
         addingImages: controller.addingImages || _editing?.picking == true,

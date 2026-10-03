@@ -526,9 +526,9 @@ class _GitTaskChangesCardState extends State<_GitTaskChangesCard> {
         redo ? 'redoProjectGitTaskChanges' : 'discardProjectGitTaskChanges',
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showGlassSnackBar(
-        SnackBar(content: Text(redo ? '已重做全部修改' : '已撤销全部修改')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(redo ? '已重做全部修改' : '已撤销全部修改')));
       await _load();
     });
     if (mounted) setState(() => _busy = false);

@@ -1,3 +1,4 @@
+import 'floating_search_layout.dart';
 import 'conversation_list_tile.dart';
 import '../../widgets/empty_data_view.dart';
 import 'dart:async';
@@ -9,7 +10,6 @@ import '../../storage/home_conversations.dart';
 import 'chat_controller.dart';
 import 'group_avatar.dart';
 import 'member_avatar.dart';
-import 'model_search_field.dart';
 import 'settings_appearance.dart';
 import 'compose_icon.dart';
 
@@ -79,9 +79,10 @@ class _AssetChatPickerState extends State<AssetChatPicker> {
     } on Object catch (error) {
       if (mounted && generation == _generation) {
         _failed = true;
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
       }
     } finally {
       if (mounted && generation == _generation)
@@ -107,17 +108,18 @@ class _AssetChatPickerState extends State<AssetChatPicker> {
                   Navigator.pop(context, widget.controller.activeConversation);
               } on Object catch (error) {
                 if (mounted)
-                  ScaffoldMessenger.of(context).showGlassSnackBar(
+                  ScaffoldMessenger.of(context).showToast(
                     SnackBar(content: Text(errorMessage(error))),
+                    kind: ToastKind.error,
                   );
               }
             },
           ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: ModelSearchField(
+
+          Expanded(
+            child: FloatingSearchLayout(
+              itemCount: _items.length,
               controller: _search,
-              hintText: '搜索聊天',
               onChanged: (_) {
                 ++_generation;
                 _debounce?.cancel();
@@ -126,47 +128,71 @@ class _AssetChatPickerState extends State<AssetChatPicker> {
                   () => _load(reset: true),
                 );
               },
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              children: [
-                for (final item in _items)
-                  ConversationListTile(
-                    controller: widget.controller,
-                    conversation: item,
-                    avatar: item.kind == ConversationKind.group
-                        ? GroupAvatar(members: _groups[item.id]!, size: 48)
-                        : MemberAvatar(
-                            sender: _senders[item.defaultSenderId]!,
-                            size: 48,
+              hintText: '搜索聊天',
+              enabled: true,
+              bottom: 16,
+              child: CustomScrollView(
+                controller: _scroll,
+
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      FloatingSearchLayout.clearance,
+                    ),
+                    sliver: SliverMainAxisGroup(
+                      slivers: [
+                        SliverList.list(
+                          children: [
+                            for (final item in _items)
+                              ConversationListTile(
+                                controller: widget.controller,
+                                conversation: item,
+                                avatar: item.kind == ConversationKind.group
+                                    ? GroupAvatar(
+                                        members: _groups[item.id]!,
+                                        size: 48,
+                                      )
+                                    : MemberAvatar(
+                                        sender: _senders[item.defaultSenderId]!,
+                                        size: 48,
+                                      ),
+                                onTap: () => Navigator.pop(context, item),
+                              ),
+                            if (_loading)
+                              const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+
+                            if (_failed || _more && !_loading)
+                              Center(
+                                child: TextButton(
+                                  onPressed: () => _load(reset: _items.isEmpty),
+                                  child: Text(_failed ? '重试' : '加载更多'),
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (!_loading && _items.isEmpty && !_failed)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: const EmptyDataView(title: '没有找到聊天'),
+                              ),
+                            ),
                           ),
-                    onTap: () => Navigator.pop(context, item),
-                  ),
-                if (_loading)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(),
+                      ],
                     ),
                   ),
-                if (!_loading && _items.isEmpty && !_failed)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: const EmptyDataView(title: '没有找到聊天'),
-                    ),
-                  ),
-                if (_failed || _more && !_loading)
-                  Center(
-                    child: TextButton(
-                      onPressed: () => _load(reset: _items.isEmpty),
-                      child: Text(_failed ? '重试' : '加载更多'),
-                    ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

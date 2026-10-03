@@ -21,7 +21,7 @@ Future<void> showAccessibilityRequestSheet(
   );
   if (controller.accessibilityRequestPending) {
     controller.cancelAccessibilityRequest();
-    messenger.showGlassSnackBar(const SnackBar(content: Text('本次暂不开启无障碍')));
+    messenger.showToast(const SnackBar(content: Text('本次暂不开启无障碍')));
   }
 }
 
@@ -79,7 +79,7 @@ class _AccessibilityRequestSheetState
         navigator.removeRoute(route);
       }
       if (timedOut) {
-        messenger.showGlassSnackBar(const SnackBar(content: Text('等待超时，已自动拒绝本次请求')));
+        messenger.showToast(const SnackBar(content: Text('等待超时，已自动拒绝本次请求')));
       }
     });
   }
@@ -93,8 +93,9 @@ class _AccessibilityRequestSheetState
       await widget.controller.enableRequestedAccessibility();
     } on Object catch (error) {
       if (mounted) {
-        _messenger.showGlassSnackBar(
+        _messenger.showToast(
           SnackBar(content: Text('无法打开无障碍设置，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     } finally {

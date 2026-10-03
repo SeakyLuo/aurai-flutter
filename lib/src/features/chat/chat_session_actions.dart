@@ -15,7 +15,11 @@ extension _ChatSessionActions on _ChatPageState {
         if (mounted) Navigator.pop(context);
       });
     } on Object catch (error) {
-      if (mounted) _imageNotice('临时会话归档失败，请重试：${errorMessage(error)}');
+      if (mounted)
+        _imageNotice(
+          '临时会话归档失败，请重试：${errorMessage(error)}',
+          kind: ToastKind.error,
+        );
     } finally {
       _temporaryExitPending = false;
     }
@@ -24,9 +28,9 @@ extension _ChatSessionActions on _ChatPageState {
   Future<void> _openBatterySettings() async {
     await widget.controller.openBatterySettings();
     if (mounted) {
-      ScaffoldMessenger.of(context).showGlassSnackBar(
-        SnackBar(content: Text('请在“电池”或“后台耗电管理”中允许 Aurai 后台运行')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text('请在“电池”或“后台耗电管理”中允许 Aurai 后台运行')));
     }
   }
 
@@ -59,7 +63,11 @@ extension _ChatSessionActions on _ChatPageState {
           return;
         await widget.controller.markActiveConversationRead();
       } on Object catch (caughtError) {
-        if (mounted) _imageNotice('已读状态保存失败，请重试：${errorMessage(caughtError)}');
+        if (mounted)
+          _imageNotice(
+            '已读状态保存失败，请重试：${errorMessage(caughtError)}',
+            kind: ToastKind.error,
+          );
       } finally {
         _markReadScheduled = false;
       }
@@ -80,7 +88,7 @@ extension _ChatSessionActions on _ChatPageState {
   bool _beforeDeleteConversation() {
     if (_imageOperationPending()) return false;
     if (widget.controller.isBusy || _preparingGoal) {
-      _imageNotice('请先停止当前任务，再删除会话');
+      _imageNotice('请先停止当前任务，再删除会话', kind: ToastKind.warning);
       return false;
     }
     _focusNode.unfocus();

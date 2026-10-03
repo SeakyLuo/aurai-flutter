@@ -1,4 +1,6 @@
 import 'task_playback_icon.dart';
+import 'tool_activity_view.dart';
+import 'chat_header_background.dart';
 import 'menu_press_highlight.dart';
 import '../../storage/group_chat_store.dart';
 import '../../storage/group_participation.dart';
@@ -7,13 +9,13 @@ import 'group_member_header_actions.dart';
 import 'glass_surface.dart';
 import 'header_action_menu.dart';
 import '../../app/glass_notice.dart';
+import '../../app/global_ui.dart';
 import 'group_status_builder.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/error_message.dart';
 import 'chat_controller.dart';
-import 'ai_contact_page.dart';
-import 'member_avatar.dart';
+import 'member_profile_avatar.dart';
 import 'jump_to_bottom_button.dart';
 import 'question_icon.dart';
 import 'settings_appearance.dart';
@@ -23,6 +25,7 @@ import '../../domain/message_sender.dart';
 import 'settings_icon.dart';
 
 part 'group_thought_details.dart';
+part 'group_stop_member_button.dart';
 
 Future<void> showGroupActivitySheet(
   BuildContext context, {
@@ -176,8 +179,9 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       await widget.controller.resumeAllGroupAutoReply(widget.conversationId);
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('恢复接话失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _resumingAll = false);
@@ -249,11 +253,17 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                         label: '移除成员',
                         icon: const SettingsIcon(type: SettingsIconType.remove),
                       ),
-                    (
-                      value: 'stop',
-                      label: '停止当前回复',
-                      icon: QuestionIcon(type: QuestionIconType.stop),
-                    ),
+                    if (widget.controller
+                        .groupActivitiesFor(
+                          widget.conversationId,
+                          includeThoughts: false,
+                        )
+                        .any((activity) => !activity.stopping))
+                      (
+                        value: 'stop',
+                        label: '停止本次回复',
+                        icon: QuestionIcon(type: QuestionIconType.stop),
+                      ),
                     (
                       value: 'wake',
                       label: '全部唤醒',
@@ -294,8 +304,9 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       await widget.controller.wakeAllGroupMembers(widget.conversationId);
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('唤醒失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _wakingAll = false);
@@ -311,8 +322,9 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       );
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('唤醒失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _waking.remove(activity.sender.id));
@@ -345,8 +357,9 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       );
     } on Object catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text('读取睡眠原因失败：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
     }
   }
@@ -391,34 +404,21 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       );
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('恢复接话失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _resuming.remove(activity.sender.id));
     }
   }
 
-  Widget _avatar(GroupMemberActivity activity) {
-    final avatar = MemberAvatar(sender: activity.sender, size: 40);
-    if (activity.sender.kind != MessageSenderKind.agent) return avatar;
-    return Semantics(
-      button: true,
-      label: '查看${activity.sender.name}的资料',
-      child: GestureDetector(
-        onTap: () => Navigator.of(context).push<void>(
-          MaterialPageRoute(
-            builder: (_) => AiContactPage(
-              controller: widget.controller,
-              senderId: activity.sender.id,
-              groupId: widget.conversationId,
-            ),
-          ),
-        ),
-        child: avatar,
-      ),
-    );
-  }
+  Widget _avatar(GroupMemberActivity activity) => MemberProfileAvatar(
+    controller: widget.controller,
+    sender: activity.sender,
+    groupId: widget.conversationId,
+    size: 40,
+  );
 
   Widget _row(GroupMemberActivity activity) {
     final running = !activity.idle && !activity.sleeping;
@@ -463,11 +463,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
               Expanded(
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap:
-                      running &&
-                          activity.thoughts.any(
-                            (text) => text.trim().isNotEmpty,
-                          )
+                  onTap: running
                       ? () => _openDetails(activity)
                       : activity.sleeping
                       ? () => _openSleepDetails(activity)
@@ -516,8 +512,8 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                               : () => _openPauseDetails(activity),
                           child: Text(
                             activity.autoReplyPauseReason!.isEmpty
-                                ? '自动接话已关闭'
-                                : '自动接话已关闭 · ${activity.autoReplyPauseReason}',
+                                ? '接话已关闭'
+                                : '接话已关闭 · ${activity.autoReplyPauseReason}',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -533,6 +529,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
               const SizedBox(width: 8),
               if (_canManage && activity.autoReplyPaused && !activity.isMuted)
                 SettingsGlassAction(
+                  style: SettingsActionStyle.outlined,
                   label: _resuming.contains(activity.sender.id)
                       ? '恢复中'
                       : '恢复接话',
@@ -556,6 +553,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                 ),
               if (running)
                 _StopMemberButton(
+                  style: SettingsActionStyle.outlined,
                   controller: widget.controller,
                   conversationId: widget.conversationId,
                   activity: activity,
@@ -564,6 +562,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                   !activity.autoReplyPaused &&
                   !activity.isMuted)
                 SettingsGlassAction(
+                  style: SettingsActionStyle.outlined,
                   label: _waking.contains(activity.sender.id) ? '唤醒中' : '唤醒',
                   icon: Icons.play_arrow_rounded,
                   iconWidget: _waking.contains(activity.sender.id)
@@ -611,18 +610,23 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
             ? activities.where((a) => !a.stopping && !a.waitingForUser).toList()
             : activities;
         final body = visible.isEmpty
-            ? Center(
-                child: Text(
-                  widget._asSheet ? '当前没有成员在思考或睡眠' : '群内暂无 AI 成员',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ? Padding(
+                padding: EdgeInsets.only(
+                  top: widget._asSheet ? 64 : settingsHeaderHeight(context),
+                ),
+                child: Center(
+                  child: Text(
+                    widget._asSheet ? '当前没有成员在思考或睡眠' : '群内暂无 AI 成员',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               )
             : ListView(
                 padding: widget._asSheet
-                    ? const EdgeInsets.fromLTRB(8, 4, 8, 24)
+                    ? const EdgeInsets.fromLTRB(8, 64, 6, 24)
                     : settingsPagePadding(
                         context,
                         const EdgeInsets.fromLTRB(8, 4, 8, 24),
@@ -634,26 +638,29 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
           title: '群成员状态',
           trailing: _batchActions(),
         );
-        return visible.isEmpty
-            ? Stack(
-                fit: StackFit.expand,
-                children: [
-                  body,
-                  Align(alignment: Alignment.topCenter, child: header),
-                ],
-              )
-            : Column(
-                children: [
-                  header,
-                  Expanded(child: body),
-                ],
-              );
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            body,
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 76,
+              child: IgnorePointer(child: ChatHeaderBackground()),
+            ),
+            Align(alignment: Alignment.topCenter, child: header),
+          ],
+        );
       },
     );
     if (widget._asSheet) {
-      return SizedBox(
-        height: MediaQuery.sizeOf(context).height * .7,
-        child: SafeArea(top: false, child: content),
+      return ClipRRect(
+        borderRadius: GlobalUI.bottomSheetBorderRadius,
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * .7,
+          child: SafeArea(top: false, child: content),
+        ),
       );
     }
     return Scaffold(
@@ -672,80 +679,6 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
         onBack: () => Navigator.pop(context),
       ),
       body: SettingsPageBody(child: SafeArea(top: false, child: content)),
-    );
-  }
-}
-
-class _StopMemberButton extends StatefulWidget {
-  const _StopMemberButton({
-    required this.controller,
-    required this.conversationId,
-    required this.activity,
-  });
-  final ChatController controller;
-  final String conversationId;
-  final GroupMemberActivity activity;
-
-  @override
-  State<_StopMemberButton> createState() => _StopMemberButtonState();
-}
-
-class _StopMemberButtonState extends State<_StopMemberButton> {
-  bool _busy = false;
-  bool _retry = false;
-
-  Future<void> _stop() async {
-    setState(() {
-      _busy = true;
-      _retry = false;
-    });
-    try {
-      await widget.controller.stopGroupMember(
-        conversationId: widget.conversationId,
-        senderId: widget.activity.sender.id,
-        runId: widget.activity.runId,
-      );
-    } on Object catch (error) {
-      if (mounted) {
-        _retry = true;
-        ScaffoldMessenger.of(context).showGlassSnackBar(
-          SnackBar(content: Text('终止失败：${errorMessage(error)}')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final stopping = _busy || (widget.activity.stopping && !_retry);
-    final colors = Theme.of(context).colorScheme;
-    return SettingsGlassAction(
-      label: stopping ? '终止中' : '终止思考',
-      icon: Icons.stop_rounded,
-      onPressed: stopping ? null : _stop,
-      iconWidget: SizedBox.square(
-        dimension: 20,
-        child: Center(
-          child: stopping
-              ? SizedBox.square(
-                  dimension: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 1.65,
-                    color: colors.onSurfaceVariant,
-                  ),
-                )
-              : Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: colors.onSurface,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-        ),
-      ),
     );
   }
 }

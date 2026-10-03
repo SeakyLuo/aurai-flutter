@@ -5,7 +5,6 @@ import 'conversation_menu_icon.dart';
 import 'delete_confirmation_dialog.dart';
 import 'package:flutter/material.dart';
 import '../../domain/model_provider.dart';
-import '../../providers/model_catalog.dart';
 import 'chat_controller.dart';
 import 'settings_appearance.dart';
 import 'menu_press_highlight.dart';
@@ -32,9 +31,7 @@ class ModelSettingsSheet extends StatefulWidget {
     bool accountOnly = false,
     ModelService? initialService,
   }) async {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..removeCurrentSnackBar();
+    AppToasts.dismiss();
     return await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (_) => ModelSettingsSheet(
@@ -93,8 +90,9 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
       await widget.controller.reorderModelProviders(savedOrder);
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('排序保存失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     } finally {
@@ -152,15 +150,14 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
               color: colors.error,
             ),
           ),
-        if (service.isCustom)
-          (
-            value: 'delete',
-            label: '删除供应商',
-            icon: ConversationMenuIcon(
-              type: ConversationMenuIconType.delete,
-              color: colors.error,
-            ),
+        (
+          value: 'delete',
+          label: '删除供应商',
+          icon: ConversationMenuIcon(
+            type: ConversationMenuIconType.delete,
+            color: colors.error,
           ),
+        ),
       ],
     );
     if (!mounted || action == null) return;
@@ -189,14 +186,16 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
       );
       if (!mounted) return;
       setState(() => _saved = true);
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text(deleting ? '供应商已删除' : '密钥已清除')),
+        kind: ToastKind.success,
       );
     } catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
     }
   }
 
@@ -329,20 +328,22 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
                                 child: ListTile(
                                   minTileHeight: 76,
                                   horizontalTitleGap: 14,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 2,
-                                  ),
+                                  contentPadding:
+                                      const EdgeInsetsDirectional.fromSTEB(
+                                        14,
+                                        2,
+                                        12,
+                                        2,
+                                      ),
                                   leading: ModelProviderIcon(config: profile),
                                   title: Text(profile.displayName),
                                   subtitle: Text(
-                                    profile.isConfigured
-                                        ? (widget.accountOnly
-                                              ? '已配置'
-                                              : profile.model.isEmpty
-                                              ? '选择模型'
-                                              : modelDisplayName(profile.model))
-                                        : '未配置',
+                                    !profile.isConfigured &&
+                                            !profile.isSpeechConfigured
+                                        ? '未配置'
+                                        : profile.autoSyncModels
+                                        ? '默认全部'
+                                        : '已设置 ${profile.savedModels.toSet().length} 个模型',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),

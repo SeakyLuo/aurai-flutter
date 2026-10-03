@@ -292,6 +292,7 @@ enum AgentStepStatus { running, completed, failed, cancelled }
 
 class AgentStep {
   const AgentStep({
+    this.callId,
     required this.toolName,
     required this.title,
     required this.status,
@@ -303,6 +304,7 @@ class AgentStep {
   });
 
   final String toolName;
+  final String? callId;
   final String title;
   final AgentStepStatus status;
   final String? detail;
@@ -316,6 +318,7 @@ class AgentStep {
     String? detail,
     String? resultJson,
   }) => AgentStep(
+    callId: callId,
     toolName: toolName,
     title: title,
     status: status ?? this.status,
@@ -556,6 +559,8 @@ String _defaultToolTitle(String name) => switch (name) {
   'sendHtmlMessage' => '发送 HTML 消息',
   'readHtmlMessage' => '读取 HTML 消息',
   'readHtmlProgram' => '读取小程序状态',
+  'readHtmlData' => '读取 HTML 数据',
+  'updateHtmlData' => '更新 HTML 数据',
   'submitHtmlProgramEvent' => '提交小程序行动',
   'readHtmlApp' => '读取小程序',
   'mergeProjectBranch' => '合并项目分支',

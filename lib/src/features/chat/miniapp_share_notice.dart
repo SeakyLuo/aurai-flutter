@@ -12,7 +12,7 @@ void showMiniappShareNotice(
   String text = '已分享小程序',
 }) {
   final navigationContext = Navigator.of(context).context;
-  ScaffoldMessenger.of(context).showGlassSnackBar(
+  ScaffoldMessenger.of(context).showToast(
     SnackBar(
       content: Text(text),
       persist: false,
@@ -29,5 +29,6 @@ void showMiniappShareNotice(
         ),
       ),
     ),
+    kind: ToastKind.success,
   );
 }

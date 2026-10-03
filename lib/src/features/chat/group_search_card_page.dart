@@ -68,9 +68,10 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
         _closing = true;
         _changes.cancel();
         _card = null;
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
         final route = ModalRoute.of(context)!;
         if (route.isCurrent) {
           Navigator.pop(context);
@@ -104,6 +105,7 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
                 MenuPressHighlight(
                   onLongPressStart: (_) => showInteractiveStatistics(
                     context,
+                    controller: widget.controller,
                     database: widget.controller.groupStore.database,
                     messageId: widget.result.id,
                   ),
@@ -131,8 +133,9 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
                         });
                       } on Object catch (error) {
                         if (context.mounted)
-                          ScaffoldMessenger.of(context).showGlassSnackBar(
+                          ScaffoldMessenger.of(context).showToast(
                             SnackBar(content: Text(errorMessage(error))),
+                            kind: ToastKind.error,
                           );
                       }
                     },

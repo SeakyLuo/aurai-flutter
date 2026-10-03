@@ -47,9 +47,10 @@ class _MiniappReleaseNotesViewState extends State<MiniappReleaseNotesView> {
     } on Object catch (error) {
       if (mounted) {
         setState(() => _failed = true);
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);

@@ -59,7 +59,7 @@ class _ProjectWorktreesPageState extends State<ProjectWorktreesPage> {
           if (mounted) {
             ScaffoldMessenger.of(
               context,
-            ).showGlassSnackBar(const SnackBar(content: Text('此目录不是 Git 仓库')));
+            ).showToast(const SnackBar(content: Text('此目录不是 Git 仓库')));
             Navigator.pop(context);
           }
           return;
@@ -79,9 +79,10 @@ class _ProjectWorktreesPageState extends State<ProjectWorktreesPage> {
   Future<void> _create() async {
     final branches = (_data!['branches'] as List).cast<String>();
     if (branches.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(const SnackBar(content: Text('请先在项目中创建一次 Git 提交')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('请先在项目中创建一次 Git 提交')),
+        kind: ToastKind.warning,
+      );
       return;
     }
     final created = await Navigator.push<bool>(
@@ -109,9 +110,10 @@ class _ProjectWorktreesPageState extends State<ProjectWorktreesPage> {
       ),
     );
     if (created != true || !mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showGlassSnackBar(const SnackBar(content: Text('工作树已创建并关联到项目')));
+    ScaffoldMessenger.of(context).showToast(
+      const SnackBar(content: Text('工作树已创建并关联到项目')),
+      kind: ToastKind.success,
+    );
     await _load();
   }
 
@@ -185,8 +187,9 @@ class _ProjectWorktreesPageState extends State<ProjectWorktreesPage> {
         DevelopmentProjects.changingWorktrees.removeAll(affected);
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text(deleting ? '工作树已删除' : '已合并到主目录')),
+        kind: ToastKind.success,
       );
       await _load();
     });
@@ -251,66 +254,81 @@ class _ProjectWorktreesPageState extends State<ProjectWorktreesPage> {
             : Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 640),
-                  child: ListView(
-                    padding: settingsPagePadding(
-                      context,
-                      const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                    ),
-                    children: [
-                      if (items.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 32,
-                            horizontal: 16,
-                          ),
-                          child: EmptyDataView(
-                            title: canCreate
-                                ? '还没有工作树，点击右上角创建'
-                                : '此目录尚无 Git 提交，提交后可创建工作树',
-                          ),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: settingsPagePadding(
+                          context,
+                          const EdgeInsets.fromLTRB(16, 12, 16, 24),
                         ),
-                      for (final item in items.cast<Map>())
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Material(
-                            color: settingsFieldColor(context),
-                            borderRadius: BorderRadius.circular(24),
-                            clipBehavior: Clip.antiAlias,
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.only(
-                                left: 18,
-                                right: 8,
-                              ),
-                              leading: const SettingsIcon(
-                                type: SettingsIconType.git,
-                              ),
-                              title: Text(
-                                item['name'] as String,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 15),
-                              ),
-                              subtitle: Text(
-                                '基于 ${item['baseBranch']}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                              onTap: _busy ? null : () => _act(item, 'diff'),
-                              trailing: Builder(
-                                builder: (anchor) => IconButton(
-                                  tooltip: '工作树操作',
-                                  icon: const SettingsIcon(
-                                    type: SettingsIconType.more,
+                        sliver: SliverMainAxisGroup(
+                          slivers: [
+                            SliverList.list(
+                              children: [
+                                for (final item in items.cast<Map>())
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: Material(
+                                      color: settingsFieldColor(context),
+                                      borderRadius: BorderRadius.circular(24),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: ListTile(
+                                        contentPadding: const EdgeInsets.only(
+                                          left: 18,
+                                          right: 8,
+                                        ),
+                                        leading: const SettingsIcon(
+                                          type: SettingsIconType.git,
+                                        ),
+                                        title: Text(
+                                          item['name'] as String,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 15),
+                                        ),
+                                        subtitle: Text(
+                                          '基于 ${item['baseBranch']}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                        onTap: _busy
+                                            ? null
+                                            : () => _act(item, 'diff'),
+                                        trailing: Builder(
+                                          builder: (anchor) => IconButton(
+                                            tooltip: '工作树操作',
+                                            icon: const SettingsIcon(
+                                              type: SettingsIconType.more,
+                                            ),
+                                            onPressed: _busy
+                                                ? null
+                                                : () => _menu(anchor, item),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                  onPressed: _busy
-                                      ? null
-                                      : () => _menu(anchor, item),
+                              ],
+                            ),
+                            if (items.isEmpty)
+                              SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 32,
+                                    horizontal: 16,
+                                  ),
+                                  child: EmptyDataView(
+                                    title: canCreate
+                                        ? '还没有工作树，点击右上角创建'
+                                        : '此目录尚无 Git 提交，提交后可创建工作树',
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
+                          ],
                         ),
+                      ),
                     ],
                   ),
                 ),

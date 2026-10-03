@@ -19,15 +19,35 @@ class AgentRuntime {
     required ModelProvider provider,
     required ToolRegistry registry,
     required ToolExecutor executor,
+    List<Future<List<Map<String, Object?>>>>? userInputs,
   }) : _provider = provider,
        _registry = registry,
-       _executor = executor;
+       _executor = executor,
+       _userInputs = userInputs ?? [];
 
   final ModelProvider _provider;
   final ToolRegistry _registry;
   final ToolExecutor _executor;
   String? get activeToolName => _executor.activeToolName;
   bool _cancelRequested = false;
+  bool _acceptingUserInput = true;
+  final List<Future<List<Map<String, Object?>>>> _userInputs;
+
+  /// Reserve delivery before persistence so a finishing turn waits for the message.
+  bool enqueueUserInput(Future<List<Map<String, Object?>>> input) {
+    if (!_acceptingUserInput || _cancelRequested) return false;
+    _userInputs.add(input);
+    return true;
+  }
+
+  Future<List<Map<String, Object?>>> _takeUserInput() async {
+    final input = <Map<String, Object?>>[];
+    while (_userInputs.isNotEmpty) {
+      final pending = _userInputs.removeAt(0);
+      input.addAll(await pending);
+    }
+    return input;
+  }
 
   Future<AgentRunResult> run({
     required List<AgentMessage> conversation,
@@ -42,6 +62,7 @@ class AgentRuntime {
     Future<void> Function(ModelTurn)? onTurnCompleted,
     Future<void> Function(ToolCall)? onToolStarted,
     Future<void> Function(ToolResult)? onToolCompleted,
+    List<String> Function()? takeUserUpdates,
     bool Function(ToolResult)? endsRun,
     void Function(String text)? onTextChanged,
     void Function(String text)? onReasoningChanged,
@@ -90,7 +111,10 @@ class AgentRuntime {
             await task.beginTurn();
           }
         }
+        final userMessageInput = await _takeUserInput();
+        _throwIfCancelled();
         await onTurnStarted?.call();
+        final incomingMessages = takeUserUpdates?.call() ?? const <String>[];
         final modelTurn = await _provider.respond(
           ModelRequest(
             messages: conversation,
@@ -121,7 +145,9 @@ class AgentRuntime {
             capabilities: _registry.capabilities,
             continuationToken: continuationToken,
             toolResults: toolResults,
+            userMessageInput: userMessageInput,
             userUpdates: [
+              ...incomingMessages,
               if (goalContinuation)
                 '运行时续跑提醒（不是新的用户授权）：目标仍未完成。继续推进并验证完成条件；完成后调用 updateGoal。相同阻塞条件连续三轮仍无法推进才会停止；有进展时用 active 清除阻塞计数，需要用户信息用 askUser。不要只重复进度说明。',
               for (final update in updates)
@@ -195,6 +221,10 @@ class AgentRuntime {
           }, detail: jsonEncode(modelTurn.response['incomplete_details']));
         }
         if (modelTurn.toolCalls.isEmpty) {
+          if (_userInputs.isNotEmpty) {
+            toolResults = const [];
+            continue;
+          }
           final messages = (modelTurn.response['output'] as List? ?? const [])
               .cast<Map>()
               .where((item) => item['type'] == 'message');
@@ -215,6 +245,10 @@ class AgentRuntime {
           }
           if (activeGoal) {
             goalContinuation = true;
+            toolResults = const [];
+            continue;
+          }
+          if (_userInputs.isNotEmpty) {
             toolResults = const [];
             continue;
           }
@@ -255,6 +289,7 @@ class AgentRuntime {
           stepIndices[call.id] = steps.length;
           steps.add(
             AgentStep(
+              callId: call.id,
               toolName: call.name,
               title: toolTitle(call.name),
               status: AgentStepStatus.running,
@@ -263,7 +298,17 @@ class AgentRuntime {
             ),
           );
           onStepsChanged(List.unmodifiable(steps));
-          final result = userHandoffOccurred
+          final result = _userInputs.isNotEmpty
+              ? ToolResult(
+                  callId: call.id,
+                  toolName: call.name,
+                  status: ToolResultStatus.cancelled,
+                  output: const {
+                    'performed': false,
+                    'reason': '用户插入了新消息，此次预排工具尚未执行。请先阅读新消息，再决定后续操作。',
+                  },
+                )
+              : userHandoffOccurred
               ? ToolResult(
                   callId: call.id,
                   toolName: call.name,
@@ -333,6 +378,8 @@ class AgentRuntime {
         toolResults = nextResults;
       }
     } finally {
+      _acceptingUserInput = false;
+      _userInputs.clear();
       if (task != null && (await task.read())['status'] == 'active') {
         await task.pause(_cancelRequested ? '用户停止了当前执行' : '执行已中断，等待继续');
       }

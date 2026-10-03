@@ -118,7 +118,7 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
     } on Object catch (error) {
       if (mounted) {
         setState(() => _sending = false);
-        _messenger.currentState!.showGlassSnackBar(
+        _messenger.currentState!.showToast(
           SnackBar(
             content: Text(
               error is StateError
@@ -128,6 +128,7 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
                   : '转发失败，请重试：${errorMessage(error)}',
             ),
           ),
+          kind: ToastKind.error,
         );
       }
     }
@@ -285,7 +286,7 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-          trailing: const SettingsIcon(type: SettingsIconType.chevron),
+          trailing: const SettingsIcon(type: SettingsIconType.chevronDown),
           onTap: _sending ? null : _options,
         ),
     ],

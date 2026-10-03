@@ -160,14 +160,18 @@ class GroupMessageMarks {
     return {...rows.single, 'updated_at': marks.single['updated_at']};
   }
 
-  Future<List<Map<String, Object?>>> page(String groupId, int offset) async {
+  Future<List<Map<String, Object?>>> page(
+    String groupId,
+    int offset, {
+    int limit = 40,
+  }) async {
     await _member(groupId);
     final marks = await database.query(
       'group_favorite_messages',
       where: 'conversation_id = ?',
       whereArgs: [groupId],
       orderBy: 'saved_at DESC, message_id DESC',
-      limit: 40,
+      limit: limit,
       offset: offset,
     );
     if (marks.isEmpty) return [];

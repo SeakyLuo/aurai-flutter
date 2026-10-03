@@ -63,13 +63,18 @@ class _GroupFavoritesPageState extends State<GroupFavoritesPage> {
   }
 
   Future<void> _load({bool reset = false}) async {
+    final limit = reset && _rows.length > 40 ? _rows.length : 40;
     if (_loading || (!reset && !_more)) return;
     setState(() {
       _loading = true;
       _failed = false;
     });
     final success = await runUiAction(context, () async {
-      final rows = await _store.page(widget.groupId, reset ? 0 : _rows.length);
+      final rows = await _store.page(
+        widget.groupId,
+        reset ? 0 : _rows.length,
+        limit: limit,
+      );
       final messages = await (await _renderer).hydrate(rows);
       if (!mounted) return;
       setState(() {
@@ -87,7 +92,7 @@ class _GroupFavoritesPageState extends State<GroupFavoritesPage> {
             ),
           );
         }
-        _more = rows.length == 40;
+        _more = rows.length == limit;
       });
     });
     if (!mounted) return;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/global_ui.dart';
 
 class TaskFailureIcon extends StatelessWidget {
   const TaskFailureIcon({super.key, this.size = 16});
@@ -17,26 +18,20 @@ class _FailurePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.scale(size.width / 20, size.height / 20);
-    canvas.drawCircle(
-      const Offset(10, 10),
-      9,
-      Paint()..color = dark ? const Color(0xff412b33) : const Color(0xfffce9ef),
-    );
-    canvas.drawCircle(
-      const Offset(10, 10),
-      9,
-      Paint()
-        ..color = dark ? const Color(0xff74505d) : const Color(0xfff5cdd9)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
-    );
+    canvas.scale(size.width / 24, size.height / 24);
     final pen = Paint()
-      ..color = dark ? const Color(0xffe7a1b6) : const Color(0xffd56f90)
-      ..strokeWidth = 1.8
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(const Offset(10, 5.5), const Offset(10, 10.7), pen);
-    canvas.drawCircle(const Offset(10, 14), .95, pen);
+      ..color = dark ? GlobalUI.darkWarningRed : GlobalUI.warningRed
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.65
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawCircle(const Offset(12, 12), 9, pen);
+    canvas.drawLine(const Offset(12, 7), const Offset(12, 12.5), pen);
+    canvas.drawCircle(
+      const Offset(12, 16.5),
+      .95,
+      pen..style = PaintingStyle.fill,
+    );
   }
 
   @override

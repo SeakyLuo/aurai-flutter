@@ -53,9 +53,10 @@ class _SkillEditorState extends State<SkillEditor> {
     super.dispose();
   }
 
-  void _notice(String message) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(message)));
+  void _notice(String message, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(message)), kind: kind);
   Future<bool> _save() async {
     setState(() => _busy = true);
     try {
@@ -91,11 +92,14 @@ class _SkillEditorState extends State<SkillEditor> {
         _description.text = _saved.description;
         _instructions.text = _saved.instructions;
       });
-      _notice('技能已保存');
+      _notice('技能已保存', kind: ToastKind.success);
       return true;
     } on Object catch (e) {
       if (mounted)
-        _notice(e is StateError ? e.message : '保存失败，请重试：${errorMessage(e)}');
+        _notice(
+          e is StateError ? e.message : '保存失败，请重试：${errorMessage(e)}',
+          kind: ToastKind.error,
+        );
       return false;
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -232,7 +236,11 @@ class _SkillEditorState extends State<SkillEditor> {
                     opacity: _dirty && !_busy ? 1 : .3,
                     child: const SettingsIcon(type: SettingsIconType.check),
                   ),
-                  onPressed: _dirty && !_busy ? () => _save() : null,
+                  onPressed: _dirty && !_busy
+                      ? () async {
+                          if (await _save() && mounted) _leave();
+                        }
+                      : null,
                 ),
               ],
             ),
@@ -306,9 +314,11 @@ class _SkillEditorState extends State<SkillEditor> {
                       borderRadius: BorderRadius.circular(26),
                       clipBehavior: Clip.antiAlias,
                       child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 8,
+                        contentPadding: const EdgeInsetsDirectional.fromSTEB(
+                          18,
+                          8,
+                          12,
+                          8,
                         ),
                         leading: SettingsIcon(
                           type: _visibility == 'private'
@@ -320,7 +330,7 @@ class _SkillEditorState extends State<SkillEditor> {
                           style: const TextStyle(fontSize: 16),
                         ),
                         trailing: const SettingsIcon(
-                          type: SettingsIconType.chevron,
+                          type: SettingsIconType.chevronDown,
                         ),
                         onTap:
                             _busy ||
@@ -328,17 +338,12 @@ class _SkillEditorState extends State<SkillEditor> {
                                     !widget.store.canManageVisibility(_saved))
                             ? null
                             : () async {
-                                final value =
-                                    await Navigator.push<(String, Set<String>)>(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => SkillVisibilityPicker(
-                                          store: widget.store,
-                                          visibility: _visibility,
-                                          selected: _visibleTo,
-                                        ),
-                                      ),
-                                    );
+                                final value = await showSkillVisibilityPicker(
+                                  context,
+                                  store: widget.store,
+                                  visibility: _visibility,
+                                  selected: _visibleTo,
+                                );
                                 if (mounted && value != null)
                                   setState(() {
                                     _visibility = value.$1;
@@ -365,9 +370,11 @@ class _SkillEditorState extends State<SkillEditor> {
                       borderRadius: BorderRadius.circular(26),
                       clipBehavior: Clip.antiAlias,
                       child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 8,
+                        contentPadding: const EdgeInsetsDirectional.fromSTEB(
+                          18,
+                          8,
+                          12,
+                          8,
                         ),
                         title: ListenableBuilder(
                           listenable: widget.store,

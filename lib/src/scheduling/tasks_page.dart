@@ -68,14 +68,16 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
     try {
       await tasks.reload();
     } on Object catch (error) {
-      if (mounted) _notice('无法读取任务，请稍后重试：${errorMessage(error)}');
+      if (mounted)
+        _notice('无法读取任务，请稍后重试：${errorMessage(error)}', kind: ToastKind.error);
     }
     if (mounted) setState(() => _loading = false);
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(text)), kind: kind);
 
   Future<void> _ensureDraft() async {
     if (_draftConversationId == widget.controller.activeConversation.id) return;
@@ -95,14 +97,14 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
         case AttachmentSource.gallery:
           if (widget.controller.draftImages.length ==
               MessageImageStore.maxImages) {
-            _notice('每条消息最多添加 4 张图片，请先移除一张');
+            _notice('每条消息最多添加 4 张图片，请先移除一张', kind: ToastKind.warning);
             return;
           }
           await widget.controller.addImages(ImageSource.gallery);
         case AttachmentSource.camera:
           if (widget.controller.draftImages.length ==
               MessageImageStore.maxImages) {
-            _notice('每条消息最多添加 4 张图片，请先移除一张');
+            _notice('每条消息最多添加 4 张图片，请先移除一张', kind: ToastKind.warning);
             return;
           }
           await widget.controller.addImages(ImageSource.camera);
@@ -136,7 +138,8 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
           return;
       }
     } on Object catch (error) {
-      if (mounted) _notice('附件添加失败，请重试：${errorMessage(error)}');
+      if (mounted)
+        _notice('附件添加失败，请重试：${errorMessage(error)}', kind: ToastKind.error);
     }
   }
 
@@ -144,7 +147,8 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
     try {
       await tasks.permission();
     } on Object catch (error) {
-      if (mounted) _notice('无法打开设置：${errorMessage(error)}');
+      if (mounted)
+        _notice('无法打开设置：${errorMessage(error)}', kind: ToastKind.error);
     }
   }
 
@@ -216,7 +220,7 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
               stopping: false,
               onSend: () {
                 if (widget.controller.needsConfiguration) {
-                  _notice('请先在设置中配置模型，再创建任务');
+                  _notice('请先在设置中配置模型，再创建任务', kind: ToastKind.warning);
                   return;
                 }
                 Navigator.pop(
@@ -247,7 +251,10 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
                   await widget.controller.removeDraftImage(image);
                 } on Object catch (error) {
                   if (mounted) {
-                    _notice('附件移除失败，请重试：${errorMessage(error)}');
+                    _notice(
+                      '附件移除失败，请重试：${errorMessage(error)}',
+                      kind: ToastKind.error,
+                    );
                   }
                 }
               },
@@ -256,7 +263,10 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
                   await widget.controller.removeDraftFile(file);
                 } on Object catch (error) {
                   if (mounted) {
-                    _notice('附件移除失败，请重试：${errorMessage(error)}');
+                    _notice(
+                      '附件移除失败，请重试：${errorMessage(error)}',
+                      kind: ToastKind.error,
+                    );
                   }
                 }
               },
@@ -466,7 +476,7 @@ Future<void> openScheduledTasks(
     await controller.submitGoal(request.prompt);
   } on Object catch (error) {
     if (context.mounted)
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(
           content: Text(
             error is StateError
@@ -474,6 +484,7 @@ Future<void> openScheduledTasks(
                 : '无法创建任务，请在聊天中重试：${errorMessage(error)}',
           ),
         ),
+        kind: ToastKind.error,
       );
   }
 }

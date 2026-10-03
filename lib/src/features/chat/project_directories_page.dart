@@ -169,66 +169,76 @@ class _ProjectDirectoriesPageState extends State<ProjectDirectoriesPage> {
             ),
           ],
         ),
-        body: ListView(
-          padding: settingsPagePadding(
-            context,
-            const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          ),
-          children: [
-            if (items == null)
-              const Center(child: CircularProgressIndicator())
-            else if (items.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: EmptyDataView(title: '还没有关联目录，点击右上角添加。'),
-              ),
-            for (final item in items ?? <ProjectDirectory>[])
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Material(
-                  color: settingsFieldColor(context),
-                  borderRadius: BorderRadius.circular(24),
-                  clipBehavior: Clip.antiAlias,
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.only(left: 18, right: 8),
-                    leading: const FileToolIcon(type: FileToolIconType.folder),
-                    title: Text(
-                      item.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 15),
-                    ),
-                    subtitle: Text(
-                      item.worktree
-                          ? 'Git 工作树'
-                          : item.managed
-                          ? 'Aurai 工作区'
-                          : '手机文件夹',
-                    ),
-                    subtitleTextStyle: TextStyle(
-                      fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    trailing: Builder(
-                      builder: (anchor) => IconButton(
-                        tooltip: '目录操作',
-                        icon: const SettingsIcon(type: SettingsIconType.more),
-                        onPressed: _busy ? null : () => _actions(anchor, item),
-                      ),
-                    ),
-                    onTap: _busy
-                        ? null
-                        : () => runUiAction(
-                            context,
-                            () => AuraiPlatform.instance.openProjectFolder(
-                              item.uri,
+        body: items != null && items.isEmpty
+            ? Padding(
+                padding: settingsPagePadding(context, EdgeInsets.zero),
+                child: const EmptyDataView(title: '还没有关联目录，点击右上角添加。'),
+              )
+            : ListView(
+                padding: settingsPagePadding(
+                  context,
+                  const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                ),
+                children: [
+                  if (items == null)
+                    const Center(child: CircularProgressIndicator()),
+                  for (final item in items ?? <ProjectDirectory>[])
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Material(
+                        color: settingsFieldColor(context),
+                        borderRadius: BorderRadius.circular(24),
+                        clipBehavior: Clip.antiAlias,
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.only(
+                            left: 18,
+                            right: 8,
+                          ),
+                          leading: const FileToolIcon(
+                            type: FileToolIconType.folder,
+                          ),
+                          title: Text(
+                            item.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 15),
+                          ),
+                          subtitle: Text(
+                            item.worktree
+                                ? 'Git 工作树'
+                                : item.managed
+                                ? 'Aurai 工作区'
+                                : '手机文件夹',
+                          ),
+                          subtitleTextStyle: TextStyle(
+                            fontSize: 13,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                          trailing: Builder(
+                            builder: (anchor) => IconButton(
+                              tooltip: '目录操作',
+                              icon: const SettingsIcon(
+                                type: SettingsIconType.more,
+                              ),
+                              onPressed: _busy
+                                  ? null
+                                  : () => _actions(anchor, item),
                             ),
                           ),
-                  ),
-                ),
+                          onTap: _busy
+                              ? null
+                              : () => runUiAction(
+                                  context,
+                                  () => AuraiPlatform.instance
+                                      .openProjectFolder(item.uri),
+                                ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-          ],
-        ),
       ),
     );
   }

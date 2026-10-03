@@ -25,7 +25,8 @@ extension _ChatSearchNavigation on _ChatPageState {
         _unreadTarget.value = (id: id, count: unreadCount, visible: !fits);
       }
     } on Object catch (error) {
-      if (mounted) _imageNotice('未读位置加载失败：${errorMessage(error)}');
+      if (mounted)
+        _imageNotice('未读位置加载失败：${errorMessage(error)}', kind: ToastKind.error);
     } finally {
       _locatingInitialMessage = false;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -128,7 +129,10 @@ extension _ChatSearchNavigation on _ChatPageState {
     } on Object catch (caughtError) {
       if (mounted && identical(controller.activeConversation, conversation)) {
         _scrollToBottom();
-        _imageNotice('无法定位这条消息，请重新搜索：${errorMessage(caughtError)}');
+        _imageNotice(
+          '无法定位这条消息，请重新搜索：${errorMessage(caughtError)}',
+          kind: ToastKind.error,
+        );
       }
     }
   }

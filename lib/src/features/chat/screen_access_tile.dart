@@ -26,10 +26,11 @@ class _ScreenAccessTileState extends State<ScreenAccessTile> {
       return await widget.controller.getScreenAccess(widget.senderId);
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(
             content: Text('无法读取屏幕操作授权，请重新启动 App 后再试：${errorMessage(error)}'),
           ),
+          kind: ToastKind.error,
         );
       }
       return null;
@@ -46,8 +47,9 @@ class _ScreenAccessTileState extends State<ScreenAccessTile> {
       if (mounted) setState(() => _allowed = value);
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('无法保存屏幕操作授权，请重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     } finally {

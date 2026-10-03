@@ -1,4 +1,5 @@
 import '../domain/model_provider.dart';
+import '../domain/tool_detail_target.dart';
 import 'package:flutter/foundation.dart';
 import '../domain/tool_models.dart';
 
@@ -179,7 +180,21 @@ class ProviderConfigurationTool
         status: _cancelled.value
             ? ToolResultStatus.cancelled
             : ToolResultStatus.success,
-        output: output,
+        output: {
+          ...output,
+          if (const {
+            'configureModelProvider',
+            'configureProviderBalance',
+            'configureProviderIcon',
+          }.contains(name))
+            'detailTargets': [
+              ToolDetailTarget(
+                type: ToolDetailType.provider,
+                id: output['provider'] as String,
+                name: output['name'] as String,
+              ).toJson(),
+            ],
+        },
       );
     } catch (error) {
       return ToolResult(

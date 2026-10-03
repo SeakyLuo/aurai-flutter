@@ -6,7 +6,7 @@ import '../../domain/model_provider.dart';
 import '../../providers/image_generation_client.dart';
 import '../../scheduling/task_unsaved_dialog.dart';
 import 'chat_controller.dart';
-import 'choice_sheet.dart';
+import 'model_choice_sheet.dart';
 import 'model_provider_detail.dart';
 import 'model_provider_icon.dart';
 import 'settings_appearance.dart';
@@ -51,9 +51,11 @@ class _ImageGenerationSettingsPageState
     super.dispose();
   }
 
-  void _notice(String text) => ScaffoldMessenger.of(context).showGlassSnackBar(
-    SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
-  );
+  void _notice(String text, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(context).showToast(
+        SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
+        kind: kind,
+      );
 
   void _leave() {
     setState(() => _allowPop = true);
@@ -92,8 +94,9 @@ class _ImageGenerationSettingsPageState
   }
 
   Future<void> _chooseService() async {
-    final value = await showChoiceSheet<ModelService>(
+    final value = await showProviderChoiceSheet(
       context,
+      profiles: widget.controller.modelSettings.profiles,
       title: '生图服务商',
       selected: _service,
       choices: [
@@ -127,7 +130,7 @@ class _ImageGenerationSettingsPageState
         _notice('没有可用的生图模型，请检查服务商配置');
         return;
       }
-      final selected = await showChoiceSheet<String>(
+      final selected = await showModelOptionsSheet(
         context,
         title: '选择生图模型',
         selected: _model?.id ?? '',
@@ -138,9 +141,9 @@ class _ImageGenerationSettingsPageState
       if (!mounted || selected == null) return;
       setState(() => _model = models.firstWhere((m) => m.id == selected));
     } on ModelProviderException catch (error) {
-      if (mounted) _notice(error.message);
+      if (mounted) _notice(error.message, kind: ToastKind.error);
     } on Object {
-      if (mounted) _notice('无法获取生图模型，请检查网络和服务商配置后重试');
+      if (mounted) _notice('无法获取生图模型，请检查网络和服务商配置后重试', kind: ToastKind.error);
     } finally {
       client.close();
       _client = null;
@@ -150,7 +153,7 @@ class _ImageGenerationSettingsPageState
 
   Future<void> _save() async {
     if (_model == null) {
-      _notice('请先选择生图模型');
+      _notice('请先选择生图模型', kind: ToastKind.warning);
       return;
     }
     if (!_account.isConfigured) {
@@ -163,10 +166,10 @@ class _ImageGenerationSettingsPageState
         ImageGenerationConfig(service: _service, model: _model!),
       );
       if (!mounted) return;
-      _notice('图片生成设置已保存');
+      _notice('图片生成设置已保存', kind: ToastKind.success);
       _leave();
     } on Object {
-      if (mounted) _notice('保存失败，请稍后重试');
+      if (mounted) _notice('保存失败，请稍后重试', kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -218,12 +221,14 @@ class _ImageGenerationSettingsPageState
                       config: widget.controller.modelSettings.profile(_service),
                     ),
                     onTap: _locked ? null : _chooseService,
+                    sheet: true,
                   ),
                   const SizedBox(height: 12),
                   _row(
                     title: '生图模型',
                     subtitle: _model?.name ?? '选择模型',
                     onTap: _locked ? null : _chooseModel,
+                    sheet: true,
                   ),
                   const SizedBox(height: 12),
                   _row(
@@ -264,16 +269,20 @@ class _ImageGenerationSettingsPageState
     required String subtitle,
     Widget? leading,
     VoidCallback? onTap,
+    bool sheet = false,
   }) => Material(
     color: settingsFieldColor(context),
     borderRadius: BorderRadius.circular(24),
     clipBehavior: Clip.antiAlias,
     child: ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      contentPadding: settingsCardPadding,
+      minTileHeight: settingsCardHeight,
       leading: leading,
       title: Text(title),
       subtitle: Text(subtitle),
-      trailing: const SettingsIcon(type: SettingsIconType.chevron),
+      trailing: SettingsIcon(
+        type: sheet ? SettingsIconType.chevronDown : SettingsIconType.chevron,
+      ),
       onTap: onTap,
     ),
   );

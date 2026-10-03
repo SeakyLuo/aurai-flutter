@@ -151,6 +151,7 @@ class ConversationWriter {
             'conversations',
             {
               'draft': header['draft'],
+              'draft_updated_at': header['draft_updated_at'],
               'draft_quote_json': header['draft_quote_json'],
             },
             where: 'id = ?',

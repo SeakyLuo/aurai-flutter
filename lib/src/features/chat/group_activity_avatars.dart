@@ -127,7 +127,7 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
   }
 
   @override
-  Widget build(BuildContext context) => _visible.isEmpty || !_routeVisible
+  Widget build(BuildContext context) => _visible.isEmpty
       ? const SizedBox.shrink()
       : Center(
           heightFactor: 1,

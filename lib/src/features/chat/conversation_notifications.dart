@@ -116,8 +116,9 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
       await openHomeConversation(context, widget.controller, id);
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('会话暂时无法打开，请稍后重试：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
       }
     }
@@ -126,9 +127,7 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
   void _onMemoryNotice() {
     final notice = widget.controller.memory.notices.value;
     if (notice == null) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showGlassSnackBar(SnackBar(content: Text(notice)));
+    ScaffoldMessenger.of(context).showToast(SnackBar(content: Text(notice)));
   }
 
   void _onCompleted() {

@@ -37,36 +37,49 @@ class _CustomAvatarPageState extends State<CustomAvatarPage> {
   }
 
   List<MapEntry<String, String>> get _visibleSymbols {
-    final entries = avatarSymbols.entries.toList();
-    final fixed = entries.take(2).toList();
-    final labels = avatarSymbols;
-    final recent = [
-      for (final value in _recentSymbols)
-        if (!fixed.any((entry) => entry.key == value))
-          MapEntry(value, labels[value] ?? 'Emoji'),
-    ];
-    final used = {
-      ...fixed.map((entry) => entry.key),
-      ...recent.map((e) => e.key),
-    };
+    const fixedKeys = ['app_logo_white', 'initial'];
+    final icons = {...avatarSymbols.keys}
+        .where(
+          (key) => !fixedKeys.contains(key) && !key.startsWith('portrait:'),
+        )
+        .toList();
+    final emojis = {
+      'emoji:😀',
+      'emoji:😎',
+      'emoji:🥰',
+      'emoji:🐱',
+      'emoji:🐶',
+      'emoji:🌸',
+      'emoji:🌈',
+      'emoji:☀️',
+      'emoji:🍀',
+    }.toList();
     return [
-      ...fixed,
-      ...recent,
-      for (final entry in entries)
-        if (!used.contains(entry.key)) entry,
+      for (final key in fixedKeys) MapEntry(key, avatarSymbols[key]!),
+      for (final key in <String>{
+        ..._recentSymbols.where(
+          (key) =>
+              !fixedKeys.contains(key) &&
+              (avatarSymbols.containsKey(key) || key.startsWith('emoji:')),
+        ),
+        'portrait:dark_hair_boy',
+        'portrait:brown_hair_girl',
+        'portrait:little_robot',
+        ...emojis.take(7),
+        ...icons,
+      })
+        MapEntry(key, avatarSymbols[key] ?? 'Emoji'),
     ].take(24).toList();
   }
 
-  Future<void> _selectSymbol(String value) async {
-    final fixed = avatarSymbols.keys.take(2);
+  Future<void> _selectSymbol(String value, {bool reorder = false}) async {
+    setState(() => _icon = value);
+    const fixed = ['app_logo_white', 'initial'];
     final recent = fixed.contains(value)
         ? _recentSymbols
         : await AvatarSymbolRecents.record(widget.database, value);
-    if (mounted) {
-      setState(() {
-        _icon = value;
-        _recentSymbols = recent;
-      });
+    if (mounted && reorder) {
+      setState(() => _recentSymbols = recent);
     }
   }
 
@@ -77,7 +90,7 @@ class _CustomAvatarPageState extends State<CustomAvatarPage> {
       color: _color,
       name: widget.name,
     );
-    if (icon != null && mounted) await _selectSymbol(icon);
+    if (icon != null && mounted) await _selectSymbol(icon, reorder: true);
   }
 
   @override

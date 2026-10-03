@@ -140,9 +140,10 @@ class _ImagePreviewState extends State<ImagePreview> {
         : widget.originMessageId;
     if (image is FileImage && !await image.file.exists()) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(const SnackBar(content: Text('图片文件已丢失，无法保存或转发')));
+        ScaffoldMessenger.of(context).showToast(
+          const SnackBar(content: Text('图片文件已丢失，无法保存或转发')),
+          kind: ToastKind.error,
+        );
       return;
     }
     if (!mounted) return;
@@ -157,8 +158,9 @@ class _ImagePreviewState extends State<ImagePreview> {
       }
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('无法读取图片来源：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     }
     if (!mounted) return;
@@ -179,7 +181,7 @@ class _ImagePreviewState extends State<ImagePreview> {
       if (sent == true && mounted)
         ScaffoldMessenger.of(
           context,
-        ).showGlassSnackBar(const SnackBar(content: Text('已转发')));
+        ).showToast(const SnackBar(content: Text('已转发')));
       return;
     }
     if (action == 'locate') {
@@ -193,8 +195,9 @@ class _ImagePreviewState extends State<ImagePreview> {
         );
       } on Object catch (error) {
         if (mounted)
-          ScaffoldMessenger.of(context).showGlassSnackBar(
+          ScaffoldMessenger.of(context).showToast(
             SnackBar(content: Text('无法定位原消息，可能已被删除：${errorMessage(error)}')),
+            kind: ToastKind.error,
           );
       }
       return;
@@ -203,13 +206,14 @@ class _ImagePreviewState extends State<ImagePreview> {
     try {
       final saved = await PreviewImageActions.perform(image, action);
       if (mounted && action == 'save' && saved) {
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(const SnackBar(content: Text('图片已保存到应用目录')));
+        ScaffoldMessenger.of(context).showToast(
+          const SnackBar(content: Text('图片已保存到应用目录')),
+          kind: ToastKind.success,
+        );
       }
     } on Object catch (error) {
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(
             content: Text(
               action == 'save'
@@ -217,6 +221,7 @@ class _ImagePreviewState extends State<ImagePreview> {
                   : '无法转发图片，请重试：${errorMessage(error)}',
             ),
           ),
+          kind: ToastKind.error,
         );
     } finally {
       _exporting = false;
@@ -241,7 +246,7 @@ class _ImagePreviewState extends State<ImagePreview> {
       onPointerSignal: (_) => _showControls(),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: _showControls,
+        onTap: () => Navigator.pop(context),
         onLongPressStart: (details) => _openActions(details.globalPosition),
         child: Stack(
           fit: StackFit.expand,
@@ -262,7 +267,7 @@ class _ImagePreviewState extends State<ImagePreview> {
                     heroTag: widget.heroTag,
                     heroEnabled:
                         index == widget.initialIndex && index == _index,
-                    onTap: _showControls,
+                    onTap: () => Navigator.pop(context),
                   ),
                 ),
               ),

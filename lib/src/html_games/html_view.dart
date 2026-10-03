@@ -224,11 +224,11 @@ class _HtmlViewState extends State<HtmlView>
     }
   }
 
-  void _notice(String message) {
+  void _notice(String message, {ToastKind kind = ToastKind.info}) {
     if (mounted)
       ScaffoldMessenger.of(
         context,
-      ).showGlassSnackBar(SnackBar(content: Text(message)));
+      ).showToast(SnackBar(content: Text(message)), kind: kind);
   }
 
   Future<void> _refreshCard() async {
@@ -302,7 +302,10 @@ class _HtmlViewState extends State<HtmlView>
       });
     } on Object catch (caughtError) {
       if (mounted) setState(() => _failed = true);
-      _notice('卡片加载失败，请点击重试：${errorMessage(caughtError)}');
+      _notice(
+        '卡片加载失败，请点击重试：${errorMessage(caughtError)}',
+        kind: ToastKind.error,
+      );
     } finally {
       if (mounted) {
         setState(() => _opening = false);
@@ -352,7 +355,11 @@ class _HtmlViewState extends State<HtmlView>
                 )
                 .catchError((Object error) {
                   if (_savedSize == size) _savedSize = null;
-                  if (mounted) _notice('尺寸保存失败：${errorMessage(error)}');
+                  if (mounted)
+                    _notice(
+                      '尺寸保存失败：${errorMessage(error)}',
+                      kind: ToastKind.error,
+                    );
                 }),
           );
         }
@@ -373,7 +380,7 @@ class _HtmlViewState extends State<HtmlView>
       return;
     }
     if (session.error != null) {
-      _notice(session.error!);
+      _notice(session.error!, kind: ToastKind.error);
       session.error = null;
       if (session.failed) {
         _failed = true;
@@ -391,7 +398,7 @@ class _HtmlViewState extends State<HtmlView>
       HtmlGameSignals.changes.add(widget.messageId);
       _notice('已重新排队，AI 空闲后会继续');
     } on Object catch (error) {
-      _notice('未能重新通知：${errorMessage(error)}');
+      _notice('未能重新通知：${errorMessage(error)}', kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _retrying = false);
     }
@@ -522,7 +529,7 @@ class _HtmlViewState extends State<HtmlView>
                     alignment: Alignment.topCenter,
                   ),
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 12, 16),
                   child: Row(
                     children: [
                       Expanded(

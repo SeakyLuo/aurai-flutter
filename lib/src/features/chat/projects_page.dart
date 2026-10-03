@@ -229,6 +229,10 @@ class _ProjectPageState extends State<ProjectPage> {
   }
 
   Future<void> _load({bool more = false}) async {
+    final count = _conversations?.length ?? 0;
+    final limit = !more && count > HomeConversations.pageSize
+        ? count
+        : HomeConversations.pageSize;
     if (_loading) return;
     setState(() => _loading = true);
     await runUiAction(context, () async {
@@ -236,6 +240,7 @@ class _ProjectPageState extends State<ProjectPage> {
       final page = await reader.forProject(
         _project.id,
         offset: more ? _conversations!.length : 0,
+        limit: limit,
       );
       final avatars = await Future.wait<Object>([
         reader.senders(page),
@@ -255,7 +260,7 @@ class _ProjectPageState extends State<ProjectPage> {
         _senders.addAll(avatars[0] as Map<String, MessageSender>);
         _groups.addAll(avatars[1] as Map<String, List<MessageSender>>);
         _conversations = more ? [..._conversations!, ...page] : page;
-        _more = page.length == HomeConversations.pageSize;
+        _more = page.length == limit;
       });
     });
     if (mounted) setState(() => _loading = false);
@@ -311,8 +316,9 @@ class _ProjectPageState extends State<ProjectPage> {
       Navigator.popUntil(context, (route) => route.isFirst);
       await submission;
     } on Object catch (error) {
-      messenger.showGlassSnackBar(
+      messenger.showToast(
         SnackBar(content: Text('无法发送消息，请重试：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
     } finally {
       if (mounted) setState(() => _opening = false);
@@ -360,14 +366,14 @@ class _ProjectPageState extends State<ProjectPage> {
         case AttachmentSource.gallery:
           if (widget.controller.draftImages.length ==
               MessageImageStore.maxImages) {
-            _notice('每条消息最多添加 4 张图片，请先移除一张');
+            _notice('每条消息最多添加 4 张图片，请先移除一张', kind: ToastKind.warning);
             return;
           }
           await widget.controller.addImages(ImageSource.gallery);
         case AttachmentSource.camera:
           if (widget.controller.draftImages.length ==
               MessageImageStore.maxImages) {
-            _notice('每条消息最多添加 4 张图片，请先移除一张');
+            _notice('每条消息最多添加 4 张图片，请先移除一张', kind: ToastKind.warning);
             return;
           }
           await widget.controller.addImages(ImageSource.camera);
@@ -407,13 +413,15 @@ class _ProjectPageState extends State<ProjectPage> {
           return;
       }
     } on Object catch (error) {
-      if (mounted) _notice('附件添加失败，请重试：${errorMessage(error)}');
+      if (mounted)
+        _notice('附件添加失败，请重试：${errorMessage(error)}', kind: ToastKind.error);
     }
   }
 
-  void _notice(String message) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(message)));
+  void _notice(String message, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(message)), kind: kind);
 
   Future<void> _selectRecipient() async {
     final recipient = await Navigator.push<AiProfile>(
@@ -595,14 +603,22 @@ class _ProjectPageState extends State<ProjectPage> {
               try {
                 await widget.controller.removeDraftImage(image);
               } on Object catch (error) {
-                if (mounted) _notice('附件移除失败，请重试：${errorMessage(error)}');
+                if (mounted)
+                  _notice(
+                    '附件移除失败，请重试：${errorMessage(error)}',
+                    kind: ToastKind.error,
+                  );
               }
             },
             onRemoveFile: (file) async {
               try {
                 await widget.controller.removeDraftFile(file);
               } on Object catch (error) {
-                if (mounted) _notice('附件移除失败，请重试：${errorMessage(error)}');
+                if (mounted)
+                  _notice(
+                    '附件移除失败，请重试：${errorMessage(error)}',
+                    kind: ToastKind.error,
+                  );
               }
             },
             addingImages:

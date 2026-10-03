@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../domain/avatar_style.dart';
+import '../../domain/avatar_portraits.dart';
 import 'avatar_background.dart';
 import 'avatar_symbol.dart';
 
@@ -44,6 +45,13 @@ class ProfileAvatar extends StatelessWidget {
                 height: size,
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => _initial(background.foreground),
+              )
+            : avatarPortraits.containsKey(style.icon)
+            ? Image.asset(
+                avatarPortraits[style.icon]!.asset,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
               )
             : style.icon == 'initial'
             ? _initial(background.foreground)

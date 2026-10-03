@@ -11,6 +11,9 @@ Map<String, Object?> conversationRow(Conversation value) => {
   'id': value.id,
   'created_at': value.createdAt.microsecondsSinceEpoch,
   'updated_at': value.updatedAt.microsecondsSinceEpoch,
+  'draft_updated_at': value.draftPreview == null
+      ? 0
+      : value.draftUpdatedAt?.microsecondsSinceEpoch ?? 0,
   'title': value.title,
   'kind': value.kind.name,
   'mode': value.mode.name,
@@ -50,6 +53,9 @@ Conversation conversationFromRow(Map<String, Object?> row) =>
       ..storedUpdatedAt = DateTime.fromMicrosecondsSinceEpoch(
         row['updated_at']! as int,
       )
+      ..draftUpdatedAt = row['draft_updated_at'] == 0
+          ? null
+          : DateTime.fromMicrosecondsSinceEpoch(row['draft_updated_at']! as int)
       ..storedTitle = row['title']! as String
       ..storedPreview = row['preview'] as String?
       ..isPinned = row['pinned'] == 1

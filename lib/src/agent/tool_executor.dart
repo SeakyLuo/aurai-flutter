@@ -219,9 +219,11 @@ class ToolExecutor {
     try {
       final ToolResult result;
       try {
-        result = await tool
-            .execute(call)
-            .timeout(tool.definition.executionTimeout);
+        final execution = tool.execute(call);
+        // Questions own their deadline, including deferred user responses.
+        result = tool is AskUserTool
+            ? await execution
+            : await execution.timeout(tool.definition.executionTimeout);
       } on StateError catch (error) {
         return ToolResult(
           callId: call.id,

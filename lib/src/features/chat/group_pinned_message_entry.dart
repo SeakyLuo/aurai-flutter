@@ -1,3 +1,4 @@
+import 'settings_appearance.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -119,8 +120,8 @@ class _GroupPinnedMessageEntryState extends State<GroupPinnedMessageEntry> {
     final message = _message;
     if (message == null) return const SizedBox.shrink();
     final tile = ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-      minTileHeight: 60,
+      contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 12),
+      minTileHeight: settingsCardHeight,
       title: const Text('置顶消息', style: TextStyle(fontSize: 15)),
       subtitle: Text(
         groupSavedMessagePreview(message),

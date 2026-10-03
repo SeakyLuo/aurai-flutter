@@ -1,3 +1,5 @@
+import 'message_menu_sheet.dart';
+import 'message_primary_actions.dart';
 import '../../storage/quick_reply_recents.dart';
 import 'message_action.dart';
 export 'message_action.dart';
@@ -24,6 +26,9 @@ import 'menu_press_highlight.dart';
 Future<MessageMenuResult?> showMessageActionsMenu(
   BuildContext context, {
   required AgentMessage message,
+  bool groupMenu = false,
+  bool preserveSelection = false,
+  bool allowReadAloud = false,
   bool allowStar = false,
   bool allowGroupMarks = false,
   bool pinned = false,
@@ -48,22 +53,21 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   if (!context.mounted) return null;
   final options = quickReplyOptionsByKey;
   final visibleKeys = recentQuickReplyKeys(recent, 5);
-  return showModalBottomSheet<MessageMenuResult>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
-    barrierColor: Colors.black.withValues(alpha: .24),
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-    ),
-    builder: (context) {
+  return showMessageMenuSheet(
+    context,
+    preserveSelection: preserveSelection,
+    builder: (context, close) {
       final media = MediaQuery.of(context);
       final iconColor = Theme.of(context).brightness == Brightness.dark
           ? Theme.of(context).colorScheme.onSurfaceVariant
           : const Color(0xff222222);
       final actions = [
+        if (allowReadAloud)
+          (
+            const MessageActionResult(MessageAction.readAloud),
+            SettingsIcon(type: SettingsIconType.sound, color: iconColor),
+            '朗读',
+          ),
         if (allowRetry)
           (
             const MessageActionResult(MessageAction.retry),
@@ -180,7 +184,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
       return ConstrainedBox(
         constraints: BoxConstraints(maxHeight: media.size.height * .78),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
@@ -200,10 +204,8 @@ Future<MessageMenuResult?> showMessageActionsMenu(
                             selected: sentQuickReplyKeys.contains(option.key),
                             child: EmojiButton(
                               selected: sentQuickReplyKeys.contains(option.key),
-                              onTap: () => Navigator.pop(
-                                context,
-                                MessageQuickReplyResult(option),
-                              ),
+                              onTap: () =>
+                                  close(MessageQuickReplyResult(option)),
                               child: Text(
                                 option.emoji,
                                 style: TextStyle(
@@ -227,7 +229,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
                               fixedSize: const Size.square(44),
                               backgroundColor: Theme.of(
                                 context,
-                              ).colorScheme.onSurface.withValues(alpha: .10),
+                              ).colorScheme.onSurface.withValues(alpha: .07),
                               shape: const CircleBorder(),
                             ),
                             onPressed: () async {
@@ -236,10 +238,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
                                 selectedKeys: sentQuickReplyKeys,
                               );
                               if (context.mounted && option != null) {
-                                Navigator.pop(
-                                  context,
-                                  MessageQuickReplyResult(option),
-                                );
+                                close(MessageQuickReplyResult(option));
                               }
                             },
                             icon: const SidebarActionIcon(
@@ -251,11 +250,29 @@ Future<MessageMenuResult?> showMessageActionsMenu(
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                const SizedBox(height: 4),
+                Divider(
+                  height: 12,
+                  thickness: .5,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xff606064)
+                      : const Color(0xffbdbdc2),
+                ),
               ],
+              if (groupMenu)
+                MessagePrimaryActions(
+                  allowQuote: allowQuote,
+                  allowForward: allowForward,
+                  allowCopy:
+                      allowCopy &&
+                      message.htmlGame == null &&
+                      message.text.isNotEmpty,
+                  allowStar: allowStar,
+                  starred: starred,
+                  onAction: (action) => close(MessageActionResult(action)),
+                ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+                padding: const EdgeInsets.fromLTRB(14, 6, 0, 6),
                 child: DefaultTextStyle(
                   style: Theme.of(context).textTheme.bodySmall!.copyWith(
                     fontSize: 13,
@@ -269,10 +286,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
                           borderRadius: BorderRadius.circular(12),
                           onTap: () => onVisibility(context),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 8,
-                            ),
+                            padding: const EdgeInsets.fromLTRB(4, 8, 0, 8),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -297,14 +311,23 @@ Future<MessageMenuResult?> showMessageActionsMenu(
                   ),
                 ),
               ),
-              for (final (result, icon, label) in actions)
+              for (final (result, icon, label) in actions.where(
+                (entry) =>
+                    !groupMenu ||
+                    !{
+                      MessageAction.quote,
+                      MessageAction.forward,
+                      MessageAction.copy,
+                      MessageAction.star,
+                    }.contains(entry.$1.action),
+              ))
                 InkWell(
                   borderRadius: BorderRadius.circular(18),
-                  onTap: () => Navigator.pop(context, result),
+                  onTap: () => close(result),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
-                      vertical: 12,
+                      vertical: 10,
                     ),
                     child: Row(
                       children: [

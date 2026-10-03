@@ -141,20 +141,20 @@ class _PrivateTaskListState extends State<PrivateTaskList> {
               ),
             ),
             Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-                child: StreamBuilder<Map<String, dynamic>>(
-                  stream: widget.store.changes,
-                  initialData: {'steps': widget.steps},
-                  builder: (context, snapshot) {
-                    final steps =
-                        (snapshot.requireData['steps'] as List? ?? const [])
-                            .cast<Map>();
-                    return steps.isEmpty
-                        ? EmptyDataView(title: '暂无任务')
-                        : PrivateTaskListNodes(steps: steps);
-                  },
-                ),
+              child: StreamBuilder<Map<String, dynamic>>(
+                stream: widget.store.changes,
+                initialData: {'steps': widget.steps},
+                builder: (context, snapshot) {
+                  final steps =
+                      (snapshot.requireData['steps'] as List? ?? const [])
+                          .cast<Map>();
+                  return steps.isEmpty
+                      ? EmptyDataView(title: '暂无任务')
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                          child: PrivateTaskListNodes(steps: steps),
+                        );
+                },
               ),
             ),
           ],

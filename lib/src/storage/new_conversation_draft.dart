@@ -30,6 +30,9 @@ class NewConversationDraft {
       ..projectId = data['projectId'] as String?
       ..storedTitle = data['title'] as String?
       ..draft = data['text']! as String
+      ..draftUpdatedAt = data['draftUpdatedAt'] == null
+          ? null
+          : DateTime.parse(data['draftUpdatedAt']! as String)
       ..draftQuote = data['quote'] == null
           ? null
           : MessageQuote.fromJson(
@@ -64,6 +67,7 @@ class NewConversationDraft {
       'id': conversation.id,
       'createdAt': conversation.createdAt.toIso8601String(),
       'text': conversation.draft,
+      'draftUpdatedAt': conversation.draftUpdatedAt?.toIso8601String(),
       'title': conversation.storedTitle,
       'projectId': conversation.projectId,
       'quote': conversation.draftQuote?.toJson(),

@@ -72,7 +72,7 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
                 AssetLibraryPage(controller: widget.controller, trash: true),
           ),
         );
-        if (mounted) await _load(reset: true);
+        if (mounted) await _load(refresh: true);
       case 'clear':
         final confirmed = await showDialog<bool>(
           context: context,
@@ -253,7 +253,7 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
         ? '${asset.name}.${extensionFromMime(asset.mimeType)}'
         : asset.name;
     await File(asset.path).copy('${directory.path}/$name');
-    if (mounted && notify) _notice('已保存到应用下载目录');
+    if (mounted && notify) _notice('已保存到应用下载目录', kind: ToastKind.success);
   }
 
   Future<void> _delete(List<String> ids, {VoidCallback? onDeleted}) async {
@@ -279,7 +279,7 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
       _notice('已彻底删除');
       return;
     }
-    ScaffoldMessenger.of(context).showGlassSnackBar(
+    ScaffoldMessenger.of(context).showToast(
       SnackBar(
         content: const Text('已移入回收站'),
         action: SnackBarAction(
@@ -292,7 +292,7 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
 
   Future<void> _restore(List<String> ids) async {
     await _mutate(() => _library.restore(ids));
-    if (mounted) _notice('已恢复到资料库');
+    if (mounted) _notice('已恢复到资料库', kind: ToastKind.success);
   }
 
   Future<void> _mutate(Future<void> Function() action) async {
@@ -304,7 +304,7 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
         _selected.clear();
         _selecting = false;
       });
-      await _load(reset: true);
+      await _load(refresh: true);
     } finally {
       if (mounted) _update(() => _busy = false);
     }
@@ -331,7 +331,8 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
       for (final asset in assets) {
         await _save(asset, notify: false);
       }
-      if (mounted) _notice('已保存 ${assets.length} 项到应用下载目录');
+      if (mounted)
+        _notice('已保存 ${assets.length} 项到应用下载目录', kind: ToastKind.success);
     } finally {
       if (mounted) _update(() => _busy = false);
     }
@@ -375,7 +376,8 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
     return sent == true;
   }
 
-  void _notice(String message) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(message)));
+  void _notice(String message, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(message)), kind: kind);
 }

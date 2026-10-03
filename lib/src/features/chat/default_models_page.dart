@@ -10,7 +10,7 @@ import '../../providers/model_catalog.dart';
 import '../../providers/model_purpose_catalog.dart';
 import '../../providers/openrouter_models.dart';
 import 'chat_controller.dart';
-import 'choice_sheet.dart';
+import 'model_choice_sheet.dart';
 import 'model_replacement_page.dart';
 import 'model_provider_icon.dart';
 import 'model_settings_sheet.dart';
@@ -38,9 +38,10 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
     super.dispose();
   }
 
-  void _notice(String message) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(message)));
+  void _notice(String message, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(message)), kind: kind);
 
   Future<void> _providers() => ModelSettingsSheet.show(
     context,
@@ -71,8 +72,13 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
 
   Future<void> _select(ModelPurpose purpose) async {
     final service = _currentService(purpose);
+    final account = service == null
+        ? null
+        : widget.controller.modelSettings.profile(service);
     if (service == null ||
-        !widget.controller.modelSettings.profile(service).isConfigured) {
+        (purpose == ModelPurpose.speechSynthesis
+            ? !account!.isSpeechConfigured
+            : !account!.isConfigured)) {
       await _selectProvider(purpose);
       return;
     }
@@ -88,7 +94,7 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
     ModelPurpose.text =>
       widget.controller.modelSettings.modelDefaults[purpose]?.service ??
           widget.controller.modelSettings.activeService,
-    ModelPurpose.videoGeneration =>
+    ModelPurpose.speechSynthesis || ModelPurpose.videoGeneration =>
       widget.controller.modelSettings.modelDefaults[purpose]?.service,
     ModelPurpose.musicGeneration =>
       widget.controller.modelSettings.modelDefaults[purpose]?.service ??
@@ -107,17 +113,17 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
       .values
       .where(
         (profile) =>
-            profile.isConfigured &&
+            (purpose == ModelPurpose.speechSynthesis
+                ? profile.isSpeechConfigured
+                : profile.isConfigured) &&
             switch (purpose) {
               ModelPurpose.imageGeneration =>
                 profile.service.supportsImageGeneration,
               ModelPurpose.videoGeneration =>
                 profile.protocol.supportsChatModels,
               ModelPurpose.text => profile.protocol.supportsChatModels,
-              ModelPurpose.musicGeneration =>
-                profile.protocol.defaultModelPurposes.contains(
-                  ModelPurpose.musicGeneration,
-                ),
+              ModelPurpose.musicGeneration || ModelPurpose.speechSynthesis =>
+                profile.supportedModelPurposes.contains(purpose),
             },
       )
       .toList();
@@ -130,8 +136,9 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
       accounts = _accounts(purpose);
       if (accounts.isEmpty) return;
     }
-    final service = await showChoiceSheet<ModelService?>(
+    final service = await showProviderChoiceSheet(
       context,
+      profiles: widget.controller.modelSettings.profiles,
       title: '选择供应商',
       selected: _currentService(purpose),
       choices: [
@@ -156,7 +163,23 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
     try {
       final catalog = ModelCatalog();
       _catalog = catalog;
-      final models = !account.autoSyncModels
+      final models = purpose == ModelPurpose.speechSynthesis
+          ? {
+                  ...account.modelCatalog.map((model) => model.id),
+                  ...account.savedModels,
+                  ...?account.details?.modelPurposes.keys,
+                }
+                .where(
+                  (id) =>
+                      modelPurposesFor(
+                        account,
+                        id,
+                      ).contains(ModelPurpose.speechSynthesis) &&
+                      (account.autoSyncModels ||
+                          account.savedModels.contains(id)),
+                )
+                .toList()
+          : !account.autoSyncModels
           ? account.savedModels
           : await catalog.loadFor(
               account,
@@ -174,19 +197,15 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
           ModelPurpose.videoGeneration =>
             info?.outputModalities.contains('video') ?? true,
           ModelPurpose.imageGeneration => false,
-          ModelPurpose.musicGeneration =>
-            account.protocol.defaultModelPurposes.contains(
-              ModelPurpose.musicGeneration,
-            ),
+          ModelPurpose.musicGeneration || ModelPurpose.speechSynthesis =>
+            account.supportedModelPurposes.contains(purpose),
         };
         if (eligible) {
           choices.add(
             DefaultModelSelection(
               service: service,
               model: model,
-              name:
-                  info?.name ??
-                  modelDisplayName(account.protocol.displayModel(model)),
+              name: account.displayModel(model, catalogName: info?.name),
             ),
           );
         }
@@ -204,7 +223,7 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
               : purpose == ModelPurpose.musicGeneration
               ? widget.controller.modelSettings.firstAvailableMusicModel?.model
               : null);
-      final choice = await showChoiceSheet<String?>(
+      final choice = await showModelOptionsSheet(
         context,
         title: purpose.label,
         selected: currentModel,
@@ -220,7 +239,7 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
       );
       if (mounted) setState(() {});
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       _catalog?.close();
       _catalog = null;
@@ -247,7 +266,7 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
       if (models.isEmpty) {
         throw StateError('没有可用的图片生成模型，请到供应商的模型管理中设置用途');
       }
-      final selected = await showChoiceSheet<String?>(
+      final selected = await showModelOptionsSheet(
         context,
         title: ModelPurpose.imageGeneration.label,
         selected: widget.controller.imageGeneration?.service == service
@@ -266,7 +285,7 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
       );
       if (mounted) setState(() {});
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {
       client.close();
       _imageClient = null;
@@ -278,23 +297,34 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
     final settings = widget.controller.modelSettings;
     if (purpose == ModelPurpose.imageGeneration) {
       final selected = widget.controller.imageGeneration;
-      return selected?.model.name ?? '未设置';
+      return selected == null
+          ? '未设置'
+          : settings
+                .profile(selected.service)
+                .displayModel(
+                  selected.model.id,
+                  catalogName: selected.model.name,
+                );
     }
     final selected = settings.modelDefaults[purpose];
     if (selected != null) {
-      return settings.profile(selected.service).isConfigured
-          ? selected.name
+      return (purpose == ModelPurpose.speechSynthesis
+              ? settings.profile(selected.service).isSpeechConfigured
+              : settings.profile(selected.service).isConfigured)
+          ? settings
+                .profile(selected.service)
+                .displayModel(selected.model, catalogName: selected.name)
           : '未设置';
     }
     if (purpose == ModelPurpose.text) {
       final config = settings.activeConfig;
-      return config.isConfigured ? modelDisplayName(config.model) : '未设置';
+      return config.isConfigured ? config.displayModel(config.model) : '未设置';
     }
     if (purpose == ModelPurpose.musicGeneration) {
       final selection = settings.firstAvailableMusicModel;
       return selection == null
           ? '未设置'
-          : selection.config.protocol.displayModel(selection.model);
+          : selection.config.displayModel(selection.model);
     }
     return '未设置';
   }
@@ -306,7 +336,9 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
     final settings = widget.controller.modelSettings;
     final selected = settings.modelDefaults[purpose];
     if (selected != null) {
-      return settings.profile(selected.service).isConfigured;
+      return (purpose == ModelPurpose.speechSynthesis
+          ? settings.profile(selected.service).isSpeechConfigured
+          : settings.profile(selected.service).isConfigured);
     }
     if (purpose == ModelPurpose.musicGeneration) {
       return settings.firstAvailableMusicModel != null;
@@ -319,6 +351,7 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
     ModelPurpose.imageGeneration => '默认图片生成模型',
     ModelPurpose.videoGeneration => '默认视频生成模型',
     ModelPurpose.musicGeneration => '默认音乐生成模型',
+    ModelPurpose.speechSynthesis => '默认语音合成模型',
   };
 
   @override
@@ -374,9 +407,11 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
                   borderRadius: BorderRadius.circular(24),
                   clipBehavior: Clip.antiAlias,
                   child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 10,
+                    contentPadding: const EdgeInsetsDirectional.fromSTEB(
+                      18,
+                      10,
+                      12,
+                      10,
                     ),
                     leading: _hasSelection(purpose)
                         ? _providerButton(purpose)

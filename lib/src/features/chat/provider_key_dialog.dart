@@ -46,9 +46,10 @@ class _ProviderKeyDialogState extends State<ProviderKeyDialog> {
 
   Future<void> _save() async {
     if (_key.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(const SnackBar(content: Text('请输入 API 密钥')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('请输入 API 密钥')),
+        kind: ToastKind.warning,
+      );
       return;
     }
     setState(() => _saving = true);
@@ -67,8 +68,9 @@ class _ProviderKeyDialogState extends State<ProviderKeyDialog> {
         Navigator.pop(context, false);
         return;
       }
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         const SnackBar(content: Text('密钥保存失败，请确认供应商地址未变化后重试')),
+        kind: ToastKind.error,
       );
     }
   }

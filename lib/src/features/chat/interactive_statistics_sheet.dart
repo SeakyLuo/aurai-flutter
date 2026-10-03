@@ -15,13 +15,15 @@ import '../../domain/interactive_message.dart';
 import '../../domain/message_sender.dart';
 import '../../storage/interactive_action_history.dart';
 import '../../storage/interactive_message_store.dart';
-import 'member_avatar.dart';
+import 'member_profile_avatar.dart';
+import 'chat_controller.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 
 Future<void> showInteractiveStatistics(
   BuildContext context, {
   required Database database,
+  required ChatController controller,
   required String messageId,
 }) {
   final snapshot = InteractivePageScope.of(context)?.snapshot;
@@ -32,6 +34,7 @@ Future<void> showInteractiveStatistics(
     showDragHandle: false,
     builder: (_) => _StatisticsSheet(
       database: database,
+      controller: controller,
       messageId: messageId,
       snapshot: snapshot,
     ),
@@ -41,11 +44,13 @@ Future<void> showInteractiveStatistics(
 class _StatisticsSheet extends StatefulWidget {
   const _StatisticsSheet({
     required this.database,
+    required this.controller,
     required this.messageId,
     this.actor,
     this.snapshot,
   });
   final Database database;
+  final ChatController controller;
   final String messageId;
   final String? actor;
   final InteractiveMessage? snapshot;
@@ -56,6 +61,7 @@ class _StatisticsSheet extends StatefulWidget {
 class _StatisticsSheetState extends State<_StatisticsSheet> {
   InteractiveMessage? _card;
   Map<String, MessageSender> _senders = {};
+  String? _groupId;
   String? _perspective;
   InteractiveOptionKey? _option;
   final _pageStorage = PageStorageBucket();
@@ -85,9 +91,10 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
 
   void _error(Object error) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+    ScaffoldMessenger.of(context).showToast(
+      SnackBar(content: Text(errorMessage(error))),
+      kind: ToastKind.error,
+    );
   }
 
   Future<void> _load() async {
@@ -95,7 +102,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
     try {
       final rows = await widget.database.query(
         'messages',
-        columns: ['interactive_json'],
+        columns: ['interactive_json', 'conversation_id'],
         where: 'id = ? AND kind != ?',
         whereArgs: [widget.messageId, 'system'],
       );
@@ -131,6 +138,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
                   _card!.participantRevision(actor));
       setState(() {
         _card = card;
+        _groupId = rows.single['conversation_id'] as String;
         _senders = {
           for (final row in senders)
             row['id'] as String: MessageSender.fromRow(row),
@@ -214,6 +222,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
     showDragHandle: false,
     builder: (_) => _StatisticsSheet(
       database: widget.database,
+      controller: widget.controller,
       messageId: widget.messageId,
       actor: id,
     ),
@@ -299,6 +308,8 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
                       : _option != null
                       ? _participants(card)
                       : InteractiveStatisticsOverview(
+                          controller: widget.controller,
+                          groupId: _groupId!,
                           card: card,
                           senders: _senders,
                           onParticipant: _openParticipant,
@@ -342,6 +353,8 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
         if (people.isEmpty) const Text('暂无参与记录'),
         for (final id in people)
           InteractiveParticipantTile(
+            controller: widget.controller,
+            groupId: _groupId!,
             card: card,
             sender: statisticsSender(card, _senders, id),
             actor: id,
@@ -363,7 +376,9 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
         const SizedBox(height: 12),
         Row(
           children: [
-            MemberAvatar(
+            MemberProfileAvatar(
+              controller: widget.controller,
+              groupId: _groupId,
               sender: statisticsSender(card, _senders, actor),
               size: 40,
             ),

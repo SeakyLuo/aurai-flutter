@@ -47,6 +47,9 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
   }
 
   Future<void> _load({bool reset = false}) async {
+    final limit = reset && _items.length > ConversationReader.pageSize
+        ? _items.length
+        : ConversationReader.pageSize;
     setState(() {
       _retryReset = reset;
       _loading = true;
@@ -55,6 +58,7 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
     try {
       final page = await widget.controller.archivedConversations(
         after: reset || _items.isEmpty ? null : _items.last,
+        limit: limit,
       );
       final avatars = await Future.wait<Object>([
         HomeConversations(widget.controller.groupStore).senders(page),
@@ -76,13 +80,14 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
         _senders.addAll(avatars[0] as Map<String, MessageSender>);
         _groups.addAll(avatars[1] as Map<String, List<MessageSender>>);
         _loaded = true;
-        _hasMore = page.length == ConversationReader.pageSize;
+        _hasMore = page.length == limit;
       });
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _failed = true);
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text('无法加载归档会话，请重试：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
     } finally {
       if (mounted) setState(() => _loading = false);

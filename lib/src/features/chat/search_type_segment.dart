@@ -6,17 +6,30 @@ class SearchTypeSegment extends StatelessWidget {
     required this.files,
     required this.onChanged,
     this.labels = const ['会话', '文件'],
-  });
+  }) : selectedIndex = null,
+       onIndexChanged = null;
+  const SearchTypeSegment.indexed({
+    super.key,
+    required this.labels,
+    required int index,
+    required ValueChanged<int> onChanged,
+  }) : selectedIndex = index,
+       onIndexChanged = onChanged,
+       files = false,
+       onChanged = null;
+  final int? selectedIndex;
+  final ValueChanged<int>? onIndexChanged;
+  int get index => selectedIndex ?? (files ? 1 : 0);
   final List<String> labels;
   final bool files;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final colors = Theme.of(context).colorScheme;
     return SizedBox(
-      width: 196,
+      width: 98.0 * labels.length,
       height: 44,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -29,15 +42,13 @@ class SearchTypeSegment extends StatelessWidget {
             children: [
               Positioned.fill(
                 child: AnimatedAlign(
-                  alignment: files
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
+                  alignment: Alignment(-1 + 2 * index / (labels.length - 1), 0),
                   duration: MediaQuery.disableAnimationsOf(context)
                       ? Duration.zero
                       : const Duration(milliseconds: 220),
                   curve: Curves.easeOutCubic,
                   child: FractionallySizedBox(
-                    widthFactor: .5,
+                    widthFactor: 1 / labels.length,
                     heightFactor: 1,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -50,20 +61,26 @@ class SearchTypeSegment extends StatelessWidget {
               ),
               Row(
                 children: [
-                  for (final value in [false, true])
+                  for (var value = 0; value < labels.length; value++)
                     Expanded(
                       child: Semantics(
                         button: true,
-                        selected: files == value,
+                        selected: index == value,
                         inMutuallyExclusiveGroup: true,
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: () {
-                            if (files != value) onChanged(value);
+                            if (index != value) {
+                              if (onIndexChanged != null) {
+                                onIndexChanged!(value);
+                              } else {
+                                onChanged!(value == 1);
+                              }
+                            }
                           },
                           child: Center(
                             child: Text(
-                              labels[value ? 1 : 0],
+                              labels[value],
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w400,

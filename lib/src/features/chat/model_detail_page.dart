@@ -5,7 +5,6 @@ import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../domain/model_provider.dart';
 import '../../providers/model_context_limits.dart';
-import '../../providers/model_catalog.dart';
 import '../../providers/model_purpose_catalog.dart';
 import 'chat_controller.dart';
 import 'model_context_page.dart';
@@ -46,23 +45,48 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
   late ModelReasoning _reasoning = _initialReasoning;
   bool _saving = false;
   bool _allowPop = false;
+  late final TextEditingController _apiName, _displayName;
+  late final String _initialApiName, _initialDisplayName;
+
+  @override
+  void initState() {
+    super.initState();
+    _initialApiName = _config.apiModelFor(widget.model);
+    _initialDisplayName = _config.displayModel(widget.model);
+    _apiName = TextEditingController(text: _initialApiName);
+    _displayName = TextEditingController(text: _initialDisplayName);
+  }
+
+  @override
+  void dispose() {
+    _apiName.dispose();
+    _displayName.dispose();
+    super.dispose();
+  }
 
   bool get _dirty =>
       !_purposes.containsAll(_initialPurposes) ||
       !_initialPurposes.containsAll(_purposes) ||
-      _reasoning != _initialReasoning;
+      _reasoning != _initialReasoning ||
+      _apiName.text.trim() != _initialApiName ||
+      _displayName.text.trim() != _initialDisplayName;
 
   ModelConfig get _config =>
       (widget.draft?.config ??
       widget.controller.modelSettings.profile(widget.service));
 
-  void _notice(String message) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(message)));
+  void _notice(String message, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(message)), kind: kind);
 
   Future<void> _save() async {
+    if (_apiName.text.trim().isEmpty || _displayName.text.trim().isEmpty) {
+      _notice('请填写接口名称和展示名称');
+      return;
+    }
     if (_purposes.isEmpty) {
-      _notice('请至少选择一种模型用途');
+      _notice('请至少选择一种模型用途', kind: ToastKind.warning);
       return;
     }
     if (_initialPurposes.contains(ModelPurpose.text) &&
@@ -81,7 +105,7 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
           defaultText.service == widget.service &&
           defaultText.model == widget.model;
       if (aiCount > 0 || isDefault) {
-        _notice('此模型仍被文本功能使用。请先到模型设置或 AI 的模型设置中更换模型。');
+        _notice('此模型仍被文本功能使用。请先到模型设置或 AI 的模型设置中更换模型。', kind: ToastKind.warning);
         return;
       }
     }
@@ -100,6 +124,25 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
             models: current.savedModels,
             autoSyncModels: current.autoSyncModels,
             requestAdapters: details?.requestAdapters ?? const {},
+            speechApi: details?.speechApi,
+            speechApiKey: details?.speechApiKey ?? '',
+            modelCatalog: [
+              for (final model
+                  in details?.modelCatalog ??
+                      const <({String id, String name})>[])
+                if (model.id != widget.model) model,
+              (id: widget.model, name: _displayName.text.trim()),
+            ],
+            modelApiNames:
+                {
+                  ...?details?.modelApiNames,
+                  if (_apiName.text.trim() != widget.model)
+                    widget.model: _apiName.text.trim(),
+                }..removeWhere(
+                  (model, _) =>
+                      model == widget.model &&
+                      _apiName.text.trim() == widget.model,
+                ),
             balance: details?.balance,
             icon: details?.icon,
             modelContextOverrides: details?.modelContextOverrides ?? const {},
@@ -132,7 +175,8 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
         Navigator.pop(context);
       }
     } on Object catch (error) {
-      if (mounted) _notice('保存失败：${errorMessage(error)}');
+      if (mounted)
+        _notice('保存失败：${errorMessage(error)}', kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -251,8 +295,7 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Column(
                     children: [
-                      for (final purpose
-                          in _config.protocol.supportedModelPurposes)
+                      for (final purpose in _config.supportedModelPurposes)
                         Semantics(
                           checked: selected.contains(purpose),
                           child: ListTile(
@@ -311,6 +354,7 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
     ModelPurpose.imageGeneration => '图片',
     ModelPurpose.videoGeneration => '视频',
     ModelPurpose.musicGeneration => '音乐',
+    ModelPurpose.speechSynthesis => '语音合成',
   };
 
   @override
@@ -328,7 +372,7 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
       return Scaffold(
         extendBodyBehindAppBar: true,
         appBar: SettingsAppBar(
-          title: modelDisplayName(_config.protocol.displayModel(widget.model)),
+          title: _config.displayModel(widget.model),
           onBack: () => Navigator.pop(context),
         ),
         body: SettingsPageBody(
@@ -341,6 +385,16 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
                   const EdgeInsets.fromLTRB(12, 12, 12, 32),
                 ),
                 children: [
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    title: const Text('接口名称'),
+                    subtitle: Text(_initialApiName),
+                  ),
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    title: const Text('展示名称'),
+                    subtitle: Text(_initialDisplayName),
+                  ),
                   ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                     title: const Text('模型用途'),
@@ -413,7 +467,7 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
       child: Scaffold(
         extendBodyBehindAppBar: true,
         appBar: SettingsAppBar(
-          title: modelDisplayName(_config.protocol.displayModel(widget.model)),
+          title: _config.displayModel(widget.model),
           onBack: _saving ? null : _leave,
           actions: [
             SettingsGlassAction(
@@ -434,16 +488,20 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
                   const EdgeInsets.fromLTRB(16, 20, 16, 32),
                 ),
                 children: [
+                  _label('接口名称'),
+                  _nameField(_apiName, '接口实际使用的模型名称', 200),
+                  const SizedBox(height: 24),
+                  _label('展示名称'),
+                  _nameField(_displayName, '在 App 中显示的名称', 60),
+                  const SizedBox(height: 24),
                   _label('模型用途'),
                   Material(
                     color: settingsFieldColor(context),
                     borderRadius: BorderRadius.circular(24),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 10,
-                      ),
+                      minTileHeight: settingsCardHeight,
+                      contentPadding: settingsCardPadding,
                       title: Text(
                         _purposes.isEmpty
                             ? '选择模型用途'
@@ -453,7 +511,7 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
                                   .join(' · '),
                       ),
                       trailing: const SettingsIcon(
-                        type: SettingsIconType.chevron,
+                        type: SettingsIconType.chevronDown,
                       ),
                       onTap: _saving ? null : _pickPurposes,
                     ),
@@ -476,10 +534,8 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
                       borderRadius: BorderRadius.circular(24),
                       clipBehavior: Clip.antiAlias,
                       child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 10,
-                        ),
+                        minTileHeight: settingsCardHeight,
+                        contentPadding: settingsCardPadding,
                         title: Text(
                           adapter != null
                               ? '此模型单独配置'
@@ -507,10 +563,8 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
                       borderRadius: BorderRadius.circular(24),
                       clipBehavior: Clip.antiAlias,
                       child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 10,
-                        ),
+                        minTileHeight: settingsCardHeight,
+                        contentPadding: settingsCardPadding,
                         title: Text(
                           contextOverride == null
                               ? '继承默认 ${defaultPercent}% · 约 ${limits.compactThreshold} token'
@@ -539,6 +593,30 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
       style: TextStyle(
         fontSize: 15,
         color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    ),
+  );
+
+  Widget _nameField(
+    TextEditingController controller,
+    String hint,
+    int maxLength,
+  ) => TextField(
+    controller: controller,
+    enabled: !_saving,
+    maxLength: maxLength,
+    autocorrect: false,
+    enableSuggestions: false,
+    style: const TextStyle(fontSize: 16),
+    decoration: InputDecoration(
+      hintText: hint,
+      counterText: '',
+      filled: true,
+      fillColor: settingsFieldColor(context),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(26),
+        borderSide: BorderSide.none,
       ),
     ),
   );

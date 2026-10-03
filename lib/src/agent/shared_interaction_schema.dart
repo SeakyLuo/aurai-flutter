@@ -31,6 +31,12 @@ const sharedInteractionSchema = {
       'description':
           'Defaults true. False locks an actor submission until next round.',
     },
+    'actorWeights': {
+      'type': 'object',
+      'additionalProperties': {'type': 'number', 'exclusiveMinimum': 0},
+      'description':
+          'Optional positive vote weights keyed by eligible actors. Requires actors. Omitted actors have weight 1; weights are fixed by the creator and never supplied by voters.',
+    },
     'reveal': {
       'type': 'string',
       'enum': ['immediate', 'onComplete'],

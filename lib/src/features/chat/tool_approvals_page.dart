@@ -1,364 +1,403 @@
-import '../../widgets/empty_data_view.dart';
-import 'dart:convert';
-
-import '../../app/glass_notice.dart';
-import '../../domain/error_message.dart';
-import '../../domain/tool_models.dart';
 import 'package:flutter/material.dart';
+import '../../app/ui_action.dart';
+import '../../widgets/empty_data_view.dart';
 import 'chat_controller.dart';
-import 'glass_surface.dart';
+import 'choice_sheet.dart';
+import 'delete_confirmation_dialog.dart';
+import 'dialog_action_button.dart';
+import 'header_action_menu.dart';
+import 'menu_press_highlight.dart';
+import 'question_icon.dart';
 import 'settings_appearance.dart';
-import 'tool_action_icon.dart';
-import 'tool_detail_page.dart';
+import 'settings_icon.dart';
+import 'tool_approval_entry.dart';
 
 class ToolApprovalsPage extends StatefulWidget {
-  const ToolApprovalsPage({super.key, required this.controller});
-
+  const ToolApprovalsPage({super.key, required this.controller, this.senderId});
   final ChatController controller;
-
+  final String? senderId;
   @override
   State<ToolApprovalsPage> createState() => _ToolApprovalsPageState();
 }
 
 class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
-  final _removing = <String>{};
-  late final String _conversation = widget.controller.activeConversation.id;
-
-  Future<void> _revoke(String key, String? conversation) async {
-    final token = '$conversation:$key';
-    setState(() => _removing.add(token));
-    try {
-      await widget.controller.toolApprovals.revoke(
-        key,
-        conversation: conversation,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showGlassSnackBar(const SnackBar(content: Text('已撤销工具授权')));
-      }
-    } catch (caughtError) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showGlassSnackBar(
-          SnackBar(content: Text('撤销授权失败，请重试：${errorMessage(caughtError)}')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _removing.remove(token));
-    }
+  List<ToolApprovalEntry> _entries = [];
+  Map<String, String> _names = {};
+  late String? _selected = widget.senderId;
+  bool _loading = true;
+  final _removing = <(String, String?)>{};
+  @override
+  void initState() {
+    super.initState();
+    _load();
   }
 
+  Future<void> _load() async {
+    await runUiAction(context, () async {
+      final store = widget.controller.toolApprovals;
+      final entries = [
+        for (final e in store.persistent.entries)
+          ToolApprovalEntry(e.key, e.value, null),
+        for (final s in store.sessions.entries)
+          for (final e in s.value.entries)
+            ToolApprovalEntry(e.key, e.value, s.key),
+      ];
+      final ids = {for (final e in entries) ...e.references}.toList();
+      final names = <String, String>{};
+      if (ids.isNotEmpty) {
+        final placeholders = List.filled(ids.length, '?').join(',');
+        final db = widget.controller.groupStore.database;
+        final results = await Future.wait([
+          db.query(
+            'message_senders',
+            columns: ['id', 'name'],
+            where: 'id IN ($placeholders)',
+            whereArgs: ids,
+          ),
+          db.query(
+            'conversations',
+            columns: ['id', 'title'],
+            where: 'id IN ($placeholders)',
+            whereArgs: ids,
+          ),
+        ]);
+        for (final r in results[0]) {
+          names[r['id'] as String] = r['name'] as String;
+        }
+        for (final r in results[1]) {
+          names[r['id'] as String] = r['title'] as String;
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _entries = entries;
+        _names = names;
+        for (final e in entries) {
+          _names.putIfAbsent(e.sender, () => e.savedSenderName);
+        }
+        _selected ??= entries.firstOrNull?.sender;
+      });
+    });
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _chooseAi() async {
+    final value = await showChoiceSheet<String>(
+      context,
+      title: '选择 AI',
+      selected: _selected!,
+      choices: [
+        for (final id in _entries.map((e) => e.sender).toSet())
+          (value: id, label: _names[id]!),
+      ],
+    );
+    if (mounted && value != null) setState(() => _selected = value);
+  }
+
+  Future<bool> _revoke(ToolApprovalEntry e) async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (_) => const DeleteConfirmationDialog(
+        title: '撤销这项授权？',
+        description: '撤销后，AI 再次执行需要授权的操作时会重新询问。',
+        confirmLabel: '撤销授权',
+      ),
+    );
+    if (!mounted || yes != true) return false;
+    final token = (e.key, e.conversation);
+    setState(() => _removing.add(token));
+    final ok = await runUiAction(
+      context,
+      () => widget.controller.toolApprovals.revoke(
+        e.key,
+        conversation: e.conversation,
+      ),
+    );
+    if (mounted)
+      setState(() {
+        _removing.remove(token);
+        if (ok) _entries.remove(e);
+      });
+    return ok;
+  }
+
+  Future<void> _menu(
+    BuildContext anchor,
+    ToolApprovalEntry e, {
+    Offset? position,
+    VoidCallback? onRevoked,
+  }) async {
+    final action = await showHeaderActionMenu(
+      anchor,
+      position: position,
+      destructiveValues: const {'revoke'},
+      items: const [
+        (
+          value: 'revoke',
+          label: '撤销授权',
+          icon: SettingsIcon(type: SettingsIconType.remove),
+        ),
+      ],
+    );
+    if (!mounted || action != 'revoke') return;
+    if (await _revoke(e)) onRevoked?.call();
+  }
+
+  Future<void> _details(ToolApprovalEntry e) {
+    var revoking = false;
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: false,
+      builder: (sheet) => SafeArea(
+        top: false,
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheet).height * .6,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Row(
+                  children: [
+                    SettingsGlassAction(
+                      label: '关闭',
+                      icon: Icons.close_rounded,
+                      iconWidget: const QuestionIcon(
+                        type: QuestionIconType.close,
+                      ),
+                      onPressed: () => Navigator.pop(sheet),
+                    ),
+                    const Expanded(
+                      child: Text(
+                        '授权详情',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 40),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+                  children: [
+                    _field('允许操作', e.title),
+                    _field(
+                      '授权范围',
+                      e.summary(_names).isEmpty
+                          ? e.description
+                          : e.summary(_names),
+                    ),
+                    if (e.summary(_names).isNotEmpty &&
+                        e.summary(_names) != e.description)
+                      _field('授权说明', e.description),
+                    _field(
+                      '有效范围',
+                      e.conversation == null
+                          ? '始终允许'
+                          : '仅限会话：${_names[e.conversation] ?? '已删除的会话'}',
+                    ),
+                    StatefulBuilder(
+                      builder: (context, updateButton) => DialogActionButton(
+                        text: '撤销授权',
+                        role: DialogActionRole.destructive,
+                        loading: revoking,
+                        onPressed: () async {
+                          updateButton(() => revoking = true);
+                          final revoked = await _revoke(e);
+                          if (!sheet.mounted) return;
+                          if (revoked) {
+                            Navigator.pop(sheet);
+                          } else {
+                            updateButton(() => revoking = false);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _field(String label, String value) => Padding(
+    padding: const EdgeInsets.only(bottom: 20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: settingsFieldColor(context),
+            borderRadius: BorderRadius.circular(26),
+          ),
+          child: Text(value, style: const TextStyle(fontSize: 15, height: 1.5)),
+        ),
+      ],
+    ),
+  );
+  Widget _section(
+    String title,
+    List<ToolApprovalEntry> entries, {
+    bool first = false,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Padding(
+        padding: EdgeInsets.fromLTRB(12, first ? 0 : 24, 12, 10),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+      Material(
+        color: settingsFieldColor(context),
+        borderRadius: BorderRadius.circular(26),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            for (final e in entries)
+              Builder(
+                builder: (anchor) {
+                  final subtitle = e.summary(_names);
+                  final busy = _removing.contains((e.key, e.conversation));
+                  return MenuPressHighlight(
+                    borderRadius: BorderRadius.circular(18),
+                    onLongPressStart: busy
+                        ? null
+                        : (d) => _menu(anchor, e, position: d.globalPosition),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 6,
+                      ),
+                      title: Text(
+                        e.title,
+                        style: const TextStyle(fontSize: 15),
+                      ),
+                      subtitle: subtitle.isEmpty
+                          ? null
+                          : Text(
+                              subtitle,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: busy ? null : () => _details(e),
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    ],
+  );
   @override
   Widget build(BuildContext context) {
-    final store = widget.controller.toolApprovals;
-    final current = store.sessions[_conversation] ?? {};
-    final hasApprovals = store.persistent.isNotEmpty || current.isNotEmpty;
-    final tools = {
-      for (final tool in widget.controller.globalToolDefinitions)
-        tool.name: tool,
-    };
-
+    final entries = _entries.where((e) => e.sender == _selected).toList();
+    final permanent = entries.where((e) => e.conversation == null).toList();
+    final sessions = <String, List<ToolApprovalEntry>>{};
+    for (final e in entries) {
+      if (e.conversation != null)
+        sessions.putIfAbsent(e.conversation!, () => []).add(e);
+    }
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
         title: '工具授权',
-        onBack: () => Navigator.maybePop(context),
+        onBack: () => Navigator.pop(context),
       ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: hasApprovals
-                ? ListView(
-                    padding: EdgeInsets.fromLTRB(
-                      12,
-                      settingsHeaderHeight(context) + 16,
-                      12,
-                      24,
+      body: SettingsPageBody(
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: settingsPagePadding(
+                      context,
+                      const EdgeInsets.fromLTRB(18, 12, 18, 24),
                     ),
-                    children: [
-                      const _PageIntroduction(),
-                      if (store.persistent.isNotEmpty) ...[
-                        const SizedBox(height: 28),
-                        _ApprovalSection(
-                          title: '始终允许',
-                          description: '仅对应 AI 可在授权范围内执行，不会获得额外群角色',
-                          entries: store.persistent,
-                          tools: tools,
-                          removing: _removing,
-                          onRevoke: (key) => _revoke(key, null),
-                          onOpen: _openTool,
-                        ),
-                      ],
-                      if (current.isNotEmpty) ...[
-                        const SizedBox(height: 28),
-                        _ApprovalSection(
-                          title: '当前会话允许',
-                          description: '仅对应 AI 可在当前会话的授权范围内执行',
-                          entries: current,
-                          tools: tools,
-                          scope: _conversation,
-                          removing: _removing,
-                          onRevoke: (key) => _revoke(key, _conversation),
-                          onOpen: _openTool,
-                        ),
-                      ],
-                    ],
-                  )
-                : const _EmptyApprovals(),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openTool(ToolDefinition tool) async {
-    await Navigator.push<void>(
-      context,
-      MaterialPageRoute(builder: (_) => ToolDetailPage(tool: tool)),
-    );
-    if (mounted) setState(() {});
-  }
-}
-
-class _PageIntroduction extends StatelessWidget {
-  const _PageIntroduction();
-
-  @override
-  Widget build(BuildContext context) => Text(
-    '授权绑定具体 AI；涉及他人数据或状态时还会限定目标和操作。授权不能提升群管理角色。你可以随时撤销，之后需要授权的操作会重新询问。',
-    style: TextStyle(
-      fontSize: 14,
-      height: 1.55,
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
-    ),
-  );
-}
-
-class _ApprovalSection extends StatelessWidget {
-  const _ApprovalSection({
-    required this.title,
-    required this.description,
-    required this.entries,
-    required this.tools,
-    required this.removing,
-    required this.onRevoke,
-    required this.onOpen,
-    this.scope,
-  });
-
-  final String title;
-  final String description;
-  final Map<String, String> entries;
-  final Map<String, ToolDefinition> tools;
-  final Set<String> removing;
-  final ValueChanged<String> onRevoke;
-  final ValueChanged<ToolDefinition> onOpen;
-  final String? scope;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 17,
-                height: 1.35,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              description,
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.45,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 12),
-      for (final entry in entries.entries) ...[
-        _ApprovalTile(
-          toolKey: entry.key,
-          label: entry.value,
-          tool: tools[_toolNameFromKey(entry.key)],
-          removing: removing.contains('$scope:${entry.key}'),
-          onRevoke: () => onRevoke(entry.key),
-          onOpen: onOpen,
-        ),
-        const SizedBox(height: 10),
-      ],
-    ],
-  );
-}
-
-class _ApprovalTile extends StatelessWidget {
-  const _ApprovalTile({
-    required this.toolKey,
-    required this.label,
-    required this.tool,
-    required this.removing,
-    required this.onRevoke,
-    required this.onOpen,
-  });
-
-  final String toolKey;
-  final String label;
-  final ToolDefinition? tool;
-  final bool removing;
-  final VoidCallback onRevoke;
-  final ValueChanged<ToolDefinition> onOpen;
-
-  String get _toolName => _toolNameFromKey(toolKey);
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: colors.primary.withValues(alpha: .12),
-            blurRadius: 24,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: GlassSurface(
-        radius: 24,
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(24),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(24),
-            onTap: tool == null ? null : () => onOpen(tool!),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          colors.primary.withValues(alpha: .22),
-                          colors.primary.withValues(alpha: .08),
-                        ],
-                      ),
-                    ),
-                    child: Center(
-                      child: SizedBox.square(
-                        dimension: 20,
-                        child: ColorFiltered(
-                          colorFilter: ColorFilter.mode(
-                            Theme.of(context).brightness == Brightness.dark
-                                ? const Color(0xffc4b5fd)
-                                : const Color(0xff7959df),
-                            BlendMode.srcIn,
-                          ),
-                          child: FittedBox(
-                            child: ToolActionIcon(toolName: _toolName),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    sliver: SliverList.list(
                       children: [
-                        Text(
-                          label,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            height: 1.4,
-                          ),
-                        ),
-                        if (tool != null) ...[
-                          const SizedBox(height: 3),
-                          Text(
-                            tool!.description,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              height: 1.4,
-                              color: colors.onSurfaceVariant,
+                        if (widget.senderId == null && _selected != null)
+                          Material(
+                            color: settingsFieldColor(context),
+                            borderRadius: BorderRadius.circular(26),
+                            clipBehavior: Clip.antiAlias,
+                            child: ListTile(
+                              title: Text(_names[_selected]!),
+                              trailing: const SettingsIcon(
+                                type: SettingsIconType.chevron,
+                              ),
+                              onTap: _entries.isEmpty ? null : _chooseAi,
                             ),
                           ),
-                        ],
+                        if (permanent.isNotEmpty)
+                          _section(
+                            '始终允许',
+                            permanent,
+                            first: widget.senderId != null || _selected == null,
+                          ),
+                        for (final session in sessions.entries)
+                          _section(
+                            '会话内允许 · ${_names[session.key] ?? '已删除的会话'}',
+                            session.value,
+                            first:
+                                permanent.isEmpty &&
+                                session.key == sessions.keys.first &&
+                                (widget.senderId != null || _selected == null),
+                          ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  if (removing)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.8,
-                          color: colors.onSurfaceVariant,
-                        ),
+                  if (_loading || entries.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: _loading
+                            ? const CircularProgressIndicator()
+                            : const EmptyDataView(title: '暂无工具授权'),
                       ),
-                    )
-                  else
-                    TextButton(
-                      onPressed: onRevoke,
-                      style: TextButton.styleFrom(
-                        foregroundColor: colors.error,
-                        backgroundColor: colors.error.withValues(alpha: .07),
-                        minimumSize: const Size(48, 34),
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        shape: const StadiumBorder(),
-                        textStyle: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      child: const Text('撤销'),
                     ),
                 ],
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-String _toolNameFromKey(String key) =>
-    key.startsWith('[') ? (jsonDecode(key) as List).first as String : key;
-
-class _EmptyApprovals extends StatelessWidget {
-  const _EmptyApprovals();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(32, settingsHeaderHeight(context), 32, 24),
-      child: Center(
-        child: const EmptyDataView(
-          title: '暂无已保存的授权',
-          description: '需要确认的操作仍会在执行前询问你，授权后会显示在这里。',
         ),
       ),
     );

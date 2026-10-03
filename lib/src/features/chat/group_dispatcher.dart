@@ -57,7 +57,7 @@ class GroupDispatcher {
       if (isMuted(entry.key)) continue;
       if (authors.contains(entry.key)) continue;
       if (!messages.any((message) => message.canView(entry.key))) continue;
-      if (paused.contains(entry.key) && !mentions.contains(entry.key)) continue;
+      if (paused.contains(entry.key)) continue;
       if (mentions.contains(entry.key)) {
         entry.value.timer?.cancel();
         entry.value.timer = null;
@@ -71,7 +71,7 @@ class GroupDispatcher {
   void receiveTargeted(List<AgentMessage> messages, Set<String> recipients) {
     history.addAll(messages);
     for (final id in recipients) {
-      if (isMuted(id)) continue;
+      if (isMuted(id) || paused.contains(id)) continue;
       final mailbox = _members[id];
       if (mailbox == null) continue;
       mailbox.timer?.cancel();
@@ -84,7 +84,7 @@ class GroupDispatcher {
 
   void start(Iterable<String> recipients) {
     for (final id in recipients) {
-      if (isMuted(id)) continue;
+      if (isMuted(id) || paused.contains(id)) continue;
       final mailbox = _members[id];
       if (mailbox == null) continue;
       _markPending(mailbox);
@@ -166,7 +166,11 @@ class GroupDispatcher {
   }
 
   void _schedule(String id, _Mailbox mailbox) {
-    if (stopped || isMuted(id) || mailbox.active || mailbox.timer != null)
+    if (stopped ||
+        paused.contains(id) ||
+        isMuted(id) ||
+        mailbox.active ||
+        mailbox.timer != null)
       return;
     mailbox.timer = Timer(
       mailbox.sleepUntil?.difference(DateTime.now()) ?? Duration.zero,

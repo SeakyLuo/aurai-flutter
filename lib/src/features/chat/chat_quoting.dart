@@ -4,7 +4,7 @@ extension _ChatQuoting on _ChatPageState {
   Future<void> _reeditRecalledMessage(AgentMessage message) async {
     if (_editing != null) return;
     if (_textController.text.isNotEmpty) {
-      _imageNotice('请先发送或清空当前草稿，再重新编辑');
+      _imageNotice('请先发送或清空当前草稿，再重新编辑', kind: ToastKind.warning);
       return;
     }
     final conversation = widget.controller.activeConversation;
@@ -15,7 +15,7 @@ extension _ChatQuoting on _ChatPageState {
         _focusNode.requestFocus();
       }
     } on Object catch (error) {
-      if (mounted) _imageNotice(errorMessage(error));
+      if (mounted) _imageNotice(errorMessage(error), kind: ToastKind.error);
     }
   }
 
@@ -23,7 +23,11 @@ extension _ChatQuoting on _ChatPageState {
     try {
       await widget.controller.recallMessage(message);
     } on Object catch (caughtError) {
-      if (mounted) _imageNotice('撤回失败，请重试：${errorMessage(caughtError)}');
+      if (mounted)
+        _imageNotice(
+          '撤回失败，请重试：${errorMessage(caughtError)}',
+          kind: ToastKind.error,
+        );
     }
   }
 
@@ -42,7 +46,11 @@ extension _ChatQuoting on _ChatPageState {
           identical(conversation, widget.controller.activeConversation))
         _focusNode.requestFocus();
     } on Object catch (caughtError) {
-      if (mounted) _imageNotice('引用保存失败，请重试：${errorMessage(caughtError)}');
+      if (mounted)
+        _imageNotice(
+          '引用保存失败，请重试：${errorMessage(caughtError)}',
+          kind: ToastKind.error,
+        );
     }
   }
 
@@ -56,7 +64,11 @@ extension _ChatQuoting on _ChatPageState {
       _focusNode.unfocus();
       _positionSearchResult(id);
     } on Object catch (caughtError) {
-      if (mounted) _imageNotice('原消息已不存在：${errorMessage(caughtError)}');
+      if (mounted)
+        _imageNotice(
+          '原消息已不存在：${errorMessage(caughtError)}',
+          kind: ToastKind.error,
+        );
     }
   }
 }

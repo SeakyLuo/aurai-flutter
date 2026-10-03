@@ -1,3 +1,4 @@
+import 'floating_search_layout.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
@@ -48,8 +49,9 @@ class _MentionSheetState extends State<_MentionSheet> {
         );
     } on Object catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text('成员读取失败，请重试：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
       Navigator.pop(context);
     }
@@ -72,65 +74,78 @@ class _MentionSheetState extends State<_MentionSheet> {
             MediaQuery.viewInsetsOf(context).bottom * .5,
         child: SafeArea(
           top: false,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 48),
-                      child: Center(
-                        child: Text(
-                          '选择提醒的人',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w500,
-                          ),
+          child: SearchSheetBody(
+            header: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 48),
+                    child: Center(
+                      child: Text(
+                        '选择提醒的人',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: SettingsGlassAction(
-                        label: '关闭',
-                        icon: Icons.close_rounded,
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: TextField(
-                  controller: _search,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: '搜索成员',
-                    filled: true,
-                    fillColor: settingsFieldColor(context),
-                    prefixIcon: const Padding(
-                      padding: EdgeInsets.all(14),
-                      child: SidebarActionIcon(
-                        type: SidebarActionIconType.search,
-                      ),
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(26),
-                      borderSide: BorderSide.none,
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: SettingsGlassAction(
+                      label: '关闭',
+                      icon: Icons.close_rounded,
+                      onPressed: () => Navigator.pop(context),
                     ),
                   ),
-                ),
+                ],
               ),
-              Expanded(
-                child: _members == null
-                    ? const Center(child: CircularProgressIndicator())
-                    : ListView(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        children: [
+            ),
+            child: FloatingSearchLayout(
+              itemCount: _members?.length ?? 0,
+              controller: _search,
+              onChanged: (_) => setState(() {}),
+              hintText: '搜索成员',
+              enabled: true,
+              bottom: 16,
+              child: _members == null
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(
+                        16,
+                        68,
+                        16,
+                        FloatingSearchLayout.clearance,
+                      ),
+                      children: [
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          minLeadingWidth: 44,
+                          horizontalTitleGap: 12,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          leading: const SizedBox.square(
+                            dimension: 44,
+                            child: Center(
+                              child: SidebarActionIcon(
+                                type: SidebarActionIconType.group,
+                              ),
+                            ),
+                          ),
+                          title: const Text(
+                            '所有人',
+                            style: TextStyle(fontSize: 15),
+                          ),
+                          onTap: () =>
+                              Navigator.pop(context, <MessageSender>[]),
+                        ),
+                        for (final member in _members!.where(
+                          (m) => m.sender.name.toLowerCase().contains(query),
+                        ))
                           ListTile(
                             contentPadding: EdgeInsets.zero,
                             minLeadingWidth: 44,
@@ -138,55 +153,29 @@ class _MentionSheetState extends State<_MentionSheet> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            leading: const SizedBox.square(
-                              dimension: 44,
-                              child: Center(
-                                child: SidebarActionIcon(
-                                  type: SidebarActionIconType.group,
-                                ),
-                              ),
+                            leading: MemberAvatar(
+                              sender: member.sender,
+                              size: 44,
                             ),
-                            title: const Text(
-                              '所有人',
-                              style: TextStyle(fontSize: 15),
+                            title: Text(
+                              member.sender.name,
+                              style: const TextStyle(fontSize: 15),
                             ),
                             onTap: () =>
-                                Navigator.pop(context, <MessageSender>[]),
+                                Navigator.pop(context, [member.sender]),
                           ),
-                          for (final member in _members!.where(
-                            (m) => m.sender.name.toLowerCase().contains(query),
-                          ))
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              minLeadingWidth: 44,
-                              horizontalTitleGap: 12,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              leading: MemberAvatar(
-                                sender: member.sender,
-                                size: 44,
-                              ),
-                              title: Text(
-                                member.sender.name,
-                                style: const TextStyle(fontSize: 15),
-                              ),
-                              onTap: () =>
-                                  Navigator.pop(context, [member.sender]),
-                            ),
-                          if (query.isNotEmpty &&
-                              !_members!.any(
-                                (m) =>
-                                    m.sender.name.toLowerCase().contains(query),
-                              ))
-                            const Padding(
-                              padding: EdgeInsets.all(24),
-                              child: Center(child: Text('没有找到成员')),
-                            ),
-                        ],
-                      ),
-              ),
-            ],
+                        if (query.isNotEmpty &&
+                            !_members!.any(
+                              (m) =>
+                                  m.sender.name.toLowerCase().contains(query),
+                            ))
+                          const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Center(child: Text('没有找到成员')),
+                          ),
+                      ],
+                    ),
+            ),
           ),
         ),
       ),

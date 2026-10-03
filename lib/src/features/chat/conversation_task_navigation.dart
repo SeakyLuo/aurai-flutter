@@ -29,9 +29,10 @@ Future<void> openConversationTask(
     originTaskId: originTaskId,
   );
   if (tasks.isEmpty) {
-    ScaffoldMessenger.of(
-      context,
-    ).showGlassSnackBar(const SnackBar(content: Text('关联任务已删除')));
+    ScaffoldMessenger.of(context).showToast(
+      const SnackBar(content: Text('关联任务已删除')),
+      kind: ToastKind.success,
+    );
     return;
   }
   String? id;

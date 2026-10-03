@@ -30,7 +30,7 @@ class AiGroupList extends StatefulWidget {
 class _AiGroupListState extends State<AiGroupList> {
   final _groups = <Map<String, Object?>>[];
   final _avatars = <String, List<MessageSender>>{};
-  bool _loading = false, _more = true;
+  bool _loading = false, _more = true, _failed = false;
   @override
   void initState() {
     super.initState();
@@ -39,7 +39,10 @@ class _AiGroupListState extends State<AiGroupList> {
 
   Future<void> _load() async {
     if (_loading || !_more) return;
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
     try {
       final rows = await widget.controller.groupStore.aiGroups(
         widget.senderId,
@@ -56,12 +59,11 @@ class _AiGroupListState extends State<AiGroupList> {
           _more = rows.length == 50;
         });
     } on Object catch (error) {
+      if (mounted) setState(() => _failed = true);
       if (mounted)
-        ScaffoldMessenger.of(context).showGlassSnackBar(
-          SnackBar(
-            content: Text('群聊加载失败：${errorMessage(error)}'),
-            action: SnackBarAction(label: '重试', onPressed: _load),
-          ),
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text('群聊加载失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
         );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -70,61 +72,84 @@ class _AiGroupListState extends State<AiGroupList> {
 
   @override
   Widget build(BuildContext context) => PaginationListener(
-    hasMore: _more,
+    hasMore: _more && !_failed,
+    failed: _failed,
+    onRetry: _load,
     loadMore: _load,
-    child: ListView(
-      padding: widget.padding,
-      children: [
-        if (!widget.joined)
-          ListTile(
-            leading: const SettingsIcon(type: SettingsIconType.add),
-            title: const Text('新建群聊'),
-            onTap: () async {
-              try {
-                final group = await widget.controller.groupStore.createGroup(
-                  aiIds: [widget.senderId],
-                );
-                if (context.mounted)
-                  widget.onSelected({
-                    'id': group.id,
-                    'title': group.title,
-                    'created': true,
-                  });
-              } on Object catch (error) {
-                if (context.mounted)
-                  ScaffoldMessenger.of(context).showGlassSnackBar(
-                    SnackBar(content: Text('创建失败，请重试：${errorMessage(error)}')),
-                  );
-              }
-            },
-          ),
-        for (final group in _groups)
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 6),
-            horizontalTitleGap: 12,
-            minTileHeight: 72,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Text(
-              group['title'] as String,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 16),
-            ),
-            leading: GroupAvatar(members: _avatars[group['id']]!, size: 48),
-            onTap: () => widget.onSelected(group),
-          ),
-        if (_loading) const Center(child: CircularProgressIndicator()),
-        if (!_loading && _groups.isEmpty)
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Center(
-              child: EmptyDataView(
-                title: widget.joined ? '尚未加入群聊' : '没有可加入的群聊',
+    child: CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: widget.padding,
+          sliver: SliverMainAxisGroup(
+            slivers: [
+              SliverList.list(
+                children: [
+                  if (!widget.joined)
+                    ListTile(
+                      leading: const SettingsIcon(type: SettingsIconType.add),
+                      title: const Text('新建群聊'),
+                      onTap: () async {
+                        try {
+                          final group = await widget.controller.groupStore
+                              .createGroup(aiIds: [widget.senderId]);
+                          if (context.mounted)
+                            widget.onSelected({
+                              'id': group.id,
+                              'title': group.title,
+                              'created': true,
+                            });
+                        } on Object catch (error) {
+                          if (context.mounted)
+                            ScaffoldMessenger.of(context).showToast(
+                              SnackBar(
+                                content: Text(
+                                  '创建失败，请重试：${errorMessage(error)}',
+                                ),
+                              ),
+                              kind: ToastKind.error,
+                            );
+                        }
+                      },
+                    ),
+                  for (final group in _groups)
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 6),
+                      horizontalTitleGap: 12,
+                      minTileHeight: 72,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      title: Text(
+                        group['title'] as String,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                      leading: GroupAvatar(
+                        members: _avatars[group['id']]!,
+                        size: 48,
+                      ),
+                      onTap: () => widget.onSelected(group),
+                    ),
+                  if (_loading)
+                    const Center(child: CircularProgressIndicator()),
+                ],
               ),
-            ),
+              if (!_loading && _groups.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
+                      child: EmptyDataView(
+                        title: widget.joined ? '尚未加入群聊' : '没有可加入的群聊',
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
+        ),
       ],
     ),
   );

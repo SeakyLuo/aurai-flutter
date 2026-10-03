@@ -41,9 +41,10 @@ class _DefaultModelSettingsPageState extends State<DefaultModelSettingsPage> {
       (widget.draft?.config ??
       widget.controller.modelSettings.profile(widget.service));
 
-  void _notice(String message) => ScaffoldMessenger.of(
-    context,
-  ).showGlassSnackBar(SnackBar(content: Text(message)));
+  void _notice(String message, {ToastKind kind = ToastKind.info}) =>
+      ScaffoldMessenger.of(
+        context,
+      ).showToast(SnackBar(content: Text(message)), kind: kind);
 
   Future<bool> _save() async {
     if (_reasoning == _savedReasoning) return true;
@@ -58,15 +59,17 @@ class _DefaultModelSettingsPageState extends State<DefaultModelSettingsPage> {
       if (mounted) {
         setState(() => _savedReasoning = _reasoning);
         if (widget.draft == null) {
-          _notice('默认模型设置已保存');
-        } else {
-          setState(() => _allowPop = true);
-          Navigator.pop(context);
+          _notice('默认模型设置已保存', kind: ToastKind.success);
         }
+        setState(() => _allowPop = true);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) Navigator.pop(context);
+        });
       }
       return true;
     } on Object catch (error) {
-      if (mounted) _notice('保存失败：${errorMessage(error)}');
+      if (mounted)
+        _notice('保存失败：${errorMessage(error)}', kind: ToastKind.error);
       return false;
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -244,10 +247,8 @@ class _DefaultModelSettingsPageState extends State<DefaultModelSettingsPage> {
                     borderRadius: BorderRadius.circular(24),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 10,
-                      ),
+                      minTileHeight: settingsCardHeight,
+                      contentPadding: settingsCardPadding,
                       title: Text(
                         adapters?.containsKey('') == true ? '已设置默认值' : '未设置',
                         style: adapters?.containsKey('') == true
@@ -271,10 +272,8 @@ class _DefaultModelSettingsPageState extends State<DefaultModelSettingsPage> {
                     borderRadius: BorderRadius.circular(24),
                     clipBehavior: Clip.antiAlias,
                     child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 10,
-                      ),
+                      minTileHeight: settingsCardHeight,
+                      contentPadding: settingsCardPadding,
                       title: Text('压缩阈值 ${percent ?? 80}%'),
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,

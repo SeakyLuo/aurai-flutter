@@ -50,7 +50,7 @@ class OpenAiResponsesProvider implements ModelProvider {
     final restart = request.continuationToken == null || compacted;
     final json = await _transport.send(
       {
-        'model': config.model,
+        'model': config.apiModel,
         'stream': true,
         'max_output_tokens': _context.limits.outputTokens,
         'instructions':
@@ -59,6 +59,9 @@ class OpenAiResponsesProvider implements ModelProvider {
             ? _context.input
             : [
                 ...request.toolResults.map(functionCallOutput),
+                ..._context.supportsImages
+                    ? request.userMessageInput
+                    : textOnlyModelInput(request.userMessageInput),
                 for (final update in request.userUpdates)
                   {'role': 'user', 'content': update},
               ],

@@ -9,6 +9,7 @@ class GroupMemberActivity {
     this.stopping = false,
     this.waitingForUser = false,
     this.thoughts = const [],
+    this.activities = const [],
     this.preview = '',
     this.thinkingHidden = false,
     this.sleepingUntil,
@@ -32,6 +33,7 @@ class GroupMemberActivity {
   final bool stopping;
   final bool waitingForUser;
   final List<String> thoughts;
+  final List<AgentTaskActivity> activities;
   final String preview;
   final bool thinkingHidden;
 }
@@ -39,7 +41,9 @@ class GroupMemberActivity {
 class _GroupMemberThoughts {
   _GroupMemberThoughts(this.runId);
   final String runId;
-  final turns = <(int, int, bool), String>{};
+  final turns = <Object, AgentTaskActivity>{};
+  final steps = <int, AgentStep>{};
+  Object? latest;
 }
 
 extension GroupMemberActivities on ChatController {
@@ -216,7 +220,37 @@ extension GroupMemberActivities on ChatController {
       cache[senderId] = _GroupMemberThoughts(runId);
     }
     final thoughts = cache[senderId]!;
-    thoughts.turns[(turn, messageIndex, isReasoning)] = text;
+    final key = (turn, messageIndex, isReasoning);
+    thoughts.turns[key] = AgentTaskActivity(
+      text: text,
+      isReasoning: isReasoning,
+    );
+    thoughts.latest = key;
+    groupActivityChanges.value++;
+  }
+
+  void _recordGroupSteps(String senderId, String runId, List<AgentStep> steps) {
+    if (_callbacksDisposed) return;
+    final cache = _execution.groupThoughts;
+    if (cache[senderId]?.runId != runId) {
+      cache[senderId] = _GroupMemberThoughts(runId);
+    }
+    final thoughts = cache[senderId]!;
+    for (var i = 0; i < steps.length; i++) {
+      final step = steps[i];
+      if (identical(thoughts.steps[i], step)) continue;
+      thoughts.steps[i] = step;
+      thoughts.turns[i] = AgentTaskActivity(
+        text: step.title,
+        toolName: step.toolName,
+        status: step.status,
+        requestJson: step.requestJson,
+        resultJson: step.resultJson,
+        startedAt: step.startedAt,
+        finishedAt: step.finishedAt,
+      );
+      thoughts.latest = i;
+    }
     groupActivityChanges.value++;
   }
 
@@ -228,6 +262,22 @@ extension GroupMemberActivities on ChatController {
         ? latest.length - 120
         : lineStart;
     return latest.substring(start).trim();
+  }
+
+  List<AgentTaskActivity>? groupRunActivities(
+    String conversationId,
+    String senderId,
+    String runId,
+  ) {
+    final state = _executionStates[conversationId];
+    final thoughts = state?.groupThoughts[senderId];
+    if (thoughts == null || thoughts.runId != runId) return null;
+    final hidden =
+        state!.hiddenThinkingMembers.contains(senderId) ||
+        state.groupRuns[senderId]?.thinkingHidden == true;
+    return thoughts.turns.values
+        .where((activity) => !hidden || !activity.isReasoning)
+        .toList();
   }
 
   List<GroupMemberActivity> groupActivitiesFor(
@@ -254,7 +304,9 @@ extension GroupMemberActivities on ChatController {
           state.removedGroupMembers.contains(entry.key)) {
         continue;
       }
-      final step = member.steps
+      final thoughts = state.groupThoughts[entry.key];
+      final hasThoughts = thoughts?.runId == member.activeRunId;
+      final step = (hasThoughts ? thoughts!.steps.values : member.steps)
           .where((step) => step.status == AgentStepStatus.running)
           .lastOrNull;
       if (step?.toolName == 'sleepGroupChat') continue;
@@ -265,15 +317,20 @@ extension GroupMemberActivities on ChatController {
         waitingForAction = (result['userAction'] as Map?)?['pending'] == true;
       }
       final stopping = member.runState == ChatRunState.stopping;
-      final thoughts = state.groupThoughts[entry.key];
-      final hasThoughts =
-          includeThoughts && thoughts?.runId == member.activeRunId;
-      final visibleThoughts = hasThoughts
-          ? thoughts!.turns.entries
-                .where((entry) => !member.thinkingHidden || !entry.key.$3)
-                .map((entry) => entry.value)
+      final visibleActivities = includeThoughts && hasThoughts
+          ? thoughts!.turns.values
+                .where(
+                  (activity) => !member.thinkingHidden || !activity.isReasoning,
+                )
                 .toList()
-          : const <String>[];
+          : const <AgentTaskActivity>[];
+      final latest = hasThoughts ? thoughts!.turns[thoughts.latest] : null;
+      final showStatus =
+          stopping ||
+          confirming ||
+          waitingForAction ||
+          step != null ||
+          member.reconnectAttempt > 0;
       activities.add(
         GroupMemberActivity(
           sender: entry.value,
@@ -286,10 +343,19 @@ extension GroupMemberActivities on ChatController {
           thinkingHidden: member.thinkingHidden,
           waitingForUser:
               confirming || waitingForAction || step?.toolName == 'askUser',
-          thoughts: List.unmodifiable(visibleThoughts),
-          preview: visibleThoughts.isEmpty
+          activities: List.unmodifiable(visibleActivities),
+          thoughts: List.unmodifiable(
+            visibleActivities
+                .where((activity) => activity.toolName == null)
+                .map((activity) => activity.text),
+          ),
+          preview:
+              !includeThoughts ||
+                  showStatus ||
+                  latest == null ||
+                  (member.thinkingHidden && latest.isReasoning)
               ? ''
-              : _groupActivityPreview(visibleThoughts.last),
+              : _groupActivityPreview(latest.text),
           description: stopping
               ? '正在终止'
               : confirming
@@ -298,15 +364,9 @@ extension GroupMemberActivities on ChatController {
               ? '等待你的操作'
               : step?.toolName == 'askUser'
               ? '等待你的回答'
-              : member.thinkingHidden
-              ? '正在思考'
               : member.reconnectAttempt > 0
               ? '正在重新连接'
-              : switch (step?.toolName) {
-                  'searchWeb' || 'readWebPage' || 'searchImages' => '正在查看资料',
-                  null => '正在思考',
-                  _ => '正在处理操作',
-                },
+              : step?.title ?? '正在思考',
         ),
       );
     }

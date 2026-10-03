@@ -217,7 +217,7 @@ Future<bool> manageTask(
   try {
     await tasks.manage(id, action);
     if (context.mounted)
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(
           content: Text(switch (action) {
             'delete' => '任务已删除',
@@ -226,11 +226,12 @@ Future<bool> manageTask(
             _ => '正在停止',
           }),
         ),
+        kind: ToastKind.success,
       );
     return true;
   } on Object catch (e) {
     if (context.mounted)
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(
           content: Text(
             e is PlatformException
@@ -238,6 +239,7 @@ Future<bool> manageTask(
                 : '操作失败，请重试：${errorMessage(e)}',
           ),
         ),
+        kind: ToastKind.error,
       );
     return false;
   }
@@ -263,8 +265,9 @@ Future<void> openTaskConversation(
       );
   } on Object catch (error) {
     if (context.mounted)
-      ScaffoldMessenger.of(context).showGlassSnackBar(
+      ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text('无法打开对应会话，可能已被删除：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
   }
 }

@@ -51,8 +51,9 @@ class _GroupContactPickerState extends State<GroupContactPicker> {
     } catch (caughtError) {
       if (mounted) {
         setState(() => _failed = true);
-        ScaffoldMessenger.of(context).showGlassSnackBar(
+        ScaffoldMessenger.of(context).showToast(
           SnackBar(content: Text('通讯录读取失败，请重试：${errorMessage(caughtError)}')),
+          kind: ToastKind.error,
         );
       }
     } finally {
@@ -77,37 +78,52 @@ class _GroupContactPickerState extends State<GroupContactPicker> {
     body: PaginationListener(
       hasMore: _more && !_failed,
       loadMore: _load,
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          settingsHeaderHeight(context) + 16,
-          16,
-          16,
-        ),
-        children: [
-          for (final ai in _profiles)
-            GroupMemberChoice(
-              selected: _selected.containsKey(ai.sender.id),
-              sender: ai.sender,
-              onTap: () => setState(() {
-                if (_selected.containsKey(ai.sender.id)) {
-                  _selected.remove(ai.sender.id);
-                } else if (_selected.length < widget.limit) {
-                  _selected[ai.sender.id] = ai;
-                } else {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showGlassSnackBar(const SnackBar(content: Text('群成员已达上限')));
-                }
-              }),
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              settingsHeaderHeight(context) + 16,
+              16,
+              16,
             ),
-          if (_loading) const Center(child: CircularProgressIndicator()),
-          if (_failed) TextButton(onPressed: _load, child: const Text('重试')),
-          if (!_loading && !_failed && _profiles.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: EmptyDataView(title: '通讯录还没有朋友，可返回随机添加成员。'),
+            sliver: SliverMainAxisGroup(
+              slivers: [
+                SliverList.list(
+                  children: [
+                    for (final ai in _profiles)
+                      GroupMemberChoice(
+                        selected: _selected.containsKey(ai.sender.id),
+                        sender: ai.sender,
+                        onTap: () => setState(() {
+                          if (_selected.containsKey(ai.sender.id)) {
+                            _selected.remove(ai.sender.id);
+                          } else if (_selected.length < widget.limit) {
+                            _selected[ai.sender.id] = ai;
+                          } else {
+                            ScaffoldMessenger.of(context).showToast(
+                              const SnackBar(content: Text('群成员已达上限')),
+                            );
+                          }
+                        }),
+                      ),
+                    if (_loading)
+                      const Center(child: CircularProgressIndicator()),
+                    if (_failed)
+                      TextButton(onPressed: _load, child: const Text('重试')),
+                  ],
+                ),
+                if (!_loading && !_failed && _profiles.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: EmptyDataView(title: '通讯录还没有朋友，可返回随机添加成员。'),
+                    ),
+                  ),
+              ],
             ),
+          ),
         ],
       ),
     ),

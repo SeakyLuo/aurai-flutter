@@ -37,6 +37,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
   }
 
   Future<void> _load({bool reset = false}) async {
+    final limit = reset && _items.length > ConversationReader.pageSize
+        ? _items.length
+        : ConversationReader.pageSize;
     if (_loading) return;
     setState(() {
       _loading = true;
@@ -45,6 +48,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
     try {
       final page = await widget.controller.groupConversations(
         after: reset || _items.isEmpty ? null : _items.last,
+        limit: limit,
       );
       final avatars = await widget.controller.groupStore.avatarMembers(
         page.map((item) => item.id).toList(),
@@ -58,19 +62,14 @@ class _GroupChatPageState extends State<GroupChatPage> {
         _avatars.addAll(avatars);
         final ids = _items.map((item) => item.id).toSet();
         _items.addAll(page.where((item) => !ids.contains(item.id)));
-        _hasMore = page.length == ConversationReader.pageSize;
+        _hasMore = page.length == limit;
       });
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _failed = true);
-      ScaffoldMessenger.of(context).showGlassSnackBar(
-        SnackBar(
-          content: Text('群聊加载失败，请重试：${errorMessage(error)}'),
-          action: SnackBarAction(
-            label: '重试',
-            onPressed: () => _load(reset: reset),
-          ),
-        ),
+      ScaffoldMessenger.of(context).showToast(
+        SnackBar(content: Text('群聊加载失败，请重试：${errorMessage(error)}')),
+        kind: ToastKind.error,
       );
     } finally {
       if (mounted) setState(() => _loading = false);

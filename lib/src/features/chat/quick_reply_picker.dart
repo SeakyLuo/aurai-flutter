@@ -1,9 +1,8 @@
+import 'floating_search_layout.dart';
 import 'package:flutter/material.dart';
 import '../../domain/emoji_catalog.dart';
 import '../../domain/quick_reply_option.dart';
 import '../../storage/quick_reply_recents.dart';
-import 'model_search_field.dart';
-import 'question_icon.dart';
 import 'quick_reply_groups.dart';
 import 'emoji_category_icon.dart';
 import 'emoji_button.dart';
@@ -231,29 +230,6 @@ class _QuickReplyPickerState extends State<_QuickReplyPicker> {
           top: false,
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: ModelSearchField(
-                        controller: _search,
-                        onChanged: _changed,
-                        hintText: '搜索表情',
-                      ),
-                    ),
-                    if (_query.isNotEmpty)
-                      IconButton(
-                        tooltip: '清空搜索',
-                        onPressed: () {
-                          _search.clear();
-                          _changed('');
-                        },
-                        icon: const QuestionIcon(type: QuestionIconType.close),
-                      ),
-                  ],
-                ),
-              ),
               if (_query.isEmpty)
                 SizedBox(
                   height: 60,
@@ -300,78 +276,92 @@ class _QuickReplyPickerState extends State<_QuickReplyPicker> {
                   ),
                 ),
               Expanded(
-                child: CustomScrollView(
-                  controller: _scroll,
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  slivers: [
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                      sliver: SliverMainAxisGroup(
-                        slivers: [
-                          if (_query.isNotEmpty) ...[
-                            _heading('搜索结果 · ${_results.length}'),
-                            if (_results.isEmpty)
-                              SliverToBoxAdapter(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 32,
-                                  ),
-                                  child: Text(
-                                    '没有找到相关表情，试试其他关键词',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
+                child: FloatingSearchLayout(
+                  itemCount: widget.catalog.byKey.length,
+                  controller: _search,
+                  onChanged: _changed,
+                  hintText: '搜索表情',
+                  enabled: true,
+                  bottom: 16,
+                  child: CustomScrollView(
+                    controller: _scroll,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(
+                          20,
+                          0,
+                          20,
+                          FloatingSearchLayout.clearance,
+                        ),
+                        sliver: SliverMainAxisGroup(
+                          slivers: [
+                            if (_query.isNotEmpty) ...[
+                              _heading('搜索结果 · ${_results.length}'),
+                              if (_results.isEmpty)
+                                SliverFillRemaining(
+                                  hasScrollBody: false,
+                                  child: Center(
+                                    child: Text(
+                                      '没有找到相关表情，试试其他关键词',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            _entries(_results),
-                          ] else ...[
-                            if (_category == -1) ...[
-                              _heading(widget.recent.isEmpty ? '常用表情' : '最近使用'),
-                              SliverGrid(
-                                gridDelegate: _grid,
-                                delegate: SliverChildBuilderDelegate((
-                                  _,
-                                  index,
-                                ) {
-                                  final option =
-                                      quickReplyOptionsByKey[recent[index]]!;
-                                  final entry =
-                                      widget.catalog.byKey[option.key];
-                                  return _tile(
-                                    option,
-                                    entry?.label ?? option.emoji,
-                                    onLongPress:
-                                        entry != null &&
-                                            widget
-                                                    .catalog
-                                                    .variants[entry.base]!
-                                                    .length >
-                                                1
-                                        ? () => _variants(entry)
-                                        : null,
-                                  );
-                                }, childCount: recent.length),
-                              ),
-                            ],
-                            for (
-                              var category = 0;
-                              category < emojiCategoryLabels.length;
-                              category++
-                            )
-                              if (_category == -1 || _category == category) ...[
-                                _heading(emojiCategoryLabels[category]),
-                                _entries(widget.catalog.categories[category]),
+                              _entries(_results),
+                            ] else ...[
+                              if (_category == -1) ...[
+                                _heading(
+                                  widget.recent.isEmpty ? '常用表情' : '最近使用',
+                                ),
+                                SliverGrid(
+                                  gridDelegate: _grid,
+                                  delegate: SliverChildBuilderDelegate((
+                                    _,
+                                    index,
+                                  ) {
+                                    final option =
+                                        quickReplyOptionsByKey[recent[index]]!;
+                                    final entry =
+                                        widget.catalog.byKey[option.key];
+                                    return _tile(
+                                      option,
+                                      entry?.label ?? option.emoji,
+                                      onLongPress:
+                                          entry != null &&
+                                              widget
+                                                      .catalog
+                                                      .variants[entry.base]!
+                                                      .length >
+                                                  1
+                                          ? () => _variants(entry)
+                                          : null,
+                                    );
+                                  }, childCount: recent.length),
+                                ),
                               ],
+                              for (
+                                var category = 0;
+                                category < emojiCategoryLabels.length;
+                                category++
+                              )
+                                if (_category == -1 ||
+                                    _category == category) ...[
+                                  _heading(emojiCategoryLabels[category]),
+                                  _entries(widget.catalog.categories[category]),
+                                ],
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],

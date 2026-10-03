@@ -1,4 +1,5 @@
 import '../../storage/home_conversations.dart';
+import '../../domain/tool_detail_target.dart';
 import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 import '../../agent/private_task_tool.dart';
 import '../../storage/private_task_state.dart';
@@ -18,6 +19,8 @@ import '../../domain/context_summary.dart';
 import '../../domain/live_project_changes.dart';
 import '../../providers/request_adapter_runner.dart';
 import '../../providers/responses_transport.dart';
+import '../../providers/response_message_input.dart';
+import '../../providers/model_image_input.dart';
 import '../../agent/request_adapter_tool.dart';
 import 'pending_message_queue.dart';
 import '../../domain/quick_reply_option.dart';
@@ -47,6 +50,7 @@ import '../../agent/starred_message_tool.dart';
 import '../../agent/html_app_data_tool.dart';
 import '../../agent/html_app_publication_tool.dart';
 import '../../html_games/miniapp_library_store.dart';
+import '../../html_games/miniapp_agent_catalog.dart';
 import '../../html_games/miniapp_forward.dart';
 import '../../html_games/miniapp_template.dart';
 import '../../html_games/html_app_store.dart';
@@ -62,6 +66,8 @@ import '../../storage/recalled_message_drafts.dart';
 import '../../html_games/html_message_interaction.dart';
 import '../../storage/message_callbacks.dart';
 import '../../agent/html_message_update_tool.dart';
+import '../../agent/html_data_access_tool.dart';
+import '../../html_games/html_message_data.dart';
 import 'notification_avatar.dart';
 import '../../agent/friend_tools.dart';
 import '../../storage/contact_relationships.dart';
@@ -205,6 +211,7 @@ part 'draft_attachment_actions.dart';
 part 'asset_library_actions.dart';
 part 'conversation_search_navigation.dart';
 part 'conversation_run.dart';
+part 'run_tool_logging.dart';
 part 'conversation_run_failure.dart';
 part 'conversation_run_persistence.dart';
 part 'scheduled_execution.dart';
@@ -250,8 +257,7 @@ class ChatController extends ChangeNotifier {
   Future<void> prepareSkillCreation() async {
     await createConversation();
     final draft = activeConversation.draft;
-    activeConversation.draft =
-        "${draft.isEmpty ? '' : '$draft\n\n'}帮我创建一个可复用的技能：";
+    updateDraft("${draft.isEmpty ? '' : '$draft\n\n'}帮我创建一个可复用的技能：");
     await saveDraft();
     pendingComposerDraft = activeConversation.draft;
     notifyListeners();
@@ -327,7 +333,7 @@ class ChatController extends ChangeNotifier {
     <Conversation>[..._conversations.where((item) => !item.isArchived)]
       ..sort((a, b) {
         if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
-        return b.updatedAt.compareTo(a.updatedAt);
+        return b.listUpdatedAt.compareTo(a.listUpdatedAt);
       }),
   );
   List<AgentMessage> get messages => activeConversation.messages;
@@ -443,13 +449,13 @@ class ChatController extends ChangeNotifier {
     await navigationState.initialize();
     await OpenRouterModels.initialize();
     await DetectedModelPurposes.initialize();
-    modelSettings = await _platform.loadModelSettings();
     await refreshCapabilities();
     final activeId = await _store.initialize(
       _imageStore.directory,
       _platform.loadLegacyAppState,
       _platform.clearLegacyAppState,
     );
+    modelSettings = await _platform.loadModelSettings();
     await ToolCustomizations.initialize(_store.database);
     await _loadPendingMessageQueues();
     await _loadImageGeneration();
@@ -590,6 +596,9 @@ class ChatController extends ChangeNotifier {
     loadingConversations = true;
     try {
       await _reloadConversations();
+      if (activeConversation.kind == ConversationKind.group) {
+        await refreshGroupDisplayNames(activeConversation.id);
+      }
     } finally {
       loadingConversations = false;
       notifyListeners();
@@ -622,8 +631,14 @@ class ChatController extends ChangeNotifier {
 
   GroupChatStore get groupStore => _store.groups;
 
-  Future<List<Conversation>> groupConversations({Conversation? after}) =>
-      _store.reader.list(after: after, kind: ConversationKind.group);
+  Future<List<Conversation>> groupConversations({
+    Conversation? after,
+    int limit = ConversationReader.pageSize,
+  }) => _store.reader.list(
+    after: after,
+    limit: limit,
+    kind: ConversationKind.group,
+  );
 
   Future<void> loadEarlierMessages() async {
     if (loadingEarlierMessages || !activeConversation.hasEarlierMessages)
@@ -667,7 +682,9 @@ class ChatController extends ChangeNotifier {
     final conversation = activeConversation;
     if (conversation.draft == text) return;
     conversation.draft = text;
-    if (text.trim().isNotEmpty) conversation.storedUpdatedAt = DateTime.now();
+    conversation.draftUpdatedAt = conversation.draftPreview == null
+        ? null
+        : DateTime.now();
   }
 
   Future<void> saveDraft() async {

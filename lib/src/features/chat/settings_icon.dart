@@ -32,6 +32,7 @@ enum SettingsIconType {
   git,
   device,
   chevron,
+  chevronDown,
   back,
   check,
   reset,
@@ -43,6 +44,7 @@ enum SettingsIconType {
   more,
   field,
   play,
+  sound,
   eye,
   eyeOff,
   grid,
@@ -79,6 +81,24 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.sound:
+        canvas.drawPath(
+          Path()
+            ..moveTo(10, 8)
+            ..lineTo(6, 8)
+            ..quadraticBezierTo(4.5, 8, 4.5, 9.5)
+            ..lineTo(4.5, 14.5)
+            ..quadraticBezierTo(4.5, 16, 6, 16)
+            ..lineTo(10, 16)
+            ..lineTo(14, 19.5)
+            ..lineTo(14, 4.5)
+            ..close()
+            ..moveTo(17, 8.5)
+            ..cubicTo(19, 10.3, 19, 13.7, 17, 15.5)
+            ..moveTo(20, 5.5)
+            ..cubicTo(23.5, 9, 23.5, 15, 20, 18.5),
+          pen,
+        );
       case SettingsIconType.grid:
         for (final x in [3.5, 14.0]) {
           for (final y in [3.5, 14.0]) {
@@ -530,6 +550,14 @@ class _SettingsIconPainter extends CustomPainter {
             ..moveTo(9.5, 7)
             ..lineTo(14.5, 12)
             ..lineTo(9.5, 17),
+          pen,
+        );
+      case SettingsIconType.chevronDown:
+        canvas.drawPath(
+          Path()
+            ..moveTo(7, 9.5)
+            ..lineTo(12, 14.5)
+            ..lineTo(17, 9.5),
           pen,
         );
       case SettingsIconType.back:

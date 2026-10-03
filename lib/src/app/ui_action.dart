@@ -12,9 +12,10 @@ Future<bool> runUiAction(
     return true;
   } on Object catch (error) {
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+      ScaffoldMessenger.of(context).showToast(
+        SnackBar(content: Text(errorMessage(error))),
+        kind: ToastKind.error,
+      );
     }
     return false;
   }

@@ -49,8 +49,10 @@ import 'image_attachments.dart';
 import 'task_summary_view.dart';
 import 'reasoning_message_view.dart';
 import 'message_actions_menu.dart';
+import 'speech_readout.dart';
 import 'message_visibility_sheet.dart';
 import 'menu_press_highlight.dart';
+import 'group_message_selection.dart';
 import 'html_message_more_button.dart';
 import 'source_citation_syntax.dart';
 import 'source_citation_view.dart';
@@ -135,6 +137,7 @@ class _MessageItemState extends State<MessageItem> {
   @override
   void dispose() {
     _copyResetTimer?.cancel();
+    unawaited(stopSpeechReadout(message.id));
     super.dispose();
   }
 
@@ -186,7 +189,9 @@ class _MessageItemState extends State<MessageItem> {
       ? Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            message.text.isEmpty ? _withActions(_content) : _content,
+            message.text.isEmpty
+                ? _withActions(_content)
+                : _selectableContent(),
             if (message.quickReplies.isNotEmpty)
               this._buildQuickReplies(context),
           ],
@@ -228,7 +233,14 @@ class _MessageItemState extends State<MessageItem> {
                 _hasReplyContent &&
                 (widget.replyPart?.last ?? true))
               MessageReplyFooter(
+                messageKey: message.id,
                 copied: _copied,
+                onReadAloud: _canReadAloud
+                    ? () => _readAloud(
+                        message,
+                        text: widget.replyPart?.copyText ?? message.text,
+                      )
+                    : null,
                 onMore: message.htmlGame == null
                     ? () => _openActions(compactMenu: true)
                     : null,
@@ -253,43 +265,8 @@ class _MessageItemState extends State<MessageItem> {
           ],
         );
 
-  Widget _selectableContent() {
-    if (message.interactive != null) return _content;
-    if (widget.groupBubble && message.htmlGame == null) {
-      return message.isReasoning ? _withActions(_content) : _content;
-    }
-    if (widget.streaming) return _withActions(_content);
-    if (message.htmlGame != null) {
-      return widget.onQuote == null && widget.onQuickReply == null
-          ? _content
-          : _withActions(_content);
-    }
-    final content = SelectionArea(
-      onSelectionChanged: (selection) => _selectedText = selection?.plainText,
-      contextMenuBuilder: (context, selection) =>
-          AdaptiveTextSelectionToolbar.buttonItems(
-            anchors: selection.contextMenuAnchors,
-            buttonItems: [
-              ...selection.contextMenuButtonItems,
-              if (widget.onQuote != null)
-                ContextMenuButtonItem(
-                  label: '引用',
-                  onPressed: () {
-                    final text = _selectedText;
-                    selection.hideToolbar();
-                    selection.clearSelection();
-                    widget.onQuote!(message, selectedText: text);
-                  },
-                ),
-            ],
-          ),
-      child: _content,
-    );
-    return content;
-  }
-
   Widget _withActions(Widget child) => MenuPressHighlight(
-    onLongPressStart: (_) => _openActions(),
+    onLongPressStart: _bubbleTextSelection ? null : (_) => _openActions(),
     borderRadius: BorderRadius.circular(22),
     child: child,
   );
@@ -309,7 +286,7 @@ class _MessageItemState extends State<MessageItem> {
         MiniappShareMessage(
           message: message,
           groupBubble: widget.groupBubble,
-          onLongPress: () => _openActions(compactMenu: !widget.groupBubble),
+          onLongPress: () => _openActions(),
         ),
       );
 
@@ -353,8 +330,7 @@ class _MessageItemState extends State<MessageItem> {
                       top: HtmlMessageMoreButton.top,
                       right: HtmlMessageMoreButton.right,
                       child: HtmlMessageMoreButton(
-                        onPressed: () =>
-                            _openActions(compactMenu: !widget.groupBubble),
+                        onPressed: () => _openActions(),
                       ),
                     ),
                 ],
@@ -423,7 +399,9 @@ class _MessageItemState extends State<MessageItem> {
                     const SizedBox(height: 8),
                   if (message.text.isNotEmpty)
                     MenuPressHighlight(
-                      onLongPressStart: (_) => _openActions(),
+                      onLongPressStart: _bubbleTextSelection
+                          ? null
+                          : (_) => _openActions(),
                       borderRadius: BorderRadius.circular(26),
                       child: Material(
                         key: _bubbleKey,
@@ -522,6 +500,7 @@ class _MessageItemState extends State<MessageItem> {
               onStatistics: !widget.readOnly || widget.onLocate != null
                   ? () => showInteractiveStatistics(
                       context,
+                      controller: ImageActionScope.of(context),
                       database: ImageActionScope.of(
                         context,
                       ).groupStore.database,
@@ -674,7 +653,9 @@ class _MessageItemState extends State<MessageItem> {
               ),
         child: _withGroupFavorite(
           MenuPressHighlight(
-            onLongPressStart: (_) => _openActions(),
+            onLongPressStart: _bubbleTextSelection
+                ? null
+                : (_) => _openActions(),
             borderRadius: BorderRadius.circular(22),
             child: Material(
               key: _bubbleKey,
@@ -721,7 +702,12 @@ class _MessageItemState extends State<MessageItem> {
         setState(() => _copied = false);
       });
     } on Object catch (error) {
-      if (context.mounted) _notice(context, '复制失败，请重试：${errorMessage(error)}');
+      if (context.mounted)
+        _notice(
+          context,
+          '复制失败，请重试：${errorMessage(error)}',
+          kind: ToastKind.error,
+        );
     }
   }
 
@@ -751,9 +737,18 @@ class _MessageItemState extends State<MessageItem> {
         await AuraiPlatform.instance.openSourceFile(file.url);
       } on PlatformException catch (error) {
         if (context.mounted)
-          _notice(context, error.message ?? '无法打开此文件：${errorMessage(error)}');
+          _notice(
+            context,
+            error.message ?? '无法打开此文件：${errorMessage(error)}',
+            kind: ToastKind.error,
+          );
       } on Object catch (error) {
-        if (context.mounted) _notice(context, '无法打开此文件：${errorMessage(error)}');
+        if (context.mounted)
+          _notice(
+            context,
+            '无法打开此文件：${errorMessage(error)}',
+            kind: ToastKind.error,
+          );
       }
       return;
     }
@@ -761,7 +756,7 @@ class _MessageItemState extends State<MessageItem> {
     if (uri == null ||
         !{'https', 'http'}.contains(uri.scheme) ||
         uri.host.isEmpty) {
-      _notice(context, '无法打开此链接');
+      _notice(context, '无法打开此链接', kind: ToastKind.error);
       return;
     }
     try {
@@ -771,11 +766,19 @@ class _MessageItemState extends State<MessageItem> {
       });
     } on Object catch (error) {
       if (context.mounted)
-        _notice(context, '无法打开链接，请稍后再试：${errorMessage(error)}');
+        _notice(
+          context,
+          '无法打开链接，请稍后再试：${errorMessage(error)}',
+          kind: ToastKind.error,
+        );
     }
   }
 
-  void _notice(BuildContext context, String text) => ScaffoldMessenger.of(
+  void _notice(
+    BuildContext context,
+    String text, {
+    ToastKind kind = ToastKind.info,
+  }) => ScaffoldMessenger.of(
     context,
-  ).showGlassSnackBar(SnackBar(content: Text(text)));
+  ).showToast(SnackBar(content: Text(text)), kind: kind);
 }

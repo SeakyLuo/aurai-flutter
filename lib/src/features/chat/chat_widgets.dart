@@ -228,7 +228,7 @@ class ExecutionProgress extends StatelessWidget {
         !needsConfiguration &&
         (state == ChatRunState.idle || state == ChatRunState.cancelled)) {
       return TaskFailureCard(
-        error: '任务待继续',
+        error: '任务已终止',
         actionLabel: '继续任务',
         paused: true,
         onRetry: onContinue,

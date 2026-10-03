@@ -190,7 +190,7 @@ Map<String, Object?> modelReasoningParameters(ModelConfig config) {
   if (effort == ModelReasoning.automatic) return const {};
   if (!modelReasoningOptions(
     config.service,
-    config.model,
+    config.apiModel,
     config.baseUrl,
   ).contains(effort)) {
     throw const ModelProviderException('当前模型不支持所选思考设置，请在模型设置中重新选择');

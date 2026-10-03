@@ -116,20 +116,24 @@ class _StarredMessageListState extends State<_StarredMessageList> {
     if (_scroll.position.extentAfter < 300 && !_failed) _load();
   }
 
-  void _notice(Object error) {
+  void _notice(Object error, {ToastKind kind = ToastKind.info}) {
     ScaffoldMessenger.of(
       context,
-    ).showGlassSnackBar(SnackBar(content: Text(errorMessage(error))));
+    ).showToast(SnackBar(content: Text(errorMessage(error))), kind: kind);
   }
 
   Future<void> _load({bool reset = false}) async {
+    final limit = reset && _rows.length > 50 ? _rows.length : 50;
     if (_loading || (!reset && !_more)) return;
     setState(() {
       _loading = true;
       _failed = false;
     });
     try {
-      final rows = await _store.page(offset: reset ? 0 : _rows.length);
+      final rows = await _store.page(
+        offset: reset ? 0 : _rows.length,
+        limit: limit,
+      );
       final conversationIds = rows
           .map((row) => row['conversation_id'])
           .toSet()
@@ -161,12 +165,12 @@ class _StarredMessageListState extends State<_StarredMessageList> {
         for (final row in related[1] as List<Map<String, Object?>>) {
           _titles[row['id'] as String] = row['title'] as String;
         }
-        _more = rows.length == 50;
+        _more = rows.length == limit;
       });
     } on Object catch (error) {
       if (mounted) {
         _failed = true;
-        _notice(error);
+        _notice(error, kind: ToastKind.error);
       }
     } finally {
       if (mounted) {
@@ -192,7 +196,7 @@ class _StarredMessageListState extends State<_StarredMessageList> {
       );
       if (mounted) await _load(reset: true);
     } on Object catch (error) {
-      if (mounted) _notice(error);
+      if (mounted) _notice(error, kind: ToastKind.error);
     } finally {
       _opening = false;
     }
@@ -228,7 +232,7 @@ class _StarredMessageListState extends State<_StarredMessageList> {
         },
       );
     } on Object catch (error) {
-      if (mounted) _notice(error);
+      if (mounted) _notice(error, kind: ToastKind.error);
     }
   }
 

@@ -1,3 +1,4 @@
+import '../domain/tool_detail_target.dart';
 import '../domain/tool_models.dart';
 
 const htmlAppGuide =
@@ -25,17 +26,33 @@ class HtmlAppDataTool implements AgentTool, RuntimeCapabilityAgentTool {
         ? ToolSafety.lowRisk
         : ToolSafety.readOnly,
     description: name == 'listHtmlApps'
-        ? 'Find up to 50 of your persistent miniapps by title, newest first. Apps survive deletion of message launchers. Use the returned appId with readHtmlApp/updateHtmlApp to read or modify its source without a messageId, or sendHtmlMessage to reopen the same app and data. Ask by title/date if ambiguous; never ask users for IDs or paths.'
+        ? 'Find miniapps in the same library available to the user. source filters all, builtin, library (published and builtin), mine, installed, favorites. sendMode=message filters the composer + message-capable apps, using their actual send declaration; all includes share-only apps. Results supply appId, entryKind and sendModes. Pass appId and entryKind to sendHtmlMessage with sendMode=message for a fresh isolated message instance or share for a reusable library card. Sharing never sends session progress or private results. Pagination is bounded; continue with nextOffset even when capability filtering leaves an empty page. IDs are internal; ask by title if ambiguous. Listing does not grant permission to edit another creator application.'
         : 'Read or write a named JSON data document owned by your miniapp. The HTML page shares these exact documents through AuraiHTML.readData/writeData. Use names such as career.json or season_2026.json. Each document is at most 4 MB. Read returns revision/value; a missing document returns revision 0 and value null. Write requires that revision and atomically replaces the file; stale writes fail. Keep large app data here, not in the 64 KB message summary. Use these tools rather than editing data envelopes through shell. A successful write notifies open app pages; listen for aurai:messageupdate and reread needed data. No AI callback is started by a data write.',
     inputSchema: {
       'type': 'object',
       'properties': {
-        if (name == 'listHtmlApps')
+        if (name == 'listHtmlApps') ...{
+          'source': {
+            'type': 'string',
+            'enum': [
+              'all',
+              'builtin',
+              'library',
+              'mine',
+              'installed',
+              'favorites',
+            ],
+          },
+          'sendMode': {
+            'type': 'string',
+            'enum': ['all', 'message'],
+          },
+          'offset': {'type': 'integer', 'minimum': 0},
           'query': {
             'type': 'string',
             'description': 'Title fragment; empty lists recent apps.',
-          }
-        else ...{
+          },
+        } else ...{
           'appId': {'type': 'string'},
           'name': {'type': 'string'},
           if (name == 'writeHtmlAppData') ...{
@@ -55,20 +72,32 @@ class HtmlAppDataTool implements AgentTool, RuntimeCapabilityAgentTool {
   @override
   Future<ToolResult> execute(ToolCall call) async {
     try {
+      final output = await invoke(name, call.arguments);
       return ToolResult(
         callId: call.id,
         toolName: name,
         status: ToolResultStatus.success,
-        output: await invoke(name, call.arguments),
+        output: {
+          ...output,
+          if (name == 'listHtmlApps')
+            'detailTargets': [
+              for (final app in (output['apps'] as List).cast<Map>())
+                ToolDetailTarget(
+                  type: app['entryKind'] == 'published'
+                      ? ToolDetailType.miniappPublication
+                      : ToolDetailType.miniapp,
+                  id: app['appId'] as String,
+                  name: app['title'] as String,
+                ).toJson(),
+            ],
+        },
       );
     } on Object catch (error) {
       return ToolResult(
         callId: call.id,
         toolName: name,
         status: ToolResultStatus.error,
-        output: {
-          'message': error.toString(),
-        },
+        output: {'message': error.toString()},
       );
     }
   }
