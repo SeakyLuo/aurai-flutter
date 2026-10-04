@@ -475,6 +475,10 @@ List<ChatTimelineEntry> buildChatTimeline(
                     messageId: message.id,
                     conversationId: conversation.id,
                     store: controller.htmlStore,
+                    onOpenProfile: (senderId) async {
+                      if (!context.mounted) return;
+                      openNoticeMember(context, senderId);
+                    },
                   ),
             onInteractiveRetry: (eventId) =>
                 controller.retryInteractiveCallback(message.id, eventId),

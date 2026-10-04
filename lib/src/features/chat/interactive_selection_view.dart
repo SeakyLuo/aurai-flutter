@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../domain/interactive_selection.dart';
 import 'interactive_message_button.dart';
+import '../../agent/ask_user_tool.dart';
+import 'user_question_option_tile.dart';
 
 class InteractiveSelectionView extends StatefulWidget {
   const InteractiveSelectionView({
@@ -14,11 +16,13 @@ class InteractiveSelectionView extends StatefulWidget {
     required this.busy,
     required this.onSubmit,
     this.showSubmit = true,
+    this.question = false,
   });
   final Map<String, Object?> button;
   final Map? self;
   final bool locked, submitted, allowChange, busy;
   final bool showSubmit;
+  final bool question;
   final ValueChanged<Object> onSubmit;
 
   @override
@@ -72,7 +76,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
               style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
             ),
           ),
-        for (final option in config.options)
+        for (final (index, option) in config.options.indexed)
           Builder(
             builder: (context) {
               final id = option['id'] as String;
@@ -91,6 +95,19 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
                   _selected.add(id);
                 }
               });
+              if (widget.question)
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: UserQuestionOptionTile(
+                    option: UserQuestionOption(
+                      content: option['label'] as String,
+                    ),
+                    number: index + 1,
+                    multiple: config.multiple,
+                    selected: selected,
+                    onTap: enabled ? toggle : null,
+                  ),
+                );
               return Semantics(
                 checked: selected,
                 inMutuallyExclusiveGroup: !config.multiple,

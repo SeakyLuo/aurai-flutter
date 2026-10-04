@@ -35,6 +35,10 @@ const htmlGameLifecycleScript = r'''
       const result=await appData({operation:'retryEvent',eventId});return result.events[0];
     },
     readData(name){return appData({operation:'read',name})},
+    openProfile(senderId){
+      if(!navigator.userActivation.isActive)return Promise.reject(new Error('Open profiles from a user action'));
+      return appData({operation:'openProfile',senderId});
+    },
     writeData(name,value,expectedRevision){return appData({operation:'write',name,value,expectedRevision})},
     get messageState(){return window.__auraiMessageState()},
     get interaction(){return window.__auraiInteractionState()},

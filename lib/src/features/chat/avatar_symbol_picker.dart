@@ -21,9 +21,19 @@ Future<String?> showAvatarSymbolPicker(
   required String name,
   Map<String, String> symbols = avatarSymbols,
   Widget Function(String value)? previewBuilder,
+  BuildContext? previewContext,
 }) async {
   final catalog = await EmojiCatalog.load();
   if (!context.mounted) return null;
+  final screenHeight = MediaQuery.sizeOf(context).height;
+  final double height;
+  if (previewContext != null) {
+    final preview = previewContext.findRenderObject()! as RenderBox;
+    final bottom = preview.localToGlobal(Offset(0, preview.size.height)).dy;
+    height = screenHeight - bottom - 16;
+  } else {
+    height = screenHeight * .78;
+  }
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
@@ -39,6 +49,7 @@ Future<String?> showAvatarSymbolPicker(
         catalog: catalog,
         symbols: symbols,
         previewBuilder: previewBuilder,
+        height: height,
       ),
     ),
   );
@@ -52,6 +63,7 @@ class _AvatarSymbolPicker extends StatefulWidget {
     required this.catalog,
     required this.symbols,
     this.previewBuilder,
+    required this.height,
   });
 
   final String selected;
@@ -60,6 +72,7 @@ class _AvatarSymbolPicker extends StatefulWidget {
   final EmojiCatalog catalog;
   final Map<String, String> symbols;
   final Widget Function(String value)? previewBuilder;
+  final double height;
 
   @override
   State<_AvatarSymbolPicker> createState() => _AvatarSymbolPickerState();
@@ -107,7 +120,7 @@ class _AvatarSymbolPickerState extends State<_AvatarSymbolPicker> {
   Widget build(BuildContext context) => Padding(
     padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
     child: SizedBox(
-      height: MediaQuery.sizeOf(context).height * .78,
+      height: widget.height,
       child: SafeArea(
         top: false,
         child: Stack(

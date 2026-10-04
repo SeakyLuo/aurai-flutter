@@ -130,6 +130,7 @@ extension GroupConversationRun on ChatController {
             createdAt: DateTime.now(),
             isGroupMessage: true,
             isFailure: true,
+            runId: _groupRuns[id]?.activeRunId,
           );
           conversation.messages.add(failure);
           conversation.messageCount++;

@@ -26,7 +26,7 @@ class ContactProfileSplitState extends State<ContactProfileSplit>
 
   bool get supportsSplit => context.size!.width >= 600;
 
-  Future<void> open(MaterialPageRoute<void> route) async {
+  Future<T?> open<T>(MaterialPageRoute<T> route) async {
     FocusManager.instance.primaryFocus?.unfocus();
     final navigator = GlobalKey<NavigatorState>();
     setState(() {
@@ -42,13 +42,14 @@ class ContactProfileSplitState extends State<ContactProfileSplit>
       );
     });
     _animation.forward();
-    await route.popped;
-    if (!mounted || _navigator != navigator) return;
+    final result = await route.popped;
+    if (!mounted || _navigator != navigator) return result;
     setState(() => _open = false);
     await _animation.reverse();
     if (mounted && !_open && _navigator == navigator) {
       setState(() => _detail = null);
     }
+    return result;
   }
 
   @override

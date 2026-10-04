@@ -26,6 +26,7 @@ import 'settings_icon.dart';
 
 part 'group_thought_details.dart';
 part 'group_stop_member_button.dart';
+part 'group_run_details_layout.dart';
 
 Future<void> showGroupActivitySheet(
   BuildContext context, {
@@ -36,9 +37,12 @@ Future<void> showGroupActivitySheet(
   isScrollControlled: true,
   useSafeArea: true,
   showDragHandle: false,
-  builder: (_) => GroupActivityPage._sheet(
-    controller: controller,
-    conversationId: conversationId,
+  builder: (sheetContext) => SizedBox(
+    height: MediaQuery.sizeOf(sheetContext).height * .7,
+    child: GroupActivityPage._sheet(
+      controller: controller,
+      conversationId: conversationId,
+    ),
   ),
 );
 
@@ -657,10 +661,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
     if (widget._asSheet) {
       return ClipRRect(
         borderRadius: GlobalUI.bottomSheetBorderRadius,
-        child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * .7,
-          child: SafeArea(top: false, child: content),
-        ),
+        child: SafeArea(top: false, child: content),
       );
     }
     return Scaffold(

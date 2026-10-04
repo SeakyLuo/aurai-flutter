@@ -116,6 +116,9 @@ class DeepSeekResponsesProvider implements ModelProvider {
             id: item['call_id']! as String,
             name: item['name']! as String,
             arguments: item['arguments']! as String,
+            acceptsEmptyArguments: request.tools.any(
+              (tool) => tool.name == item['name'] && tool.acceptsEmptyArguments,
+            ),
           ),
         );
       }

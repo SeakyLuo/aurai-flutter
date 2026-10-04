@@ -3,6 +3,8 @@ import 'interactive_selection_view.dart';
 import '../../domain/interactive_selection.dart';
 import 'package:flutter/material.dart';
 import 'interactive_message_button.dart';
+import '../../agent/ask_user_tool.dart';
+import 'user_question_option_tile.dart';
 
 /// Renders projected data only. Rules and settlement live in the domain layer.
 class InteractionContent extends StatelessWidget {
@@ -18,6 +20,7 @@ class InteractionContent extends StatelessWidget {
     required this.busy,
     this.pendingButtonId,
     required this.onClick,
+    this.question = false,
   });
   final Map<String, Object?> view;
   final int buttonColumns;
@@ -25,6 +28,7 @@ class InteractionContent extends StatelessWidget {
   final bool readOnly, allowChange, eligible, shared;
   final String? busy;
   final String? pendingButtonId;
+  final bool question;
   final void Function(Map<String, Object?> button, {Object? value}) onClick;
 
   @override
@@ -37,6 +41,9 @@ class InteractionContent extends StatelessWidget {
     final collecting = view['phase'] == 'collecting' && view['closed'] != true;
     final choosing = collecting && (!submitted || allowChange);
     final self = view['self'] as Map?;
+    final answer = question
+        ? self ?? (view['choices'] as List?)?.firstOrNull as Map?
+        : null;
     final selectedButton = collecting && submitted && !allowChange
         ? participantButtons
               .where(
@@ -50,7 +57,7 @@ class InteractionContent extends StatelessWidget {
         : null;
     final showSubmitted = selectedButton != null;
     final status = view['closed'] == true || view['phase'] == 'closed'
-        ? '已结束'
+        ? (question && answer != null ? '已回答' : '已结束')
         : view['completed'] == true
         ? '本轮已完成'
         : collecting
@@ -58,7 +65,8 @@ class InteractionContent extends StatelessWidget {
         : null;
     final participationSummary = [
       if (status != null) status,
-      if (view['summaryVisible'] == true) '${view['submittedCount']} 人参与',
+      if (!question && view['summaryVisible'] == true)
+        '${view['submittedCount']} 人参与',
     ].join(' · ');
     final actions = participantButtons
         .where((button) => button['selection'] == null)
@@ -103,18 +111,34 @@ class InteractionContent extends StatelessWidget {
             '统计尚未公开',
             style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
           ),
+        if (question && !choosing && answer != null) ...[
+          const SizedBox(height: 12),
+          UserQuestionOptionTile(
+            option: UserQuestionOption(
+              title: '${answer['name']}的回答',
+              content: answer['label'] as String,
+            ),
+            number: 1,
+            selected: true,
+            onTap: null,
+          ),
+        ],
         if ((actions.isNotEmpty || showSubmitted) &&
             (status != null ||
                 (view['revealed'] == true && view['summaryVisible'] != true)))
           const SizedBox(height: 12),
         for (final button in buttons.where(
-          (button) => collecting && button['selection'] != null,
+          (button) =>
+              collecting &&
+              (!question || choosing) &&
+              button['selection'] != null,
         ))
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: InteractiveSelectionView(
               key: ValueKey((button['id'], view['round'])),
               button: button,
+              question: question,
               self: self,
               locked:
                   readOnly ||

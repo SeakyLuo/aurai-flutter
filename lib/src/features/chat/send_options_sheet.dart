@@ -4,6 +4,7 @@ import '../../domain/message_sender.dart';
 import 'draft_visibility_sheet.dart';
 import 'question_icon.dart';
 import 'settings_appearance.dart';
+import 'settings_icon.dart';
 import 'visibility_option_tile.dart';
 
 class SendOptionsSheet extends StatefulWidget {
@@ -27,6 +28,10 @@ class SendOptionsSheet extends StatefulWidget {
 class _SendOptionsSheetState extends State<SendOptionsSheet> {
   late DraftVisibility? _visibility = widget.initial;
   late final _selections = <DraftVisibilityMode, DraftVisibility>{
+    for (final entry
+        in widget.initial?.selections.entries ??
+            const <MapEntry<DraftVisibilityMode, List<MessageSender>>>[])
+      entry.key: DraftVisibility(entry.key, entry.value),
     if (widget.initial case final initial?) initial.mode: initial,
   };
 
@@ -64,7 +69,23 @@ class _SendOptionsSheetState extends State<SendOptionsSheet> {
       _visibility = result;
       _selections[mode] = result;
     });
-    widget.onChanged(result);
+  }
+
+  void _save() {
+    final current =
+        _visibility ?? const DraftVisibility(DraftVisibilityMode.everyone, []);
+    widget.onChanged(
+      DraftVisibility(
+        current.mode,
+        current.members,
+        selections: {
+          for (final entry in _selections.entries)
+            if (entry.key != DraftVisibilityMode.everyone)
+              entry.key: entry.value.members,
+        },
+      ),
+    );
+    Navigator.pop(context);
   }
 
   @override
@@ -90,7 +111,12 @@ class _SendOptionsSheetState extends State<SendOptionsSheet> {
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
                 ),
               ),
-              const SizedBox(width: 40),
+              SettingsGlassAction(
+                label: '保存',
+                icon: Icons.check_rounded,
+                iconWidget: const SettingsIcon(type: SettingsIconType.check),
+                onPressed: _save,
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -105,9 +131,9 @@ class _SendOptionsSheetState extends State<SendOptionsSheet> {
                 DraftVisibilityMode.excluded => '部分人不可见',
               },
               subtitle:
-                  _visibility?.mode == mode &&
-                      mode != DraftVisibilityMode.everyone
-                  ? _visibility!.members.map((member) => member.name).join('、')
+                  mode != DraftVisibilityMode.everyone &&
+                      _selections.containsKey(mode)
+                  ? _selections[mode]!.label
                   : null,
               onTap: () {
                 if (mode == DraftVisibilityMode.everyone) {
@@ -116,7 +142,6 @@ class _SendOptionsSheetState extends State<SendOptionsSheet> {
                     [],
                   );
                   setState(() => _visibility = value);
-                  widget.onChanged(value);
                 } else {
                   _edit(mode);
                 }

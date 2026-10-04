@@ -38,6 +38,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   bool starred = false,
   bool allowEditing = true,
   bool allowHistory = false,
+  bool allowTimeline = false,
   Future<void> Function(BuildContext)? onVisibility,
   bool allowQuote = false,
   bool allowRecall = false,
@@ -82,6 +83,12 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             const MessageActionResult(MessageAction.history),
             SettingsIcon(type: SettingsIconType.tasks, color: iconColor),
             '查看历史',
+          ),
+        if (allowTimeline)
+          (
+            const MessageActionResult(MessageAction.timeline),
+            SettingsIcon(type: SettingsIconType.tasks, color: iconColor),
+            '查看任务线',
           ),
         if (message.htmlGame != null &&
             message.htmlGame!.displayMode != 'inline')

@@ -27,6 +27,7 @@ class HtmlView extends StatefulWidget {
     this.surfaceId = 'chat',
     this.fullscreen = false,
     this.backLabel = '返回会话',
+    this.onOpenProfile,
   });
   final HtmlGameCard card;
   final String messageId;
@@ -35,6 +36,7 @@ class HtmlView extends StatefulWidget {
   final String surfaceId;
   final bool fullscreen;
   final String backLabel;
+  final Future<void> Function(String)? onOpenProfile;
 
   Future<HtmlGameCard> captureForwardPreview() async {
     final view = _HtmlViewState._views
@@ -60,6 +62,7 @@ class HtmlView extends StatefulWidget {
             surfaceId: surfaceId,
             fullscreen: true,
             backLabel: backLabel,
+            onOpenProfile: onOpenProfile,
           ),
         ),
       );
@@ -295,6 +298,7 @@ class _HtmlViewState extends State<HtmlView>
         game,
         widget.store,
         surfaceId: widget.surfaceId,
+        onOpenProfile: widget.onOpenProfile,
         fullscreen: widget.fullscreen,
         hostTopInset: widget.fullscreen
             ? MediaQuery.paddingOf(context).top + SettingsAppBar.toolbarHeight

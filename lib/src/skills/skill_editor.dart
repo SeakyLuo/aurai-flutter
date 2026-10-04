@@ -40,7 +40,8 @@ class _SkillEditorState extends State<SkillEditor> {
       _saved.id.isEmpty ||
       _visibility != _saved.visibility ||
       !setEquals(_scopes.toSet(), _saved.scopes.toSet()) ||
-      !setEquals(_visibleTo, _saved.visibleTo.toSet()) ||
+      (_visibility == 'selected' &&
+          !setEquals(_visibleTo, _saved.visibleTo.toSet())) ||
       _name.text != _saved.name ||
       _description.text != _saved.description ||
       _instructions.text != _saved.instructions ||
@@ -69,7 +70,7 @@ class _SkillEditorState extends State<SkillEditor> {
           id: _saved.id,
           visibility: _visibility,
           scopes: _scopes,
-          visibleTo: _visibleTo.toList(),
+          visibleTo: _visibility == 'selected' ? _visibleTo.toList() : const [],
           dependencyIds: _dependencies.toList(),
           name: _name.text,
           description: _description.text,

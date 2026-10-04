@@ -45,6 +45,13 @@ class ToolDefinition {
   final String? authorizationScope;
   final String? authorizationLabel;
 
+  bool get acceptsEmptyArguments {
+    final schema = modelInputSchema;
+    return schema['type'] == 'object' &&
+        (schema['properties'] as Map).isEmpty &&
+        schema['additionalProperties'] == false;
+  }
+
   Map<String, Object?> get modelInputSchema {
     final needsConfirmation = [safety, ...actionSafety.values].any(
       (value) =>
@@ -110,7 +117,11 @@ class ToolCall {
     required String id,
     required String name,
     required String arguments,
+    bool acceptsEmptyArguments = false,
   }) {
+    if (arguments.isEmpty && acceptsEmptyArguments) {
+      return ToolCall.fromModel(id: id, name: name, arguments: const {});
+    }
     try {
       final decoded = jsonDecode(arguments);
       if (decoded is! Map<String, dynamic>) {

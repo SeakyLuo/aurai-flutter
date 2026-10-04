@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../storage/development_projects.dart';
 import 'chat_controller.dart';
 import 'project_list_tile.dart';
-import 'project_profile_page.dart';
+import 'project_profile_navigation.dart';
 import 'question_icon.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -67,13 +67,7 @@ class _ConversationProjectSheetState extends State<ConversationProjectSheet> {
       Navigator.pop(context, ConversationProjectSelection(_selectedProjectId));
 
   Future<void> _open(DevelopmentProject project) async {
-    await Navigator.push<void>(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            ProjectProfilePage(controller: widget.controller, project: project),
-      ),
-    );
+    await openProjectProfile(context, widget.controller, project);
     final projects = await widget.controller.projects.list();
     if (!mounted) return;
     setState(() {

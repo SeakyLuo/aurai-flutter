@@ -24,6 +24,7 @@ class CustomAvatarPage extends StatefulWidget {
 }
 
 class _CustomAvatarPageState extends State<CustomAvatarPage> {
+  final _previewKey = GlobalKey();
   late String _icon = widget.initial.icon;
   late String _color = widget.initial.color;
   List<String> _recentSymbols = [];
@@ -76,6 +77,7 @@ class _CustomAvatarPageState extends State<CustomAvatarPage> {
       selected: _icon,
       color: _color,
       name: widget.name,
+      previewContext: _previewKey.currentContext!,
     );
     if (icon != null && mounted) await _selectSymbol(icon);
   }
@@ -104,6 +106,7 @@ class _CustomAvatarPageState extends State<CustomAvatarPage> {
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Center(
                 child: ProfileAvatar(
+                  key: _previewKey,
                   style: _style,
                   name: widget.name,
                   size: 104,

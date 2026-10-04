@@ -1,6 +1,15 @@
 part of 'message_item.dart';
 
 extension _FailureRetry on _MessageItemState {
+  Widget _failureCard() => _withActions(
+    TaskFailureCard(
+      error: message.text,
+      padding: const EdgeInsets.only(top: 6, bottom: 8),
+      enabled: !_retryingFailure && widget.onRetry != null,
+      onRetry: widget.onRetry == null ? null : _retryFailure,
+    ),
+  );
+
   Future<void> _retryFailure() async {
     _setRetryingFailure(true);
     try {
@@ -243,6 +252,11 @@ extension _MessageItemActions on _MessageItemState {
             allowEditing:
                 widget.onEdit != null && snapshot.miniappShare == null,
             allowHistory: hasHistory,
+            allowTimeline:
+                widget.groupBubble &&
+                snapshot.runId != null &&
+                snapshot.role == AgentMessageRole.assistant &&
+                !snapshot.isSystem,
             allowQuote: widget.onQuote != null,
             allowRecall: widget.onRecall != null,
             allowRetry: allowRetry,
@@ -281,6 +295,12 @@ extension _MessageItemActions on _MessageItemState {
     }
     final action = (result as MessageActionResult).action;
     switch (action) {
+      case MessageAction.timeline:
+        await showRunTimelineSheet(
+          context,
+          controller: ImageActionScope.of(context),
+          message: snapshot,
+        );
       case MessageAction.pin:
       case MessageAction.groupFavorite:
         final mark = groupMark!;

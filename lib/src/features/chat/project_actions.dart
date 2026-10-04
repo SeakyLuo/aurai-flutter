@@ -8,7 +8,7 @@ import 'chat_controller.dart';
 import 'conversation_menu_icon.dart';
 import 'delete_confirmation_dialog.dart';
 import 'header_action_menu.dart';
-import 'project_profile_page.dart';
+import 'project_profile_navigation.dart';
 import 'settings_icon.dart';
 
 enum ProjectActionResult { changed, removed }
@@ -70,13 +70,8 @@ Future<ProjectActionResult?> showProjectActions(
     switch (action) {
       case 'info':
         final latest = await controller.projects.read(project.id);
-        final removed = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(
-            builder: (_) =>
-                ProjectProfilePage(controller: controller, project: latest),
-          ),
-        );
+        if (!context.mounted) return null;
+        final removed = await openProjectProfile(context, controller, latest);
         return removed == true
             ? ProjectActionResult.removed
             : ProjectActionResult.changed;

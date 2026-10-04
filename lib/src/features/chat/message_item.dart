@@ -47,6 +47,7 @@ import '../../domain/web_sources.dart';
 import '../../platform/aurai_platform.dart';
 import 'image_attachments.dart';
 import 'task_summary_view.dart';
+import 'run_timeline_sheet.dart';
 import 'task_failure_card.dart';
 import 'reasoning_message_view.dart';
 import 'message_actions_menu.dart';
@@ -191,12 +192,7 @@ class _MessageItemState extends State<MessageItem> {
 
   Widget _buildMessage(BuildContext context) =>
       widget.groupBubble && message.isFailure
-      ? TaskFailureCard(
-          error: message.text,
-          padding: const EdgeInsets.only(top: 6, bottom: 8),
-          enabled: !_retryingFailure && widget.onRetry != null,
-          onRetry: widget.onRetry == null ? null : _retryFailure,
-        )
+      ? _failureCard()
       : message.role == AgentMessageRole.user
       ? Column(
           crossAxisAlignment: CrossAxisAlignment.end,

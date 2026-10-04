@@ -280,8 +280,18 @@ class AgentRuntime {
         if (modelTurn.toolCalls.any((call) => call.argumentsError != null)) {
           invalidArgumentTurns++;
           if (invalidArgumentTurns > 2) {
-            throw const ModelProviderException(
-              '模型连续生成了无效工具参数，修正两次后仍失败，本轮工具未执行，请重试',
+            final invalidCalls = modelTurn.toolCalls
+                .where((call) => call.argumentsError != null)
+                .toList();
+            throw ModelProviderException(
+              '${invalidCalls.map((call) => toolTitle(call.name)).join('、')}的参数连续无效，修正两次后仍失败。本次调用未执行，此前成功的操作已保留。',
+              detail: invalidCalls
+                  .map(
+                    (call) =>
+                        '${call.name}: ${call.argumentsError}\n'
+                        '原始参数：${jsonEncode(call.arguments)}',
+                  )
+                  .join('\n\n'),
             );
           }
         } else {

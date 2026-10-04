@@ -98,12 +98,10 @@ class _SkillVisibilityPickerState extends State<SkillVisibilityPicker> {
         children: [
           _VisibilityHeader(
             title: '技能可见范围',
+            actionLabel: '保存',
             onDone: _visibility == 'selected' && _selected.isEmpty
                 ? null
-                : () => Navigator.pop(context, (
-                    _visibility,
-                    _visibility == 'selected' ? _selected : <String>{},
-                  )),
+                : () => Navigator.pop(context, (_visibility, _selected)),
           ),
           const SizedBox(height: 12),
           for (final value in ['private', 'public', 'selected'])
@@ -213,9 +211,14 @@ class _SkillVisibleMembersSheetState extends State<_SkillVisibleMembersSheet> {
 }
 
 class _VisibilityHeader extends StatelessWidget {
-  const _VisibilityHeader({required this.title, required this.onDone});
+  const _VisibilityHeader({
+    required this.title,
+    required this.onDone,
+    this.actionLabel = '完成',
+  });
   final String title;
   final VoidCallback? onDone;
+  final String actionLabel;
   @override
   Widget build(BuildContext context) => Stack(
     alignment: Alignment.center,
@@ -238,7 +241,7 @@ class _VisibilityHeader extends StatelessWidget {
             onPressed: () => Navigator.pop(context),
           ),
           SettingsGlassAction(
-            label: '完成',
+            label: actionLabel,
             icon: Icons.check_rounded,
             iconWidget: const SettingsIcon(type: SettingsIconType.check),
             onPressed: onDone,

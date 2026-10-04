@@ -18,7 +18,7 @@ import 'archive_confirmation_dialog.dart';
 import 'conversation_menu_icon.dart';
 import 'glass_surface.dart';
 import 'menu_press_highlight.dart';
-import 'project_profile_page.dart';
+import 'project_profile_navigation.dart';
 import 'conversation_rename_dialog.dart';
 import 'delete_confirmation_dialog.dart';
 
@@ -405,15 +405,7 @@ class _ConversationMoreState extends State<ConversationMore> {
           _conversation.projectId!,
         );
         if (!mounted) return;
-        await Navigator.push<void>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProjectProfilePage(
-              controller: widget.controller,
-              project: project,
-            ),
-          ),
-        );
+        await openProjectProfile(context, widget.controller, project);
       case _MoreAction.pin:
         await _pin();
       case _MoreAction.members:

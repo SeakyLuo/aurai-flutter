@@ -5,6 +5,7 @@ import '../../domain/error_message.dart';
 import 'interactive_message_button.dart';
 import 'package:flutter/material.dart';
 import '../../domain/interactive_message.dart';
+import 'question_icon.dart';
 
 class InteractiveMessageView extends StatefulWidget {
   const InteractiveMessageView({
@@ -148,6 +149,9 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         : _card.hasInteraction
         ? _card.interactionView(widget.actorId)
         : null;
+    final question =
+        (_card.interaction['actors'] as List?)?.length == 1 &&
+        card.buttons.any((button) => button['selection'] != null);
     final statisticsVisible =
         card.showStatistics &&
         (widget.historical && _card.snapshotView != null
@@ -162,6 +166,10 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (question) ...[
+                const QuestionIcon(type: QuestionIconType.question),
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: Text(
                   card.title,
@@ -232,6 +240,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
             InteractionContent(
               key: ValueKey((widget.actorId, card.title, card.body)),
               view: sharedView,
+              question: question,
               shared: _card.shared,
               buttons: card.buttons,
               buttonColumns: card.buttonColumns,

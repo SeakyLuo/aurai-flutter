@@ -9,12 +9,14 @@ class UserQuestionOptionTile extends StatelessWidget {
     required this.number,
     required this.selected,
     required this.onTap,
+    this.multiple = false,
   });
 
   final UserQuestionOption option;
   final int number;
   final bool selected;
   final VoidCallback? onTap;
+  final bool multiple;
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +25,7 @@ class UserQuestionOptionTile extends StatelessWidget {
     final accent = dark ? const Color(0xffc4b5fd) : const Color(0xff7959df);
     return Semantics(
       selected: selected,
-      inMutuallyExclusiveGroup: true,
+      inMutuallyExclusiveGroup: !multiple,
       child: Material(
         color: selected
             ? colors.primary.withValues(alpha: dark ? .19 : .14)

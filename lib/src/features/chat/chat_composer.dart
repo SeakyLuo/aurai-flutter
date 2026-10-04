@@ -24,11 +24,7 @@ extension _ChatComposer on _ChatPageState {
           onChanged: (result) {
             if (!mounted || _conversationId != id) return;
             _updateDraftVisibility(() {
-              if (result.mode == DraftVisibilityMode.everyone) {
-                _draftVisibility.remove(id);
-              } else {
-                _draftVisibility[id] = result;
-              }
+              _draftVisibility[id] = result;
             });
           },
         ),
@@ -48,7 +44,10 @@ extension _ChatComposer on _ChatPageState {
             : _editing != null
             ? '编辑消息'
             : isGroup
-            ? _draftVisibility[_conversationId]?.label ?? ''
+            ? _draftVisibility[_conversationId]?.mode ==
+                      DraftVisibilityMode.everyone
+                  ? ''
+                  : _draftVisibility[_conversationId]?.label ?? ''
             : '回复 ${controller.activeAi!.sender.name}',
         quote: _editing != null
             ? _editing!.message.quote

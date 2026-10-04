@@ -36,6 +36,7 @@ import '../../domain/library_asset.dart';
 import 'conversation_search_page.dart';
 import 'sidebar_action_icon.dart';
 import 'glass_surface.dart';
+import 'contact_profile_split.dart';
 
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key, required this.controller});
@@ -107,6 +108,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
   @override
   Widget build(BuildContext context) {
     final projects = _projects;
+    return ContactProfileSplit(child: _content(context, projects));
+  }
+
+  Widget _content(BuildContext context, List<DevelopmentProject>? projects) {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
@@ -493,6 +498,10 @@ class _ProjectPageState extends State<ProjectPage> {
 
   @override
   Widget build(BuildContext context) {
+    return ContactProfileSplit(child: _content(context));
+  }
+
+  Widget _content(BuildContext context) {
     final conversations = _conversations;
     return Scaffold(
       extendBodyBehindAppBar: true,

@@ -1,4 +1,5 @@
 import 'detail_split_layout.dart';
+import 'pane_navigator.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -52,6 +53,7 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
   Completer<bool?>? _detailsResult;
   int _request = 0;
   bool _open = false;
+  final _paneNavigator = GlobalKey<PaneNavigatorState>();
   bool _returningFromConversation = false;
 
   Future<void> backFromConversation() async {
@@ -287,7 +289,10 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
   Widget build(BuildContext context) => PopScope(
     canPop: !_open || _returningFromConversation,
     onPopInvokedWithResult: (didPop, _) {
-      if (!didPop && _open && !_returningFromConversation) {
+      if (!didPop &&
+          _open &&
+          !_returningFromConversation &&
+          !_paneNavigator.currentState!.hasOverlayRoute) {
         if (_details != null) {
           _detailsNavigator!.currentState!.maybePop();
         } else {
@@ -298,7 +303,11 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
     child: DetailSplitLayout(
       animation: _curve,
       opened: _open,
-      child: widget.child,
+      child: PaneNavigator(
+        key: _paneNavigator,
+        handleBack: !_returningFromConversation,
+        child: widget.child,
+      ),
       detailBuilder: _message != null || _details != null
           ? (context, wide) => _details ?? _detail(context, wide: wide)
           : null,

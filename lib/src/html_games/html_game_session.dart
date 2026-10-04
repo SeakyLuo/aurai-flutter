@@ -38,6 +38,7 @@ class HtmlGameSession extends ChangeNotifier {
     this.hostSafeTopInset = 0,
     this.hostSafeBottomInset = 0,
     this.hostRightInset = 0,
+    this.onOpenProfile,
   }) {
     _readyTimeout = Timer(const Duration(seconds: 15), () {
       if (!_closed && !ready) {
@@ -70,6 +71,7 @@ class HtmlGameSession extends ChangeNotifier {
   bool _editing = false;
   HtmlGame? _pendingUpdate;
   final String surfaceId;
+  final Future<void> Function(String)? onOpenProfile;
   final bool fullscreen;
   final bool independent;
   final double hostTopInset;
@@ -237,6 +239,20 @@ class HtmlGameSession extends ChangeNotifier {
         try {
           final args = (jsonDecode(call.arguments as String) as Map)
               .cast<String, Object?>();
+          if (args['operation'] == 'openProfile') {
+            final senderId = args['senderId'] as String;
+            final members = await store.database.query(
+              'conversation_members',
+              columns: ['sender_id'],
+              where: 'conversation_id = ? AND sender_id = ?',
+              whereArgs: [game.conversationId, senderId],
+              limit: 1,
+            );
+            if (members.isEmpty) throw StateError('该成员不属于当前会话');
+            if (onOpenProfile == null) throw StateError('请从会话卡片打开成员资料');
+            await onOpenProfile!(senderId);
+            return jsonEncode({'opened': true});
+          }
           if (args['operation'] == 'events' ||
               args['operation'] == 'retryEvent') {
             if (independent) {

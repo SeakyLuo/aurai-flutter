@@ -9,9 +9,10 @@ import 'question_icon.dart';
 enum DraftVisibilityMode { everyone, included, excluded }
 
 class DraftVisibility {
-  const DraftVisibility(this.mode, this.members);
+  const DraftVisibility(this.mode, this.members, {this.selections = const {}});
   final DraftVisibilityMode mode;
   final List<MessageSender> members;
+  final Map<DraftVisibilityMode, List<MessageSender>> selections;
   List<String>? get audience => mode == DraftVisibilityMode.included
       ? [MessageSender.localUser.id, ...members.map((m) => m.id)]
       : null;
