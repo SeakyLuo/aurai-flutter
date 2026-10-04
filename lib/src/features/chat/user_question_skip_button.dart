@@ -46,8 +46,8 @@ class _UserQuestionSkipButtonState extends State<UserQuestionSkipButton> {
     final seconds = (remaining.inMilliseconds / 1000).ceil();
     final countdown = seconds > 0 && remaining < const Duration(hours: 1)
         ? remaining < const Duration(minutes: 1)
-              ? '剩余 $seconds 秒'
-              : '剩余 ${(seconds / 60).ceil()} 分钟'
+              ? ' $seconds 秒'
+              : ' ${(seconds / 60).ceil()} 分钟'
         : null;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -75,7 +75,7 @@ class _UserQuestionSkipButtonState extends State<UserQuestionSkipButton> {
                   FocusScope.of(context).unfocus();
                   question.answer(skipped: true);
                 },
-          child: Text(question.isUserAction ? '取消等待' : '跳过'),
+          child: Text('跳过'),
         ),
         if (countdown != null)
           Text(

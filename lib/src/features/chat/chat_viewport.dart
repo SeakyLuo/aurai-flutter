@@ -43,6 +43,7 @@ class ChatViewport extends StatefulWidget {
     this.sentMessageId,
     this.showScrollbar = false,
     required this.onContentBelowChanged,
+    this.onVisibleEntriesChanged,
   });
 
   final List<ChatTimelineEntry> entries;
@@ -62,12 +63,21 @@ class ChatViewport extends StatefulWidget {
   final String? sentMessageId;
   final bool showScrollbar;
   final ValueChanged<bool> onContentBelowChanged;
+  final VoidCallback? onVisibleEntriesChanged;
 
   @override
   State<ChatViewport> createState() => ChatViewportState();
 }
 
 class ChatViewportState extends State<ChatViewport> {
+  Set<String> get visibleEntryIds => {
+    for (final item in _positions.itemPositions.value)
+      if (item.index < widget.entries.length &&
+          item.itemTrailingEdge * _height > widget.padding.top &&
+          item.itemLeadingEdge * _height < _height - widget.padding.bottom)
+        widget.entries[item.index].id,
+  };
+
   // Message bookmarks own restoration; do not reuse the list package
   // position cache from an earlier viewport or search window.
   final _pageStorage = PageStorageBucket();
@@ -386,6 +396,9 @@ class ChatViewportState extends State<ChatViewport> {
       _replyAnchorId,
     );
     widget.onBookmark(_anchor!);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onVisibleEntriesChanged?.call();
+    });
   }
 
   Future<bool?> unreadFitsViewport(

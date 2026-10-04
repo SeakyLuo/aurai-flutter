@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import '../domain/message_sender.dart';
 import '../domain/avatar_portraits.dart';
 import '../features/chat/member_avatar.dart';
+import '../features/chat/profile_avatar.dart';
 
 /// Reuse the IM avatar widget so miniapps display the same photos and symbols.
 class MiniappMemberAvatars {
@@ -57,14 +58,20 @@ class MiniappMemberAvatars {
     view.prepareInitialFrame();
     final adapter = RenderObjectToWidgetAdapter<RenderBox>(
       container: boundary,
-      child: Directionality(
-        textDirection: TextDirection.ltr,
-        child: Theme(
-          data: ThemeData(
-            brightness:
-                WidgetsBinding.instance.platformDispatcher.platformBrightness,
+      child: MediaQuery(
+        data: const MediaQueryData(
+          size: Size.square(size),
+          devicePixelRatio: 1,
+        ),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: Theme(
+            data: ThemeData(
+              brightness:
+                  WidgetsBinding.instance.platformDispatcher.platformBrightness,
+            ),
+            child: MemberAvatar(sender: sender, size: size),
           ),
-          child: MemberAvatar(sender: sender, size: size),
         ),
       ),
     );
@@ -75,10 +82,7 @@ class MiniappMemberAvatars {
           if (sender.avatarPath != null)
             _precache(FileImage(File(sender.avatarPath!)), root)
           else if (avatarPortraits.containsKey(sender.avatarIcon))
-            _precache(
-              AssetImage(avatarPortraits[sender.avatarIcon]!.asset),
-              root,
-            )
+            _precache(avatarPortraitImage(sender.avatarIcon, size, 1), root)
           else if (sender.avatarIcon == 'app_logo' ||
               sender.avatarIcon == 'app_logo_white')
             _precache(

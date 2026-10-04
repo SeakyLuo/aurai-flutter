@@ -72,6 +72,7 @@ import 'notification_avatar.dart';
 import '../../agent/friend_tools.dart';
 import '../../storage/contact_relationships.dart';
 import '../../domain/error_message.dart';
+import '../../domain/message_lookup_error.dart';
 import '../../agent/execution_log_tool.dart';
 import '../../diagnostics/execution_log.dart';
 import '../../agent/html_message_tool.dart';
@@ -79,6 +80,7 @@ import '../../html_games/html_store.dart';
 import '../../html_games/html_game_session.dart';
 import '../../html_games/miniapp_program_store.dart';
 import '../../domain/interactive_message.dart';
+import '../../domain/interactive_tool_view.dart';
 import '../../storage/interactive_completion.dart';
 import '../../storage/interactive_message_store.dart';
 import '../../agent/interactive_message_tool.dart';
@@ -134,6 +136,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../agent/agent_runtime.dart';
+import '../../agent/response_decision.dart';
 import '../../agent/system_prompt.dart';
 import '../../agent/ask_user_tool.dart';
 import '../../agent/model_balance_tool.dart';
@@ -198,6 +201,7 @@ part 'app_control_actions.dart';
 part 'app_assistance_actions.dart';
 part 'peer_conversations.dart';
 part 'interactive_message_actions.dart';
+part 'interactive_ai_decision.dart';
 part 'message_callback_actions.dart';
 part 'html_actions.dart';
 part 'miniapp_template_sending.dart';
@@ -352,6 +356,7 @@ class ChatController extends ChangeNotifier {
   bool _systemEventDrainScheduled = false;
   final _groupToolQueue = GroupToolQueue();
   final groupActivityChanges = ValueNotifier<int>(0);
+  final contactsChanged = ValueNotifier<AiProfile?>(null);
   final programErrors = ValueNotifier<String?>(null);
   final _peerSessions = <String, Future<_PeerSession>>{};
   Iterable<Conversation> get groupRuns =>
@@ -402,6 +407,7 @@ class ChatController extends ChangeNotifier {
     questionNotifications.dispose();
     notificationOpenRequests.dispose();
     groupActivityChanges.dispose();
+    contactsChanged.dispose();
     programErrors.dispose();
     super.dispose();
   }

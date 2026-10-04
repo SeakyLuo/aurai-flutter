@@ -10,6 +10,7 @@ import 'group_system_notice.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/ai_profile.dart';
+import '../domain/contact_name_order.dart';
 import '../domain/message_sender.dart';
 import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
@@ -85,25 +86,49 @@ class GroupChatStore {
     int offset = 0,
     int limit = pageSize,
     String ownerId = 'user:local',
+    String? senderId,
   }) async {
-    final rows = await database.query(
-      'ai_profiles',
+    final index = await database.query(
+      'message_senders',
+      columns: ['id', 'name'],
       where:
-          'sender_id IN (SELECT friend_id FROM contact_friendships WHERE owner_id = ?) AND sender_id IN (SELECT id FROM message_senders WHERE archived = ? AND instr(lower(name), ?) > 0)',
-      whereArgs: [ownerId, archived ? 1 : 0, query.toLowerCase()],
-      orderBy: 'created_at DESC, sender_id DESC',
-      limit: limit,
-      offset: offset,
+          'archived = ? AND instr(lower(name), ?) > 0 AND id IN '
+          '(SELECT friend_id FROM contact_friendships WHERE owner_id = ?) AND id IN '
+          '(SELECT sender_id FROM ai_profiles)${senderId == null ? '' : ' AND id = ?'}',
+      whereArgs: [
+        archived ? 1 : 0,
+        query.toLowerCase(),
+        ownerId,
+        if (senderId != null) senderId,
+      ],
     );
-    if (rows.isEmpty) return [];
-    final senders = await _senders(
-      database,
-      rows.map((r) => r['sender_id'] as String).toList(),
-    );
-    return [
+    final ordered =
+        index
+            .map(
+              (row) =>
+                  ContactNameOrder(row['id'] as String, row['name'] as String),
+            )
+            .toList()
+          ..sort();
+    final ids = ordered
+        .skip(offset)
+        .take(limit)
+        .map((entry) => entry.id)
+        .toList();
+    if (ids.isEmpty) return [];
+    final (rows, senders) = await (
+      database.query(
+        'ai_profiles',
+        where: 'sender_id IN (${_slots(ids.length)})',
+        whereArgs: ids,
+      ),
+      _senders(database, ids),
+    ).wait;
+    final profiles = {
       for (final row in rows)
-        AiProfile.fromRows(senders[row['sender_id']]!, row),
-    ];
+        row['sender_id']: AiProfile.fromRows(senders[row['sender_id']]!, row),
+    };
+    return [for (final id in ids) profiles[id]!];
   }
 
   Future<List<Map<String, Object?>>> aiGroups(

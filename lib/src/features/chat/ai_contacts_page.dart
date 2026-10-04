@@ -13,6 +13,7 @@ import 'conversation_icon.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
+import '../../domain/contact_name_order.dart';
 import '../../domain/avatar_style.dart';
 import 'chat_controller.dart';
 import 'ai_contact_editor.dart';
@@ -66,6 +67,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
     _archived = widget.archived;
     _searchQuery = _search.text;
     _search.addListener(_searchChanged);
+    widget.controller.contactsChanged.addListener(_contactsChanged);
     _load(reset: true);
   }
 
@@ -73,6 +75,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
   void dispose() {
     _debounce?.cancel();
     _search.removeListener(_searchChanged);
+    widget.controller.contactsChanged.removeListener(_contactsChanged);
     if (widget.searchController == null) _search.dispose();
     super.dispose();
   }
@@ -88,10 +91,65 @@ class _AiContactsPageState extends State<AiContactsPage> {
     );
   }
 
-  Future<void> _load({bool reset = false, bool refresh = false}) async {
-    if (!reset && !refresh && (_loading || !_more)) return;
-    final replace = reset || refresh;
-    final limit = refresh && _items.length > 50 ? _items.length : 50;
+  Future<void> _contactsChanged() async {
+    final ai = widget.controller.contactsChanged.value!;
+    final index = _items.indexWhere((item) => item.sender.id == ai.sender.id);
+    if (index >= 0 &&
+        _items[index].sender.name == ai.sender.name &&
+        _items[index].sender.archived == ai.sender.archived) {
+      setState(() => _items[index] = ai);
+      return;
+    }
+    final generation = _generation;
+    final query = _search.text.trim();
+    try {
+      final (contacts, count) = await (
+        widget.controller.groupStore.contacts(
+          query,
+          archived: _archived,
+          senderId: ai.sender.id,
+        ),
+        widget.controller.groupStore.contactCount(query, archived: _archived),
+      ).wait;
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        final boundary = _more && _items.isNotEmpty
+            ? ContactNameOrder(_items.last.sender.id, _items.last.sender.name)
+            : null;
+        _items.removeWhere((item) => item.sender.id == ai.sender.id);
+        _items.addAll(
+          contacts.where(
+            (item) =>
+                boundary == null ||
+                ContactNameOrder(
+                      item.sender.id,
+                      item.sender.name,
+                    ).compareTo(boundary) <=
+                    0,
+          ),
+        );
+        _items.sort(
+          (a, b) => ContactNameOrder(
+            a.sender.id,
+            a.sender.name,
+          ).compareTo(ContactNameOrder(b.sender.id, b.sender.name)),
+        );
+        _count = count;
+        _more = _items.length < count;
+      });
+    } on Object catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text('朋友更新失败：${errorMessage(error)}')),
+          kind: ToastKind.error,
+        );
+    }
+  }
+
+  Future<void> _load({bool reset = false}) async {
+    if (!reset && (_loading || !_more)) return;
+    final replace = reset;
+    const limit = 50;
     final generation = replace ? ++_generation : _generation;
     setState(() {
       _loading = true;
@@ -146,7 +204,6 @@ class _AiContactsPageState extends State<AiContactsPage> {
             AiContactPage(controller: widget.controller, senderId: id),
       ),
     );
-    if (mounted) _load(refresh: true);
   }
 
   bool _openingConversation = false;
@@ -195,14 +252,15 @@ class _AiContactsPageState extends State<AiContactsPage> {
     if (id != null && widget.selectForConversation) {
       final ai = await widget.controller.groupStore.loadAi(id);
       if (mounted) await _startConversation(ai);
-      if (mounted) _load(reset: true);
       return;
     }
     if (id != null) {
-      setState(() => _archived = false);
+      if (_archived) {
+        setState(() => _archived = false);
+        _load(reset: true);
+      }
       await _open(id);
     }
-    if (mounted) _load(reset: true);
   }
 
   Future<void> _menu(AiProfile ai, BuildContext anchorContext) async {
@@ -249,12 +307,10 @@ class _AiContactsPageState extends State<AiContactsPage> {
     if (!mounted || action == null) return;
     if (action == 'message') {
       await openAiChat(context, widget.controller, ai);
-      if (mounted) _load(refresh: true);
       return;
     }
     if (action == 'archive') {
       await changeAiArchive(context, widget.controller, ai);
-      if (mounted) _load(refresh: true);
       return;
     }
     if (action == 'edit') {
@@ -265,7 +321,6 @@ class _AiContactsPageState extends State<AiContactsPage> {
               AiContactEditor(controller: widget.controller, profile: ai),
         ),
       );
-      if (mounted) _load(refresh: true);
     } else {
       await _open(ai.sender.id);
     }
@@ -358,6 +413,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                       child: ListTile(
+                        visualDensity: const VisualDensity(vertical: -1),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 6,
                         ),
@@ -436,6 +492,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
                                 : (_) => _menu(ai, anchorContext),
                             borderRadius: BorderRadius.circular(22),
                             child: ListTile(
+                              visualDensity: const VisualDensity(vertical: -1),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(22),
                               ),

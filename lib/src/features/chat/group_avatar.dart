@@ -8,11 +8,16 @@ class GroupAvatar extends StatelessWidget {
   const GroupAvatar({super.key, required this.members, this.size = 48});
   final List<MessageSender> members;
   final double size;
+  static double memberSize(double size, int count) {
+    final columns = count <= 4 ? 2 : 3;
+    return (size - 8 - (columns - 1) * 2) / columns;
+  }
+
   @override
   Widget build(BuildContext context) {
     final visible = members.take(9).toList();
     final columns = visible.length <= 4 ? 2 : 3;
-    final cell = (size - 8 - (columns - 1) * 2) / columns;
+    final cell = memberSize(size, visible.length);
     return Container(
       width: size,
       height: size,

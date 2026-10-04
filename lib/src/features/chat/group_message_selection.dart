@@ -20,16 +20,50 @@ class GroupMessageSelection extends StatefulWidget {
   final ValueChanged<String>? onReadAloud;
 
   @override
-  State<GroupMessageSelection> createState() => _GroupMessageSelectionState();
+  State<GroupMessageSelection> createState() => GroupMessageSelectionState();
 }
 
-class _GroupMessageSelectionState extends State<GroupMessageSelection> {
+class GroupMessageSelectionState extends State<GroupMessageSelection> {
+  final _selectionKey = GlobalKey<SelectionAreaState>();
+  final _focus = FocusNode();
   bool _menuOpen = false;
   bool _selectionActive = false;
   String? _text;
 
+  Future<void> openMenu() async {
+    if (_menuOpen) return;
+    _selectionActive = true;
+    _menuOpen = true;
+    await _showMenu();
+  }
+
+  Future<void> _showMenu() async {
+    final selection = _selectionKey.currentState!.selectableRegion;
+    _focus.requestFocus();
+    selection.selectAll(SelectionChangedCause.toolbar);
+    var acted = false;
+    try {
+      acted = await widget.onOpenMenu();
+    } finally {
+      if (selection.mounted) {
+        selection.hideToolbar(acted);
+        if (acted) selection.clearSelection();
+      }
+      _menuOpen = false;
+      if (acted) _selectionActive = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => SelectionArea(
+    key: _selectionKey,
+    focusNode: _focus,
     onSelectionChanged: (selection) {
       _text = selection?.plainText;
       widget.onChanged(_text);
@@ -43,18 +77,7 @@ class _GroupMessageSelectionState extends State<GroupMessageSelection> {
         _menuOpen = true;
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (!mounted || !selection.mounted) return;
-          selection.selectAll(SelectionChangedCause.toolbar);
-          var acted = false;
-          try {
-            acted = await widget.onOpenMenu();
-          } finally {
-            if (selection.mounted) {
-              selection.hideToolbar(acted);
-              if (acted) selection.clearSelection();
-            }
-            _menuOpen = false;
-            if (acted) _selectionActive = false;
-          }
+          await _showMenu();
         });
       }
       if (_menuOpen) return const SizedBox.shrink();

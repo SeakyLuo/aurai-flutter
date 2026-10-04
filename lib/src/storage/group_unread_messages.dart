@@ -81,7 +81,8 @@ class GroupUnreadMessages {
             through.id.compareTo(conversation.groupReadId) > 0)) {
       conversation.groupReadAt = at;
       conversation.groupReadId = through.id;
-      conversation.unreadMessageCount = 0;
     }
+    // Reading a visible card does not imply that later messages were seen.
+    await load([conversation]);
   }
 }

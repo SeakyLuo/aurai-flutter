@@ -9,6 +9,7 @@ import '../domain/tool_models.dart';
 import 'tool_executor.dart';
 import 'ask_user_tool.dart';
 import 'tool_registry.dart';
+import 'response_decision.dart';
 
 class AgentCancelled implements Exception {
   const AgentCancelled();
@@ -64,11 +65,13 @@ class AgentRuntime {
     Future<void> Function(ToolResult)? onToolCompleted,
     List<String> Function()? takeUserUpdates,
     bool Function(ToolResult)? endsRun,
+    ResponseDecision? decision,
     void Function(String text)? onTextChanged,
     void Function(String text)? onReasoningChanged,
     void Function()? onProcessingStarted,
     void Function(int attempt)? onReconnect,
     void Function(int index)? onMessageStarted,
+    void Function(int index)? onMessageCompleted,
   }) async {
     _cancelRequested = false;
     final steps = <AgentStep>[];
@@ -77,8 +80,12 @@ class AgentRuntime {
     var invalidArgumentTurns = 0;
     var toolResults = const <ToolResult>[];
 
-    final questions = _registry.find('askUser') as AskUserTool?;
-    final task = (_registry.find('getGoal') as PrivateTaskTool?)?.store;
+    final questions = decision == null
+        ? _registry.find('askUser') as AskUserTool?
+        : null;
+    final task = decision == null
+        ? (_registry.find('getGoal') as PrivateTaskTool?)?.store
+        : null;
     var goalContinuation = false;
     try {
       while (true) {
@@ -123,11 +130,14 @@ class AgentRuntime {
             personalContext: [
               await personalContext?.call() ?? '',
               if (task != null) await task.context(),
+              if (decision != null) decision.instructions,
             ].join('\n\n'),
+            responseSchema: decision?.schema,
             onContextSummary: onContextSummary,
             onPrivateContextSummary: onPrivateContextSummary,
             onCompactionChanged: onCompactionChanged,
             onMessageStarted: onMessageStarted,
+            onMessageCompleted: onMessageCompleted,
             onReconnect: onReconnect,
             onProcessingStarted: () {
               _throwIfCancelled();
@@ -139,10 +149,10 @@ class AgentRuntime {
             },
             onTextChanged: (text) {
               _throwIfCancelled();
-              onTextChanged?.call(text);
+              if (decision == null) onTextChanged?.call(text);
             },
-            tools: _registry.beginTurn(),
-            capabilities: _registry.capabilities,
+            tools: decision == null ? _registry.beginTurn() : const [],
+            capabilities: decision == null ? _registry.capabilities : const [],
             continuationToken: continuationToken,
             toolResults: toolResults,
             userMessageInput: userMessageInput,
@@ -159,7 +169,9 @@ class AgentRuntime {
         continuationToken = modelTurn.continuationToken;
         _throwIfCancelled();
 
-        if (modelTurn.text != null && modelTurn.text!.isNotEmpty) {
+        if (decision == null &&
+            modelTurn.text != null &&
+            modelTurn.text!.isNotEmpty) {
           onTextChanged?.call(modelTurn.text!);
         }
 
@@ -220,6 +232,14 @@ class AgentRuntime {
             _ => hasText ? '回复未完成，已保留已生成的正文，请重试' : '回复未完成，尚未生成正文，请重试',
           }, detail: jsonEncode(modelTurn.response['incomplete_details']));
         }
+        if (decision != null) {
+          if (modelTurn.toolCalls.isNotEmpty) {
+            throw StateError('交互决策返回了工具调用，尚未提交');
+          }
+          _throwIfCancelled();
+          await decision.submit(modelTurn.text ?? '');
+          return AgentRunResult(answer: '', steps: List.unmodifiable(steps));
+        }
         if (modelTurn.toolCalls.isEmpty) {
           if (_userInputs.isNotEmpty) {
             toolResults = const [];
@@ -270,7 +290,6 @@ class AgentRuntime {
         }
 
         final nextResults = <ToolResult>[];
-        var userHandoffOccurred = false;
         for (final call in modelTurn.toolCalls) {
           _throwIfCancelled();
           onProcessingStarted?.call();
@@ -279,10 +298,7 @@ class AgentRuntime {
               call.argumentsError == null && tool is ToolHistoryAgentTool
               ? (tool as ToolHistoryAgentTool).historyArguments(call)
               : call.arguments;
-          final historyArguments = {
-            ...toolArguments,
-            if (call.userAction != null) 'userAction': call.userAction,
-          };
+          final historyArguments = {...toolArguments};
           await onToolStarted?.call(
             ToolCall(id: call.id, name: call.name, arguments: historyArguments),
           );
@@ -308,17 +324,6 @@ class AgentRuntime {
                     'reason': '用户插入了新消息，此次预排工具尚未执行。请先阅读新消息，再决定后续操作。',
                   },
                 )
-              : userHandoffOccurred
-              ? ToolResult(
-                  callId: call.id,
-                  toolName: call.name,
-                  status: ToolResultStatus.cancelled,
-                  output: const {
-                    'cancelled': true,
-                    'performed': false,
-                    'reason': '前一步已交给用户操作，此次预排动作未执行。请先根据用户反馈核实状态，再决定后续操作。',
-                  },
-                )
               : call.argumentsError != null
               ? ToolResult(
                   callId: call.id,
@@ -332,23 +337,7 @@ class AgentRuntime {
                         r'该工具未执行。请根据 detail 中的位置和原始 JSON 片段修正语法，特别检查对象/数组的闭合括号和逗号。不要原样重发错误参数。请重新生成符合工具 schema 的完整 JSON 对象；字符串中的换行必须写为 \n，制表符写为 \t，双引号和反斜杠必须正确转义。不要重发已经成功执行的其他工具。',
                   },
                 )
-              : await _executor.execute(
-                  call,
-                  onWaitingForUser: (actionResult) {
-                    steps[steps.length - 1] = steps.last.copyWith(
-                      resultJson: jsonEncode({
-                        ...actionResult.output,
-                        'userAction': {
-                          'pending': true,
-                          'instruction': call.userAction,
-                        },
-                      }),
-                    );
-                    onStepsChanged(List.unmodifiable(steps));
-                  },
-                );
-          if (result.output.containsKey('userAction'))
-            userHandoffOccurred = true;
+              : await _executor.execute(call);
           await onToolCompleted?.call(result);
           final status =
               result.output['pending'] == true &&

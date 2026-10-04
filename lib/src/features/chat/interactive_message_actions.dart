@@ -152,15 +152,17 @@ extension InteractiveMessageActions on ChatController {
         throw StateError('当前权限不允许查看其他参与者的历史快照');
       return {
         'messageId': id,
-        ...old.readFor(senderId),
-        'perspective': {
-          ...old.viewFor(perspective).toJson(),
-          if (old.hasInteraction)
-            'interactionView': old.interactionView(
-              perspective,
-              viewer: senderId,
-            ),
-        },
+        if (row['sender_id'] == senderId) ...old.readFor(senderId),
+        ...interactiveToolView(id, old, senderId),
+        if (perspective != senderId)
+          'perspective': {
+            ...old.viewFor(perspective).toJson(),
+            if (old.hasInteraction)
+              'interactionView': old.interactionView(
+                perspective,
+                viewer: senderId,
+              ),
+          },
         'history': await readInteractiveHistory(
           _store.database,
           id,
@@ -193,14 +195,17 @@ extension InteractiveMessageActions on ChatController {
       };
     }
     if (operation == 'clickInteractiveMessage') {
+      if (args['actionToken'] != interactiveActionToken(id, old, senderId)) {
+        throw StateError('操作凭据已过期或不属于当前卡片与参与者。重新读取卡片，按当前状态决定操作；不要原样重试。');
+      }
       final actor = await groupStore.loadAi(senderId);
       final result = await InteractiveMessageStore(_store.database).click(
         source.id,
         id,
         args['buttonId'] as String,
-        args['revision'] as int,
+        old.revision,
         actor: actor.sender,
-        participantRevision: args['participantRevision'] as int,
+        participantRevision: old.participantRevision(senderId),
         inputValue: args['value'],
       );
       _replaceInteractiveCard(source.id, id, result.card, source: source);
@@ -215,7 +220,7 @@ extension InteractiveMessageActions on ChatController {
       MessageCallbacks.changes.add(null);
       return {
         'messageId': id,
-        ...result.card.readFor(senderId),
+        ...interactiveToolView(id, result.card, senderId),
         if (result.url != null) 'url': result.url,
       };
     }

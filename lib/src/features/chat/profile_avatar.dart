@@ -5,6 +5,16 @@ import '../../domain/avatar_portraits.dart';
 import 'avatar_background.dart';
 import 'avatar_symbol.dart';
 
+ImageProvider avatarPortraitImage(
+  String icon,
+  double size,
+  double pixelRatio,
+) => ResizeImage.resizeIfNeeded(
+  (size * (avatarPortraitScales[icon] ?? 1) * pixelRatio).ceil(),
+  null,
+  AssetImage(avatarPortraits[icon]!.asset),
+);
+
 class ProfileAvatar extends StatelessWidget {
   const ProfileAvatar({
     super.key,
@@ -47,16 +57,35 @@ class ProfileAvatar extends StatelessWidget {
                 errorBuilder: (_, _, _) => _initial(background.foreground),
               )
             : avatarPortraits.containsKey(style.icon)
-            ? Image.asset(
-                avatarPortraits[style.icon]!.asset,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
+            ? Align(
+                alignment:
+                    style.icon == 'portrait:snail' ||
+                        style.icon == 'portrait:saturn' ||
+                        style.icon == 'portrait:sunglasses_bee' ||
+                        style.icon == 'portrait:dumpling' ||
+                        style.icon == 'portrait:double_scoop_ice_cream'
+                    ? Alignment.center
+                    : Alignment.bottomCenter,
+                child: Transform.scale(
+                  scale: (avatarPortraitScales[style.icon] ?? 1) > 1
+                      ? avatarPortraitScales[style.icon]!
+                      : 1,
+                  child: Image(
+                    image: avatarPortraitImage(
+                      style.icon,
+                      size,
+                      MediaQuery.devicePixelRatioOf(context),
+                    ),
+                    width: size * (avatarPortraitScales[style.icon] ?? 1),
+                    height: size * (avatarPortraitScales[style.icon] ?? 1),
+                    fit: BoxFit.contain,
+                  ),
+                ),
               )
             : style.icon == 'initial'
             ? _initial(background.foreground)
             : SizedBox.square(
-                dimension: size * .46,
+                dimension: size * (style.icon == 'app_logo_white' ? .62 : .46),
                 child: FittedBox(
                   child: AvatarSymbol(
                     symbol: style.icon,

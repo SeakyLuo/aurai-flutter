@@ -50,17 +50,6 @@ class _UserQuestionAnswerState extends State<UserQuestionAnswer> {
             ),
           ),
         ),
-        if (question.isUserAction)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text(
-              '操作完成后，请返回 Aurai 点“已完成”。遇到问题也可以在下方说明。',
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
         for (var i = 0; i < question.options.length; i++)
           Padding(
             padding: EdgeInsets.only(
@@ -87,9 +76,7 @@ class _UserQuestionAnswerState extends State<UserQuestionAnswer> {
             controller: _text,
             focusNode: _focus,
             enabled: enabled,
-            hintText:
-                question.customAnswerPlaceholder ??
-                (question.isUserAction ? '说明遇到的问题' : '或自行撰写回复'),
+            hintText: question.customAnswerPlaceholder ?? '或自行撰写回复',
             onChanged: (value) => setState(() {
               question.draft = value;
               question.selected = null;

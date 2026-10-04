@@ -1,15 +1,11 @@
-import '../domain/agent_models.dart';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'html_game.dart';
 import 'html_store.dart';
 
 /// Small display-only cache. Tool reads continue to use the canonical store.
 class HtmlGameDisplayCache {
   static final _games = <String, HtmlGame>{};
-  static final _content =
-      <
-        String,
-        ({String html, String background, bool stateful, String token})
-      >{};
 
   static void invalidate(String messageId) => _games.remove(messageId);
 
@@ -39,22 +35,13 @@ class HtmlGameDisplayCache {
     return game;
   }
 
-  static String identity(HtmlGame game) {
-    final old = _content.remove(game.messageId);
-    final token =
-        old != null &&
-            old.html == game.html &&
-            old.background == game.backgroundMode &&
-            old.stateful == game.stateful
-        ? old.token
-        : newMessageId();
-    _content[game.messageId] = (
-      html: game.html,
-      background: game.backgroundMode,
-      stateful: game.stateful,
-      token: token,
-    );
-    if (_content.length > 8) _content.remove(_content.keys.first);
-    return token;
-  }
+  // The native page outlives the display cache and list entries. Its identity
+  // must remain stable when ordinary messages rebuild or move those entries.
+  static String identity(HtmlGame game) => sha256
+      .convert(
+        utf8.encode(
+          jsonEncode([game.html, game.backgroundMode, game.stateful]),
+        ),
+      )
+      .toString();
 }

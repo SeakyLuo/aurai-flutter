@@ -82,6 +82,9 @@ Future<void> changeAiArchive(
     } else {
       await controller.groupStore.archiveAi(ai.sender.id);
     }
+    controller.contactsChanged.value = await controller.groupStore.loadAi(
+      ai.sender.id,
+    );
     if (context.mounted)
       ScaffoldMessenger.of(context).showToast(
         SnackBar(content: Text(ai.sender.archived ? '已恢复朋友' : '已归档朋友')),

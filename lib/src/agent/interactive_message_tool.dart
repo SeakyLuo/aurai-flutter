@@ -2,6 +2,7 @@ import '../diagnostics/execution_log.dart';
 import 'shared_interaction_schema.dart';
 import 'interactive_message_schema.dart';
 import '../domain/tool_models.dart';
+import '../domain/message_lookup_error.dart';
 
 class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
   InteractiveMessageTool(this.name, this.run);
@@ -30,13 +31,13 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
             'Votes update the card without system receipts. The creator always reads live aggregates; individual choices follow visibility. interaction.reveal supplies default timing for other viewers; participation.visibilityTiming and summaryVisibilityTiming override it independently. visibilityImmediateActors/summaryVisibilityImmediateActors allow permitted early viewing. Register listeners through participation.callbackEvents: vote for each submission/change (source=interactionVote, operationType=submit|change); complete for completion/manual closure (source=interactionComplete, completionType=conditionMet|manualClose). Registered listeners receive events automatically; no additional enable switch. Both include current results allowed to creator and require no callbackEventId acknowledgment or participant waiting. Last vote may emit both in order. Keep completion reachable and gate result views on available context. '
             'This tool performs the operation directly. Keep message/button IDs internal and do not repeat the full card as ordinary text.',
       'readInteractiveMessage' =>
-        'Read an accessible interactive message without switching conversations. Returns your current card, revision, participantRevision, definition, visible interactionView and up to 50 of your action-history events. '
-            'Read before clicking; interactionView contains phase, round, submitted, self and permitted results. Hidden opponents’ choices and runtime state are not available before reveal. '
-            'For your own card, pass only messageId; omit participantId and beforeEvent or set them to JSON null. Never use an empty participantId or invent a pagination cursor. participantId changes only the read-only perspective; perspective.interactionView belongs to that participant, while top-level revisions and ownParticipation remain yours. Use the last history sequence as beforeEvent only for earlier events. messageId must identify the actual card, not an ordinary message asking you to read it. A parameter or message-type error does not mean the card needs to be resent.',
+        'Read an accessible interactive message without switching conversations. Returns your current card, actionToken, eligibility, buttons/options, visible interactionView and up to 50 of your action-history events. Authors also receive revision and definition for editing. Reading does not submit anything. When you decide to participate and submitted=false, call clickInteractiveMessage; a text choice does not count. '
+            'Use the current card supplied in chat context directly, or read it when missing/stale. interactionView contains phase, round, submitted, self and permitted results. Hidden opponents’ choices and runtime state are not available before reveal. '
+            'For your own card, pass only messageId; omit participantId and beforeEvent or set them to JSON null. Never use an empty participantId or invent a pagination cursor. participantId changes only the read-only perspective; perspective.interactionView belongs to that participant, while actionToken and ownParticipation remain yours. Use the last history sequence as beforeEvent only for earlier events. messageId must identify the actual card, not an ordinary message asking you to read it. A parameter or message-type error does not mean the card needs to be resent.',
       'retryInteractiveCallback' =>
         'Retry your failed callback using messageId and callbackEventId from ownParticipation.callback. Reuses the same event; does not click the button again or repeat its local state changes. Only failed events can retry. Read current state after a status conflict.',
       'clickInteractiveMessage' =>
-        'Perform one existing button action as the current AI, just like a human tap. Pass messageId, buttonId, revision and participantRevision from a fresh readInteractiveMessage. '
+        'Perform one existing button action as the current AI, just like a human tap. Copy messageId, actionToken and button id from the current card in chat context or readInteractiveMessage. Do not construct or decode actionToken: the app checks card and participant versions atomically. Never retype, shorten or reconstruct message identifiers. '
             'submit records or replaces only your current-round choice. nextRound works after completion; it preserves shared state and clears round submissions. No participant impersonation parameter is needed. '
             'On a stale-state error, read again and decide against the new phase; do not blindly replay an old choice into a new round. Success returns your visible updated state; openUrl also returns its URL.',
       _ =>
@@ -66,7 +67,11 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
                 'For selection submit buttons: option id for single, array of option ids for multiple. The host resolves configured values and records labels. For HTML input-enabled endpoints: text or JSON (max 16 KB). Omit for ordinary fixed buttons.',
           },
           'buttonId': {'type': 'string'},
-          'participantRevision': {'type': 'integer', 'minimum': 0},
+          'actionToken': {
+            'type': 'string',
+            'description':
+                'Copy exactly from the current card. Bound to this message, your identity and the observed versions; a stale token requires rereading before deciding again.',
+          },
         },
         if (name == 'readInteractiveMessage') ...{
           'participantId': {
@@ -82,9 +87,13 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
                 'Omit or use JSON null on the first read. For earlier history, use the last sequence returned by the previous read; do not guess 1.',
           },
         },
-        if (name != 'sendInteractiveMessage') 'messageId': {'type': 'string'},
-        if (name == 'updateInteractiveMessage' ||
-            name == 'clickInteractiveMessage')
+        if (name != 'sendInteractiveMessage')
+          'messageId': {
+            'type': 'string',
+            'description':
+                'Copy the exact messageId returned by the card read or accessible chat history. Never shorten, reconstruct or guess it.',
+          },
+        if (name == 'updateInteractiveMessage')
           'revision': {'type': 'integer', 'minimum': 0},
         if (name == 'sendInteractiveMessage' ||
             name == 'updateInteractiveMessage') ...{
@@ -120,11 +129,7 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         if (name != 'sendInteractiveMessage') 'messageId',
         if (name == 'updateInteractiveMessage') 'revision',
         if (name == 'retryInteractiveCallback') 'callbackEventId',
-        if (name == 'clickInteractiveMessage') ...[
-          'buttonId',
-          'revision',
-          'participantRevision',
-        ],
+        if (name == 'clickInteractiveMessage') ...['buttonId', 'actionToken'],
         if (name == 'sendInteractiveMessage' ||
             name == 'updateInteractiveMessage') ...[
           'title',
@@ -188,6 +193,12 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         status: ToolResultStatus.error,
         output: {
           'message': error.toString(),
+          if (error is MessageLookupError) ...{
+            'code': error.code,
+            'suggestion': error.code == 'message_not_found'
+                ? '消息未找到不代表权限不足。重新核对最近读取结果中的 messageId；必要时从当前可访问的聊天记录重新查找行动卡，再读取最新卡片并原样使用返回的 messageId、buttonId 和版本。不要原样重试错误参数、猜测标识、要求重发卡片或修改权限。'
+                : '你不是该会话的当前成员。请确认目标会话与成员资格；不要重复点击，也不要把访问限制当成卡片失效。',
+          },
         },
       );
     }

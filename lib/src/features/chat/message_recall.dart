@@ -81,14 +81,20 @@ extension MessageRecall on ChatController {
     final rows = await _store.database.query(
       'messages',
       columns: ['conversation_id'],
-      where:
-          'id = ? AND conversation_id IN '
-          '(SELECT conversation_id FROM conversation_members WHERE sender_id = ? AND left_at IS NULL)',
-      whereArgs: [messageId, senderId],
+      where: 'id = ?',
+      whereArgs: [messageId],
       limit: 1,
     );
-    if (rows.isEmpty) throw StateError('消息不存在或你无权访问该会话');
+    if (rows.isEmpty) throw MessageLookupError.notFound();
     final id = rows.single['conversation_id'] as String;
+    final access = await _store.database.query(
+      'conversation_members',
+      columns: ['sender_id'],
+      where: 'conversation_id = ? AND sender_id = ? AND left_at IS NULL',
+      whereArgs: [id, senderId],
+      limit: 1,
+    );
+    if (access.isEmpty) throw MessageLookupError.accessDenied();
     if (id == source.id) return source;
     if (id == activeConversation.id) return activeConversation;
     final live = _liveConversation(id);

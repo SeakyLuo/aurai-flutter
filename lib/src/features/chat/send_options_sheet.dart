@@ -12,10 +12,12 @@ class SendOptionsSheet extends StatefulWidget {
     required this.members,
     required this.onChanged,
     this.initial,
+    this.mentionedMemberIds = const {},
   });
 
   final List<MessageSender> members;
   final DraftVisibility? initial;
+  final Set<String> mentionedMemberIds;
   final ValueChanged<DraftVisibility> onChanged;
 
   @override
@@ -41,7 +43,19 @@ class _SendOptionsSheetState extends State<SendOptionsSheet> {
         child: DraftVisibilitySheet(
           mode: mode,
           members: widget.members,
-          initial: _selections[mode],
+          initial:
+              _selections[mode] ??
+              (mode == DraftVisibilityMode.included
+                  ? DraftVisibility(
+                      mode,
+                      widget.members
+                          .where(
+                            (member) =>
+                                widget.mentionedMemberIds.contains(member.id),
+                          )
+                          .toList(),
+                    )
+                  : null),
         ),
       ),
     );

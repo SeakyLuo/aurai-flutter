@@ -7,12 +7,14 @@ class MenuPressHighlight extends StatefulWidget {
     required this.child,
     this.borderRadius = BorderRadius.zero,
     this.customBorder,
+    this.keepHighlightWhileOpen = true,
   });
 
   final Future<void> Function(LongPressStartDetails)? onLongPressStart;
   final Widget child;
   final BorderRadius borderRadius;
   final ShapeBorder? customBorder;
+  final bool keepHighlightWhileOpen;
 
   static VoidCallback? _dismissActive;
 
@@ -96,7 +98,9 @@ class _MenuPressHighlightState extends State<MenuPressHighlight> {
             child: IgnorePointer(
               child: ExcludeSemantics(
                 child: AnimatedOpacity(
-                  opacity: _pressed || _opening ? 1 : 0,
+                  opacity: (_opening ? widget.keepHighlightWhileOpen : _pressed)
+                      ? 1
+                      : 0,
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.linear,
                   child: Material(

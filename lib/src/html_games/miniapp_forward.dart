@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import '../domain/interactive_message.dart';
+import 'html_view.dart';
 
 import '../app/glass_notice.dart';
 import '../domain/agent_models.dart';
@@ -53,13 +56,38 @@ Future<void> forwardMiniapp(BuildContext context, MiniappEntry entry) async {
 
 Future<void> openMiniappLink(BuildContext context, Uri uri) async {
   try {
+    final controller = ImageActionScope.of(context);
+    if (uri.pathSegments.length == 2 && uri.pathSegments.first == 'message') {
+      final id = uri.pathSegments.last;
+      final rows = await controller.htmlStore.database.query(
+        'messages',
+        columns: ['conversation_id', 'interactive_json'],
+        where: 'id = ? AND kind = ?',
+        whereArgs: [id, 'html_game'],
+        limit: 1,
+      );
+      if (rows.isEmpty) throw StateError('小程序消息已删除或撤回');
+      if (rows.single['interactive_json'] case final String raw) {
+        InteractiveMessage.fromJson(
+          jsonDecode(raw) as Map<String, dynamic>,
+        ).requireViewer(MessageSender.localUser.id);
+      }
+      final card = await controller.htmlStore.card(id);
+      if (!context.mounted) return;
+      await HtmlView(
+        card: card,
+        messageId: id,
+        conversationId: rows.single['conversation_id'] as String,
+        store: controller.htmlStore,
+      ).openFullscreen(context);
+      return;
+    }
     if (uri.pathSegments.length != 2 ||
         !MiniappKind.values.any(
           (kind) => kind.name == uri.pathSegments.first,
         )) {
       throw StateError('小程序链接无效');
     }
-    final controller = ImageActionScope.of(context);
     final library = MiniappLibraryStore(controller.htmlStore.database);
     final id = uri.pathSegments[1];
     final builtins = await library.bundled();

@@ -426,6 +426,16 @@ class _ChatPageState extends State<ChatPage>
                           constraints: const BoxConstraints(maxWidth: 760),
                           child: ScrollAwareJumpStack(
                             messages: controller.messages,
+                            readThrough: isGroup
+                                ? (
+                                    at: controller
+                                        .activeConversation
+                                        .groupReadAt,
+                                    id: controller
+                                        .activeConversation
+                                        .groupReadId,
+                                  )
+                                : null,
                             acknowledgedRunId:
                                 !isGroup &&
                                     controller
@@ -476,6 +486,8 @@ class _ChatPageState extends State<ChatPage>
                                               top +
                                               8 -
                                               MessageItem.userTopMargin,
+                                          onVisibleEntriesChanged:
+                                              _scheduleMarkRead,
                                           onContentBelowChanged: (value) {
                                             if (mounted &&
                                                 _conversationId ==
@@ -546,7 +558,6 @@ class _ChatPageState extends State<ChatPage>
                                 bottom: bottom + 8,
                                 child: Center(
                                   child: JumpToBottomButton(
-                                    newMessagesOnly: true,
                                     visible:
                                         !_followOutput &&
                                         (_contentBelow ||

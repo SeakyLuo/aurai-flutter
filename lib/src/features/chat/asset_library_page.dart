@@ -1,5 +1,6 @@
 import 'floating_search_layout.dart';
 import '../../widgets/empty_data_view.dart';
+import '../../utils/widget_utils.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -130,7 +131,19 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
       final ratios = await Future.wait([
         for (final asset in page)
           if (asset.isImage && !_imageRatios.containsKey(asset.path))
-            assetImageRatio(asset).then((ratio) => MapEntry(asset.path, ratio)),
+            assetImageRatio(asset).then(
+              (ratio) => MapEntry(asset.path, ratio),
+              onError: (Object error, StackTrace stack) async {
+                if (mounted && generation == _generation) {
+                  await _perform(() async {
+                    Error.throwWithStackTrace(error, stack);
+                  });
+                }
+                // The existing UnavailableImage tile occupies a square;
+                // a failed thumbnail must not discard the entire page.
+                return MapEntry(asset.path, 1.0);
+              },
+            ),
       ]);
       succeeded = true;
       if (!mounted || generation != _generation) return;
@@ -378,9 +391,9 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
       return const Center(child: CircularProgressIndicator());
     if (_items.isEmpty && _failed)
       return Center(
-        child: TextButton(
+        child: WidgetUtils.primaryButton(
+          text: '重试',
           onPressed: () => _perform(() => _load(reset: true)),
-          child: const Text('重试'),
         ),
       );
     if (_items.isEmpty) {
@@ -419,9 +432,14 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
                 padding: const EdgeInsets.all(16),
                 child: _loading
                     ? const CircularProgressIndicator()
+                    : _failed
+                    ? WidgetUtils.primaryButton(
+                        text: '重试',
+                        onPressed: () => _perform(() => _load()),
+                      )
                     : TextButton(
                         onPressed: () => _perform(() => _load()),
-                        child: Text(_failed ? '重试' : '加载更多'),
+                        child: const Text('加载更多'),
                       ),
               ),
             ),

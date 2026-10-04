@@ -50,6 +50,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
   Timer? _updates;
   int _groupCount = 0;
   bool _loading = false, _more = true, _loaded = false;
+  bool _reloadPending = false;
   @override
   void initState() {
     super.initState();
@@ -82,7 +83,10 @@ class RecentChatsPageState extends State<RecentChatsPage> {
     final limit = reset && _items.length > HomeConversations.pageSize
         ? _items.length
         : HomeConversations.pageSize;
-    if (_loading) return;
+    if (_loading) {
+      if (reset) _reloadPending = true;
+      return;
+    }
     setState(() => _loading = true);
     try {
       final reader = HomeConversations(widget.controller.groupStore);
@@ -138,7 +142,13 @@ class RecentChatsPageState extends State<RecentChatsPage> {
           kind: ToastKind.error,
         );
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        if (_reloadPending) {
+          _reloadPending = false;
+          unawaited(reload());
+        }
+      }
     }
   }
 

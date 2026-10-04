@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import '../../domain/avatar_style.dart';
 import '../../storage/avatar_symbol_recents.dart';
 import 'avatar_color_library.dart';
+import 'avatar_selection_mark.dart';
 import 'avatar_symbol.dart';
 import 'avatar_symbol_picker.dart';
 import 'profile_avatar.dart';
@@ -25,62 +26,48 @@ class CustomAvatarPage extends StatefulWidget {
 class _CustomAvatarPageState extends State<CustomAvatarPage> {
   late String _icon = widget.initial.icon;
   late String _color = widget.initial.color;
-  List<String> _recentSymbols = const [];
+  List<String> _recentSymbols = [];
   AvatarStyle get _style => AvatarStyle(icon: _icon, color: _color);
 
   @override
   void initState() {
     super.initState();
-    AvatarSymbolRecents.load(widget.database).then((values) {
-      if (mounted) setState(() => _recentSymbols = values);
-    });
+    _loadRecentSymbols();
+  }
+
+  Future<void> _loadRecentSymbols() async {
+    final values = await AvatarSymbolRecents.load(widget.database);
+    if (mounted) setState(() => _recentSymbols = values);
   }
 
   List<MapEntry<String, String>> get _visibleSymbols {
-    const fixedKeys = ['app_logo_white', 'initial'];
-    final icons = {...avatarSymbols.keys}
-        .where(
-          (key) => !fixedKeys.contains(key) && !key.startsWith('portrait:'),
-        )
-        .toList();
-    final emojis = {
+    const keys = [
+      'app_logo_white',
+      'initial',
+      'portrait:dark_hair_boy',
+      'portrait:brown_hair_girl',
+      'portrait:little_robot',
       'emoji:😀',
       'emoji:😎',
       'emoji:🥰',
       'emoji:🐱',
       'emoji:🐶',
-      'emoji:🌸',
-      'emoji:🌈',
-      'emoji:☀️',
-      'emoji:🍀',
-    }.toList();
+      'person',
+      'spark',
+      'puzzle',
+      'memory',
+      'smile',
+    ];
     return [
-      for (final key in fixedKeys) MapEntry(key, avatarSymbols[key]!),
-      for (final key in <String>{
-        ..._recentSymbols.where(
-          (key) =>
-              !fixedKeys.contains(key) &&
-              (avatarSymbols.containsKey(key) || key.startsWith('emoji:')),
-        ),
-        'portrait:dark_hair_boy',
-        'portrait:brown_hair_girl',
-        'portrait:little_robot',
-        ...emojis.take(7),
-        ...icons,
-      })
-        MapEntry(key, avatarSymbols[key] ?? 'Emoji'),
-    ].take(24).toList();
+      for (final key in {..._recentSymbols, ...keys}.take(15))
+        MapEntry(key, key.startsWith('emoji:') ? 'Emoji' : avatarSymbols[key]!),
+    ];
   }
 
-  Future<void> _selectSymbol(String value, {bool reorder = false}) async {
+  Future<void> _selectSymbol(String value) async {
     setState(() => _icon = value);
-    const fixed = ['app_logo_white', 'initial'];
-    final recent = fixed.contains(value)
-        ? _recentSymbols
-        : await AvatarSymbolRecents.record(widget.database, value);
-    if (mounted && reorder) {
-      setState(() => _recentSymbols = recent);
-    }
+    final values = await AvatarSymbolRecents.record(widget.database, value);
+    if (mounted) setState(() => _recentSymbols = values);
   }
 
   Future<void> _showAllSymbols() async {
@@ -90,7 +77,7 @@ class _CustomAvatarPageState extends State<CustomAvatarPage> {
       color: _color,
       name: widget.name,
     );
-    if (icon != null && mounted) await _selectSymbol(icon, reorder: true);
+    if (icon != null && mounted) await _selectSymbol(icon);
   }
 
   @override
@@ -149,11 +136,7 @@ class _CustomAvatarPageState extends State<CustomAvatarPage> {
                         entry.value,
                         _icon == entry.key,
                         () => _selectSymbol(entry.key),
-                        ProfileAvatar(
-                          style: AvatarStyle(icon: entry.key, color: _color),
-                          name: widget.name,
-                          size: 40,
-                        ),
+                        entry.key,
                       ),
                   ]),
                   const SizedBox(height: 24),
@@ -172,47 +155,47 @@ class _CustomAvatarPageState extends State<CustomAvatarPage> {
     ),
   );
 
-  Widget _grid(List<Widget> children) => LayoutBuilder(
-    builder: (context, constraints) {
-      final columns = (constraints.maxWidth / 52).floor().clamp(1, 6);
-      return GridView.count(
-        crossAxisCount: columns,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 6,
-        crossAxisSpacing: 6,
-        children: children,
-      );
-    },
+  Widget _grid(List<Widget> children) => GridView.count(
+    crossAxisCount: 5,
+    padding: EdgeInsets.zero,
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    mainAxisSpacing: 8,
+    crossAxisSpacing: 8,
+    children: children,
   );
 
   Widget _choice(
     String label,
     bool selected,
     VoidCallback onTap,
-    Widget child,
+    String value,
   ) => Semantics(
     label: label,
     selected: selected,
     button: true,
     child: Tooltip(
       message: label,
-      child: InkResponse(
-        onTap: onTap,
-        radius: 26,
-        child: Center(
-          child: Container(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
             padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                width: 2,
-                color: selected
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.transparent,
+            child: LayoutBuilder(
+              builder: (context, constraints) => Center(
+                child: AvatarSelectionMark(
+                  selected: selected,
+                  child: ProfileAvatar(
+                    style: AvatarStyle(icon: value, color: _color),
+                    name: widget.name,
+                    size: constraints.biggest.shortestSide - 10,
+                  ),
+                ),
               ),
             ),
-            child: child,
           ),
         ),
       ),

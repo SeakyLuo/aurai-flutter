@@ -37,10 +37,18 @@ extension _ChatSessionActions on _ChatPageState {
   void _scheduleMarkRead() {
     final conversation = widget.controller.activeConversation;
     if (_markReadScheduled || _locatingInitialMessage) return;
+    AgentMessage? through;
     if (conversation.kind == ConversationKind.group) {
-      if (_contentBelow ||
-          conversation.searchHasLater ||
-          !conversation.needsGroupReadCheckpoint)
+      final visible =
+          _viewportKey.currentState?.visibleEntryIds ?? const <String>{};
+      through = widget.controller.visibleMessages
+          .where((message) => visible.contains(message.id))
+          .lastOrNull;
+      if (through == null) return;
+      final at = through.createdAt.microsecondsSinceEpoch;
+      if (at < conversation.groupReadAt ||
+          (at == conversation.groupReadAt &&
+              through.id.compareTo(conversation.groupReadId) <= 0))
         return;
     } else if (conversation.activeRunId == null ||
         !_hasVisibleActiveRunContent(conversation) ||
@@ -56,12 +64,10 @@ extension _ChatSessionActions on _ChatPageState {
                 AppLifecycleState.resumed ||
             _scaffoldKey.currentState!.isDrawerOpen ||
             widget.controller.activeConversation != conversation ||
-            (conversation.kind == ConversationKind.group &&
-                (_contentBelow || conversation.searchHasLater)) ||
             (conversation.kind != ConversationKind.group &&
                 !_hasVisibleActiveRunContent(conversation)))
           return;
-        await widget.controller.markActiveConversationRead();
+        await widget.controller.markActiveConversationRead(through: through);
       } on Object catch (caughtError) {
         if (mounted)
           _imageNotice(
@@ -72,6 +78,7 @@ extension _ChatSessionActions on _ChatPageState {
         _markReadScheduled = false;
       }
     });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   bool _hasVisibleActiveRunContent(Conversation conversation) =>

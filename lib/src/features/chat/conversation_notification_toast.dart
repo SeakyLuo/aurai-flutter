@@ -95,7 +95,7 @@ class _ConversationNotificationToastState
                         if (!_closing && widget.onOpen()) _dismiss();
                       },
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 16, 16, 9),
+                        padding: const EdgeInsets.fromLTRB(18, 12, 16, 6),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -164,7 +164,7 @@ class _ConversationNotificationToastState
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 6),
                             Container(
                               width: 40,
                               height: 3,

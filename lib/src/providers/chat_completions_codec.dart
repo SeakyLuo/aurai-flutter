@@ -111,6 +111,15 @@ Map<String, Object?> chatCompletionsBody(
     'model': body['model'],
     'stream': true,
     'messages': messages,
+    if ((body['text'] as Map?)?['format'] case final Map format)
+      'response_format': {
+        'type': format['type'],
+        'json_schema': {
+          'name': format['name'],
+          'strict': format['strict'],
+          'schema': format['schema'],
+        },
+      },
     for (final key in ['reasoning', 'thinking', 'enable_thinking'])
       if (body.containsKey(key)) key: body[key],
     if (body['max_output_tokens'] != null)
@@ -143,6 +152,7 @@ Future<Map<String, Object?>> readChatCompletionsStream(
   void Function(String)? onReasoningChanged,
   void Function()? onProcessingStarted,
   void Function(int)? onMessageStarted,
+  void Function(int)? onMessageCompleted,
 }) async {
   final text = StringBuffer(), reasoning = StringBuffer();
   final calls = <int, Map<String, Object?>>{};
@@ -265,6 +275,7 @@ Future<Map<String, Object?>> readChatCompletionsStream(
       }
     }
   }
+  if (text.isNotEmpty) onMessageCompleted?.call(0);
   return {
     'id': id,
     'status': completed ? 'completed' : 'incomplete',

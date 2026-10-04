@@ -15,6 +15,12 @@ extension _ChatComposer on _ChatPageState {
         builder: (_) => SendOptionsSheet(
           initial: _draftVisibility[id],
           members: members.map((m) => m.sender).toList(),
+          mentionedMemberIds: {
+            if (_mentions.any((mention) => mention.senderId == null))
+              ...members.map((member) => member.sender.id)
+            else
+              ..._mentions.map((mention) => mention.senderId!),
+          },
           onChanged: (result) {
             if (!mounted || _conversationId != id) return;
             _updateDraftVisibility(() {

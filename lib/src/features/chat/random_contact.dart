@@ -2,6 +2,7 @@ import 'offline_contact_candidates.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../domain/avatar_style.dart';
+import '../../domain/profile_gender.dart';
 import '../../domain/emoji_catalog.dart';
 import '../../domain/response_preferences.dart';
 import '../../domain/avatar_portraits.dart';
@@ -14,9 +15,11 @@ class RandomContact {
     this.description,
     this.role,
     this.avatar,
-    this.responses,
-  );
+    this.responses, {
+    required this.gender,
+  });
   final String name, description, role;
+  final ProfileGender gender;
   final AvatarStyle avatar;
   final ResponsePreferences responses;
 
@@ -64,6 +67,7 @@ class RandomContact {
             trait: TraitLevel.values[_random.nextInt(TraitLevel.values.length)],
         },
       ),
+      gender: _random.nextBool() ? ProfileGender.male : ProfileGender.female,
     );
   }
 }

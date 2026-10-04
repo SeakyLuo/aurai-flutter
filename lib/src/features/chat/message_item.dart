@@ -47,6 +47,7 @@ import '../../domain/web_sources.dart';
 import '../../platform/aurai_platform.dart';
 import 'image_attachments.dart';
 import 'task_summary_view.dart';
+import 'task_failure_card.dart';
 import 'reasoning_message_view.dart';
 import 'message_actions_menu.dart';
 import 'speech_readout.dart';
@@ -122,8 +123,12 @@ class _MessageItemState extends State<MessageItem> {
   late Widget _content;
   List<SourceReference> _sources = const [];
   bool _copied = false;
+  bool _retryingFailure = false;
+  void _setRetryingFailure(bool value) =>
+      setState(() => _retryingFailure = value);
   String? _selectedText;
   final _bubbleKey = GlobalKey();
+  final _selectionKey = GlobalKey<GroupMessageSelectionState>();
   Timer? _copyResetTimer;
 
   bool get _hasReplyContent =>
@@ -185,7 +190,14 @@ class _MessageItemState extends State<MessageItem> {
         );
 
   Widget _buildMessage(BuildContext context) =>
-      message.role == AgentMessageRole.user
+      widget.groupBubble && message.isFailure
+      ? TaskFailureCard(
+          error: message.text,
+          padding: const EdgeInsets.only(top: 6, bottom: 8),
+          enabled: !_retryingFailure && widget.onRetry != null,
+          onRetry: widget.onRetry == null ? null : _retryFailure,
+        )
+      : message.role == AgentMessageRole.user
       ? Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -266,7 +278,8 @@ class _MessageItemState extends State<MessageItem> {
         );
 
   Widget _withActions(Widget child) => MenuPressHighlight(
-    onLongPressStart: _bubbleTextSelection ? null : (_) => _openActions(),
+    keepHighlightWhileOpen: !_bubbleTextSelection,
+    onLongPressStart: (_) => _openBubbleMenu(),
     borderRadius: BorderRadius.circular(22),
     child: child,
   );
@@ -399,9 +412,8 @@ class _MessageItemState extends State<MessageItem> {
                     const SizedBox(height: 8),
                   if (message.text.isNotEmpty)
                     MenuPressHighlight(
-                      onLongPressStart: _bubbleTextSelection
-                          ? null
-                          : (_) => _openActions(),
+                      keepHighlightWhileOpen: !_bubbleTextSelection,
+                      onLongPressStart: (_) => _openBubbleMenu(),
                       borderRadius: BorderRadius.circular(26),
                       child: Material(
                         key: _bubbleKey,
@@ -516,6 +528,7 @@ class _MessageItemState extends State<MessageItem> {
             style: body,
             members: widget.mentionMembers,
             onOpen: widget.onOpenMember,
+            onOpenLink: (href) => _openLink(context, href),
           )
         else
           MediaQuery.removePadding(
@@ -653,9 +666,8 @@ class _MessageItemState extends State<MessageItem> {
               ),
         child: _withGroupFavorite(
           MenuPressHighlight(
-            onLongPressStart: _bubbleTextSelection
-                ? null
-                : (_) => _openActions(),
+            keepHighlightWhileOpen: !_bubbleTextSelection,
+            onLongPressStart: (_) => _openBubbleMenu(),
             borderRadius: BorderRadius.circular(22),
             child: Material(
               key: _bubbleKey,

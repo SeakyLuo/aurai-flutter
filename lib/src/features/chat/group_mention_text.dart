@@ -53,6 +53,7 @@ class GroupMentionText extends StatefulWidget {
     required this.style,
     required this.members,
     this.onOpen,
+    this.onOpenLink,
     this.bareNames = false,
     this.textAlign,
     this.maxLines,
@@ -62,6 +63,7 @@ class GroupMentionText extends StatefulWidget {
   final TextStyle style;
   final Map<String, String> members;
   final ValueChanged<String>? onOpen;
+  final ValueChanged<String>? onOpenLink;
   final bool bareNames;
   final TextAlign? textAlign;
   final int? maxLines;
@@ -91,7 +93,7 @@ class _GroupMentionTextState extends State<GroupMentionText> {
     final names = widget.members.keys.toList()
       ..sort((a, b) => b.length.compareTo(a.length));
     final pattern = RegExp(
-      r'\[((?:\\.|[^\]])+)\]\(aurai://member/([^)]+)\)|@所有人' +
+      r'\[((?:\\.|[^\]])+)\]\((aurai://(?:member|miniapp)/[^)]+)\)|@所有人' +
           (names.isEmpty
               ? ''
               : '|@(?:${names.map(RegExp.escape).join('|')})(?![a-zA-Z0-9_])') +
@@ -106,21 +108,32 @@ class _GroupMentionTextState extends State<GroupMentionText> {
       final label =
           match.group(1)?.replaceAllMapped(RegExp(r'\\(.)'), (m) => m[1]!) ??
           match[0]!;
-      final id = match.group(2) == null
+      final link = match.group(2);
+      final uri = link == null ? null : Uri.parse(link);
+      final isMiniapp = uri?.host == 'miniapp';
+      final id = link == null
           ? widget.members[label] ??
                 (label.startsWith('@')
                     ? widget.members[label.substring(1)]
                     : null)
-          : Uri.decodeComponent(match.group(2)!);
+          : isMiniapp
+          ? null
+          : uri!.pathSegments.single;
       TapGestureRecognizer? recognizer;
-      if (id != null && widget.onOpen != null) {
+      if (isMiniapp && widget.onOpenLink != null) {
+        recognizer = TapGestureRecognizer()
+          ..onTap = () => widget.onOpenLink!(link!);
+        _recognizers.add(recognizer);
+      } else if (id != null && widget.onOpen != null) {
         recognizer = TapGestureRecognizer()..onTap = () => widget.onOpen!(id);
         _recognizers.add(recognizer);
       }
       spans.add(
         TextSpan(
           text: label,
-          style: groupMentionStyle(context),
+          style: isMiniapp
+              ? GlobalUI.linkStyle(context)
+              : groupMentionStyle(context),
           recognizer: recognizer,
         ),
       );

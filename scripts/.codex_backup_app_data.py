@@ -6,7 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
+import shlex
 import subprocess
 
 
@@ -19,6 +19,8 @@ def adb(*args: str, stdout=None) -> subprocess.CompletedProcess[bytes]:
     environment = os.environ.copy()
     environment["SystemRoot"] = r"C:\Windows"
     environment["windir"] = r"C:\Windows"
+    if args[0] == "shell":
+        args = ("shell", shlex.join(args[1:]))
     return subprocess.run(
         [str(ADB), "-s", DEVICE, *args],
         env=environment,
@@ -38,9 +40,6 @@ def sha256(path: Path) -> str:
 
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 desktop = Path.home() / "Desktop"
-for previous in desktop.glob("Aurai数据备份_*"):
-    if previous.is_dir() and not (previous / "manifest.json").exists():
-        shutil.rmtree(previous)
 destination = desktop / f"Aurai数据备份_{timestamp}"
 (destination / "databases").mkdir(parents=True)
 

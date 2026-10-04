@@ -22,13 +22,10 @@ class ToolExecutor {
   String? get activeToolName => _activeTool?.definition.name;
   bool _cancelRequested = false;
 
-  Future<ToolResult> execute(
-    ToolCall call, {
-    void Function(ToolResult)? onWaitingForUser,
-  }) async {
+  Future<ToolResult> execute(ToolCall call) async {
     _cancelRequested = false;
     try {
-      return await _execute(call, onWaitingForUser: onWaitingForUser);
+      return await _execute(call);
     } on Object catch (error) {
       return ToolResult(
         callId: call.id,
@@ -44,23 +41,7 @@ class ToolExecutor {
     }
   }
 
-  Future<ToolResult> _execute(
-    ToolCall call, {
-    void Function(ToolResult)? onWaitingForUser,
-  }) async {
-    if (call.userAction != null &&
-        (call.userAction!.trim().isEmpty ||
-            call.userAction!.trim() == 'null')) {
-      return ToolResult(
-        callId: call.id,
-        toolName: call.name,
-        status: ToolResultStatus.error,
-        output: const {
-          'error':
-              'userAction 必须是具体的用户操作说明；不需要用户接手时请传 JSON null，不要传字符串 "null"。此次工具尚未执行，请修正参数。',
-        },
-      );
-    }
+  Future<ToolResult> _execute(ToolCall call) async {
     final tool = _registry.find(call.name);
     if (tool == null) {
       return ToolResult(
@@ -115,21 +96,6 @@ class ToolExecutor {
       );
     }
     _registry.retain(call.name);
-    final questions = _registry.find('askUser') as AskUserTool?;
-    if (call.userAction != null &&
-        (tool.definition.waitsForUser ||
-            questions == null ||
-            questions.hasPending)) {
-      return ToolResult(
-        callId: call.id,
-        toolName: call.name,
-        status: ToolResultStatus.error,
-        output: const {
-          'error':
-              '当前工具已有用户等待流程，或已有问题未处理，不能再添加人工交接。此次动作尚未执行，请移除 userAction 或先处理已有问题。',
-        },
-      );
-    }
     if (tool is PreflightAgentTool) {
       try {
         final rejected = await (tool as PreflightAgentTool).preflight(call);
@@ -188,7 +154,7 @@ class ToolExecutor {
     return runAuthorizedTool(
       call,
       tool.definition,
-      () => _executeAuthorized(tool, call, questions, onWaitingForUser),
+      () => _executeAuthorized(tool, call),
     );
   }
 
@@ -201,12 +167,7 @@ class ToolExecutor {
     Future<ToolResult> Function() action,
   ) => action();
 
-  Future<ToolResult> _executeAuthorized(
-    AgentTool tool,
-    ToolCall call,
-    AskUserTool? questions,
-    void Function(ToolResult)? onWaitingForUser,
-  ) async {
+  Future<ToolResult> _executeAuthorized(AgentTool tool, ToolCall call) async {
     if (_cancelRequested) {
       return ToolResult(
         callId: call.id,
@@ -251,36 +212,7 @@ class ToolExecutor {
           },
         );
       }
-      if (_cancelRequested ||
-          call.userAction == null ||
-          result.status != ToolResultStatus.success ||
-          result.output.containsKey('error') ||
-          result.output['cancelled'] == true ||
-          result.output['pending'] == true ||
-          result.output['performed'] == false ||
-          result.output['opened'] == false ||
-          result.output['started'] == false ||
-          result.output['granted'] == false)
-        return result;
-      _activeTool = questions;
-      onWaitingForUser?.call(result);
-      final answer = await questions!.waitForUserAction(call.userAction!);
-      return ToolResult(
-        callId: result.callId,
-        toolName: result.toolName,
-        status: result.status,
-        attachments: result.attachments,
-        output: {
-          ...result.output,
-          'userAction': {
-            'instruction': call.userAction,
-            ...answer,
-            'next': answer['reportedCompleted'] == true
-                ? '用户报告手动步骤完成。重新观察或检查实际状态后再继续，不将此确认当作系统授权或任务成功。'
-                : '用户取消或反馈了问题，未确认完成。不要继续依赖该步骤的操作；取消不撤销之前已执行的动作，不自动重新交接。',
-          },
-        },
-      );
+      return result;
     } on TimeoutException catch (error) {
       String? cancellationError;
       try {

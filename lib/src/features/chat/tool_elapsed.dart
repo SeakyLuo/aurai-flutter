@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -17,8 +16,7 @@ bool toolShowsElapsed(String? toolName, {String? resultJson}) {
   }.contains(toolName)) {
     return false;
   }
-  return resultJson == null ||
-      !(jsonDecode(resultJson) as Map).containsKey('userAction');
+  return true;
 }
 
 class ToolElapsed extends StatefulWidget {

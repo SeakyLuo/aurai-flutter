@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'avatar_palette_store.dart';
 import 'avatar_background.dart';
+import 'avatar_selection_mark.dart';
 import 'avatar_color_dialog.dart';
 import 'delete_confirmation_dialog.dart';
 import 'settings_icon.dart';
@@ -206,23 +207,16 @@ class _AvatarColorLibraryState extends State<AvatarColorLibrary> {
                     onTap: () => widget.onSelected(value),
                     onLongPress: () => _remove(kind, value),
                     child: Center(
-                      child: Container(
+                      child: SizedBox(
                         width: 48,
                         height: 48,
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            width: 2,
-                            color: widget.selected == value
-                                ? Theme.of(context).colorScheme.primary
-                                : Colors.transparent,
-                          ),
-                        ),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: AvatarBackground.decode(value).gradient,
+                        child: AvatarSelectionMark(
+                          selected: widget.selected == value,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: AvatarBackground.decode(value).gradient,
+                            ),
                           ),
                         ),
                       ),

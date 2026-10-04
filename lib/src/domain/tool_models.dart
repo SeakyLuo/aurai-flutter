@@ -51,19 +51,10 @@ class ToolDefinition {
           value == ToolSafety.sensitive || value == ToolSafety.destructive,
     );
     final confirmation = needsConfirmation || confirmationMayBeRequired;
-    final handoff = !waitsForUser;
     return {
       ...inputSchema,
       'properties': {
         ...(inputSchema['properties'] as Map),
-        if (handoff)
-          'userAction': {
-            'type': ['string', 'null'],
-            'minLength': 1,
-            'maxLength': 600,
-            'description':
-                '只有工具成功后仍需要人类亲自完成操作（如登录、扫码、选择授权文件夹）时，才填写具体说明：在哪里、做什么、完成后如何返回。填写字符串会立即触发“等待你操作”面板并暂停执行，不是备注或状态文案。无需人类接手（如发消息、搜索、读取、等待）时传 JSON null，例如 {"userAction": null}；绝不能传 {"userAction": "null"}、空字符串或笼统的“请操作”。需要接手的示例：{"userAction": "请在打开的登录页完成登录，然后返回 App 点已完成"}。已有独立等待流程时不要重复交接。这不是权限审批；用户确认后仍须核实实际结果。',
-          },
         if (confirmation)
           'confirmationTimeoutSeconds': {
             'type': ['integer', 'null'],
@@ -74,7 +65,6 @@ class ToolDefinition {
       },
       'required': [
         ...(inputSchema['required'] as List? ?? const []),
-        if (handoff) 'userAction',
         if (confirmation) 'confirmationTimeoutSeconds',
       ],
     };
@@ -113,7 +103,6 @@ class ToolCall {
     required this.name,
     required this.arguments,
     this.confirmationTimeoutSeconds,
-    this.userAction,
     this.argumentsError,
   });
 
@@ -156,19 +145,15 @@ class ToolCall {
   }) {
     final executionArguments = Map<String, Object?>.of(arguments);
     final timeout = executionArguments.remove('confirmationTimeoutSeconds');
-    final userAction = executionArguments.remove('userAction');
     final argumentErrors = <String>[
       if (timeout != null && timeout is! int)
         'confirmationTimeoutSeconds 必须是整数或 null',
-      if (userAction != null && userAction is! String)
-        'userAction 必须是字符串或 null',
     ];
     return ToolCall(
       id: id,
       name: name,
       arguments: executionArguments,
       confirmationTimeoutSeconds: timeout is int ? timeout : null,
-      userAction: userAction is String ? userAction : null,
       argumentsError: argumentErrors.isEmpty
           ? null
           : '工具参数不符合 schema：${argumentErrors.join('；')}',
@@ -177,7 +162,6 @@ class ToolCall {
 
   final String? argumentsError;
   final int? confirmationTimeoutSeconds;
-  final String? userAction;
   final String id;
   final String name;
   final Map<String, Object?> arguments;

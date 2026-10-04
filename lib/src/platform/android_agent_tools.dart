@@ -391,7 +391,7 @@ class OpenSettingsTool extends _PlatformTool {
   ToolDefinition get definition => const ToolDefinition(
     name: 'openSettings',
     description:
-        'Open a stable Android Settings screen. If the user must change a setting before work can continue, supply userAction to pause within this call until the user responds. Opening a page or the user reporting completion does not prove permission was granted; check actual state afterward. For navigation alone set userAction=null and reply briefly.',
+        'Open a stable Android Settings screen. If the user must change a setting before work can continue, use askUser after opening the page to explain the manual step and wait for the user response. Opening a page or the user reporting completion does not prove permission was granted; check actual state afterward. For navigation alone reply briefly without asking a question.',
     inputSchema: <String, Object?>{
       'type': 'object',
       'properties': <String, Object?>{

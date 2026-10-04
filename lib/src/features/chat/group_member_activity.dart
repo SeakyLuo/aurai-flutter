@@ -311,11 +311,6 @@ extension GroupMemberActivities on ChatController {
           .lastOrNull;
       if (step?.toolName == 'sleepGroupChat') continue;
       final confirming = state.confirmingSenderId == entry.key;
-      var waitingForAction = false;
-      if (step?.resultJson != null) {
-        final result = jsonDecode(step!.resultJson!) as Map;
-        waitingForAction = (result['userAction'] as Map?)?['pending'] == true;
-      }
       final stopping = member.runState == ChatRunState.stopping;
       final visibleActivities = includeThoughts && hasThoughts
           ? thoughts!.turns.values
@@ -326,11 +321,7 @@ extension GroupMemberActivities on ChatController {
           : const <AgentTaskActivity>[];
       final latest = hasThoughts ? thoughts!.turns[thoughts.latest] : null;
       final showStatus =
-          stopping ||
-          confirming ||
-          waitingForAction ||
-          step != null ||
-          member.reconnectAttempt > 0;
+          stopping || confirming || step != null || member.reconnectAttempt > 0;
       activities.add(
         GroupMemberActivity(
           sender: entry.value,
@@ -341,8 +332,7 @@ extension GroupMemberActivities on ChatController {
           mute: mutedMembers[entry.key],
           autoReplyPauseReason: pausedReasons[entry.key],
           thinkingHidden: member.thinkingHidden,
-          waitingForUser:
-              confirming || waitingForAction || step?.toolName == 'askUser',
+          waitingForUser: confirming || step?.toolName == 'askUser',
           activities: List.unmodifiable(visibleActivities),
           thoughts: List.unmodifiable(
             visibleActivities
@@ -360,8 +350,6 @@ extension GroupMemberActivities on ChatController {
               ? '正在终止'
               : confirming
               ? '等待你的授权'
-              : waitingForAction
-              ? '等待你的操作'
               : step?.toolName == 'askUser'
               ? '等待你的回答'
               : member.reconnectAttempt > 0

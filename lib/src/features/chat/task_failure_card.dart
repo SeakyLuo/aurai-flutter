@@ -8,6 +8,8 @@ import 'conversation_menu_icon.dart';
 import 'glass_surface.dart';
 import 'task_failure_icon.dart';
 import 'task_playback_icon.dart';
+import 'interactive_message_button.dart';
+import '../../app/notice_details_sheet.dart';
 
 class TaskFailureCard extends StatelessWidget {
   const TaskFailureCard({
@@ -17,12 +19,14 @@ class TaskFailureCard extends StatelessWidget {
     this.actionLabel = '重试',
     this.paused,
     this.enabled = true,
+    this.padding = const EdgeInsets.fromLTRB(18, 12, 18, 20),
   });
   final bool? paused;
   final bool enabled;
   final String error;
   final String actionLabel;
-  final VoidCallback onRetry;
+  final VoidCallback? onRetry;
+  final EdgeInsetsGeometry padding;
 
   Future<void> _copyError(BuildContext context) async {
     final copied = await runUiAction(
@@ -39,7 +43,7 @@ class TaskFailureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
+    padding: padding,
     child: Container(
       padding: paused == null
           ? const EdgeInsets.fromLTRB(16, 6, 8, 16)
@@ -145,13 +149,54 @@ class TaskFailureCard extends StatelessWidget {
         const SizedBox(height: 4),
         Padding(
           padding: const EdgeInsets.only(right: 8),
-          child: Text(
-            error,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.45,
-              color: colors.onSurfaceVariant,
-            ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final style = DefaultTextStyle.of(context).style.merge(
+                TextStyle(
+                  fontSize: 14,
+                  height: 1.45,
+                  color: colors.onSurfaceVariant,
+                ),
+              );
+              final painter = TextPainter(
+                text: TextSpan(text: error, style: style),
+                textDirection: Directionality.of(context),
+                textScaler: MediaQuery.textScalerOf(context),
+                locale: Localizations.localeOf(context),
+                maxLines: 4,
+                ellipsis: '…',
+              )..layout(maxWidth: constraints.maxWidth);
+              final overflow = painter.didExceedMaxLines;
+              painter.dispose();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    error,
+                    style: style,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (overflow) ...[
+                    const SizedBox(height: 12),
+                    InteractiveMessageButton(
+                      button: const {
+                        'label': '查看详情',
+                        'icon': 'none',
+                        'showArrow': true,
+                      },
+                      busy: false,
+                      locked: false,
+                      onPressed: () => showNoticeDetailsSheet(
+                        context,
+                        text: TextSpan(text: error),
+                        style: style,
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
         ),
       ],

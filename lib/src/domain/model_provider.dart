@@ -514,6 +514,7 @@ class ModelRequest {
     this.contextSummary,
     this.privateContextSummary,
     this.personalContext = '',
+    this.responseSchema,
     this.onContextSummary,
     this.onPrivateContextSummary,
     this.onCompactionChanged,
@@ -522,6 +523,7 @@ class ModelRequest {
     this.onProcessingStarted,
     this.onReconnect,
     this.onMessageStarted,
+    this.onMessageCompleted,
     this.toolResults = const <ToolResult>[],
     this.userUpdates = const <String>[],
     this.userMessageInput = const <Map<String, Object?>>[],
@@ -534,6 +536,7 @@ class ModelRequest {
   final ContextSummary? contextSummary;
   final ContextSummary? privateContextSummary;
   final String personalContext;
+  final Map<String, Object?>? responseSchema;
   final Future<void> Function(ContextSummary)? onContextSummary;
   final Future<void> Function(ContextSummary)? onPrivateContextSummary;
   final void Function(bool)? onCompactionChanged;
@@ -545,6 +548,7 @@ class ModelRequest {
   final void Function()? onProcessingStarted;
   final void Function(int attempt)? onReconnect;
   final void Function(int index)? onMessageStarted;
+  final void Function(int index)? onMessageCompleted;
 }
 
 class ModelTurn {

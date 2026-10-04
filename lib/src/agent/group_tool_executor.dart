@@ -41,10 +41,7 @@ class GroupToolExecutor extends ToolExecutor {
   final Future<void> Function() waitForInteraction;
 
   @override
-  Future<ToolResult> execute(
-    ToolCall call, {
-    void Function(ToolResult)? onWaitingForUser,
-  }) {
+  Future<ToolResult> execute(ToolCall call) {
     Future<ToolResult> perform() => cancelled()
         ? Future.value(
             ToolResult(
@@ -54,8 +51,8 @@ class GroupToolExecutor extends ToolExecutor {
               output: const {'cancelled': true, 'performed': false},
             ),
           )
-        : super.execute(call, onWaitingForUser: onWaitingForUser);
-    if (call.name == 'askUser' && call.userAction == null) {
+        : super.execute(call);
+    if (call.name == 'askUser') {
       return queue.questionsFor(owner ?? this).run(() async {
         await waitForInteraction();
         return perform();
@@ -98,9 +95,7 @@ class GroupToolExecutor extends ToolExecutor {
           'requestAccessibilityAccess',
         }.contains(call.name);
     final exclusive =
-        call.userAction != null ||
-        definition.waitsForUser && call.name != 'askUser' ||
-        deviceSurface;
+        definition.waitsForUser && call.name != 'askUser' || deviceSurface;
     return exclusive
         ? waitForInteraction().then((_) => queue.run(action, owner: owner))
         : action();

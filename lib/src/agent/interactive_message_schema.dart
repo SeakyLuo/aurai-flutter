@@ -42,7 +42,8 @@ const interactiveSelectionSchema = {
 
 const interactiveButtonColumnsSchema = {
   'type': 'integer',
-  'enum': [1, 2],
+  'minimum': 1,
+  'maximum': 2,
   'description':
       'Native card button columns: 1 is a vertical list (default), 2 is an equal-width grid in row-major order. Use 2 for short voting/quiz options and 1 for long action labels. Odd final buttons stay half-width. This changes presentation only; tapping still executes immediately. Omitted updates/states/callbacks retain the current layout.',
 };

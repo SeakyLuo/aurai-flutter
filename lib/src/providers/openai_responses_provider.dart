@@ -79,6 +79,15 @@ class OpenAiResponsesProvider implements ModelProvider {
           ),
         ],
         'tool_choice': 'auto',
+        if (request.responseSchema != null)
+          'text': {
+            'format': {
+              'type': 'json_schema',
+              'name': 'interactive_choice',
+              'strict': true,
+              'schema': request.responseSchema,
+            },
+          },
         'parallel_tool_calls': false,
         'store': true,
         'include': ['reasoning.encrypted_content'],
@@ -86,6 +95,7 @@ class OpenAiResponsesProvider implements ModelProvider {
       },
       onTextChanged: request.onTextChanged,
       onMessageStarted: request.onMessageStarted,
+      onMessageCompleted: request.onMessageCompleted,
       onProcessingStarted: request.onProcessingStarted,
     );
     _context.recordOutput(

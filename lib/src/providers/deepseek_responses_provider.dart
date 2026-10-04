@@ -51,6 +51,7 @@ class DeepSeekResponsesProvider implements ModelProvider {
       onTextChanged: request.onTextChanged,
       onReasoningChanged: request.onReasoningChanged,
       onMessageStarted: request.onMessageStarted,
+      onMessageCompleted: request.onMessageCompleted,
       onProcessingStarted: request.onProcessingStarted,
     );
     _appendResponseOutput(json);
@@ -75,6 +76,15 @@ class DeepSeekResponsesProvider implements ModelProvider {
         )
         .toList(growable: false),
     'tool_choice': 'auto',
+    if (request.responseSchema != null)
+      'text': {
+        'format': {
+          'type': 'json_schema',
+          'name': 'interactive_choice',
+          'strict': true,
+          'schema': request.responseSchema,
+        },
+      },
   };
 
   void _appendResponseOutput(Map<String, Object?> json) {

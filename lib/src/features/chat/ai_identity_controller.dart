@@ -361,6 +361,7 @@ extension AiIdentityController on ChatController {
         store.modelConfig = () => aiConfig(ai);
       }
     }
+    contactsChanged.value = ai;
     _conversationChanged();
   }
 

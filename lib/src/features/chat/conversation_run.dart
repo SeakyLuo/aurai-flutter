@@ -156,7 +156,7 @@ extension ConversationRun on ChatController {
         questionTool: AskUserTool(runConversation.id, (question) {
           pendingQuestion = question;
           final target = groupParent ?? runConversation;
-          if (question == null || question.isUserAction) {
+          if (question == null) {
             target.pendingQuestionPreviews.remove(runId);
           } else {
             final title = question.title?.trim();
@@ -176,9 +176,7 @@ extension ConversationRun on ChatController {
             _platform.updateAttentionNotification(
               runConversation.id,
               'question',
-              title: question == null
-                  ? null
-                  : (question.isUserAction ? '等待你操作' : '等待你的回答'),
+              title: question == null ? null : '等待你的回答',
               body: question?.question,
             ),
           );
@@ -188,7 +186,7 @@ extension ConversationRun on ChatController {
               !alongsideGroup) {
             unawaited(
               _platform.updateAgentSessionStep(
-                question.isUserAction ? '等待你操作' : '等待你的回答',
+                '等待你的回答',
                 conversationId: runConversation.id,
               ),
             );
@@ -254,6 +252,13 @@ extension ConversationRun on ChatController {
       }
       if (runConversation.runState == ChatRunState.stopping)
         throw AgentCancelled();
+      final decision = groupParent != null && callbackEvents.isEmpty
+          ? await _interactiveAiDecision(
+              userMessage,
+              groupParent,
+              reply.senderId,
+            )
+          : null;
       var turnOrdinal = 0;
       late String modelTurnId;
       final stepActivityIndices = <int>[];
@@ -262,13 +267,18 @@ extension ConversationRun on ChatController {
       String? reasoningMessageId;
       int? reasoningActivityIndex, outputMessageIndex;
       await runtime.run(
+        decision: decision,
         endsRun: (result) =>
             result.toolName == 'sleepGroupChat' &&
             result.status == ToolResultStatus.success,
         conversation: [
           ...(groupHistory == null
               ? _privateHistory(history.take(lastUser + 1), reply.senderId)
-              : _groupHistory([...history], reply.senderId)),
+              : _groupHistory(
+                  [...history],
+                  reply.senderId,
+                  decisionMessageId: decision == null ? null : userMessage.id,
+                )),
           if (callbackEvents.isNotEmpty) _callbackContext(callbackEvents),
           if (continuationProtocol.isNotEmpty)
             AgentMessage(
@@ -344,6 +354,8 @@ extension ConversationRun on ChatController {
             ? null
             : () => _takeGroupRunUpdates(reply.senderId, observed),
         onTurnCompleted: (turn) async {
+          _setMemberStreaming(reply.senderId, null, groupParent);
+          _notifyMember(runConversation, groupParent);
           await _persistMember(runConversation, groupParent);
           await _store.runs.finishTurn(modelTurnId, turn);
         },
@@ -374,6 +386,10 @@ extension ConversationRun on ChatController {
           outputMessageIndex = index;
           turnMessageId = null;
           turnActivityIndex = null;
+        },
+        onMessageCompleted: (_) {
+          _setMemberStreaming(reply.senderId, null, groupParent);
+          _notifyMember(runConversation, groupParent);
         },
         onProcessingStarted: () {
           if (groupParent != null) return;
@@ -646,14 +662,16 @@ extension ConversationRun on ChatController {
       }
       outcome = 'completed';
     } on Object catch (error, stack) {
-      failureDiagnostic = await _logRunFailure(
-        error,
-        stack,
-        config: runConfig,
-        conversationId: runConversation.id,
-        sender: reply.sender,
-        runId: runId,
-      );
+      if (error is! AgentCancelled) {
+        failureDiagnostic = await _logRunFailure(
+          error,
+          stack,
+          config: runConfig,
+          conversationId: runConversation.id,
+          sender: reply.sender,
+          runId: runId,
+        );
+      }
       if (runConversation.runState == ChatRunState.stopping ||
           error is AgentCancelled) {
         runConversation.runState = ChatRunState.cancelled;

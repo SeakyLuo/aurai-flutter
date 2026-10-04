@@ -49,7 +49,7 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
       context: context,
       builder: (_) => DeleteConfirmationDialog(
         title: '移除所选成员？',
-        description: '将移除 ${_selected.length} 位 AI，保留已有聊天记录。',
+        description: '将移除 ${_selected.length} 位成员，保留已有聊天记录。',
         confirmLabel: '移除',
       ),
     );

@@ -11,6 +11,7 @@ class RecalledMessageNotice extends StatelessWidget {
     this.onEdit,
     this.onOpenSource,
     this.onOpenMember,
+    this.onOpenLink,
     this.memberNames = const {},
     required this.style,
   });
@@ -19,6 +20,7 @@ class RecalledMessageNotice extends StatelessWidget {
   final TextStyle style;
   final ValueChanged<String>? onOpenSource;
   final ValueChanged<String>? onOpenMember;
+  final ValueChanged<String>? onOpenLink;
   final Map<String, String> memberNames;
 
   @override
@@ -28,7 +30,7 @@ class RecalledMessageNotice extends StatelessWidget {
   );
 
   Widget _notice(BuildContext context) {
-    final text = message.isSystem && memberNames.isNotEmpty
+    final text = message.isSystem
         ? GroupMentionText(
             text: message.text,
             style: style,
@@ -36,6 +38,7 @@ class RecalledMessageNotice extends StatelessWidget {
             bareNames: true,
             textAlign: TextAlign.center,
             onOpen: onOpenMember,
+            onOpenLink: onOpenLink,
           )
         : Text(message.text, textAlign: TextAlign.center, style: style);
     if (message.quote != null && onOpenSource != null) {

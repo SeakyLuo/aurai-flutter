@@ -30,7 +30,6 @@ class UserQuestion {
     required this.allowCustomAnswer,
     this.title,
     this.customAnswerPlaceholder,
-    this.isUserAction = false,
     this.callId,
     Duration timeout = responseTimeout,
   }) : expiresAt = DateTime.now().add(timeout) {
@@ -51,7 +50,6 @@ class UserQuestion {
   final List<Object> options;
   final bool allowCustomAnswer;
   final String? customAnswerPlaceholder;
-  final bool isUserAction;
   UserQuestionOption optionAt(int index) =>
       UserQuestionOption.fromValue(options[index]);
   final result = Completer<Map<String, Object?>>();
@@ -63,10 +61,6 @@ class UserQuestion {
     final text = draft.trim();
     result.complete({
       'skipped': skipped,
-      if (isUserAction) ...{
-        'cancelled': skipped || (text.isEmpty && selected == 1),
-        'reportedCompleted': !skipped && text.isEmpty && selected == 0,
-      },
       if (!skipped)
         'answer': text.isNotEmpty ? text : optionAt(selected!).answer,
     });
@@ -93,31 +87,12 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
     await _pending?.result.future;
   }
 
-  Future<Map<String, Object?>> waitForUserAction(String instruction) async {
-    final question = UserQuestion(
-      conversationId: conversationId,
-      sender: sender,
-      question: instruction,
-      options: const ['已完成', '取消'],
-      allowCustomAnswer: true,
-      isUserAction: true,
-    );
-    _pending = question;
-    onQuestion(question);
-    try {
-      return await question.result.future;
-    } finally {
-      _pending = null;
-      onQuestion(null);
-    }
-  }
-
   @override
   ToolDefinition get definition => const ToolDefinition(
     name: 'askUser',
     waitsForUser: true,
     description:
-        'Ask one concise question when a user preference or missing information is needed. title is an optional short heading shown instead of the generic question label. Present up to four options, or no options for a free-text question. Each option may be plain text or an object with a short title and supporting content. Set an option title to null for content only; avoid repeating the option title in its content. Set allowCustomAnswer=true only when the user may need to write an answer outside the provided options. A question with no options always accepts free text. customAnswerPlaceholder optionally provides a concise hint for that input; omit it to use the app default. The user may answer or skip. waitForResponse=true or null waits for the answer. Set false only when independent work can continue without it: returns pending immediately and the actual answer arrives as a user update on a later model turn. Do not perform answer-dependent work or claim a final outcome while pending. Never infer an answer from skipping. Do not repeat the question in prose before calling. Incorporate later answers or skips before finalizing; a skip is not consent. For skipped optional details, use a reasonable stated assumption; otherwise explain what is still needed. Do not use this for device permission approval.',
+        'Ask one concise question when a user preference, missing information, or a manual step such as login or scanning is needed. For manual steps, open the relevant page first, explain what to do and how to return in question, and offer completion and cancellation options. After the answer, verify actual state; a completion report is not permission or proof of success. Tools with their own user waiting flow do not need another question. title is an optional short heading shown instead of the generic question label. Present up to four options, or no options for a free-text question. Each option may be plain text or an object with a short title and supporting content. Set an option title to null for content only; avoid repeating the option title in its content. Set allowCustomAnswer=true only when the user may need to write an answer outside the provided options. A question with no options always accepts free text. customAnswerPlaceholder optionally provides a concise hint for that input; omit it to use the app default. The user may answer or skip. waitForResponse=true or null waits for the answer. Set false only when independent work can continue without it: returns pending immediately and the actual answer arrives as a user update on a later model turn. Do not perform answer-dependent work or claim a final outcome while pending. Never infer an answer from skipping. Do not repeat the question in prose before calling. Incorporate later answers or skips before finalizing; a skip is not consent. For skipped optional details, use a reasonable stated assumption; otherwise explain what is still needed. Do not use this for device permission approval.',
     inputSchema: {
       'type': 'object',
       'properties': {

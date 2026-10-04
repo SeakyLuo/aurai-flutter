@@ -1,6 +1,7 @@
 import 'private_reply_layout.dart';
 import 'interactive_message_paging.dart';
 import 'recalled_message_notice.dart';
+import '../../html_games/miniapp_forward.dart';
 import '../../html_games/html_view.dart';
 import '../../domain/tool_activity_groups.dart';
 import 'tool_activity_group.dart';
@@ -113,6 +114,24 @@ List<ChatTimelineEntry> buildChatTimeline(
           if (reasoningIds.contains(id) || !richRuns.contains(message.runId))
             id,
   };
+  final visibleMessages = controller.visibleMessages
+      .where(
+        (message) =>
+            !(message.isSystem && message.text == '私密交互消息已更新') &&
+            (message.canView(MessageSender.localUser.id)) &&
+            (!hiddenIds.contains(message.id) ||
+                message.id == conversation.searchMessageId),
+      )
+      .toList();
+  final firstMessageByRun = {
+    for (final message in visibleMessages.reversed)
+      if (message.role == AgentMessageRole.assistant && message.runId != null)
+        message.runId!: message.id,
+  };
+  final messagePositions = {
+    for (final (index, message) in visibleMessages.indexed) message.id: index,
+  };
+  final headersByMessage = <String, List<ChatTimelineEntry>>{};
   final toolsByMessage = <String, List<ChatTimelineEntry>>{};
   final followingToolsByMessage = <String, List<ChatTimelineEntry>>{};
   final messagesById = {
@@ -156,6 +175,31 @@ List<ChatTimelineEntry> buildChatTimeline(
                   senderName: member.replyingSenderName,
                 ),
   ];
+  final firstToolAnchorByRun = <String, String>{};
+  for (final entry in liveSteps) {
+    final position = messagePositions[entry.afterMessageId];
+    if (position == null) continue;
+    final previous = firstToolAnchorByRun[entry.runId];
+    if (previous == null || position < messagePositions[previous]!) {
+      firstToolAnchorByRun[entry.runId] = entry.afterMessageId;
+    }
+  }
+  void placeRunHeader(ChatTimelineEntry header, String runId, String anchorId) {
+    final firstMessage = firstMessageByRun[runId];
+    final firstToolAnchor = firstToolAnchorByRun[runId];
+    final toolsComeFirst =
+        firstToolAnchor != null &&
+        (firstMessage == null ||
+            messagePositions[firstToolAnchor]! <
+                messagePositions[firstMessage]!);
+    final target = toolsComeFirst
+        ? activitiesAfter(firstToolAnchor, runId)
+        : firstMessage != null
+        ? headersByMessage.putIfAbsent(firstMessage, () => [])
+        : activitiesAfter(anchorId, runId);
+    target.add(header);
+  }
+
   final memberSources = {
     for (final member in members.where((_) => !isGroup))
       member.activeRunId: webSourcesFromSteps(
@@ -199,7 +243,7 @@ List<ChatTimelineEntry> buildChatTimeline(
   if (!isGroup) {
     for (final entry in conversation.cancelledRunMessages.entries) {
       elapsedRuns.add(entry.key);
-      activitiesAfter(entry.value, entry.key).add(
+      placeRunHeader(
         ChatTimelineEntry(
           'run-elapsed:${entry.key}',
           (_) => _StoppedRunElapsed(
@@ -207,6 +251,8 @@ List<ChatTimelineEntry> buildChatTimeline(
             cancelled: true,
           ),
         ),
+        entry.key,
+        entry.value,
       );
     }
   }
@@ -218,17 +264,19 @@ List<ChatTimelineEntry> buildChatTimeline(
     if (liveElapsed != null &&
         !liveElapsedPlaced &&
         entry.runId == conversation.activeRunId) {
-      activitiesAfter(entry.afterMessageId, entry.runId).add(liveElapsed);
+      placeRunHeader(liveElapsed, entry.runId, entry.afterMessageId);
       liveElapsedPlaced = true;
     }
     if (runElapsed != null &&
         elapsedRuns.add(entry.runId) &&
         (entry.runId != conversation.activeRunId || !showElapsed)) {
-      activitiesAfter(entry.afterMessageId, entry.runId).add(
+      placeRunHeader(
         ChatTimelineEntry(
           'run-elapsed:${entry.runId}',
           (_) => _StoppedRunElapsed(elapsed: runElapsed),
         ),
+        entry.runId,
+        entry.afterMessageId,
       );
     }
     activitiesAfter(entry.afterMessageId, entry.runId).add(
@@ -283,15 +331,6 @@ List<ChatTimelineEntry> buildChatTimeline(
       ),
     );
   }
-  final visibleMessages = controller.visibleMessages
-      .where(
-        (message) =>
-            !(message.isSystem && message.text == '私密交互消息已更新') &&
-            (message.canView(MessageSender.localUser.id)) &&
-            (!hiddenIds.contains(message.id) ||
-                message.id == conversation.searchMessageId),
-      )
-      .toList();
   if (liveElapsed != null && !liveElapsedPlaced) {
     final firstRunMessage = visibleMessages.indexWhere(
       (message) => message.runId == conversation.activeRunId,
@@ -301,7 +340,7 @@ List<ChatTimelineEntry> buildChatTimeline(
         : firstRunMessage == 0
         ? visibleMessages.first
         : visibleMessages.last;
-    activitiesAfter(anchor.id, conversation.activeRunId!).add(liveElapsed);
+    placeRunHeader(liveElapsed, conversation.activeRunId!, anchor.id);
   }
   final end = beforeMessageId == null
       ? visibleMessages.length
@@ -379,6 +418,7 @@ List<ChatTimelineEntry> buildChatTimeline(
             ),
           ),
         ),
+      if (message.id != beforeMessageId) ...?headersByMessage[message.id],
       if (message.id != beforeMessageId)
         ChatTimelineEntry(message.id, (context) {
           if (message.isSystem) {
@@ -388,6 +428,7 @@ List<ChatTimelineEntry> buildChatTimeline(
                 message: message,
                 onEdit: onReeditRecalled,
                 onOpenSource: onOpenQuote,
+                onOpenLink: (href) => openMiniappLink(context, Uri.parse(href)),
                 memberNames: isGroup ? noticeNameIds : const {},
                 onOpenMember: isGroup
                     ? (id) => openNoticeMember(context, id)
@@ -509,7 +550,6 @@ List<ChatTimelineEntry> buildChatTimeline(
                   message.interactive?.systemPresentation != true
               ? GroupMessageHeading(
                   groupId: conversation.id,
-                  isFailure: message.isFailure,
                   sender:
                       conversation.noticeMembers[message.senderId] ??
                       message.sender!,
@@ -566,9 +606,15 @@ List<ChatTimelineEntry> buildChatTimeline(
                   child: pagedBody,
                 )
               : pagedBody;
-          if (message.id != highlightedMessageId) return item;
+          // Keep the HTML subtree mounted when message highlighting ends.
+          if (message.id != highlightedMessageId && message.htmlGame == null) {
+            return item;
+          }
           return TweenAnimationBuilder<double>(
-            tween: Tween(begin: .28, end: 0),
+            tween: Tween(
+              begin: message.id == highlightedMessageId ? .28 : 0,
+              end: 0,
+            ),
             duration: const Duration(seconds: 4),
             curve: const Interval(.5, 1, curve: Curves.easeOut),
             builder: (context, opacity, child) => DecoratedBox(

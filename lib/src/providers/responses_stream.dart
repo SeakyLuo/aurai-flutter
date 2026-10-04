@@ -10,6 +10,7 @@ Future<Map<String, Object?>> readResponsesStream(
   void Function(String text)? onReasoningChanged,
   void Function()? onProcessingStarted,
   void Function(int index)? onMessageStarted,
+  void Function(int index)? onMessageCompleted,
 }) async {
   final reasoningParts = <(int, String, int), String>{};
   String lastReasoning = '';
@@ -133,6 +134,7 @@ Future<Map<String, Object?>> readResponsesStream(
             onMessageStarted?.call(activeMessage);
             onTextChanged?.call(text);
           }
+          onMessageCompleted?.call(event['output_index'] as int);
         }
       case 'response.output_text.delta':
       case 'response.refusal.delta':

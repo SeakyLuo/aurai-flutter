@@ -1,14 +1,18 @@
+import 'chat_header_background.dart';
+import '../../app/global_ui.dart';
 import 'floating_search_layout.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/avatar_style.dart';
 import '../../domain/emoji_catalog.dart';
 import 'avatar_symbol.dart';
+import 'avatar_selection_mark.dart';
 import 'emoji_category_icon.dart';
 import 'profile_avatar.dart';
 import 'question_icon.dart';
 import 'search_type_segment.dart';
 import 'glass_surface.dart';
+import 'retained_tab_view.dart';
 
 Future<String?> showAvatarSymbolPicker(
   BuildContext context, {
@@ -26,13 +30,16 @@ Future<String?> showAvatarSymbolPicker(
     useSafeArea: true,
     showDragHandle: false,
     barrierColor: Colors.black.withValues(alpha: .24),
-    builder: (_) => _AvatarSymbolPicker(
-      selected: selected,
-      color: color,
-      name: name,
-      catalog: catalog,
-      symbols: symbols,
-      previewBuilder: previewBuilder,
+    builder: (_) => ClipRRect(
+      borderRadius: GlobalUI.bottomSheetBorderRadius,
+      child: _AvatarSymbolPicker(
+        selected: selected,
+        color: color,
+        name: name,
+        catalog: catalog,
+        symbols: symbols,
+        previewBuilder: previewBuilder,
+      ),
     ),
   );
 }
@@ -60,8 +67,11 @@ class _AvatarSymbolPicker extends StatefulWidget {
 
 class _AvatarSymbolPickerState extends State<_AvatarSymbolPicker> {
   final _search = TextEditingController();
-  late int _mode = _hasPortraits ? 2 : 0;
-  bool get _emoji => _mode == 1;
+  late int _mode = widget.selected.startsWith('emoji:')
+      ? 1
+      : widget.selected.startsWith('portrait:')
+      ? 2
+      : 0;
   bool get _hasPortraits =>
       widget.symbols.keys.any((key) => key.startsWith('portrait:'));
   int _category = -1;
@@ -100,49 +110,79 @@ class _AvatarSymbolPickerState extends State<_AvatarSymbolPicker> {
       height: MediaQuery.sizeOf(context).height * .78,
       child: SafeArea(
         top: false,
-        child: Column(
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
+            Positioned.fill(
+              child: RetainedTabView(
+                index: _hasPortraits ? 2 - _mode : _mode,
+                onChanged: (index) =>
+                    _changeMode(_hasPortraits ? 2 - index : index),
                 children: [
-                  RoundAction(
-                    label: '关闭',
-                    icon: Icons.close_rounded,
-                    iconWidget: const QuestionIcon(
-                      type: QuestionIconType.close,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: SearchTypeSegment.indexed(
-                        index: _hasPortraits ? 2 - _mode : _mode,
-                        labels: _hasPortraits
-                            ? ['插画', 'Emoji', '图标']
-                            : ['图标', 'Emoji'],
-                        onChanged: (index) =>
-                            _changeMode(_hasPortraits ? 2 - index : index),
+                  if (_hasPortraits)
+                    _iconGrid(portraits: true)
+                  else
+                    _iconGrid(portraits: false),
+                  Column(
+                    children: [
+                      const SizedBox(height: 60),
+                      if (_query.isEmpty) _categories(),
+                      if (_showCurrentEmoji) _currentEmojiRow(),
+                      if (_showCurrentEmoji) _allEmojiHeading(),
+                      Expanded(
+                        child: FloatingSearchLayout(
+                          itemCount: _emojis.length,
+                          controller: _search,
+                          onChanged: _searchChanged,
+                          hintText: '搜索 Emoji',
+                          bottom: 16,
+                          child: _emojiGrid(),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 40),
+                  if (_hasPortraits) _iconGrid(portraits: false),
                 ],
               ),
             ),
-
-            if (_emoji && _query.isEmpty) _categories(),
-            if (_showCurrentEmoji) _currentEmojiRow(),
-            if (_showCurrentEmoji) _allEmojiHeading(),
-            Expanded(
-              child: FloatingSearchLayout(
-                itemCount: _emojis.length,
-                controller: _search,
-                onChanged: _searchChanged,
-                hintText: '搜索 Emoji',
-                enabled: _emoji,
-                bottom: 16,
-                child: _emoji ? _emojiGrid() : _iconGrid(),
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 76,
+              child: IgnorePointer(child: ChatHeaderBackground()),
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Row(
+                  children: [
+                    RoundAction(
+                      label: '关闭',
+                      icon: Icons.close_rounded,
+                      iconWidget: const QuestionIcon(
+                        type: QuestionIconType.close,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: SearchTypeSegment.indexed(
+                          index: _hasPortraits ? 2 - _mode : _mode,
+                          labels: _hasPortraits
+                              ? ['插画', 'Emoji', '图标']
+                              : ['图标', 'Emoji'],
+                          onChanged: (index) =>
+                              _changeMode(_hasPortraits ? 2 - index : index),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 40),
+                  ],
+                ),
               ),
             ),
           ],
@@ -152,10 +192,7 @@ class _AvatarSymbolPickerState extends State<_AvatarSymbolPicker> {
   );
 
   bool get _showCurrentEmoji =>
-      _emoji &&
-      _query.isEmpty &&
-      _category == -1 &&
-      widget.selected.startsWith('emoji:');
+      _query.isEmpty && _category == -1 && widget.selected.startsWith('emoji:');
 
   Widget _currentEmojiRow() => SizedBox(
     width: double.infinity,
@@ -222,18 +259,20 @@ class _AvatarSymbolPickerState extends State<_AvatarSymbolPicker> {
     ),
   );
 
-  Widget _iconGrid() {
+  Widget _iconGrid({required bool portraits}) {
     final entries = widget.symbols.entries
-        .where((entry) => entry.key.startsWith('portrait:') == (_mode == 2))
+        .where((entry) => entry.key.startsWith('portrait:') == portraits)
         .toList();
     return GridView.builder(
+      key: ValueKey(portraits ? 'portraits' : 'icons'),
+      primary: false,
       padding: const EdgeInsets.fromLTRB(
         20,
-        8,
+        68,
         20,
         FloatingSearchLayout.clearance,
       ),
-      gridDelegate: _mode == 2 ? _portraitGridDelegate : _iconGridDelegate,
+      gridDelegate: portraits ? _portraitGridDelegate : _iconGridDelegate,
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
@@ -260,6 +299,7 @@ class _AvatarSymbolPickerState extends State<_AvatarSymbolPicker> {
     }
     return GridView.builder(
       key: ValueKey((_category, _query)),
+      primary: false,
       padding: const EdgeInsets.fromLTRB(
         20,
         0,
@@ -284,13 +324,13 @@ class _AvatarSymbolPickerState extends State<_AvatarSymbolPicker> {
 
   static const _portraitGridDelegate =
       SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
+        crossAxisCount: 5,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       );
 
   static const _emojiGridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
-    crossAxisCount: 6,
+    crossAxisCount: 5,
     crossAxisSpacing: 8,
     mainAxisSpacing: 8,
   );
@@ -302,21 +342,27 @@ class _AvatarSymbolPickerState extends State<_AvatarSymbolPicker> {
       selected: selected,
       button: true,
       child: Material(
-        color: selected
-            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: .06)
-            : Colors.transparent,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: () => Navigator.pop(context, value),
           borderRadius: BorderRadius.circular(16),
-          child: Center(
-            child:
-                widget.previewBuilder?.call(value) ??
-                ProfileAvatar(
-                  style: AvatarStyle(icon: value, color: widget.color),
-                  name: widget.name,
-                  size: _mode == 2 ? 60 : 44,
+          child: Padding(
+            padding: const EdgeInsets.all(3),
+            child: LayoutBuilder(
+              builder: (context, constraints) => Center(
+                child: AvatarSelectionMark(
+                  selected: selected,
+                  child:
+                      widget.previewBuilder?.call(value) ??
+                      ProfileAvatar(
+                        style: AvatarStyle(icon: value, color: widget.color),
+                        name: widget.name,
+                        size: constraints.biggest.shortestSide - 10,
+                      ),
                 ),
+              ),
+            ),
           ),
         ),
       ),

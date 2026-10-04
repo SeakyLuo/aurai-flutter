@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../../domain/agent_models.dart';
 import 'package:flutter/material.dart';
 import 'glass_surface.dart';
@@ -33,6 +34,7 @@ class JumpToBottomButton extends StatelessWidget {
             ? Duration.zero
             : const Duration(milliseconds: 220);
         final color = GlobalUI.taskTimeColor(context);
+        final capsule = !iconOnly && state.unread > 0;
         return IgnorePointer(
           ignoring: !shown,
           child: ExcludeSemantics(
@@ -45,7 +47,7 @@ class JumpToBottomButton extends StatelessWidget {
                 duration: duration,
                 curve: Curves.easeOutCubic,
                 child: GlassSurface(
-                  radius: iconOnly ? 20 : 24,
+                  radius: capsule ? 24 : 20,
                   child: AnimatedSize(
                     duration: duration,
                     alignment: Alignment.centerRight,
@@ -61,9 +63,13 @@ class JumpToBottomButton extends StatelessWidget {
                             onPressed: onPressed,
                             style: TextButton.styleFrom(
                               foregroundColor: color,
-                              minimumSize: const Size(56, 40),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
+                              minimumSize: Size(capsule ? 56 : 40, 40),
+                              tapTargetSize: capsule
+                                  ? MaterialTapTargetSize.padded
+                                  : MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.standard,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: capsule ? 16 : 8,
                                 vertical: 10,
                               ),
                               shape: const StadiumBorder(),
@@ -77,12 +83,29 @@ class JumpToBottomButton extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   MessageJumpArrow(color: color),
-                                  if (state.unread > 0) ...[
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '${state.unread > 9999 ? '9999+' : state.unread}条新消息',
+                                  AnimatedSwitcher(
+                                    duration: duration,
+                                    layoutBuilder: (current, previous) => Stack(
+                                      alignment: Alignment.centerRight,
+                                      children: [
+                                        ...previous,
+                                        if (current != null) current,
+                                      ],
                                     ),
-                                  ],
+                                    child: state.unread > 0
+                                        ? Padding(
+                                            key: const ValueKey('unread'),
+                                            padding: const EdgeInsets.only(
+                                              left: 6,
+                                            ),
+                                            child: Text(
+                                              '${state.unread > 9999 ? '9999+' : state.unread}条新消息',
+                                            ),
+                                          )
+                                        : const SizedBox.shrink(
+                                            key: ValueKey('arrow'),
+                                          ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -107,12 +130,14 @@ class ScrollAwareJumpStack extends StatefulWidget {
     this.messages = const [],
     this.atBottom = false,
     this.acknowledgedRunId,
+    this.readThrough,
   });
   final List<Widget> children;
   final StackFit fit;
   final List<AgentMessage> messages;
   final bool atBottom;
   final String? acknowledgedRunId;
+  final ({int at, String id})? readThrough;
 
   @override
   State<ScrollAwareJumpStack> createState() => _ScrollAwareJumpStackState();
@@ -122,6 +147,7 @@ class _ScrollAwareJumpStackState extends State<ScrollAwareJumpStack> {
   final _visible = ValueNotifier((visible: false, unread: 0));
   final _unread = <String>{};
   DateTime? _latest;
+  Timer? _hideTimer;
 
   @override
   void initState() {
@@ -141,10 +167,18 @@ class _ScrollAwareJumpStackState extends State<ScrollAwareJumpStack> {
           !(message.canView(MessageSender.localUser.id))) {
         continue;
       }
+      final readThrough = widget.readThrough;
+      final at = message.createdAt.microsecondsSinceEpoch;
       final acknowledged =
-          widget.acknowledgedRunId != null &&
-          message.runId == widget.acknowledgedRunId;
-      final unreadKey = message.runId ?? message.id;
+          (widget.acknowledgedRunId != null &&
+              message.runId == widget.acknowledgedRunId) ||
+          (readThrough != null &&
+              (at < readThrough.at ||
+                  (at == readThrough.at &&
+                      message.id.compareTo(readThrough.id) <= 0)));
+      final unreadKey = readThrough == null
+          ? message.runId ?? message.id
+          : message.id;
       if (acknowledged) _unread.remove(unreadKey);
       if (!initial &&
           previous != null &&
@@ -172,23 +206,23 @@ class _ScrollAwareJumpStackState extends State<ScrollAwareJumpStack> {
 
   bool _onScroll(ScrollNotification event) {
     if (event.depth != 0 || event.metrics.axis != Axis.vertical) return false;
-    if (event is ScrollUpdateNotification && event.dragDetails != null) {
-      final delta = event.scrollDelta ?? 0;
-      if (delta != 0) {
-        final towardEnd = event.metrics.axisDirection == AxisDirection.down
-            ? delta > 0
-            : delta < 0;
-        _visible.value = (
-          visible: towardEnd && !widget.atBottom,
-          unread: _unread.length,
-        );
-      }
+    if ((event is ScrollStartNotification && event.dragDetails != null) ||
+        (event is ScrollUpdateNotification && event.dragDetails != null)) {
+      _hideTimer?.cancel();
+      _visible.value = (visible: !widget.atBottom, unread: _unread.length);
+    }
+    if (event is ScrollEndNotification) {
+      _hideTimer?.cancel();
+      _hideTimer = Timer(const Duration(seconds: 2), () {
+        _visible.value = (visible: false, unread: _unread.length);
+      });
     }
     return false;
   }
 
   @override
   void dispose() {
+    _hideTimer?.cancel();
     _visible.dispose();
     super.dispose();
   }

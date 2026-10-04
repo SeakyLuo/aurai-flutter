@@ -191,14 +191,14 @@ extension ConversationActions on ChatController {
     hasMoreConversations = page.length == ConversationReader.pageSize;
   }
 
-  Future<void> markActiveConversationRead() async {
+  Future<void> markActiveConversationRead({AgentMessage? through}) async {
     final conversation = activeConversation;
     if (conversation.kind == ConversationKind.group) {
       if (!conversation.needsGroupReadCheckpoint) return;
-      final latest = conversation.messages.last;
+      final latest = through ?? conversation.messages.last;
       await _store.writer.flush();
       await GroupUnreadMessages(_store.database).markRead(conversation, latest);
-      _updateConversationList();
+      _updateConversationList(conversation);
       _conversationChanged();
       return;
     }
@@ -213,7 +213,7 @@ extension ConversationActions on ChatController {
       conversation.seenRunId = previous;
       rethrow;
     }
-    _updateConversationList();
+    _updateConversationList(conversation);
     _conversationChanged();
   }
 

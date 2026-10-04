@@ -157,12 +157,6 @@ class _ToolActivityViewState extends State<ToolActivityView> {
         count: request['count'] as int? ?? 1,
       );
     }
-    final waitingForUser =
-        running &&
-        widget.resultJson != null &&
-        ((jsonDecode(widget.resultJson!) as Map)['userAction']
-                as Map?)?['pending'] ==
-            true;
     final isQuestion = widget.toolName == 'askUser';
     final pendingQuestion = _pendingQuestion;
     final canExpand = !running || isQuestion;
@@ -277,8 +271,6 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                       leading: Semantics(
                         label: pendingQuestion != null
                             ? '等待你的回答'
-                            : waitingForUser
-                            ? '等待你操作'
                             : switch (widget.status) {
                                 AgentStepStatus.running => '正在执行',
                                 AgentStepStatus.completed => '已完成',
@@ -288,11 +280,7 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                         child: SizedBox.square(
                           dimension: MediaQuery.textScalerOf(context).scale(18),
                           child: FittedBox(
-                            child: waitingForUser
-                                ? const QuestionIcon(
-                                    type: QuestionIconType.userAction,
-                                  )
-                                : pageSource != null
+                            child: pageSource != null
                                 ? SourceIcon(source: pageSource, size: 18)
                                 : skillIcon == null
                                 ? ToolActionIcon(toolName: widget.toolName)
@@ -302,15 +290,10 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                       ),
                       label: pendingQuestion != null
                           ? '待回答 · ${pendingQuestion.title ?? '问题'}'
-                          : waitingForUser
-                          ? '等待你操作'
                           : displayTitle,
-                      animate:
-                          running && !waitingForUser && pendingQuestion == null,
+                      animate: running && pendingQuestion == null,
                       singleLine: true,
-                      detail: isQuestion || waitingForUser
-                          ? null
-                          : inlineDetail,
+                      detail: isQuestion ? null : inlineDetail,
                       suffix: hasFileChanges && _fileChanges.allLinesCounted
                           ? Padding(
                               padding: const EdgeInsets.only(left: 8),

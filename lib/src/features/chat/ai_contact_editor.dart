@@ -66,6 +66,7 @@ class _AiContactEditorState extends State<AiContactEditor> {
   final _editedText = <TextEditingController>{};
   bool _avatarEdited = false;
   bool _styleEdited = false;
+  bool _genderEdited = false;
   final _editedTraits = <ResponseTrait>{};
   final _generator = ContactGenerator();
   bool _rolling = false;
@@ -81,11 +82,13 @@ class _AiContactEditorState extends State<AiContactEditor> {
         if (_editedText.contains(_description))
           'description': _description.text,
         if (_editedText.contains(_role)) 'role': _role.text,
+        if (_genderEdited) 'gender': _gender.name,
       });
       if (!mounted) return;
 
       setState(() {
         _rolling = false;
+        if (!_genderEdited) _gender = generated.gender;
         if (!_editedText.contains(_name)) _name.text = generated.name;
         if (!_editedText.contains(_description))
           _description.text = generated.description;
@@ -355,6 +358,7 @@ class _AiContactEditorState extends State<AiContactEditor> {
                 ? null
                 : (value) => setState(() {
                     _gender = value;
+                    _genderEdited = true;
                     _changed = true;
                   }),
           ),

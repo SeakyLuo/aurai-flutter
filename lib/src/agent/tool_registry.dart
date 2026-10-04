@@ -45,6 +45,8 @@ class ToolRegistry {
             tool.name == 'searchTools' ||
             tool.name == 'askUser' ||
             tool.name == 'hideThinking' ||
+            tool.name == 'readInteractiveMessage' ||
+            tool.name == 'clickInteractiveMessage' ||
             const [
               'createGoal',
               'clearGoal',

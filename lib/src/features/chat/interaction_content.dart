@@ -53,8 +53,8 @@ class InteractionContent extends StatelessWidget {
         ? '已结束'
         : view['completed'] == true
         ? '本轮已完成'
-        : view['summaryVisible'] == true
-        ? '进行中'
+        : collecting
+        ? (eligible ? '进行中' : '进行中 · 仅可查看')
         : null;
     final participationSummary = [
       if (status != null) status,
@@ -107,7 +107,7 @@ class InteractionContent extends StatelessWidget {
             (status != null ||
                 (view['revealed'] == true && view['summaryVisible'] != true)))
           const SizedBox(height: 12),
-        for (final button in participantButtons.where(
+        for (final button in buttons.where(
           (button) => collecting && button['selection'] != null,
         ))
           Padding(
@@ -118,12 +118,14 @@ class InteractionContent extends StatelessWidget {
               self: self,
               locked:
                   readOnly ||
+                  !eligible ||
                   !collecting ||
                   busy != null ||
                   pendingButtonId == button['id'],
               submitted: submitted,
               allowChange: allowChange,
               busy: busy == button['id'],
+              showSubmit: eligible && !readOnly,
               onSubmit: (value) => onClick(button, value: value),
             ),
           ),

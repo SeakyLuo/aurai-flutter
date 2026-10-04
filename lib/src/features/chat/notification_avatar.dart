@@ -10,6 +10,7 @@ import '../../domain/avatar_portraits.dart';
 import '../../storage/group_chat_store.dart';
 import 'group_avatar.dart';
 import 'member_avatar.dart';
+import 'profile_avatar.dart';
 
 class NotificationAvatar {
   NotificationAvatar(this.store);
@@ -33,6 +34,9 @@ class NotificationAvatar {
       ];
     }
     const size = 64.0;
+    final memberSize = group
+        ? GroupAvatar.memberSize(size, senders.length)
+        : size;
     final boundary = RenderRepaintBoundary();
     final pipeline = PipelineOwner();
     final focus = FocusManager();
@@ -50,16 +54,22 @@ class NotificationAvatar {
     view.prepareInitialFrame();
     final adapter = RenderObjectToWidgetAdapter<RenderBox>(
       container: boundary,
-      child: Directionality(
-        textDirection: TextDirection.ltr,
-        child: Theme(
-          data: ThemeData(
-            brightness:
-                WidgetsBinding.instance.platformDispatcher.platformBrightness,
+      child: MediaQuery(
+        data: const MediaQueryData(
+          size: Size.square(size),
+          devicePixelRatio: 3,
+        ),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: Theme(
+            data: ThemeData(
+              brightness:
+                  WidgetsBinding.instance.platformDispatcher.platformBrightness,
+            ),
+            child: group
+                ? GroupAvatar(members: senders, size: size)
+                : MemberAvatar(sender: senders.single, size: size),
           ),
-          child: group
-              ? GroupAvatar(members: senders, size: size)
-              : MemberAvatar(sender: senders.single, size: size),
         ),
       ),
     );
@@ -75,7 +85,7 @@ class NotificationAvatar {
             )
           else if (avatarPortraits.containsKey(sender.avatarIcon))
             precacheImage(
-              AssetImage(avatarPortraits[sender.avatarIcon]!.asset),
+              avatarPortraitImage(sender.avatarIcon, memberSize, 3),
               root,
             )
           else if (sender.avatarIcon == 'app_logo' ||

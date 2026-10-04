@@ -68,7 +68,7 @@ class _SelectionMessageMenuRoute
   @override
   Widget buildModalBarrier() => ModalBarrier(
     dismissible: true,
-    onDismiss: () => navigator!.pop(),
+    onDismiss: () => navigator!.pop(const MessageMenuDismissResult()),
     semanticsLabel: barrierLabel,
   );
 }

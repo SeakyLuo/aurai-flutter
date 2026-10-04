@@ -37,6 +37,7 @@ class ResponsesTransport {
     void Function(String)? onReasoningChanged,
     void Function()? onProcessingStarted,
     void Function(int index)? onMessageStarted,
+    void Function(int index)? onMessageCompleted,
   }) async {
     var hasText = false;
     try {
@@ -59,6 +60,7 @@ class ResponsesTransport {
               onProcessingStarted?.call();
             },
             onMessageStarted: onMessageStarted,
+            onMessageCompleted: onMessageCompleted,
           );
         } on _RetryableFailure catch (failure) {
           checkCancelled();
@@ -86,6 +88,7 @@ class ResponsesTransport {
     void Function(String)? onReasoningChanged,
     void Function()? onProcessingStarted,
     void Function(int index)? onMessageStarted,
+    void Function(int index)? onMessageCompleted,
   }) async {
     checkCancelled();
     final client = HttpClient()
@@ -163,6 +166,7 @@ class ResponsesTransport {
           await (chat ? readChatCompletionsStream : readResponsesStream)(
             response,
             onMessageStarted: onMessageStarted,
+            onMessageCompleted: onMessageCompleted,
             onReasoningChanged: onReasoningChanged,
             onProcessingStarted: () {
               checkCancelled();

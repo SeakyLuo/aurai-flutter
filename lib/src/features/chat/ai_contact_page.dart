@@ -1,6 +1,7 @@
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../domain/message_sender.dart';
+import '../../storage/group_member_details.dart';
 import 'dialog_action_button.dart';
 import 'header_action_menu.dart';
 import 'conversation_menu_icon.dart';
@@ -42,6 +43,7 @@ class AiContactPage extends StatefulWidget {
 
 class _AiContactPageState extends State<AiContactPage> {
   AiProfile? _ai;
+  String _groupNickname = '';
   bool _busy = false;
   @override
   void initState() {
@@ -55,8 +57,21 @@ class _AiContactPageState extends State<AiContactPage> {
       ).showToast(SnackBar(content: Text(text)), kind: kind);
   Future<void> _reload() async {
     try {
-      final ai = await widget.controller.groupStore.loadAi(widget.senderId);
-      if (mounted) setState(() => _ai = ai);
+      final groupId = widget.groupId;
+      final (ai, nickname) = await (
+        widget.controller.groupStore.loadAi(widget.senderId),
+        groupId == null
+            ? Future.value('')
+            : GroupMemberDetailsStore(widget.controller.groupStore.database)
+                  .read(groupId, senderId: widget.senderId)
+                  .then((details) => details.nickname),
+      ).wait;
+      if (mounted) {
+        setState(() {
+          _ai = ai;
+          _groupNickname = nickname;
+        });
+      }
     } on Object catch (error) {
       if (mounted) {
         _notice('朋友读取失败：${errorMessage(error)}', kind: ToastKind.error);
@@ -277,6 +292,19 @@ class _AiContactPageState extends State<AiContactPage> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  if (_groupNickname.isNotEmpty &&
+                      _groupNickname != ai.sender.name)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        '群昵称：$_groupNickname',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
                   if (ai.description.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),

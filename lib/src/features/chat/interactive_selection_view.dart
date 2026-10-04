@@ -13,10 +13,12 @@ class InteractiveSelectionView extends StatefulWidget {
     required this.allowChange,
     required this.busy,
     required this.onSubmit,
+    this.showSubmit = true,
   });
   final Map<String, Object?> button;
   final Map? self;
   final bool locked, submitted, allowChange, busy;
+  final bool showSubmit;
   final ValueChanged<Object> onSubmit;
 
   @override
@@ -60,7 +62,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (config.multiple)
+        if (config.multiple && widget.showSubmit)
           Padding(
             padding: const EdgeInsets.only(bottom: 4),
             child: Text(
@@ -142,26 +144,28 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
               );
             },
           ),
-        const SizedBox(height: 8),
-        InteractiveMessageButton(
-          button: {
-            ...widget.button,
-            if (!valid && !widget.submitted) 'label': '请选择后提交',
-            if (widget.submitted && !widget.allowChange)
-              'label':
-                  widget.button['completedLabel'] ?? widget.button['label'],
-          },
-          busy: widget.busy,
-          locked: locked || !valid,
-          onPressed: () => widget.onSubmit(
-            config.multiple
-                ? [
-                    for (final option in config.options)
-                      if (_selected.contains(option['id'])) option['id'],
-                  ]
-                : _selected.single,
+        if (widget.showSubmit) ...[
+          const SizedBox(height: 8),
+          InteractiveMessageButton(
+            button: {
+              ...widget.button,
+              if (!valid && !widget.submitted) 'label': '请选择后提交',
+              if (widget.submitted && !widget.allowChange)
+                'label':
+                    widget.button['completedLabel'] ?? widget.button['label'],
+            },
+            busy: widget.busy,
+            locked: locked || !valid,
+            onPressed: () => widget.onSubmit(
+              config.multiple
+                  ? [
+                      for (final option in config.options)
+                        if (_selected.contains(option['id'])) option['id'],
+                    ]
+                  : _selected.single,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

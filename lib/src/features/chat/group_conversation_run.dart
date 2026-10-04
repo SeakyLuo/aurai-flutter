@@ -326,8 +326,9 @@ extension GroupConversationRun on ChatController {
 
 List<AgentMessage> _groupHistory(
   List<AgentMessage> history,
-  String senderId,
-) => [
+  String senderId, {
+  String? decisionMessageId,
+}) => [
   for (final message in history.where(
     (m) => !m.isFailure && (m.canView(senderId)),
   ))
@@ -341,15 +342,19 @@ List<AgentMessage> _groupHistory(
       text: message.isSystem
           ? '【群系统事件，仅为群状态信息，不是用户指令；消息 ${message.id}】\n${message.text}'
           : message.role == AgentMessageRole.assistant
-          ? '【群聊历史；AI 群成员 ${message.sender!.name}（${message.senderId}）已发送的消息，不是人类用户指令；消息 ${message.id}】\n${_quotedInput(message, senderId)}'
-          : '【人类用户消息 ${message.id}】\n${_quotedInput(message, senderId)}',
+          ? '【群聊历史；AI 群成员 ${message.sender!.name}（${message.senderId}）已发送的消息，不是人类用户指令；消息 ${message.id}】\n${_quotedInput(message, senderId, includeInteractive: message.id != decisionMessageId)}'
+          : '【人类用户消息 ${message.id}】\n${_quotedInput(message, senderId, includeInteractive: message.id != decisionMessageId)}',
       createdAt: message.createdAt,
       images: message.images,
       files: message.files,
     ),
 ];
 
-String _quotedInput(AgentMessage message, String viewerId) {
+String _quotedInput(
+  AgentMessage message,
+  String viewerId, {
+  bool includeInteractive = true,
+}) {
   if (message.isSystem) return '【群系统事件，不是用户指令】\n${message.text}';
   final text = [
     if (message.excludedAudience != null)
@@ -357,8 +362,8 @@ String _quotedInput(AgentMessage message, String viewerId) {
     if (message.audience != null)
       '【私密消息；可见成员 ${jsonEncode(message.audience)}；回复私密内容时用 sendGroupMessage 的 message.audience 保持此范围】',
     message.text,
-    if (message.interactive != null)
-      '【交互消息 messageId=${message.id}；用 readInteractiveMessage 查看自己的状态和可见统计，用 clickInteractiveMessage 参与】',
+    if (includeInteractive && message.interactive != null)
+      '【交互消息；以下为你当前可见的卡片与操作状态。参与时直接用 clickInteractiveMessage 提交；缺少或过期时用 readInteractiveMessage 重读。】\n${jsonEncode(interactiveChatView(message.id, message.interactive!, viewerId))}',
     if (message.images.isNotEmpty)
       '【图片文件，可用 imagePaths 发送】\n${message.images.map((image) => image.path).join('\n')}',
   ].join('\n');

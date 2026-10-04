@@ -39,7 +39,7 @@ class HtmlMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
             'For shared data collection or fixed-button participation, supply interaction, buttons and participation at creation. AuraiHTML.interaction contains the authenticated viewer projection (revision, participantRevision, buttons, interactionView). For text/forms/drawing data, declare a submit button with input:text or input:json, then await AuraiHTML.submitInteraction({buttonId,value}) to save up to 16 KB of JSON as the authenticated participant submission. Data is saved directly in shared session; an optional notifyAi:true on the endpoint additionally queues a creator callback. Default one latest submission per participant; allowChange:true permits replacement until completion. Use interaction views/visibility rules to expose only allowed data. Call await AuraiHTML.clickButton(buttonId) only from a deliberate user gesture; it executes the predefined button directly and returns refreshed visible state, without an AI callback unless that endpoint explicitly sets notifyAi:true. Listen to aurai:messageupdate for other participants updates. Never put secret roles or hidden choices in HTML, button values, initial state or the public definition. This API cannot choose an actor or target another message. '
             'Do not send HTML as an ordinary Markdown code block when an interactive card is requested. '
             'width null fits the message; inline height is measured by the host, not specified by you. '
-            'No human handoff is needed merely to deliver a card: userAction must be JSON null.',
+            'No extra askUser question is needed merely to deliver a card.',
     inputSchema: {
       'type': 'object',
       'properties': {

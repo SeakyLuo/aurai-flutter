@@ -5,12 +5,22 @@ import 'cjk_strong_syntax.dart';
 final _memberMentionLink = RegExp(
   r'\[((?:\\.|[^\]])+)\]\(aurai://member/[^)]+\)',
 );
+final _miniappMessageLink = RegExp(
+  r'\[((?:\\.|[^\]])+)\]\(aurai://miniapp/[^)]+\)',
+);
 
 /// Replaces internal member links with the same `@name` label shown in chat.
-String memberMentionsPlainText(String source) => source.replaceAllMapped(
-  _memberMentionLink,
-  (match) => match[1]!.replaceAllMapped(RegExp(r'\\(.)'), (part) => part[1]!),
-);
+String memberMentionsPlainText(String source) => source
+    .replaceAllMapped(
+      _memberMentionLink,
+      (match) =>
+          match[1]!.replaceAllMapped(RegExp(r'\\(.)'), (part) => part[1]!),
+    )
+    .replaceAllMapped(
+      _miniappMessageLink,
+      (match) =>
+          match[1]!.replaceAllMapped(RegExp(r'\\(.)'), (part) => part[1]!),
+    );
 
 /// Returns the text users can see after Markdown is rendered.
 ///

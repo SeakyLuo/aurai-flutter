@@ -119,9 +119,7 @@ class _UserQuestionCardState extends State<UserQuestionCard> {
                       children: [
                         Expanded(
                           child: ThinkingIndicator(
-                            label:
-                                question.title ??
-                                (question.isUserAction ? '等待你操作' : '问题'),
+                            label: question.title ?? '问题',
                             animate: false,
                             singleLine: true,
                             leading: SizedBox.square(
@@ -130,9 +128,7 @@ class _UserQuestionCardState extends State<UserQuestionCard> {
                               ).scale(18),
                               child: FittedBox(
                                 child: QuestionIcon(
-                                  type: question.isUserAction
-                                      ? QuestionIconType.userAction
-                                      : QuestionIconType.question,
+                                  type: QuestionIconType.question,
                                 ),
                               ),
                             ),
@@ -167,11 +163,7 @@ class _UserQuestionCardState extends State<UserQuestionCard> {
                                             ),
                                           ),
                                         ),
-                                        TextSpan(
-                                          text: question.isUserAction
-                                              ? '请你完成一个操作'
-                                              : '问了你一个问题',
-                                        ),
+                                        TextSpan(text: '问了你一个问题'),
                                       ],
                                     ),
                                     style: TextStyle(

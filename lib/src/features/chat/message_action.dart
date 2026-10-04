@@ -21,6 +21,10 @@ sealed class MessageMenuResult {
   const MessageMenuResult();
 }
 
+class MessageMenuDismissResult extends MessageMenuResult {
+  const MessageMenuDismissResult();
+}
+
 class MessageActionResult extends MessageMenuResult {
   const MessageActionResult(this.action);
   final MessageAction action;

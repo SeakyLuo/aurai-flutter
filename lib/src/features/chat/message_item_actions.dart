@@ -1,11 +1,27 @@
 part of 'message_item.dart';
 
+extension _FailureRetry on _MessageItemState {
+  Future<void> _retryFailure() async {
+    _setRetryingFailure(true);
+    try {
+      await widget.onRetry!(message);
+    } finally {
+      if (mounted) _setRetryingFailure(false);
+    }
+  }
+}
+
 extension _MessageItemActions on _MessageItemState {
+  Future<void> _openBubbleMenu() => _bubbleTextSelection
+      ? _selectionKey.currentState!.openMenu()
+      : _openActions();
+
   Widget _selectableContent() {
     if (message.interactive != null) return _content;
     if (_hasBubble && message.htmlGame == null) {
       if (_bubbleTextSelection) {
         return GroupMessageSelection(
+          key: _selectionKey,
           onChanged: (text) => _selectedText = text,
           onOpenMenu: () async {
             var acted = false;
@@ -258,6 +274,7 @@ extension _MessageItemActions on _MessageItemState {
           );
     if (!mounted || result == null) return;
     onActionSelected?.call();
+    if (result is MessageMenuDismissResult) return;
     if (result case MessageQuickReplyResult(:final option)) {
       await widget.onQuickReply?.call(snapshot, option.key);
       return;
