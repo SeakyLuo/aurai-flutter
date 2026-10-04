@@ -1,4 +1,5 @@
 import 'private_goal_panel.dart';
+import 'program_task_panel.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/glass_notice.dart';
@@ -32,11 +33,18 @@ class _PendingMessagePanelState extends State<PendingMessagePanel> {
   Object? _shownError;
 
   @override
-  Widget build(BuildContext context) => PrivateGoalPanel(
-    store: widget.controller.privateTaskState,
-    controller: widget.controller,
-    builder: (context, header) => _buildPanel(context, header),
-  );
+  Widget build(BuildContext context) =>
+      widget.controller.activeConversation.kind == ConversationKind.group
+      ? ProgramTaskPanel(
+          controller: widget.controller,
+          conversationId: widget.controller.activeConversation.id,
+          child: _buildPanel(context, null),
+        )
+      : PrivateGoalPanel(
+          store: widget.controller.privateTaskState,
+          controller: widget.controller,
+          builder: (context, header) => _buildPanel(context, header),
+        );
 
   Widget _buildPanel(BuildContext context, Widget? header) {
     final queue = widget.controller.pendingMessageQueue;

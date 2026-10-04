@@ -1,4 +1,5 @@
 import 'skill_icon_names.dart';
+import '../domain/resource_scope.dart';
 import 'skill_sort.dart';
 import '../domain/message_sender.dart';
 import 'skill_permission.dart';
@@ -9,12 +10,14 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 part 'skill_library_store.dart';
+part 'skill_batch_install_store.dart';
 
 class SavedSkill {
   const SavedSkill({
     this.id = '',
     this.ownerId = '',
     this.visibility = 'public',
+    this.scopes = const [],
     this.visibleTo = const [],
     this.dependencyIds = const [],
     required this.name,
@@ -26,6 +29,7 @@ class SavedSkill {
     this.icon = 'skill',
   });
   final String ownerId, visibility;
+  final List<ResourceScope> scopes;
   final List<String> visibleTo;
   final String id, name, description, instructions, script;
   final List<String> dependencyIds;
@@ -36,6 +40,14 @@ class SavedSkill {
     'id': id,
     'ownerId': ownerId,
     'visibility': visibility,
+    'groupIds': scopes
+        .where((s) => s.type == 'group')
+        .map((s) => s.id)
+        .toList(),
+    'projectIds': scopes
+        .where((s) => s.type == 'project')
+        .map((s) => s.id)
+        .toList(),
     'visibleTo': visibleTo,
     'dependencyIds': dependencyIds,
     'name': name,
@@ -50,6 +62,12 @@ class SavedSkill {
     id: data['id'] as String? ?? '',
     ownerId: data['ownerId'] as String? ?? data['owner_id'] as String? ?? '',
     visibility: data['visibility'] as String? ?? 'private',
+    scopes: [
+      for (final id in data['groupIds'] as List? ?? const [])
+        ResourceScope.group(id as String),
+      for (final id in data['projectIds'] as List? ?? const [])
+        ResourceScope.project(id as String),
+    ],
     visibleTo: List<String>.from(data['visibleTo'] as List? ?? const []),
     dependencyIds: List<String>.from(
       data['dependencyIds'] as List? ?? const [],
@@ -77,6 +95,20 @@ class SkillStore extends ChangeNotifier {
   final _timestamps = <String, Map<String, int>>{};
   final _lastEditors = <String, String>{};
   final _members = <MessageSender>[];
+  final _groups = <Map<String, Object?>>[];
+  List<Map<String, Object?>> get groups => List.unmodifiable(_groups);
+  final _projects = <Map<String, Object?>>[];
+  List<Map<String, Object?>> get projects => List.unmodifiable(_projects);
+  Future<Set<String>> currentGroupMemberships() async {
+    final rows = await _database.query(
+      'conversation_members',
+      columns: ['conversation_id'],
+      where: 'sender_id = ? AND left_at IS NULL',
+      whereArgs: [ownerId],
+    );
+    return rows.map((row) => row['conversation_id'] as String).toSet();
+  }
+
   SkillSort sort = SkillSort.createdDescending;
   SkillPermission defaultPermission = SkillPermission.lowRisk;
   List<MessageSender> get members => List.unmodifiable(_members);
@@ -208,6 +240,22 @@ class SkillStore extends ChangeNotifier {
           '%skill_default_permission',
         ],
       ),
+      db.query(
+        'resource_scopes',
+        where: 'resource_type = ?',
+        whereArgs: ['skill'],
+      ),
+      db.query(
+        'conversations',
+        columns: ['id', 'title', 'project_id'],
+        where: "kind = 'group'",
+        orderBy: 'updated_at DESC',
+      ),
+      db.query(
+        'development_projects',
+        columns: ['id', 'name'],
+        orderBy: 'updated_at DESC',
+      ),
     ]);
   }
 
@@ -218,6 +266,13 @@ class SkillStore extends ChangeNotifier {
 
   Future<void> _reload() async => _applySnapshot(await _snapshot());
   void _applySnapshot(List<List<Map<String, Object?>>> rows) {
+    final scopes = resourceScopeMap(rows[6]);
+    _groups
+      ..clear()
+      ..addAll(rows[7]);
+    _projects
+      ..clear()
+      ..addAll(rows[8]);
     _installations
       ..clear()
       ..addEntries(
@@ -251,6 +306,14 @@ class SkillStore extends ChangeNotifier {
         'enabled': _installations[id]?['enabled'] == 1,
         'dependencyIds': dependencies[id] ?? [],
         'visibleTo': grants[id] ?? [],
+        'groupIds': (scopes[id] ?? [])
+            .where((s) => s.type == 'group')
+            .map((s) => s.id)
+            .toList(),
+        'projectIds': (scopes[id] ?? [])
+            .where((s) => s.type == 'project')
+            .map((s) => s.id)
+            .toList(),
       });
     }
     _members

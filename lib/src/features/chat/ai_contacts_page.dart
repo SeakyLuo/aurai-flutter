@@ -25,6 +25,7 @@ import 'settings_icon.dart';
 import 'pagination_listener.dart';
 import 'recent_chats_page.dart';
 import 'sidebar_action_icon.dart';
+import 'contact_profile_split.dart';
 
 class AiContactsPage extends StatefulWidget {
   const AiContactsPage({
@@ -53,6 +54,7 @@ class AiContactsPage extends StatefulWidget {
 }
 
 class _AiContactsPageState extends State<AiContactsPage> {
+  final _profileSplit = GlobalKey<ContactProfileSplitState>();
   late final _search = widget.searchController ?? TextEditingController();
   late String _searchQuery;
   final _items = <AiProfile>[];
@@ -197,13 +199,18 @@ class _AiContactsPageState extends State<AiContactsPage> {
   }
 
   Future<void> _open(String id) async {
-    await Navigator.push<void>(
-      context,
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            AiContactPage(controller: widget.controller, senderId: id),
-      ),
+    await _openDetail(
+      AiContactPage(controller: widget.controller, senderId: id),
     );
+  }
+
+  Future<void> _openDetail(Widget page) async {
+    final route = MaterialPageRoute<void>(builder: (_) => page);
+    if (_profileSplit.currentState!.supportsSplit) {
+      await _profileSplit.currentState!.open(route);
+    } else {
+      await Navigator.push<void>(context, route);
+    }
   }
 
   bool _openingConversation = false;
@@ -327,7 +334,10 @@ class _AiContactsPageState extends State<AiContactsPage> {
   }
 
   @override
-  Widget build(BuildContext context) => widget.embedded
+  Widget build(BuildContext context) =>
+      ContactProfileSplit(key: _profileSplit, child: _page());
+
+  Widget _page() => widget.embedded
       ? _body()
       : Scaffold(
           extendBodyBehindAppBar: true,
@@ -437,13 +447,10 @@ class _AiContactsPageState extends State<AiContactsPage> {
                         trailing: const SettingsIcon(
                           type: SettingsIconType.chevron,
                         ),
-                        onTap: () => Navigator.push<void>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => RecentChatsPage(
-                              controller: widget.controller,
-                              groupsOnly: true,
-                            ),
+                        onTap: () => _openDetail(
+                          RecentChatsPage(
+                            controller: widget.controller,
+                            groupsOnly: true,
                           ),
                         ),
                       ),

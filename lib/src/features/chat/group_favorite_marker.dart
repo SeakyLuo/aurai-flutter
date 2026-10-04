@@ -1,3 +1,4 @@
+import 'profile_navigation.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
@@ -69,7 +70,8 @@ class _GroupFavoriteMarkerState extends State<GroupFavoriteMarker> {
   void _openProfile() {
     final mark = _mark!;
     final controller = ImageActionScope.of(context);
-    Navigator.of(context).push<void>(
+    openProfileRoute(
+      context,
       MaterialPageRoute(
         builder: (_) => mark.actorId == MessageSender.localUser.id
             ? PersonalInfoPage(memory: controller.memory)

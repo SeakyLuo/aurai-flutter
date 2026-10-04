@@ -1,3 +1,5 @@
+import 'profile_navigation.dart';
+import 'pinned_message_split.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'dart:io';
@@ -205,8 +207,8 @@ class _ConversationMoreState extends State<ConversationMore> {
 
   Future<void> _openMenu([Offset? position]) async {
     final button = context.findRenderObject()! as RenderBox;
-    final overlay =
-        Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final overlay = navigator.overlay!.context.findRenderObject()! as RenderBox;
     final origin = button.localToGlobal(Offset.zero, ancestor: overlay);
     final pinned = _conversation.isPinned;
     final isGroup = _conversation.kind == ConversationKind.group;
@@ -219,7 +221,7 @@ class _ConversationMoreState extends State<ConversationMore> {
     ).isNotEmpty;
     final hasProject =
         widget.showProjectAction && _conversation.projectId != null;
-    final safe = MediaQuery.paddingOf(context);
+    final safe = MediaQuery.paddingOf(navigator.context);
     final menuWidth = 212.0;
     final menuHeight =
         (_conversation.isTemporary
@@ -230,7 +232,7 @@ class _ConversationMoreState extends State<ConversationMore> {
         (hasTask ? 54 : 0) +
         (hasProject ? 54 : 0);
     final anchor =
-        position ??
+        (position == null ? null : overlay.globalToLocal(position)) ??
         Offset(
           origin.dx + button.size.width - menuWidth,
           origin.dy + button.size.height + 10,
@@ -245,6 +247,7 @@ class _ConversationMoreState extends State<ConversationMore> {
     );
     final action = await showGeneralDialog<_MoreAction>(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: true,
       barrierLabel: '关闭更多菜单',
       barrierColor: Colors.transparent,
@@ -381,7 +384,7 @@ class _ConversationMoreState extends State<ConversationMore> {
     if (!mounted) return;
     switch (action) {
       case _MoreAction.profile:
-        await Navigator.push<void>(
+        await openProfileRoute(
           context,
           MaterialPageRoute(
             builder: (_) => AiContactPage(
@@ -447,28 +450,31 @@ class _ConversationMoreState extends State<ConversationMore> {
   }
 
   Future<void> _openDetails() async {
-    final leftConversation = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => _conversation.kind == ConversationKind.group
-            ? GroupInfoPage(
-                controller: widget.controller,
-                conversation: _conversation,
-                originTaskId: widget.originTaskId,
-                onPin: _pin,
-                onArchive: _archive,
-              )
-            : DirectConversationInfoPage(
-                controller: widget.controller,
-                conversation: _conversation,
-                originTaskId: widget.originTaskId,
-                onSave: _saveChat,
-                onPin: _pin,
-                onArchive: _archive,
-                onDelete: () => _delete(confirmed: true),
-              ),
-      ),
-    );
+    Widget details(BuildContext _) =>
+        _conversation.kind == ConversationKind.group
+        ? GroupInfoPage(
+            controller: widget.controller,
+            conversation: _conversation,
+            originTaskId: widget.originTaskId,
+            onPin: _pin,
+            onArchive: _archive,
+          )
+        : DirectConversationInfoPage(
+            controller: widget.controller,
+            conversation: _conversation,
+            originTaskId: widget.originTaskId,
+            onSave: _saveChat,
+            onPin: _pin,
+            onArchive: _archive,
+            onDelete: () => _delete(confirmed: true),
+          );
+    final split = context.findAncestorStateOfType<PinnedMessageSplitState>();
+    final leftConversation = split != null && split.supportsSplit
+        ? await split.openDetails(details)
+        : await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: details),
+          );
     if (!mounted) return;
     widget.onChanged?.call();
     if (leftConversation == true && Navigator.canPop(context)) {

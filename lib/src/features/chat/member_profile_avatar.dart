@@ -1,3 +1,4 @@
+import 'profile_navigation.dart';
 import 'package:flutter/material.dart';
 import '../../domain/message_sender.dart';
 import 'ai_contact_page.dart';
@@ -24,7 +25,8 @@ class MemberProfileAvatar extends StatelessWidget {
     label: '查看${sender.name}的资料',
     child: InkWell(
       borderRadius: BorderRadius.circular(size / 2),
-      onTap: () => Navigator.of(context).push<void>(
+      onTap: () => openProfileRoute(
+        context,
         MaterialPageRoute(
           builder: (_) => sender.id == MessageSender.localUser.id
               ? PersonalInfoPage(memory: controller.memory)

@@ -19,7 +19,7 @@ class HtmlStore {
       "EXISTS (SELECT 1 FROM html_game_receipts WHERE processed_at IS NULL AND attempts >= 3 AND event_id IN (SELECT id FROM html_game_events WHERE message_id = html_games.message_id)) AS retry_available";
   Future<HtmlGameCard> card(String id) async {
     final rows = await database.rawQuery(
-      "SELECT app_id, title, preview, background_mode, display_mode, display_width, display_height, measured_width, measured_height, measured_scale, measured_version, version, status, $retryColumn FROM html_games WHERE message_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
+      "SELECT app_id, title, preview, preview_theme, background_mode, display_mode, display_width, display_height, measured_width, measured_height, measured_scale, measured_version, version, status, $retryColumn FROM html_games WHERE message_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
       [id],
     );
     if (rows.isEmpty) throw StateError('游戏已被删除或撤回');
@@ -491,7 +491,12 @@ class HtmlStore {
     return {'applied': true, ...snapshot};
   });
 
-  Future<void> savePreview(String id, int version, Uint8List bytes) async {
+  Future<void> savePreview(
+    String id,
+    int version,
+    Uint8List bytes,
+    String theme,
+  ) async {
     if (bytes.length > 256 * 1024) return;
     final program = await database.query(
       'app_state',
@@ -504,7 +509,7 @@ class HtmlStore {
     if (program.isNotEmpty) return;
     await database.update(
       'html_games',
-      {'preview': bytes},
+      {'preview': bytes, 'preview_theme': theme},
       where: 'message_id = ? AND version = ?',
       whereArgs: [id, version],
     );

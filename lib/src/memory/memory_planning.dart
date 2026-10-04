@@ -7,7 +7,7 @@ Keep only explicit stable background, explicitly persistent preferences, endurin
 Reject current-game rules, round state, temporary roles, scores, card wording, restart behavior, play or testing plans, debugging steps, probes, verification protocols, tool-operation details, one-off UI adjustments, casual complaints and reactions, pasted documents, secrets, and inferred personality traits. Repetition, strong wording, technical specificity, or words like "rule", "agreement" and "preference" do not establish lasting scope. Do not promote "do it this way now" into "always prefers this" or turn an AI proposal into an established group rule. Explicit requests to remember a specific fact may preserve it, but retain its stated scope instead of inventing permanence.
 Examples in automatic mode: "这局发牌后冻结，改了就重开" => no memory; "先用占位词验证 audience，三个人确认再发牌" => no memory; "这次不要法官，直接对原始证据" => no memory, not a preference against referees; "这个游戏太无聊了" => no memory, not a lasting game preference. "以后这个群的活动都约北京时间晚上九点，这是固定约定" => retain the explicit enduring group agreement. "我一直更喜欢合作类游戏" => retain only that speaker's explicitly persistent preference.
 Compare with profile and existing memories only to avoid duplicates and identify explicit corrections. Never modify or remove manual entries.
-Return ONLY JSON {"changes":[{"ids":[],"text":"fact","reason":"brief reason"}]}. Empty ids means addition. Nonempty ids replaces/merges those automatic entries into text; empty text deletes them. Each fact <=300 characters. Reasons in user's language; for automatic additions state the explicit evidence of lasting relevance, not merely that the topic may recur. Only use existing IDs. No overlapping IDs.
+Call submitMemoryPlan with {"changes":[{"ids":[],"text":"fact","reason":"brief reason"}]} as tool arguments; never return the plan in reply text. Empty ids means addition. Nonempty ids replaces/merges those automatic entries into text; empty text deletes them. Each fact <=300 characters. Reasons in user's language; for automatic additions state the explicit evidence of lasting relevance, not merely that the topic may recur. Only use existing IDs. No overlapping IDs.
 In automatic mode: extract new facts ONLY from latest_statement, the latest source message, attributed using source. Existing memories and profile are comparison data, not sources of new facts. Do not summarize, reorganize or re-extract historical conversations, tool activity or existing memories. Update or remove an automatic memory only when the latest message explicitly corrects or retracts that fact. Do not store deletion requests as new memories or infer a permanent exclusion preference from deletion. If the latest message contains no new lasting fact or correction, return an empty changes array.
 In requested mode: interpret latest_statement as the user's current request to organize, supplement or correct memories. Organizing must not store the request itself. Propose redundant, obsolete or low-value automatic facts for deletion with reasons; all changes will be reviewed by the user. Supplement explicit facts as concise additions, not verbatim commands. Do not create facts not stated by the user.''';
 
@@ -33,9 +33,37 @@ extension MemoryPlanning on MemoryController {
     AgentMessage? sourceMessage,
   }) async {
     final revision = _epoch;
+    const resultTool = StructuredResultTool(
+      'submitMemoryPlan',
+      '提交记忆变更方案，由原有审核和保存流程处理。',
+      {
+        'type': 'object',
+        'properties': {
+          'changes': {
+            'type': 'array',
+            'items': {
+              'type': 'object',
+              'properties': {
+                'ids': {
+                  'type': 'array',
+                  'items': {'type': 'string'},
+                },
+                'text': {'type': 'string', 'maxLength': 300},
+                'reason': {'type': 'string'},
+              },
+              'required': ['ids', 'text', 'reason'],
+              'additionalProperties': false,
+            },
+          },
+        },
+        'required': ['changes'],
+        'additionalProperties': false,
+      },
+    );
     final response = await transport
         .send({
-          'model': transport.config.model,
+          'model': transport.config.apiModel,
+          ...resultTool.request,
           'stream': true,
           'max_output_tokens': 8192,
           'instructions': _memoryInstructions,
@@ -90,14 +118,7 @@ extension MemoryPlanning on MemoryController {
     if (response['status'] != 'completed') {
       throw StateError('记忆整理未完成，请重试');
     }
-    final raw = (response['output'] as List)
-        .cast<Map>()
-        .where((e) => e['type'] == 'message')
-        .expand((e) => (e['content'] as List).cast<Map>())
-        .where((e) => e['type'] == 'output_text')
-        .map((e) => e['text'] as String)
-        .join();
-    final decoded = jsonDecode(raw) as Map<String, dynamic>;
+    final decoded = resultTool.read(response);
     final changes = <MemoryChange>[];
     final used = <String>{};
     final byId = {for (final e in entries) e['id'] as String: e};

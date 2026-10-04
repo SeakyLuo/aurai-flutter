@@ -1,4 +1,6 @@
 import '../app/glass_notice.dart';
+import '../features/chat/resource_scope_picker.dart';
+import '../domain/resource_scope.dart';
 import '../domain/error_message.dart';
 import 'skill_visibility_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -25,6 +27,7 @@ class _SkillEditorState extends State<SkillEditor> {
   late SavedSkill _saved = widget.skill;
   late String _visibility = _saved.visibility;
   late Set<String> _visibleTo = _saved.visibleTo.toSet();
+  late List<ResourceScope> _scopes = _saved.scopes;
   late final _name = TextEditingController(text: _saved.name);
   late final _description = TextEditingController(text: _saved.description);
   late final _instructions = TextEditingController(text: _saved.instructions);
@@ -36,6 +39,7 @@ class _SkillEditorState extends State<SkillEditor> {
   bool get _dirty =>
       _saved.id.isEmpty ||
       _visibility != _saved.visibility ||
+      !setEquals(_scopes.toSet(), _saved.scopes.toSet()) ||
       !setEquals(_visibleTo, _saved.visibleTo.toSet()) ||
       _name.text != _saved.name ||
       _description.text != _saved.description ||
@@ -64,6 +68,7 @@ class _SkillEditorState extends State<SkillEditor> {
         SavedSkill(
           id: _saved.id,
           visibility: _visibility,
+          scopes: _scopes,
           visibleTo: _visibleTo.toList(),
           dependencyIds: _dependencies.toList(),
           name: _name.text,
@@ -326,7 +331,7 @@ class _SkillEditorState extends State<SkillEditor> {
                               : SettingsIconType.eye,
                         ),
                         title: Text(
-                          skillVisibilityLabel(_visibility),
+                          skillVisibilityLabel(_visibility, scopes: _scopes),
                           style: const TextStyle(fontSize: 16),
                         ),
                         trailing: const SettingsIcon(
@@ -343,6 +348,7 @@ class _SkillEditorState extends State<SkillEditor> {
                                   store: widget.store,
                                   visibility: _visibility,
                                   selected: _visibleTo,
+                                  scopes: _scopes,
                                 );
                                 if (mounted && value != null)
                                   setState(() {
@@ -391,6 +397,18 @@ class _SkillEditorState extends State<SkillEditor> {
                         onTap: _busy ? null : _chooseDependencies,
                       ),
                     ),
+                  ),
+                  ResourceScopeField(
+                    projects: widget.store.projects,
+                    scopes: _scopes,
+                    groups: widget.store.groups,
+                    requiredGroup: _visibility == 'public',
+                    onChanged:
+                        _busy ||
+                            (_saved.id.isNotEmpty &&
+                                !widget.store.canManageVisibility(_saved))
+                        ? null
+                        : (scopes) => setState(() => _scopes = scopes),
                   ),
                   _field('使用说明', _instructions, 10000, multiline: true),
                   _field('执行脚本（可选）', _script, 50000, multiline: true),

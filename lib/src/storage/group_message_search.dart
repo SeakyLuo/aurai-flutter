@@ -117,6 +117,7 @@ class GroupMessageSearch {
           'message_id',
           'title',
           'preview',
+          'preview_theme',
           'display_mode',
           'background_mode',
           'display_width',

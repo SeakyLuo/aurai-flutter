@@ -8,9 +8,18 @@ import '../features/chat/settings_icon.dart';
 import '../features/chat/visibility_option_tile.dart';
 import '../widgets/empty_data_view.dart';
 import 'skill_store.dart';
+import '../domain/resource_scope.dart';
 
-String skillVisibilityLabel(String value) => switch (value) {
-  'public' => '公开',
+String skillVisibilityLabel(
+  String value, {
+  List<ResourceScope> scopes = const [],
+}) => switch (value) {
+  'public' =>
+    scopes.any((s) => s.type == 'project')
+        ? scopes.any((s) => s.type == 'group')
+              ? '范围内公开'
+              : '项目内公开'
+        : '群内公开',
   'selected' => '指定人可见',
   _ => '仅自己可见',
 };
@@ -20,6 +29,7 @@ Future<(String, Set<String>)?> showSkillVisibilityPicker(
   required SkillStore store,
   required String visibility,
   required Set<String> selected,
+  required List<ResourceScope> scopes,
 }) => showModalBottomSheet<(String, Set<String>)>(
   context: context,
   isScrollControlled: true,
@@ -29,6 +39,7 @@ Future<(String, Set<String>)?> showSkillVisibilityPicker(
     store: store,
     visibility: visibility,
     selected: selected,
+    scopes: scopes,
   ),
 );
 
@@ -38,10 +49,12 @@ class SkillVisibilityPicker extends StatefulWidget {
     required this.store,
     required this.visibility,
     required this.selected,
+    required this.scopes,
   });
   final SkillStore store;
   final String visibility;
   final Set<String> selected;
+  final List<ResourceScope> scopes;
   @override
   State<SkillVisibilityPicker> createState() => _SkillVisibilityPickerState();
 }
@@ -97,15 +110,15 @@ class _SkillVisibilityPickerState extends State<SkillVisibilityPicker> {
             VisibilityOptionTile(
               selected: _visibility == value,
               opensMembers: value == 'selected',
-              title: skillVisibilityLabel(value),
+              title: skillVisibilityLabel(value, scopes: widget.scopes),
               subtitle: value == 'selected' && _selected.isNotEmpty
                   ? widget.store.members
                         .where((m) => _selected.contains(m.id))
                         .map((m) => m.name)
                         .join('、')
                   : switch (value) {
-                      'public' => '所有人和 AI 可查看、安装、修改和删除',
-                      'selected' => '选中的人和 AI 可查看、安装，内容由你维护',
+                      'public' => '可在所选群聊或项目内查看和使用',
+                      'selected' => '选中的人可查看、安装，内容由你维护',
                       _ => '只有自己可查看、安装和维护',
                     },
               onTap: value == 'selected'

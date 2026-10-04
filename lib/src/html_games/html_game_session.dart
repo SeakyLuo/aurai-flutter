@@ -31,6 +31,7 @@ class HtmlGameSession extends ChangeNotifier {
     this.store, {
     this.localState = const [],
     required this.theme,
+    this.surfaceId = 'chat',
     this.fullscreen = false,
     this.independent = false,
     this.hostTopInset = 0,
@@ -68,6 +69,7 @@ class HtmlGameSession extends ChangeNotifier {
   ThemeData theme;
   bool _editing = false;
   HtmlGame? _pendingUpdate;
+  final String surfaceId;
   final bool fullscreen;
   final bool independent;
   final double hostTopInset;
@@ -97,6 +99,7 @@ class HtmlGameSession extends ChangeNotifier {
   bool _pageLoaded = false;
   String? error;
   Uint8List? preview;
+  String? previewTheme;
   int? previewVersion;
   late final String identity =
       '${HtmlGameDisplayCache.identity(game)}:fixed-height-v1';
@@ -400,9 +403,17 @@ class HtmlGameSession extends ChangeNotifier {
     if (!force && next == theme) return;
     theme = next;
     _document = null;
+    preview = null;
+    previewVersion = null;
+    previewTheme = null;
     if (_pageLoaded && !_closed && !_closing) {
       try {
         await _channel?.invokeMethod<void>('theme', htmlMessageTheme(theme));
+        _captureTimer?.cancel();
+        _captureTimer = Timer(
+          const Duration(milliseconds: 500),
+          () => unawaited(capture()),
+        );
       } on Object catch (failure) {
         error = '主题更新失败：${errorMessage(failure)}';
         notifyListeners();
@@ -434,16 +445,19 @@ class HtmlGameSession extends ChangeNotifier {
       return;
     _capturing = true;
     final version = game.version;
+    final captureTheme = theme;
     try {
       final bytes = await _channel
           ?.invokeMethod<Uint8List>('snapshot')
           .timeout(const Duration(seconds: 1));
       if (bytes != null &&
           bytes.length <= 256 * 1024 &&
-          version == game.version) {
+          version == game.version &&
+          captureTheme == theme) {
         preview = bytes;
         previewVersion = version;
-        await store.savePreview(game.messageId, version, bytes);
+        previewTheme = captureTheme.brightness.name;
+        await store.savePreview(game.messageId, version, bytes, previewTheme!);
         if (!_closed) notifyListeners();
       }
     } on Object {

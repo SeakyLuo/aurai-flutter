@@ -1,5 +1,6 @@
 import '../../widgets/empty_data_view.dart';
 import '../../storage/private_task_state.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'glass_surface.dart';
@@ -9,21 +10,41 @@ import 'settings_appearance.dart';
 import 'question_icon.dart';
 
 /// Inline task progress on the existing composer glass surface.
-class PrivateTaskList extends StatefulWidget {
+class PrivateTaskList extends StatelessWidget {
   const PrivateTaskList({super.key, required this.steps, required this.store});
   final List<Map> steps;
   final PrivateTaskState store;
 
   @override
-  State<PrivateTaskList> createState() => _PrivateTaskListState();
+  Widget build(BuildContext context) =>
+      TaskProgressList(steps: steps, changes: store.changes);
 }
 
-class _PrivateTaskListState extends State<PrivateTaskList> {
+class TaskProgressList extends StatefulWidget {
+  const TaskProgressList({
+    super.key,
+    required this.steps,
+    required this.changes,
+    this.title = '任务清单',
+    this.label = '任务',
+  });
+  final List<Map> steps;
+  final Stream<Map<String, dynamic>> changes;
+  final String title, label;
+
+  @override
+  State<TaskProgressList> createState() => _TaskProgressListState();
+}
+
+class _TaskProgressListState extends State<TaskProgressList> {
   @override
   Widget build(BuildContext context) {
     final steps = widget.steps;
     final completed = steps
-        .where((step) => step['status'] == 'completed')
+        .where(
+          (step) =>
+              step['status'] == 'completed' || step['status'] == 'skipped',
+        )
         .length;
     final current =
         steps.where((step) => step['status'] == 'in_progress').firstOrNull ??
@@ -55,7 +76,7 @@ class _PrivateTaskListState extends State<PrivateTaskList> {
                           child: Row(
                             children: [
                               Text(
-                                '任务 · $completed/${steps.length}',
+                                '${widget.label} · $completed/${steps.length}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: colors.onSurfaceVariant,
@@ -126,13 +147,20 @@ class _PrivateTaskListState extends State<PrivateTaskList> {
                     ),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  const Expanded(
-                    child: Text(
-                      '任务清单',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
+                  Expanded(
+                    child: StreamBuilder<Map<String, dynamic>>(
+                      stream: widget.changes,
+                      initialData: {'title': widget.title},
+                      builder: (context, snapshot) => Text(
+                        snapshot.requireData['title'] as String? ??
+                            widget.title,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -142,7 +170,7 @@ class _PrivateTaskListState extends State<PrivateTaskList> {
             ),
             Flexible(
               child: StreamBuilder<Map<String, dynamic>>(
-                stream: widget.store.changes,
+                stream: widget.changes,
                 initialData: {'steps': widget.steps},
                 builder: (context, snapshot) {
                   final steps =

@@ -1,4 +1,6 @@
-import '../app/global_ui.dart';
+import '../features/chat/library_detail_split.dart';
+import '../features/chat/resource_scope_filter.dart';
+import '../domain/resource_scope.dart';
 import '../features/chat/floating_search_layout.dart';
 import '../widgets/empty_data_view.dart';
 import '../app/glass_notice.dart';
@@ -8,7 +10,6 @@ import '../features/chat/member_avatar.dart';
 import 'skill_visibility_picker.dart';
 import '../features/chat/delete_confirmation_dialog.dart';
 import '../features/chat/settings_icon.dart';
-import '../scheduling/task_filter_menu.dart';
 import '../domain/error_message.dart';
 import '../features/chat/settings_appearance.dart';
 import 'skill_detail_page.dart';
@@ -27,17 +28,43 @@ class SkillsPage extends StatefulWidget {
     required this.store,
     required this.controller,
     this.library = false,
+    this.groupId,
+    this.projectId,
   });
   final SkillStore store;
   final ChatController controller;
   final bool library;
+  final String? groupId, projectId;
   @override
   State<SkillsPage> createState() => _SkillsPageState();
 }
 
 class _SkillsPageState extends State<SkillsPage> {
+  final _detailSplitKey = GlobalKey<LibraryDetailSplitState>();
+  int get _resourceCount => widget.store.library
+      .where(
+        (skill) =>
+            matchesResourceFilter(
+              skill.scopes,
+              widget.groupId != null
+                  ? ResourceScope.group(widget.groupId!)
+                  : widget.projectId != null
+                  ? ResourceScope.project(widget.projectId!)
+                  : null,
+              widget.store.groups,
+            ) &&
+            (widget.library ||
+                _filter != 'installed' ||
+                widget.store.isInstalled(skill.id)),
+      )
+      .length;
   final _search = TextEditingController();
   String _status = 'enabled';
+  late ResourceScope? _scope = widget.groupId != null
+      ? ResourceScope.group(widget.groupId!)
+      : widget.projectId != null
+      ? ResourceScope.project(widget.projectId!)
+      : null;
   late String _filter = widget.library ? 'library' : 'installed';
   bool _loading = true;
   @override
@@ -71,7 +98,8 @@ class _SkillsPageState extends State<SkillsPage> {
     MaterialPageRoute<void>(
       builder: (_) => SkillEditor(
         store: widget.store,
-        skill: const SavedSkill(
+        skill: SavedSkill(
+          scopes: [if (_scope != null) _scope!],
           name: '',
           description: '',
           instructions: '',
@@ -89,6 +117,8 @@ class _SkillsPageState extends State<SkillsPage> {
         store: widget.store,
         controller: widget.controller,
         library: true,
+        groupId: _scope?.type == 'group' ? _scope!.id : null,
+        projectId: _scope?.type == 'project' ? _scope!.id : null,
       ),
     ),
   );
@@ -180,22 +210,6 @@ class _SkillsPageState extends State<SkillsPage> {
     }
   }
 
-  Future<void> _chooseStatus(BuildContext anchor) async {
-    FocusManager.instance.primaryFocus?.unfocus();
-    final box = anchor.findRenderObject()! as RenderBox;
-    final selected = await showTaskChoiceMenu(
-      context,
-      anchor: box.localToGlobal(Offset.zero) & box.size,
-      selected: _status,
-      label: '技能状态',
-      choices: const [
-        (value: 'enabled', label: '已启用'),
-        (value: 'disabled', label: '已停用'),
-      ],
-    );
-    if (mounted && selected != null) setState(() => _status = selected);
-  }
-
   Future<void> _preferences(BuildContext anchor) async {
     final box = anchor.findRenderObject()! as RenderBox;
     final action = await showSkillPreferencesMenu(
@@ -235,198 +249,204 @@ class _SkillsPageState extends State<SkillsPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    extendBodyBehindAppBar: true,
-    appBar: SettingsAppBar(
-      title: widget.library ? '技能库' : '技能',
-      titleWidget: widget.library
-          ? null
-          : SkillPageHeader(
-              scope: _filter,
-              onScope: (value) => setState(() => _filter = value),
+  Widget build(BuildContext context) => LibraryDetailSplit(
+    key: _detailSplitKey,
+    child: Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: SettingsAppBar(
+        title: widget.library ? '技能库' : '技能',
+        titleWidget: widget.library
+            ? null
+            : SkillPageHeader(
+                scope: _filter,
+                onScope: (value) => setState(() => _filter = value),
+              ),
+        onBack: () => Navigator.pop(context),
+        actions: [
+          Builder(
+            builder: (anchor) => SettingsGlassAction(
+              label: '更多',
+              icon: Icons.more_vert,
+              iconWidget: const TaskActionIcon('more'),
+              onPressed: () => _preferences(anchor),
             ),
-      onBack: () => Navigator.pop(context),
-      actions: [
-        Builder(
-          builder: (anchor) => SettingsGlassAction(
-            label: '更多',
-            icon: Icons.more_vert,
-            iconWidget: const TaskActionIcon('more'),
-            onPressed: () => _preferences(anchor),
           ),
-        ),
-      ],
-    ),
-    body: SettingsPageBody(
-      child: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: Column(
-              children: [
-                Expanded(
-                  child: FloatingSearchLayout(
-                    itemCount: widget.store.library
-                        .where(
-                          (skill) =>
-                              widget.library ||
-                              _filter != 'installed' ||
-                              (widget.store.isInstalled(skill.id) &&
-                                  skill.enabled == (_status == 'enabled')),
-                        )
-                        .length,
-                    controller: _search,
-                    onChanged: (_) => setState(() {}),
-                    hintText: '搜索技能',
-                    trailingAction: _filter != 'installed'
-                        ? null
-                        : Builder(
-                            builder: (anchor) => SettingsGlassAction(
-                              label: _status == 'disabled'
-                                  ? '筛选：已停用'
-                                  : '筛选：已启用',
-                              icon: Icons.filter_list_rounded,
-                              onPressed: () => _chooseStatus(anchor),
-                              iconWidget: SettingsIcon(
-                                type: SettingsIconType.filter,
-                                color: GlobalUI.highlightTextColor(context),
-                              ),
-                            ),
-                          ),
-                    enabled: true,
-                    bottom: 16,
-                    child: ListenableBuilder(
-                      listenable: widget.store,
-                      builder: (context, _) {
-                        if (_loading)
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        final scope = widget.library ? 'library' : _filter;
-                        final query = _search.text.trim().toLowerCase();
-                        final items =
-                            widget.store.library
-                                .where(
-                                  (s) =>
-                                      (scope != 'installed' ||
-                                          widget.store.isInstalled(s.id)) &&
-                                      (scope != 'installed' ||
-                                          s.enabled ==
-                                              (_status == 'enabled')) &&
-                                      (scope != 'created' ||
-                                          s.ownerId == widget.store.ownerId) &&
-                                      (s.name.toLowerCase().contains(query) ||
-                                          s.description.toLowerCase().contains(
-                                            query,
-                                          )),
-                                )
-                                .toList()
-                              ..sort(widget.store.compareSkills);
-                        if (items.isEmpty)
-                          return Center(
-                            child: EmptyDataView(
-                              title: query.isNotEmpty
-                                  ? '没有匹配的技能'
-                                  : scope == 'installed'
-                                  ? (_status == 'disabled'
-                                        ? '暂无已停用技能'
-                                        : '暂无已启用技能')
-                                  : '暂无技能',
-                              description:
-                                  query.isEmpty &&
-                                      scope == 'installed' &&
-                                      _status == 'enabled'
-                                  ? '安装并启用技能，让 AI 拥有更多能力，帮你处理各种任务。'
+        ],
+      ),
+      body: SettingsPageBody(
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: FloatingSearchLayout(
+                      itemCount: _resourceCount,
+                      controller: _search,
+                      onChanged: (_) => setState(() {}),
+                      hintText: '搜索技能',
+                      trailingAction: _resourceCount < 20
+                          ? null
+                          : ResourceScopeFilter(
+                              groups: widget.store.groups,
+                              projects: widget.store.projects,
+                              value: _scope,
+                              onChanged: (value) =>
+                                  setState(() => _scope = value),
+                              status: _status,
+                              onStatus:
+                                  !widget.library && _filter == 'installed'
+                                  ? (value) => setState(() => _status = value)
                                   : null,
-                              actionText: query.isEmpty && scope == 'installed'
-                                  ? (_status == 'enabled' ? '去安装' : '查看已启用技能')
-                                  : null,
-                              actionIcon: _status == 'enabled'
-                                  ? SettingsIcon(
-                                      type: SettingsIconType.add,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onPrimary,
-                                    )
-                                  : null,
-                              onAction: _status == 'enabled'
-                                  ? _install
-                                  : () => setState(() => _status = 'enabled'),
                             ),
-                          );
-                        return ListView.separated(
-                          padding: settingsPagePadding(
-                            context,
-                            const EdgeInsets.fromLTRB(
-                              16,
-                              16,
-                              16,
-                              FloatingSearchLayout.clearance,
-                            ),
-                          ),
-                          keyboardDismissBehavior:
-                              ScrollViewKeyboardDismissBehavior.onDrag,
-                          itemCount: items.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final skill = items[index];
-                            final creator = widget.store.members
-                                .where((member) => member.id == skill.ownerId)
-                                .firstOrNull;
-                            return SkillListTile(
-                              skill: skill,
-                              onLongPressStart: (details) =>
-                                  _skillMenu(skill, details.globalPosition),
-                              footer: !widget.library
-                                  ? null
-                                  : Row(
-                                      children: [
-                                        if (creator != null) ...[
-                                          MemberAvatar(
-                                            sender: creator,
-                                            size: 24,
-                                          ),
-                                          const SizedBox(width: 8),
-                                        ],
-                                        Expanded(
-                                          child: Text(
-                                            widget.store.ownerName(skill),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          skillVisibilityLabel(
-                                            skill.visibility,
-                                          ),
-                                          style: const TextStyle(fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute<void>(
-                                  builder: (_) => SkillDetailPage(
-                                    controller: widget.controller,
-                                    store: widget.store,
-                                    skillId: skill.id,
-                                  ),
-                                ),
+                      enabled: true,
+                      bottom: 16,
+                      child: ListenableBuilder(
+                        listenable: widget.store,
+                        builder: (context, _) {
+                          if (_loading)
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          final scope = widget.library ? 'library' : _filter;
+                          final query = _search.text.trim().toLowerCase();
+                          final items =
+                              widget.store.library
+                                  .where(
+                                    (s) =>
+                                        matchesResourceFilter(
+                                          s.scopes,
+                                          _scope,
+                                          widget.store.groups,
+                                        ) &&
+                                        (scope != 'installed' ||
+                                            widget.store.isInstalled(s.id)) &&
+                                        (scope != 'installed' ||
+                                            s.enabled ==
+                                                (_status == 'enabled')) &&
+                                        (scope != 'created' ||
+                                            s.ownerId ==
+                                                widget.store.ownerId) &&
+                                        (s.name.toLowerCase().contains(query) ||
+                                            s.description
+                                                .toLowerCase()
+                                                .contains(query)),
+                                  )
+                                  .toList()
+                                ..sort(widget.store.compareSkills);
+                          if (items.isEmpty)
+                            return Center(
+                              child: EmptyDataView(
+                                title: query.isNotEmpty
+                                    ? '没有匹配的技能'
+                                    : scope == 'installed'
+                                    ? (_status == 'disabled'
+                                          ? '暂无已停用技能'
+                                          : '暂无已启用技能')
+                                    : '暂无技能',
+                                description:
+                                    query.isEmpty &&
+                                        scope == 'installed' &&
+                                        _status == 'enabled'
+                                    ? '安装并启用技能，让 AI 拥有更多能力，帮你处理各种任务。'
+                                    : null,
+                                actionText:
+                                    query.isEmpty && scope == 'installed'
+                                    ? (_status == 'enabled' ? '去安装' : '查看已启用技能')
+                                    : null,
+                                actionIcon: _status == 'enabled'
+                                    ? SettingsIcon(
+                                        type: SettingsIconType.add,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onPrimary,
+                                      )
+                                    : null,
+                                onAction: _status == 'enabled'
+                                    ? _install
+                                    : () => setState(() => _status = 'enabled'),
                               ),
                             );
-                          },
-                        );
-                      },
+                          return ListView.separated(
+                            padding: settingsPagePadding(
+                              context,
+                              const EdgeInsets.fromLTRB(
+                                16,
+                                16,
+                                16,
+                                FloatingSearchLayout.clearance,
+                              ),
+                            ),
+                            keyboardDismissBehavior:
+                                ScrollViewKeyboardDismissBehavior.onDrag,
+                            itemCount: items.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, index) {
+                              final skill = items[index];
+                              final creator = widget.store.members
+                                  .where((member) => member.id == skill.ownerId)
+                                  .firstOrNull;
+                              return SkillListTile(
+                                skill: skill,
+                                onLongPressStart: (details) =>
+                                    _skillMenu(skill, details.globalPosition),
+                                footer: !widget.library
+                                    ? null
+                                    : Row(
+                                        children: [
+                                          if (creator != null) ...[
+                                            MemberAvatar(
+                                              sender: creator,
+                                              size: 24,
+                                            ),
+                                            const SizedBox(width: 8),
+                                          ],
+                                          Expanded(
+                                            child: Text(
+                                              widget.store.ownerName(skill),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Text(
+                                            skillVisibilityLabel(
+                                              skill.visibility,
+                                              scopes: skill.scopes,
+                                            ),
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                onTap: () => _detailSplitKey.currentState!.open(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => SkillDetailPage(
+                                      controller: widget.controller,
+                                      store: widget.store,
+                                      skillId: skill.id,
+                                      groupId: _scope?.type == 'group'
+                                          ? _scope!.id
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

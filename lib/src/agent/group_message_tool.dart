@@ -55,21 +55,21 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
                   'Optional, defaults to false. Text is displayed literally; set true only when Markdown formatting or network image syntax is intended.',
             },
             'imagePaths': {
-              'type': 'array',
+              'type': ['array', 'null'],
               'maxItems': 4,
               'items': {'type': 'string'},
               'description':
                   'Optional local JPG, PNG or WebP file paths obtained from tools or message history, never invented. Files are copied into permanent message storage. Up to 4 images, each under 10 MB.',
             },
             'mentionIds': {
-              'type': 'array',
+              'type': ['array', 'null'],
               'items': {'type': 'string'},
               'uniqueItems': true,
               'description':
-                  'Optional; omit when not mentioning anyone. Mentioned members are automatically added to the message; do not repeat the same @names in text.',
+                  'Optional; omit, use null or [] when not mentioning anyone. Mentioned members are automatically added to the message; do not repeat the same @names in text.',
             },
             'audience': {
-              'type': 'array',
+              'type': ['array', 'null'],
               'minItems': 1,
               'uniqueItems': true,
               'items': {'type': 'string'},
@@ -80,7 +80,7 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
               'type': ['string', 'null'],
             },
             'excludedAudience': {
-              'type': 'array',
+              'type': ['array', 'null'],
               'minItems': 1,
               'uniqueItems': true,
               'items': {'type': 'string'},
@@ -157,10 +157,10 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
         if ((item['text'] as String).trim().isEmpty && paths.isEmpty) {
           throw ArgumentError('消息需要文字或图片');
         }
-        if (!item.containsKey('mentionIds')) item['mentionIds'] = <String>[];
+        item['mentionIds'] ??= <String>[];
         final mentions = item['mentionIds'];
         if (mentions is! List || mentions.any((id) => id is! String)) {
-          throw ArgumentError('mentionIds 必须是成员 ID 数组；不 @ 成员请省略或传 []');
+          throw ArgumentError('mentionIds 必须是成员 ID 数组；不 @ 成员请省略、传 null 或 []');
         }
         if (item['quoteMessageId'] != null &&
             item['quoteMessageId'] is! String) {
@@ -209,7 +209,11 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
           (output.remove('_images') as List<MessageImage>?) ?? const [];
       final attachments = await Future.wait([
         for (final image in images)
-          readVisionImage(File(image.path), image.mimeType, original: false).then(
+          readVisionImage(
+            File(image.path),
+            image.mimeType,
+            original: false,
+          ).then(
             (vision) => ToolAttachment(
               type: ToolAttachmentType.image,
               mimeType: vision.mimeType,

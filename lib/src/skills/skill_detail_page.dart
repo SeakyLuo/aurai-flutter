@@ -12,11 +12,13 @@ import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
 import '../scheduling/task_action_menu.dart';
 import 'skill_action_menu.dart';
+import 'skill_batch_install_page.dart';
 import 'skill_editor.dart';
 import 'skill_icon.dart';
 import 'skill_permission_picker.dart';
 import 'skill_store.dart';
 import 'skill_visibility_picker.dart';
+import '../features/chat/resource_scope_picker.dart';
 
 class SkillDetailPage extends StatefulWidget {
   const SkillDetailPage({
@@ -24,10 +26,12 @@ class SkillDetailPage extends StatefulWidget {
     required this.store,
     required this.controller,
     required this.skillId,
+    this.groupId,
   });
   final SkillStore store;
   final ChatController controller;
   final String skillId;
+  final String? groupId;
   @override
   State<SkillDetailPage> createState() => _SkillDetailPageState();
 }
@@ -78,11 +82,14 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
       skill.enabled,
       showEdit: widget.store.canEdit(skill),
       canDelete: widget.store.canEdit(skill),
+      canBatchInstall: widget.groupId != null,
       installed:
           widget.store.usesInstallations && widget.store.isInstalled(skill.id),
     );
     if (!mounted || action == null) return;
     switch (action) {
+      case 'batchInstall':
+        await _batchInstall(skill);
       case 'edit':
         await Navigator.push(
           context,
@@ -102,6 +109,35 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
         );
       case 'delete':
         await _delete(skill);
+    }
+  }
+
+  Future<void> _batchInstall(SavedSkill skill) async {
+    setState(() => _busy = true);
+    try {
+      final candidates = await widget.store.groupInstallCandidates(
+        skill.id,
+        widget.groupId!,
+      );
+      if (!mounted) return;
+      final selected = await Navigator.push<Set<String>>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SkillBatchInstallPage(candidates: candidates),
+        ),
+      );
+      if (!mounted || selected == null) return;
+      await widget.store.installForGroupMembers(
+        skill.id,
+        widget.groupId!,
+        selected,
+      );
+      if (mounted)
+        _notice('已为 ${selected.length} 位 AI 安装技能', kind: ToastKind.success);
+    } on Object catch (error) {
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -151,7 +187,8 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
           title: '技能详情',
           onBack: () => Navigator.pop(context),
           actions: [
-            if (widget.store.canEdit(skill) ||
+            if (widget.groupId != null ||
+                widget.store.canEdit(skill) ||
                 (widget.store.usesInstallations && installed))
               Builder(
                 builder: (anchor) => SettingsGlassAction(
@@ -230,7 +267,10 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          skillVisibilityLabel(skill.visibility),
+                          skillVisibilityLabel(
+                            skill.visibility,
+                            scopes: skill.scopes,
+                          ),
                           style: TextStyle(
                             fontSize: 13,
                             color: Theme.of(
@@ -241,6 +281,13 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
                       ],
                     ),
                     const SizedBox(height: 20),
+                    if (skill.scopes.isNotEmpty)
+                      ResourceScopeField(
+                        projects: widget.store.projects,
+                        scopes: skill.scopes,
+                        groups: widget.store.groups,
+                        onChanged: null,
+                      ),
                     if (widget.store.usesInstallations && !installed)
                       DialogActionButton(
                         text: '安装技能',
@@ -325,6 +372,7 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
             store: widget.store,
             controller: widget.controller,
             skillId: id,
+            groupId: widget.groupId,
           ),
         ),
       ),

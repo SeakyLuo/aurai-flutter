@@ -1,3 +1,4 @@
+import 'profile_navigation.dart';
 import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -100,7 +101,7 @@ class _GroupAnnouncementPageState extends State<GroupAnnouncementPage> {
 
   Future<void> _openProfile() async {
     final senderId = _editor!.id;
-    await Navigator.push<void>(
+    await openProfileRoute(
       context,
       MaterialPageRoute(
         builder: (_) => senderId == MessageSender.localUser.id

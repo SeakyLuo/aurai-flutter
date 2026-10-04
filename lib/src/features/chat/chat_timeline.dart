@@ -1,3 +1,4 @@
+import 'profile_navigation.dart';
 import 'private_reply_layout.dart';
 import 'interactive_message_paging.dart';
 import 'recalled_message_notice.dart';
@@ -30,6 +31,7 @@ class ChatTimelineEntry {
 List<ChatTimelineEntry> buildChatTimeline(
   ChatController controller, {
   required Future<void> Function(AgentMessage) onEdit,
+  AgentMessage? singleMessage,
   String? beforeMessageId,
   String? highlightedMessageId,
   bool allowEditing = true,
@@ -43,6 +45,9 @@ List<ChatTimelineEntry> buildChatTimeline(
   Future<void> Function(AgentMessage)? onBranch,
 }) {
   final conversation = controller.activeConversation;
+  final timelineMessages = singleMessage == null
+      ? controller.visibleMessages
+      : [singleMessage];
   final mentionSenders = {
     for (final sender in conversation.creationMembers) sender.id: sender,
     for (final message in [
@@ -74,7 +79,7 @@ List<ChatTimelineEntry> buildChatTimeline(
   }
   noticeNameIds.removeWhere((name, _) => ambiguousNoticeNames.contains(name));
   void openNoticeMember(BuildContext context, String id) {
-    Navigator.push<void>(
+    openProfileRoute(
       context,
       MaterialPageRoute(
         builder: (_) => id == MessageSender.localUser.id
@@ -88,9 +93,7 @@ List<ChatTimelineEntry> buildChatTimeline(
     );
   }
 
-  final richRuns = isGroup
-      ? <String>{}
-      : richReplyRuns(controller.visibleMessages);
+  final richRuns = isGroup ? <String>{} : richReplyRuns(timelineMessages);
   final watch = conversation.executionWatch;
   final showElapsed =
       !isGroup &&
@@ -98,23 +101,23 @@ List<ChatTimelineEntry> buildChatTimeline(
       ((conversation.hasExecutionProcess && watch.isRunning) ||
           conversation.runState == ChatRunState.failed ||
           conversation.runState == ChatRunState.interrupted) &&
-      !controller.visibleMessages.any(
+      !timelineMessages.any(
         (message) =>
             message.runId == conversation.activeRunId &&
             message.taskSummary != null,
       );
   final reasoningIds = {
-    for (final message in controller.visibleMessages)
+    for (final message in timelineMessages)
       if (message.isReasoning) message.id,
   };
   final hiddenIds = {
-    for (final message in controller.visibleMessages)
+    for (final message in timelineMessages)
       if (!isGroup && message.taskSummary != null)
         for (final id in message.taskSummary!.intermediateMessageIds)
           if (reasoningIds.contains(id) || !richRuns.contains(message.runId))
             id,
   };
-  final visibleMessages = controller.visibleMessages
+  final visibleMessages = timelineMessages
       .where(
         (message) =>
             !(message.isSystem && message.text == '私密交互消息已更新') &&
@@ -135,7 +138,7 @@ List<ChatTimelineEntry> buildChatTimeline(
   final toolsByMessage = <String, List<ChatTimelineEntry>>{};
   final followingToolsByMessage = <String, List<ChatTimelineEntry>>{};
   final messagesById = {
-    for (final message in controller.visibleMessages) message.id: message,
+    for (final message in timelineMessages) message.id: message,
   };
   List<ChatTimelineEntry> activitiesAfter(String messageId, String runId) {
     final anchor = messagesById[messageId];
@@ -148,7 +151,7 @@ List<ChatTimelineEntry> buildChatTimeline(
 
   // Completed summaries render their saved activities; keep the source records.
   final summarizedRuns = {
-    for (final message in controller.visibleMessages)
+    for (final message in timelineMessages)
       if (message.taskSummary != null) message.runId,
   };
   final members = controller.groupRuns.toList();
@@ -468,6 +471,7 @@ List<ChatTimelineEntry> buildChatTimeline(
                 ? null
                 : HtmlView(
                     card: message.htmlGame!,
+                    surfaceId: singleMessage == null ? 'chat' : 'pinned',
                     messageId: message.id,
                     conversationId: conversation.id,
                     store: controller.htmlStore,
@@ -496,7 +500,8 @@ List<ChatTimelineEntry> buildChatTimeline(
             onOpenQuote: onOpenQuote,
             onOpenMember: (id) {
               if (id == MessageSender.localUser.id) return;
-              Navigator.of(context).push(
+              openProfileRoute(
+                context,
                 MaterialPageRoute<void>(
                   builder: (_) => AiContactPage(
                     controller: controller,
@@ -556,7 +561,7 @@ List<ChatTimelineEntry> buildChatTimeline(
                   onMention: onMention == null
                       ? null
                       : () => onMention(message.sender!),
-                  onOpenProfile: () => Navigator.push<void>(
+                  onOpenProfile: () => openProfileRoute(
                     context,
                     MaterialPageRoute(
                       builder: (_) => AiContactPage(

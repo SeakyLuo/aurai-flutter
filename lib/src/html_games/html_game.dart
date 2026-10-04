@@ -6,6 +6,7 @@ class HtmlGameCard {
     required this.title,
     this.appId,
     this.preview,
+    this.previewTheme,
     this.width,
     this.height = 320,
     this.measuredWidth,
@@ -25,6 +26,7 @@ class HtmlGameCard {
   final String backgroundMode;
   final String title;
   final Uint8List? preview;
+  final String? previewTheme;
   final int? width;
   final int height;
   final int version;
@@ -36,6 +38,7 @@ class HtmlGameCard {
     backgroundMode: row['background_mode'] as String,
     title: row['title'] as String,
     preview: row['preview'] as Uint8List?,
+    previewTheme: row['preview_theme'] as String?,
     measuredWidth: (row['measured_width'] as num?)?.toDouble(),
     measuredHeight: (row['measured_height'] as num?)?.toDouble(),
     measuredScale: (row['measured_scale'] as num?)?.toDouble(),

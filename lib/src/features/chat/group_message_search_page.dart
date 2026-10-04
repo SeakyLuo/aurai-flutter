@@ -1,3 +1,4 @@
+import 'profile_navigation.dart';
 import 'floating_search_layout.dart';
 import '../../widgets/empty_data_view.dart';
 import 'retained_tab_view.dart';
@@ -131,7 +132,8 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
 
   void _openProfile(GroupMessageSearchResult result) {
     _focus.unfocus();
-    Navigator.of(context).push<void>(
+    openProfileRoute(
+      context,
       MaterialPageRoute(
         builder: (_) => result.sender.id == MessageSender.localUser.id
             ? PersonalInfoPage(memory: widget.controller.memory)

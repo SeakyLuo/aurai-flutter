@@ -1,3 +1,4 @@
+import 'profile_navigation.dart';
 import '../../domain/message_sender.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
@@ -52,7 +53,8 @@ class StarredMessageTile extends StatelessWidget {
   final Widget? sourceLabel;
 
   void _openProfile(BuildContext context) {
-    Navigator.of(context).push<void>(
+    openProfileRoute(
+      context,
       MaterialPageRoute(
         builder: (_) => result.sender.id == MessageSender.localUser.id
             ? PersonalInfoPage(memory: controller.memory)

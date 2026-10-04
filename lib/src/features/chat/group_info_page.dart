@@ -6,6 +6,10 @@ import '../../storage/group_member_details.dart';
 import '../../storage/group_chat_store.dart';
 import 'group_pinned_message_entry.dart';
 import 'group_favorites_page.dart';
+import 'group_apps_section.dart';
+import 'group_tasks_page.dart';
+import 'tools_page.dart';
+import '../../skills/skills_page.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'dart:math' as math;
@@ -22,7 +26,6 @@ import '../../storage/conversation_rows.dart';
 import 'member_profile_avatar.dart';
 import 'chat_controller.dart';
 import 'conversation_rename_dialog.dart';
-import 'conversation_task_navigation.dart';
 import 'group_activity_sheet.dart';
 import 'group_announcement_page.dart';
 import 'markdown_preview_text.dart';
@@ -140,6 +143,27 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
       MaterialPageRoute(builder: (_) => page),
     );
     if (mounted) await _reload();
+  }
+
+  Future<void> _openApp(Widget page) =>
+      Navigator.push<void>(context, MaterialPageRoute(builder: (_) => page));
+
+  Future<void> _openSkills() async {
+    await runUiAction(context, () async {
+      final store = await widget.controller.aiSkills(
+        MessageSender.localUser.id,
+      );
+      if (!mounted) return;
+      await _openApp(
+        SkillsPage(
+          store: store,
+          controller: widget.controller,
+          library: true,
+          groupId: _conversation.id,
+          projectId: _conversation.projectId,
+        ),
+      );
+    });
   }
 
   Future<void> _rename() => _perform(
@@ -410,7 +434,9 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                                       if (_canManage)
                                         _memberAction(
                                           '移除',
-                                          const _RemoveMemberIcon(),
+                                          const SettingsIcon(
+                                            type: SettingsIconType.remove,
+                                          ),
                                           () => _open(
                                             GroupRemoveMembersPage(
                                               controller: widget.controller,
@@ -426,6 +452,33 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                             ),
                             const SizedBox(height: 8),
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _surface(
+                        GroupAppsSection(
+                          onTasks: () => _openApp(
+                            GroupTasksPage(
+                              controller: widget.controller,
+                              conversationId: _conversation.id,
+                              originTaskId: widget.originTaskId,
+                            ),
+                          ),
+                          onMarks: () => _openApp(
+                            GroupFavoritesPage(
+                              controller: widget.controller,
+                              groupId: _conversation.id,
+                              groupTitle: _conversation.title,
+                            ),
+                          ),
+                          onTools: () => _openApp(
+                            ToolsPage(
+                              controller: widget.controller,
+                              groupId: _conversation.id,
+                              projectId: _conversation.projectId,
+                            ),
+                          ),
+                          onSkills: _openSkills,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -542,24 +595,10 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                                   ),
                                 ),
                               ),
-                              Column(
-                                children: [
-                                  _row(
-                                    '群标记',
-                                    () => _open(
-                                      GroupFavoritesPage(
-                                        controller: widget.controller,
-                                        groupId: _conversation.id,
-                                        groupTitle: _conversation.title,
-                                      ),
-                                    ),
-                                  ),
-                                  GroupPinnedMessageEntry(
-                                    controller: widget.controller,
-                                    groupId: _conversation.id,
-                                    embedded: true,
-                                  ),
-                                ],
+                              GroupPinnedMessageEntry(
+                                controller: widget.controller,
+                                groupId: _conversation.id,
+                                embedded: true,
                               ),
                             ]),
                             if (!_conversation.isArchived) ...[
@@ -589,27 +628,6 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                         role: DialogActionRole.secondary,
                         onPressed: _busy ? null : _copyConversationId,
                       ),
-                      if (conversationTasks(
-                        widget.controller,
-                        _conversation.id,
-                        originTaskId: widget.originTaskId,
-                      ).isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        _surface(
-                          _row(
-                            '关联任务',
-                            () => openConversationTask(
-                              context,
-                              widget.controller,
-                              _conversation.id,
-                              originTaskId: widget.originTaskId,
-                            ),
-                            icon: const SettingsIcon(
-                              type: SettingsIconType.tasks,
-                            ),
-                          ),
-                        ),
-                      ],
                       const SizedBox(height: 12),
                       DialogActionButton(
                         text: _conversation.isArchived ? '取消归档' : '归档群聊',
@@ -749,21 +767,6 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
     title: Text(title, style: const TextStyle(fontSize: 15)),
     trailing: const SettingsIcon(type: SettingsIconType.chevron),
     onTap: onTap,
-  );
-}
-
-class _RemoveMemberIcon extends StatelessWidget {
-  const _RemoveMemberIcon();
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Container(
-      width: 16,
-      height: 1.65,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-        borderRadius: BorderRadius.circular(1),
-      ),
-    ),
   );
 }
 

@@ -438,10 +438,17 @@ extension InteractiveMessageActions on ChatController {
   }) async {
     final conversation = activeConversation;
     await _store.writer.flush();
-    final message = conversation.messages.firstWhere(
-      (message) => message.id == messageId,
+    final rows = await _store.database.query(
+      'messages',
+      columns: ['interactive_json'],
+      where: 'id = ? AND conversation_id = ? AND kind != ?',
+      whereArgs: [messageId, conversation.id, 'system'],
     );
-    final card = message.interactive!;
+    if (rows.isEmpty) throw StateError('消息已撤回或删除');
+    final card = InteractiveMessage.fromJson(
+      jsonDecode(rows.single['interactive_json'] as String)
+          as Map<String, dynamic>,
+    );
     if (card.revision != revision ||
         card.participantRevision(MessageSender.localUser.id) !=
             participantRevision) {

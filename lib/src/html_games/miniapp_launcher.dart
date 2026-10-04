@@ -46,5 +46,8 @@ Future<void> openMiniapp(
   }
   if (!context.mounted) return;
   onReady?.call();
-  await Navigator.push<void>(context, MaterialPageRoute(builder: (_) => page));
+  await Navigator.of(
+    context,
+    rootNavigator: true,
+  ).push<void>(MaterialPageRoute(builder: (_) => page));
 }

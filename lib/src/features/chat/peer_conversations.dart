@@ -130,8 +130,10 @@ extension PeerConversations on ChatController {
         '没有要说的就输出 [[NO_REPLY]]，等待对方新消息；不要循环查消息。私聊创建本身不强迫发言。';
     final memory = await aiMemory(profile, scope: conversation.id);
     final skills = await aiSkills(senderId);
-    final documents = AiDocumentScope(_store.database, senderId);
-    await documents.initialize();
+    final project = conversation.projectId == null
+        ? null
+        : await projects.read(conversation.projectId!);
+    final documents = await _aiDocuments(senderId, project);
     final provider = config.service.useOpenAiTransport
         ? OpenAiResponsesProvider(
             config,
@@ -160,6 +162,7 @@ extension PeerConversations on ChatController {
     session.runIds[senderId] = runId;
     final watch = Stopwatch()..start();
     final registry = ToolRegistry(
+      currentProjectId: () => documents.project?.id,
       tools: _createTools(
         conversation: conversation,
         senderId: senderId,

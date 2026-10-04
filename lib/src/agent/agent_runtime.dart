@@ -132,7 +132,6 @@ class AgentRuntime {
               if (task != null) await task.context(),
               if (decision != null) decision.instructions,
             ].join('\n\n'),
-            responseSchema: decision?.schema,
             onContextSummary: onContextSummary,
             onPrivateContextSummary: onPrivateContextSummary,
             onCompactionChanged: onCompactionChanged,
@@ -151,8 +150,13 @@ class AgentRuntime {
               _throwIfCancelled();
               if (decision == null) onTextChanged?.call(text);
             },
-            tools: decision == null ? _registry.beginTurn() : const [],
-            capabilities: decision == null ? _registry.capabilities : const [],
+            tools: _registry.beginTurn(
+              exclusiveTool: decision?.exclusive == true ? decision : null,
+              additionalTool: decision?.exclusive == false ? decision : null,
+            ),
+            capabilities: decision?.exclusive == true
+                ? const []
+                : _registry.capabilities,
             continuationToken: continuationToken,
             toolResults: toolResults,
             userMessageInput: userMessageInput,
@@ -232,15 +236,10 @@ class AgentRuntime {
             _ => hasText ? '回复未完成，已保留已生成的正文，请重试' : '回复未完成，尚未生成正文，请重试',
           }, detail: jsonEncode(modelTurn.response['incomplete_details']));
         }
-        if (decision != null) {
-          if (modelTurn.toolCalls.isNotEmpty) {
-            throw StateError('交互决策返回了工具调用，尚未提交');
-          }
-          _throwIfCancelled();
-          await decision.submit(modelTurn.text ?? '');
-          return AgentRunResult(answer: '', steps: List.unmodifiable(steps));
-        }
         if (modelTurn.toolCalls.isEmpty) {
+          if (decision != null) {
+            throw StateError('模型未调用 ${decision.definition.name}，本轮行动尚未提交');
+          }
           if (_userInputs.isNotEmpty) {
             toolResults = const [];
             continue;
@@ -360,13 +359,17 @@ class AgentRuntime {
           onStepsChanged(List.unmodifiable(steps));
           _throwIfCancelled();
           nextResults.add(result);
-          if (endsRun?.call(result) == true) {
+          if ((decision != null &&
+                  result.toolName == decision.definition.name &&
+                  result.status == ToolResultStatus.success) ||
+              endsRun?.call(result) == true) {
             return AgentRunResult(answer: '', steps: List.unmodifiable(steps));
           }
         }
         toolResults = nextResults;
       }
     } finally {
+      _registry.endTurn();
       _acceptingUserInput = false;
       _userInputs.clear();
       if (task != null && (await task.read())['status'] == 'active') {

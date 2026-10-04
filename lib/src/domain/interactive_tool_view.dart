@@ -66,8 +66,9 @@ Map<String, Object?> interactiveToolView(
 Map<String, Object?> interactiveChatView(
   String messageId,
   InteractiveMessage card,
-  String actor,
-) {
+  String actor, {
+  bool includeResults = false,
+}) {
   final view = interactiveToolView(messageId, card, actor);
   final state = view['interactionView'] as Map?;
   if (view['eligible'] == false ||
@@ -80,7 +81,35 @@ Map<String, Object?> interactiveChatView(
       'eligible': view['eligible'],
       'closed': view['closed'],
       if (state != null) 'submitted': state['submitted'],
-      'next': view['next'],
+      if (includeResults) 'body': view['body'],
+      if (includeResults && state != null)
+        'interactionView': {
+          for (final key in [
+            'round',
+            'phase',
+            'completed',
+            'submittedCount',
+            'distribution',
+          ])
+            if (state.containsKey(key)) key: state[key],
+          if (state.containsKey('choices'))
+            'choices': [
+              for (final choice in state['choices'] as List)
+                {
+                  for (final key in [
+                    'actorId',
+                    'name',
+                    'weight',
+                    'label',
+                    'value',
+                  ])
+                    if ((choice as Map).containsKey(key)) key: choice[key],
+                },
+            ],
+        },
+      'next': includeResults
+          ? '${view['next']} 这是最近一次投票；引用结果时核对正文中的轮次，缺少详情时调用 readInteractiveMessage。'
+          : '${view['next']} 这里只提供简要状态；引用投票、弃权或其他结果前，调用 readInteractiveMessage，传入此 messageId，核对轮次及获准查看的详情。',
     };
   }
   return view;

@@ -1,3 +1,4 @@
+import '../features/chat/library_detail_split.dart';
 import '../features/chat/floating_search_layout.dart';
 import '../widgets/empty_data_view.dart';
 import 'miniapp_recent_page.dart';
@@ -32,6 +33,7 @@ class MiniappLibraryPage extends StatefulWidget {
 }
 
 class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
+  final _detailSplitKey = GlobalKey<LibraryDetailSplitState>();
   late final _store = MiniappLibraryStore(widget.controller.htmlStore.database);
   final _search = TextEditingController();
   List<MiniappEntry> _bundled = [], _apps = [], _recent = [], _locals = [];
@@ -303,8 +305,7 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
                 await _openRecent(entry);
                 return;
               }
-              await Navigator.push<void>(
-                context,
+              await _detailSplitKey.currentState!.open(
                 MaterialPageRoute(
                   builder: (_) => MiniappDetailPage(
                     entry: entry,
@@ -349,134 +350,143 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
                 ? timeOrder
                 : a.publicationId.compareTo(b.publicationId);
           });
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: SettingsAppBar(
-        title: widget.pickingMessage ? '选择要发送的小程序' : '小程序',
-        onBack: () => Navigator.pop(context),
-      ),
-      body: SettingsPageBody(
-        child: SafeArea(
-          top: false,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: FloatingSearchLayout(
-                      itemCount: {
-                        for (final entry in [..._bundled, ..._apps, ..._locals])
-                          if (!widget.pickingMessage ||
-                              _messageCapable.contains(
-                                '${entry.kind.name}:${entry.id}',
-                              ))
-                            entry.publicationId,
-                      }.length,
-                      controller: _search,
-                      onChanged: _queryChanged,
-                      hintText: '搜索小程序',
-                      enabled: true,
-                      bottom: 16,
-                      child: PaginationListener(
-                        failed: _failed,
-                        onRetry: () => _load(reset: !_more && !_localMore),
-                        hasMore: !_loading && !_failed && (_more || _localMore),
-                        loadMore: () => _load(reset: false),
-                        child: CustomScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
+    return LibraryDetailSplit(
+      key: _detailSplitKey,
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: SettingsAppBar(
+          title: widget.pickingMessage ? '选择要发送的小程序' : '小程序',
+          onBack: () => Navigator.pop(context),
+        ),
+        body: SettingsPageBody(
+          child: SafeArea(
+            top: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: FloatingSearchLayout(
+                        itemCount: {
+                          for (final entry in [
+                            ..._bundled,
+                            ..._apps,
+                            ..._locals,
+                          ])
+                            if (!widget.pickingMessage ||
+                                _messageCapable.contains(
+                                  '${entry.kind.name}:${entry.id}',
+                                ))
+                              entry.publicationId,
+                        }.length,
+                        controller: _search,
+                        onChanged: _queryChanged,
+                        hintText: '搜索小程序',
+                        enabled: true,
+                        bottom: 16,
+                        child: PaginationListener(
+                          failed: _failed,
+                          onRetry: () => _load(reset: !_more && !_localMore),
+                          hasMore:
+                              !_loading && !_failed && (_more || _localMore),
+                          loadMore: () => _load(reset: false),
+                          child: CustomScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
 
-                          keyboardDismissBehavior:
-                              ScrollViewKeyboardDismissBehavior.onDrag,
+                            keyboardDismissBehavior:
+                                ScrollViewKeyboardDismissBehavior.onDrag,
 
-                          slivers: [
-                            SliverPadding(
-                              padding: settingsPagePadding(
-                                context,
-                                const EdgeInsets.fromLTRB(
-                                  16,
-                                  16,
-                                  16,
-                                  FloatingSearchLayout.clearance,
+                            slivers: [
+                              SliverPadding(
+                                padding: settingsPagePadding(
+                                  context,
+                                  const EdgeInsets.fromLTRB(
+                                    16,
+                                    16,
+                                    16,
+                                    FloatingSearchLayout.clearance,
+                                  ),
                                 ),
-                              ),
-                              sliver: SliverMainAxisGroup(
-                                slivers: [
-                                  SliverList.list(
-                                    children: [
-                                      if (!widget.pickingMessage &&
-                                          query.isEmpty &&
-                                          _recent.isNotEmpty)
-                                        _recentSection(),
-                                      if (!widget.pickingMessage)
-                                        Padding(
-                                          padding: const EdgeInsets.fromLTRB(
-                                            8,
-                                            0,
-                                            8,
-                                            14,
+                                sliver: SliverMainAxisGroup(
+                                  slivers: [
+                                    SliverList.list(
+                                      children: [
+                                        if (!widget.pickingMessage &&
+                                            query.isEmpty &&
+                                            _recent.isNotEmpty)
+                                          _recentSection(),
+                                        if (!widget.pickingMessage)
+                                          Padding(
+                                            padding: const EdgeInsets.fromLTRB(
+                                              8,
+                                              0,
+                                              8,
+                                              14,
+                                            ),
+                                            child: Text(
+                                              query.isEmpty ? '发现小程序' : '搜索结果',
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurfaceVariant,
+                                              ),
+                                            ),
                                           ),
-                                          child: Text(
-                                            query.isEmpty ? '发现小程序' : '搜索结果',
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w600,
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.onSurfaceVariant,
+                                        if (_loading && entries.isEmpty)
+                                          const Padding(
+                                            padding: EdgeInsets.all(16),
+                                            child: SearchSkeleton(
+                                              label: '正在加载小程序',
+                                              avatarSize: 48,
+                                            ),
+                                          ),
+
+                                        for (final entry in entries)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 12,
+                                            ),
+                                            child: _tile(entry),
+                                          ),
+                                        if (_loading && entries.isNotEmpty)
+                                          const Padding(
+                                            padding: EdgeInsets.all(16),
+                                            child: Center(
+                                              child:
+                                                  CircularProgressIndicator(),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    if (!_loading && entries.isEmpty)
+                                      SliverFillRemaining(
+                                        hasScrollBody: false,
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(32),
+                                          child: Center(
+                                            child: EmptyDataView(
+                                              title: query.isEmpty
+                                                  ? (widget.pickingMessage
+                                                        ? '暂无可发送的小程序'
+                                                        : '暂无已发布的小程序')
+                                                  : '没有匹配的小程序',
                                             ),
                                           ),
                                         ),
-                                      if (_loading && entries.isEmpty)
-                                        const Padding(
-                                          padding: EdgeInsets.all(16),
-                                          child: SearchSkeleton(
-                                            label: '正在加载小程序',
-                                            avatarSize: 48,
-                                          ),
-                                        ),
-
-                                      for (final entry in entries)
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            bottom: 12,
-                                          ),
-                                          child: _tile(entry),
-                                        ),
-                                      if (_loading && entries.isNotEmpty)
-                                        const Padding(
-                                          padding: EdgeInsets.all(16),
-                                          child: Center(
-                                            child: CircularProgressIndicator(),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  if (!_loading && entries.isEmpty)
-                                    SliverFillRemaining(
-                                      hasScrollBody: false,
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(32),
-                                        child: Center(
-                                          child: EmptyDataView(
-                                            title: query.isEmpty
-                                                ? (widget.pickingMessage
-                                                      ? '暂无可发送的小程序'
-                                                      : '暂无已发布的小程序')
-                                                : '没有匹配的小程序',
-                                          ),
-                                        ),
                                       ),
-                                    ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

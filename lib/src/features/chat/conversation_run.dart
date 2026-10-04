@@ -194,30 +194,17 @@ extension ConversationRun on ChatController {
           _notifyMember(runConversation, groupParent);
         }, sender: reply.sender),
       )..addAll(_thinkingTools(runConversation, groupParent, reply));
-      if (groupParent != null) {
-        _bindGroupRunTools(
-          tools: tools,
-          parent: groupParent,
-          member: runConversation,
-          reply: reply,
-          observed: observed,
-          publishedIds: runMessageIds,
-          onSleep: () => leftSleepDraft = true,
-        );
-      }
-      final registry = ToolRegistry(tools: tools, capabilities: capabilities);
-      registry.load(
-        await recentConversationTools(_store.database, runConversation.id),
+      final registry = await _createMemberToolRegistry(
+        currentProjectId: () => documents.project?.id,
+        tools: tools,
+        parent: groupParent,
+        member: runConversation,
+        reply: reply,
+        observed: observed,
+        publishedIds: runMessageIds,
+        onSleep: () => leftSleepDraft = true,
+        groupId: groupHistory == null ? null : runConversation.id,
       );
-      registry.load([
-        'sendGroupMessage',
-        if (groupParent != null) ...[
-          'sleepGroupChat',
-          'wakeGroupMember',
-          'pauseGroupAutoReply',
-          'resumeGroupAutoReply',
-        ],
-      ]);
       Future<bool> confirm(ToolCall call, ToolDefinition definition) =>
           _confirm(
             call,

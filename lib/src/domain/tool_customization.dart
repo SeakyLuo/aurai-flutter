@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
 import 'tool_models.dart';
+import 'resource_scope.dart';
 
 class ToolCustomization {
   const ToolCustomization({
@@ -10,23 +11,28 @@ class ToolCustomization {
     required this.icon,
     this.description,
     this.inputSchema,
+    this.scopes = const [],
   });
 
   final String? title;
   final String icon;
   final String? description;
   final Map<String, Object?>? inputSchema;
+  final List<ResourceScope> scopes;
 
-  factory ToolCustomization.fromRow(Map<String, Object?> row) =>
-      ToolCustomization(
-        title: row['title'] as String?,
-        icon: row['icon']! as String,
-        description: row['description'] as String?,
-        inputSchema: row['input_schema_json'] == null
-            ? null
-            : (jsonDecode(row['input_schema_json']! as String) as Map)
-                  .cast<String, Object?>(),
-      );
+  factory ToolCustomization.fromRow(
+    Map<String, Object?> row,
+    List<ResourceScope> scopes,
+  ) => ToolCustomization(
+    title: row['title'] as String?,
+    scopes: scopes,
+    icon: row['icon']! as String,
+    description: row['description'] as String?,
+    inputSchema: row['input_schema_json'] == null
+        ? null
+        : (jsonDecode(row['input_schema_json']! as String) as Map)
+              .cast<String, Object?>(),
+  );
 
   Map<String, Object?> toRow(String name) => {
     'name': name,
@@ -43,28 +49,62 @@ abstract final class ToolCustomizations {
 
   static Future<void> initialize(Database database) async {
     _database = database;
-    final rows = await database.query('tool_customizations');
+    final snapshot = await Future.wait([
+      database.query('tool_customizations'),
+      database.query(
+        'resource_scopes',
+        where: 'resource_type = ?',
+        whereArgs: ['tool'],
+      ),
+    ]);
+    final rows = snapshot[0];
+    final scopes = resourceScopeMap(snapshot[1]);
     values
       ..clear()
       ..addEntries(
         rows.map(
-          (row) =>
-              MapEntry(row['name']! as String, ToolCustomization.fromRow(row)),
+          (row) => MapEntry(
+            row['name']! as String,
+            ToolCustomization.fromRow(row, scopes[row['name']] ?? []),
+          ),
         ),
       );
   }
 
   static Future<void> save(String name, ToolCustomization value) async {
     final row = value.toRow(name);
-    final updated = await _database.update(
-      'tool_customizations',
-      row,
-      where: 'name = ?',
-      whereArgs: [name],
-    );
-    if (updated == 0) await _database.insert('tool_customizations', row);
+    await _database.transaction((txn) async {
+      final updated = await txn.update(
+        'tool_customizations',
+        row,
+        where: 'name = ?',
+        whereArgs: [name],
+      );
+      if (updated == 0) await txn.insert('tool_customizations', row);
+      await writeResourceScopes(txn, 'tool', name, value.scopes);
+    });
     values[name] = value;
   }
+
+  static bool availableIn(String name, String? groupId, {String? projectId}) =>
+      matchesResourceScope(
+        values[name]?.scopes ?? [],
+        groupId,
+        projectId: projectId,
+      );
+
+  static Future<List<Map<String, Object?>>> groups() => _database.query(
+    'conversations',
+    columns: ['id', 'title', 'project_id'],
+    where: "kind = 'group'",
+    orderBy: 'updated_at DESC',
+  );
+
+  static Future<List<Map<String, Object?>>> projects() => _database.query(
+    'development_projects',
+    columns: ['id', 'name'],
+    orderBy: 'updated_at DESC',
+  );
 
   static ToolDefinition apply(ToolDefinition tool) {
     final value = values[tool.name];

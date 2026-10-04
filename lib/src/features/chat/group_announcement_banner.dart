@@ -1,3 +1,4 @@
+import 'profile_navigation.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -138,7 +139,7 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
   }
 
   Future<void> _openProfile(String senderId) async {
-    await Navigator.push<void>(
+    await openProfileRoute(
       context,
       MaterialPageRoute(
         builder: (_) => senderId == MessageSender.localUser.id

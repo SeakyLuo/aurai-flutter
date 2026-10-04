@@ -203,6 +203,35 @@ class MiniappProgramStore {
     if (expectedVersion != null && expectedVersion != row['version']) {
       throw StateError('小程序已更新，请重新读取后提交');
     }
+    // A program may require a published speech before accepting its end card.
+    final submittingActor = delegatedPlayer as String? ?? actorId;
+    final speechBinding = bindings.values
+        .cast<Map>()
+        .where(
+          (binding) =>
+              binding['action'] == action &&
+              (binding['actors'] as List).contains(submittingActor) &&
+              binding['publicMessageSince'] != null,
+        )
+        .firstOrNull;
+    if (speechBinding != null) {
+      final published = await txn.query(
+        'messages',
+        columns: ['id'],
+        where: '''conversation_id = ? AND sender_id = ?
+          AND kind = 'group_message' AND created_at >= ? AND TRIM(text) != ''
+          AND json_extract(interactive_json, '\$.participation.audience') IS NULL
+          AND json_extract(interactive_json, '\$.participation.excludedAudience') IS NULL''',
+        whereArgs: [
+          conversationId,
+          submittingActor,
+          speechBinding['publicMessageSince'],
+        ],
+        limit: 1,
+      );
+      if (published.isEmpty)
+        throw StateError('请先成功发送公开发言，再提交结束发言；发送失败或尚未发送的内容不算已发表');
+    }
     final now = DateTime.now().millisecondsSinceEpoch;
     final output = await runner.run(
       MiniappCapabilityProtocol.wrap(script, declared),
@@ -309,7 +338,12 @@ class MiniappProgramStore {
     final version = (row['version'] as int) + 1;
     await txn.update(
       'html_games',
-      {'state_json': jsonEncode(view), 'version': version, 'preview': null},
+      {
+        'state_json': jsonEncode(view),
+        'version': version,
+        'preview': null,
+        'updated_at': now * 1000,
+      },
       where: 'message_id = ?',
       whereArgs: [messageId],
     );

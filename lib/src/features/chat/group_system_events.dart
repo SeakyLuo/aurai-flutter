@@ -5,8 +5,18 @@ extension GroupSystemEvents on ChatController {
       (message.messageMetadata?.participation['_programWakeMembers'] as List?)
           ?.cast<String>();
 
+  List<String>? _noticeWakeMembers(AgentMessage message) {
+    if (message.messageMetadata?.participation['_programWake'] == true) {
+      return _programWakeMembers(message) ?? message.audience;
+    }
+    final card = message.interactive;
+    if (card == null || !card.shared) return null;
+    return (card.interaction['actors'] as List?)?.cast<String>();
+  }
+
   void _dispatchGroupNotice(GroupDispatcher dispatcher, AgentMessage notice) {
-    if (notice.audience == null) {
+    final recipients = _noticeWakeMembers(notice);
+    if (notice.audience == null && recipients == null) {
       dispatcher.receive([notice], mentions: _groupNoticeMentions([notice]));
     } else {
       dispatcher.receiveTargeted(
@@ -15,7 +25,7 @@ extension GroupSystemEvents on ChatController {
           for (final id in _groupReplies.keys)
             if (id != notice.senderId &&
                 notice.canView(id) &&
-                _programWakeMembers(notice)?.contains(id) != false &&
+                recipients?.contains(id) != false &&
                 (!dispatcher.paused.contains(id) ||
                     notice.messageMetadata?.participation['_programWake'] ==
                         true))
@@ -168,19 +178,16 @@ extension GroupSystemEvents on ChatController {
           }
           _store.writer.remember(notices);
           _notifyRun(target);
-          final programNotices = notices.where(
-            (m) => m.messageMetadata?.participation['_programWake'] == true,
-          );
+          final targeted = notices.every((m) => _noticeWakeMembers(m) != null);
           await _executeGroupChat(
             target,
-            wakeMembers: programNotices.isEmpty
-                ? null
-                : {
-                    for (final notice in programNotices)
-                      for (final id
-                          in _programWakeMembers(notice) ?? notice.audience!)
-                        if (id != notice.senderId) id,
-                  },
+            wakeMembers: targeted
+                ? {
+                    for (final notice in notices)
+                      for (final id in _noticeWakeMembers(notice)!)
+                        if (id != notice.senderId && notice.canView(id)) id,
+                  }
+                : null,
           );
         } finally {
           _runningConversation = null;

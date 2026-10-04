@@ -1,6 +1,47 @@
 part of 'chat_controller.dart';
 
 extension GlobalTools on ChatController {
+  Future<ToolRegistry> _createMemberToolRegistry({
+    required String? Function() currentProjectId,
+    required List<AgentTool> tools,
+    required Conversation? parent,
+    required Conversation member,
+    required _ReplyContext reply,
+    required List<AgentMessage> observed,
+    required List<String> publishedIds,
+    required VoidCallback onSleep,
+    required String? groupId,
+  }) async {
+    if (parent != null) {
+      _bindGroupRunTools(
+        tools: tools,
+        parent: parent,
+        member: member,
+        reply: reply,
+        observed: observed,
+        publishedIds: publishedIds,
+        onSleep: onSleep,
+      );
+    }
+    final registry = ToolRegistry(
+      currentProjectId: currentProjectId,
+      tools: tools,
+      capabilities: capabilities,
+      groupId: groupId,
+    );
+    registry.load(await recentConversationTools(_store.database, member.id));
+    registry.load([
+      'sendGroupMessage',
+      if (parent != null) ...[
+        'sleepGroupChat',
+        'wakeGroupMember',
+        'pauseGroupAutoReply',
+        'resumeGroupAutoReply',
+      ],
+    ]);
+    return registry;
+  }
+
   List<AgentTool> _createTools({
     required Conversation conversation,
     required String senderId,
@@ -426,8 +467,19 @@ extension GlobalTools on ChatController {
             ).execute(call);
           }),
           for (final operation in SkillTool.operations)
-            SkillTool(skills, operation),
-          RunSkillTool(skills, _platform, conversationId),
+            SkillTool(
+              skills,
+              operation,
+              groupId: groupId,
+              currentProjectId: () => documents.project?.id,
+            ),
+          RunSkillTool(
+            skills,
+            _platform,
+            conversationId,
+            groupId: groupId,
+            currentProjectId: () => documents.project?.id,
+          ),
           WebTool('searchWeb', webSources),
           SourceDatesTool(webSources),
           ImageSearchTool(),
@@ -550,6 +602,13 @@ extension GlobalTools on ChatController {
       ),
       webSources: WebSourceRegistry(),
     );
-    return ToolRegistry(tools: tools, capabilities: capabilities).catalog;
+    return [
+      ...ToolRegistry(
+        tools: tools,
+        capabilities: capabilities,
+        management: true,
+      ).catalog,
+      ...ResponseDecision.catalog.map(ToolCustomizations.apply),
+    ];
   }
 }

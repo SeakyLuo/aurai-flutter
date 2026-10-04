@@ -16,13 +16,13 @@ Future<String?> showHeaderActionMenu(
   Offset? position,
 }) {
   final button = context.findRenderObject()! as RenderBox;
-  final overlay =
-      Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
+  final navigator = Navigator.of(context, rootNavigator: true);
+  final overlay = navigator.overlay!.context.findRenderObject()! as RenderBox;
   final origin = position == null
       ? button.localToGlobal(Offset.zero, ancestor: overlay)
       : overlay.globalToLocal(position);
   final anchor = origin & (position == null ? button.size : Size.zero);
-  final media = MediaQuery.of(context);
+  final media = MediaQuery.of(navigator.context).copyWith(size: overlay.size);
   final width = math.min(
     212.0,
     media.size.width - media.padding.horizontal - 16,
@@ -33,6 +33,7 @@ Future<String?> showHeaderActionMenu(
   );
   return showGeneralDialog<String>(
     context: context,
+    useRootNavigator: true,
     requestFocus: false,
     barrierDismissible: true,
     barrierLabel: '关闭菜单',

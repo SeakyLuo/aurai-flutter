@@ -1,3 +1,4 @@
+import 'profile_navigation.dart';
 import '../../widgets/empty_data_view.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -135,7 +136,8 @@ class _GroupFavoritesPageState extends State<GroupFavoritesPage> {
         children: [
           const Text('由 '),
           InkWell(
-            onTap: () => Navigator.of(context).push<void>(
+            onTap: () => openProfileRoute(
+              context,
               MaterialPageRoute(
                 builder: (_) => marker.id == MessageSender.localUser.id
                     ? PersonalInfoPage(memory: widget.controller.memory)

@@ -84,6 +84,8 @@ class MiniappMessageCapability {
           'action': effect['event'],
           'data': effect['data'],
           'actors': card.interaction['actors'] ?? audience,
+          if (effect['requirePublicMessage'] == true)
+            'publicMessageSince': DateTime.now().microsecondsSinceEpoch,
         };
       }
       final metadata =

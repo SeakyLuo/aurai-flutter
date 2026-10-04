@@ -1,3 +1,5 @@
+import 'profile_navigation.dart';
+import 'pinned_message_split.dart';
 import 'draft_visibility_sheet.dart';
 import 'send_options_sheet.dart';
 import 'app_dialog.dart';
@@ -57,6 +59,7 @@ import 'jump_to_bottom_button.dart';
 import 'chat_timeline.dart';
 import 'model_settings_sheet.dart';
 
+part 'chat_pinned_message.dart';
 part 'chat_group_navigation.dart';
 part 'chat_mentions.dart';
 part 'chat_progress.dart';
@@ -99,6 +102,7 @@ class _ChatPageState extends State<ChatPage>
   late String _mentionConversationId = widget.controller.activeConversation.id;
   bool _mentionOpen = false;
   final _draftVisibility = <String, DraftVisibility>{};
+  final _pinSplitKey = GlobalKey<PinnedMessageSplitState>();
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   late final _textController = MentionTextController(
     () => _mentions,
@@ -282,7 +286,8 @@ class _ChatPageState extends State<ChatPage>
             context,
             question: pendingQuestion,
             showSender: isGroup,
-            onOpenSender: () => Navigator.of(context).push<void>(
+            onOpenSender: () => openProfileRoute(
+              _scaffoldKey.currentContext!,
               MaterialPageRoute(
                 builder: (_) => AiContactPage(
                   controller: controller,
@@ -364,227 +369,243 @@ class _ChatPageState extends State<ChatPage>
         child: AbsorbPointer(
           absorbing: controller.changingConversation,
           child: BackdropGroup(
-            child: Scaffold(
-              key: _scaffoldKey,
-              backgroundColor: timeline.isEmpty && !isGroup
-                  ? Colors.transparent
-                  : null,
-              extendBody: true,
-              extendBodyBehindAppBar: true,
-              resizeToAvoidBottomInset: false,
-              appBar: ChatHeader(
-                onBack: () => Navigator.maybePop(context),
-                editing: _editing != null,
-                onCancelEdit:
-                    (_editing?.saving == true || _editing?.picking == true)
-                    ? null
-                    : _cancelMessageEdit,
-                controller: controller,
-                beforeDelete: _beforeDeleteConversation,
-                originTaskId: widget.originTaskId,
-              ),
-              bottomNavigationBar: AnnotatedRegion<SystemUiOverlayStyle>(
-                value: const SystemUiOverlayStyle(
-                  systemNavigationBarColor: Colors.transparent,
-                  systemNavigationBarDividerColor: Colors.transparent,
-                  systemNavigationBarIconBrightness: Brightness.dark,
-                  systemNavigationBarContrastEnforced: false,
+            child: PinnedMessageSplit(
+              key: _pinSplitKey,
+              controller: controller,
+              conversationId: conversationId,
+              onLocate: _locateSearchMessage,
+              messageBuilder: _buildPinnedMessage,
+              child: Scaffold(
+                key: _scaffoldKey,
+                backgroundColor: timeline.isEmpty && !isGroup
+                    ? Colors.transparent
+                    : null,
+                extendBody: true,
+                extendBodyBehindAppBar: true,
+                resizeToAvoidBottomInset: false,
+                appBar: ChatHeader(
+                  onBack: () =>
+                      _pinSplitKey.currentState!.backFromConversation(),
+                  editing: _editing != null,
+                  onCancelEdit:
+                      (_editing?.saving == true || _editing?.picking == true)
+                      ? null
+                      : _cancelMessageEdit,
+                  controller: controller,
+                  beforeDelete: _beforeDeleteConversation,
+                  originTaskId: widget.originTaskId,
                 ),
-                child: KeyboardInset(
-                  enabled: !_questionSheetShowing,
-                  child: WorkspaceChangesPanel(
-                    controller: controller,
-                    child: PendingMessagePanel(
+                bottomNavigationBar: AnnotatedRegion<SystemUiOverlayStyle>(
+                  value: const SystemUiOverlayStyle(
+                    systemNavigationBarColor: Colors.transparent,
+                    systemNavigationBarDividerColor: Colors.transparent,
+                    systemNavigationBarIconBrightness: Brightness.dark,
+                    systemNavigationBarContrastEnforced: false,
+                  ),
+                  child: KeyboardInset(
+                    enabled: !_questionSheetShowing,
+                    child: WorkspaceChangesPanel(
                       controller: controller,
-                      onSend: _sendQueuedMessages,
-                      onEdit: _editing == null && !controller.addingImages
-                          ? _editQueuedMessage
-                          : null,
-                      child: _buildChatComposer(isGroup),
+                      child: PendingMessagePanel(
+                        controller: controller,
+                        onSend: _sendQueuedMessages,
+                        onEdit: _editing == null && !controller.addingImages
+                            ? _editQueuedMessage
+                            : null,
+                        child: _buildChatComposer(isGroup),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              body: GroupAnnouncementBanner(
-                controller: controller,
-                groupId: isGroup ? _conversationId : null,
-                onLocate: _locateSearchMessage,
-                builder: (context, announcementHeight) {
-                  final top = isGroup
-                      ? View.of(context).padding.top /
-                                View.of(context).devicePixelRatio +
-                            ChatHeader.toolbarHeight +
-                            announcementHeight
-                      : MediaQuery.paddingOf(context).top;
-                  final bottom = MediaQuery.paddingOf(context).bottom;
-                  return Stack(
-                    children: [
-                      if (timeline.isEmpty && !isGroup)
-                        const Positioned.fill(child: SearchAuroraBackground()),
-                      Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 760),
-                          child: ScrollAwareJumpStack(
-                            messages: controller.messages,
-                            readThrough: isGroup
-                                ? (
-                                    at: controller
-                                        .activeConversation
-                                        .groupReadAt,
-                                    id: controller
-                                        .activeConversation
-                                        .groupReadId,
-                                  )
-                                : null,
-                            acknowledgedRunId:
-                                !isGroup &&
-                                    controller
-                                            .pendingQuestion
-                                            ?.conversationId ==
-                                        _conversationId
-                                ? controller.activeConversation.activeRunId
-                                : null,
-                            atBottom:
-                                (_followOutput || !_contentBelow) &&
-                                !(controller.hasSearchWindow &&
-                                    controller
-                                        .activeConversation
-                                        .searchHasLater),
-                            key: ValueKey(_conversationId),
-                            children: [
-                              Positioned.fill(
-                                child: timeline.isEmpty && isGroup
-                                    ? const SizedBox.expand()
-                                    : timeline.isEmpty
-                                    ? RepaintBoundary(
-                                        child: EmptyConversation(
-                                          contentPadding: EdgeInsets.only(
-                                            top: top,
-                                          ),
-                                          onUseExample: _useExample,
-                                        ),
-                                      )
-                                    : isGroup &&
-                                          controller.visibleMessages.every(
-                                            (message) => message.isSystem,
-                                          )
-                                    ? _groupIntroduction(timeline, top, bottom)
-                                    : RepaintBoundary(
-                                        key: PageStorageKey(
-                                          'conversation:$_conversationId',
-                                        ),
-                                        child: ChatViewport(
-                                          key: _viewportKey,
-                                          entries: timeline,
-                                          showScrollbar: true,
-                                          onScrollToLatest: _scrollToBottom,
-                                          bookmark:
-                                              _scrollBookmarks[_conversationId],
-                                          followOutput: _followOutput,
-                                          sentMessageId: _sentMessageId,
-                                          sentMessageTop:
-                                              top +
-                                              8 -
-                                              MessageItem.userTopMargin,
-                                          onVisibleEntriesChanged:
-                                              _scheduleMarkRead,
-                                          onContentBelowChanged: (value) {
-                                            if (mounted &&
-                                                _conversationId ==
-                                                    conversationId) {
-                                              setState(
-                                                () => _contentBelow = value,
-                                              );
-                                            }
-                                          },
-                                          padding: EdgeInsets.only(
-                                            top: top + 12,
-                                            bottom:
-                                                bottom +
-                                                (isGroup
-                                                    ? GroupActivityAvatars
-                                                          .height
-                                                    : 16),
-                                          ),
-                                          hasEarlierMessages:
-                                              controller.visibleHasEarlier,
-                                          hasLaterMessages:
-                                              controller.hasSearchWindow &&
-                                              controller
-                                                  .activeConversation
-                                                  .searchHasLater,
-                                          loadLaterMessages: controller
-                                              .loadVisibleLaterMessages,
-                                          loadEarlierMessages: controller
-                                              .loadVisibleEarlierMessages,
-                                          onUserScroll: _dismissReachedUnread,
-                                          onBookmark: (bookmark) {
-                                            if (_editing == null)
-                                              _scrollBookmarks[conversationId] =
-                                                  bookmark;
-                                          },
-                                          onFollowOutputChanged: (value) {
-                                            if (mounted)
-                                              setState(
-                                                () => _followOutput =
-                                                    controller.hasSearchWindow
-                                                    ? false
-                                                    : value,
-                                              );
-                                          },
-                                          summaryOwners: chatSummaryOwners(
-                                            controller,
-                                          ),
-                                        ),
-                                      ),
-                              ),
-                              if (controller.changingConversation)
+                body: GroupAnnouncementBanner(
+                  controller: controller,
+                  groupId: isGroup ? _conversationId : null,
+                  onLocate: (id) => _pinSplitKey.currentState!.open(id),
+                  builder: (context, announcementHeight) {
+                    final top = isGroup
+                        ? View.of(context).padding.top /
+                                  View.of(context).devicePixelRatio +
+                              ChatHeader.toolbarHeight +
+                              announcementHeight
+                        : MediaQuery.paddingOf(context).top;
+                    final bottom = MediaQuery.paddingOf(context).bottom;
+                    return Stack(
+                      children: [
+                        if (timeline.isEmpty && !isGroup)
+                          const Positioned.fill(
+                            child: SearchAuroraBackground(),
+                          ),
+                        Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 760),
+                            child: ScrollAwareJumpStack(
+                              messages: controller.messages,
+                              readThrough: isGroup
+                                  ? (
+                                      at: controller
+                                          .activeConversation
+                                          .groupReadAt,
+                                      id: controller
+                                          .activeConversation
+                                          .groupReadId,
+                                    )
+                                  : null,
+                              acknowledgedRunId:
+                                  !isGroup &&
+                                      controller
+                                              .pendingQuestion
+                                              ?.conversationId ==
+                                          _conversationId
+                                  ? controller.activeConversation.activeRunId
+                                  : null,
+                              atBottom:
+                                  (_followOutput || !_contentBelow) &&
+                                  !(controller.hasSearchWindow &&
+                                      controller
+                                          .activeConversation
+                                          .searchHasLater),
+                              key: ValueKey(_conversationId),
+                              children: [
                                 Positioned.fill(
-                                  child: ColoredBox(
-                                    color: Theme.of(context).colorScheme.surface
-                                        .withValues(alpha: 0.81),
-                                    child: Center(
-                                      child: Padding(
-                                        padding: EdgeInsets.all(24),
-                                        child: const ThinkingIndicator(
-                                          label: '正在打开会话',
+                                  child: timeline.isEmpty && isGroup
+                                      ? const SizedBox.expand()
+                                      : timeline.isEmpty
+                                      ? RepaintBoundary(
+                                          child: EmptyConversation(
+                                            contentPadding: EdgeInsets.only(
+                                              top: top,
+                                            ),
+                                            onUseExample: _useExample,
+                                          ),
+                                        )
+                                      : isGroup &&
+                                            controller.visibleMessages.every(
+                                              (message) => message.isSystem,
+                                            )
+                                      ? _groupIntroduction(
+                                          timeline,
+                                          top,
+                                          bottom,
+                                        )
+                                      : RepaintBoundary(
+                                          key: PageStorageKey(
+                                            'conversation:$_conversationId',
+                                          ),
+                                          child: ChatViewport(
+                                            key: _viewportKey,
+                                            entries: timeline,
+                                            showScrollbar: true,
+                                            onScrollToLatest: _scrollToBottom,
+                                            bookmark:
+                                                _scrollBookmarks[_conversationId],
+                                            followOutput: _followOutput,
+                                            sentMessageId: _sentMessageId,
+                                            sentMessageTop:
+                                                top +
+                                                8 -
+                                                MessageItem.userTopMargin,
+                                            onVisibleEntriesChanged:
+                                                _scheduleMarkRead,
+                                            onContentBelowChanged: (value) {
+                                              if (mounted &&
+                                                  _conversationId ==
+                                                      conversationId) {
+                                                setState(
+                                                  () => _contentBelow = value,
+                                                );
+                                              }
+                                            },
+                                            padding: EdgeInsets.only(
+                                              top: top + 12,
+                                              bottom:
+                                                  bottom +
+                                                  (isGroup
+                                                      ? GroupActivityAvatars
+                                                            .height
+                                                      : 16),
+                                            ),
+                                            hasEarlierMessages:
+                                                controller.visibleHasEarlier,
+                                            hasLaterMessages:
+                                                controller.hasSearchWindow &&
+                                                controller
+                                                    .activeConversation
+                                                    .searchHasLater,
+                                            loadLaterMessages: controller
+                                                .loadVisibleLaterMessages,
+                                            loadEarlierMessages: controller
+                                                .loadVisibleEarlierMessages,
+                                            onUserScroll: _dismissReachedUnread,
+                                            onBookmark: (bookmark) {
+                                              if (_editing == null)
+                                                _scrollBookmarks[conversationId] =
+                                                    bookmark;
+                                            },
+                                            onFollowOutputChanged: (value) {
+                                              if (mounted)
+                                                setState(
+                                                  () => _followOutput =
+                                                      controller.hasSearchWindow
+                                                      ? false
+                                                      : value,
+                                                );
+                                            },
+                                            summaryOwners: chatSummaryOwners(
+                                              controller,
+                                            ),
+                                          ),
+                                        ),
+                                ),
+                                if (controller.changingConversation)
+                                  Positioned.fill(
+                                    child: ColoredBox(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .surface
+                                          .withValues(alpha: 0.81),
+                                      child: Center(
+                                        child: Padding(
+                                          padding: EdgeInsets.all(24),
+                                          child: const ThinkingIndicator(
+                                            label: '正在打开会话',
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              Positioned(
-                                right: 16,
-                                bottom: bottom + 8,
-                                child: Center(
-                                  child: JumpToBottomButton(
-                                    visible:
-                                        !_followOutput &&
-                                        (_contentBelow ||
-                                            (controller.hasSearchWindow &&
-                                                controller
-                                                    .activeConversation
-                                                    .searchHasLater)) &&
-                                        timeline.isNotEmpty,
-                                    onPressed: _scrollToBottom,
+                                Positioned(
+                                  right: 16,
+                                  bottom: bottom + 8,
+                                  child: Center(
+                                    child: JumpToBottomButton(
+                                      visible:
+                                          !_followOutput &&
+                                          (_contentBelow ||
+                                              (controller.hasSearchWindow &&
+                                                  controller
+                                                      .activeConversation
+                                                      .searchHasLater)) &&
+                                          timeline.isNotEmpty,
+                                      onPressed: _scrollToBottom,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      _unreadPositionHint(top),
-                      if (isGroup)
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: bottom,
-                          child: _groupStatus(active),
-                        ),
-                    ],
-                  );
-                },
+                        _unreadPositionHint(top),
+                        if (isGroup)
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: bottom,
+                            child: _groupStatus(active),
+                          ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
           ),

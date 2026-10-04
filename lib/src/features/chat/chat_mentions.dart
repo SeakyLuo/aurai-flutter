@@ -3,7 +3,8 @@ part of 'chat_page.dart';
 extension _ChatMentions on _ChatPageState {
   void _openDraftMention(String senderId) {
     _focusNode.unfocus();
-    Navigator.of(context).push<void>(
+    openProfileRoute(
+      _scaffoldKey.currentContext!,
       MaterialPageRoute(
         builder: (_) => senderId == MessageSender.localUser.id
             ? PersonalInfoPage(memory: widget.controller.memory)

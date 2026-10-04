@@ -412,10 +412,17 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
           sliver: grid
               ? SliverGrid.builder(
-                  gridDelegate: AssetLibraryGridDelegate([
-                    for (final asset in _items)
-                      asset.isImage ? _imageRatios[asset.path]! : .82,
-                  ]),
+                  gridDelegate: AssetLibraryGridDelegate(
+                    [
+                      for (final asset in _items)
+                        asset.isImage ? _imageRatios[asset.path]! : .82,
+                    ],
+                    columns: switch (MediaQuery.sizeOf(context).width) {
+                      < 600 => 2,
+                      < 800 => 3,
+                      _ => 4,
+                    },
+                  ),
                   itemCount: _items.length,
                   itemBuilder: (_, index) => _tile(_items[index], grid: true),
                 )

@@ -1,3 +1,4 @@
+import '../providers/structured_result_tool.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -7,6 +8,7 @@ import '../providers/model_context_limits.dart';
 import '../providers/responses_transport.dart';
 
 /// A page-scoped, tool-free client. Credentials and app conversations stay native.
+/// JSON results use a result-only function, without access to application tools.
 class HtmlAiService {
   final _jobs = <int, _AiJob>{};
 
@@ -115,6 +117,16 @@ class HtmlAiService {
     }
     final transport = ResponsesTransport(config);
     job.transport = transport;
+    const resultTool = StructuredResultTool(
+      'submitPageResult',
+      '返回页面请求的 JSON 值，不执行页面或设备操作。',
+      {
+        'type': 'object',
+        'properties': {'value': <String, Object?>{}},
+        'required': ['value'],
+        'additionalProperties': false,
+      },
+    );
     final response = await transport.send(
       {
         'model': config.model,
@@ -124,9 +136,11 @@ class HtmlAiService {
           maxTokens,
           ModelContextLimits.forConfig(config).outputTokens,
         ),
-        if (format == 'json')
+        if (format == 'json') ...{
+          ...resultTool.request,
           'instructions':
-              'Return exactly one valid JSON value. Do not use Markdown fences or add commentary.',
+              'Call submitPageResult with the requested JSON value in its value argument. Do not return the result in reply text.',
+        },
         'input': [
           for (final message in messages)
             {'role': message['role'], 'content': message['content']},
@@ -137,12 +151,24 @@ class HtmlAiService {
         if (utf8.encode(text).length > 512 * 1024) {
           throw const ModelProviderException('AI 回复超过大小限制');
         }
-        onText(text);
+        if (format == 'text') onText(text);
       },
     );
     job.checkCancelled();
     if (response['status'] != 'completed') {
       throw const ModelProviderException('AI 回复未完成');
+    }
+    if (format == 'json') {
+      final result = resultTool.read(response);
+      if (result.length != 1 || !result.containsKey('value')) {
+        throw FormatException('页面结果工具必须提供 value', jsonEncode(result));
+      }
+      final text = jsonEncode(result['value']);
+      if (utf8.encode(text).length > 512 * 1024) {
+        throw const ModelProviderException('AI 回复超过大小限制');
+      }
+      onText(text);
+      return {'text': text, 'json': result['value'], 'model': config.model};
     }
     final text = [
       for (final item in (response['output'] as List).cast<Map>())
@@ -153,19 +179,7 @@ class HtmlAiService {
     if (text.trim().isEmpty || utf8.encode(text).length > 512 * 1024) {
       throw const ModelProviderException('AI 没有返回有效文本');
     }
-    Object? value;
-    if (format == 'json') {
-      try {
-        value = jsonDecode(text);
-      } on FormatException {
-        return {'error': 'AI 没有返回有效 JSON，请重试', 'code': 'invalid_json'};
-      }
-    }
-    return {
-      'text': text,
-      if (format == 'json') 'json': value,
-      'model': config.model,
-    };
+    return {'text': text, 'model': config.model};
   }
 
   Future<void> cancel(int id) async => _jobs[id]?.cancel();

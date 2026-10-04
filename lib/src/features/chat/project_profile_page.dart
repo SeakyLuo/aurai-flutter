@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/glass_notice.dart';
+import '../../app/ui_action.dart';
+import '../../domain/message_sender.dart';
+import '../../skills/skills_page.dart';
+import 'tools_page.dart';
 import '../../domain/ai_profile.dart';
 import '../../domain/avatar_style.dart';
 import '../../domain/error_message.dart';
@@ -88,6 +92,22 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
     await _loadPath();
   }
 
+  Future<void> _skills() => runUiAction(context, () async {
+    final store = await widget.controller.aiSkills(MessageSender.localUser.id);
+    if (!mounted) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SkillsPage(
+          store: store,
+          controller: widget.controller,
+          library: true,
+          projectId: _project.id,
+        ),
+      ),
+    );
+  });
+
   Future<void> _memory() async {
     final project = await Navigator.push<DevelopmentProject>(
       context,
@@ -151,7 +171,7 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
     } on Object catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showToast(
-          SnackBar(content: Text('默认处理人保存失败：${errorMessage(error)}')),
+          SnackBar(content: Text('项目经理保存失败：${errorMessage(error)}')),
           kind: ToastKind.error,
         );
       }
@@ -277,7 +297,7 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
                 subtitle: _localPath ?? '',
               ),
               _row(
-                '默认处理人',
+                '项目经理',
                 _defaultHandler == null
                     ? SettingsIcon(
                         type: SettingsIconType.contacts,
@@ -294,6 +314,24 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
                       ),
                 _defaultHandler == null ? null : _selectDefaultHandler,
                 subtitle: _defaultHandler?.sender.name ?? '',
+              ),
+              _row(
+                '工具',
+                const SettingsIcon(type: SettingsIconType.tools),
+                () => Navigator.push<void>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ToolsPage(
+                      controller: widget.controller,
+                      projectId: _project.id,
+                    ),
+                  ),
+                ),
+              ),
+              _row(
+                '技能',
+                const SettingsIcon(type: SettingsIconType.skills),
+                _skills,
               ),
               const SizedBox(height: 14),
               DialogActionButton(

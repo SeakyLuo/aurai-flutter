@@ -133,10 +133,20 @@ Map<String, Object?> chatCompletionsBody(
               'name': tool['name'],
               'description': tool['description'],
               'parameters': tool['parameters'],
+              if (tool.containsKey('strict')) 'strict': tool['strict'],
             },
           },
       ],
-      'tool_choice': 'auto',
+      'tool_choice': switch (body['tool_choice']) {
+        final Map choice => {
+          'type': 'function',
+          'function': {'name': choice['name']},
+        },
+        final String choice => choice,
+        _ => 'auto',
+      },
+      if (body.containsKey('parallel_tool_calls'))
+        'parallel_tool_calls': body['parallel_tool_calls'],
     },
   };
 }

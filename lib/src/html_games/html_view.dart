@@ -24,6 +24,7 @@ class HtmlView extends StatefulWidget {
     required this.messageId,
     required this.conversationId,
     required this.store,
+    this.surfaceId = 'chat',
     this.fullscreen = false,
     this.backLabel = '返回会话',
   });
@@ -31,6 +32,7 @@ class HtmlView extends StatefulWidget {
   final String messageId;
   final String conversationId;
   final HtmlStore store;
+  final String surfaceId;
   final bool fullscreen;
   final String backLabel;
 
@@ -39,7 +41,8 @@ class HtmlView extends StatefulWidget {
         .where(
           (view) =>
               view.widget.messageId == messageId &&
-              view.widget.fullscreen == fullscreen,
+              view.widget.fullscreen == fullscreen &&
+              view.widget.surfaceId == surfaceId,
         )
         .firstOrNull;
     await view?._session?.capture();
@@ -54,6 +57,7 @@ class HtmlView extends StatefulWidget {
             messageId: messageId,
             conversationId: conversationId,
             store: store,
+            surfaceId: surfaceId,
             fullscreen: true,
             backLabel: backLabel,
           ),
@@ -79,6 +83,9 @@ class _HtmlViewState extends State<HtmlView>
   late final StreamSubscription<String> _appChanges;
   late HtmlGameCard _card;
   Uint8List? _preview;
+  String? _previewTheme;
+  Uint8List? get _themedPreview =>
+      _previewTheme == Theme.of(context).brightness.name ? _preview : null;
   double? _contentHeight;
   (double, double, double, int)? _savedSize;
   (String, double, bool, double, int)? _heightKey;
@@ -93,6 +100,7 @@ class _HtmlViewState extends State<HtmlView>
     super.initState();
     _card = widget.card;
     _preview = _card.preview;
+    _previewTheme = _card.previewTheme;
     _appChanges = HtmlGameSignals.appChanges.stream
         .where((id) => id == _card.appId)
         .listen((_) => unawaited(_refreshCard()));
@@ -144,6 +152,7 @@ class _HtmlViewState extends State<HtmlView>
     if (widget.card.version > _card.version) {
       _card = widget.card;
       _preview = _card.preview;
+      _previewTheme = _card.previewTheme;
     }
   }
 
@@ -238,6 +247,7 @@ class _HtmlViewState extends State<HtmlView>
         setState(() {
           _card = next;
           _preview = next.preview;
+          _previewTheme = next.previewTheme;
         });
       }
     } on Object {
@@ -257,6 +267,7 @@ class _HtmlViewState extends State<HtmlView>
           (view) =>
               !identical(view, this) &&
               view.widget.messageId == widget.messageId &&
+              view.widget.surfaceId == widget.surfaceId &&
               (view._session != null || view._opening),
         )
         .firstOrNull;
@@ -283,6 +294,7 @@ class _HtmlViewState extends State<HtmlView>
       final session = HtmlGameSession(
         game,
         widget.store,
+        surfaceId: widget.surfaceId,
         fullscreen: widget.fullscreen,
         hostTopInset: widget.fullscreen
             ? MediaQuery.paddingOf(context).top + SettingsAppBar.toolbarHeight
@@ -326,6 +338,7 @@ class _HtmlViewState extends State<HtmlView>
         session.preview != null &&
         !identical(_preview, session.preview)) {
       _preview = session.preview;
+      _previewTheme = session.previewTheme;
       changed = true;
     }
     // Keep the saved dimensions while the document and its state are loading.
@@ -417,8 +430,10 @@ class _HtmlViewState extends State<HtmlView>
     session.removeListener(_sessionChanged);
     await session.close();
     if (session.previewVersion == session.game.version &&
-        session.preview != null)
+        session.preview != null) {
       _preview = session.preview;
+      _previewTheme = session.previewTheme;
+    }
     _session = null;
     if (mounted) setState(() {});
     for (final view in _views) {
@@ -521,9 +536,9 @@ class _HtmlViewState extends State<HtmlView>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (_preview != null)
+                if (_themedPreview != null)
                   Image.memory(
-                    _preview!,
+                    _themedPreview!,
                     height: 160,
                     fit: BoxFit.cover,
                     alignment: Alignment.topCenter,
@@ -619,7 +634,7 @@ class _HtmlViewState extends State<HtmlView>
                           height: documentHeight,
                           child: HtmlGameSurface(
                             session: _session!,
-                            preview: _preview,
+                            preview: _themedPreview,
                             loadingBackground:
                                 _card.backgroundMode == 'transparent'
                                 ? Colors.transparent
@@ -631,13 +646,13 @@ class _HtmlViewState extends State<HtmlView>
                         ),
                       ),
                     )
-                  else if (_preview != null && !_failed)
+                  else if (_themedPreview != null && !_failed)
                     GestureDetector(
                       onTap: _open,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: Image.memory(
-                          _preview!,
+                          _themedPreview!,
                           gaplessPlayback: true,
                           height: height,
                           fit: BoxFit.fitWidth,

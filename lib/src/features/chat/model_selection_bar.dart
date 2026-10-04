@@ -14,12 +14,14 @@ class ModelSelectionBar extends StatefulWidget {
     required this.totalCount,
     required this.allSelected,
     required this.onSelectAll,
+    this.searchHintText = '搜索模型',
   });
   final TextEditingController search;
   final ValueChanged<String> onSearchChanged;
   final int selectedCount, totalCount;
   final bool allSelected;
   final VoidCallback? onSelectAll;
+  final String searchHintText;
   @override
   State<ModelSelectionBar> createState() => _ModelSelectionBarState();
 }
@@ -114,7 +116,9 @@ class _ModelSelectionBarState extends State<ModelSelectionBar> {
                   bottom: 0,
                   child: Center(
                     child: RoundAction(
-                      label: filtered ? '搜索中：${widget.search.text}' : '搜索模型',
+                      label: filtered
+                          ? '搜索中：${widget.search.text}'
+                          : widget.searchHintText,
                       icon: Icons.search_rounded,
                       iconWidget: SidebarActionIcon(
                         type: SidebarActionIconType.search,
@@ -154,8 +158,8 @@ class _ModelSelectionBarState extends State<ModelSelectionBar> {
                                 onSubmitted: (_) => _fold(),
                                 textInputAction: TextInputAction.search,
                                 style: const TextStyle(fontSize: 16),
-                                decoration: const InputDecoration(
-                                  hintText: '搜索模型',
+                                decoration: InputDecoration(
+                                  hintText: widget.searchHintText,
                                   filled: false,
                                   border: InputBorder.none,
                                   enabledBorder: InputBorder.none,

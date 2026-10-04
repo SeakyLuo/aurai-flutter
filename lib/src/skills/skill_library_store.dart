@@ -81,11 +81,24 @@ extension SkillLibraryOperations on SkillStore {
     if (old != null &&
         !canManageVisibility(old) &&
         (value.visibility != old.visibility ||
+            !setEquals(value.scopes.toSet(), old.scopes.toSet()) ||
             !setEquals(value.visibleTo.toSet(), old.visibleTo.toSet()))) {
       throw StateError('仅创建者可以修改可见范围');
     }
     if (value.visibility == 'selected' && value.visibleTo.isEmpty)
       throw StateError('请选择可见的人或 AI');
+    if (value.visibility == 'public' &&
+        value.scopes.isEmpty &&
+        !(old?.visibility == 'public' && old!.scopes.isEmpty))
+      throw StateError('请选择公开的群聊或项目');
+    if (value.scopes.any(
+      (s) => switch (s.type) {
+        'group' => !_groups.any((g) => g['id'] == s.id),
+        'project' => !_projects.any((p) => p['id'] == s.id),
+        _ => true,
+      },
+    ))
+      throw StateError('所选群聊或项目已不存在，请重新选择');
     if (value.visibleTo.any((id) => !_members.any((m) => m.id == id)))
       throw StateError('可见范围包含已移除的联系人，请重新选择');
     final creator = old?.ownerId ?? ownerId;
@@ -97,6 +110,7 @@ extension SkillLibraryOperations on SkillStore {
       id: old?.id ?? _newId(),
       ownerId: creator,
       visibility: value.visibility,
+      scopes: value.scopes.toSet().toList(),
       visibleTo: value.visibility == 'selected'
           ? value.visibleTo.toSet().toList()
           : [],
@@ -160,6 +174,7 @@ extension SkillLibraryOperations on SkillStore {
         );
         if (changed != 1) throw StateError('技能已被修改，请返回后重新打开');
       }
+      await writeResourceScopes(txn, 'skill', saved.id, saved.scopes);
       if (updatePermission) {
         await txn.update(
           'skill_installations',
@@ -228,6 +243,7 @@ extension SkillLibraryOperations on SkillStore {
     if (references.isNotEmpty) throw StateError('其他技能仍依赖此技能，请先移除依赖');
     await _commit((txn) async {
       await txn.delete('skills', where: 'id = ?', whereArgs: [skill.id]);
+      await writeResourceScopes(txn, 'skill', skill.id, const []);
     });
   });
 }

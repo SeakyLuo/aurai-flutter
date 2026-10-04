@@ -19,22 +19,26 @@ Future<double> assetImageRatio(LibraryAsset asset) async {
   }
 }
 
-/// Two independent columns retain each image's original proportions.
+/// Independent columns retain each image's original proportions.
 class AssetLibraryGridDelegate extends SliverGridDelegate {
-  const AssetLibraryGridDelegate(this.ratios);
+  const AssetLibraryGridDelegate(this.ratios, {required this.columns});
   final List<double> ratios;
+  final int columns;
 
   @override
   SliverGridLayout getLayout(SliverConstraints constraints) {
     const gap = 14.0;
-    final width = (constraints.crossAxisExtent - gap) / 2;
-    final heights = [0.0, 0.0];
+    final width = (constraints.crossAxisExtent - gap * (columns - 1)) / columns;
+    final heights = List.filled(columns, 0.0);
     final geometries = <SliverGridGeometry>[];
     for (final ratio in ratios) {
-      final column = heights[0] <= heights[1] ? 0 : 1;
+      var column = 0;
+      for (var i = 1; i < columns; i++) {
+        if (heights[i] < heights[column]) column = i;
+      }
       final height = width / ratio;
       final visualColumn = constraints.crossAxisDirection == AxisDirection.left
-          ? 1 - column
+          ? columns - 1 - column
           : column;
       geometries.add(
         SliverGridGeometry(

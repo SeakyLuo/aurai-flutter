@@ -22,6 +22,7 @@ const htmlGameSchema = [
     status TEXT NOT NULL,
     turn_sender_id TEXT,
     preview BLOB,
+    preview_theme TEXT CHECK(preview_theme IN ('light','dark')),
     updated_at INTEGER NOT NULL
   )''',
   'CREATE INDEX html_games_conversation ON html_games(conversation_id)',

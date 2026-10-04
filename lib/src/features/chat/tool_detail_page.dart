@@ -1,4 +1,7 @@
 import '../../app/glass_notice.dart';
+import 'resource_scope_picker.dart';
+import '../../domain/resource_scope.dart';
+import 'package:flutter/foundation.dart';
 import 'delete_confirmation_dialog.dart';
 import 'question_icon.dart';
 import '../../skills/skill_icon_picker.dart';
@@ -26,6 +29,36 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
   late String _savedTitle = toolTitle(_tool.name);
   late String _savedIcon = ToolCustomizations.values[_tool.name]?.icon ?? '';
   late String _icon = _savedIcon;
+  late List<ResourceScope> _scopes =
+      ToolCustomizations.values[_tool.name]?.scopes ?? [];
+  List<Map<String, Object?>> _groups = [];
+  List<Map<String, Object?>> _projects = [];
+  @override
+  void initState() {
+    super.initState();
+    _loadGroups();
+  }
+
+  Future<void> _loadGroups() async {
+    try {
+      final rows = await Future.wait([
+        ToolCustomizations.groups(),
+        ToolCustomizations.projects(),
+      ]);
+      if (mounted)
+        setState(() {
+          _groups = rows[0];
+          _projects = rows[1];
+        });
+    } on Object catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(error.toString())),
+          kind: ToastKind.error,
+        );
+    }
+  }
+
   late final _name = TextEditingController(text: _savedTitle);
   late final _description = TextEditingController(text: _tool.description);
   late final _parameters = TextEditingController(
@@ -37,6 +70,10 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
   bool get _changed =>
       _name.text != _savedTitle ||
       _icon != _savedIcon ||
+      !setEquals(
+        _scopes.toSet(),
+        (ToolCustomizations.values[_tool.name]?.scopes ?? []).toSet(),
+      ) ||
       _description.text != _tool.description ||
       _parameters.text != _encode(_tool.inputSchema);
 
@@ -80,6 +117,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
         _description.text = _tool.description;
         _parameters.text = _encode(_tool.inputSchema);
         _icon = _savedIcon;
+        _scopes = ToolCustomizations.values[_tool.name]?.scopes ?? [];
         _editing = false;
       });
       return;
@@ -115,6 +153,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
       final customization = ToolCustomization(
         title: _name.text.trim(),
         icon: _icon,
+        scopes: _scopes,
         description: _description.text,
         inputSchema: decoded.cast<String, Object?>(),
       );
@@ -289,6 +328,15 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
                           ),
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 16),
+                    ResourceScopeField(
+                      projects: _projects,
+                      scopes: _scopes,
+                      groups: _groups,
+                      onChanged: !_editing || _saving
+                          ? null
+                          : (scopes) => setState(() => _scopes = scopes),
                     ),
                     _label('使用说明'),
                     _editing

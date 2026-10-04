@@ -14,9 +14,11 @@ Future<String?> showSkillActionMenu(
   bool installed = true,
   bool canDelete = true,
   bool canInstall = false,
+  bool canBatchInstall = false,
 }) => _showSkillMenu(context, position, [
   if (showEdit) ('edit', '编辑'),
   if (canInstall) ('install', '安装'),
+  if (canBatchInstall) ('batchInstall', '批量安装'),
   if (installed) ('uninstall', '卸载'),
   if (installed) (enabled ? 'pause' : 'resume', enabled ? '停用' : '启用'),
   if (canDelete) ('delete', '删除'),
@@ -110,9 +112,13 @@ Future<String?> _showSkillMenu(
                                       const SettingsIcon(
                                         type: SettingsIconType.add,
                                       )
-                                    else if (entry.$1 == 'install')
-                                      const SettingsIcon(
+                                    else if (entry.$1 == 'install' ||
+                                        entry.$1 == 'batchInstall')
+                                      SettingsIcon(
                                         type: SettingsIconType.skills,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
                                       )
                                     else if (entry.$1 == 'permissions')
                                       const SettingsIcon(

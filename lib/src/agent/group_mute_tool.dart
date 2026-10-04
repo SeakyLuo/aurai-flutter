@@ -16,7 +16,7 @@ class GroupMuteTool implements AgentTool, RuntimeCapabilityAgentTool {
     capabilityId: 'local.group_chats',
     safety: ToolSafety.lowRisk,
     description:
-        '设置目标群成员禁言或解除禁言。可从任何会话调用；省略 groupId 使用当前群，没有当前群时必须指定目标群。只有目标群的群主和管理员可调用；群主可管理管理员和普通成员，管理员只可管理普通成员，不能管理自己或群主。适用于真人和 AI。禁言强制阻止发消息，@、自动接话及定时唤醒都不能绕过。durationMinutes 为 null 永久禁言，为 0 解除禁言，正数按分钟设置限时禁言，最长 30 天，到期自动解除。不改变自动接话设置。根据用户明确安排或正在主持的游戏规则操作；通过 readGroupChat 获取目标群和成员，不让用户填写 ID。',
+        '设置目标群成员禁言或解除禁言。可从任何会话调用；省略 groupId 使用当前群，没有当前群时必须指定目标群。只有目标群的群主和管理员可调用；群主可管理管理员和普通成员，管理员只可管理普通成员，不能管理自己或群主。禁言强制阻止发消息，@、自动接话及定时唤醒都不能绕过。durationMinutes 为 null 永久禁言，为 0 解除禁言，正数按分钟设置限时禁言，最长 30 天，到期自动解除。不改变自动接话设置。根据用户明确安排或正在主持的游戏规则操作；通过 readGroupChat 获取目标群和成员，不让用户填写 ID。',
     inputSchema: {
       'type': 'object',
       'properties': {

@@ -1,3 +1,4 @@
+import 'profile_navigation.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/ai_profile.dart';
 import '../../domain/error_message.dart';
@@ -138,7 +139,7 @@ class _DirectConversationInfoPageState
   }
 
   Future<void> _openProfile() async {
-    await Navigator.push<void>(
+    await openProfileRoute(
       context,
       MaterialPageRoute(
         builder: (_) => AiContactPage(

@@ -31,15 +31,23 @@ import 'package:sqflite/sqflite.dart';
 import '../memory/memory_controller.dart';
 import 'message_quick_reply_schema.dart';
 import 'tool_customization_schema.dart';
+import 'resource_scope_schema.dart';
+import 'project_resource_migration.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 82,
+  version: 85,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion >= 20 && oldVersion < 85) {
+      await db.execute(
+        "ALTER TABLE html_games ADD COLUMN preview_theme TEXT CHECK(preview_theme IN ('light','dark'))",
+      );
+      await db.update('html_games', {'preview': null});
+    }
     if (oldVersion >= 2 && oldVersion < 77) {
       await db.execute(
         "ALTER TABLE memory_settings ADD COLUMN gender TEXT NOT NULL DEFAULT 'unknown' CHECK(gender IN ('male', 'female', 'unknown'))",
@@ -444,6 +452,8 @@ Future<Database> openConversationDatabase() async => openDatabase(
         'CREATE INDEX conversation_project_order ON conversations(project_id, pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC)',
       );
     }
+    if (oldVersion < 83) await migrateResourceScopes(db);
+    if (oldVersion < 84) await migrateWerewolfProjectResources(db);
   },
   onCreate: (db, version) async {
     final batch = db.batch();
@@ -492,6 +502,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
     await migrateAuraiAvatar(db);
     await migrateAuraiDescription(db);
     await seedToolCustomizations(db);
+    await db.execute(resourceScopeSchema);
   },
 );
 
