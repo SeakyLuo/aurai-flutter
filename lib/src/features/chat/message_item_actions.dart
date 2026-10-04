@@ -1,12 +1,17 @@
 part of 'message_item.dart';
 
 extension _FailureRetry on _MessageItemState {
-  Widget _failureCard() => _withActions(
-    TaskFailureCard(
-      error: message.text,
-      padding: const EdgeInsets.only(top: 6, bottom: 8),
-      enabled: !_retryingFailure && widget.onRetry != null,
-      onRetry: widget.onRetry == null ? null : _retryFailure,
+  Widget _failureCard() => Padding(
+    padding: const EdgeInsets.only(top: 6, bottom: 8),
+    child: MenuPressHighlight(
+      onLongPressStart: (_) => _openBubbleMenu(),
+      borderRadius: BorderRadius.circular(24),
+      child: TaskFailureCard(
+        error: message.text,
+        padding: EdgeInsets.zero,
+        enabled: !_retryingFailure && widget.onRetry != null,
+        onRetry: widget.onRetry == null ? null : _retryFailure,
+      ),
     ),
   );
 

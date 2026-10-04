@@ -7,6 +7,8 @@ class HtmlRouteObserver extends NavigatorObserver with ChangeNotifier {
   final _routes = <Route<dynamic>>[];
 
   bool isVisible(Route<dynamic> route) {
+    // A pane has its own navigator; routes in another navigator cannot cover it.
+    if (route.navigator != navigator) return route.isCurrent;
     for (final entry in _routes.reversed) {
       if (identical(entry, route)) return true;
       if (entry is PageRoute) return false;

@@ -309,7 +309,21 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
         child: widget.child,
       ),
       detailBuilder: _message != null || _details != null
-          ? (context, wide) => _details ?? _detail(context, wide: wide)
+          ? (context, wide) => Stack(
+              fit: StackFit.expand,
+              children: [
+                if (_message != null)
+                  Offstage(
+                    key: const ValueKey('pinned-message'),
+                    offstage: _details != null,
+                    child: TickerMode(
+                      enabled: _details == null,
+                      child: _detail(context, wide: wide),
+                    ),
+                  ),
+                if (_details != null) _details!,
+              ],
+            )
           : null,
     ),
   );

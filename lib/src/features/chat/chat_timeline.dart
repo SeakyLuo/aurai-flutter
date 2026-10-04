@@ -57,6 +57,7 @@ List<ChatTimelineEntry> buildChatTimeline(
       if (message.sender != null) message.sender!.id: message.sender!,
   };
   final mentionMembers = <String, String>{};
+  final interactiveMembers = {...mentionSenders, ...conversation.noticeMembers};
   final ambiguousNames = <String>{};
   for (final sender in mentionSenders.values) {
     if (mentionMembers.containsKey(sender.name))
@@ -467,6 +468,7 @@ List<ChatTimelineEntry> buildChatTimeline(
                   )
                 : null,
             mentionMembers: mentionMembers,
+            interactiveMembers: interactiveMembers,
             htmlView: message.htmlGame == null
                 ? null
                 : HtmlView(
@@ -477,7 +479,18 @@ List<ChatTimelineEntry> buildChatTimeline(
                     store: controller.htmlStore,
                     onOpenProfile: (senderId) async {
                       if (!context.mounted) return;
-                      openNoticeMember(context, senderId);
+                      await openProfileRoute(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => senderId == MessageSender.localUser.id
+                              ? PersonalInfoPage(memory: controller.memory)
+                              : AiContactPage(
+                                  controller: controller,
+                                  senderId: senderId,
+                                  groupId: conversation.id,
+                                ),
+                        ),
+                      );
                     },
                   ),
             onInteractiveRetry: (eventId) =>

@@ -96,6 +96,7 @@ class _HtmlViewState extends State<HtmlView>
   bool _opening = false, _retrying = false;
   bool _failed = false, _foreground = true, _leaving = false;
   bool _tabVisible = true;
+  bool _profileOpen = false;
   Future<void>? _closing;
 
   @override
@@ -185,6 +186,12 @@ class _HtmlViewState extends State<HtmlView>
 
   void _checkVisibility() {
     if (!_visible) {
+      if (_profileOpen) {
+        _idleTimer?.cancel();
+        _idleTimer = null;
+        unawaited(_session?.setVisible(false));
+        return;
+      }
       if (_leaving || !htmlRouteObserver.isVisible(ModalRoute.of(context)!)) {
         if (_leaving) {
           if (_session != null) unawaited(_close());
@@ -258,6 +265,24 @@ class _HtmlViewState extends State<HtmlView>
     }
   }
 
+  Future<void> _openProfile(String senderId) async {
+    if (_profileOpen) return;
+    _profileOpen = true;
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    // Acknowledge the HTML click immediately; navigation completes on return.
+    unawaited(_showProfile(senderId));
+  }
+
+  Future<void> _showProfile(String senderId) async {
+    try {
+      await widget.onOpenProfile!(senderId);
+    } finally {
+      _profileOpen = false;
+      if (mounted) _scheduleVisibility();
+    }
+  }
+
   Future<void> _open() async {
     if (_opening || _session != null) return;
     if (!Platform.isAndroid) {
@@ -298,7 +323,7 @@ class _HtmlViewState extends State<HtmlView>
         game,
         widget.store,
         surfaceId: widget.surfaceId,
-        onOpenProfile: widget.onOpenProfile,
+        onOpenProfile: widget.onOpenProfile == null ? null : _openProfile,
         fullscreen: widget.fullscreen,
         hostTopInset: widget.fullscreen
             ? MediaQuery.paddingOf(context).top + SettingsAppBar.toolbarHeight

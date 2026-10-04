@@ -85,12 +85,14 @@ class MessageItem extends StatefulWidget {
     this.onBranch,
     this.availableSources = const {},
     this.mentionMembers = const {},
+    this.interactiveMembers = const {},
     this.excludedActivityMessageId,
   });
   final AgentMessage message;
   final PrivateReplyPart? replyPart;
   final Widget? trailingActivities;
   final Map<String, String> mentionMembers;
+  final Map<String, MessageSender> interactiveMembers;
   final Future<InteractiveClickResult?> Function(
     String buttonId,
     int revision,
@@ -162,6 +164,7 @@ class _MessageItemState extends State<MessageItem> {
         oldWidget.readOnly != widget.readOnly ||
         oldWidget.onLocate != widget.onLocate ||
         !mapEquals(oldWidget.mentionMembers, widget.mentionMembers) ||
+        !mapEquals(oldWidget.interactiveMembers, widget.interactiveMembers) ||
         !mapEquals(oldWidget.availableSources, widget.availableSources)) {
       _content = _buildContent(context);
     }
@@ -501,6 +504,8 @@ class _MessageItemState extends State<MessageItem> {
             child: InteractiveMessageView(
               key: ValueKey(page?.sequence),
               card: page?.snapshot ?? message.interactive!,
+              members: widget.interactiveMembers,
+              onOpenMember: widget.onOpenMember,
               historical: page?.snapshot != null,
               readOnly: widget.readOnly || page?.snapshot != null,
               onClick: widget.onInteractiveClick!,

@@ -6,6 +6,9 @@ import 'interactive_message_button.dart';
 import 'package:flutter/material.dart';
 import '../../domain/interactive_message.dart';
 import 'question_icon.dart';
+import '../../domain/message_sender.dart';
+import '../../app/global_ui.dart';
+import 'member_avatar.dart';
 
 class InteractiveMessageView extends StatefulWidget {
   const InteractiveMessageView({
@@ -19,8 +22,12 @@ class InteractiveMessageView extends StatefulWidget {
     this.historical = false,
     this.onRetry,
     this.onStatistics,
+    this.members = const {},
+    this.onOpenMember,
   });
   final InteractiveMessage card;
+  final Map<String, MessageSender> members;
+  final ValueChanged<String>? onOpenMember;
   final VoidCallback? onStatistics;
   final String actorId;
   final bool readOnly;
@@ -152,6 +159,13 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
     final question =
         (_card.interaction['actors'] as List?)?.length == 1 &&
         card.buttons.any((button) => button['selection'] != null);
+    final recipient = question
+        ? widget.members[(_card.interaction['actors'] as List).single]
+        : null;
+    final answered =
+        sharedView?['self'] != null ||
+        (sharedView?['choices'] as List?)?.isNotEmpty == true ||
+        sharedView?['submittedCount'] == 1;
     final statisticsVisible =
         card.showStatistics &&
         (widget.historical && _card.snapshotView != null
@@ -183,6 +197,49 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               if (widget.titleTrailing case final trailing?) trailing,
             ],
           ),
+          if (recipient != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: widget.onOpenMember == null
+                    ? null
+                    : () => widget.onOpenMember!(recipient.id),
+                child: Row(
+                  children: [
+                    MemberAvatar(sender: recipient, size: 24),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            if (!answered && !card.closed)
+                              const TextSpan(text: '请 '),
+                            TextSpan(
+                              text: recipient.name,
+                              style: TextStyle(
+                                color: GlobalUI.highlightTextColor(context),
+                              ),
+                            ),
+                            TextSpan(
+                              text: answered
+                                  ? ' 已回答'
+                                  : card.closed
+                                  ? ' · 问题已结束'
+                                  : ' 回答这个问题',
+                            ),
+                          ],
+                        ),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           if (card.body.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(

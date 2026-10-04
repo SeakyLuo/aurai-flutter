@@ -3,8 +3,6 @@ import 'interactive_selection_view.dart';
 import '../../domain/interactive_selection.dart';
 import 'package:flutter/material.dart';
 import 'interactive_message_button.dart';
-import '../../agent/ask_user_tool.dart';
-import 'user_question_option_tile.dart';
 
 /// Renders projected data only. Rules and settlement live in the domain layer.
 class InteractionContent extends StatelessWidget {
@@ -101,7 +99,7 @@ class InteractionContent extends StatelessWidget {
               ),
             },
           ),
-        if (participationSummary.isNotEmpty)
+        if (!question && participationSummary.isNotEmpty)
           Text(
             participationSummary,
             style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
@@ -111,27 +109,12 @@ class InteractionContent extends StatelessWidget {
             '统计尚未公开',
             style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
           ),
-        if (question && !choosing && answer != null) ...[
-          const SizedBox(height: 12),
-          UserQuestionOptionTile(
-            option: UserQuestionOption(
-              title: '${answer['name']}的回答',
-              content: answer['label'] as String,
-            ),
-            number: 1,
-            selected: true,
-            onTap: null,
-          ),
-        ],
         if ((actions.isNotEmpty || showSubmitted) &&
             (status != null ||
                 (view['revealed'] == true && view['summaryVisible'] != true)))
           const SizedBox(height: 12),
         for (final button in buttons.where(
-          (button) =>
-              collecting &&
-              (!question || choosing) &&
-              button['selection'] != null,
+          (button) => (question || collecting) && button['selection'] != null,
         ))
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -139,17 +122,21 @@ class InteractionContent extends StatelessWidget {
               key: ValueKey((button['id'], view['round'])),
               button: button,
               question: question,
-              self: self,
+              self: question ? answer : self,
               locked:
                   readOnly ||
                   !eligible ||
                   !collecting ||
                   busy != null ||
                   pendingButtonId == button['id'],
-              submitted: submitted,
+              submitted: question ? answer != null : submitted,
               allowChange: allowChange,
               busy: busy == button['id'],
-              showSubmit: eligible && !readOnly,
+              showSubmit:
+                  eligible &&
+                  !readOnly &&
+                  collecting &&
+                  (!question || choosing),
               onSubmit: (value) => onClick(button, value: value),
             ),
           ),
