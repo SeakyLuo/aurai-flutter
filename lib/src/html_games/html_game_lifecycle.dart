@@ -12,18 +12,17 @@ const htmlGameLifecycleScript = r'''
   let events=[];
   window.__auraiCallbacks=value=>{events=value;document.dispatchEvent(new CustomEvent('aurai:eventupdate',{detail:structuredClone(events)}))};
   window.__auraiDataReply=(id,value)=>{
-    const pending=pendingData.get(id);if(!pending)return;pendingData.delete(id);nativeClear(pending.timer);
+    const pending=pendingData.get(id);if(!pending)return;pendingData.delete(id);
     value.error?pending.reject(new Error(value.error)):pending.resolve(value);
   };
   const appData=args=>new Promise((resolve,reject)=>{
     const id=++dataSerial;
-    const timer=nativeTimeout(()=>{pendingData.delete(id);reject(new Error('Operation acknowledgement timed out; read the latest state before retrying'))},15000);
-    pendingData.set(id,{resolve,reject,timer});
+    pendingData.set(id,{resolve,reject});
     AuraiGameBridge.appData(id,JSON.stringify(args));
   });
   window.__auraiSaved=(id,ok)=>{const entry=pendingSaves.get(id);if(!entry)return;pendingSaves.delete(id);if(ok){saved=JSON.parse(entry.json);entry.resolve()}else entry.reject(new Error('State save failed'));};
   window.__auraiInteractionReply=(id,value)=>{
-    const pending=pendingEvents.get(id);if(!pending)return;pendingEvents.delete(id);if(pending.timer!==null)nativeClear(pending.timer);
+    const pending=pendingEvents.get(id);if(!pending)return;pendingEvents.delete(id);
     value.error?pending.reject(new Error(value.error)):pending.resolve(value);
   };
   window.AuraiHTML=Object.freeze({
@@ -59,14 +58,13 @@ const htmlGameLifecycleScript = r'''
       return result;
     },
     requestResize(){document.dispatchEvent(new Event('aurai:resize'))},
-    submitEvent({eventId,action,data=null,notifyAi=true,waitForCompletion=false}){
+    submitEvent({eventId,action,data=null,notifyAi=true}){
       if(!navigator.userActivation.isActive)return Promise.reject(new Error('Submit events from a user action, not on load or a timer'));
       if(pendingEvents.has(eventId))return Promise.reject(new Error('This event is already pending'));
       const json=JSON.stringify({eventId,action,data,notifyAi});
       if(new TextEncoder().encode(json).length>16384)return Promise.reject(new Error('Event exceeds 16 KB'));
       return new Promise((resolve,reject)=>{
-        const timer=waitForCompletion?null:nativeTimeout(()=>{pendingEvents.delete(eventId);reject(new Error('Submission acknowledgement timed out; use readEvent with the same eventId before retrying'))},15000);
-        pendingEvents.set(eventId,{resolve,reject,timer});AuraiGameBridge.postInteraction(eventId,json);
+        pendingEvents.set(eventId,{resolve,reject});AuraiGameBridge.postInteraction(eventId,json);
       });
     },
     get state(){return structuredClone(saved)},

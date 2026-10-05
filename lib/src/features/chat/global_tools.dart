@@ -159,18 +159,9 @@ extension GlobalTools on ChatController {
               }
               if (operation == 'submitHtmlProgramEvent') {
                 final programs = MiniappProgramStore(_store.database);
-                if (args['expectedVersion'] == null) {
-                  final pending = await programs.pendingCompaction(
-                    target.id,
-                    args['messageId'] as String,
-                    senderId,
-                  );
-                  final retry = pending?['retry'] as Map?;
-                  if (retry == null ||
-                      retry['expectedVersion'] != null ||
-                      retry['eventId'] != args['eventId']) {
-                    throw ArgumentError('新操作必须先读取版本；空版本只用于恢复原上下文压缩请求');
-                  }
+                if (args['expectedVersion'] == null &&
+                    args['action'] != 'context.compact.retry') {
+                  throw ArgumentError('新操作必须先读取版本；空版本只用于恢复原上下文压缩请求');
                 }
                 return programs.event(
                   target.id,

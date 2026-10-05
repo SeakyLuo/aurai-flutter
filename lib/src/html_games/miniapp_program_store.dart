@@ -10,6 +10,7 @@ import 'html_app_store.dart';
 import 'miniapp_program.dart';
 import 'miniapp_capability_protocol.dart';
 import 'miniapp_program_change.dart';
+import 'miniapp_context_recovery.dart';
 export 'miniapp_program_change.dart';
 
 /// Reducers cannot access databases or Java. Their effects commit with state.
@@ -30,38 +31,12 @@ class MiniappProgramStore {
     String conversationId,
     String messageId,
     String actorId,
-  ) async {
-    final rows = await database.query(
-      'app_state',
-      columns: ['value'],
-      where: 'key = ?',
-      whereArgs: ['context_compaction:$conversationId'],
-    );
-    if (rows.isEmpty) return null;
-    final pending = MiniappProgram.decode(rows.single['value']);
-    if (pending['messageId'] != messageId) return null;
-    final compaction = pending['contextCompaction'] as Map;
-    final events = await database.query(
-      'html_game_events',
-      columns: ['actor_id', 'request_json'],
-      where: 'id = ?',
-      whereArgs: [compaction['eventId']],
-    );
-    final event = events.single;
-    final request = MiniappProgram.decode(event['request_json']);
-    return {
-      'stateCommitted': true,
-      'contextCompacted': false,
-      if (event['actor_id'] == actorId)
-        'retry': {
-          'messageId': messageId,
-          'eventId': (jsonDecode(compaction['eventId'] as String) as List)[1],
-          'expectedVersion': request['expectedVersion'],
-          'action': request['action'],
-          'data': request['data'],
-        },
-    };
-  }
+  ) => MiniappContextRecovery.pending(
+    database,
+    conversationId,
+    messageId,
+    actorId,
+  );
 
   static Future<List<Map<String, Object?>>> members(
     DatabaseExecutor db,
@@ -107,16 +82,24 @@ class MiniappProgramStore {
   ) async {
     late MiniappProgramChange change;
     final result = await database.transaction((txn) async {
-      change = await reduce(
-        txn,
-        conversationId,
-        messageId,
-        actorId,
-        eventId: args['eventId'] as String,
-        action: args['action'] as String,
-        data: args['data'],
-        expectedVersion: args['expectedVersion'] as int?,
-      );
+      change = args['action'] == MiniappContextRecovery.action
+          ? await MiniappContextRecovery.resume(
+              txn,
+              conversationId,
+              messageId,
+              actorId,
+              args,
+            )
+          : await reduce(
+              txn,
+              conversationId,
+              messageId,
+              actorId,
+              eventId: args['eventId'] as String,
+              action: args['action'] as String,
+              data: args['data'],
+              expectedVersion: args['expectedVersion'] as int?,
+            );
       final rows = await txn.query(
         'html_games',
         columns: ['version', 'state_json'],
@@ -133,7 +116,9 @@ class MiniappProgramStore {
     await change.publish();
     return {
       ...result,
-      if (change.contextCompaction != null) 'contextCompacted': true,
+      if (change.contextCompaction != null ||
+          args['action'] == MiniappContextRecovery.action)
+        'contextCompacted': true,
     };
   }
 

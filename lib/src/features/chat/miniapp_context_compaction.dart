@@ -158,7 +158,7 @@ extension MiniappContextCompactionActions on ChatController {
               'html_game_events',
               {
                 'snapshot_json': jsonEncode(
-                  <String, Object?>{...snapshot}
+                  <String, Object?>{...snapshot, 'contextCompacted': true}
                     ..remove('pendingContextChange'),
                 ),
               },

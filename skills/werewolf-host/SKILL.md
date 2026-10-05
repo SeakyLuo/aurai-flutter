@@ -37,7 +37,7 @@ setChannels 替换完整频道列表，必须基于 channelDefinitions 保留仍
 
 - collect 安排下一轮行动、发言或投票。
 - configure 仅用于尚未开始的对局，提交约定的板子、玩家和主持人，并由小程序立即分配身份、进入 waiting，通知主持安排首夜；身份告知不会唤醒玩家。
-- configure 会主动压缩群上下文，在唤醒主持前完成：旧局按局归档，简要保留结局、复盘和首刀保护等跨局事实，不把旧身份、票型或怀疑沿用到本局。无需再调用 compactContext。压缩失败时操作可能已提交，先读 readHtmlProgram 的 contextCompaction；修复原因后使用原 retry 参数恢复，不能换 eventId 重做发牌。
+- configure 会主动压缩群上下文，在唤醒主持前完成：旧局按局归档，简要保留结局、复盘和首刀保护等跨局事实，不把旧身份、票型或怀疑沿用到本局。无需再调用 compactContext。压缩失败时操作可能已提交，先读 readHtmlProgram 的 contextCompaction；发起人、小程序创建人及开发团队成员可恢复；安装副本沿用原小程序团队，仍需在当前群内。修复原因后提交返回的 retry（action=context.compact.retry、expectedVersion=null、data={}），只继续压缩，不能换 eventId 重做发牌。恢复不会提供原开局参数或扩大私密信息读取权限。
 - resolve 提交公开裁定、死亡、私密反馈、警长、技能消耗、天数或胜负。
 - stop 用于用户明确要求结束对局，不当作正常完成投票。
 
