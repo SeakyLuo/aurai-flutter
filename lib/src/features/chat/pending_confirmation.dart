@@ -1,29 +1,5 @@
 part of 'chat_controller.dart';
 
-class PendingConfirmation {
-  PendingConfirmation(
-    this.call,
-    this.definition,
-    this.conversationId,
-    this.senderId,
-    this.senderName,
-    this.label,
-  ) : deadline = call.confirmationTimeoutSeconds == null
-          ? null
-          : DateTime.now().add(
-              Duration(seconds: call.confirmationTimeoutSeconds!),
-            );
-  final String conversationId;
-  final String senderId;
-  final String senderName;
-  final String label;
-  final DateTime? deadline;
-  final ToolCall call;
-  final ToolDefinition definition;
-  String scope = 'once';
-  final completer = Completer<bool>();
-}
-
 extension _PendingConfirmationActions on ChatController {
   Future<bool> _confirm(
     ToolCall call,
@@ -32,6 +8,8 @@ extension _PendingConfirmationActions on ChatController {
     String? conversationId,
     String senderId = 'agent:aurai',
     bool screenAccess = false,
+    String? taskTitle,
+    Future<void>? cancellation,
   }) async {
     if (_removedGroupMembers.contains(senderId) &&
         _groupRuns.containsKey(senderId))
@@ -59,7 +37,9 @@ extension _PendingConfirmationActions on ChatController {
       whereArgs: [senderId],
       limit: 1,
     )).single;
-    final senderName = sender['name'] as String;
+    final senderName = taskTitle == null
+        ? sender['name'] as String
+        : '${sender['name']} · $taskTitle';
     final label =
         '$senderName · ${definition.authorizationLabel ?? (call.name == 'runSkill' ? '技能：${call.arguments['name']}（版本 ${call.arguments['revision']}）' : toolTitle(call.name))}';
     if (!existing)
@@ -73,9 +53,11 @@ extension _PendingConfirmationActions on ChatController {
     _confirmingSenderId = senderId;
     notifyListeners();
     final bool approved;
+    var resolved = false;
     try {
-      final scope = accessibilityAvailable && !definition.singleUseConfirmation
-          ? await _platform.requestConfirmation(
+      final request =
+          accessibilityAvailable && !definition.singleUseConfirmation
+          ? _platform.requestConfirmation(
               call.id,
               call.name,
               call.arguments,
@@ -85,8 +67,8 @@ extension _PendingConfirmationActions on ChatController {
               autoApproved: existing,
             )
           : existing
-          ? 'once'
-          : await _confirmInApp(
+          ? Future.value('once')
+          : _confirmInApp(
               call,
               definition,
               conversationId,
@@ -94,6 +76,21 @@ extension _PendingConfirmationActions on ChatController {
               senderName,
               label,
             );
+      final scope = cancellation == null
+          ? await request
+          : await Future.any([
+              request,
+              cancellation.then((_) async {
+                if (!resolved) {
+                  if (identical(pendingConfirmation?.call, call))
+                    _execution.resolveConfirmation(false);
+                  if (accessibilityAvailable)
+                    await _platform.cancelPendingInteraction();
+                }
+                return 'deny';
+              }),
+            ]);
+      resolved = true;
       approved = scope != 'deny';
       if (approved && !definition.singleUseConfirmation) {
         await toolApprovals.grant(
@@ -106,6 +103,7 @@ extension _PendingConfirmationActions on ChatController {
         );
       }
     } finally {
+      resolved = true;
       _confirmingSenderId = null;
       notifyListeners();
       await _platform.updateAttentionNotification(conversationId, 'approval');
@@ -131,19 +129,6 @@ extension _PendingConfirmationActions on ChatController {
       senderName,
       label,
     );
-    pendingConfirmation = request;
-    notifyListeners();
-    final timer = call.confirmationTimeoutSeconds == null
-        ? null
-        : Timer(Duration(seconds: call.confirmationTimeoutSeconds!), () {
-            if (identical(pendingConfirmation, request))
-              resolveConfirmation(false);
-          });
-    try {
-      final approved = await request.completer.future;
-      return approved ? request.scope : 'deny';
-    } finally {
-      timer?.cancel();
-    }
+    return _execution.requestConfirmation(request);
   }
 }

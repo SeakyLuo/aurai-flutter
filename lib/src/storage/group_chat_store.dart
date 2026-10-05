@@ -397,7 +397,7 @@ class GroupChatStore {
       'agent_runs',
       columns: ['sender_id'],
       distinct: true,
-      where: "user_message_id = ? AND status = 'completed'",
+      where: "parent_run_id IS NULL AND user_message_id = ? AND status = 'completed'",
       whereArgs: [messageId],
       limit: maxAiMembers,
     );

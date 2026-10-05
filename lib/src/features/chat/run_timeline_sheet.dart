@@ -36,6 +36,7 @@ class _RunTimelineSheetState extends State<_RunTimelineSheet> {
   final _entries = <int, RunTimelineEntry>{};
   Map<String, Object?>? _run;
   bool _loading = false;
+  bool _refreshPending = false;
   bool _hasEarlier = false;
   int? _earliest;
   Timer? _updates;
@@ -50,12 +51,24 @@ class _RunTimelineSheetState extends State<_RunTimelineSheet> {
 
   void _changed() {
     if (_run != null && _run!['status'] != 'running') return;
-    _updates?.cancel();
-    _updates = Timer(const Duration(milliseconds: 350), () => _load());
+    _refreshPending = true;
+    _scheduleRefresh();
+  }
+
+  void _scheduleRefresh() {
+    if (!_refreshPending || _loading || _updates != null) return;
+    if (_run != null && _run!['status'] != 'running') return;
+    _updates = Timer(const Duration(milliseconds: 350), () {
+      _updates = null;
+      _load();
+    });
   }
 
   Future<void> _load({bool earlier = false}) async {
     if (_loading) return;
+    _updates?.cancel();
+    _updates = null;
+    if (!earlier) _refreshPending = false;
     setState(() => _loading = true);
     final loaded = await runUiAction(context, () async {
       final page = await _store.read(
@@ -76,7 +89,11 @@ class _RunTimelineSheetState extends State<_RunTimelineSheet> {
     });
     if (!mounted) return;
     setState(() => _loading = false);
-    if (!loaded && _run == null) Navigator.pop(context);
+    if (!loaded && _run == null) {
+      Navigator.pop(context);
+      return;
+    }
+    _scheduleRefresh();
   }
 
   @override

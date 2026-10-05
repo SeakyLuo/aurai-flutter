@@ -341,10 +341,10 @@ extension InteractiveMessageActions on ChatController {
     if (_runningConversation != null) _runningConversation!,
     if (_privateConversation != null) _privateConversation!,
     ..._groupRuns.values,
-    if (_executionStates[id]?.conversation case final target?) target,
-    if (_executionStates[id]?.runningConversation case final running?) running,
-    if (_executionStates[id]?.privateConversation case final private?) private,
-    ...?_executionStates[id]?.groupRuns.values,
+    if (_executions.sessions[id]?.conversation case final target?) target,
+    if (_executions.sessions[id]?.runningConversation case final running?) running,
+    if (_executions.sessions[id]?.privateConversation case final private?) private,
+    ...?_executions.sessions[id]?.groupRuns.values,
     ..._conversations,
     ..._searchWindows.values,
   }.where((c) => c.id == id);
@@ -374,7 +374,7 @@ extension InteractiveMessageActions on ChatController {
         }
       }
     }
-    final dispatcher = _executionStates[conversationId]?.groupDispatcher;
+    final dispatcher = _executions.sessions[conversationId]?.groupDispatcher;
     if (dispatcher != null) {
       final index = dispatcher.history.indexWhere((m) => m.id == id);
       if (index >= 0)
@@ -402,7 +402,7 @@ extension InteractiveMessageActions on ChatController {
       }
     }
     _store.writer.remember([message]);
-    final dispatcher = _executionStates[conversationId]?.groupDispatcher;
+    final dispatcher = _executions.sessions[conversationId]?.groupDispatcher;
     if (notifyParticipants &&
         (source?.kind == ConversationKind.group || dispatcher != null)) {
       unawaited(

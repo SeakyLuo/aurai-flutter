@@ -207,7 +207,7 @@ extension AiIdentityController on ChatController {
   ].join('\n');
 
   void requireProjectIdle(String projectId) {
-    if ({_execution, ..._executionStates.values}.any(
+    if ({_execution, ..._executions.sessions.values}.any(
       (state) =>
           state.conversation?.projectId == projectId &&
           (state.runningConversation != null ||
@@ -319,7 +319,7 @@ extension AiIdentityController on ChatController {
       _renameLoadedGroupNotices(ai.sender.id, previousName, ai.sender.name);
     }
     if (_activeAi?.sender.id == ai.sender.id) _activeAi = ai;
-    for (final state in {_execution, ..._executionStates.values}) {
+    for (final state in {_execution, ..._executions.sessions.values}) {
       if (state.groupReplies.containsKey(ai.sender.id)) {
         state.groupReplies[ai.sender.id] = _groupReplyContext(ai);
         state.groupSenders[ai.sender.id] = ai.sender;
@@ -433,7 +433,7 @@ extension AiIdentityController on ChatController {
   }
 
   void _refreshGroupModelConfigs() {
-    for (final state in {_execution, ..._executionStates.values}) {
+    for (final state in {_execution, ..._executions.sessions.values}) {
       for (final id in state.groupReplies.keys.toList()) {
         state.groupReplies[id] = _groupReplyContext(
           state.groupReplies[id]!.profile,

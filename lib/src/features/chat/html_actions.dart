@@ -8,7 +8,7 @@ extension HtmlActions on ChatController {
     if (change.memberNamesChanged) {
       await refreshGroupDisplayNames(change.conversationId);
     }
-    final state = _executionStates[change.conversationId];
+    final state = _executions.sessions[change.conversationId];
     final dispatcher = state?.groupDispatcher;
     for (final entry in change.replyStates.entries) {
       if (entry.value) {
@@ -52,7 +52,7 @@ extension HtmlActions on ChatController {
       ..._conversations,
       _activeConversation,
       _runningConversation,
-      for (final state in _executionStates.values) state.conversation,
+      for (final state in _executions.sessions.values) state.conversation,
     }) {
       if (conversation == null || conversation.id != groupId) continue;
       conversation.noticeMembers

@@ -304,7 +304,7 @@ extension MessageQuickReplies on ChatController {
         value.messages.removeWhere((message) => message.id == replyId);
         value.messageCount--;
       }
-      final execution = _executionStates[conversation.id];
+      final execution = _executions.sessions[conversation.id];
       execution?.groupDispatcher?.history.removeWhere(
         (message) => message.id == replyId,
       );

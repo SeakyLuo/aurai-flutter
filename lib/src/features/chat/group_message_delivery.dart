@@ -25,7 +25,7 @@ extension GroupMessageDelivery on ChatController {
     required Map<String, Object?> arguments,
     required Conversation member,
     required Conversation parent,
-    required _ReplyContext reply,
+    required ExecutionReplyContext reply,
     required List<AgentMessage> observed,
     required List<String> publishedIds,
     required GroupDispatcher dispatcher,
@@ -307,7 +307,7 @@ extension GroupMessageDelivery on ChatController {
   ) async {
     GroupParticipation.changes.add(groupId);
     try {
-      final state = _executionStates[groupId];
+      final state = _executions.sessions[groupId];
       if (state != null) {
         if (paused) {
           state.groupDispatcher?.pause(senderId);

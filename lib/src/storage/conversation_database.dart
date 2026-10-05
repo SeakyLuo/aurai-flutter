@@ -1,4 +1,5 @@
 import 'private_task_state.dart';
+import 'subagent_runs.dart';
 import 'speech_provider_migration.dart';
 import 'speech_configuration_migration.dart';
 import 'speech_voice_catalog_migration.dart';
@@ -38,7 +39,7 @@ import 'project_resource_migration.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 87,
+  version: 88,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -475,12 +476,18 @@ Future<Database> openConversationDatabase() async => openDatabase(
       await batch.commit(noResult: true);
     }
     if (oldVersion < 87) await migrateHtmlEventIdentities(db);
+    if (oldVersion < 88) {
+      for (final statement in subagentRunSchema) {
+        await db.execute(statement);
+      }
+    }
   },
   onCreate: (db, version) async {
     final batch = db.batch();
     for (final statement in [
       ..._schema,
       privateTaskStateSchema,
+      ...subagentRunSchema,
       ...assetLibrarySchema,
       projectRecordSchema,
       ...projectDirectorySchema,

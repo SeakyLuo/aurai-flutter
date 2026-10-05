@@ -175,6 +175,7 @@ class AgentRunStore {
   }
 
   Future<void> finishTool(String runId, ToolResult result) async {
+    final status = AgentStepStatus.fromResult(result);
     // Notification bodies and screen pixels remain task-scoped, not durable history.
     final output = result.toolName == 'getNotifications'
         ? <String, Object?>{'contentRetention': 'task_only'}
@@ -182,14 +183,12 @@ class AgentRunStore {
     await database.update(
       'tool_calls',
       {
-        'status': switch (result.status) {
-          ToolResultStatus.success => 'completed',
-          ToolResultStatus.cancelled => 'cancelled',
-          ToolResultStatus.denied || ToolResultStatus.error => 'failed',
-        },
+        'status': status.name,
         'result_status': result.status.name,
         'result_json': jsonEncode(output),
-        'finished_at': DateTime.now().microsecondsSinceEpoch,
+        'finished_at': status == AgentStepStatus.running
+            ? null
+            : DateTime.now().microsecondsSinceEpoch,
       },
       where: 'id = ?',
       whereArgs: ['$runId:${result.callId}'],

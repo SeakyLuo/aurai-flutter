@@ -22,7 +22,7 @@ extension MessageCallbackActions on ChatController {
       final generation = _callbackGeneration;
       final busyIds = {
         ..._callbackConversations,
-        for (final entry in _executionStates.entries)
+        for (final entry in _executions.sessions.entries)
           if (entry.value.runningConversation != null ||
               entry.value.systemEventLoading ||
               entry.value.submitting)

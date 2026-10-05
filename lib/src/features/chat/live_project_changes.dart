@@ -3,7 +3,7 @@ part of 'chat_controller.dart';
 extension LiveProjectChangeState on ChatController {
   List<LiveProjectChanges> get liveProjectChanges {
     final latest = <String, LiveProjectChanges>{};
-    for (final run in _viewExecution.liveProjectChanges.values) {
+    for (final run in _executions.visible.liveProjectChanges.values) {
       for (final change in run) {
         latest[change.workspaceId] = change;
       }

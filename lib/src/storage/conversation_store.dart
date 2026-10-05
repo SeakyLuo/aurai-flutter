@@ -106,6 +106,13 @@ class ConversationStore {
           where: 'status = ?',
           whereArgs: ['running'],
         );
+        batch.rawUpdate(
+          r"""UPDATE tool_calls
+          SET result_json = json_set(result_json, '$.pending', json('false'), '$.interrupted', json('true'),
+            '$.message', '执行已中断；已完成的操作不会撤销。继续前必须核实已有结果，不得直接重放外部写入。'),
+            result_status = 'cancelled'
+          WHERE status = 'running' AND json_extract(result_json, '$.pending') = 1""",
+        );
         batch.update(
           'tool_calls',
           {'status': 'cancelled'},
@@ -171,7 +178,8 @@ class ConversationStore {
     await writer.flush();
     await database.delete(
       'conversations',
-      where: "id = ? AND kind = 'direct' AND message_count = 0 AND NOT EXISTS (SELECT 1 FROM agent_runs WHERE conversation_id = conversations.id)",
+      where:
+          "id = ? AND kind = 'direct' AND message_count = 0 AND NOT EXISTS (SELECT 1 FROM agent_runs WHERE conversation_id = conversations.id)",
       whereArgs: [id],
     );
     await database.delete(

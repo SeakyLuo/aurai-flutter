@@ -42,7 +42,7 @@ Future<List<Map<String, Object?>>> loadTaskContinuationProtocol(
     'agent_runs',
     columns: ['id', 'started_at'],
     where:
-        "conversation_id = ? AND user_message_id = ? AND provider = ? AND model = ? AND status IN ('completed', 'failed', 'cancelled', 'interrupted') AND (final_message_id IS NULL OR final_message_id NOT IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != ''))",
+        "parent_run_id IS NULL AND conversation_id = ? AND user_message_id = ? AND provider = ? AND model = ? AND status IN ('completed', 'failed', 'cancelled', 'interrupted') AND (final_message_id IS NULL OR final_message_id NOT IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != ''))",
     whereArgs: [
       conversationId,
       userMessageId,
@@ -155,7 +155,7 @@ Future<List<Map<String, Object?>>> loadFailedRunProtocol(
   final runs = await database.query(
     'agent_runs',
     columns: ['status', 'provider', 'model'],
-    where: 'id = ? AND conversation_id = ? AND sender_id = ?',
+    where: 'parent_run_id IS NULL AND id = ? AND conversation_id = ? AND sender_id = ?',
     whereArgs: [runId, conversationId, senderId],
     limit: 1,
   );
@@ -198,7 +198,7 @@ Future<Map<String, List<Map<String, Object?>>>> loadProtocolHistory(
   ModelConfig config,
 ) async {
   final selection =
-      'SELECT id FROM agent_runs WHERE conversation_id = ? '
+      'SELECT id FROM agent_runs WHERE parent_run_id IS NULL AND conversation_id = ? '
       "AND provider = ? AND model = ? AND status IN ('completed', 'failed', 'interrupted') "
       'AND id IN (SELECT run_id FROM messages WHERE conversation_id = ? AND created_at >= ?)';
   final args = [

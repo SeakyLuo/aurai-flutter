@@ -1,3 +1,4 @@
+import 'subagent_tool_activity.dart';
 import 'private_task_history.dart';
 import 'tool_elapsed.dart';
 import 'tool_inline_detail.dart';
@@ -128,6 +129,10 @@ class _ToolActivityViewState extends State<ToolActivityView> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.toolName == 'runSubagent') {
+      return SubagentToolActivity(status: widget.status,
+        requestJson: widget.requestJson, resultJson: widget.resultJson);
+    }
     final skillIcon =
         widget.toolName == 'runSkill' && widget.requestJson != null
         ? (jsonDecode(widget.requestJson!) as Map)['icon'] as String? ?? 'skill'

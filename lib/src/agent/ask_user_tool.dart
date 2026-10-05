@@ -1,3 +1,4 @@
+import 'deferred_tool.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
@@ -31,6 +32,7 @@ class UserQuestion {
     this.title,
     this.customAnswerPlaceholder,
     this.callId,
+    this.executionRunId,
     Duration timeout = responseTimeout,
   }) : expiresAt = DateTime.now().add(timeout) {
     _timeout = Timer(timeout, () {
@@ -40,6 +42,7 @@ class UserQuestion {
   }
   static const responseTimeout = Duration(days: 1);
   final String? callId;
+  final String? executionRunId;
   final DateTime expiresAt;
   late final Timer _timeout;
   final sheetVisible = ValueNotifier(false);
@@ -67,8 +70,14 @@ class UserQuestion {
   }
 }
 
-class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
-  AskUserTool(this.conversationId, this.onQuestion, {required this.sender});
+class AskUserTool implements DeferredAgentTool, RuntimeCapabilityAgentTool {
+  AskUserTool(
+    this.conversationId,
+    this.onQuestion, {
+    required this.sender,
+    this.executionRunId,
+  });
+  final String? executionRunId;
   final String conversationId;
   final MessageSender sender;
   final void Function(UserQuestion?) onQuestion;
@@ -184,6 +193,7 @@ class AskUserTool implements AgentTool, RuntimeCapabilityAgentTool {
     }
     final question = UserQuestion(
       callId: call.id,
+      executionRunId: executionRunId,
       timeout: Duration(
         seconds:
             call.arguments['timeoutSeconds'] as int? ??

@@ -51,7 +51,7 @@ extension GroupSleepRecovery on ChatController {
     if (paused.contains(senderId) && until != null) {
       throw StateError('自动接话已关闭，请先恢复自动接话再安排定时唤醒');
     }
-    final state = _executionStates[groupId];
+    final state = _executions.sessions[groupId];
     final dispatcher = state?.groupDispatcher;
     final active =
         dispatcher != null && !dispatcher.closed && !dispatcher.stopped;
@@ -125,7 +125,7 @@ extension GroupSleepRecovery on ChatController {
       ),
     );
     _publishInteractiveChange(conversationId, notice);
-    final dispatcher = _executionStates[conversationId]?.groupDispatcher;
+    final dispatcher = _executions.sessions[conversationId]?.groupDispatcher;
     if (dispatcher != null && !dispatcher.closed && !dispatcher.stopped) {
       await _groupSleeps.remove(conversationId, senderId);
       if (!dispatcher.closed && !dispatcher.stopped) {
@@ -171,7 +171,7 @@ extension GroupSleepRecovery on ChatController {
       ),
     );
     _publishInteractiveChange(conversationId, notice);
-    final dispatcher = _executionStates[conversationId]?.groupDispatcher;
+    final dispatcher = _executions.sessions[conversationId]?.groupDispatcher;
     final immediate =
         dispatcher != null && !dispatcher.closed && !dispatcher.stopped;
     await _groupSleeps.wakeMembers(conversationId, ids, immediate: immediate);

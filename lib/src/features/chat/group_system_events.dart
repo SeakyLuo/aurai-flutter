@@ -146,7 +146,7 @@ extension GroupSystemEvents on ChatController {
       _systemEventDrainScheduled = false;
       if (_callbacksDisposed) return;
       for (final id in _queuedSystemNotices.keys.toList()) {
-        final state = _executionStates[id];
+        final state = _executions.sessions[id];
         if (state != null &&
             (state.runningConversation != null ||
                 state.systemEventLoading ||
