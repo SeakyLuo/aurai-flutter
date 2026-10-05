@@ -1,5 +1,6 @@
 import 'app_bottom_sheet.dart';
 import 'app_sheet_surface.dart';
+import 'app_sheet_body.dart';
 import 'package:flutter/material.dart';
 import '../../domain/speech_voice.dart';
 
@@ -12,7 +13,6 @@ import 'speech_voice_row.dart';
 import '../../domain/speech_preview_mode.dart';
 import 'floating_search_layout.dart';
 import 'speech_voice_filter.dart';
-import 'chat_header_background.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'speech_voice_list_skeleton.dart';
@@ -197,116 +197,104 @@ class _VoiceChoiceSheetState extends State<_VoiceChoiceSheet> {
         child: AppSheetSurface(
           child: SafeArea(
             top: false,
-            child: Stack(
-              children: [
-                Column(
-                  children: [
-                    Expanded(
-                      child: PaginationListener(
-                        hasMore: !_loading && (widget.hasMore?.call() ?? false),
-                        loadMore: _nextPage,
-                        child: FloatingSearchLayout(
-                          controller: _search,
-                          trailingAction: SpeechVoiceFilter.available(voices)
-                              ? SpeechVoiceFilterAction(
-                                  filter: _voiceFilter,
-                                  onPressed: _loading ? null : _chooseFilter,
-                                )
-                              : null,
-                          hintText: '搜索音色',
-                          enabled: !_loading && voices.length >= 20,
-                          onChanged: (_) =>
-                              setState(() => _previewVoice = null),
-                          child: _loading
-                              ? const Padding(
-                                  padding: EdgeInsets.only(top: 68),
-                                  child: SpeechVoiceListSkeleton(),
-                                )
-                              : filtered.isEmpty
-                              ? const CustomScrollView(
-                                  physics: AlwaysScrollableScrollPhysics(),
-                                  slivers: [
-                                    SliverFillRemaining(
-                                      hasScrollBody: false,
-                                      child: Center(
-                                        child: EmptyDataView(title: '没有匹配的音色'),
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : Padding(
-                                  padding: EdgeInsets.zero,
-                                  child: DecoratedBox(
-                                    decoration: const BoxDecoration(),
-                                    child: ListView.separated(
-                                      physics:
-                                          const AlwaysScrollableScrollPhysics(),
-                                      padding: EdgeInsets.only(
-                                        top: 68,
-                                        bottom: FloatingSearchLayout.clearance,
-                                      ),
-                                      separatorBuilder: (_, index) =>
-                                          filtered[index].id ==
-                                                  widget.selected ||
-                                              filtered[index + 1].id ==
-                                                  widget.selected
-                                          ? const SizedBox(height: 6)
-                                          : Divider(
-                                              height: 5,
-                                              thickness: .5,
-                                              indent: 76,
-                                              endIndent: 16,
-                                              color: colors.outlineVariant
-                                                  .withValues(alpha: .45),
-                                            ),
-                                      itemCount: filtered.length,
-                                      itemBuilder: (context, index) {
-                                        final voice = filtered[index];
-                                        final selected =
-                                            voice.id == widget.selected;
-                                        return SpeechVoiceRow(
-                                          key: ValueKey(voice.id),
-                                          voice: voice,
-                                          onRename: _renameVoice,
-                                          detailsOnLongPress: true,
-                                          selected: selected,
-                                          onTap: () =>
-                                              Navigator.pop(context, voice.id),
-                                          preview: SpeechVoicePreview(
-                                            account: widget.account,
-                                            voice: voice,
-                                            mode: _mode,
-                                            text: _text,
-                                            active: _previewVoice == voice.id,
-                                            enabled:
-                                                _mode ==
-                                                    SpeechPreviewMode
-                                                        .providerAudio ||
-                                                widget.account.model.isNotEmpty,
-                                            onActivate: () => setState(
-                                              () => _previewVoice = voice.id,
-                                            ),
-                                          ),
-                                        );
-                                      },
+            child: AppSheetBody(
+              header: header,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: PaginationListener(
+                      hasMore: !_loading && (widget.hasMore?.call() ?? false),
+                      loadMore: _nextPage,
+                      child: FloatingSearchLayout(
+                        controller: _search,
+                        trailingAction: SpeechVoiceFilter.available(voices)
+                            ? SpeechVoiceFilterAction(
+                                filter: _voiceFilter,
+                                onPressed: _loading ? null : _chooseFilter,
+                              )
+                            : null,
+                        hintText: '搜索音色',
+                        enabled: !_loading && voices.length >= 20,
+                        onChanged: (_) => setState(() => _previewVoice = null),
+                        child: _loading
+                            ? const Padding(
+                                padding: EdgeInsets.only(top: 68),
+                                child: SpeechVoiceListSkeleton(),
+                              )
+                            : filtered.isEmpty
+                            ? const CustomScrollView(
+                                physics: AlwaysScrollableScrollPhysics(),
+                                slivers: [
+                                  SliverFillRemaining(
+                                    hasScrollBody: false,
+                                    child: Center(
+                                      child: EmptyDataView(title: '没有匹配的音色'),
                                     ),
                                   ),
+                                ],
+                              )
+                            : Padding(
+                                padding: EdgeInsets.zero,
+                                child: DecoratedBox(
+                                  decoration: const BoxDecoration(),
+                                  child: ListView.separated(
+                                    physics:
+                                        const AlwaysScrollableScrollPhysics(),
+                                    padding: EdgeInsets.only(
+                                      top: 68,
+                                      bottom: FloatingSearchLayout.clearance,
+                                    ),
+                                    separatorBuilder: (_, index) =>
+                                        filtered[index].id == widget.selected ||
+                                            filtered[index + 1].id ==
+                                                widget.selected
+                                        ? const SizedBox(height: 6)
+                                        : Divider(
+                                            height: 5,
+                                            thickness: .5,
+                                            indent: 76,
+                                            endIndent: 16,
+                                            color: colors.outlineVariant
+                                                .withValues(alpha: .45),
+                                          ),
+                                    itemCount: filtered.length,
+                                    itemBuilder: (context, index) {
+                                      final voice = filtered[index];
+                                      final selected =
+                                          voice.id == widget.selected;
+                                      return SpeechVoiceRow(
+                                        key: ValueKey(voice.id),
+                                        voice: voice,
+                                        onRename: _renameVoice,
+                                        detailsOnLongPress: true,
+                                        selected: selected,
+                                        onTap: () =>
+                                            Navigator.pop(context, voice.id),
+                                        preview: SpeechVoicePreview(
+                                          account: widget.account,
+                                          voice: voice,
+                                          mode: _mode,
+                                          text: _text,
+                                          active: _previewVoice == voice.id,
+                                          enabled:
+                                              _mode ==
+                                                  SpeechPreviewMode
+                                                      .providerAudio ||
+                                              widget.account.model.isNotEmpty,
+                                          onActivate: () => setState(
+                                            () => _previewVoice = voice.id,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
                                 ),
-                        ),
+                              ),
                       ),
                     ),
-                  ],
-                ),
-                if (!_loading)
-                  const Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: 80,
-                    child: IgnorePointer(child: ChatHeaderBackground()),
                   ),
-                Positioned(top: 0, left: 0, right: 0, child: header),
-              ],
+                ],
+              ),
             ),
           ),
         ),

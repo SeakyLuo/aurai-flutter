@@ -218,71 +218,87 @@ class InteractiveStatisticsOverview extends StatelessWidget {
                   value: ratio,
                   minHeight: 6,
                   borderRadius: BorderRadius.circular(3),
-                  backgroundColor: colors.surfaceContainerHighest,
+                  backgroundColor: colors.onSurface.withValues(alpha: 0.08),
                   color: colors.primary,
                 ),
               ],
               if (people.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 2,
-                  runSpacing: 4,
-                  children: [
-                    for (
-                      var index = 0;
-                      index < people.length && index < 5;
-                      index++
-                    )
-                      Tooltip(
-                        message: statisticsName(card, people[index]),
-                        child: Padding(
-                          padding: const EdgeInsets.all(6),
-                          child: Stack(
-                            children: [
-                              MemberProfileAvatar(
-                                controller: controller,
-                                groupId: groupId,
-                                sender: statisticsSender(
-                                  card,
-                                  senders,
-                                  people[index],
-                                ),
-                                size: 32,
-                              ),
-                              if (index == 4 && people.length > 5)
-                                Positioned.fill(
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withValues(
-                                        alpha: .48,
-                                      ),
-                                      shape: BoxShape.circle,
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    const avatarExtent = 44.0, spacing = 2.0;
+                    final columns =
+                        ((constraints.maxWidth + spacing) /
+                                (avatarExtent + spacing))
+                            .floor()
+                            .clamp(1, people.length);
+                    final capacity = columns * 2;
+                    final visibleCount = people.length < capacity
+                        ? people.length
+                        : capacity;
+                    final overflow = people.length > capacity;
+                    final remaining = people.length - visibleCount + 1;
+                    return Wrap(
+                      spacing: 2,
+                      runSpacing: 4,
+                      children: [
+                        for (var index = 0; index < visibleCount; index++)
+                          Tooltip(
+                            message: statisticsName(card, people[index]),
+                            child: Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: Stack(
+                                children: [
+                                  MemberProfileAvatar(
+                                    controller: controller,
+                                    groupId: groupId,
+                                    sender: statisticsSender(
+                                      card,
+                                      senders,
+                                      people[index],
                                     ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 3,
-                                      ),
-                                      child: Center(
-                                        child: FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          child: Text(
-                                            '+${people.length - 5}',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
+                                    size: 32,
+                                  ),
+                                  if (overflow && index == visibleCount - 1)
+                                    Positioned.fill(
+                                      child: GestureDetector(
+                                        behavior: HitTestBehavior.opaque,
+                                        onTap: () => onOption(key),
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(
+                                              alpha: .48,
+                                            ),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 3,
+                                            ),
+                                            child: Center(
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Text(
+                                                  '+$remaining',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
                                             ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ),
-                            ],
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
               ],
             ],
@@ -319,6 +335,7 @@ class InteractiveParticipantTile extends StatelessWidget {
     required this.sender,
     required this.actor,
     required this.onTap,
+    this.showChoice = true,
   });
   final InteractiveMessage card;
   final ChatController controller;
@@ -326,6 +343,7 @@ class InteractiveParticipantTile extends StatelessWidget {
   final MessageSender sender;
   final String actor;
   final VoidCallback onTap;
+  final bool showChoice;
   @override
   Widget build(BuildContext context) => ListTile(
     contentPadding: EdgeInsets.zero,
@@ -333,13 +351,16 @@ class InteractiveParticipantTile extends StatelessWidget {
       controller: controller,
       sender: sender,
       groupId: groupId,
+      size: showChoice ? 40 : 32,
     ),
     title: Text(statisticsName(card, actor)),
-    subtitle: Text(
-      card.shared
-          ? (card.choices[actor]?['label'] as String? ?? '本轮尚未提交')
-          : card.participants[actor]!['label'] as String,
-    ),
+    subtitle: showChoice
+        ? Text(
+            card.shared
+                ? (card.choices[actor]?['label'] as String? ?? '本轮尚未提交')
+                : card.participants[actor]!['label'] as String,
+          )
+        : null,
     trailing: const SettingsIcon(type: SettingsIconType.chevron),
     onTap: onTap,
   );

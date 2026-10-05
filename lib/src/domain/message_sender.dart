@@ -7,10 +7,12 @@ class MessageSender {
     this.avatarColor = 'violet',
     this.avatarPath,
     this.archived = false,
+    this.originalName,
   });
 
   final String id;
   final String name;
+  final String? originalName;
   final MessageSenderKind kind;
   final String avatarIcon;
   final String avatarColor;

@@ -51,7 +51,7 @@ const interactiveButtonColumnsSchema = {
 const interactiveStatisticsSchema = {
   'type': 'boolean',
   'description':
-      'Show the View statistics message-menu entry. Defaults to true. Set false to hide it during an activity, and set true in a final named state to reveal it locally on nextState. A state that omits this field inherits the current value. Updates may change this flag. This controls the entry only, not collection or participation visibility.',
+      'Show the card View details statistics entry. Defaults to true. The entry is hidden while the viewer can submit or change a selection, and appears after submission or closing when statistics are visible. Set false to hide it during an activity, and set true in a final named state to reveal it locally on nextState. A state that omits this field inherits the current value. Updates may change this flag. This controls the entry only, not collection or participation visibility.',
 };
 
 const interactiveBodySchema = {
@@ -70,7 +70,13 @@ const interactiveButtonsSchema = {
     'type': 'object',
     'properties': {
       'id': {'type': 'string', 'minLength': 1},
-      'label': {'type': 'string', 'minLength': 1, 'maxLength': 80},
+      'label': {
+        'type': 'string',
+        'minLength': 1,
+        'maxLength': 80,
+        'description':
+            'Button text, also used before a selection is made. For selection submit actions, prefer 提交 unless the activity needs a custom action label. Do not use instructions such as 请选择后提交 as the label.',
+      },
       'action': {
         'type': 'string',
         'enum': ['update', 'acknowledge', 'openUrl', 'submit', 'nextRound'],

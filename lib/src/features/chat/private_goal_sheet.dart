@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'app_sheet_body.dart';
 import 'package:flutter/material.dart';
 import '../../app/ui_action.dart';
 import '../../scheduling/task_unsaved_dialog.dart';
@@ -241,129 +242,121 @@ class _PrivateGoalSheetState extends State<PrivateGoalSheet> {
           height: (MediaQuery.sizeOf(context).height - inset) * .85,
           child: SafeArea(
             top: false,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: _editing ? 40 : 81,
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: SettingsGlassAction(
-                            label: _editing ? '取消编辑' : '关闭',
-                            icon: Icons.close_rounded,
-                            iconWidget: const QuestionIcon(
-                              type: QuestionIconType.close,
-                            ),
-                            onPressed: _busy ? null : _back,
+            child: AppSheetBody(
+              header: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: _editing ? 40 : 81,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: SettingsGlassAction(
+                          label: _editing ? '取消编辑' : '关闭',
+                          icon: Icons.close_rounded,
+                          iconWidget: const QuestionIcon(
+                            type: QuestionIconType.close,
                           ),
+                          onPressed: _busy ? null : _back,
                         ),
                       ),
-                      Expanded(
-                        child: Text(
-                          _editing ? '编辑目标' : '目标',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                          ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        _editing ? '编辑目标' : '目标',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      SettingsGlassActionSurface(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            RoundAction(
-                              label: _editing ? '保存' : '编辑目标',
-                              icon: Icons.edit_rounded,
-                              iconWidget: _busy
-                                  ? const SizedBox.square(
-                                      dimension: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : _editing
-                                  ? SettingsIcon(
-                                      type: SettingsIconType.check,
-                                      color:
-                                          SettingsGlassAction.foregroundColor(
-                                            context,
-                                            enabled: _text.text
-                                                .trim()
-                                                .isNotEmpty,
-                                          ),
-                                    )
-                                  : const ConversationMenuIcon(
-                                      type: ConversationMenuIconType.rename,
+                    ),
+                    SettingsGlassActionSurface(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RoundAction(
+                            label: _editing ? '保存' : '编辑目标',
+                            icon: Icons.edit_rounded,
+                            iconWidget: _busy
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
                                     ),
-                              onPressed:
-                                  _busy ||
-                                      (_editing && _text.text.trim().isEmpty)
-                                  ? null
-                                  : () async {
-                                      if (_editing) {
-                                        if (_dirty) {
-                                          await _save();
-                                        } else {
-                                          setState(() => _editing = false);
-                                        }
-                                      } else {
-                                        _edit();
-                                      }
-                                    },
-                            ),
-                            if (!_editing) ...[
-                              SizedBox(
-                                height: 18,
-                                child: VerticalDivider(
-                                  width: 1,
-                                  color: colors.outlineVariant,
-                                ),
-                              ),
-                              Builder(
-                                builder: (anchor) => RoundAction(
-                                  label: '目标操作',
-                                  icon: Icons.more_horiz,
-                                  iconWidget: const SettingsIcon(
-                                    type: SettingsIconType.more,
+                                  )
+                                : _editing
+                                ? SettingsIcon(
+                                    type: SettingsIconType.check,
+                                    color: SettingsGlassAction.foregroundColor(
+                                      context,
+                                      enabled: _text.text.trim().isNotEmpty,
+                                    ),
+                                  )
+                                : const ConversationMenuIcon(
+                                    type: ConversationMenuIconType.rename,
                                   ),
-                                  onPressed: _busy ? null : () => _more(anchor),
-                                ),
+                            onPressed:
+                                _busy || (_editing && _text.text.trim().isEmpty)
+                                ? null
+                                : () async {
+                                    if (_editing) {
+                                      if (_dirty) {
+                                        await _save();
+                                      } else {
+                                        setState(() => _editing = false);
+                                      }
+                                    } else {
+                                      _edit();
+                                    }
+                                  },
+                          ),
+                          if (!_editing) ...[
+                            SizedBox(
+                              height: 18,
+                              child: VerticalDivider(
+                                width: 1,
+                                color: colors.outlineVariant,
                               ),
-                            ],
+                            ),
+                            Builder(
+                              builder: (anchor) => RoundAction(
+                                label: '目标操作',
+                                icon: Icons.more_horiz,
+                                iconWidget: const SettingsIcon(
+                                  type: SettingsIconType.more,
+                                ),
+                                onPressed: _busy ? null : () => _more(anchor),
+                              ),
+                            ),
                           ],
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: ListView(
-                    padding: _editing
-                        ? const EdgeInsets.fromLTRB(16, 16, 16, 32)
-                        : const EdgeInsets.fromLTRB(12, 12, 12, 32),
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    children: [
-                      _field(
-                        '目标',
-                        _text,
-                        _goal['objective'] as String? ?? '',
-                        multiline: true,
-                      ),
-                      if (_editing) const SizedBox(height: 16),
-                      _field(
-                        'Token 预算',
-                        _budget,
-                        _goal['tokenBudget']?.toString() ?? '不限',
-                      ),
-                    ],
+              ),
+              child: ListView(
+                padding: _editing
+                    ? const EdgeInsets.fromLTRB(16, 84, 16, 32)
+                    : const EdgeInsets.fromLTRB(12, 80, 12, 32),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                children: [
+                  _field(
+                    '目标',
+                    _text,
+                    _goal['objective'] as String? ?? '',
+                    multiline: true,
                   ),
-                ),
-              ],
+                  if (_editing) const SizedBox(height: 16),
+                  _field(
+                    'Token 预算',
+                    _budget,
+                    _goal['tokenBudget']?.toString() ?? '不限',
+                  ),
+                ],
+              ),
             ),
           ),
         ),

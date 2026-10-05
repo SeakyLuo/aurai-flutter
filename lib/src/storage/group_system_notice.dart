@@ -8,10 +8,12 @@ Future<AgentMessage?> writeGroupMemberNotice(
   DatabaseExecutor db,
   String groupId,
   List<String> added,
-  List<String> removed,
-) async {
+  List<String> removed, {
+  required String actorId,
+}) async {
   final ids = {...added, ...removed};
   if (ids.isEmpty) return null;
+  ids.add(actorId);
   final rows = await db.query(
     'message_senders',
     columns: ['id', 'name'],
@@ -25,7 +27,7 @@ Future<AgentMessage?> writeGroupMemberNotice(
     [
       if (added.isNotEmpty) '${added.map((id) => names[id]).join('、')} 加入群聊',
       if (removed.isNotEmpty)
-        '${removed.map((id) => names[id]).join('、')} 离开群聊',
+        '${names[actorId]} 把 ${removed.map((id) => names[id]).join('、')} 移出了群聊',
     ].join('；'),
   );
 }

@@ -1,12 +1,15 @@
 import 'app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import '../../app/ui_action.dart';
+import '../../domain/message_sender.dart';
 import '../../widgets/empty_data_view.dart';
 import 'chat_controller.dart';
 import 'choice_sheet.dart';
 import 'delete_confirmation_dialog.dart';
 import 'dialog_action_button.dart';
 import 'header_action_menu.dart';
+import 'group_member_choice.dart';
+import 'member_avatar.dart';
 import 'menu_press_highlight.dart';
 import 'question_icon.dart';
 import 'settings_appearance.dart';
@@ -24,6 +27,7 @@ class ToolApprovalsPage extends StatefulWidget {
 class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
   List<ToolApprovalEntry> _entries = [];
   Map<String, String> _names = {};
+  Map<String, MessageSender> _senders = {};
   late String? _selected = widget.senderId;
   bool _loading = true;
   final _removing = <(String, String?)>{};
@@ -45,13 +49,13 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
       ];
       final ids = {for (final e in entries) ...e.references}.toList();
       final names = <String, String>{};
+      final senders = <String, MessageSender>{};
       if (ids.isNotEmpty) {
         final placeholders = List.filled(ids.length, '?').join(',');
         final db = widget.controller.groupStore.database;
         final results = await Future.wait([
           db.query(
             'message_senders',
-            columns: ['id', 'name'],
             where: 'id IN ($placeholders)',
             whereArgs: ids,
           ),
@@ -64,6 +68,8 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
         ]);
         for (final r in results[0]) {
           names[r['id'] as String] = r['name'] as String;
+          final sender = MessageSender.fromRow(r);
+          senders[sender.id] = sender;
         }
         for (final r in results[1]) {
           names[r['id'] as String] = r['title'] as String;
@@ -73,6 +79,7 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
       setState(() {
         _entries = entries;
         _names = names;
+        _senders = senders;
         for (final e in entries) {
           _names.putIfAbsent(e.sender, () => e.savedSenderName);
         }
@@ -85,12 +92,18 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
   Future<void> _chooseAi() async {
     final value = await showChoiceSheet<String>(
       context,
-      title: '选择联系人',
+      title: '选择群成员',
+      searchHint: '搜索群成员',
       selected: _selected!,
       choices: [
         for (final id in _entries.map((e) => e.sender).toSet())
           (value: id, label: _names[id]!),
       ],
+      itemBuilder: (choice, selected, onTap) => GroupMemberChoice(
+        sender: _senders[choice.value]!,
+        selected: selected,
+        onTap: onTap,
+      ),
     );
     if (mounted && value != null) setState(() => _selected = value);
   }
@@ -361,9 +374,17 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
                             borderRadius: BorderRadius.circular(26),
                             clipBehavior: Clip.antiAlias,
                             child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 6,
+                              ),
+                              leading: MemberAvatar(
+                                sender: _senders[_selected]!,
+                                size: 36,
+                              ),
                               title: Text(_names[_selected]!),
                               trailing: const SettingsIcon(
-                                type: SettingsIconType.chevron,
+                                type: SettingsIconType.chevronDown,
                               ),
                               onTap: _entries.isEmpty ? null : _chooseAi,
                             ),

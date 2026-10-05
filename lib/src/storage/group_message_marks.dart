@@ -26,6 +26,7 @@ typedef GroupMessageMarkStatus = ({
   bool isGroup,
   bool pinned,
   bool favorite,
+  bool canPin,
 });
 
 class GroupMessageMarks {
@@ -40,6 +41,9 @@ class GroupMessageMarks {
   String get viewerId => accessActorId ?? actorId;
   Database get database => groups.database;
   static final changes = StreamController<String>.broadcast();
+
+  static const _visibleMessage =
+      r"NOT EXISTS (SELECT 1 FROM (SELECT ? AS visibility_viewer) WHERE (json_extract(interactive_json, '$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(interactive_json, '$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(interactive_json, '$.participation.excludedAudience') WHERE value = visibility_viewer))";
 
   // Marks and pins belong to a conversation. Group access requires membership;
   // private conversations are managed by the local user.
@@ -79,11 +83,9 @@ class GroupMessageMarks {
   Future<GroupMessageMarkStatus?> status(String messageId) async {
     final rows = await database.query(
       'messages',
-      columns: ['conversation_id'],
-      where:
-          '''id = ? AND kind IN ('user', 'group_message', 'html_game', 'assistant', 'final')
-        AND (interactive_json IS NULL OR (json_extract(interactive_json, '\$.participation.audience') IS NULL AND json_extract(interactive_json, '\$.participation.excludedAudience') IS NULL))''',
-      whereArgs: [messageId],
+      columns: ['conversation_id', 'kind', 'interactive_json'],
+      where: "id = ? AND kind != 'system' AND $_visibleMessage",
+      whereArgs: [messageId, viewerId],
     );
     if (rows.isEmpty) return null;
     final groupId = rows.single['conversation_id'] as String;
@@ -107,8 +109,18 @@ class GroupMessageMarks {
       isGroup: isGroup,
       pinned: marks[0].isNotEmpty,
       favorite: marks[1].isNotEmpty,
+      canPin: await _canPin(messageId),
     );
   }
+
+  Future<bool> _canPin(String messageId) async => (await database.query(
+    'messages',
+    columns: ['id'],
+    where:
+        r"id = ? AND kind IN ('user', 'group_message', 'html_game', 'assistant', 'final') AND (interactive_json IS NULL OR (json_extract(interactive_json, '$.participation.audience') IS NULL AND json_extract(interactive_json, '$.participation.excludedAudience') IS NULL))",
+    whereArgs: [messageId],
+    limit: 1,
+  )).isNotEmpty;
 
   Future<void> pin(String groupId, String messageId, bool value) =>
       _set('group_pinned_messages', 'updated_at', groupId, messageId, value);
@@ -129,9 +141,14 @@ class GroupMessageMarks {
         final rows = await txn.query(
           'messages',
           columns: ['id'],
-          where:
-              r"id = ? AND conversation_id = ? AND kind IN ('user', 'group_message', 'html_game', 'assistant', 'final') AND (interactive_json IS NULL OR (json_extract(interactive_json, '$.participation.audience') IS NULL AND json_extract(interactive_json, '$.participation.excludedAudience') IS NULL))",
-          whereArgs: [messageId, groupId],
+          where: table == 'group_pinned_messages'
+              ? r"id = ? AND conversation_id = ? AND kind IN ('user', 'group_message', 'html_game', 'assistant', 'final') AND (interactive_json IS NULL OR (json_extract(interactive_json, '$.participation.audience') IS NULL AND json_extract(interactive_json, '$.participation.excludedAudience') IS NULL))"
+              : "id = ? AND conversation_id = ? AND kind != 'system' AND $_visibleMessage",
+          whereArgs: [
+            messageId,
+            groupId,
+            if (table != 'group_pinned_messages') viewerId,
+          ],
         );
         if (rows.isEmpty) {
           throw StateError(isGroup ? '只能操作本群对所有成员可见的消息' : '只能操作本会话中的聊天消息');
@@ -175,18 +192,20 @@ class GroupMessageMarks {
   }
 
   Future<Map<String, Object?>?> pinned(String groupId) async {
-    await _conversationAccess(groupId);
-    final marks = await database.query(
-      'group_pinned_messages',
-      where: 'conversation_id = ?',
-      whereArgs: [groupId],
-    );
-    if (marks.isEmpty) return null;
-    final rows = await database.query(
-      'messages',
-      where: 'id = ?',
-      whereArgs: [marks.single['message_id']],
-    );
+    final (_, marks, rows) = await (
+      _conversationAccess(groupId),
+      database.query(
+        'group_pinned_messages',
+        where: 'conversation_id = ?',
+        whereArgs: [groupId],
+      ),
+      database.query(
+        'messages',
+        where:
+            'id = (SELECT message_id FROM group_pinned_messages WHERE conversation_id = ?)',
+        whereArgs: [groupId],
+      ),
+    ).wait;
     if (rows.isEmpty) return null;
     return {...rows.single, 'updated_at': marks.single['updated_at']};
   }
@@ -199,8 +218,9 @@ class GroupMessageMarks {
     await _conversationAccess(groupId);
     final marks = await database.query(
       'group_favorite_messages',
-      where: 'conversation_id = ?',
-      whereArgs: [groupId],
+      where:
+          "conversation_id = ? AND message_id IN (SELECT id FROM messages WHERE kind != 'system' AND $_visibleMessage)",
+      whereArgs: [groupId, viewerId],
       orderBy: 'saved_at DESC, message_id DESC',
       limit: limit,
       offset: offset,

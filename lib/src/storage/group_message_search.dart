@@ -93,8 +93,9 @@ class GroupMessageSearch {
   }
 
   Future<List<GroupMessageSearchResult>> hydrate(
-    List<Map<String, Object?>> rows,
-  ) async {
+    List<Map<String, Object?>> rows, {
+    bool includeHtmlPreview = true,
+  }) async {
     if (rows.isEmpty) return [];
     final ids = rows.map((r) => r['id']).toList();
     final senderIds = rows.map((r) => r['sender_id']).toSet().toList();
@@ -116,7 +117,7 @@ class GroupMessageSearch {
           'app_id',
           'message_id',
           'title',
-          'preview',
+          if (includeHtmlPreview) 'preview',
           'preview_theme',
           'display_mode',
           'background_mode',

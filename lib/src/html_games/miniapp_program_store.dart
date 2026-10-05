@@ -346,6 +346,7 @@ class MiniappProgramStore {
         throughCreatedAt: boundary.single['created_at'] as int,
       );
     }
+    if (calls.pinMessage) change.pinActorId = actorId;
     final nicknames = calls.nicknames;
     await capabilities.members.setNicknames(
       txn,

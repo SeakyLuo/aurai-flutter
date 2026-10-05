@@ -1,4 +1,5 @@
 import 'app_bottom_sheet.dart';
+import 'chat_header_background.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/interactive_selection.dart';
 import 'interactive_message_paging.dart';
@@ -296,27 +297,41 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
                 ),
               ),
               Expanded(
-                child: PageStorage(
-                  bucket: _pageStorage,
-                  child: card == null
-                      ? const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : widget.snapshot != null
-                      ? InteractiveSnapshotStatistics(card: widget.snapshot!)
-                      : actor != null
-                      ? _participant(card, actor)
-                      : _option != null
-                      ? _participants(card)
-                      : InteractiveStatisticsOverview(
-                          controller: widget.controller,
-                          groupId: _groupId!,
-                          card: card,
-                          senders: _senders,
-                          onParticipant: _openParticipant,
-                          onOption: (option) =>
-                              setState(() => _option = option),
-                        ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    PageStorage(
+                      bucket: _pageStorage,
+                      child: card == null
+                          ? const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : widget.snapshot != null
+                          ? InteractiveSnapshotStatistics(
+                              card: widget.snapshot!,
+                            )
+                          : actor != null
+                          ? _participant(card, actor)
+                          : _option != null
+                          ? _participants(card)
+                          : InteractiveStatisticsOverview(
+                              controller: widget.controller,
+                              groupId: _groupId!,
+                              card: card,
+                              senders: _senders,
+                              onParticipant: _openParticipant,
+                              onOption: (option) =>
+                                  setState(() => _option = option),
+                            ),
+                    ),
+                    const Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 20,
+                      child: IgnorePointer(child: ChatHeaderBackground()),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -344,7 +359,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
     final people = _optionParticipants(card);
     return ListView(
       key: PageStorageKey(('option', option)),
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
       children: [
         Text(
           '选项：${option.$2}',
@@ -359,6 +374,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
             card: card,
             sender: statisticsSender(card, _senders, id),
             actor: id,
+            showChoice: false,
             onTap: () => _openParticipant(id),
           ),
       ],

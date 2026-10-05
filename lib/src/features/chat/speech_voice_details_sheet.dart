@@ -1,4 +1,5 @@
 import 'app_bottom_sheet.dart';
+import 'app_sheet_body.dart';
 import 'app_sheet_surface.dart';
 import 'package:flutter/material.dart';
 import '../../app/global_ui.dart';
@@ -65,158 +66,142 @@ class _SpeechVoiceDetailsSheetState extends State<_SpeechVoiceDetailsSheet> {
     return AppSheetSurface(
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                children: [
+        child: AppSheetBody(
+          shrinkWrap: true,
+          header: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                SettingsGlassAction(
+                  label: '关闭',
+                  icon: Icons.close_rounded,
+                  iconWidget: const QuestionIcon(type: QuestionIconType.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                const Expanded(
+                  child: Text(
+                    '音色详情',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                if (widget.onRename != null)
                   SettingsGlassAction(
-                    label: '关闭',
-                    icon: Icons.close_rounded,
-                    iconWidget: const QuestionIcon(
-                      type: QuestionIconType.close,
+                    label: '修改名称',
+                    icon: Icons.edit_rounded,
+                    iconWidget: const ConversationMenuIcon(
+                      type: ConversationMenuIconType.rename,
                     ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const Expanded(
-                    child: Text(
-                      '音色详情',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  if (widget.onRename != null)
-                    SettingsGlassAction(
-                      label: '修改名称',
-                      icon: Icons.edit_rounded,
-                      iconWidget: const ConversationMenuIcon(
-                        type: ConversationMenuIconType.rename,
-                      ),
-                      onPressed: _saving ? null : _rename,
-                    )
-                  else
-                    const SizedBox(width: 40),
-                ],
-              ),
+                    onPressed: _saving ? null : _rename,
+                  )
+                else
+                  const SizedBox(width: 40),
+              ],
             ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 80, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SpeechVoiceAvatar(
-                          name: _voice.name,
-                          avatarUrl: _voice.avatarUrl,
-                          size: 48,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    SpeechVoiceAvatar(
+                      name: _voice.name,
+                      avatarUrl: _voice.avatarUrl,
+                      size: 48,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      _voice.name,
-                                      style: const TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                              Flexible(
+                                child: Text(
+                                  _voice.name,
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                  if (gender == 'male' ||
-                                      gender == 'female') ...[
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      gender == 'male' ? '♂' : '♀',
-                                      semanticsLabel: gender == 'male'
-                                          ? '男'
-                                          : '女',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: gender == 'male'
-                                            ? GlobalUI.maleColor
-                                            : GlobalUI.femaleColor,
-                                      ),
-                                    ),
-                                  ],
-                                ],
+                                ),
                               ),
-                              if (details != null &&
-                                  details.tags.isNotEmpty) ...[
-                                const SizedBox(height: 6),
-                                Wrap(
-                                  spacing: 6,
-                                  runSpacing: 6,
-                                  children: [
-                                    for (final tag in details.tags)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 3,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: colors.onSurface.withValues(
-                                            alpha: .055,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            16,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          tag,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: colors.onSurfaceVariant,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
+                              if (gender == 'male' || gender == 'female') ...[
+                                const SizedBox(width: 6),
+                                Text(
+                                  gender == 'male' ? '♂' : '♀',
+                                  semanticsLabel: gender == 'male' ? '男' : '女',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: gender == 'male'
+                                        ? GlobalUI.maleColor
+                                        : GlobalUI.femaleColor,
+                                  ),
                                 ),
                               ],
                             ],
                           ),
-                        ),
-                      ],
+                          if (details != null && details.tags.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                for (final tag in details.tags)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: colors.onSurface.withValues(
+                                        alpha: .055,
+                                      ),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Text(
+                                      tag,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: colors.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                    if (details != null && details.description.isNotEmpty) ...[
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Divider(
-                          height: 1,
-                          thickness: .5,
-                          color: colors.outlineVariant.withValues(alpha: .45),
-                        ),
-                      ),
-                      Text(
-                        '声音特点',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        details.description,
-                        style: const TextStyle(fontSize: 14, height: 1.5),
-                      ),
-                    ],
                   ],
                 ),
-              ),
+                if (details != null && details.description.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Divider(
+                      height: 1,
+                      thickness: .5,
+                      color: colors.outlineVariant.withValues(alpha: .45),
+                    ),
+                  ),
+                  Text(
+                    '声音特点',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    details.description,
+                    style: const TextStyle(fontSize: 14, height: 1.5),
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

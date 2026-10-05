@@ -176,6 +176,7 @@ class _ProgramTaskPanelState extends State<ProgramTaskPanel> {
             )
           else
             TaskProgressList(
+              key: ValueKey(progress['id'] ?? progress['title']),
               steps: (progress['steps'] as List).cast<Map>(),
               changes: _changes.stream,
               title: progress['title'] as String,

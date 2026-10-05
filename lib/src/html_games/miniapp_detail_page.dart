@@ -12,6 +12,7 @@ import '../app/glass_notice.dart';
 import '../domain/error_message.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
+import '../features/chat/conversation_menu_icon.dart';
 import '../features/chat/member_avatar.dart';
 import '../features/chat/dialog_action_button.dart';
 import '../scheduling/task_action_menu.dart';
@@ -131,7 +132,9 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
             (
               value: 'team',
               label: '开发团队',
-              icon: const SettingsIcon(type: SettingsIconType.contacts),
+              icon: const ConversationMenuIcon(
+                type: ConversationMenuIconType.members,
+              ),
             ),
           (
             value: 'forward',

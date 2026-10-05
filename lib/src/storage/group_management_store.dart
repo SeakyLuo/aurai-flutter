@@ -370,6 +370,7 @@ extension GroupManagementStore on GroupChatStore {
                 (id) => id != MessageSender.localUser.id && !aiIds.contains(id),
               )
               .toList(),
+          actorId: actorId,
         );
       })
       .then((notice) => _notifySystem(conversationId, notice));

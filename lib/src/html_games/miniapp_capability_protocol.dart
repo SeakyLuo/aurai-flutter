@@ -4,6 +4,7 @@ import 'dart:convert';
 abstract final class MiniappCapabilityProtocol {
   static const operations = {
     'messages.send',
+    'messages.pin',
     'messages.intercept',
     'cards.close',
     'cards.submit',
@@ -70,6 +71,9 @@ class MiniappCapabilityCalls {
       switch (name) {
         case 'messages.send':
           messages.add(args);
+        case 'messages.pin':
+          if (args.isNotEmpty) throw ArgumentError('messages.pin 只置顶当前实例，无需参数');
+          pinMessage = true;
         case 'messages.intercept':
           final action = args['action'] as String;
           if (action.isEmpty) throw ArgumentError('消息拦截需要处理事件');
@@ -114,6 +118,7 @@ class MiniappCapabilityCalls {
   final replyStates = <String, bool>{};
   final nicknames = <String, String>{};
   bool releaseReplies = false;
+  bool pinMessage = false;
   bool timerChanged = false;
   int? wakeAt;
   String? contextInstructions;

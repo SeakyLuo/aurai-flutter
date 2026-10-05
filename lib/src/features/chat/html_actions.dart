@@ -43,6 +43,18 @@ extension HtmlActions on ChatController {
       groupActivityChanges.value++;
     }
     _conversationChanged();
+    if (change.pinActorId case final actorId?) {
+      // Pinning is independent of the committed game state and AI delivery.
+      try {
+        await GroupMessageMarks(
+          groupStore,
+          actorId: actorId,
+        ).pin(change.conversationId, change.messageId, true);
+      } on Object catch (error, stack) {
+        developer.log('Miniapp pin failed', error: error, stackTrace: stack);
+        programErrors.value = '小程序置顶失败：${errorMessage(error)}';
+      }
+    }
   }
 
   Future<void> refreshGroupDisplayNames(String groupId) async {

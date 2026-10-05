@@ -72,11 +72,15 @@ List<ChatTimelineEntry> buildChatTimeline(
     ...mentionSenders.values,
     ...conversation.noticeMembers.values,
   ]) {
-    if (noticeNameIds.containsKey(sender.name) &&
-        noticeNameIds[sender.name] != sender.id) {
-      ambiguousNoticeNames.add(sender.name);
+    for (final name in {
+      sender.name,
+      if (sender.originalName != null) sender.originalName!,
+    }) {
+      if (noticeNameIds.containsKey(name) && noticeNameIds[name] != sender.id) {
+        ambiguousNoticeNames.add(name);
+      }
+      noticeNameIds[name] = sender.id;
     }
-    noticeNameIds[sender.name] = sender.id;
   }
   noticeNameIds.removeWhere((name, _) => ambiguousNoticeNames.contains(name));
   void openNoticeMember(BuildContext context, String id) {

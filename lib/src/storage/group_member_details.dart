@@ -141,6 +141,7 @@ class GroupMemberDetailsStore {
       result[sender.id] = MessageSender(
         id: sender.id,
         name: row['nickname'] as String,
+        originalName: sender.originalName ?? sender.name,
         kind: sender.kind,
         avatarIcon: sender.avatarIcon,
         avatarColor: sender.avatarColor,

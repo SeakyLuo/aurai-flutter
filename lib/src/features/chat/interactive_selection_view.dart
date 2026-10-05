@@ -250,7 +250,6 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
           InteractiveMessageButton(
             button: {
               ...widget.button,
-              if (!valid && !widget.submitted) 'label': '请选择后提交',
               if (widget.submitted && !widget.allowChange)
                 'label':
                     widget.button['completedLabel'] ?? widget.button['label'],

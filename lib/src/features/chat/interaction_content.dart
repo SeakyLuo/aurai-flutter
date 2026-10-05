@@ -3,6 +3,8 @@ import 'interactive_selection_view.dart';
 import '../../domain/interactive_selection.dart';
 import 'package:flutter/material.dart';
 import 'interactive_message_button.dart';
+import '../../domain/message_sender.dart';
+import 'vote_participant_avatars.dart';
 
 /// Renders projected data only. Rules and settlement live in the domain layer.
 class InteractionContent extends StatelessWidget {
@@ -19,6 +21,9 @@ class InteractionContent extends StatelessWidget {
     this.pendingButtonId,
     required this.onClick,
     this.question = false,
+    this.members = const {},
+    this.onOpenMember,
+    this.onStatistics,
   });
   final Map<String, Object?> view;
   final int buttonColumns;
@@ -27,6 +32,9 @@ class InteractionContent extends StatelessWidget {
   final String? busy;
   final String? pendingButtonId;
   final bool question;
+  final Map<String, MessageSender> members;
+  final ValueChanged<String>? onOpenMember;
+  final VoidCallback? onStatistics;
   final void Function(Map<String, Object?> button, {Object? value}) onClick;
 
   @override
@@ -95,6 +103,11 @@ class InteractionContent extends StatelessWidget {
             child: switch (component['type']) {
               'distribution' => InteractionDistribution(
                 data: Map<String, Object?>.from(component as Map),
+                hideZeroVotes: true,
+                submissions: view['submissions'] as Map?,
+                members: members,
+                onOpenMember: onOpenMember,
+                onShowAll: onStatistics,
               ),
               'metric' => Text(
                 '${component['label'] ?? ''} ${component['value'] ?? ''}',
@@ -187,15 +200,53 @@ class InteractionContent extends StatelessWidget {
 }
 
 class InteractionDistribution extends StatelessWidget {
-  const InteractionDistribution({super.key, required this.data});
+  const InteractionDistribution({
+    super.key,
+    required this.data,
+    this.hideZeroVotes = false,
+    this.submissions,
+    this.members = const {},
+    this.onOpenMember,
+    this.onShowAll,
+  });
   final Map<String, Object?> data;
+  final bool hideZeroVotes;
+  final Map? submissions;
+  final Map<String, MessageSender> members;
+  final ValueChanged<String>? onOpenMember;
+  final VoidCallback? onShowAll;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final total = data['total'] as num;
     final selected = data['selected'] as Map?;
-    final items = data['items'] as List;
+    final options = data['items'] as List;
+    final items = hideZeroVotes && options.length >= 3
+        ? options.where((option) => option['count'] != 0).toList()
+        : options;
+    final voters = <(String, String), List<MessageSender>>{};
+    if (items.length <= 2 && submissions != null) {
+      for (final entry in submissions!.entries) {
+        final id = entry.key as String;
+        final choice = Map<String, Object?>.from(entry.value as Map);
+        final sender =
+            members[id] ??
+            MessageSender(
+              id: id,
+              name: choice['name'] as String,
+              kind: MessageSenderKind.agent,
+            );
+        for (final selection in selectionEntries(choice)) {
+          voters
+              .putIfAbsent((
+                selection['buttonId'] as String,
+                selection['label'] as String,
+              ), () => [])
+              .add(sender);
+        }
+      }
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -234,7 +285,9 @@ class InteractionDistribution extends StatelessWidget {
                             value: ratio,
                             minHeight: 8,
                             borderRadius: BorderRadius.circular(4),
-                            backgroundColor: colors.surfaceContainerHighest,
+                            backgroundColor: colors.onSurface.withValues(
+                              alpha: 0.08,
+                            ),
                             color: colors.primary,
                           ),
                         ),
@@ -248,6 +301,15 @@ class InteractionDistribution extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (voters[(option['buttonId'], option['label'])]
+                        case final people? when people.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      VoteParticipantAvatars(
+                        people: people,
+                        onOpenMember: onOpenMember,
+                        onShowAll: onShowAll,
+                      ),
+                    ],
                   ],
                 );
               },

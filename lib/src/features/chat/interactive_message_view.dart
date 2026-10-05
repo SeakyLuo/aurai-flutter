@@ -169,7 +169,20 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         sharedView?['self'] != null ||
         (sharedView?['choices'] as List?)?.isNotEmpty == true ||
         sharedView?['submittedCount'] == 1;
+    final selecting =
+        sharedView != null &&
+        sharedView['phase'] == 'collecting' &&
+        sharedView['closed'] != true &&
+        (sharedView['submitted'] != true || _card.engine.allowChange) &&
+        !widget.readOnly &&
+        !widget.historical &&
+        _card.snapshotView == null &&
+        (!_card.shared ||
+            _card.interaction['actors'] == null ||
+            (_card.interaction['actors'] as List).contains(widget.actorId)) &&
+        card.buttons.any((button) => button['selection'] != null);
     final statisticsVisible =
+        !selecting &&
         card.showStatistics &&
         (widget.historical && _card.snapshotView != null
             ? _card.snapshotView!['summaryVisible'] == true
@@ -294,6 +307,9 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
             InteractionContent(
               key: ValueKey((widget.actorId, card.title, card.body)),
               view: sharedView,
+              members: widget.members,
+              onOpenMember: widget.onOpenMember,
+              onStatistics: widget.onStatistics,
               question: question,
               shared: _card.shared,
               buttons: card.buttons,

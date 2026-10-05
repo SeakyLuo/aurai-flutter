@@ -68,34 +68,21 @@ class PrivateTaskListNodes extends StatelessWidget {
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            steps[index]['step'] as String,
-                            style: TextStyle(
-                              fontSize: 13,
-                              height: 1.5,
-                              fontWeight:
-                                  steps[index]['status'] == 'in_progress'
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
-                              color: steps[index]['status'] == 'in_progress'
-                                  ? colors.onSurface
-                                  : colors.onSurfaceVariant,
-                            ),
-                          ),
-                          if (steps[index]['description']
-                              case final String description
-                              when description.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            TaskNodeDescription(
-                              title: steps[index]['step'] as String,
-                              description: description,
-                              width: constraints.maxWidth - 30,
-                            ),
-                          ],
-                        ],
+                      child: TaskNodeDescription(
+                        title: steps[index]['step'] as String,
+                        description:
+                            steps[index]['description'] as String? ?? '',
+                        width: constraints.maxWidth - 30,
+                        titleStyle: TextStyle(
+                          fontSize: 13,
+                          height: 1.5,
+                          fontWeight: steps[index]['status'] == 'in_progress'
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                          color: steps[index]['status'] == 'in_progress'
+                              ? colors.onSurface
+                              : colors.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ),

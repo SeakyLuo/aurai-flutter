@@ -1,10 +1,9 @@
-import 'app_sheet_surface.dart';
+import 'app_sheet_body.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'glass_surface.dart';
 import 'question_icon.dart';
 import 'sidebar_action_icon.dart';
-import 'chat_header_background.dart';
 
 /// The library search pattern, shared by pages and selection sheets.
 class FloatingSearchLayout extends StatefulWidget {
@@ -42,40 +41,13 @@ class FloatingSearchLayout extends StatefulWidget {
 }
 
 /// Sheets keep their controls above the scrolling content, like page AppBars.
-class SearchSheetBody extends StatelessWidget {
+class SearchSheetBody extends AppSheetBody {
   const SearchSheetBody({
     super.key,
-    required this.header,
-    required this.child,
-    this.shrinkWrap = false,
+    required super.header,
+    required super.child,
+    super.shrinkWrap,
   });
-  final Widget header, child;
-  final bool shrinkWrap;
-
-  @override
-  Widget build(BuildContext context) => AppSheetSurface(
-    child: shrinkWrap
-        ? Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              header,
-              Flexible(child: child),
-            ],
-          )
-        : Stack(
-            children: [
-              Positioned.fill(child: child),
-              const Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 80,
-                child: IgnorePointer(child: ChatHeaderBackground()),
-              ),
-              Positioned(top: 0, left: 0, right: 0, child: header),
-            ],
-          ),
-  );
 }
 
 class _FloatingSearchLayoutState extends State<FloatingSearchLayout> {

@@ -208,7 +208,7 @@ class GroupChatStore {
         return writeGroupMemberNotice(txn, conversationId, [], [
           for (final row in members)
             if (ids.contains(row['sender_id'])) row['sender_id'] as String,
-        ]);
+        ], actorId: actorId);
       })
       .then((notice) => _notifySystem(conversationId, notice));
 
@@ -275,7 +275,13 @@ class GroupChatStore {
           );
         }
         await batch.commit(noResult: true);
-        return writeGroupMemberNotice(txn, conversationId, added, []);
+        return writeGroupMemberNotice(
+          txn,
+          conversationId,
+          added,
+          [],
+          actorId: actorId,
+        );
       })
       .then((notice) => _notifySystem(conversationId, notice));
 
@@ -397,7 +403,8 @@ class GroupChatStore {
       'agent_runs',
       columns: ['sender_id'],
       distinct: true,
-      where: "parent_run_id IS NULL AND user_message_id = ? AND status = 'completed'",
+      where:
+          "parent_run_id IS NULL AND user_message_id = ? AND status = 'completed'",
       whereArgs: [messageId],
       limit: maxAiMembers,
     );

@@ -138,7 +138,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             ),
             starred ? '取消收藏' : '收藏',
           ),
-        if (allowPin || allowGroupMarks)
+        if (allowPin)
           (
             const MessageActionResult(MessageAction.pin),
             ConversationMenuIcon(
@@ -192,18 +192,18 @@ Future<MessageMenuResult?> showMessageActionsMenu(
           ),
         if (allowReadAloud)
           (
-          const MessageActionResult(MessageAction.readAloud),
-          SettingsIcon(type: SettingsIconType.sound, color: iconColor),
-          '朗读',
+            const MessageActionResult(MessageAction.readAloud),
+            SettingsIcon(type: SettingsIconType.sound, color: iconColor),
+            '朗读',
           ),
         if (allowBranch)
           (
-          const MessageActionResult(MessageAction.branch),
-          ConversationMenuIcon(
-            type: ConversationMenuIconType.branch,
-            color: iconColor,
-          ),
-          '在新聊天继续',
+            const MessageActionResult(MessageAction.branch),
+            ConversationMenuIcon(
+              type: ConversationMenuIconType.branch,
+              color: iconColor,
+            ),
+            '在新聊天继续',
           ),
       ];
       return ConstrainedBox(

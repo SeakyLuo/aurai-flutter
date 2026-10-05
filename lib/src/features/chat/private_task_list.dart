@@ -1,4 +1,5 @@
 import 'app_bottom_sheet.dart';
+import 'app_sheet_body.dart';
 import '../../widgets/empty_data_view.dart';
 import '../../storage/private_task_state.dart';
 import 'dart:async';
@@ -10,6 +11,7 @@ import 'private_task_list_nodes.dart';
 import 'settings_icon.dart';
 import 'settings_appearance.dart';
 import 'question_icon.dart';
+import 'task_completion_transition.dart';
 
 /// Inline task progress on the existing composer glass surface.
 class PrivateTaskList extends StatelessWidget {
@@ -60,106 +62,109 @@ class _TaskProgressListState extends State<TaskProgressList> {
     final colors = Theme.of(context).colorScheme;
     final accent = GlobalUI.highlightTextColor(context);
     final count = '$completed/' + steps.length.toString();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: GlassSurface(
-        radius: 22,
-        shadowOpacity: .65,
-        child: Material(
-          color: Colors.transparent,
-          child: Semantics(
-            button: true,
-            label: widget.title + '，已完成 $count 步，第 $position 步，$summary',
-            child: InkWell(
-              borderRadius: BorderRadius.circular(22),
-              onTap: _showSteps,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: [
-                    SizedBox.square(
-                      dimension: 34,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          TweenAnimationBuilder<double>(
-                            tween: Tween(end: completed / steps.length),
-                            duration: MediaQuery.disableAnimationsOf(context)
-                                ? Duration.zero
-                                : const Duration(milliseconds: 250),
-                            builder: (context, value, _) => SizedBox.expand(
-                              child: CircularProgressIndicator(
-                                value: value,
-                                strokeWidth: 1.65,
-                                strokeCap: StrokeCap.round,
-                                color: accent,
-                                backgroundColor: colors.outlineVariant
-                                    .withValues(alpha: .5),
-                              ),
-                            ),
-                          ),
-                          SizedBox.square(
-                            dimension: 20,
-                            child: FittedBox(
-                              child: SettingsIcon(
-                                type: SettingsIconType.taskList,
-                                color: colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  widget.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    height: 1.3,
-                                    fontWeight: FontWeight.w500,
-                                    color: accent,
-                                  ),
+    return TaskCompletionTransition(
+      completed: completed == steps.length,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: GlassSurface(
+          radius: 22,
+          shadowOpacity: .65,
+          child: Material(
+            color: Colors.transparent,
+            child: Semantics(
+              button: true,
+              label: widget.title + '，已完成 $count 步，第 $position 步，$summary',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(22),
+                onTap: _showSteps,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox.square(
+                        dimension: 34,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            TweenAnimationBuilder<double>(
+                              tween: Tween(end: completed / steps.length),
+                              duration: MediaQuery.disableAnimationsOf(context)
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 250),
+                              builder: (context, value, _) => SizedBox.expand(
+                                child: CircularProgressIndicator(
+                                  value: value,
+                                  strokeWidth: 1.65,
+                                  strokeCap: StrokeCap.round,
+                                  color: accent,
+                                  backgroundColor: colors.outlineVariant
+                                      .withValues(alpha: .5),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                count,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  height: 1.3,
+                            ),
+                            SizedBox.square(
+                              dimension: 20,
+                              child: FittedBox(
+                                child: SettingsIcon(
+                                  type: SettingsIconType.taskList,
                                   color: colors.onSurfaceVariant,
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            summary,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 15,
-                              height: 1.4,
-                              color: colors.onSurface,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    widget.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      height: 1.3,
+                                      fontWeight: FontWeight.w500,
+                                      color: accent,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  count,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.3,
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              summary,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                height: 1.4,
+                                color: colors.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -180,60 +185,55 @@ class _TaskProgressListState extends State<TaskProgressList> {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(context).height * .75,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                children: [
-                  SettingsGlassAction(
-                    label: '关闭',
-                    icon: Icons.close_rounded,
-                    iconWidget: const QuestionIcon(
-                      type: QuestionIconType.close,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  Expanded(
-                    child: StreamBuilder<Map<String, dynamic>>(
-                      stream: widget.changes,
-                      initialData: {'title': widget.title},
-                      builder: (context, snapshot) => Text(
-                        snapshot.requireData['title'] as String? ??
-                            widget.title,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w600,
-                        ),
+        child: AppSheetBody(
+          shrinkWrap: true,
+          header: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                SettingsGlassAction(
+                  label: '关闭',
+                  icon: Icons.close_rounded,
+                  iconWidget: const QuestionIcon(type: QuestionIconType.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                Expanded(
+                  child: StreamBuilder<Map<String, dynamic>>(
+                    stream: widget.changes,
+                    initialData: {'title': widget.title},
+                    builder: (context, snapshot) => Text(
+                      snapshot.requireData['title'] as String? ?? widget.title,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 40),
-                ],
-              ),
+                ),
+                const SizedBox(width: 40),
+              ],
             ),
-            Flexible(
-              child: StreamBuilder<Map<String, dynamic>>(
-                stream: widget.changes,
-                initialData: {'steps': widget.steps},
-                builder: (context, snapshot) {
-                  final steps =
-                      (snapshot.requireData['steps'] as List? ?? const [])
-                          .cast<Map>();
-                  return steps.isEmpty
-                      ? EmptyDataView(title: '暂无任务')
-                      : SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-                          child: PrivateTaskListNodes(steps: steps),
-                        );
-                },
-              ),
-            ),
-          ],
+          ),
+          child: StreamBuilder<Map<String, dynamic>>(
+            stream: widget.changes,
+            initialData: {'steps': widget.steps},
+            builder: (context, snapshot) {
+              final steps = (snapshot.requireData['steps'] as List? ?? const [])
+                  .cast<Map>();
+              return steps.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.fromLTRB(24, 76, 24, 24),
+                      child: EmptyDataView(title: '暂无任务'),
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 76, 24, 16),
+                      child: PrivateTaskListNodes(steps: steps),
+                    );
+            },
+          ),
         ),
       ),
     ),

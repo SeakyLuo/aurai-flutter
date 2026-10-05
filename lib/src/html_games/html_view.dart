@@ -69,6 +69,13 @@ class HtmlView extends StatefulWidget {
         );
   }
 
+  Future<void> openAdaptive(BuildContext context) {
+    final split = context.findAncestorStateOfType<PinnedMessageSplitState>();
+    return split != null && split.supportsSplit
+        ? openSplit(context)
+        : openFullscreen(context);
+  }
+
   Future<void> openFullscreen(BuildContext context) =>
       Navigator.of(context).push<void>(
         MaterialPageRoute(
@@ -568,7 +575,12 @@ class _HtmlViewState extends State<HtmlView>
                 : const Color(0xffefeff3),
             borderRadius: BorderRadius.circular(22),
             clipBehavior: Clip.antiAlias,
-            child: _buildView(context),
+            child: InkWell(
+              onTap: _card.displayMode == 'hybrid'
+                  ? () => widget.openAdaptive(context)
+                  : null,
+              child: _buildView(context),
+            ),
           );
     return widget.fullscreen || _card.displayMode == 'standalone'
         ? content
@@ -586,7 +598,7 @@ class _HtmlViewState extends State<HtmlView>
           borderRadius: BorderRadius.circular(16),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: () => widget.openFullscreen(context),
+            onTap: () => widget.openAdaptive(context),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -625,13 +637,9 @@ class _HtmlViewState extends State<HtmlView>
               _card.width?.toDouble() ?? constraints.maxWidth,
               constraints.maxWidth,
             );
-            // Keep the document at its measured layout width across surfaces.
-            final layoutWidth =
-                (_card.measuredVersion == _card.version
-                    ? _card.measuredWidth
-                    : null) ??
-                (_heightKey?.$5 == _card.version ? _heightKey?.$2 : null) ??
-                width;
+            // Reflow at the current surface width; cached measurements do not
+            // determine the document viewport on another surface.
+            final layoutWidth = width;
             final key = (
               widget.messageId,
               layoutWidth,
@@ -662,11 +670,14 @@ class _HtmlViewState extends State<HtmlView>
             }
             final documentHeight =
                 _contentHeight ??
-                (_card.measuredVersion == _card.version
+                (_card.measuredVersion == _card.version &&
+                        _card.measuredWidth == layoutWidth &&
+                        _card.measuredScale ==
+                            MediaQuery.textScalerOf(context).scale(1)
                     ? _card.measuredHeight
                     : null) ??
                 _card.height.toDouble();
-            final height = documentHeight * width / layoutWidth;
+            final height = documentHeight;
             return SizedBox(
               key: _anchor,
               width: math.min(
@@ -681,29 +692,25 @@ class _HtmlViewState extends State<HtmlView>
                     // Resizing the native surface should not animate its clip.
                     SizedBox(
                       height: height,
-                      child: FittedBox(
-                        fit: BoxFit.contain,
-                        alignment: Alignment.topLeft,
-                        child: SizedBox(
-                          width: layoutWidth,
-                          height: documentHeight,
-                          child: HtmlGameSurface(
-                            session: _session!,
-                            preview: _themedPreview,
-                            loadingBackground:
-                                _card.backgroundMode == 'transparent'
-                                ? Colors.transparent
-                                : Theme.of(context).brightness ==
-                                      Brightness.dark
-                                ? const Color(0xff2a292f)
-                                : const Color(0xffefeff3),
-                          ),
+                      child: IgnorePointer(
+                        ignoring: _card.displayMode == 'hybrid',
+                        child: HtmlGameSurface(
+                          session: _session!,
+                          preview: _themedPreview,
+                          loadingBackground:
+                              _card.backgroundMode == 'transparent'
+                              ? Colors.transparent
+                              : Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xff2a292f)
+                              : const Color(0xffefeff3),
                         ),
                       ),
                     )
                   else if (_themedPreview != null && !_failed)
                     GestureDetector(
-                      onTap: _open,
+                      onTap: _card.displayMode == 'hybrid'
+                          ? () => widget.openAdaptive(context)
+                          : _open,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: Image.memory(
@@ -736,11 +743,6 @@ class _HtmlViewState extends State<HtmlView>
                     TextButton(
                       onPressed: _retrying ? null : _retry,
                       child: const Text('重试回合'),
-                    ),
-                  if (_card.displayMode == 'hybrid')
-                    TextButton(
-                      onPressed: () => widget.openFullscreen(context),
-                      child: const Text('查看详情'),
                     ),
                 ],
               ),

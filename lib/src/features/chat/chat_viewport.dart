@@ -491,7 +491,17 @@ class ChatViewportState extends State<ChatViewport> {
       }
     } else {
       _rememberPosition();
+      _anchorHistoryPosition();
     }
+  }
+
+  void _anchorHistoryPosition() {
+    final anchor = _anchor;
+    if (_following || anchor == null) return;
+    // Dragging only changes the pixel offset; PositionedList still lays out
+    // around its previous center (usually the footer). Rebase on the visible
+    // message so later messages growing or arriving cannot push history up.
+    _preserveEntry(anchor.messageId);
   }
 
   void _preserveEntry(String id) {
@@ -535,7 +545,7 @@ class ChatViewportState extends State<ChatViewport> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || revision != _scrollRevision) return;
       final index = _anchorIndex(bookmark);
-      _jumpToEntry(
+      _items.jumpTo(
         index: index,
         alignment: _listAlignment(index, bookmark.alignment),
       );
@@ -660,7 +670,11 @@ class ChatViewportState extends State<ChatViewport> {
                       if (!mounted || revision != _scrollRevision) return;
                       _rememberPosition();
                       _userScrolling = false;
-                      if (_following) _scheduleBottomSync();
+                      if (_following) {
+                        _scheduleBottomSync();
+                      } else {
+                        _anchorHistoryPosition();
+                      }
                     });
                   }
                 }

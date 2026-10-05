@@ -21,6 +21,7 @@ Future<T?> showChoiceSheet<T>(
   bool showTitle = true,
   bool showSelection = true,
   Widget? Function(T)? leadingBuilder,
+  Widget Function(Choice<T>, bool, VoidCallback)? itemBuilder,
   String Function(T)? searchText,
 }) => showAppBottomSheet<T>(
   context: context,
@@ -38,6 +39,7 @@ Future<T?> showChoiceSheet<T>(
     showTitle: showTitle,
     showSelection: showSelection,
     leadingBuilder: leadingBuilder,
+    itemBuilder: itemBuilder,
     searchText: searchText,
   ),
 );
@@ -53,6 +55,7 @@ class _ChoiceSheet<T> extends StatefulWidget {
     required this.showTitle,
     required this.showSelection,
     this.leadingBuilder,
+    this.itemBuilder,
     this.searchText,
     required this.selected,
   });
@@ -64,6 +67,7 @@ class _ChoiceSheet<T> extends StatefulWidget {
   final bool alwaysShowSearch, showTitle;
   final bool allowSearch;
   final Widget? Function(T)? leadingBuilder;
+  final Widget Function(Choice<T>, bool, VoidCallback)? itemBuilder;
   final String Function(T)? searchText;
 
   @override
@@ -162,7 +166,7 @@ class _ChoiceSheetState<T> extends State<_ChoiceSheet<T>> {
                           shrinkWrap: !expanded,
                           padding: EdgeInsets.fromLTRB(
                             12,
-                            expanded ? 68 : 0,
+                            68,
                             12,
                             widget.allowSearch && widget.choices.length >= 20
                                 ? FloatingSearchLayout.clearance
@@ -172,6 +176,13 @@ class _ChoiceSheetState<T> extends State<_ChoiceSheet<T>> {
                           itemBuilder: (context, index) {
                             final choice = shown[index];
                             final selected = choice.value == widget.selected;
+                            if (widget.itemBuilder case final buildItem?) {
+                              return buildItem(
+                                choice,
+                                selected,
+                                () => Navigator.pop(context, choice.value),
+                              );
+                            }
                             return Semantics(
                               checked: widget.showSelection ? selected : null,
                               inMutuallyExclusiveGroup: widget.showSelection,

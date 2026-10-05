@@ -54,7 +54,10 @@ extension GroupSystemEvents on ChatController {
     AgentMessage notice,
   ) async {
     final target = await _forwardTarget(groupId);
-    if (notice.text.contains('加入群聊') || notice.text.contains('离开群聊')) {
+    if (notice.text.contains('加入群聊') ||
+        notice.text.contains('离开群聊') ||
+        notice.text.contains('移出了群聊') ||
+        notice.text.contains('退出了群聊')) {
       final members = await groupStore.noticeMembers(groupId);
       target.noticeMembers
         ..clear()

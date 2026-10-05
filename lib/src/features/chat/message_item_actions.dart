@@ -262,7 +262,9 @@ extension _MessageItemActions on _MessageItemState {
       if (!mounted) return;
     }
     GroupMessageMarkStatus? groupMark;
-    if (allowStar) {
+    if (!widget.streaming &&
+        !snapshot.isSystem &&
+        (!widget.readOnly || widget.onLocate != null)) {
       final loaded = await runUiAction(context, () async {
         groupMark = await GroupMessageMarks(
           ImageActionScope.of(context).groupStore,
@@ -307,7 +309,7 @@ extension _MessageItemActions on _MessageItemState {
             allowStar: allowStar,
             allowGroupMarks: groupMark?.isGroup ?? false,
             allowMarks: groupMark != null,
-            allowPin: groupMark != null,
+            allowPin: groupMark?.canPin ?? false,
             pinned: groupMark?.pinned ?? false,
             groupFavorite: groupMark?.favorite ?? false,
             allowCopy: true,

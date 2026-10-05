@@ -52,6 +52,7 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
   int? _pinStamp;
   late final StreamSubscription<String> _marks;
   int _loadId = 0;
+  int _pinLoadId = 0;
   bool _loadedStored = false;
   double _noticeHeight = 0;
   bool get _isGroup =>
@@ -61,10 +62,10 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
   void initState() {
     super.initState();
     _subscription = GroupAnnouncementStore.changes.stream.listen((id) {
-      if (id == widget.groupId) _load();
+      if (id == widget.groupId) _loadAnnouncement();
     });
     _marks = GroupMessageMarks.changes.stream.listen((id) {
-      if (id == widget.groupId) _load();
+      if (id == widget.groupId) _loadPin();
     });
     _load();
   }
@@ -82,17 +83,39 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
   }
 
   Future<void> _load() async {
-    final request = ++_loadId;
     _loadedStored = widget.controller.activeConversation.isStored;
     if (!_loadedStored) return;
+    await Future.wait([_loadAnnouncement(), _loadPin()]);
+  }
+
+  Future<void> _loadAnnouncement() async {
+    final request = ++_loadId;
     final id = widget.groupId;
     await runUiAction(context, () async {
-      final (value, dismissed, pinRow) = await (
+      final (value, dismissed) = await (
         _isGroup
             ? GroupAnnouncementStore(
                 widget.controller.groupStore,
               ).read(id, MessageSender.localUser.id)
             : Future<GroupAnnouncement?>.value(null),
+        _dismissals.read(id, MessageSender.localUser.id),
+      ).wait;
+      if (!mounted || request != _loadId || id != widget.groupId) return;
+      setState(
+        () => _value =
+            value?.updatedAt.microsecondsSinceEpoch.toString() ==
+                dismissed['announcement']
+            ? null
+            : value,
+      );
+    });
+  }
+
+  Future<void> _loadPin() async {
+    final request = ++_pinLoadId;
+    final id = widget.groupId;
+    await runUiAction(context, () async {
+      final (dismissed, pinRow) = await (
         _dismissals.read(id, MessageSender.localUser.id),
         GroupMessageMarks(widget.controller.groupStore).pinned(id),
       ).wait;
@@ -103,19 +126,14 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
         final results = await GroupMessageSearch(
           widget.controller.groupStore.database,
           '${root.path}/message_images',
-        ).hydrate([pinRow]);
+        ).hydrate([pinRow], includeHtmlPreview: false);
         pin = results.single;
       }
-      if (!mounted || request != _loadId) return;
-      _pin = pin;
-      _pinStamp = pinRow?['updated_at'] as int?;
-      setState(
-        () => _value =
-            value?.updatedAt.microsecondsSinceEpoch.toString() ==
-                dismissed['announcement']
-            ? null
-            : value,
-      );
+      if (!mounted || request != _pinLoadId || id != widget.groupId) return;
+      setState(() {
+        _pin = pin;
+        _pinStamp = pinRow?['updated_at'] as int?;
+      });
     });
   }
 
