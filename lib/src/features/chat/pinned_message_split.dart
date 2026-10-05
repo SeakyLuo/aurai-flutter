@@ -99,24 +99,13 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
       await _detailsNavigator!.currentState!.push<void>(route);
       return;
     }
-    final pinned = _open ? _message : null;
-    final conversationId = widget.conversationId;
-    await openDetails(route.builder);
-    if (mounted &&
-        !_open &&
-        _detailsResult == null &&
-        pinned != null &&
-        widget.conversationId == conversationId &&
-        identical(_message, pinned)) {
-      setState(() {
-        _details = null;
-        _open = true;
-      });
-      _animation.forward();
-    }
+    await openDetails(route.builder, returnToPinned: _open && _message != null);
   }
 
-  Future<bool?> openDetails(WidgetBuilder builder) {
+  Future<bool?> openDetails(
+    WidgetBuilder builder, {
+    bool returnToPinned = false,
+  }) {
     FocusManager.instance.primaryFocus?.unfocus();
     _detailsResult?.complete(null);
     final result = Completer<bool?>();
@@ -131,15 +120,29 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
         key: navigator,
         onGenerateInitialRoutes: (_, _) => [
           MaterialPageRoute<void>(builder: (_) => const SizedBox.shrink()),
-          route,
+          if (!returnToPinned) route,
         ],
         onGenerateRoute: (_) => null,
       );
     });
-    route.popped.then((value) {
+    if (returnToPinned) {
+      // Initial routes do not animate. Push after the navigator is mounted.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && identical(_detailsResult, result)) {
+          navigator.currentState!.push(route);
+        }
+      });
+    }
+    route.popped.then((value) async {
+      // Keep both pages mounted until the profile's reverse transition ends.
+      if (returnToPinned) await route.completed;
       if (!mounted || !identical(_detailsResult, result)) return;
       _detailsResult = null;
-      close();
+      if (returnToPinned) {
+        setState(() => _details = null);
+      } else {
+        close();
+      }
       result.complete(value);
     });
     _animation.forward();
@@ -313,9 +316,9 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
               fit: StackFit.expand,
               children: [
                 if (_message != null)
-                  Offstage(
+                  IgnorePointer(
                     key: const ValueKey('pinned-message'),
-                    offstage: _details != null,
+                    ignoring: _details != null,
                     child: TickerMode(
                       enabled: _details == null,
                       child: _detail(context, wide: wide),

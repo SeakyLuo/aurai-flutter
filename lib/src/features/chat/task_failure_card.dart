@@ -8,6 +8,7 @@ import 'conversation_menu_icon.dart';
 import 'glass_surface.dart';
 import 'task_failure_icon.dart';
 import 'task_playback_icon.dart';
+import 'question_icon.dart';
 import 'interactive_message_button.dart';
 import '../../app/notice_details_sheet.dart';
 
@@ -17,6 +18,7 @@ class TaskFailureCard extends StatelessWidget {
     required this.onRetry,
     required this.error,
     this.actionLabel = '重试',
+    this.continuing = false,
     this.paused,
     this.enabled = true,
     this.padding = const EdgeInsets.fromLTRB(18, 12, 18, 20),
@@ -25,6 +27,7 @@ class TaskFailureCard extends StatelessWidget {
   final bool enabled;
   final String error;
   final String actionLabel;
+  final bool continuing;
   final VoidCallback? onRetry;
   final EdgeInsetsGeometry padding;
 
@@ -136,12 +139,19 @@ class TaskFailureCard extends StatelessWidget {
             RoundAction(
               label: actionLabel,
               icon: Icons.refresh_rounded,
-              iconWidget: ConversationMenuIcon(
-                type: ConversationMenuIconType.retry,
-                color: enabled
-                    ? colors.onSurfaceVariant
-                    : colors.onSurfaceVariant.withValues(alpha: .3),
-              ),
+              iconWidget: continuing
+                  ? QuestionIcon(
+                      type: QuestionIconType.play,
+                      color: enabled
+                          ? colors.onSurfaceVariant
+                          : colors.onSurfaceVariant.withValues(alpha: .3),
+                    )
+                  : ConversationMenuIcon(
+                      type: ConversationMenuIconType.retry,
+                      color: enabled
+                          ? colors.onSurfaceVariant
+                          : colors.onSurfaceVariant.withValues(alpha: .3),
+                    ),
               onPressed: enabled ? onRetry : null,
             ),
           ],

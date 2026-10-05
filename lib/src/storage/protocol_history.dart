@@ -120,15 +120,15 @@ List<Map<String, Object?>> _continuationProtocolItems(
     for (final tool in tools) tool['provider_call_id']: tool,
   };
   for (final callId in pending) {
-    final tool = toolsByCallId[callId]!;
-    final completed = tool['status'] == 'completed';
+    final tool = toolsByCallId[callId];
+    final hasResult = tool?['result_json'] != null;
     items.add({
       'type': 'function_call_output',
       'call_id': callId,
       'output': jsonEncode(
-        completed
+        hasResult
             ? {
-                'status': tool['result_status'],
+                'status': tool!['result_status'],
                 'result': jsonDecode(tool['result_json']! as String),
               }
             : {
@@ -136,13 +136,57 @@ List<Map<String, Object?>> _continuationProtocolItems(
                 'result': const {
                   'cancelled': true,
                   'interrupted': true,
-                  'reason': '该工具调用已被终止，未产生结果。',
+                  'reason': '该工具调用未返回结果。继续前请检查当前状态，不要重复已经成功的操作。',
                 },
               },
       ),
     });
   }
   return items;
+}
+
+Future<List<Map<String, Object?>>> loadFailedRunProtocol(
+  Database database,
+  String conversationId,
+  String senderId,
+  String runId,
+  ModelConfig config,
+) async {
+  final runs = await database.query(
+    'agent_runs',
+    columns: ['status', 'provider', 'model'],
+    where: 'id = ? AND conversation_id = ? AND sender_id = ?',
+    whereArgs: [runId, conversationId, senderId],
+    limit: 1,
+  );
+  if (runs.isEmpty || runs.single['status'] != 'failed') {
+    throw StateError('这次执行已不能继续');
+  }
+  if (runs.single['provider'] != config.service.name ||
+      runs.single['model'] != config.model) {
+    throw StateError('请切回中断时使用的模型后继续');
+  }
+  final records = await Future.wait([
+    database.query(
+      'model_turns',
+      where: 'run_id = ?',
+      whereArgs: [runId],
+      orderBy: 'ordinal',
+    ),
+    database.query('tool_calls', where: 'run_id = ?', whereArgs: [runId]),
+  ]);
+  return [
+    ..._continuationProtocolItems(records[0], records[1]),
+    {
+      'role': 'user',
+      'content': [
+        {
+          'type': 'input_text',
+          'text': '用户要求继续刚才中断的任务。保留已经完成的操作和已经发送的消息，结合最新状态从未完成处继续，不要从头重做。',
+        },
+      ],
+    },
+  ];
 }
 
 /// Replay complete exchanges as one compaction unit. Legacy and interrupted

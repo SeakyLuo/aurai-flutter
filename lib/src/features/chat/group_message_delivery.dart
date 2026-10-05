@@ -83,6 +83,24 @@ extension GroupMessageDelivery on ChatController {
     }
     final senders = _groupSenders;
     if (!senders.containsKey(reply.senderId)) throw const AgentCancelled();
+    if (item != null) {
+      final routed = await MiniappGroupMessageRouter(_store.database).send(
+        parent.id,
+        reply.senderId,
+        item,
+        arguments['participation'] as String,
+      );
+      if (routed != null) {
+        publishedIds.add(routed['messageId'] as String);
+        _execution.groupReplyDrafts.remove(reply.senderId);
+        return {
+          ...routed,
+          'participation': dispatcher.paused.contains(reply.senderId)
+              ? 'paused'
+              : 'active',
+        };
+      }
+    }
     final byId = {for (final m in dispatcher.history) m.id: m};
     final mentions = <String>{};
     final output = <AgentMessage>[];

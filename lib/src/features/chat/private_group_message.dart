@@ -31,6 +31,12 @@ extension PrivateGroupMessage on ChatController {
       return _changePrivateGroupParticipation(arguments, senderId);
     }
     if (isGroup) await groupStore.requireCanSpeak(id, senderId);
+    if (isGroup) {
+      final routed = await MiniappGroupMessageRouter(
+        _store.database,
+      ).send(id, senderId, item, participation);
+      if (routed != null) return routed;
+    }
     final images = item['_images'] as List<MessageImage>;
     final audience = _messageAudience(item, senders.keys, senderId);
     final excludedAudience = _messageExcludedAudience(
@@ -40,6 +46,9 @@ extension PrivateGroupMessage on ChatController {
     );
     final files = item['_files'] as List<MessageFile>? ?? const <MessageFile>[];
     final text = (item['text'] as String).trim();
+    if (text.isEmpty && images.isEmpty && files.isEmpty) {
+      throw ArgumentError('消息不能为空');
+    }
     if (text.length > 20000) throw ArgumentError('消息文字不能超过 20000 字');
     final mentions = List<String>.from(item['mentionIds'] as List).toSet();
     if (!isGroup && excludedAudience != null) throw ArgumentError('部分不可见仅支持群聊');

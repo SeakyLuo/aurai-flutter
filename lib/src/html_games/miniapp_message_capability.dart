@@ -35,6 +35,9 @@ class MiniappMessageCapability {
       }
       final id = newMessageId();
       final definition = effect['card'] as Map?;
+      if (definition == null && (effect['text'] as String).trim().isEmpty) {
+        throw ArgumentError('小程序发送的消息不能为空');
+      }
       final wakeAi = effect['wakeAi'] == true;
       if (wakeAi && audience == null) throw ArgumentError('触发 AI 回复需要明确接收人');
       final wakeMemberIds = (effect['wakeMemberIds'] as List?)?.cast<String>();
@@ -90,21 +93,19 @@ class MiniappMessageCapability {
       }
       final metadata =
           card ??
-          (wakeAi
-              ? InteractiveMessage(
-                  revision: 0,
-                  title: effect['text'] as String,
-                  body: '',
-                  buttons: const [],
-                  participation: {
-                    'audience': audience,
-                    'presentation': 'message',
-                    '_programWake': true,
-                    if (wakeMemberIds != null)
-                      '_programWakeMembers': wakeMemberIds,
-                  },
-                )
-              : null);
+          InteractiveMessage(
+            revision: 0,
+            title: effect['text'] as String,
+            body: '',
+            buttons: const [],
+            participation: {
+              'audience': audience,
+              'presentation': 'message',
+              '_programMessage': messageId,
+              if (wakeAi) '_programWake': true,
+              if (wakeMemberIds != null) '_programWakeMembers': wakeMemberIds,
+            },
+          );
       final message = AgentMessage(
         id: id,
         role: senderId != null && agents.contains(senderId)
@@ -117,6 +118,7 @@ class MiniappMessageCapability {
         audience: audience,
         isSystem: card == null && senderId == null,
         isGroupMessage: true,
+        markdown: effect['markdown'] == true,
         createdAt: DateTime.now(),
       );
       batch.insert('messages', messageRow(conversationId, message));

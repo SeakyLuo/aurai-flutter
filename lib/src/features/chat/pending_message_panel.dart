@@ -1,5 +1,4 @@
 import 'private_goal_panel.dart';
-import 'program_task_panel.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/glass_notice.dart';
@@ -19,11 +18,13 @@ class PendingMessagePanel extends StatefulWidget {
     required this.onSend,
     this.onEdit,
     required this.child,
+    this.memberStatus,
   });
   final ChatController controller;
   final ValueChanged<String> onSend;
   final ValueChanged<String>? onEdit;
   final Widget child;
+  final Widget? memberStatus;
 
   @override
   State<PendingMessagePanel> createState() => _PendingMessagePanelState();
@@ -35,10 +36,21 @@ class _PendingMessagePanelState extends State<PendingMessagePanel> {
   @override
   Widget build(BuildContext context) =>
       widget.controller.activeConversation.kind == ConversationKind.group
-      ? ProgramTaskPanel(
-          controller: widget.controller,
-          conversationId: widget.controller.activeConversation.id,
-          child: _buildPanel(context, null),
+      ? Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.memberStatus != null)
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                    child: widget.memberStatus!,
+                  ),
+                ),
+              ),
+            _buildPanel(context, null),
+          ],
         )
       : PrivateGoalPanel(
           store: widget.controller.privateTaskState,

@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../domain/interactive_selection.dart';
 import 'interactive_message_button.dart';
 import '../../agent/ask_user_tool.dart';
 import 'user_question_option_tile.dart';
+import 'question_options_sheet.dart';
 
 class InteractiveSelectionView extends StatefulWidget {
   const InteractiveSelectionView({
@@ -31,6 +33,7 @@ class InteractiveSelectionView extends StatefulWidget {
 }
 
 class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
+  Completer<void>? _pickerClosed;
   late Set<String> _selected = _saved;
   InteractiveSelection get selection => InteractiveSelection(
     Map<String, Object?>.from(widget.button['selection'] as Map),
@@ -48,18 +51,63 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
             jsonEncode(widget.button['selection']) ||
         jsonEncode(oldWidget.self) != jsonEncode(widget.self)) {
       _selected = _saved;
+      _closePicker();
     }
+    if (_locked) _closePicker();
+  }
+
+  bool get _locked =>
+      widget.locked ||
+      widget.button['disabled'] == true ||
+      widget.busy ||
+      widget.submitted && !widget.allowChange;
+
+  void _closePicker() {
+    _pickerClosed?.complete();
+    _pickerClosed = null;
+  }
+
+  @override
+  void dispose() {
+    _closePicker();
+    super.dispose();
+  }
+
+  Future<void> _chooseOptions() async {
+    if (_pickerClosed != null) return;
+    final config = selection;
+    final closed = Completer<void>();
+    _pickerClosed = closed;
+    final result = await showQuestionOptionsSheet(
+      context,
+      options: [
+        for (final option in config.options)
+          UserQuestionOption(content: option['label'] as String),
+      ],
+      selected: {
+        for (final (i, option) in config.options.indexed)
+          if (_selected.contains(option['id'])) i,
+      },
+      multiple: config.multiple,
+      minimum: config.minimum,
+      maximum: config.maximum,
+      closeWhen: closed.future,
+    );
+    if (!identical(_pickerClosed, closed)) return;
+    _closePicker();
+    if (!mounted || result == null || _locked) return;
+    setState(
+      () => _selected = {
+        for (final i in result) config.options[i]['id'] as String,
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final config = selection;
     final colors = Theme.of(context).colorScheme;
-    final locked =
-        widget.locked ||
-        widget.button['disabled'] == true ||
-        widget.busy ||
-        widget.submitted && !widget.allowChange;
+    final locked = _locked;
     final valid =
         _selected.length >= config.minimum &&
         _selected.length <= config.maximum;
@@ -76,91 +124,103 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
               style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
             ),
           ),
-        for (final (index, option) in config.options.indexed)
-          Builder(
-            builder: (context) {
-              final id = option['id'] as String;
-              final selected = _selected.contains(id);
-              final enabled =
-                  !locked &&
-                  (!config.multiple ||
-                      selected ||
-                      _selected.length < config.maximum);
-              void toggle() => setState(() {
-                if (!config.multiple) {
-                  _selected = {id};
-                } else if (selected) {
-                  _selected.remove(id);
-                } else {
-                  _selected.add(id);
-                }
-              });
-              if (widget.question)
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: UserQuestionOptionTile(
-                    option: UserQuestionOption(
-                      content: option['label'] as String,
+        if (config.options.length > 5)
+          QuestionOptionsField(
+            label: _selected.isEmpty
+                ? '选择选项（${config.options.length} 项）'
+                : [
+                    for (final option in config.options)
+                      if (_selected.contains(option['id']))
+                        option['label'] as String,
+                  ].join('、'),
+            onTap: locked ? null : _chooseOptions,
+          )
+        else
+          for (final (index, option) in config.options.indexed)
+            Builder(
+              builder: (context) {
+                final id = option['id'] as String;
+                final selected = _selected.contains(id);
+                final enabled =
+                    !locked &&
+                    (!config.multiple ||
+                        selected ||
+                        _selected.length < config.maximum);
+                void toggle() => setState(() {
+                  if (!config.multiple) {
+                    _selected = {id};
+                  } else if (selected) {
+                    _selected.remove(id);
+                  } else {
+                    _selected.add(id);
+                  }
+                });
+                if (widget.question)
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: UserQuestionOptionTile(
+                      option: UserQuestionOption(
+                        content: option['label'] as String,
+                      ),
+                      number: index + 1,
+                      multiple: config.multiple,
+                      selected: selected,
+                      onTap: enabled ? toggle : null,
                     ),
-                    number: index + 1,
-                    multiple: config.multiple,
-                    selected: selected,
+                  );
+                return Semantics(
+                  checked: selected,
+                  inMutuallyExclusiveGroup: !config.multiple,
+                  enabled: enabled,
+                  label: option['label'] as String,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: enabled ? toggle : null,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 1),
+                            child: CustomPaint(
+                              size: const Size.square(22),
+                              painter: _ChoicePainter(
+                                multiple: config.multiple,
+                                selected: selected,
+                                color: selected
+                                    ? Color.lerp(
+                                        colors.primary,
+                                        colors.onSurface,
+                                        .35,
+                                      )!
+                                    : colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              option['label'] as String,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: selected
+                                    ? FontWeight.w500
+                                    : FontWeight.w400,
+                                height: 1.5,
+                                color: enabled || selected
+                                    ? colors.onSurface
+                                    : colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 );
-              return Semantics(
-                checked: selected,
-                inMutuallyExclusiveGroup: !config.multiple,
-                enabled: enabled,
-                label: option['label'] as String,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: enabled ? toggle : null,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(top: 1),
-                          child: CustomPaint(
-                            size: const Size.square(22),
-                            painter: _ChoicePainter(
-                              multiple: config.multiple,
-                              selected: selected,
-                              color: selected
-                                  ? Color.lerp(
-                                      colors.primary,
-                                      colors.onSurface,
-                                      .35,
-                                    )!
-                                  : colors.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            option['label'] as String,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: selected
-                                  ? FontWeight.w500
-                                  : FontWeight.w400,
-                              height: 1.5,
-                              color: enabled || selected
-                                  ? colors.onSurface
-                                  : colors.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
+              },
+            ),
         if (widget.showSubmit) ...[
           const SizedBox(height: 8),
           InteractiveMessageButton(

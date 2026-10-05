@@ -9,6 +9,7 @@ import 'chat_controller.dart';
 import 'private_task_list.dart';
 import 'private_task_list_nodes.dart';
 import 'settings_appearance.dart';
+import 'program_task_history.dart';
 
 /// Displays only the miniapp's public task projection, never its private state.
 class ProgramTaskPanel extends StatefulWidget {
@@ -41,13 +42,14 @@ class _ProgramTaskPanelState extends State<ProgramTaskPanel> {
   @override
   void initState() {
     super.initState();
-    _listen();
+    if (!widget.expanded) _listen();
   }
 
   @override
   void didUpdateWidget(ProgramTaskPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_conversationId != widget.conversationId) _listen();
+    if (!widget.expanded && oldWidget.conversationId != widget.conversationId)
+      _listen();
   }
 
   void _listen() {
@@ -108,6 +110,13 @@ class _ProgramTaskPanelState extends State<ProgramTaskPanel> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.expanded)
+      return ProgramTaskHistory(
+        controller: widget.controller,
+        conversationId: widget.conversationId,
+        empty: widget.empty,
+        child: widget.child,
+      );
     final progress = _progress;
     final hasProgress =
         progress != null && (progress['steps'] as List).isNotEmpty;

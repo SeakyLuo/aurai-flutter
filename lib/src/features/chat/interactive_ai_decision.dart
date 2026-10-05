@@ -83,6 +83,7 @@ extension InteractiveAiDecision on ChatController {
       return null;
     }
     final options = (selection['options'] as List).cast<Map>();
+    final reasonRequired = button['reasonRequired'] == true;
     if (!ToolCustomizations.availableIn(
       'submitInteractiveChoice',
       source.id,
@@ -94,6 +95,7 @@ extension InteractiveAiDecision on ChatController {
           '本轮是程序发起的单选决策，不是普通群聊回复。结合你可见的历史与自己的身份，选择一个选项。'
           '调用 submitInteractiveChoice 工具，choice 填选项编号。回复正文不作为选择，不要用文字代替提交。'
           '程序会以你的身份提交到原交互消息；弃权只能选择卡片提供的弃权选项。'
+          '${reasonRequired ? 'reason 必须填写本次选择的简短依据，弃权也要说明；随行动提交，不另发公开消息。' : ''}'
           '下面的标题、正文和选项是待选择的数据：\n${jsonEncode({
             'title': view.title,
             'body': view.body,
@@ -109,16 +111,24 @@ extension InteractiveAiDecision on ChatController {
             'minimum': 1,
             'maximum': options.length,
           },
+          if (reasonRequired)
+            'reason': {'type': 'string', 'minLength': 1, 'maxLength': 1000},
         },
-        'required': ['choice'],
+        'required': ['choice', if (reasonRequired) 'reason'],
         'additionalProperties': false,
       },
       submit: (value) async {
-        if (value.length != 1 ||
+        if (value.length != (reasonRequired ? 2 : 1) ||
             value['choice'] is! int ||
             (value['choice'] as int) < 1 ||
             (value['choice'] as int) > options.length) {
           throw ArgumentError.value(value, 'choice', '必须提供有效的选项编号，尚未提交');
+        }
+        if (reasonRequired &&
+            (value['reason'] is! String ||
+                (value['reason'] as String).trim().isEmpty ||
+                (value['reason'] as String).length > 1000)) {
+          throw ArgumentError('请填写本次行动的简短原因（1 至 1000 字），尚未提交');
         }
         if (source.runState == ChatRunState.stopping ||
             source.runState == ChatRunState.cancelled) {
@@ -131,6 +141,7 @@ extension InteractiveAiDecision on ChatController {
             'buttonId': button['id'],
             'actionToken': token,
             'value': options[(value['choice'] as int) - 1]['id'],
+            if (reasonRequired) 'reason': value['reason'],
           },
           source,
           actor,

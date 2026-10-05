@@ -19,6 +19,7 @@ import '../../domain/agent_models.dart';
 import 'message_time.dart';
 import 'copy_icon.dart';
 import 'conversation_menu_icon.dart';
+import 'question_icon.dart';
 import 'text_selection_icon.dart';
 import 'settings_appearance.dart';
 import 'menu_press_highlight.dart';
@@ -43,6 +44,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   bool allowQuote = false,
   bool allowRecall = false,
   bool allowRetry = false,
+  String retryLabel = '重试',
   bool allowForward = false,
   bool allowBranch = false,
   bool allowQuickReply = false,
@@ -72,11 +74,13 @@ Future<MessageMenuResult?> showMessageActionsMenu(
         if (allowRetry)
           (
             const MessageActionResult(MessageAction.retry),
-            ConversationMenuIcon(
-              type: ConversationMenuIconType.retry,
-              color: iconColor,
-            ),
-            '重试',
+            retryLabel == '继续'
+                ? QuestionIcon(type: QuestionIconType.play, color: iconColor)
+                : ConversationMenuIcon(
+                    type: ConversationMenuIconType.retry,
+                    color: iconColor,
+                  ),
+            retryLabel,
           ),
         if (allowHistory)
           (

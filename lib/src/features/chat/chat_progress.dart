@@ -90,18 +90,18 @@ extension _ChatProgress on _ChatPageState {
           context: context,
           builder: (context) => AppPromptDialog(
             title: '该成员已暂停接话',
-            description: '仅重试这次回复，还是同时恢复后续自动接话？',
+            description: '仅继续这次任务，还是同时恢复后续自动接话？',
             actions: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
                 DialogActionButton(
-                  text: '仅重试本次',
+                  text: '仅继续本次',
                   onPressed: () => Navigator.pop(context, false),
                 ),
                 const SizedBox(height: 10),
                 DialogActionButton(
-                  text: '恢复接话并重试',
+                  text: '恢复接话并继续',
                   role: DialogActionRole.secondary,
                   onPressed: () => Navigator.pop(context, true),
                 ),

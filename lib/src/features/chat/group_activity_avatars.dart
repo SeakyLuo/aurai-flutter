@@ -12,10 +12,12 @@ class GroupActivityAvatars extends StatefulWidget {
     super.key,
     required this.activities,
     required this.onPressed,
+    this.compact = false,
   });
 
   final List<GroupMemberActivity> activities;
   final VoidCallback onPressed;
+  final bool compact;
 
   static const height = 40.0;
 
@@ -135,7 +137,9 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
             constraints: const BoxConstraints(maxWidth: 760),
             // Reserve this overlay's height in the viewport even when hidden.
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: widget.compact
+                  ? EdgeInsets.zero
+                  : const EdgeInsets.symmetric(horizontal: 12),
               child: Align(
                 alignment: Alignment.centerLeft,
                 heightFactor: 1,
@@ -151,7 +155,10 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
 
   Widget _buildCluster(BuildContext context, BoxConstraints constraints) {
     // Leave the centered jump-to-bottom button in its original position.
-    final budget = math.min(144.0, (constraints.maxWidth - 56) / 2);
+    final budget = math.min(
+      144.0,
+      widget.compact ? constraints.maxWidth : (constraints.maxWidth - 56) / 2,
+    );
     final count = math.min(_visible.length, 5);
     final remaining = _visible.length - count;
     final stride = count > 1

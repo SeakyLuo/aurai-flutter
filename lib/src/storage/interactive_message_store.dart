@@ -25,6 +25,7 @@ class InteractiveMessageStore {
     required MessageSender actor,
     required int participantRevision,
     Object? inputValue,
+    String? reason,
   }) async {
     MiniappProgramChange? programChange;
     final result = await database.transaction((txn) async {
@@ -67,6 +68,11 @@ class InteractiveMessageStore {
       final view = card.viewFor(actor.id);
       var button = view.buttons.firstWhere((b) => b['id'] == buttonId);
       if (button['disabled'] == true) throw StateError('这个选项已处理');
+      if (actor.id != MessageSender.localUser.id &&
+          button['reasonRequired'] == true &&
+          (reason == null || reason.trim().isEmpty || reason.length > 1000)) {
+        throw ArgumentError('请填写本次行动的简短原因（1 至 1000 字），尚未提交');
+      }
       final action = button['action'] as String;
       if (action == 'openUrl' &&
           button['notifyAi'] != true &&
@@ -291,6 +297,7 @@ class InteractiveMessageStore {
           action: button['programEvent'] as String,
           data: button['value'] ?? button['id'],
           cardId: messageId,
+          reason: reason,
         );
         final updated = await txn.query(
           'messages',

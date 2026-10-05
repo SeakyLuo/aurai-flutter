@@ -38,6 +38,11 @@ class InteractionContent extends StatelessWidget {
         : const <Map<String, Object?>>[];
     final collecting = view['phase'] == 'collecting' && view['closed'] != true;
     final choosing = collecting && (!submitted || allowChange);
+    final editingSelection = choosing && eligible && !readOnly;
+    final components = (view['components'] as List);
+    final hasDistribution = components.any(
+      (component) => component['type'] == 'distribution',
+    );
     final self = view['self'] as Map?;
     final answer = question
         ? self ?? (view['choices'] as List?)?.firstOrNull as Map?
@@ -79,7 +84,12 @@ class InteractionContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final component in view['components'] as List)
+        for (final component in components.where(
+          (component) =>
+              question ||
+              !editingSelection ||
+              component['type'] != 'distribution',
+        ))
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: switch (component['type']) {
@@ -114,7 +124,11 @@ class InteractionContent extends StatelessWidget {
                 (view['revealed'] == true && view['summaryVisible'] != true)))
           const SizedBox(height: 12),
         for (final button in buttons.where(
-          (button) => (question || collecting) && button['selection'] != null,
+          (button) =>
+              (question ||
+                  editingSelection ||
+                  (collecting && !hasDistribution)) &&
+              button['selection'] != null,
         ))
           Padding(
             padding: const EdgeInsets.only(bottom: 8),

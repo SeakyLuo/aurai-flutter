@@ -7,6 +7,7 @@ extension _ChatGroupNavigation on _ChatPageState {
     conversationId: conversation.id,
     includeThoughts: false,
     builder: (context, activities) => GroupActivityAvatars(
+      compact: true,
       activities: activities
           .where((a) => !a.stopping && !a.waitingForUser)
           .toList(),
@@ -28,10 +29,7 @@ extension _ChatGroupNavigation on _ChatPageState {
   ) => ListView(
     key: ValueKey('introduction:$_conversationId'),
     primary: false,
-    padding: EdgeInsets.only(
-      top: top,
-      bottom: bottom + GroupActivityAvatars.height,
-    ),
+    padding: EdgeInsets.only(top: top, bottom: bottom + 16),
     children: [for (final entry in timeline) entry.builder(context)],
   );
 }

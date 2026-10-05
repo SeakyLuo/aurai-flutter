@@ -46,9 +46,14 @@ class _TaskProgressListState extends State<TaskProgressList> {
               step['status'] == 'completed' || step['status'] == 'skipped',
         )
         .length;
-    final current =
-        steps.where((step) => step['status'] == 'in_progress').firstOrNull ??
-        steps.where((step) => step['status'] == 'pending').firstOrNull;
+    if (completed == steps.length) return const SizedBox.shrink();
+    var currentIndex = steps.indexWhere(
+      (step) => step['status'] == 'in_progress',
+    );
+    if (currentIndex == -1)
+      currentIndex = steps.indexWhere((step) => step['status'] == 'pending');
+    final current = currentIndex == -1 ? null : steps[currentIndex];
+    final position = currentIndex == -1 ? steps.length : currentIndex + 1;
     final summary = current == null ? '任务已完成' : current['step'] as String;
     final colors = Theme.of(context).colorScheme;
     return Center(
@@ -67,7 +72,8 @@ class _TaskProgressListState extends State<TaskProgressList> {
                   children: [
                     Semantics(
                       button: true,
-                      label: '任务清单，已完成 $completed/${steps.length}，$summary',
+                      label:
+                          '任务清单，第 $position/${steps.length} 步，已完成 $completed 步，$summary',
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
                         onTap: _showSteps,
@@ -76,7 +82,7 @@ class _TaskProgressListState extends State<TaskProgressList> {
                           child: Row(
                             children: [
                               Text(
-                                '${widget.label} · $completed/${steps.length}',
+                                '${widget.label} · $position/${steps.length}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: colors.onSurfaceVariant,

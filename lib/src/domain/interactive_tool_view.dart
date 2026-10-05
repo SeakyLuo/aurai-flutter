@@ -45,6 +45,7 @@ Map<String, Object?> interactiveToolView(
             'action',
             'disabled',
             'selection',
+            'reasonRequired',
             'input',
             'url',
           ])

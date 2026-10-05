@@ -85,6 +85,9 @@ extension ConversationRunFailure on ChatController {
         await beforeRemoval?.call();
         await _removeFailedGroupMessage(conversation, message);
         dispatcher.history.removeWhere((entry) => entry.id == message.id);
+        if (message.runId case final runId?) {
+          _execution.groupContinuationRuns[message.senderId] = runId;
+        }
         dispatcher.receiveTargeted(const [], {message.senderId});
         _notifyRun(conversation);
       } finally {
@@ -100,6 +103,9 @@ extension ConversationRunFailure on ChatController {
           await _executeGroupChat(
             conversation,
             wakeMembers: {message.senderId},
+            continuationRuns: {
+              if (message.runId case final runId?) message.senderId: runId,
+            },
           );
         } finally {
           _runningConversation = null;
@@ -166,7 +172,6 @@ extension ConversationRunFailure on ChatController {
     _submitting = true;
     _notifyRun(conversation);
     late String goal;
-    late int messageCount;
     try {
       await _store.writer.mutate(() async {
         await _store.database.transaction((txn) async {
@@ -192,35 +197,13 @@ extension ConversationRunFailure on ChatController {
             'UPDATE conversations SET active_run_id = CASE WHEN active_run_id = ? THEN NULL ELSE active_run_id END, run_state = ?, error_detail = NULL, pending_goal = ? WHERE id = ?',
             [runId, ChatRunState.idle.name, goal, conversation.id],
           );
-          await txn.delete('agent_runs', where: 'id = ?', whereArgs: [runId]);
-          await txn.delete(
-            'app_state',
-            where: 'key = ?',
-            whereArgs: ['context_summary:${conversation.id}'],
-          );
-          final counts = await txn.rawQuery(
-            'SELECT COUNT(*) AS count FROM messages WHERE conversation_id = ?',
-            [conversation.id],
-          );
-          await txn.rawUpdate(
-            "UPDATE conversations SET message_count = ?, preview = (SELECT text FROM messages WHERE conversation_id = ? AND kind NOT IN ('commentary', 'reasoning', 'quick_reply') ORDER BY created_at DESC, id DESC LIMIT 1), updated_at = COALESCE((SELECT MAX(created_at) FROM messages WHERE conversation_id = ?), created_at) WHERE id = ?",
-            [
-              counts.single['count'],
-              conversation.id,
-              conversation.id,
-              conversation.id,
-            ],
-          );
-          messageCount = counts.single['count'] as int;
         });
       });
     } finally {
       _submitting = false;
       _notifyRun(conversation);
     }
-    conversation.messages.removeWhere((message) => message.runId == runId);
     conversation
-      ..messageCount = messageCount
       ..pendingGoal = goal
       ..activeRunId = null
       ..runState = ChatRunState.idle
@@ -229,13 +212,10 @@ extension ConversationRunFailure on ChatController {
       ..restoredExecutionElapsed = Duration.zero
       ..hasExecutionProcess = false
       ..executionUserMessageId = null
-      ..contextSummary = null
       ..reconnectAttempt = 0;
     conversation.steps.clear();
-    conversation.liveToolSteps.removeWhere((entry) => entry.runId == runId);
     conversation.unfinishedRunElapsed.remove(runId);
     conversation.cancelledRunMessages.remove(runId);
-    _store.writer.invalidateHistory(conversation.id);
     _notifyRun(conversation);
     await _continuePending();
   }

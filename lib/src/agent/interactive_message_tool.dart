@@ -63,6 +63,13 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
                 'For callback completion: eventId received in the callback context. Updates only the triggering participant title/body/buttons and atomically completes that event; do not send interaction/participation/states. Retrying an already committed result does not apply it twice.',
           },
         if (name == 'clickInteractiveMessage') ...{
+          'reason': {
+            'type': 'string',
+            'minLength': 1,
+            'maxLength': 1000,
+            'description':
+                '行动的简短依据。按钮 reasonRequired=true 时必填，包括弃权或不使用技能；随行动私密提交，不用另发群消息。',
+          },
           'value': {
             'description':
                 'For selection submit buttons: option id for single, array of option ids for multiple. The host resolves configured values and records labels. For HTML input-enabled endpoints: text or JSON (max 16 KB). Omit for ordinary fixed buttons.',

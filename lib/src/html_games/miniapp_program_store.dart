@@ -119,6 +119,7 @@ class MiniappProgramStore {
     required String action,
     Object? data,
     String? cardId,
+    String? reason,
     int? expectedVersion,
   }) async {
     final rows = await txn.query(
@@ -180,7 +181,11 @@ class MiniappProgramStore {
           !(binding['actors'] as List).contains(actorId)) {
         throw StateError('这张行动卡已结束或不属于你');
       }
-      data = {'context': binding['data'], 'value': data};
+      data = {
+        'context': binding['data'],
+        'value': data,
+        if (reason != null) 'reason': reason,
+      };
     }
     final request = jsonEncode({
       'actorId': actorId,
@@ -262,6 +267,8 @@ class MiniappProgramStore {
         .where((m) => m['kind'] == 'agent')
         .map((m) => m['id'] as String)
         .toSet();
+    if (calls.messageRoutes.keys.any((id) => !agents.contains(id)))
+      throw ArgumentError('消息拦截只能指定当前群内的 AI');
     final replyChange = await capabilities.replies.apply(
       txn,
       conversationId: conversationId,
@@ -324,6 +331,7 @@ class MiniappProgramStore {
       'state': output['state'],
       'privateViews': views,
       'bindings': bindings,
+      'messageRoutes': calls.messageRoutes,
       'wakeAt': wakeAt,
       'replyBefore': replyBefore,
       'conversationId': conversationId,

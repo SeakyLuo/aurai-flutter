@@ -20,6 +20,7 @@ import 'personal_info_page.dart';
 import 'app_dialog.dart';
 import 'dialog_action_button.dart';
 import 'chat_header.dart';
+import 'program_task_panel.dart';
 
 /// Reserves space below the chat header so the announcement cannot cover messages.
 class GroupAnnouncementBanner extends StatefulWidget {
@@ -70,6 +71,7 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
     if (oldWidget.groupId != widget.groupId) {
       _value = null;
       _pin = null;
+      _noticeHeight = 0;
       _load();
     }
   }
@@ -218,12 +220,11 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
   Widget build(BuildContext context) {
     final value = _value;
     final pin = _pin;
-    final count = (value == null ? 0 : 1) + (pin == null ? 0 : 1);
-    final height = count == 0 ? 0.0 : _noticeHeight;
+    final height = widget.groupId == null ? 0.0 : _noticeHeight;
     return Stack(
       children: [
         Positioned.fill(child: widget.builder(context, height)),
-        if (count > 0)
+        if (widget.groupId != null)
           Positioned(
             top:
                 View.of(context).padding.top /
@@ -240,35 +241,39 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
                       setState(() => _noticeHeight = size.height);
                     }
                   },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      children: [
-                        if (value != null) ...[
-                          GroupNoticeCard(
-                            author: value.editorName,
-                            time: '${messageTime(value.updatedAt)} 更新',
-                            preview: markdownPreviewText(value.content),
-                            announcement: true,
-                            onOpen: _open,
-                            onDismiss: _dismiss,
-                            onOpenProfile: () => _openProfile(value.editorId),
-                          ),
-                          const SizedBox(height: 8),
+                  child: ProgramTaskPanel(
+                    controller: widget.controller,
+                    conversationId: widget.groupId!,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        children: [
+                          if (value != null) ...[
+                            GroupNoticeCard(
+                              author: value.editorName,
+                              time: '${messageTime(value.updatedAt)} 更新',
+                              preview: markdownPreviewText(value.content),
+                              announcement: true,
+                              onOpen: _open,
+                              onDismiss: _dismiss,
+                              onOpenProfile: () => _openProfile(value.editorId),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          if (pin != null) ...[
+                            GroupNoticeCard(
+                              author: pin.sender.name,
+                              time: messageTime(pin.createdAt),
+                              preview: groupSavedMessagePreview(pin),
+                              announcement: false,
+                              onOpen: () => widget.onLocate(pin.id),
+                              onDismiss: _dismissPin,
+                              onOpenProfile: () => _openProfile(pin.sender.id),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
                         ],
-                        if (pin != null) ...[
-                          GroupNoticeCard(
-                            author: pin.sender.name,
-                            time: messageTime(pin.createdAt),
-                            preview: groupSavedMessagePreview(pin),
-                            announcement: false,
-                            onOpen: () => widget.onLocate(pin.id),
-                            onDismiss: _dismissPin,
-                            onOpenProfile: () => _openProfile(pin.sender.id),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                      ],
+                      ),
                     ),
                   ),
                 ),

@@ -408,6 +408,7 @@ class _ChatPageState extends State<ChatPage>
                       controller: controller,
                       child: PendingMessagePanel(
                         controller: controller,
+                        memberStatus: isGroup ? _groupStatus(active) : null,
                         onSend: _sendQueuedMessages,
                         onEdit: _editing == null && !controller.addingImages
                             ? _editQueuedMessage
@@ -517,12 +518,7 @@ class _ChatPageState extends State<ChatPage>
                                             },
                                             padding: EdgeInsets.only(
                                               top: top + 12,
-                                              bottom:
-                                                  bottom +
-                                                  (isGroup
-                                                      ? GroupActivityAvatars
-                                                            .height
-                                                      : 16),
+                                              bottom: bottom + 16,
                                             ),
                                             hasEarlierMessages:
                                                 controller.visibleHasEarlier,
@@ -595,13 +591,6 @@ class _ChatPageState extends State<ChatPage>
                           ),
                         ),
                         _unreadPositionHint(top),
-                        if (isGroup)
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            bottom: bottom,
-                            child: _groupStatus(active),
-                          ),
                       ],
                     );
                   },

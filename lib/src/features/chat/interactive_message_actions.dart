@@ -207,6 +207,7 @@ extension InteractiveMessageActions on ChatController {
         actor: actor.sender,
         participantRevision: old.participantRevision(senderId),
         inputValue: args['value'],
+        reason: args['reason'] as String?,
       );
       _replaceInteractiveCard(source.id, id, result.card, source: source);
       if (result.notice != null)

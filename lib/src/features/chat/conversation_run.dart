@@ -9,6 +9,7 @@ extension ConversationRun on ChatController {
     List<AgentMessage>? groupHistory,
     AgentMessage? groupUser,
     Conversation? groupParent,
+    String? continuationRunId,
   }) async {
     final summaryOwner = groupParent ?? runConversation;
     final historyVersion = _store.writer.historyVersion(summaryOwner.id);
@@ -19,17 +20,9 @@ extension ConversationRun on ChatController {
     final diagnosticCalls = <String, Object?>{};
     final sleepDraftKey =
         'group_sleep_draft:${runConversation.id}:${reply.senderId}';
-    final sleepDraftRows = groupParent == null
-        ? const <Map<String, Object?>>[]
-        : await _store.database.query(
-            'app_state',
-            columns: ['value'],
-            where: 'key = ?',
-            whereArgs: [sleepDraftKey],
-          );
-    final sleepDraft = sleepDraftRows.isEmpty
+    final sleepDraft = groupParent == null
         ? ''
-        : sleepDraftRows.single['value'] as String;
+        : await _groupSleepDraft(sleepDraftKey);
     var leftSleepDraft = false;
     final systemPrompt = await _memberSystemPrompt(
       reply,
@@ -65,14 +58,14 @@ extension ConversationRun on ChatController {
     final userMessage = callbackEvents.isNotEmpty
         ? _callbackContext(callbackEvents)
         : groupUser ?? history[lastUser];
-    final continuationProtocol = groupParent == null && callbackEvents.isEmpty
-        ? await loadTaskContinuationProtocol(
-            _store.database,
-            runConversation.id,
-            userMessage.id,
-            runConfig,
-          )
-        : const <Map<String, Object?>>[];
+    final continuationProtocol = await _runContinuation(
+      conversation: runConversation,
+      reply: reply,
+      userMessage: userMessage,
+      direct: groupParent == null,
+      hasCallbacks: callbackEvents.isNotEmpty,
+      runId: continuationRunId,
+    );
     final executionWatch = Stopwatch()..start();
     runConversation.executionWatch = executionWatch;
     runConversation.restoredExecutionElapsed = Duration.zero;
@@ -239,7 +232,10 @@ extension ConversationRun on ChatController {
       }
       if (runConversation.runState == ChatRunState.stopping)
         throw AgentCancelled();
-      final decision = groupParent != null && callbackEvents.isEmpty
+      final decision =
+          groupParent != null &&
+              callbackEvents.isEmpty &&
+              continuationRunId == null
           ? await _interactiveAiDecision(
               userMessage,
               groupParent,
@@ -752,7 +748,7 @@ extension ConversationRun on ChatController {
         if (groupParent != null &&
             outcome == 'completed' &&
             !leftSleepDraft &&
-            sleepDraftRows.isNotEmpty) {
+            sleepDraft.isNotEmpty) {
           await _store.database.delete(
             'app_state',
             where: 'key = ? AND value = ?',

@@ -243,7 +243,12 @@ class ExecutionProgress extends StatelessWidget {
       );
     }
     if (state == ChatRunState.failed) {
-      return TaskFailureCard(onRetry: onRetry, error: errorDetail ?? '任务执行失败');
+      return TaskFailureCard(
+        onRetry: onRetry,
+        error: errorDetail ?? '任务执行失败',
+        actionLabel: '继续',
+        continuing: true,
+      );
     }
 
     if (state == ChatRunState.running && compacting) {

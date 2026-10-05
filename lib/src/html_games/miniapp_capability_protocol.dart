@@ -4,6 +4,7 @@ import 'dart:convert';
 abstract final class MiniappCapabilityProtocol {
   static const operations = {
     'messages.send',
+    'messages.intercept',
     'cards.close',
     'cards.submit',
     'replies.set',
@@ -68,6 +69,12 @@ class MiniappCapabilityCalls {
       switch (name) {
         case 'messages.send':
           messages.add(args);
+        case 'messages.intercept':
+          final action = args['action'] as String;
+          if (action.isEmpty) throw ArgumentError('消息拦截需要处理事件');
+          for (final actor in (args['actors'] as List).cast<String>()) {
+            messageRoutes[actor] = action;
+          }
         case 'cards.close':
           closeKeys.addAll((args['keys'] as List).cast<String>());
         case 'cards.submit':
@@ -91,6 +98,7 @@ class MiniappCapabilityCalls {
   }
 
   final messages = <Map<String, Object?>>[];
+  final messageRoutes = <String, String>{};
   final closeKeys = <String>{};
   final submissions = <Map<String, Object?>>[];
   final replyStates = <String, bool>{};

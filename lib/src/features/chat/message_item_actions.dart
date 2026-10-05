@@ -9,6 +9,8 @@ extension _FailureRetry on _MessageItemState {
       child: TaskFailureCard(
         error: message.text,
         padding: EdgeInsets.zero,
+        actionLabel: '继续',
+        continuing: true,
         enabled: !_retryingFailure && widget.onRetry != null,
         onRetry: widget.onRetry == null ? null : _retryFailure,
       ),
@@ -265,6 +267,7 @@ extension _MessageItemActions on _MessageItemState {
             allowQuote: widget.onQuote != null,
             allowRecall: widget.onRecall != null,
             allowRetry: allowRetry,
+            retryLabel: '继续',
             allowForward:
                 !widget.streaming &&
                 (message.htmlGame != null ||

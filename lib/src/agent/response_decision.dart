@@ -12,6 +12,12 @@ class ResponseDecision implements AgentTool, RuntimeCapabilityAgentTool {
         'type': 'object',
         'properties': {
           'choice': {'type': 'integer', 'minimum': 1},
+          'reason': {
+            'type': 'string',
+            'minLength': 1,
+            'maxLength': 1000,
+            'description': '行动卡要求时必填，简要说明选择依据，包含弃权或不使用技能的原因。',
+          },
         },
         'required': ['choice'],
         'additionalProperties': false,

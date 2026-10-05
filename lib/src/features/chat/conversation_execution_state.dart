@@ -26,6 +26,7 @@ class _ConversationExecutionState {
   Set<String> hiddenThinkingMembers = {};
   final liveProjectChanges = <String, List<LiveProjectChanges>>{};
   Map<String, String> groupReplyDrafts = {};
+  final groupContinuationRuns = <String, String>{};
   Set<String> removedGroupMembers = {};
   String? confirmingSenderId;
   Map<String, AgentRuntime> groupRuntimes = {};
