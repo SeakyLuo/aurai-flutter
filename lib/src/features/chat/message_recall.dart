@@ -285,7 +285,7 @@ extension MessageRecall on ChatController {
         if (live) _replaceRecalled(dispatcher.history, message.id, notice);
         _store.writer.remember([notice]);
       });
-      programChange?.publish();
+      await programChange?.publish();
       await _store.writer.save(
         conversation,
         makeActive: false,

@@ -14,6 +14,7 @@ Future<InteractiveMessage> submitProgramCard(
   required MessageSender submitter,
   required String programAction,
   required Object? value,
+  String? reason,
 }) async {
   final rows = await txn.query(
     'messages',
@@ -54,7 +55,10 @@ Future<InteractiveMessage> submitProgramCard(
   final next = InteractiveMessage.fromJson({
     ...card.toJson(includeParticipants: true),
     if (card.shared)
-      'session': card.engine.submit(player.id, player.name, button).runtime,
+      'session': card.engine.submit(player.id, player.name, {
+        ...button,
+        if (reason != null) 'reason': reason,
+      }).runtime,
     'participants': {
       ...card.participants,
       player.id: {
@@ -70,6 +74,7 @@ Future<InteractiveMessage> submitProgramCard(
         'buttonColumns': view.buttonColumns,
         'buttonId': button['id'],
         'label': button['label'],
+        if (reason != null) 'reason': reason,
         if (button['selections'] != null) ...{
           'selections': button['selections'],
           'value': button['value'],

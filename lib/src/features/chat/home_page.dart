@@ -31,6 +31,11 @@ class _HomePageState extends State<HomePage> with RouteAware {
   final _contactSearch = TextEditingController();
   final _contactSearchFocus = FocusNode();
   bool _searchingContacts = false;
+  bool _contactDetailOpen = false;
+
+  void _contactDetailChanged(bool open) {
+    setState(() => _contactDetailOpen = open);
+  }
 
   void _toggleContactSearch() {
     _contactSearchFocus.unfocus();
@@ -47,6 +52,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
         root: true,
         searchController: _contactSearch,
         onToggleSearch: _toggleContactSearch,
+        onDetailChanged: _contactDetailChanged,
       ),
     ),
     _HomeTabPage(child: DiscoverPage(controller: widget.controller)),
@@ -97,6 +103,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
     canPop: _tab == 0 && !_searchingContacts,
     onPopInvokedWithResult: (didPop, result) {
       if (!didPop) {
+        if (_tab == 1 && _contactDetailOpen) return;
         if (_searchingContacts) {
           _toggleContactSearch();
         } else if (_tab != 0) {

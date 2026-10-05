@@ -16,10 +16,12 @@ import 'favorites.dart';
 import 'group_announcement_store.dart';
 import '../html_games/miniapp_publication_schema.dart';
 import '../html_games/html_app_store.dart';
+import '../html_games/miniapp_team_schema.dart';
 import 'interactive_action_history.dart';
 import 'message_callbacks.dart';
 import 'contact_relationships.dart';
 import '../html_games/html_game_schema.dart';
+import '../html_games/html_event_identity.dart';
 import 'ai_identity_schema.dart';
 import 'group_participation.dart';
 import 'group_creation_migration.dart';
@@ -36,7 +38,7 @@ import 'project_resource_migration.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 85,
+  version: 87,
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -454,6 +456,25 @@ Future<Database> openConversationDatabase() async => openDatabase(
     }
     if (oldVersion < 83) await migrateResourceScopes(db);
     if (oldVersion < 84) await migrateWerewolfProjectResources(db);
+    if (oldVersion < 86) {
+      for (final statement in miniappTeamSchema) {
+        await db.execute(statement);
+      }
+      final batch = db.batch();
+      for (final name in [
+        'readHtmlAppTeam',
+        'requestHtmlAppEdit',
+        'manageHtmlAppTeam',
+        'listHtmlAppEditRequests',
+      ]) {
+        batch.insert('tool_customizations', {
+          'name': name,
+          'icon': 'skill:miniapp',
+        });
+      }
+      await batch.commit(noResult: true);
+    }
+    if (oldVersion < 87) await migrateHtmlEventIdentities(db);
   },
   onCreate: (db, version) async {
     final batch = db.batch();
@@ -471,6 +492,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
       messageCallbackIndex,
       htmlAppSchema,
       htmlAppIndex,
+      ...miniappTeamSchema,
       miniappReleaseNotesSchema,
       miniappRecentIndex,
       ...miniappPublicationSchema,

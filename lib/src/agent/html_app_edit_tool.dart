@@ -17,7 +17,7 @@ class HtmlAppEditTool implements AgentTool, RuntimeCapabilityAgentTool {
     capabilityId: 'local.messages',
     safety: name == 'readHtmlApp' ? ToolSafety.readOnly : ToolSafety.lowRisk,
     description: name == 'readHtmlApp'
-        ? 'Read the source and current version of your persistent miniapp by appId from listHtmlApps. Works even when all chat launchers were deleted; no messageId or conversation search is needed. Read before updateHtmlApp. Only the creating AI can access this source.'
+        ? 'Read the source and current version of a miniapp you created or whose development team you joined. Resolve appId with listHtmlApps. Installed copies resolve to the original development source. Read before updateHtmlApp and use the returned appId. If not a member, use requestHtmlAppEdit and wait for approval; readHtmlAppTeam checks membership. No chat launcher is needed.'
         : htmlAppGuide +
               'Modify your persistent miniapp code by appId, without a chat launcher. Requires expectedVersion from readHtmlApp and exactly one of html or sourcePath. Stage changes in a new workspace HTML file, never overwrite the published source in place. Saved data, message state, presentation and library releases are preserved. Open launchers using this app code are notified. This sends no new message. For message state or callback completion use updateHtmlMessage instead. A stale version fails: reread and reconcile before retrying.',
     inputSchema: {

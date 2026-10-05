@@ -99,6 +99,7 @@ class InteractiveMessageStore {
           ? switch (action) {
               'submit' => card.engine.submit(actor.id, actor.name, {
                 ...button,
+                if (reason != null) 'reason': reason.trim(),
                 if (inputValue != null && button['selection'] == null)
                   'value': inputValue,
               }),
@@ -172,6 +173,7 @@ class InteractiveMessageStore {
         'buttons': newRound ? card.buttons : nextButtons,
         'buttonId': buttonId,
         'label': button['label'],
+        if (reason != null) 'reason': reason.trim(),
         if (button['selections'] != null) ...{
           'selections': button['selections'],
           'value': button['value'],
@@ -418,7 +420,7 @@ class InteractiveMessageStore {
         url: action == 'openUrl' ? button['url'] as String : null,
       );
     });
-    programChange?.publish();
+    await programChange?.publish();
     return result;
   }
 

@@ -12,6 +12,17 @@ import 'model_context_limits.dart';
 
 typedef ContextSummarizer = Future<String> Function(List<Map<String, Object?>>);
 typedef PublicMessageTest = bool Function(AgentMessage message);
+
+String? contextCompactionInstructions(ModelRequest request) {
+  final instructions = [
+    for (final result in request.toolResults)
+      if (result.toolName == 'compactContext' &&
+          result.status == ToolResultStatus.success)
+        if (result.output['instructions'] case final String text) text,
+  ];
+  return instructions.isEmpty ? null : instructions.join('\n\n');
+}
+
 typedef _DialogueEntry = ({
   AgentMessage message,
   List<Map<String, Object?>> input,
@@ -64,11 +75,19 @@ class ResponsesContext {
     bool force = false,
     ContextSummary? sharedSummary,
     bool useSharedSummary = false,
+    int? summaryThroughCreatedAt,
     Future<void> Function(ContextSummary)? saveSummary,
     ContextSummary? privateSummary,
     PublicMessageTest? isPublicMessage,
     Future<void> Function(ContextSummary)? savePrivateSummary,
   }) async {
+    force =
+        force ||
+        request.toolResults.any(
+          (result) =>
+              result.toolName == 'compactContext' &&
+              result.status == ToolResultStatus.success,
+        );
     if (!_initialized) {
       _layeredMemory = isPublicMessage != null;
       final saved = useSharedSummary ? sharedSummary : request.contextSummary;
@@ -86,9 +105,18 @@ class ResponsesContext {
       final messages = [
         for (final (index, message) in request.messages.indexed)
           if (index >
-              ((isPublicMessage?.call(message) ?? true)
-                  ? publicThrough
-                  : privateThrough))
+                  ((isPublicMessage?.call(message) ?? true)
+                      ? publicThrough
+                      : privateThrough) &&
+              !(summaryThroughCreatedAt != null &&
+                  ((isPublicMessage?.call(message) ?? true)
+                      ? publicThrough < 0
+                      : privateThrough < 0) &&
+                  (message.createdAt.microsecondsSinceEpoch <
+                          summaryThroughCreatedAt ||
+                      (message.createdAt.microsecondsSinceEpoch ==
+                              summaryThroughCreatedAt &&
+                          message.id.compareTo(saved!.throughMessageId) <= 0))))
             message,
       ];
       final items = await responseMessageInput(
@@ -242,10 +270,12 @@ class ResponsesContext {
         compacted = true;
       }
       size = await estimateTokens(input) + overhead;
-      if (size > target && _rounds.isNotEmpty) {
+      if (_rounds.isNotEmpty &&
+          (size > target || force && _rounds.length > 1)) {
         var count = 0;
         size += summaryReserve;
-        while (count < _rounds.length && size > target) {
+        while (count < _rounds.length &&
+            (size > target || force && count < _rounds.length - 1)) {
           size -= await estimateTokens(_rounds[count]);
           count++;
         }
@@ -293,6 +323,49 @@ class ResponsesContext {
 
   void recordOutput(List<Map<String, Object?>> output) =>
       _pendingOutput = output;
+
+  /// Uses the same bounded batches as automatic compaction.
+  Future<String> summarizeHistory(
+    Iterable<Map<String, Object?>> items,
+    String previous,
+    ContextSummarizer summarize,
+  ) => _summarize(items, previous, summarize);
+
+  Future<void> rebaseHistory({
+    required ContextSummary sharedSummary,
+    required ContextSummary privateSummary,
+    required int throughCreatedAt,
+    required ContextSummarizer summarize,
+  }) async {
+    final task = await _summarize(
+      [
+        if (_taskMemory.isNotEmpty)
+          {
+            'role': 'assistant',
+            'content': 'Earlier task memory:\n$_taskMemory',
+          },
+        ..._rounds.expand((round) => round),
+      ],
+      '',
+      summarize,
+    );
+    _taskMemory = task;
+    _rounds.clear();
+    // Keep the current tool calls paired with their results, but discard the
+    // remote reasoning state that still refers to the old history.
+    _pendingOutput = _pendingOutput
+        .where((item) => item['type'] != 'reasoning')
+        .toList();
+    _dialogue.removeWhere((entry) {
+      final at = entry.message.createdAt.microsecondsSinceEpoch;
+      return at < throughCreatedAt ||
+          (at == throughCreatedAt &&
+              entry.message.id.compareTo(sharedSummary.throughMessageId) <= 0);
+    });
+    _dialogueMemory = sharedSummary.text;
+    _privateDialogueMemory = privateSummary.text;
+    _layeredMemory = true;
+  }
 
   Future<String> _summarize(
     Iterable<Map<String, Object?>> items,

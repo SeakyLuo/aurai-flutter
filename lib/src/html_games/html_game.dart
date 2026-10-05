@@ -81,7 +81,7 @@ class HtmlGame {
   final int height;
   final bool canRetry;
   final String messageId;
-  final String appId;
+  final String? appId;
   final String conversationId;
   final String creatorId;
   final String title;
@@ -97,7 +97,7 @@ class HtmlGame {
     interactionProjection:
         row['interaction_projection'] as Map<String, Object?>?,
     messageId: row['message_id'] as String,
-    appId: row['app_id'] as String,
+    appId: row['app_id'] as String?,
     stateful: row['stateful'] == 1,
     sessionScoped: row['session_data_json'] != null,
     backgroundMode: row['background_mode'] as String,

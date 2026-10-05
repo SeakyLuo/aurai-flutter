@@ -8,7 +8,6 @@ import 'conversation_search_page.dart';
 import 'conversation_list_tile.dart';
 import '../../domain/error_message.dart';
 import 'ai_contacts_page.dart';
-import 'temporary_conversation_dialog.dart';
 import 'conversation_icon.dart';
 import 'header_action_menu.dart';
 import 'file_tool_icon.dart';
@@ -153,14 +152,8 @@ class RecentChatsPageState extends State<RecentChatsPage> {
   }
 
   bool _opening = false;
-  Future<void> _temporaryConversation() async {
-    final mode = await showDialog<ConversationMode>(
-      context: context,
-      builder: (_) => const TemporaryConversationDialog(),
-    );
-    if (!mounted || mode == null) return;
-    await _newConversation(mode: mode);
-  }
+  Future<void> _temporaryConversation() =>
+      _newConversation(mode: ConversationMode.temporaryPersonalized);
 
   Future<void> _newConversation({
     ConversationMode mode = ConversationMode.normal,
@@ -283,7 +276,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                           ),
                           (
                             value: 'temporary',
-                            label: '发起临时会话',
+                            label: '临时聊天',
                             icon: ConversationIcon(
                               temporary: true,
                               color: iconColor,

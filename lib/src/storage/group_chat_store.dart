@@ -521,6 +521,7 @@ class GroupChatStore {
 
   Future<Conversation> createGroup({
     String title = '',
+    bool notifyMembers = true,
     required List<String> aiIds,
     int temporaryCount = 0,
     List<AiProfile> newMembers = const [],
@@ -595,7 +596,9 @@ class GroupChatStore {
       conversation.messages.add(notice);
       conversation.messageCount++;
     });
-    await _notifySystem(conversation.id, conversation.messages.single);
+    if (notifyMembers) {
+      await _notifySystem(conversation.id, conversation.messages.single);
+    }
     return conversation;
   }
 

@@ -92,6 +92,7 @@ class MiniappCardCapability {
         submitter: senders[actorId]!,
         programAction: binding['action'] as String,
         value: submission['value'],
+        reason: submission['reason'] as String?,
       );
       return {bound.key: card};
     }

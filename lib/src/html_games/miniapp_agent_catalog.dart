@@ -1,13 +1,17 @@
 import 'miniapp_library_store.dart';
 import 'miniapp_message_catalog.dart';
 import 'miniapp_favorites.dart';
+import 'miniapp_team_store.dart';
 
 /// Uses the same library entries and message declaration as the composer.
 class MiniappAgentCatalog {
   MiniappAgentCatalog(this.library);
   final MiniappLibraryStore library;
 
-  Future<Map<String, Object?>> list(Map<String, Object?> args) async {
+  Future<Map<String, Object?>> list(
+    Map<String, Object?> args, {
+    required String actor,
+  }) async {
     final source = args['source'] as String? ?? 'all';
     final offset = args['offset'] as int? ?? 0;
     final query = (args['query'] as String).toLowerCase();
@@ -67,6 +71,13 @@ class MiniappAgentCatalog {
       for (final entry in entries) '${entry.kind.name}:${entry.id}': entry,
     };
     final capable = await library.messageCapable(unique.values.toList());
+    final developmentIds = {
+      for (final item in unique.entries)
+        if (!item.value.bundled) item.key: item.value.publicationId,
+    };
+    final access = await MiniappTeamStore(
+      library.database,
+    ).access(developmentIds.values.toSet().toList(), actor);
     return {
       'apps': [
         for (final item in unique.entries)
@@ -77,6 +88,10 @@ class MiniappAgentCatalog {
               'title': item.value.title,
               'description': item.value.description,
               'bundled': item.value.bundled,
+              if (access[developmentIds[item.key]] case final permissions?) ...{
+                'developmentAppId': developmentIds[item.key],
+                ...permissions,
+              },
               'sendModes': ['share', if (capable.contains(item.key)) 'message'],
             },
       ],

@@ -17,7 +17,8 @@ import 'dialog_action_button.dart';
 import 'glass_surface.dart';
 
 class GroupCreatePage extends StatefulWidget {
-  const GroupCreatePage({super.key, required this.controller});
+  const GroupCreatePage({super.key, required this.controller, this.projectId});
+  final String? projectId;
   final ChatController controller;
   @override
   State<GroupCreatePage> createState() => _GroupCreatePageState();
@@ -33,6 +34,7 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
       _directoryFailed = false;
   bool _loading = true, _saving = false, _changing = false;
   bool _leaving = false, _allowPop = false;
+  bool _notifyMembers = true;
   Set<String> _excluded = {};
   int get _newCount =>
       _members.where((ai) => !_excluded.contains(ai.sender.id)).length;
@@ -63,6 +65,7 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
       if (!mounted) return;
       setState(() {
         _name.text = saved.title;
+        _notifyMembers = saved.notifyMembers;
         _contacts = contacts;
         _members = saved.members;
         _excluded = saved.excluded.toSet();
@@ -86,6 +89,7 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
     _contacts.map((ai) => ai.sender.id).toList(),
     _members,
     excluded: _excluded.toList(),
+    notifyMembers: _notifyMembers,
   );
   Future<void> _changedName() async {
     try {
@@ -110,6 +114,7 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
         contacts.map((ai) => ai.sender.id).toList(),
         members,
         excluded: _excluded.toList(),
+        notifyMembers: _notifyMembers,
       );
       if (mounted)
         setState(() {
@@ -251,6 +256,7 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
         _contacts.map((p) => p.sender.id).toList(),
         _members,
         excluded: excluded.toList(),
+        notifyMembers: _notifyMembers,
       );
       if (mounted) setState(() => _excluded = excluded);
     } catch (caughtError) {
@@ -270,12 +276,16 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
       await _persist();
       final group = await widget.controller.groupStore.createGroup(
         title: _name.text.trim(),
+        notifyMembers: _notifyMembers,
         aiIds: _contacts.map((ai) => ai.sender.id).toList(),
         newMembers: [
           for (final ai in _members)
             if (!_excluded.contains(ai.sender.id)) ai,
         ],
       );
+      if (widget.projectId != null) {
+        await widget.controller.setConversationProject(group, widget.projectId);
+      }
       try {
         await _draft.clear();
       } catch (caughtError) {
@@ -396,7 +406,7 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
     child: Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        title: _count == 0 ? '新建群聊' : '新建群聊（$_count 人）',
+        title: '新建群聊（${_count + 1}）',
         onBack: _enabled ? _leave : null,
         actions: [
           SettingsGlassAction(
@@ -446,6 +456,32 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
                                       ),
                                     ),
                                   ),
+                                  const SizedBox(height: 12),
+                                  Material(
+                                    color: settingsFieldColor(context),
+                                    borderRadius: BorderRadius.circular(26),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: SwitchListTile(
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 18,
+                                          ),
+                                      minTileHeight: 60,
+                                      title: const Text(
+                                        '通知成员群已创建',
+                                        style: TextStyle(fontSize: 15),
+                                      ),
+                                      value: _notifyMembers,
+                                      onChanged: _enabled
+                                          ? (value) {
+                                              setState(
+                                                () => _notifyMembers = value,
+                                              );
+                                              _changedName();
+                                            }
+                                          : null,
+                                    ),
+                                  ),
                                   const SizedBox(height: 24),
                                   Padding(
                                     padding: const EdgeInsets.only(left: 4),
@@ -489,6 +525,21 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
                                       ],
                                     ),
                                   ),
+                                  GroupMemberChoice(
+                                    selected: true,
+                                    sender: MessageSender(
+                                      id: MessageSender.localUser.id,
+                                      name: MessageSender.localUser.name,
+                                      kind: MessageSenderKind.user,
+                                      avatarIcon:
+                                          widget.controller.memory.avatar.icon,
+                                      avatarColor:
+                                          widget.controller.memory.avatar.color,
+                                      avatarPath:
+                                          widget.controller.memory.avatar.path,
+                                    ),
+                                    onTap: null,
+                                  ),
                                   for (final ai in _members) _member(ai),
                                   for (final ai in [
                                     ..._contacts.where(
@@ -531,7 +582,7 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
                                   child: const Padding(
                                     padding: EdgeInsets.symmetric(vertical: 16),
                                     child: EmptyDataView(
-                                      title: '暂无成员，点击右上方＋添加',
+                                      title: '暂无 AI 成员，点击＋添加',
                                     ),
                                   ),
                                 ),

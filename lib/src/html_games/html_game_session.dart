@@ -290,7 +290,13 @@ class HtmlGameSession extends ChangeNotifier {
             expectedRevision: args['expectedRevision'] as int?,
             value: args['value'],
           );
-          if (write) HtmlGameSignals.appChanges.add(game.appId);
+          if (write) {
+            if (game.sessionScoped) {
+              HtmlGameSignals.changes.add(game.messageId);
+            } else {
+              HtmlGameSignals.appChanges.add(game.appId!);
+            }
+          }
           return jsonEncode(result);
         } on Object catch (failure) {
           return jsonEncode({'error': errorMessage(failure)});
@@ -388,7 +394,7 @@ class HtmlGameSession extends ChangeNotifier {
       final next = independent
           ? await MiniappLibraryStore(
               store.database,
-            ).loadIndependent(game.appId)
+            ).loadIndependent(game.appId!)
           : await store.load(game.conversationId, game.messageId);
       if (_closed || _closing || !_isNewer(next)) return;
       if (_editing && next.html != game.html) {

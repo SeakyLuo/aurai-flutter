@@ -87,10 +87,6 @@ extension SkillLibraryOperations on SkillStore {
     }
     if (value.visibility == 'selected' && value.visibleTo.isEmpty)
       throw StateError('请选择可见的人或 AI');
-    if (value.visibility == 'public' &&
-        value.scopes.isEmpty &&
-        !(old?.visibility == 'public' && old!.scopes.isEmpty))
-      throw StateError('请选择公开的群聊或项目');
     if (value.scopes.any(
       (s) => switch (s.type) {
         'group' => !_groups.any((g) => g['id'] == s.id),

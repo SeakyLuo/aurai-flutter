@@ -409,6 +409,10 @@ class AgentRuntime {
   }
 
   String _stepDetail(ToolResult result) {
+    if (result.toolName == 'compactContext' &&
+        result.status == ToolResultStatus.success) {
+      return '已请求压缩';
+    }
     if (result.toolName == 'openModelTopUp' &&
         result.status == ToolResultStatus.success) {
       return '已打开充值页，尚未付款';

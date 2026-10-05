@@ -14,7 +14,7 @@ import 'settings_icon.dart';
 import 'composer_more_action.dart';
 import 'task_elapsed.dart';
 
-/// Shares the queue's composer surface; listens to persisted goal changes.
+/// Listens to persisted goal changes for the composer and chat header.
 /// The independent task list uses the same subscription and initial read.
 class PrivateGoalPanel extends StatefulWidget {
   const PrivateGoalPanel({
@@ -22,7 +22,9 @@ class PrivateGoalPanel extends StatefulWidget {
     required this.store,
     required this.controller,
     required this.builder,
+    this.showTasks = true,
   });
+  final bool showTasks;
   final PrivateTaskState? store;
   final ChatController controller;
   final Widget Function(BuildContext, Widget?) builder;
@@ -91,7 +93,7 @@ class _PrivateGoalPanelState extends State<PrivateGoalPanel> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (steps.isNotEmpty)
+        if (widget.showTasks && steps.isNotEmpty)
           PrivateTaskList(
             key: ValueKey((
               widget.store!.conversationId,

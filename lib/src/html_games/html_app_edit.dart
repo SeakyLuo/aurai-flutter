@@ -1,6 +1,7 @@
 import '../agent/html_message_source.dart';
 import 'html_app_store.dart';
 import 'html_code_changes.dart';
+import 'miniapp_team_store.dart';
 
 extension HtmlAppEdit on HtmlAppStore {
   Future<Map<String, Object?>> edit(
@@ -8,19 +9,20 @@ extension HtmlAppEdit on HtmlAppStore {
     String actor,
     Map<String, Object?> args,
   ) => database.transaction((txn) async {
-    final id = args['appId'] as String;
-    final rows = await txn.query('html_apps', where: 'id = ?', whereArgs: [id]);
-    if (rows.isEmpty) throw StateError('小程序不存在');
-    final app = rows.single;
-    if (app['creator_id'] != actor) {
-      throw StateError('只能读取和修改自己创建的小程序源码');
+    final app = await MiniappTeamStore.app(txn, args['appId'] as String);
+    final id = app['id'] as String;
+    if (!await MiniappTeamStore.canEdit(txn, app, actor)) {
+      throw StateError('尚未加入开发团队，请先使用 requestHtmlAppEdit 申请修改，获批后再编辑');
     }
+    final reference = MiniappTeamStore.canManage(app, actor)
+        ? await HtmlAppStore.reference(app)
+        : <String, Object?>{'appId': id, 'sourcePath': app['source_path']};
     final version = app['version'] as int;
     final source =
         app['legacy_html'] as String? ?? await HtmlAppStore.code(app);
     if (operation == 'readHtmlApp') {
       return {
-        ...await HtmlAppStore.reference(app),
+        ...reference,
         'title': app['title'],
         'version': version,
         'html': source,
@@ -34,7 +36,7 @@ extension HtmlAppEdit on HtmlAppStore {
     if (html == null) throw ArgumentError('请提供 html 或 sourcePath');
     if (html == source) {
       return {
-        ...await HtmlAppStore.reference(app),
+        ...reference,
         'updated': false,
         'title': app['title'],
         'version': version,
@@ -61,7 +63,8 @@ extension HtmlAppEdit on HtmlAppStore {
       [now, id],
     );
     return {
-      ...await HtmlAppStore.reference({...app, 'source_path': path}),
+      ...reference,
+      'sourcePath': path,
       'updated': true,
       'title': app['title'],
       'version': version + 1,

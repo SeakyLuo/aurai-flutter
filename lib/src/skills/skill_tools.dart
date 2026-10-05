@@ -138,14 +138,14 @@ class SkillTool
             'type': 'string',
             'enum': ['private', 'public', 'selected'],
             'description':
-                'public means shared inside the configured groups or projects; specify groupIds or projectIds.',
+                'public with empty groupIds and projectIds is visible to everyone. Nonempty groupIds and/or projectIds restrict it to the union of those groups and projects.',
           },
           'groupIds': {
             'type': 'array',
             'items': {'type': 'string'},
             'uniqueItems': true,
             'description':
-                'Group scope; may include multiple groups you belong to. Include the current group. [] means unrestricted for private/selected skills.',
+                'Group scope; may include multiple groups you belong to and can be combined with projectIds. Both arrays empty means unrestricted; otherwise the union must include the current conversation.',
           },
           'projectIds': {
             'type': 'array',

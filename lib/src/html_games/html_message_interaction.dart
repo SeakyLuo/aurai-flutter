@@ -1,5 +1,6 @@
 import '../storage/html_callback_state.dart';
 import 'html_app_store.dart';
+import 'miniapp_team_store.dart';
 import 'html_code_changes.dart';
 import 'miniapp_program.dart';
 import 'miniapp_program_store.dart';
@@ -145,9 +146,10 @@ extension HtmlMessageInteraction on HtmlStore {
     final authored = row['creator_id'] == senderId;
     if (operation != 'readHtmlMessage' && !authored)
       throw StateError('只能更新自己创建的 HTML 消息');
-    final app = await HtmlAppStore.load(txn, row['app_id'] as String);
+    final appId = row['app_id'] as String?;
+    final app = appId == null ? null : await HtmlAppStore.load(txn, appId);
     final sessionScoped = row['session_data_json'] != null;
-    final savedState = sessionScoped ? row['state_json'] : app['state_json'];
+    final savedState = sessionScoped ? row['state_json'] : app!['state_json'];
     final state = jsonDecode(savedState as String);
     final program = await txn.query(
       'app_state',
@@ -185,11 +187,13 @@ extension HtmlMessageInteraction on HtmlStore {
         if (authored || args['includePrivate'] == true) ...{
           'html': (row['html'] as String).isNotEmpty
               ? row['html']
-              : await HtmlAppStore.code(app),
-          if (!sessionScoped)
-            ...await HtmlAppStore.reference(app)
-          else
-            'appId': app['id'],
+              : await HtmlAppStore.code(app!),
+          if (app != null) ...{
+            if (!sessionScoped)
+              ...await HtmlAppStore.reference(app)
+            else
+              'appId': app['id'],
+          },
         },
         'backgroundMode': row['background_mode'],
         'displayMode': row['display_mode'],
@@ -221,8 +225,10 @@ extension HtmlMessageInteraction on HtmlStore {
     if (args['expectedVersion'] != row['version'])
       throw StateError('消息已更新，请重新读取版本');
     final html = args['html'] as String?;
-    if (html != null && sessionScoped && app['creator_id'] != senderId) {
-      throw StateError('只能修改自己创建的小程序代码');
+    if (html != null &&
+        app != null &&
+        !await MiniappTeamStore.canEdit(txn, app, senderId)) {
+      throw StateError('修改小程序源码需要加入开发团队，请先使用 requestHtmlAppEdit 申请修改');
     }
     final background = args['backgroundMode'] as String?;
     final title = (args['title'] as String?)?.trim();
@@ -271,15 +277,19 @@ extension HtmlMessageInteraction on HtmlStore {
     final codeChanges = html == null
         ? const <String, Object?>{}
         : htmlCodeChanges(
-            app['id'] as String,
-            title ?? app['title'] as String,
-            await HtmlAppStore.code(app),
+            appId ?? id,
+            title ?? row['title'] as String,
+            (row['html'] as String).isNotEmpty
+                ? row['html'] as String
+                : await HtmlAppStore.code(app!),
             html,
           );
-    final sourcePath = html == null
+    final sourcePath = app == null
+        ? null
+        : html == null
         ? app['source_path'] as String
-        : await HtmlAppStore.publish(app['id'] as String, html);
-    if (!sessionScoped || html != null)
+        : await HtmlAppStore.publish(appId!, html);
+    if (app != null && (!sessionScoped || html != null))
       await txn.update(
         'html_apps',
         {
@@ -298,11 +308,12 @@ extension HtmlMessageInteraction on HtmlStore {
         'version': version,
         'preview': null,
         if (sessionScoped) 'state_json': nextState,
+        if (app == null && html != null) 'html': html,
       },
       where: sessionScoped
           ? 'message_id = ?'
           : 'app_id = ? AND session_data_json IS NULL',
-      whereArgs: [sessionScoped ? id : app['id']],
+      whereArgs: [sessionScoped ? id : app!['id']],
     );
     if (presentation.isNotEmpty || background != null) {
       await txn.update(
@@ -356,10 +367,12 @@ extension HtmlMessageInteraction on HtmlStore {
       'version': version,
       ...codeChanges,
       if (callbackId != null) 'callbackCompleted': true,
-      if (!sessionScoped)
-        ...await HtmlAppStore.reference({...app, 'source_path': sourcePath})
-      else
-        'appId': app['id'],
+      if (app != null) ...{
+        if (!sessionScoped)
+          ...await HtmlAppStore.reference({...app, 'source_path': sourcePath})
+        else
+          'appId': app['id'],
+      },
     };
   });
 }

@@ -19,6 +19,9 @@ import '../../domain/context_summary.dart';
 import '../../domain/live_project_changes.dart';
 import '../../providers/request_adapter_runner.dart';
 import '../../providers/responses_transport.dart';
+import '../../providers/responses_context.dart';
+import '../../providers/model_context_limits.dart';
+import '../../providers/shared_responses_context.dart';
 import '../../providers/response_message_input.dart';
 import '../../providers/model_image_input.dart';
 import '../../agent/request_adapter_tool.dart';
@@ -56,6 +59,8 @@ import '../../html_games/miniapp_template.dart';
 import '../../html_games/html_app_store.dart';
 import '../../html_games/html_app_edit.dart';
 import '../../agent/html_app_edit_tool.dart';
+import '../../agent/html_app_team_tool.dart';
+import '../../html_games/miniapp_team_store.dart';
 import '../../storage/interactive_callback_result.dart';
 import '../../storage/interactive_callback_state.dart';
 import '../../storage/conversation_navigation_state.dart';
@@ -79,6 +84,7 @@ import '../../agent/html_message_tool.dart';
 import '../../html_games/html_store.dart';
 import '../../html_games/html_game_session.dart';
 import '../../html_games/miniapp_program_store.dart';
+import '../../html_games/miniapp_program.dart';
 import '../../html_games/miniapp_group_message_router.dart';
 import '../../domain/interactive_message.dart';
 import '../../domain/interactive_tool_view.dart';
@@ -205,6 +211,7 @@ part 'interactive_message_actions.dart';
 part 'interactive_ai_decision.dart';
 part 'message_callback_actions.dart';
 part 'html_actions.dart';
+part 'miniapp_context_compaction.dart';
 part 'miniapp_template_sending.dart';
 part 'model_config_actions.dart';
 part 'request_adapter_actions.dart';
@@ -216,6 +223,7 @@ part 'draft_attachment_actions.dart';
 part 'asset_library_actions.dart';
 part 'conversation_search_navigation.dart';
 part 'conversation_run.dart';
+part 'run_summary_attachment.dart';
 part 'run_tool_logging.dart';
 part 'conversation_run_failure.dart';
 part 'conversation_run_continuation.dart';
@@ -361,6 +369,7 @@ class ChatController extends ChangeNotifier {
   final contactsChanged = ValueNotifier<AiProfile?>(null);
   final programErrors = ValueNotifier<String?>(null);
   final _peerSessions = <String, Future<_PeerSession>>{};
+  final _miniappCompactions = <String, Future<bool>>{};
   Iterable<Conversation> get groupRuns =>
       activeConversation.id == runningConversationId
       ? _groupRuns.values
@@ -399,6 +408,7 @@ class ChatController extends ChangeNotifier {
     _callbacksDisposed = true;
     _callbackChanges?.cancel();
     _programChanges?.cancel();
+    MiniappProgramChange.compactContext = null;
     _programTimer?.cancel();
     _callbackCardChanges?.cancel();
     removeListener(_drainMessageCallbacks);
@@ -519,6 +529,7 @@ class ChatController extends ChangeNotifier {
     _programChanges = MiniappProgramStore.changes.stream.listen(
       _receiveProgramChange,
     );
+    MiniappProgramChange.compactContext = _compactMiniappContext;
     _scheduleProgramTick();
     _callbackChanges = MessageCallbacks.changes.stream.listen((_) {
       _callbacksPending = true;

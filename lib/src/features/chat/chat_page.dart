@@ -408,7 +408,6 @@ class _ChatPageState extends State<ChatPage>
                       controller: controller,
                       child: PendingMessagePanel(
                         controller: controller,
-                        memberStatus: isGroup ? _groupStatus(active) : null,
                         onSend: _sendQueuedMessages,
                         onEdit: _editing == null && !controller.addingImages
                             ? _editQueuedMessage
@@ -420,15 +419,14 @@ class _ChatPageState extends State<ChatPage>
                 ),
                 body: GroupAnnouncementBanner(
                   controller: controller,
-                  groupId: isGroup ? _conversationId : null,
+                  groupId: _conversationId,
                   onLocate: (id) => _pinSplitKey.currentState!.open(id),
                   builder: (context, announcementHeight) {
-                    final top = isGroup
-                        ? View.of(context).padding.top /
-                                  View.of(context).devicePixelRatio +
-                              ChatHeader.toolbarHeight +
-                              announcementHeight
-                        : MediaQuery.paddingOf(context).top;
+                    final top =
+                        View.of(context).padding.top /
+                            View.of(context).devicePixelRatio +
+                        ChatHeader.toolbarHeight +
+                        announcementHeight;
                     final bottom = MediaQuery.paddingOf(context).bottom;
                     return Stack(
                       children: [
@@ -518,7 +516,8 @@ class _ChatPageState extends State<ChatPage>
                                             },
                                             padding: EdgeInsets.only(
                                               top: top + 12,
-                                              bottom: bottom + 16,
+                                              bottom:
+                                                  bottom + (isGroup ? 56 : 16),
                                             ),
                                             hasEarlierMessages:
                                                 controller.visibleHasEarlier,
@@ -570,20 +569,30 @@ class _ChatPageState extends State<ChatPage>
                                     ),
                                   ),
                                 Positioned(
+                                  left: 12,
                                   right: 16,
                                   bottom: bottom + 8,
-                                  child: Center(
-                                    child: JumpToBottomButton(
-                                      visible:
-                                          !_followOutput &&
-                                          (_contentBelow ||
-                                              (controller.hasSearchWindow &&
-                                                  controller
-                                                      .activeConversation
-                                                      .searchHasLater)) &&
-                                          timeline.isNotEmpty,
-                                      onPressed: _scrollToBottom,
-                                    ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      if (isGroup)
+                                        Expanded(child: _groupStatus(active))
+                                      else
+                                        const Spacer(),
+                                      const SizedBox(width: 8),
+                                      JumpToBottomButton(
+                                        visible:
+                                            !_followOutput &&
+                                            (_contentBelow ||
+                                                (controller.hasSearchWindow &&
+                                                    controller
+                                                        .activeConversation
+                                                        .searchHasLater)) &&
+                                            timeline.isNotEmpty,
+                                        onPressed: _scrollToBottom,
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],

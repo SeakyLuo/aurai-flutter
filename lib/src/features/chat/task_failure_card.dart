@@ -19,6 +19,7 @@ class TaskFailureCard extends StatelessWidget {
     required this.error,
     this.actionLabel = '重试',
     this.continuing = false,
+    this.busy = false,
     this.paused,
     this.enabled = true,
     this.padding = const EdgeInsets.fromLTRB(18, 12, 18, 20),
@@ -28,6 +29,7 @@ class TaskFailureCard extends StatelessWidget {
   final String error;
   final String actionLabel;
   final bool continuing;
+  final bool busy;
   final VoidCallback? onRetry;
   final EdgeInsetsGeometry padding;
 
@@ -137,9 +139,17 @@ class TaskFailureCard extends StatelessWidget {
               onPressed: () => _copyError(context),
             ),
             RoundAction(
-              label: actionLabel,
+              label: busy ? '正在继续' : actionLabel,
               icon: Icons.refresh_rounded,
-              iconWidget: continuing
+              iconWidget: busy
+                  ? SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.65,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    )
+                  : continuing
                   ? QuestionIcon(
                       type: QuestionIconType.play,
                       color: enabled
@@ -152,7 +162,7 @@ class TaskFailureCard extends StatelessWidget {
                           ? colors.onSurfaceVariant
                           : colors.onSurfaceVariant.withValues(alpha: .3),
                     ),
-              onPressed: enabled ? onRetry : null,
+              onPressed: enabled && !busy ? onRetry : null,
             ),
           ],
         ),

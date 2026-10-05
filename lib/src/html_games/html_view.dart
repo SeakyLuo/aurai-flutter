@@ -1,4 +1,5 @@
 import 'miniapp_recent_store.dart';
+import '../features/chat/pinned_message_split.dart';
 import '../features/chat/settings_appearance.dart';
 import 'miniapp_favorite_action.dart';
 import '../app/glass_notice.dart';
@@ -49,6 +50,23 @@ class HtmlView extends StatefulWidget {
         .firstOrNull;
     await view?._session?.capture();
     return store.card(messageId);
+  }
+
+  Future<void> openSplit(BuildContext context) async {
+    await context
+        .findAncestorStateOfType<PinnedMessageSplitState>()!
+        .openDetails(
+          (_) => HtmlView(
+            card: card,
+            messageId: messageId,
+            conversationId: conversationId,
+            store: store,
+            surfaceId: surfaceId,
+            fullscreen: true,
+            backLabel: backLabel,
+            onOpenProfile: onOpenProfile,
+          ),
+        );
   }
 
   Future<void> openFullscreen(BuildContext context) =>
@@ -169,6 +187,14 @@ class _HtmlViewState extends State<HtmlView>
         !htmlRouteObserver.isVisible(ModalRoute.of(context)!))
       return false;
     if (widget.fullscreen) return true;
+    if (_views.any(
+      (view) =>
+          view.widget.fullscreen &&
+          view.widget.messageId == widget.messageId &&
+          view.widget.surfaceId == widget.surfaceId &&
+          !view._leaving,
+    ))
+      return false;
     final box = _anchor.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.attached || !box.hasSize) return false;
     // Keyboard occlusion must not destroy a live form and dismiss its input.
@@ -315,8 +341,8 @@ class _HtmlViewState extends State<HtmlView>
         widget.messageId,
       );
       if (!_visible || revision != _openRevision) return;
-      if (widget.fullscreen) {
-        await recordMiniappOpen(widget.store.database, game.appId);
+      if (widget.fullscreen && game.appId != null) {
+        await recordMiniappOpen(widget.store.database, game.appId!);
         if (!_visible || revision != _openRevision) return;
       }
       final session = HtmlGameSession(

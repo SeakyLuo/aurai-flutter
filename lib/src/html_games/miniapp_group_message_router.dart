@@ -75,7 +75,7 @@ class MiniappGroupMessageRouter {
         'instruction': '消息已由小程序发布，可见范围以返回结果为准，不要重复发送。',
       };
     });
-    change?.publish();
+    await change?.publish();
     return result;
   }
 }

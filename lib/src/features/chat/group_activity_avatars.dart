@@ -154,7 +154,7 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
         );
 
   Widget _buildCluster(BuildContext context, BoxConstraints constraints) {
-    // Leave the centered jump-to-bottom button in its original position.
+    // Compact rows receive the space remaining beside the jump-to-bottom button.
     final budget = math.min(
       144.0,
       widget.compact ? constraints.maxWidth : (constraints.maxWidth - 56) / 2,

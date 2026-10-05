@@ -421,7 +421,7 @@ class _ToolActivityViewState extends State<ToolActivityView> {
             Positioned(
               left: -13,
               right: -13,
-              top: 0,
+              top: -8,
               bottom: 0,
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -442,12 +442,9 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                 ),
               ),
             ),
-          Padding(
-            padding: EdgeInsets.only(top: showCard ? 8 : 0),
-            child: KeyedSubtree(
-              key: const ValueKey('tool-content'),
-              child: content,
-            ),
+          KeyedSubtree(
+            key: const ValueKey('tool-content'),
+            child: content,
           ),
         ],
       ),

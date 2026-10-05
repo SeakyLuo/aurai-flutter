@@ -13,6 +13,7 @@ Future<Set<int>?> showQuestionOptionsSheet(
   required Set<int> selected,
   required Future<void> closeWhen,
   bool multiple = false,
+  bool readOnly = false,
   int minimum = 1,
   int maximum = 1,
 }) async {
@@ -30,6 +31,7 @@ Future<Set<int>?> showQuestionOptionsSheet(
       options: options,
       selected: selected,
       multiple: multiple,
+      readOnly: readOnly,
       minimum: minimum,
       maximum: maximum,
     ),
@@ -55,14 +57,33 @@ class QuestionOptionsField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: settingsFieldColor(context),
-    borderRadius: BorderRadius.circular(24),
+    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .045),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(18),
+      side: BorderSide(
+        color: Theme.of(
+          context,
+        ).colorScheme.outlineVariant.withValues(alpha: .5),
+      ),
+    ),
     clipBehavior: Clip.antiAlias,
-    child: ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      title: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
-      trailing: const SettingsIcon(type: SettingsIconType.chevronDown),
+    child: InkWell(
       onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(fontSize: 15, height: 1.4),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const SettingsIcon(type: SettingsIconType.chevronDown),
+          ],
+        ),
+      ),
     ),
   );
 }
@@ -72,12 +93,14 @@ class _QuestionOptionsSheet extends StatefulWidget {
     required this.options,
     required this.selected,
     required this.multiple,
+    required this.readOnly,
     required this.minimum,
     required this.maximum,
   });
   final List<UserQuestionOption> options;
   final Set<int> selected;
   final bool multiple;
+  final bool readOnly;
   final int minimum, maximum;
 
   @override
@@ -113,7 +136,9 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                   ),
                   Expanded(
                     child: Text(
-                      widget.multiple
+                      widget.readOnly
+                          ? '查看选项'
+                          : widget.multiple
                           ? '选择选项（已选 ${_selected.length} 项）'
                           : '选择选项',
                       textAlign: TextAlign.center,
@@ -123,7 +148,7 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                       ),
                     ),
                   ),
-                  if (widget.multiple)
+                  if (widget.multiple && !widget.readOnly)
                     SettingsGlassAction(
                       label: '确认',
                       icon: Icons.check_rounded,
@@ -141,7 +166,7 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                 ],
               ),
             ),
-            if (widget.multiple)
+            if (widget.multiple && !widget.readOnly)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
@@ -168,9 +193,10 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                     selected: selected,
                     multiple: widget.multiple,
                     onTap:
-                        widget.multiple &&
-                            !selected &&
-                            _selected.length >= widget.maximum
+                        widget.readOnly ||
+                            widget.multiple &&
+                                !selected &&
+                                _selected.length >= widget.maximum
                         ? null
                         : () {
                             if (!widget.multiple) {

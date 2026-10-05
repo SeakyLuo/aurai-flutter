@@ -98,7 +98,7 @@ class HtmlMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
           'type': 'string',
           'enum': ['inline', 'hybrid', 'standalone'],
           'description':
-              'inline: chat only; hybrid: chat and fullscreen; standalone: tap a static title/preview card to run fullscreen.',
+              'inline: chat only; new HTML stays in the message and does not create a reusable app. hybrid: chat and fullscreen; standalone: tap a static title/preview card to run fullscreen. Existing appId references always retain their reusable app.',
         },
       },
       'required': ['title', 'width', 'displayMode'],

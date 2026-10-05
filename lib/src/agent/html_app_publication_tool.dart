@@ -6,6 +6,7 @@ import '../domain/tool_models.dart';
 import '../html_games/miniapp_icon_store.dart';
 import '../html_games/miniapp_library_store.dart';
 import '../html_games/miniapp_metadata_store.dart';
+import '../html_games/miniapp_team_store.dart';
 
 class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
   HtmlAppPublicationTool(this.name, this.store, this.actor);
@@ -30,9 +31,9 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
         : ToolSafety.lowRisk,
     description: switch (name) {
       'listHtmlAppPublications' =>
-        'Find up to 50 miniapps created by you or owned by the local user, by title. Returns current publication revisions. Use this to resolve appId for publication tools; never ask the user for IDs.',
+        'Find up to 50 miniapps created by you or whose development team you joined, by title. Returns current publication revisions. Use this to resolve appId for publication tools; never ask the user for IDs.',
       'readHtmlAppPublication' =>
-        'Read publication state and revision of a miniapp you created or the local user owns. Resolve appId with listHtmlAppPublications, never ask the user for IDs. Installed copies and bundled apps cannot be published with these tools.',
+        'Read publication state and revision of a miniapp you created or whose development team you joined. Resolve appId with listHtmlAppPublications, never ask the user for IDs. Installed copies and bundled apps cannot be published with these tools.',
       'publishHtmlApp' =>
         'Publish the first version of a miniapp to the local application library on behalf of the user. Use only when the user requests publication, never automatically after creating a message. Credits the original creator (AI or local user). Snapshots current code without chat history or saved data. This does not publish to the internet. Read publication state first; expectedRevision must be 0.',
       'updateHtmlAppPublication' =>
@@ -102,8 +103,8 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
             '(COALESCE((SELECT title FROM miniapp_metadata WHERE app_id = html_apps.id), title)) AS title',
           ],
           where:
-              "creator_id IN (?, 'user:local') AND instr(lower(COALESCE((SELECT title FROM miniapp_metadata WHERE app_id = html_apps.id), title)), lower(?)) > 0 AND id NOT LIKE 'builtin.%' AND id NOT IN (SELECT app_id FROM miniapp_installations)",
-          whereArgs: [actor, call.arguments['query'] as String],
+              "(creator_id = ? OR id IN (SELECT app_id FROM miniapp_developers WHERE sender_id = ?)) AND instr(lower(COALESCE((SELECT title FROM miniapp_metadata WHERE app_id = html_apps.id), title)), lower(?)) > 0 AND id NOT LIKE 'builtin.%' AND id NOT IN (SELECT app_id FROM miniapp_installations)",
+          whereArgs: [actor, actor, call.arguments['query'] as String],
           orderBy: 'updated_at DESC, id',
           limit: 50,
         );
@@ -145,14 +146,17 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
       final id = call.arguments['appId'] as String;
       final rows = await store.database.query(
         'html_apps',
-        columns: ['creator_id'],
+        columns: ['id', 'creator_id'],
         where: 'id = ?',
         whereArgs: [id],
       );
       if (rows.isEmpty) throw StateError('小程序不存在');
-      if (rows.single['creator_id'] != actor &&
-          rows.single['creator_id'] != 'user:local') {
-        throw StateError('只能管理自己创建或用户拥有的小程序');
+      if (!await MiniappTeamStore.canEdit(store.database, rows.single, actor)) {
+        throw StateError('尚未加入开发团队，请先使用 requestHtmlAppEdit 申请修改');
+      }
+      if (name == 'withdrawHtmlApp' &&
+          !MiniappTeamStore.canManage(rows.single, actor)) {
+        throw StateError('只有创建人可以撤下小程序');
       }
       if (id.startsWith('builtin.'))
         throw StateError('内置小程序随 App 更新，不通过发布工具修改');
@@ -173,7 +177,7 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
           }
           await MiniappMetadataStore(
             store.database,
-          ).saveIcon(entry, importedPath);
+          ).saveIcon(entry, importedPath, actor: actor);
         } on Object {
           if (importedPath != null) await File(importedPath).delete();
           rethrow;
@@ -200,6 +204,7 @@ class HtmlAppPublicationTool implements AgentTool, RuntimeCapabilityAgentTool {
             call.arguments['title'] as String,
             call.arguments['description'] as String,
             changeLog: call.arguments['changeLog'] as String,
+            actor: actor,
           );
         }
         entry = await store.refresh(entry);

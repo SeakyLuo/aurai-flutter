@@ -3,6 +3,7 @@ import '../../storage/private_task_state.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../../app/global_ui.dart';
 import 'glass_surface.dart';
 import 'private_task_list_nodes.dart';
 import 'settings_icon.dart';
@@ -46,7 +47,7 @@ class _TaskProgressListState extends State<TaskProgressList> {
               step['status'] == 'completed' || step['status'] == 'skipped',
         )
         .length;
-    if (completed == steps.length) return const SizedBox.shrink();
+    if (steps.isEmpty) return const SizedBox.shrink();
     var currentIndex = steps.indexWhere(
       (step) => step['status'] == 'in_progress',
     );
@@ -56,67 +57,109 @@ class _TaskProgressListState extends State<TaskProgressList> {
     final position = currentIndex == -1 ? steps.length : currentIndex + 1;
     final summary = current == null ? '任务已完成' : current['step'] as String;
     final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: GlassSurface(
-            radius: 18,
-            child: IntrinsicWidth(
+    final accent = GlobalUI.highlightTextColor(context);
+    final count = '$completed/' + steps.length.toString();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: GlassSurface(
+        radius: 22,
+        shadowOpacity: .65,
+        child: Material(
+          color: Colors.transparent,
+          child: Semantics(
+            button: true,
+            label: widget.title + '，已完成 $count 步，第 $position 步，$summary',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(22),
+              onTap: _showSteps,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                child: Row(
                   children: [
-                    Semantics(
-                      button: true,
-                      label:
-                          '任务清单，第 $position/${steps.length} 步，已完成 $completed 步，$summary',
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: _showSteps,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Row(
-                            children: [
-                              Text(
-                                '${widget.label} · $position/${steps.length}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: colors.onSurfaceVariant,
-                                ),
+                    SizedBox.square(
+                      dimension: 34,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          TweenAnimationBuilder<double>(
+                            tween: Tween(end: completed / steps.length),
+                            duration: MediaQuery.disableAnimationsOf(context)
+                                ? Duration.zero
+                                : const Duration(milliseconds: 250),
+                            builder: (context, value, _) => SizedBox.expand(
+                              child: CircularProgressIndicator(
+                                value: value,
+                                strokeWidth: 1.65,
+                                strokeCap: StrokeCap.round,
+                                color: accent,
+                                backgroundColor: colors.outlineVariant
+                                    .withValues(alpha: .5),
                               ),
-                              const SizedBox(width: 10),
-                              Flexible(
+                            ),
+                          ),
+                          SizedBox.square(
+                            dimension: 20,
+                            child: FittedBox(
+                              child: SettingsIcon(
+                                type: SettingsIconType.tasks,
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
                                 child: Text(
-                                  summary,
+                                  widget.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    fontSize: 13,
-                                    color: colors.onSurface,
+                                    fontSize: 12,
+                                    height: 1.3,
+                                    fontWeight: FontWeight.w500,
+                                    color: accent,
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              RotatedBox(
-                                quarterTurns: 3,
-                                child: const SizedBox.square(
-                                  dimension: 16,
-                                  child: FittedBox(
-                                    child: SettingsIcon(
-                                      type: SettingsIconType.chevron,
-                                    ),
-                                  ),
+                              Text(
+                                count,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.3,
+                                  color: colors.onSurfaceVariant,
                                 ),
                               ),
                             ],
                           ),
-                        ),
+                          const SizedBox(height: 3),
+                          Text(
+                            summary,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 15,
+                              height: 1.4,
+                              color: colors.onSurface,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    const SizedBox(width: 10),
+                    const SettingsIcon(type: SettingsIconType.chevron),
                   ],
                 ),
               ),

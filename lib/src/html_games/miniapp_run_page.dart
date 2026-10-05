@@ -40,7 +40,7 @@ class _MiniappRunPageState extends State<MiniappRunPage>
 
   Future<void> _recordOpen() async {
     try {
-      await recordMiniappOpen(widget.store.database, widget.game.appId);
+      await recordMiniappOpen(widget.store.database, widget.game.appId!);
     } on Object catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showToast(

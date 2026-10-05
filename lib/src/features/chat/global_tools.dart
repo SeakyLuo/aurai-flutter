@@ -98,13 +98,15 @@ extension GlobalTools on ChatController {
               }
               return result;
             }),
+          for (final name in HtmlAppTeamTool.names)
+            HtmlAppTeamTool(name, MiniappTeamStore(_store.database), senderId),
           for (final name in HtmlAppDataTool.names)
             HtmlAppDataTool(name, (operation, args) async {
               final apps = HtmlAppStore(_store.database);
               if (operation == 'listHtmlApps') {
                 return MiniappAgentCatalog(
                   MiniappLibraryStore(_store.database),
-                ).list(args);
+                ).list(args, actor: senderId);
               }
               final appId = args['appId'] as String;
               final result = await apps.data(
@@ -142,16 +144,40 @@ extension GlobalTools on ChatController {
                 );
                 if (!game.state.containsKey('_miniapp'))
                   throw StateError('这条消息不是程序小程序');
+                final compaction = await MiniappProgramStore(_store.database)
+                    .pendingCompaction(
+                      target.id,
+                      args['messageId'] as String,
+                      senderId,
+                    );
                 return {
                   'messageId': args['messageId'],
                   'version': game.version,
                   'state': game.state,
+                  if (compaction != null) 'contextCompaction': compaction,
                 };
               }
               if (operation == 'submitHtmlProgramEvent') {
-                return MiniappProgramStore(
-                  _store.database,
-                ).event(target.id, args['messageId'] as String, senderId, args);
+                final programs = MiniappProgramStore(_store.database);
+                if (args['expectedVersion'] == null) {
+                  final pending = await programs.pendingCompaction(
+                    target.id,
+                    args['messageId'] as String,
+                    senderId,
+                  );
+                  final retry = pending?['retry'] as Map?;
+                  if (retry == null ||
+                      retry['expectedVersion'] != null ||
+                      retry['eventId'] != args['eventId']) {
+                    throw ArgumentError('新操作必须先读取版本；空版本只用于恢复原上下文压缩请求');
+                  }
+                }
+                return programs.event(
+                  target.id,
+                  args['messageId'] as String,
+                  senderId,
+                  args,
+                );
               }
               final result = await htmlStore.updateMessage(
                 operation,
@@ -282,12 +308,14 @@ extension GlobalTools on ChatController {
             _publishInteractiveChange(target.id, message, source: target);
             HtmlGameSignals.changes.add(message.id);
             final app = await htmlStore.load(target.id, message.id);
-            final ref = await HtmlAppStore.load(_store.database, app.appId);
+            final ref = app.appId == null
+                ? null
+                : await HtmlAppStore.load(_store.database, app.appId!);
             return {
               'sent': true,
               'messageId': message.id,
               'conversationId': target.id,
-              ...await HtmlAppStore.reference(ref),
+              if (ref != null) ...await HtmlAppStore.reference(ref),
             };
           }),
           for (final name in InteractiveMessageTool.names)

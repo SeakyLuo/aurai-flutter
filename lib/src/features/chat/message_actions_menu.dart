@@ -1,4 +1,5 @@
 import 'message_menu_sheet.dart';
+import 'pinned_message_split.dart';
 import 'message_primary_actions.dart';
 import '../../storage/quick_reply_recents.dart';
 import 'message_action.dart';
@@ -32,6 +33,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   bool allowReadAloud = false,
   bool allowStar = false,
   bool allowGroupMarks = false,
+  bool allowPin = false,
   bool pinned = false,
   bool groupFavorite = false,
   bool allowCopy = true,
@@ -55,6 +57,8 @@ Future<MessageMenuResult?> showMessageActionsMenu(
       : const <String>[];
   if (!context.mounted) return null;
   final options = quickReplyOptionsByKey;
+  final split = context.findAncestorStateOfType<PinnedMessageSplitState>();
+  final allowSplit = split != null && split.supportsSplit;
   final visibleKeys = recentQuickReplyKeys(recent, 5);
   return showMessageMenuSheet(
     context,
@@ -101,6 +105,12 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             HtmlGameIcon(HtmlGameIconType.expand, color: iconColor),
             '全屏运行',
           ),
+        if (message.htmlGame != null && allowSplit)
+          (
+            const MessageActionResult(MessageAction.splitRun),
+            HtmlGameIcon(HtmlGameIconType.split, color: iconColor),
+            '分屏运行',
+          ),
         if (allowQuote)
           (
             const MessageActionResult(MessageAction.quote),
@@ -142,7 +152,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             ),
             starred ? '取消收藏' : '收藏',
           ),
-        if (allowGroupMarks) ...[
+        if (allowPin || allowGroupMarks)
           (
             const MessageActionResult(MessageAction.pin),
             ConversationMenuIcon(
@@ -153,6 +163,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             ),
             pinned ? '取消置顶' : '置顶消息',
           ),
+        if (allowGroupMarks) ...[
           (
             const MessageActionResult(MessageAction.groupFavorite),
             ConversationMenuIcon(

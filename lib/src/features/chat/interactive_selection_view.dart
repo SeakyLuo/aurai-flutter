@@ -53,7 +53,8 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
       _selected = _saved;
       _closePicker();
     }
-    if (_locked) _closePicker();
+    if (!oldWidget.locked && widget.locked || !oldWidget.busy && widget.busy)
+      _closePicker();
   }
 
   bool get _locked =>
@@ -89,6 +90,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
           if (_selected.contains(option['id'])) i,
       },
       multiple: config.multiple,
+      readOnly: _locked,
       minimum: config.minimum,
       maximum: config.maximum,
       closeWhen: closed.future,
@@ -124,16 +126,37 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
               style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
             ),
           ),
-        if (config.options.length > 5)
+        if (widget.question &&
+            config.options.length > 5 &&
+            widget.submitted &&
+            widget.self != null) ...[
+          Text(
+            '已回答',
+            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            widget.self!['label'] as String,
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (widget.question && config.options.length > 5)
           QuestionOptionsField(
-            label: _selected.isEmpty
-                ? '选择选项（${config.options.length} 项）'
+            label: widget.submitted || locked
+                ? '查看选项（${config.options.length} 项）'
+                : _selected.isEmpty
+                ? '请选择（共 ${config.options.length} 项）'
                 : [
                     for (final option in config.options)
                       if (_selected.contains(option['id']))
                         option['label'] as String,
                   ].join('、'),
-            onTap: locked ? null : _chooseOptions,
+            onTap: widget.busy ? null : _chooseOptions,
           )
         else
           for (final (index, option) in config.options.indexed)

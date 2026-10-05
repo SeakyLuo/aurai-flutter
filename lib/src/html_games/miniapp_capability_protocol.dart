@@ -11,6 +11,7 @@ abstract final class MiniappCapabilityProtocol {
     'replies.release',
     'members.rename',
     'timer.set',
+    'context.compact',
   };
   static final _manifest = RegExp(
     r'<script\s+type="application/json"\s+id="aurai-capabilities">([\s\S]*?)</script>',
@@ -89,6 +90,15 @@ class MiniappCapabilityCalls {
           if (!args.containsKey('at')) throw ArgumentError('timer.set 必须提供 at');
           timerChanged = true;
           wakeAt = args['at'] as int?;
+        case 'context.compact':
+          final instructions = args['instructions'] as String? ?? '';
+          if (instructions.length > 4000) {
+            throw ArgumentError('额外压缩要求不能超过 4000 字');
+          }
+          if (args.keys.any((key) => key != 'instructions')) {
+            throw ArgumentError('context.compact 只支持 instructions 参数');
+          }
+          contextInstructions = instructions;
       }
     }
     if (messages.length > 64) throw ArgumentError('单次事件最多产生 64 条消息');
@@ -106,4 +116,5 @@ class MiniappCapabilityCalls {
   bool releaseReplies = false;
   bool timerChanged = false;
   int? wakeAt;
+  String? contextInstructions;
 }

@@ -1,21 +1,31 @@
 part of 'message_item.dart';
 
 extension _FailureRetry on _MessageItemState {
-  Widget _failureCard() => Padding(
-    padding: const EdgeInsets.only(top: 6, bottom: 8),
-    child: MenuPressHighlight(
-      onLongPressStart: (_) => _openBubbleMenu(),
-      borderRadius: BorderRadius.circular(24),
-      child: TaskFailureCard(
-        error: message.text,
-        padding: EdgeInsets.zero,
-        actionLabel: '继续',
-        continuing: true,
-        enabled: !_retryingFailure && widget.onRetry != null,
-        onRetry: widget.onRetry == null ? null : _retryFailure,
+  Widget _failureCard() {
+    final controller = ImageActionScope.of(context);
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        controller,
+        controller.groupActivityChanges,
+      ]),
+      builder: (context, _) => Padding(
+        padding: const EdgeInsets.only(top: 6, bottom: 8),
+        child: MenuPressHighlight(
+          onLongPressStart: (_) => _openBubbleMenu(),
+          borderRadius: BorderRadius.circular(24),
+          child: TaskFailureCard(
+            error: message.text,
+            padding: EdgeInsets.zero,
+            actionLabel: '继续',
+            continuing: true,
+            enabled: widget.onRetry != null,
+            busy: _retryingFailure || controller.isFailedReplyActive(message),
+            onRetry: widget.onRetry == null ? null : _retryFailure,
+          ),
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Future<void> _retryFailure() async {
     _setRetryingFailure(true);
@@ -28,6 +38,24 @@ extension _FailureRetry on _MessageItemState {
 }
 
 extension _MessageItemActions on _MessageItemState {
+  Widget _withBubbleStatus(Widget child) => _withGroupFavorite(
+    widget.groupBubble && message.hasRestrictedAudience
+        ? MessageVisibilityMarker(
+            isOwnMessage: message.role == AgentMessageRole.user,
+            label: message.visibilityLabel,
+            onPressed: () => runUiAction(
+              context,
+              () => showMessageVisibilitySheet(
+                context,
+                message: message,
+                database: ImageActionScope.of(context).groupStore.database,
+              ),
+            ),
+            child: child,
+          )
+        : child,
+  );
+
   Future<void> _openBubbleMenu() => _bubbleTextSelection
       ? _selectionKey.currentState!.openMenu()
       : _openActions();
@@ -250,7 +278,8 @@ extension _MessageItemActions on _MessageItemState {
                   }
                 : null,
             allowStar: allowStar,
-            allowGroupMarks: groupMark != null,
+            allowGroupMarks: groupMark?.isGroup ?? false,
+            allowPin: groupMark != null,
             pinned: groupMark?.pinned ?? false,
             groupFavorite: groupMark?.favorite ?? false,
             allowCopy: true,
@@ -378,6 +407,8 @@ extension _MessageItemActions on _MessageItemState {
         );
       case MessageAction.fullscreen:
         await (widget.htmlView! as HtmlView).openFullscreen(context);
+      case MessageAction.splitRun:
+        await (widget.htmlView! as HtmlView).openSplit(context);
       case MessageAction.forward:
         final htmlCard = snapshot.htmlGame;
         if (htmlCard != null) {

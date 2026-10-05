@@ -84,11 +84,12 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
         (
           value: 'participation',
           label: activity.autoReplyPaused ? '恢复接话' : '暂停接话',
-          icon: QuestionIcon(
-            type: activity.autoReplyPaused
-                ? QuestionIconType.play
-                : QuestionIconType.pause,
-          ),
+          icon: activity.autoReplyPaused
+              ? const QuestionIcon(type: QuestionIconType.play)
+              : TaskPlaybackIcon(
+                  paused: false,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
         ),
         if (!activity.autoReplyPaused) ...[
           if (activity.sleeping)

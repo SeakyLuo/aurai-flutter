@@ -157,6 +157,9 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         ? _card.interactionView(widget.actorId)
         : null;
     final question =
+        !(_card.interaction['views'] as List? ?? const []).any(
+          (view) => view['type'] == 'distribution',
+        ) &&
         (_card.interaction['actors'] as List?)?.length == 1 &&
         card.buttons.any((button) => button['selection'] != null);
     final recipient = question

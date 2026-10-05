@@ -14,6 +14,7 @@ enum MessageAction {
   forward,
   branch,
   fullscreen,
+  splitRun,
   history,
   timeline,
 }

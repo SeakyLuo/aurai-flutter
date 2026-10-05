@@ -37,12 +37,15 @@ class DeepSeekResponsesProvider implements ModelProvider {
     _transport.onReconnect = request.onReconnect;
     _transport.beginTurn();
     _summaryTransport.beginTurn();
+    final instructions = contextCompactionInstructions(request);
+    Future<String> summarize(List<Map<String, Object?>> content) =>
+        _summaryTransport.summarize(content, instructions: instructions);
     await (sharedContext == null
-        ? _context.prepare(request, _summaryTransport.summarize)
+        ? _context.prepare(request, summarize)
         : sharedContext!.prepare(
             _context,
             request,
-            _summaryTransport.summarize,
+            summarize,
             sharedContextOwnerId!,
           ));
     _transport.checkCancelled();

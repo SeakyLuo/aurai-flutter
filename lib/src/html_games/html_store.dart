@@ -1,4 +1,5 @@
 import 'html_app_store.dart';
+import 'html_event_identity.dart';
 import 'miniapp_program.dart';
 import 'miniapp_program_store.dart';
 import 'miniapp_member_avatars.dart';
@@ -82,14 +83,15 @@ class HtmlStore {
         : InteractiveMessage.fromJson(
             (jsonDecode(raw as String) as Map).cast<String, Object?>(),
           );
-    final app = await HtmlAppStore.load(db, rows.single['app_id'] as String);
+    final appId = rows.single['app_id'] as String?;
+    final app = appId == null ? null : await HtmlAppStore.load(db, appId);
     final html = (rows.single['html'] as String).isNotEmpty
         ? rows.single['html'] as String
-        : await HtmlAppStore.code(app);
+        : await HtmlAppStore.code(app!);
     final state = MiniappProgram.decode(
       rows.single['session_data_json'] != null
           ? rows.single['state_json']
-          : app['state_json'],
+          : app!['state_json'],
     );
     card?.requireViewer(viewer);
     if (MiniappProgram.source(html) != null) {
@@ -160,7 +162,7 @@ class HtmlStore {
       ...rows.single,
       'html': MiniappProgram.document(html),
       'state_json': jsonEncode(state),
-      'stateful': app['stateful'],
+      'stateful': app == null ? rows.single['stateful'] : app['stateful'],
       'interaction_projection': card?.webViewFor(viewer),
     });
   }
@@ -217,6 +219,7 @@ class HtmlStore {
     final width = args['width'] as int?;
     final height = args['height'] as int? ?? 320;
     final displayMode = args['displayMode'] as String? ?? 'hybrid';
+    final messageOnly = existingId == null && displayMode == 'inline';
     final backgroundMode =
         miniappSendAction(html)['backgroundMode'] as String? ??
         args['backgroundMode'] as String? ??
@@ -268,7 +271,7 @@ class HtmlStore {
             },
           });
     interactive?.validateTransport(html: true);
-    final appId = existingId ?? newMessageId();
+    final appId = messageOnly ? null : existingId ?? newMessageId();
     final message = AgentMessage(
       interactive: interactive,
       id: newMessageId(),
@@ -292,8 +295,8 @@ class HtmlStore {
       ),
     );
     final appVersion = newSession ? 0 : existing?['version'] as int? ?? 0;
-    if (existing == null) {
-      final path = await HtmlAppStore.publish(appId, html);
+    if (existing == null && !messageOnly) {
+      final path = await HtmlAppStore.publish(appId!, html);
       await txn.insert('html_apps', {
         'id': appId,
         'creator_id': creator.id,
@@ -312,14 +315,14 @@ class HtmlStore {
       'conversation_id': conversationId,
       'creator_id': callbackSenderId ?? creator.id,
       'title': title,
-      'html': state['_auraiFixedResult'] == true ? html : '',
+      'html': messageOnly || state['_auraiFixedResult'] == true ? html : '',
       'display_mode': displayMode,
       'background_mode': backgroundMode,
       'stateful': existing?['stateful'] ?? (args['stateful'] == true ? 1 : 0),
       'display_width': width,
       'display_height': height,
-      'state_json': newSession ? jsonEncode(state) : '{}',
-      if (newSession) 'session_data_json': '{}',
+      'state_json': newSession || messageOnly ? jsonEncode(state) : '{}',
+      if (newSession || messageOnly) 'session_data_json': '{}',
       'version': appVersion,
       'participants_json': jsonEncode(participants),
       'status': 'active',
@@ -337,7 +340,10 @@ class HtmlStore {
       'UPDATE conversations SET message_count = message_count + 1, preview = ?, updated_at = ? WHERE id = ?',
       [message.text, message.createdAt.microsecondsSinceEpoch, conversationId],
     );
-    final initialEventId = '${message.id}:created';
+    final initialEventId = htmlEventIdentity(
+      message.id,
+      '${message.id}:created',
+    );
     final snapshot = (await _load(
       txn,
       conversationId,
@@ -409,7 +415,7 @@ class HtmlStore {
       'html_game_events',
       columns: ['message_id', 'request_json'],
       where: 'id = ?',
-      whereArgs: [eventId],
+      whereArgs: [htmlEventIdentity(messageId, eventId)],
     );
     if (duplicates.isNotEmpty) {
       if (duplicates.single['message_id'] != messageId ||
@@ -471,7 +477,7 @@ class HtmlStore {
       whereArgs: [game.sessionScoped ? messageId : game.appId],
     );
     await txn.insert('html_game_events', {
-      'id': eventId,
+      'id': htmlEventIdentity(messageId, eventId),
       'message_id': messageId,
       'actor_id': actorId,
       'version': expected + 1,
@@ -482,7 +488,7 @@ class HtmlStore {
     final batch = txn.batch();
     for (final id in recipients) {
       batch.insert('html_game_receipts', {
-        'event_id': eventId,
+        'event_id': htmlEventIdentity(messageId, eventId),
         'conversation_id': conversationId,
         'sender_id': id,
       });

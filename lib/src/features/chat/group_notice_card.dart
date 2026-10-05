@@ -14,10 +14,12 @@ class GroupNoticeCard extends StatelessWidget {
     required this.onOpen,
     required this.onDismiss,
     required this.onOpenProfile,
+    this.dismissLabel,
   });
   final String author, time, preview;
   final bool announcement;
   final VoidCallback onOpen, onDismiss, onOpenProfile;
+  final String? dismissLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +114,7 @@ class GroupNoticeCard extends StatelessWidget {
               ),
             ),
             IconButton(
-              tooltip: announcement ? '隐藏公告提示' : '关闭置顶提示',
+              tooltip: dismissLabel ?? (announcement ? '隐藏公告提示' : '关闭置顶提示'),
               onPressed: onDismiss,
               icon: const QuestionIcon(type: QuestionIconType.close),
             ),

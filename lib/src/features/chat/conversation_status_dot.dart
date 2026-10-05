@@ -6,7 +6,7 @@ import '../../storage/development_projects.dart';
 import 'project_icon.dart';
 import 'settings_appearance.dart';
 
-const _unreadDotColor = Colors.red;
+const unreadDotColor = Colors.red;
 
 class ConversationStatusDot extends StatelessWidget {
   const ConversationStatusDot({super.key, required this.conversation});
@@ -45,7 +45,7 @@ class ConversationStatusDot extends StatelessWidget {
                 height: 8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _unreadDotColor,
+                  color: unreadDotColor,
                 ),
               ),
       ),
@@ -108,7 +108,7 @@ class ConversationUnreadAvatar extends StatelessWidget {
                 height: 12,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _unreadDotColor,
+                  color: unreadDotColor,
                   border: Border.all(
                     color: Theme.of(context).scaffoldBackgroundColor,
                     width: 2,

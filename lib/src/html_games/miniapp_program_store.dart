@@ -1,29 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
+import 'html_event_identity.dart';
 import 'miniapp_program_runner.dart';
 import 'miniapp_program_scheduler.dart';
 import 'package:sqflite/sqflite.dart';
-import '../domain/agent_models.dart';
-import '../domain/interactive_message.dart';
 import '../domain/message_sender.dart';
 import 'miniapp_program_capabilities.dart';
 import 'html_app_store.dart';
-import 'html_game_session.dart';
 import 'miniapp_program.dart';
 import 'miniapp_capability_protocol.dart';
-
-class MiniappProgramChange {
-  MiniappProgramChange(this.conversationId, this.messageId);
-  final String conversationId, messageId;
-  final messages = <({AgentMessage message, bool wakeAi})>[];
-  final cards = <String, InteractiveMessage>{};
-  final replyStates = <String, bool>{};
-  bool memberNamesChanged = false;
-  void publish() {
-    HtmlGameSignals.changes.add(messageId);
-    MiniappProgramStore.changes.add(this);
-  }
-}
+import 'miniapp_program_change.dart';
+export 'miniapp_program_change.dart';
 
 /// Reducers cannot access databases or Java. Their effects commit with state.
 class MiniappProgramStore {
@@ -38,6 +25,43 @@ class MiniappProgramStore {
   final MiniappProgramScheduler scheduler;
   final Database database;
   static final changes = StreamController<MiniappProgramChange>.broadcast();
+
+  Future<Map<String, Object?>?> pendingCompaction(
+    String conversationId,
+    String messageId,
+    String actorId,
+  ) async {
+    final rows = await database.query(
+      'app_state',
+      columns: ['value'],
+      where: 'key = ?',
+      whereArgs: ['context_compaction:$conversationId'],
+    );
+    if (rows.isEmpty) return null;
+    final pending = MiniappProgram.decode(rows.single['value']);
+    if (pending['messageId'] != messageId) return null;
+    final compaction = pending['contextCompaction'] as Map;
+    final events = await database.query(
+      'html_game_events',
+      columns: ['actor_id', 'request_json'],
+      where: 'id = ?',
+      whereArgs: [compaction['eventId']],
+    );
+    final event = events.single;
+    final request = MiniappProgram.decode(event['request_json']);
+    return {
+      'stateCommitted': true,
+      'contextCompacted': false,
+      if (event['actor_id'] == actorId)
+        'retry': {
+          'messageId': messageId,
+          'eventId': (jsonDecode(compaction['eventId'] as String) as List)[1],
+          'expectedVersion': request['expectedVersion'],
+          'action': request['action'],
+          'data': request['data'],
+        },
+    };
+  }
 
   static Future<List<Map<String, Object?>>> members(
     DatabaseExecutor db,
@@ -106,8 +130,11 @@ class MiniappProgramStore {
         'state': MiniappProgram.decode(rows.single['state_json']),
       };
     });
-    change.publish();
-    return result;
+    await change.publish();
+    return {
+      ...result,
+      if (change.contextCompaction != null) 'contextCompacted': true,
+    };
   }
 
   Future<MiniappProgramChange> reduce(
@@ -136,8 +163,11 @@ class MiniappProgramStore {
       where: 'id = ?',
       whereArgs: [messageId],
     );
-    final app = await HtmlAppStore.load(txn, row['app_id'] as String);
-    final code = await HtmlAppStore.code(app);
+    final code = (row['html'] as String).isNotEmpty
+        ? row['html'] as String
+        : await HtmlAppStore.code(
+            await HtmlAppStore.load(txn, row['app_id'] as String),
+          );
     final script = MiniappProgram.source(code);
     if (script == null) throw StateError('小程序没有事件处理程序');
     final declared = MiniappCapabilityProtocol.declarations(code);
@@ -160,6 +190,65 @@ class MiniappProgramStore {
     final delegatedPlayer = data is Map ? data['submitForPlayerId'] : null;
     final actorView = (runtime['privateViews'] as Map)[actorId] as Map?;
     final canSubmitForPlayers = actorView?['canSubmitForPlayers'] == true;
+    final request = jsonEncode({
+      'actorId': actorId,
+      'action': action,
+      'data': data,
+      if (expectedVersion != null) 'expectedVersion': expectedVersion,
+    });
+    final duplicates = await txn.query(
+      'html_game_events',
+      columns: ['request_json', 'snapshot_json'],
+      where: 'id = ? AND message_id = ?',
+      whereArgs: [htmlEventIdentity(messageId, eventId), messageId],
+    );
+    final change = MiniappProgramChange(conversationId, messageId);
+    if (duplicates.isNotEmpty) {
+      if (duplicates.single['request_json'] != request) {
+        throw StateError('操作编号已被使用');
+      }
+      final snapshot = MiniappProgram.decode(
+        duplicates.single['snapshot_json'],
+      );
+      if (snapshot['pendingContextChange'] case final Map pending) {
+        final resumed = MiniappProgramChange.fromJson(pending, senders);
+        final boundary = await txn.query(
+          'messages',
+          columns: ['id', 'created_at'],
+          where:
+              "conversation_id = ? AND kind NOT IN ('message_failure', 'reasoning') AND NOT (role = 'assistant' AND text = '')",
+          whereArgs: [conversationId],
+          orderBy: 'created_at DESC, id DESC',
+          limit: 1,
+        );
+        resumed.contextCompaction = MiniappContextCompaction(
+          eventId: resumed.contextCompaction!.eventId,
+          instructions: resumed.contextCompaction!.instructions,
+          throughMessageId: boundary.single['id'] as String,
+          throughCreatedAt: boundary.single['created_at'] as int,
+        );
+        final value = resumed.toJson();
+        await txn.update(
+          'html_game_events',
+          {
+            'snapshot_json': jsonEncode({
+              ...snapshot,
+              'pendingContextChange': value,
+            }),
+          },
+          where: 'id = ?',
+          whereArgs: [resumed.contextCompaction!.eventId],
+        );
+        await txn.update(
+          'app_state',
+          {'value': jsonEncode(value)},
+          where: 'key = ?',
+          whereArgs: ['context_compaction:$conversationId'],
+        );
+        return resumed;
+      }
+      return change;
+    }
     if (delegatedPlayer != null &&
         delegatedPlayer != actorId &&
         !canSubmitForPlayers) {
@@ -174,6 +263,7 @@ class MiniappProgramStore {
         })) {
       throw StateError('请操作对应的交互消息，提交会同时更新消息和小程序');
     }
+    String? continuationSenderId;
     if (cardId != null) {
       final binding = bindings[cardId] as Map?;
       if (binding == null ||
@@ -181,29 +271,18 @@ class MiniappProgramStore {
           !(binding['actors'] as List).contains(actorId)) {
         throw StateError('这张行动卡已结束或不属于你');
       }
+      final source = await txn.query(
+        'messages',
+        columns: ['sender_id'],
+        where: 'id = ? AND conversation_id = ?',
+        whereArgs: [cardId, conversationId],
+      );
+      continuationSenderId = source.single['sender_id'] as String;
       data = {
         'context': binding['data'],
         'value': data,
         if (reason != null) 'reason': reason,
       };
-    }
-    final request = jsonEncode({
-      'actorId': actorId,
-      'action': action,
-      'data': data,
-      if (expectedVersion != null) 'expectedVersion': expectedVersion,
-    });
-    final duplicates = await txn.query(
-      'html_game_events',
-      columns: ['request_json'],
-      where: 'id = ? AND message_id = ?',
-      whereArgs: [eventId, messageId],
-    );
-    final change = MiniappProgramChange(conversationId, messageId);
-    if (duplicates.isNotEmpty) {
-      if (duplicates.single['request_json'] != request)
-        throw StateError('操作编号已被使用');
-      return change;
     }
     if (expectedVersion != null && expectedVersion != row['version']) {
       throw StateError('小程序已更新，请重新读取后提交');
@@ -250,6 +329,38 @@ class MiniappProgramStore {
       },
     );
     final calls = MiniappCapabilityCalls(output, declared);
+    if (calls.contextInstructions != null) {
+      if (actorId != MessageSender.localUser.id &&
+          actorId != messages.single['sender_id'] &&
+          actorView?['canEditData'] != true) {
+        throw StateError('只有用户、小程序消息创建人或获授权的数据管理者可以压缩会话上下文');
+      }
+      if (MiniappProgramChange.compactContext == null) {
+        throw StateError('上下文压缩服务尚未启动');
+      }
+      final pending = await txn.query(
+        'app_state',
+        columns: ['key'],
+        where: 'key = ?',
+        whereArgs: ['context_compaction:$conversationId'],
+      );
+      if (pending.isNotEmpty) throw StateError('已有上下文压缩尚未完成，请先处理原操作');
+      final boundary = await txn.query(
+        'messages',
+        columns: ['id', 'created_at'],
+        where:
+            "conversation_id = ? AND kind NOT IN ('message_failure', 'reasoning') AND NOT (role = 'assistant' AND text = '')",
+        whereArgs: [conversationId],
+        orderBy: 'created_at DESC, id DESC',
+        limit: 1,
+      );
+      change.contextCompaction = MiniappContextCompaction(
+        eventId: htmlEventIdentity(messageId, eventId),
+        instructions: calls.contextInstructions!,
+        throughMessageId: boundary.single['id'] as String,
+        throughCreatedAt: boundary.single['created_at'] as int,
+      );
+    }
     final nicknames = calls.nicknames;
     await capabilities.members.setNicknames(
       txn,
@@ -312,6 +423,7 @@ class MiniappProgramStore {
         messageId: messageId,
         actorId: actorId,
         memberIds: memberIds,
+        continuationSenderId: continuationSenderId,
         agents: agents,
         senders: senders,
         bindings: bindings,
@@ -356,14 +468,30 @@ class MiniappProgramStore {
       whereArgs: [messageId],
     );
     await txn.insert('html_game_events', {
-      'id': eventId,
+      'id': htmlEventIdentity(messageId, eventId),
       'message_id': messageId,
       'actor_id': actorId,
       'version': version,
       'request_json': request,
-      'snapshot_json': jsonEncode({'state': view, 'version': version}),
+      'snapshot_json': jsonEncode({
+        'state': view,
+        'version': version,
+        'privateTaskProgress': {
+          for (final entry in views.entries)
+            if ((entry.value as Map).containsKey('taskProgress'))
+              entry.key: (entry.value as Map)['taskProgress'],
+        },
+        if (change.contextCompaction != null)
+          'pendingContextChange': change.toJson(),
+      }),
       'created_at': now * 1000,
     });
+    if (change.contextCompaction != null) {
+      await txn.insert('app_state', {
+        'key': 'context_compaction:$conversationId',
+        'value': jsonEncode(change.toJson()),
+      });
+    }
     return change;
   }
 
@@ -396,6 +524,11 @@ class MiniappProgramStore {
       where: 'key = ?',
       whereArgs: [MiniappProgram.key(messageId)],
     );
+    batch.delete(
+      'app_state',
+      where: "key = ? AND json_extract(value, '\$.messageId') = ?",
+      whereArgs: ['context_compaction:$conversationId', messageId],
+    );
     await batch.commit(noResult: true);
     return change;
   }
@@ -412,7 +545,7 @@ class MiniappProgramStore {
         action: 'timer',
       ),
     );
-    change?.publish();
+    await change?.publish();
   }
 
   Future<int?> nextWake() => scheduler.nextWake(database);

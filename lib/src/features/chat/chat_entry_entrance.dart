@@ -64,9 +64,16 @@ class _ChatEntryEntranceState extends State<ChatEntryEntrance>
   }
 
   @override
-  Widget build(BuildContext context) => SizeTransition(
-    sizeFactor: _animation,
-    alignment: Alignment.topCenter,
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _controller,
     child: FadeTransition(opacity: _animation, child: widget.child),
+    builder: (context, child) => ClipRect(
+      clipBehavior: _controller.isCompleted ? Clip.none : Clip.hardEdge,
+      child: Align(
+        alignment: Alignment.topCenter,
+        heightFactor: _animation.value,
+        child: child,
+      ),
+    ),
   );
 }

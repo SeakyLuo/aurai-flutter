@@ -18,6 +18,8 @@ import '../scheduling/task_action_menu.dart';
 import 'miniapp_metadata_editor.dart';
 import 'html_store.dart';
 import 'miniapp_library_store.dart';
+import 'miniapp_team_page.dart';
+import 'miniapp_team_store.dart';
 
 class MiniappDetailPage extends StatefulWidget {
   const MiniappDetailPage({
@@ -271,6 +273,32 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
                       style: Theme.of(
                         context,
                       ).textTheme.bodyMedium?.copyWith(height: 1.6),
+                    ),
+                  ],
+                  if (!entry.bundled) ...[
+                    const SizedBox(height: 24),
+                    Material(
+                      color: settingsFieldColor(context),
+                      borderRadius: BorderRadius.circular(22),
+                      clipBehavior: Clip.antiAlias,
+                      child: ListTile(
+                        leading: const SettingsIcon(
+                          type: SettingsIconType.contacts,
+                        ),
+                        title: const Text('开发团队'),
+                        trailing: const SettingsIcon(
+                          type: SettingsIconType.chevron,
+                        ),
+                        onTap: () => Navigator.push<void>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => MiniappTeamPage(
+                              store: MiniappTeamStore(widget.store.database),
+                              appId: entry.publicationId,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                   if (entry.revision > 0)

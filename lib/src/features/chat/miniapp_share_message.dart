@@ -10,10 +10,12 @@ class MiniappShareMessage extends StatelessWidget {
     required this.message,
     required this.groupBubble,
     required this.onLongPress,
+    required this.wrapContent,
   });
   final AgentMessage message;
   final bool groupBubble;
   final VoidCallback onLongPress;
+  final Widget Function(Widget) wrapContent;
 
   @override
   Widget build(BuildContext context) {
@@ -34,29 +36,31 @@ class MiniappShareMessage extends StatelessWidget {
             groupBubble ? 18 : 16,
             groupBubble ? 0 : 24,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: own
-                ? CrossAxisAlignment.end
-                : CrossAxisAlignment.start,
-            children: [
-              MiniappShareCard(
-                share: share,
-                onTap: () => openMiniappLink(context, Uri.parse(share.uri)),
-                onLongPress: onLongPress,
-              ),
-              if (share.note.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: GestureDetector(
-                    onLongPress: onLongPress,
-                    child: Text(
-                      share.note,
-                      style: const TextStyle(fontSize: 15),
+          child: wrapContent(
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: own
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
+              children: [
+                MiniappShareCard(
+                  share: share,
+                  onTap: () => openMiniappLink(context, Uri.parse(share.uri)),
+                  onLongPress: onLongPress,
+                ),
+                if (share.note.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: GestureDetector(
+                      onLongPress: onLongPress,
+                      child: Text(
+                        share.note,
+                        style: const TextStyle(fontSize: 15),
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

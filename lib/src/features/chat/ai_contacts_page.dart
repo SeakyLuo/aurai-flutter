@@ -39,6 +39,7 @@ class AiContactsPage extends StatefulWidget {
     this.conversationMode = ConversationMode.normal,
     this.searchController,
     this.onToggleSearch,
+    this.onDetailChanged,
   });
   final ChatController controller;
   final bool archived;
@@ -49,6 +50,7 @@ class AiContactsPage extends StatefulWidget {
   final ConversationMode conversationMode;
   final TextEditingController? searchController;
   final VoidCallback? onToggleSearch;
+  final ValueChanged<bool>? onDetailChanged;
   @override
   State<AiContactsPage> createState() => _AiContactsPageState();
 }
@@ -63,6 +65,16 @@ class _AiContactsPageState extends State<AiContactsPage> {
   int? _count;
   bool _loading = false, _more = true, _failed = false;
   late bool _archived;
+  late bool _useMemory =
+      widget.conversationMode == ConversationMode.temporaryPersonalized;
+  bool get _temporary =>
+      widget.selectForConversation &&
+      widget.conversationMode != ConversationMode.normal;
+  ConversationMode get _conversationMode => !_temporary
+      ? widget.conversationMode
+      : _useMemory
+      ? ConversationMode.temporaryPersonalized
+      : ConversationMode.temporaryPlain;
   @override
   void initState() {
     super.initState();
@@ -221,12 +233,12 @@ class _AiContactsPageState extends State<AiContactsPage> {
       return;
     }
     if (_openingConversation) return;
-    _openingConversation = true;
+    setState(() => _openingConversation = true);
     try {
       final id = await widget.controller.openAiConversation(
         ai,
         newConversation: true,
-        mode: widget.conversationMode,
+        mode: _conversationMode,
       );
       if (!mounted) return;
       await openHomeConversation(
@@ -244,7 +256,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
         );
       }
     } finally {
-      _openingConversation = false;
+      if (mounted) setState(() => _openingConversation = false);
     }
   }
 
@@ -334,8 +346,11 @@ class _AiContactsPageState extends State<AiContactsPage> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      ContactProfileSplit(key: _profileSplit, child: _page());
+  Widget build(BuildContext context) => ContactProfileSplit(
+    key: _profileSplit,
+    onDetailChanged: widget.onDetailChanged,
+    child: _page(),
+  );
 
   Widget _page() => widget.embedded
       ? _body()
@@ -343,11 +358,9 @@ class _AiContactsPageState extends State<AiContactsPage> {
           extendBodyBehindAppBar: true,
           appBar: SettingsAppBar(
             title: widget.selectForConversation
-                ? switch (widget.conversationMode) {
-                    ConversationMode.normal => '选择朋友',
-                    ConversationMode.temporaryPersonalized => '临时个性化 · 选择朋友',
-                    ConversationMode.temporaryPlain => '临时非个性化 · 选择朋友',
-                  }
+                ? _temporary
+                      ? '临时聊天'
+                      : '选择朋友'
                 : _archived
                 ? '已归档朋友'
                 : '通讯录',
@@ -418,6 +431,37 @@ class _AiContactsPageState extends State<AiContactsPage> {
                     height: widget.embedded ? 0 : settingsHeaderHeight(context),
                   ),
                 ),
+                if (_temporary)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      child: Material(
+                        color: settingsFieldColor(context),
+                        borderRadius: BorderRadius.circular(26),
+                        clipBehavior: Clip.antiAlias,
+                        child: SwitchListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 4,
+                          ),
+                          title: const Text(
+                            '使用记忆',
+                            style: TextStyle(fontSize: 15),
+                          ),
+                          subtitle: Text(
+                            _useMemory
+                                ? '使用已有记忆和自定义指令，不写入新记忆'
+                                : '不使用记忆和自定义指令，不写入新记忆',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          value: _useMemory,
+                          onChanged: _openingConversation
+                              ? null
+                              : (value) => setState(() => _useMemory = value),
+                        ),
+                      ),
+                    ),
+                  ),
                 if (!_archived && !widget.selectForConversation)
                   SliverToBoxAdapter(
                     child: Padding(

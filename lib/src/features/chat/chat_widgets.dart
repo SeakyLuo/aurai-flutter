@@ -325,12 +325,7 @@ class ExecutionProgress extends StatelessWidget {
 
   String get _title => switch (state) {
     ChatRunState.running when accessibilityRequestPending => '等待开启无障碍',
-    ChatRunState.running =>
-      steps.isNotEmpty && steps.last.status == AgentStepStatus.running
-          ? '正在${steps.last.title}'
-          : senderName == null
-          ? '正在思考'
-          : '$senderName 正在思考',
+    ChatRunState.running => senderName == null ? '正在思考' : '$senderName 正在思考',
     ChatRunState.stopping => '正在停止',
     ChatRunState.failed => '任务未完成',
     ChatRunState.cancelled => '任务已停止',

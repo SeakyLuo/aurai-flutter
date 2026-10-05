@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../storage/development_projects.dart';
 import 'message_time.dart';
+import 'conversation_status_dot.dart';
 import 'project_icon.dart';
 import 'settings_appearance.dart';
 
@@ -67,7 +68,7 @@ class ProjectListTile extends StatelessWidget {
                         height: 12,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: unreadDotColor,
                           border: Border.all(
                             color: Theme.of(context).scaffoldBackgroundColor,
                             width: 2,

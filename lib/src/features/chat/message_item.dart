@@ -29,6 +29,7 @@ import 'interactive_message_view.dart';
 import 'group_message_heading.dart';
 import 'message_quote_view.dart';
 import 'image_action_scope.dart';
+import 'chat_controller.dart' show ConversationRunFailure;
 import 'file_attachments.dart';
 import 'reply_image_syntax.dart';
 import 'reply_image_gallery.dart';
@@ -53,6 +54,7 @@ import 'reasoning_message_view.dart';
 import 'message_actions_menu.dart';
 import 'speech_readout.dart';
 import 'message_visibility_sheet.dart';
+import 'message_visibility_marker.dart';
 import 'menu_press_highlight.dart';
 import 'group_message_selection.dart';
 import 'html_message_more_button.dart';
@@ -195,7 +197,7 @@ class _MessageItemState extends State<MessageItem> {
 
   Widget _buildMessage(BuildContext context) =>
       widget.groupBubble && message.isFailure
-      ? _failureCard()
+      ? _withBubbleStatus(_failureCard())
       : message.role == AgentMessageRole.user
       ? Column(
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -294,12 +296,11 @@ class _MessageItemState extends State<MessageItem> {
 
   Widget _buildContent(BuildContext context) {
     if (message.miniappShare != null)
-      return _withGroupFavorite(
-        MiniappShareMessage(
-          message: message,
-          groupBubble: widget.groupBubble,
-          onLongPress: () => _openActions(),
-        ),
+      return MiniappShareMessage(
+        message: message,
+        groupBubble: widget.groupBubble,
+        onLongPress: () => _openActions(),
+        wrapContent: _withBubbleStatus,
       );
 
     if (message.htmlGame != null) {
@@ -326,7 +327,7 @@ class _MessageItemState extends State<MessageItem> {
                 : widget.groupBubble
                 ? EdgeInsets.zero
                 : const EdgeInsets.symmetric(horizontal: 18),
-            child: _withGroupFavorite(
+            child: _withBubbleStatus(
               Stack(
                 children: [
                   if (widget.onLocate case final locate?)
@@ -368,7 +369,7 @@ class _MessageItemState extends State<MessageItem> {
               widget.groupBubble ? 18 : 16,
               widget.groupBubble ? 0 : 24,
             ),
-            child: _withGroupFavorite(
+            child: _withBubbleStatus(
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -387,23 +388,22 @@ class _MessageItemState extends State<MessageItem> {
                       child: FileAttachmentCard(file: file),
                     ),
                   if (message.images.isNotEmpty)
-                    Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final image in message.images)
-                          ImageAttachment(
-                            image: image,
-                            gallery: message.images,
-                            size: message.images.length == 1
-                                ? ((constraints.maxWidth - 32) * 0.72).clamp(
-                                    80.0,
-                                    260.0,
-                                  )
-                                : ((constraints.maxWidth - 32) * 0.82 - 8) / 2,
-                          ),
-                      ],
+                    LayoutBuilder(
+                      builder: (context, imageConstraints) => Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final image in message.images)
+                            ImageAttachment(
+                              image: image,
+                              gallery: message.images,
+                              size: message.images.length == 1
+                                  ? imageConstraints.maxWidth.clamp(80.0, 260.0)
+                                  : (imageConstraints.maxWidth - 8) / 2,
+                            ),
+                        ],
+                      ),
                     ),
                   if (message.htmlGame == null && message.interactive != null)
                     ForwardedInteractiveMessage(card: message.interactive!),
@@ -665,7 +665,7 @@ class _MessageItemState extends State<MessageItem> {
             : BoxConstraints(
                 maxWidth: message.htmlGame!.width!.toDouble() + 32,
               ),
-        child: _withGroupFavorite(
+        child: _withBubbleStatus(
           MenuPressHighlight(
             keepHighlightWhileOpen: !_bubbleTextSelection,
             onLongPressStart: (_) => _openBubbleMenu(),

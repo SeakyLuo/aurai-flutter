@@ -10,7 +10,7 @@ import 'package:flutter/services.dart';
 import 'ai_contact_page.dart';
 import 'chat_controller.dart';
 import 'conversation_rename_dialog.dart';
-import 'conversation_task_navigation.dart';
+import 'private_tasks_page.dart';
 import 'conversation_project_page.dart';
 import 'delete_confirmation_dialog.dart';
 import 'dialog_action_button.dart';
@@ -357,27 +357,26 @@ class _DirectConversationInfoPageState
                             ),
                           ),
                         ),
-                        if (conversationTasks(
-                          widget.controller,
-                          _conversation.id,
-                          originTaskId: widget.originTaskId,
-                        ).isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          _surface(
-                            _row(
-                              '关联任务',
-                              () => openConversationTask(
-                                context,
-                                widget.controller,
-                                _conversation.id,
-                                originTaskId: widget.originTaskId,
-                              ),
-                              icon: const SettingsIcon(
-                                type: SettingsIconType.tasks,
+                        const SizedBox(height: 12),
+                        _surface(
+                          _row(
+                            '任务清单',
+                            () => Navigator.push<void>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PrivateTasksPage(
+                                  controller: widget.controller,
+                                  conversationId: _conversation.id,
+                                  senderId: _conversation.defaultSenderId,
+                                  originTaskId: widget.originTaskId,
+                                ),
                               ),
                             ),
+                            icon: const SettingsIcon(
+                              type: SettingsIconType.tasks,
+                            ),
                           ),
-                        ],
+                        ),
                         if (!_conversation.isArchived &&
                             !_conversation.isTemporary) ...[
                           const SizedBox(height: 12),

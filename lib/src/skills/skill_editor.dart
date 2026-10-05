@@ -355,6 +355,7 @@ class _SkillEditorState extends State<SkillEditor> {
                                   setState(() {
                                     _visibility = value.$1;
                                     _visibleTo = value.$2;
+                                    _scopes = value.$3;
                                   });
                               },
                       ),
@@ -399,18 +400,19 @@ class _SkillEditorState extends State<SkillEditor> {
                       ),
                     ),
                   ),
-                  ResourceScopeField(
-                    projects: widget.store.projects,
-                    scopes: _scopes,
-                    groups: widget.store.groups,
-                    requiredGroup: _visibility == 'public',
-                    onChanged:
-                        _busy ||
-                            (_saved.id.isNotEmpty &&
-                                !widget.store.canManageVisibility(_saved))
-                        ? null
-                        : (scopes) => setState(() => _scopes = scopes),
-                  ),
+                  if (_visibility != 'public')
+                    ResourceScopeField(
+                      visibility: false,
+                      projects: widget.store.projects,
+                      scopes: _scopes,
+                      groups: widget.store.groups,
+                      onChanged:
+                          _busy ||
+                              (_saved.id.isNotEmpty &&
+                                  !widget.store.canManageVisibility(_saved))
+                          ? null
+                          : (scopes) => setState(() => _scopes = scopes),
+                    ),
                   _field('使用说明', _instructions, 10000, multiline: true),
                   _field('执行脚本（可选）', _script, 50000, multiline: true),
                   SkillStatisticsView(store: widget.store, skillId: _saved.id),

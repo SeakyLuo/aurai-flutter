@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'html_event_identity.dart';
 import 'html_app_store.dart';
 import 'miniapp_program.dart';
 import 'html_game_session.dart';
@@ -103,7 +104,7 @@ class HtmlMessageData {
         'html_game_events',
         columns: ['request_json', 'version'],
         where: 'id = ? AND message_id = ?',
-        whereArgs: [eventId, id],
+        whereArgs: [htmlEventIdentity(id, eventId), id],
         limit: 1,
       );
       if (events.isNotEmpty) {
@@ -169,7 +170,7 @@ class HtmlMessageData {
         whereArgs: [id],
       );
       await txn.insert('html_game_events', {
-        'id': eventId,
+        'id': htmlEventIdentity(id, eventId),
         'message_id': id,
         'actor_id': actorId,
         'version': version,

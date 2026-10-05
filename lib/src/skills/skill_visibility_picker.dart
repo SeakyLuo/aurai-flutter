@@ -9,28 +9,25 @@ import '../features/chat/visibility_option_tile.dart';
 import '../widgets/empty_data_view.dart';
 import 'skill_store.dart';
 import '../domain/resource_scope.dart';
+import '../features/chat/resource_scope_picker.dart';
 
 String skillVisibilityLabel(
   String value, {
   List<ResourceScope> scopes = const [],
 }) => switch (value) {
-  'public' =>
-    scopes.any((s) => s.type == 'project')
-        ? scopes.any((s) => s.type == 'group')
-              ? '范围内公开'
-              : '项目内公开'
-        : '群内公开',
+  'public' => scopes.isEmpty ? '所有人可见' : '部分可见',
+  'partial' => '部分可见',
   'selected' => '指定人可见',
   _ => '仅自己可见',
 };
 
-Future<(String, Set<String>)?> showSkillVisibilityPicker(
+Future<(String, Set<String>, List<ResourceScope>)?> showSkillVisibilityPicker(
   BuildContext context, {
   required SkillStore store,
   required String visibility,
   required Set<String> selected,
   required List<ResourceScope> scopes,
-}) => showModalBottomSheet<(String, Set<String>)>(
+}) => showModalBottomSheet<(String, Set<String>, List<ResourceScope>)>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -60,7 +57,34 @@ class SkillVisibilityPicker extends StatefulWidget {
 }
 
 class _SkillVisibilityPickerState extends State<SkillVisibilityPicker> {
-  late String _visibility = widget.visibility;
+  late String _visibility =
+      widget.visibility == 'public' && widget.scopes.isNotEmpty
+      ? 'partial'
+      : widget.visibility;
+  late List<ResourceScope> _scopes = [...widget.scopes];
+
+  Future<void> _chooseScopes() async {
+    final scopes = await showModalBottomSheet<List<ResourceScope>>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => FractionallySizedBox(
+        heightFactor: .9,
+        child: ResourceScopePicker(
+          groups: widget.store.groups,
+          projects: widget.store.projects,
+          selected: _scopes,
+          requiredGroup: true,
+        ),
+      ),
+    );
+    if (!mounted || scopes == null) return;
+    setState(() {
+      _scopes = scopes;
+      _visibility = 'partial';
+    });
+  }
+
   late Set<String> _selected = {...widget.selected};
 
   Future<void> _chooseMembers() async {
@@ -99,27 +123,43 @@ class _SkillVisibilityPickerState extends State<SkillVisibilityPicker> {
           _VisibilityHeader(
             title: '技能可见范围',
             actionLabel: '保存',
-            onDone: _visibility == 'selected' && _selected.isEmpty
+            onDone:
+                (_visibility == 'selected' && _selected.isEmpty) ||
+                    (_visibility == 'partial' && _scopes.isEmpty)
                 ? null
-                : () => Navigator.pop(context, (_visibility, _selected)),
+                : () => Navigator.pop(context, (
+                    _visibility == 'partial' ? 'public' : _visibility,
+                    _selected,
+                    _visibility == 'public' ? <ResourceScope>[] : _scopes,
+                  )),
           ),
           const SizedBox(height: 12),
-          for (final value in ['private', 'public', 'selected'])
+          for (final value in ['public', 'partial', 'private', 'selected'])
             VisibilityOptionTile(
               selected: _visibility == value,
-              opensMembers: value == 'selected',
-              title: skillVisibilityLabel(value, scopes: widget.scopes),
-              subtitle: value == 'selected' && _selected.isNotEmpty
+              opensMembers: value == 'selected' || value == 'partial',
+              title: skillVisibilityLabel(value),
+              subtitle: value == 'partial'
+                  ? (_scopes.isEmpty
+                        ? '选择群聊或项目'
+                        : resourceScopeLabel(
+                            _scopes,
+                            widget.store.groups,
+                            widget.store.projects,
+                          ))
+                  : value == 'selected' && _selected.isNotEmpty
                   ? widget.store.members
                         .where((m) => _selected.contains(m.id))
                         .map((m) => m.name)
                         .join('、')
                   : switch (value) {
-                      'public' => '可在所选群聊或项目内查看和使用',
+                      'public' => '所有人均可查看和使用',
                       'selected' => '选中的人可查看、安装，内容由你维护',
                       _ => '只有自己可查看、安装和维护',
                     },
-              onTap: value == 'selected'
+              onTap: value == 'partial'
+                  ? _chooseScopes
+                  : value == 'selected'
                   ? _chooseMembers
                   : () => setState(() => _visibility = value),
             ),

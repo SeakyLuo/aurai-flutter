@@ -424,6 +424,18 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
             height: 1.5,
           ),
         ),
+        if (state['reason'] case final String reason) ...[
+          const SizedBox(height: 20),
+          Text(
+            '提交理由',
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(reason, style: const TextStyle(fontSize: 15, height: 1.5)),
+        ],
         const Divider(height: 32),
         const Text(
           '操作记录',

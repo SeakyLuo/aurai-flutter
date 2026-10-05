@@ -6,11 +6,13 @@ import '../domain/message_sender.dart';
 class NewGroupDraft {
   final _preferences = SharedPreferencesAsync();
   static const _key = 'new_group_draft';
+  static const _notifyKey = 'new_group_notify_members';
   static Future<void> _pending = Future.value();
 
   Future<
     ({
       String title,
+      bool notifyMembers,
       List<String> contacts,
       List<AiProfile> members,
       List<String> excluded,
@@ -19,9 +21,11 @@ class NewGroupDraft {
   load() async {
     await _pending;
     final saved = await _preferences.getString(_key);
+    final notifyMembers = await _preferences.getBool(_notifyKey) ?? true;
     if (saved == null)
       return (
         title: '',
+        notifyMembers: notifyMembers,
         contacts: <String>[],
         members: <AiProfile>[],
         excluded: <String>[],
@@ -29,6 +33,7 @@ class NewGroupDraft {
     final data = jsonDecode(saved) as Map<String, dynamic>;
     return (
       title: data['title'] as String,
+      notifyMembers: notifyMembers,
       excluded: (data['excluded'] as List? ?? const []).cast<String>(),
       contacts: (data['contacts'] as List).cast<String>(),
       members: [
@@ -48,6 +53,7 @@ class NewGroupDraft {
     List<String> contacts,
     List<AiProfile> members, {
     List<String> excluded = const [],
+    bool notifyMembers = true,
   }) {
     final data = jsonEncode({
       'title': title,
@@ -79,10 +85,16 @@ class NewGroupDraft {
           },
       ],
     });
-    return _enqueue(() => _preferences.setString(_key, data));
+    return _enqueue(() async {
+      await _preferences.setString(_key, data);
+      await _preferences.setBool(_notifyKey, notifyMembers);
+    });
   }
 
-  Future<void> clear() => _enqueue(() => _preferences.remove(_key));
+  Future<void> clear() => _enqueue(() async {
+    await _preferences.remove(_key);
+    await _preferences.remove(_notifyKey);
+  });
   Future<void> _enqueue(Future<void> Function() operation) {
     final write = _pending.then((_) => operation());
     _pending = write.catchError((Object error) {});

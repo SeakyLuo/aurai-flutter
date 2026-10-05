@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum HtmlGameIconType { game, play, expand, close }
+enum HtmlGameIconType { game, play, expand, close, split }
 
 class HtmlGameIcon extends StatelessWidget {
   const HtmlGameIcon(this.type, {super.key, this.color});
@@ -30,6 +30,15 @@ class _Painter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case HtmlGameIconType.split:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(3, 4, 18, 16),
+            const Radius.circular(3),
+          ),
+          pen,
+        );
+        canvas.drawLine(const Offset(12, 4), const Offset(12, 20), pen);
       case HtmlGameIconType.game:
         canvas.drawRRect(
           RRect.fromRectAndRadius(

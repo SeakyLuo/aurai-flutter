@@ -96,6 +96,9 @@ List<ChatTimelineEntry> buildChatTimeline(
 
   final richRuns = isGroup ? <String>{} : richReplyRuns(timelineMessages);
   final watch = conversation.executionWatch;
+  // “已处理”是整轮执行中的累计耗时，不是某个工具的完成状态。
+  // 出现思考或工具调用后整轮只显示一次；工具结束后若仍在思考，继续计时。
+  // 普通文字回复不单独显示；整轮结束由保存的处理摘要展示“用时”。
   final showElapsed =
       !isGroup &&
       watch != null &&
@@ -136,6 +139,8 @@ List<ChatTimelineEntry> buildChatTimeline(
     for (final (index, message) in visibleMessages.indexed) message.id: index,
   };
   final headersByMessage = <String, List<ChatTimelineEntry>>{};
+  final headersAfterMessage = <String, List<ChatTimelineEntry>>{};
+  final followingHeadersByMessage = <String, List<ChatTimelineEntry>>{};
   final toolsByMessage = <String, List<ChatTimelineEntry>>{};
   final followingToolsByMessage = <String, List<ChatTimelineEntry>>{};
   final messagesById = {
@@ -156,28 +161,22 @@ List<ChatTimelineEntry> buildChatTimeline(
       if (message.taskSummary != null) message.runId,
   };
   final members = controller.groupRuns.toList();
+  final stepSources = !isGroup && members.isEmpty
+      ? [conversation]
+      : members.where((_) => !isGroup);
   final liveSteps = [
-    if (!isGroup && members.isEmpty)
-      for (final (ordinal, entry) in conversation.liveToolSteps.indexed)
+    for (final source in stepSources)
+      for (final (ordinal, entry) in source.liveToolSteps.indexed)
         if (!summarizedRuns.contains(entry.runId))
           (
             ordinal: ordinal,
             afterMessageId: entry.afterMessageId,
             step: entry.step,
             runId: entry.runId,
-            senderName: null as String?,
-          )
-        else if (!isGroup)
-          for (final member in members)
-            for (final (ordinal, entry) in member.liveToolSteps.indexed)
-              if (!summarizedRuns.contains(entry.runId))
-                (
-                  ordinal: ordinal,
-                  afterMessageId: entry.afterMessageId,
-                  step: entry.step,
-                  runId: entry.runId,
-                  senderName: member.replyingSenderName,
-                ),
+            senderName: identical(source, conversation)
+                ? null
+                : source.replyingSenderName,
+          ),
   ];
   final firstToolAnchorByRun = <String, String>{};
   for (final entry in liveSteps) {
@@ -196,12 +195,20 @@ List<ChatTimelineEntry> buildChatTimeline(
         (firstMessage == null ||
             messagePositions[firstToolAnchor]! <
                 messagePositions[firstMessage]!);
-    final target = toolsComeFirst
-        ? activitiesAfter(firstToolAnchor, runId)
-        : firstMessage != null
-        ? headersByMessage.putIfAbsent(firstMessage, () => [])
-        : activitiesAfter(anchorId, runId);
-    target.add(header);
+    if (!toolsComeFirst && firstMessage != null) {
+      headersByMessage.putIfAbsent(firstMessage, () => []).add(header);
+      return;
+    }
+    final afterId = toolsComeFirst ? firstToolAnchor : anchorId;
+    final anchor = messagesById[afterId];
+    final target =
+        anchor?.role == AgentMessageRole.assistant && anchor!.runId != runId
+        ? followingHeadersByMessage
+        : headersAfterMessage;
+    // Run headings are a separate slot, always preceding their tool records.
+    // 标题位于本轮第一个思考或工具之前，不能随后续回调挪到工具下面。
+    final headers = target.putIfAbsent(afterId, () => []);
+    headers.add(header);
   }
 
   final memberSources = {
@@ -300,6 +307,7 @@ List<ChatTimelineEntry> buildChatTimeline(
                   toolName: entry.step.toolName,
                   active:
                       activeRunIds.contains(entry.runId) &&
+                      latest.step.status == AgentStepStatus.running &&
                       lastStepByRun[entry.runId] == group.end - 1,
                   activeLabel: _activeToolActivityTitle(
                     latest.step,
@@ -455,11 +463,15 @@ List<ChatTimelineEntry> buildChatTimeline(
                     message.role == AgentMessageRole.assistant &&
                     !message.isReasoning &&
                     message.id != beforeMessageId &&
-                    toolsByMessage.containsKey(message.id)
+                    (headersAfterMessage.containsKey(message.id) ||
+                        toolsByMessage.containsKey(message.id))
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      for (final entry in toolsByMessage[message.id]!)
+                      for (final entry in [
+                        ...?headersAfterMessage[message.id],
+                        ...?toolsByMessage[message.id],
+                      ])
                         KeyedSubtree(
                           key: ValueKey(entry.id),
                           child: entry.builder(context),
@@ -536,7 +548,10 @@ List<ChatTimelineEntry> buildChatTimeline(
                         message.senderId == MessageSender.localUser.id)
                 ? onQuickReply
                 : null,
-            onRetry: onRetry != null && controller.canOfferFailedRetry(message)
+            onRetry:
+                onRetry != null &&
+                    (message.isFailure ||
+                        controller.canOfferFailedRetry(message))
                 ? onRetry
                 : null,
             onBranch:
@@ -654,10 +669,14 @@ List<ChatTimelineEntry> buildChatTimeline(
           message.id != beforeMessageId &&
           (message.role != AgentMessageRole.assistant ||
               message.isReasoning ||
-              message.isSystem))
+              message.isSystem)) ...[
+        ...?headersAfterMessage[message.id],
         ...?toolsByMessage[message.id],
-      if (!isGroup && message.id != beforeMessageId)
+      ],
+      if (!isGroup && message.id != beforeMessageId) ...[
+        ...?followingHeadersByMessage[message.id],
         ...?followingToolsByMessage[message.id],
+      ],
     ],
   ];
 }
@@ -766,4 +785,4 @@ String _toolActivityTitle(AgentStep step, String? senderName) {
 }
 
 String _activeToolActivityTitle(AgentStep step, String? senderName) =>
-    '${senderName == null ? '' : '$senderName '}正在${step.title}';
+    '${senderName == null ? '' : '$senderName '}${step.title}';

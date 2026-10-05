@@ -274,10 +274,13 @@ class ConversationReader {
     final afterMessageIds = {
       for (final run in runs) run['id']!: run['user_message_id']! as String,
     };
+    final visibleMessageIds = conversation.messages.map((m) => m.id).toSet();
     for (final event in events) {
       final runId = event['run_id']! as String;
       if (event['kind'] == 'message') {
-        afterMessageIds[runId] = event['message_id']! as String;
+        if (visibleMessageIds.contains(event['message_id'])) {
+          afterMessageIds[runId] = event['message_id']! as String;
+        }
       } else if (event['kind'] == 'tool') {
         final tool = tools[event['tool_call_id']]!;
         conversation.liveToolSteps.add((
@@ -573,7 +576,7 @@ class ConversationReader {
     List<Object?> selectedArgs,
   ) async {
     final runWhere =
-        "status = 'completed' AND final_message_id IN ($selectedMessages) AND final_message_id IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != '') AND elapsed_ms IS NOT NULL AND (is_task = 1 OR id IN (SELECT run_id FROM messages WHERE kind = 'reasoning')) AND conversation_id IN (SELECT id FROM conversations WHERE kind = 'direct')";
+        "status IN ('completed', 'failed', 'interrupted') AND final_message_id IN ($selectedMessages) AND final_message_id IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != '') AND elapsed_ms IS NOT NULL AND (is_task = 1 OR id IN (SELECT run_id FROM messages WHERE kind = 'reasoning')) AND conversation_id IN (SELECT id FROM conversations WHERE kind = 'direct')";
     final runs = await database.query(
       'agent_runs',
       where: runWhere,
@@ -617,7 +620,11 @@ class ConversationReader {
           isTask: run['is_task'] == 1,
           stopped: run['status'] == 'cancelled',
           intermediateMessageIds:
-              run['status'] == 'completed' &&
+              const {
+                    'completed',
+                    'failed',
+                    'interrupted',
+                  }.contains(run['status']) &&
                   messages[run['final_message_id']]!['kind'] == 'final' &&
                   messages[run['final_message_id']]!['interactive_json'] ==
                       null &&
@@ -640,7 +647,11 @@ class ConversationReader {
           activities: [
             for (final event
                 in events[run['id']] ?? const <Map<String, Object?>>[])
-              if (((run['status'] == 'completed' &&
+              if (((const {
+                            'completed',
+                            'failed',
+                            'interrupted',
+                          }.contains(run['status']) &&
                           messages[run['final_message_id']]!['kind'] ==
                               'final' &&
                           messages[run['final_message_id']]!['interactive_json'] ==

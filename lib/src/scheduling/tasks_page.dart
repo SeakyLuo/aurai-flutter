@@ -20,12 +20,14 @@ import '../features/chat/menu_press_highlight.dart';
 import '../platform/message_file_store.dart';
 import '../platform/message_image_store.dart';
 import 'scheduled_tasks.dart';
+import '../storage/development_projects.dart';
 import 'task_detail_page.dart';
 import 'task_action_menu.dart';
 
 class TasksPage extends StatefulWidget {
-  const TasksPage({super.key, required this.controller});
+  const TasksPage({super.key, required this.controller, this.project});
   final ChatController controller;
+  final DevelopmentProject? project;
   @override
   State<TasksPage> createState() => _TasksPageState();
 }
@@ -81,7 +83,15 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
 
   Future<void> _ensureDraft() async {
     if (_draftConversationId == widget.controller.activeConversation.id) return;
-    await widget.controller.createConversation();
+    final project = widget.project;
+    if (project == null) {
+      await widget.controller.createConversation();
+    } else {
+      await widget.controller.createProjectConversation(
+        project,
+        senderId: project.defaultSenderId,
+      );
+    }
     _draftConversationId = widget.controller.activeConversation.id;
   }
 
@@ -460,16 +470,26 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
 
 Future<void> openScheduledTasks(
   BuildContext context,
-  ChatController controller,
-) async {
+  ChatController controller, {
+  DevelopmentProject? project,
+}) async {
   final request = await Navigator.of(context).push<_TaskCreationRequest>(
-    MaterialPageRoute(builder: (_) => TasksPage(controller: controller)),
+    MaterialPageRoute(
+      builder: (_) => TasksPage(controller: controller, project: project),
+    ),
   );
   if (!context.mounted || request == null) return;
   try {
     if (controller.needsConfiguration) throw StateError('请先在设置中配置模型，再创建任务');
     if (request.conversationId == null) {
-      await controller.createConversation();
+      if (project == null) {
+        await controller.createConversation();
+      } else {
+        await controller.createProjectConversation(
+          project,
+          senderId: project.defaultSenderId,
+        );
+      }
     } else if (controller.activeConversation.id != request.conversationId) {
       await controller.selectConversation(request.conversationId!);
     }

@@ -12,7 +12,20 @@ extension ScheduledExecution on ChatController {
     try {
       task = await scheduledTasks.take(false);
       if (task == null) return;
+      String? projectId;
+      final sourceConversationId = task['sourceConversationId'] as String?;
+      if (sourceConversationId != null) {
+        final source = await _store.database.query(
+          'conversations',
+          columns: ['project_id'],
+          where: 'id = ?',
+          whereArgs: [sourceConversationId],
+        );
+        if (source.isNotEmpty)
+          projectId = source.single['project_id'] as String?;
+      }
       conversation = Conversation.empty()
+        ..projectId = projectId
         ..defaultSenderId =
             task['aiSenderId'] as String? ?? MessageSender.aurai.id
         ..isScheduledTask = true

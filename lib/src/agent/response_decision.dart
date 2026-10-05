@@ -11,7 +11,7 @@ class ResponseDecision implements AgentTool, RuntimeCapabilityAgentTool {
       inputSchema: const {
         'type': 'object',
         'properties': {
-          'choice': {'type': 'integer', 'minimum': 1},
+          'choice': {'type': 'string', 'description': '所选选项的 id，按当前卡片原样填写。'},
           'reason': {
             'type': 'string',
             'minLength': 1,

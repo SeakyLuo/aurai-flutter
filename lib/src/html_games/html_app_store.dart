@@ -136,7 +136,7 @@ class HtmlAppStore {
 
   /// Both the page and AI use this transaction to serialize versioned writes.
   Future<Map<String, Object?>> data(
-    String id,
+    String? id,
     String name, {
     required String actor,
     String? messageId,
@@ -147,14 +147,13 @@ class HtmlAppStore {
     HtmlDataCommit? commit;
     try {
       return await database.transaction((txn) async {
-        final apps = await txn.query(
-          'html_apps',
-          where: 'id = ?',
-          whereArgs: [id],
-        );
-        if (apps.isEmpty) throw StateError('小程序不存在');
+        final apps = id == null
+            ? <Map<String, Object?>>[]
+            : await txn.query('html_apps', where: 'id = ?', whereArgs: [id]);
+        if (id != null && apps.isEmpty) throw StateError('小程序不存在');
         Map<String, Object?>? session;
         if (messageId == null) {
+          if (id == null) throw ArgumentError('消息数据需要 messageId');
           if (apps.single['creator_id'] != actor)
             throw StateError('只能访问自己创建的小程序数据');
         } else {
@@ -162,7 +161,7 @@ class HtmlAppStore {
             'html_games',
             columns: ['app_id', 'session_data_json', 'version'],
             where:
-                "message_id = ? AND app_id = ? AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
+                "message_id = ? AND app_id IS ? AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
             whereArgs: [messageId, id],
           );
           if (refs.isEmpty) throw StateError('小程序入口已删除或撤回');
@@ -198,7 +197,7 @@ class HtmlAppStore {
           );
           return next;
         }
-        final file = await _dataFile(id, name);
+        final file = await _dataFile(id!, name);
         commit = HtmlDataCommit(file, 'html_data_commit:$id:$name');
         await commit!.recover(txn);
         final previous = await _read(file);

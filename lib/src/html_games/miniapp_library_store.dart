@@ -10,6 +10,7 @@ import 'html_app_store.dart';
 import 'html_game.dart';
 import 'miniapp_entry.dart';
 import 'miniapp_metadata_store.dart';
+import 'miniapp_team_store.dart';
 export 'miniapp_entry.dart';
 part 'miniapp_publication_store.dart';
 

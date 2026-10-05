@@ -11,7 +11,7 @@ import 'private_task_list_nodes.dart';
 import 'settings_appearance.dart';
 import 'program_task_history.dart';
 
-/// Displays only the miniapp's public task projection, never its private state.
+/// Displays public tasks or the viewer's permissioned task projection.
 class ProgramTaskPanel extends StatefulWidget {
   const ProgramTaskPanel({
     super.key,
@@ -74,7 +74,7 @@ class _ProgramTaskPanelState extends State<ProgramTaskPanel> {
     final success = await runUiAction(context, () async {
       final rows = await widget.controller.htmlStore.database.query(
         'html_games',
-        columns: ['state_json'],
+        columns: ['message_id', 'state_json'],
         where: '''conversation_id = ?
           AND json_type(state_json, '\$.taskProgress') IS NOT NULL
           AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game'
@@ -86,11 +86,28 @@ class _ProgramTaskPanelState extends State<ProgramTaskPanel> {
         limit: 1,
       );
       if (!mounted || revision != _revision) return;
-      final progress = rows.isEmpty
+      var progress = rows.isEmpty
           ? null
           : (jsonDecode(rows.single['state_json'] as String)
                     as Map)['taskProgress']
                 as Map<String, dynamic>?;
+      if (rows.isNotEmpty) {
+        final runtimeRows = await widget.controller.htmlStore.database.query(
+          'app_state',
+          columns: ['value'],
+          where: 'key = ?',
+          whereArgs: ['miniapp-program:${rows.single['message_id']}'],
+          limit: 1,
+        );
+        if (runtimeRows.isNotEmpty) {
+          final runtime =
+              jsonDecode(runtimeRows.single['value'] as String) as Map;
+          final own = (runtime['privateViews'] as Map)['user:local'] as Map?;
+          if (own != null && own.containsKey('taskProgress'))
+            progress = own['taskProgress'] as Map<String, dynamic>?;
+        }
+      }
+      if (!mounted || revision != _revision) return;
       setState(() => _progress = progress);
       _changes.add(progress ?? {'steps': const <Map>[]});
     });

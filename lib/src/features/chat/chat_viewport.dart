@@ -495,10 +495,6 @@ class ChatViewportState extends State<ChatViewport> {
   }
 
   void _preserveEntry(String id) {
-    if (_following && !_userScrolling) {
-      _scheduleBottomSync();
-      return;
-    }
     final revision = ++_scrollRevision;
     _keepSentMessageAtTop = false;
     final position = _positions.itemPositions.value.firstWhere(

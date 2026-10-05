@@ -9,12 +9,10 @@ import '../../domain/message_sender.dart';
 import '../../storage/conversation_reader.dart';
 import '../../storage/group_message_marks.dart';
 import '../../storage/interactive_message_store.dart';
-import 'attachment_action_icon.dart';
 import 'chat_controller.dart';
 import 'conversation_menu_icon.dart';
-import 'glass_surface.dart';
 import 'header_action_menu.dart';
-import 'settings_appearance.dart';
+import 'pinned_message_detail.dart';
 
 class PinnedMessageSplit extends StatefulWidget {
   const PinnedMessageSplit({
@@ -241,52 +239,17 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
     );
   }
 
-  Widget _detail(BuildContext context, {required bool wide}) => Scaffold(
-    extendBodyBehindAppBar: true,
-    appBar: SettingsAppBar(
-      title: '置顶详情',
-      onBack: close,
-      actions: [
-        SettingsGlassActionSurface(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RoundAction(
-                label: '定位',
-                icon: Icons.my_location,
-                iconWidget: AttachmentActionIcon(
-                  type: AttachmentActionIconType.locate,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-                onPressed: () {
-                  final id = _message!.id;
-                  if (!wide) close();
-                  widget.onLocate(id);
-                },
-              ),
-              const SizedBox(height: 20, child: VerticalDivider(width: 1)),
-              Builder(
-                builder: (anchor) => RoundAction(
-                  label: '更多',
-                  icon: Icons.more_vert_rounded,
-                  onPressed: () => _menu(anchor),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-    body: SettingsPageBody(
-      child: ListView(
-        padding: settingsPagePadding(
-          context,
-          const EdgeInsets.only(top: 12, bottom: 24),
-        ),
-        children: [widget.messageBuilder(context, _message!)],
-      ),
-    ),
-  );
+  Widget _detail(BuildContext context, {required bool wide}) =>
+      PinnedMessageDetail(
+        onBack: close,
+        onLocate: () {
+          final id = _message!.id;
+          if (!wide) close();
+          widget.onLocate(id);
+        },
+        onMore: _menu,
+        child: widget.messageBuilder(context, _message!),
+      );
 
   @override
   Widget build(BuildContext context) => PopScope(

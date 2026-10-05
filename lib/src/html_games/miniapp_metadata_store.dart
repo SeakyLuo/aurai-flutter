@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import 'miniapp_entry.dart';
+import 'miniapp_team_store.dart';
 
 const miniappMetadataSchema = '''CREATE TABLE miniapp_metadata (
   app_id TEXT PRIMARY KEY,
@@ -82,9 +83,19 @@ class MiniappMetadataStore {
     );
   }
 
-  Future<void> saveIcon(MiniappEntry entry, String? iconPath) async {
+  Future<void> saveIcon(
+    MiniappEntry entry,
+    String? iconPath, {
+    String actor = 'user:local',
+  }) async {
     if (!entry.canEditMetadata) throw StateError('只能编辑自己小程序的资料');
     await database.transaction((txn) async {
+      if (actor != 'user:local') {
+        final app = await MiniappTeamStore.app(txn, entry.publicationId);
+        if (!await MiniappTeamStore.canEdit(txn, app, actor)) {
+          throw StateError('已无此小程序的编辑权限，请重新申请加入开发团队');
+        }
+      }
       final rows = await txn.query(
         'miniapp_metadata',
         columns: ['revision'],

@@ -6,6 +6,7 @@ extension MiniappPublicationOperations on MiniappLibraryStore {
     String title,
     String description, {
     required String changeLog,
+    String actor = MiniappLibraryStore.owner,
   }) async {
     title = title.trim();
     description = description.trim();
@@ -35,12 +36,15 @@ extension MiniappPublicationOperations on MiniappLibraryStore {
       if (installed.isNotEmpty) throw StateError('添加的小程序不能作为自己的作品发布');
       final current = await txn.query(
         'html_apps',
-        columns: ['source_path'],
+        columns: ['id', 'creator_id', 'source_path'],
         where: 'id = ?',
         whereArgs: [entry.id],
       );
       if (current.single['source_path'] != app['source_path']) {
         throw StateError('小程序代码已更新，请重新打开详情后发布');
+      }
+      if (!await MiniappTeamStore.canEdit(txn, current.single, actor)) {
+        throw StateError('已无此小程序的编辑权限，请重新申请加入开发团队');
       }
       final old = await txn.query(
         'miniapp_publications',

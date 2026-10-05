@@ -30,6 +30,7 @@ class ToolActionIcon extends StatelessWidget {
           ? SkillIcon(_icon!.substring(6))
           : switch (_icon) {
               'forwardMessage' => const SkillIcon('forward'),
+              'compactContext' => const SkillIcon('brain'),
               'recallMessage' => const SkillIcon('recall'),
               'createConversation' => const SkillIcon('compose'),
               'renameConversation' => const SkillIcon('rename'),
@@ -55,6 +56,10 @@ class ToolActionIcon extends StatelessWidget {
               'updateHtmlMessage' ||
               'listHtmlApps' ||
               'readHtmlApp' ||
+              'readHtmlAppTeam' ||
+              'requestHtmlAppEdit' ||
+              'manageHtmlAppTeam' ||
+              'listHtmlAppEditRequests' ||
               'updateHtmlApp' ||
               'listHtmlAppPublications' ||
               'readHtmlAppPublication' ||

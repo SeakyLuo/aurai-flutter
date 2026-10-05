@@ -8,7 +8,7 @@ import 'private_task_list_nodes.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 
-/// Reads public snapshots only; private program state never enters this list.
+/// Reads public tasks and the viewer's permissioned task snapshots.
 class ProgramTaskHistory extends StatefulWidget {
   const ProgramTaskHistory({
     super.key,
@@ -110,7 +110,12 @@ class _ProgramTaskHistoryState extends State<ProgramTaskHistory> {
   );
   Widget _tile(Map<String, Object?> row) {
     final snapshot = jsonDecode(row['snapshot_json'] as String) as Map;
-    final task = (snapshot['state'] as Map)['taskProgress'] as Map;
+    final privateProgress = snapshot['privateTaskProgress'] as Map?;
+    final task =
+        (privateProgress?.containsKey('user:local') == true
+                ? privateProgress!['user:local']
+                : (snapshot['state'] as Map)['taskProgress'])
+            as Map;
     final description = task['description'] as String?;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),

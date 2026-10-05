@@ -2,17 +2,14 @@ import 'settings_appearance.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../app/ui_action.dart';
 import '../../storage/group_message_marks.dart';
 import '../../storage/group_message_search.dart';
 import 'chat_controller.dart';
-import 'conversation_menu_icon.dart';
 import 'group_saved_message_preview.dart';
-import 'header_action_menu.dart';
-import 'home_navigation.dart';
-import 'attachment_action_icon.dart';
 import 'settings_icon.dart';
+import 'pinned_message_page.dart';
+import 'pinned_message_split.dart';
 
 class GroupPinnedMessageEntry extends StatefulWidget {
   const GroupPinnedMessageEntry({
@@ -57,56 +54,19 @@ class _GroupPinnedMessageEntryState extends State<GroupPinnedMessageEntry> {
     });
   }
 
-  Future<void> _menu(
-    BuildContext anchor,
-    GroupMessageSearchResult message,
-  ) async {
-    final color = Theme.of(context).colorScheme.onSurfaceVariant;
-    final result = await showHeaderActionMenu(
-      anchor,
-      items: [
-        (
-          value: 'locate',
-          label: '查看原消息',
-          icon: AttachmentActionIcon(
-            type: AttachmentActionIconType.locate,
-            color: color,
-          ),
-        ),
-        (
-          value: 'show',
-          label: '在聊天顶部显示',
-          icon: SettingsIcon(type: SettingsIconType.eye, color: color),
-        ),
-        (
-          value: 'unpin',
-          label: '取消置顶',
-          icon: ConversationMenuIcon(
-            type: ConversationMenuIconType.removeTop,
-            color: color,
-          ),
-        ),
-      ],
-    );
-    if (!mounted || result == null) return;
-    await runUiAction(context, () async {
-      if (result == 'locate') {
-        await openHomeConversation(
-          context,
-          widget.controller,
-          widget.groupId,
+  Future<void> _open(GroupMessageSearchResult message) async {
+    final split = context.findAncestorStateOfType<PinnedMessageSplitState>();
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => PinnedMessagePage(
+          controller: widget.controller,
+          conversationId: widget.groupId,
           messageId: message.id,
-          waitForClose: true,
-        );
-      } else if (result == 'unpin') {
-        await _store.pin(widget.groupId, message.id, false);
-      } else {
-        await SharedPreferencesAsync().remove(
-          'groupPinDismissed:${widget.groupId}',
-        );
-        GroupMessageMarks.changes.add(widget.groupId);
-      }
-    });
+          onLocate: split?.widget.onLocate,
+          messageBuilder: split?.widget.messageBuilder,
+        ),
+      ),
+    );
   }
 
   @override
@@ -128,7 +88,7 @@ class _GroupPinnedMessageEntryState extends State<GroupPinnedMessageEntry> {
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
-      onTap: () => _menu(context, message),
+      onTap: () => _open(message),
       trailing: const SettingsIcon(type: SettingsIconType.chevron),
     );
     if (widget.embedded) return tile;

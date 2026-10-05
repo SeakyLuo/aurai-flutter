@@ -131,9 +131,7 @@ class _GroupMentionTextState extends State<GroupMentionText> {
       spans.add(
         TextSpan(
           text: label,
-          style: isMiniapp
-              ? GlobalUI.linkStyle(context)
-              : groupMentionStyle(context),
+          style: groupMentionStyle(context),
           recognizer: recognizer,
         ),
       );

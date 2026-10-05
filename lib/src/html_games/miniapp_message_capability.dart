@@ -13,6 +13,7 @@ class MiniappMessageCapability {
     required String conversationId,
     required String messageId,
     required String actorId,
+    String? continuationSenderId,
     required Set<String> memberIds,
     required Set<String> agents,
     required Map<String, MessageSender> senders,
@@ -24,8 +25,8 @@ class MiniappMessageCapability {
     final batch = txn.batch();
     for (final raw in effects) {
       final effect = (raw as Map).cast<String, Object?>();
-      final senderId = effect['senderId'] as String?;
-      if (senderId != null && senderId != actorId) {
+      final requestedSenderId = effect['senderId'] as String?;
+      if (requestedSenderId != null && requestedSenderId != actorId) {
         throw ArgumentError('程序消息只能以当前操作人身份发送');
       }
       final audience = (effect['audience'] as List?)?.cast<String>();
@@ -35,6 +36,11 @@ class MiniappMessageCapability {
       }
       final id = newMessageId();
       final definition = effect['card'] as Map?;
+      // Follow-up cards retain the verified source card's author, not its respondent.
+      // Ordinary messages still use the authenticated event actor.
+      final senderId = definition != null && continuationSenderId != null
+          ? continuationSenderId
+          : requestedSenderId;
       if (definition == null && (effect['text'] as String).trim().isEmpty) {
         throw ArgumentError('小程序发送的消息不能为空');
       }

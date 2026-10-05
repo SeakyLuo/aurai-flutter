@@ -36,6 +36,8 @@ import '../../domain/library_asset.dart';
 import 'conversation_search_page.dart';
 import 'sidebar_action_icon.dart';
 import 'glass_surface.dart';
+import 'group_create_page.dart';
+import '../../scheduling/tasks_page.dart';
 import 'contact_profile_split.dart';
 
 class ProjectsPage extends StatefulWidget {
@@ -465,12 +467,28 @@ class _ProjectPageState extends State<ProjectPage> {
     }
   }
 
+  Future<void> _createGroup() async {
+    final id = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GroupCreatePage(
+          controller: widget.controller,
+          projectId: _project.id,
+        ),
+      ),
+    );
+    if (mounted && id != null) await _openConversation(id);
+  }
+
   Future<void> _showMore(BuildContext anchorContext) async {
     final result = await showProjectActions(
       anchorContext,
       widget.controller,
       _project,
       allowHomeShortcut: true,
+      onCreateGroup: _createGroup,
+      onScheduledTasks: () =>
+          openScheduledTasks(context, widget.controller, project: _project),
     );
     if (!mounted) return;
     if (result == ProjectActionResult.removed) {

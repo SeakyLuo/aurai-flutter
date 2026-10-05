@@ -10,6 +10,7 @@ import 'delete_confirmation_dialog.dart';
 import 'header_action_menu.dart';
 import 'project_profile_navigation.dart';
 import 'settings_icon.dart';
+import 'sidebar_action_icon.dart';
 
 enum ProjectActionResult { changed, removed }
 
@@ -19,6 +20,8 @@ Future<ProjectActionResult?> showProjectActions(
   DevelopmentProject project, {
   bool? hasUnread,
   bool allowHomeShortcut = false,
+  Future<void> Function()? onCreateGroup,
+  Future<void> Function()? onScheduledTasks,
 }) async {
   final context = anchorContext;
   final unread =
@@ -29,6 +32,18 @@ Future<ProjectActionResult?> showProjectActions(
     anchorContext,
     destructiveValues: const {'remove'},
     items: [
+      if (onCreateGroup != null)
+        (
+          value: 'group',
+          label: '创建群聊',
+          icon: const SidebarActionIcon(type: SidebarActionIconType.group),
+        ),
+      if (onScheduledTasks != null)
+        (
+          value: 'tasks',
+          label: '定时任务',
+          icon: const SettingsIcon(type: SettingsIconType.tasks),
+        ),
       (
         value: 'info',
         label: '项目信息',
@@ -68,6 +83,12 @@ Future<ProjectActionResult?> showProjectActions(
   if (!context.mounted || action == null) return null;
   try {
     switch (action) {
+      case 'group':
+        await onCreateGroup!();
+        return ProjectActionResult.changed;
+      case 'tasks':
+        await onScheduledTasks!();
+        return ProjectActionResult.changed;
       case 'info':
         final latest = await controller.projects.read(project.id);
         if (!context.mounted) return null;

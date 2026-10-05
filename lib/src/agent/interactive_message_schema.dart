@@ -58,6 +58,7 @@ const interactiveBodySchema = {
   'type': 'string',
   'maxLength': 10000,
   'description':
+      'Keep card copy concise: include only information needed to decide and essential constraints. Do not repeat the title, options, button actions, or submission instructions. Omit reminders such as choose a target, confirm submission, use the private card, or discussion does not count as a vote. An empty body is appropriate when the title and options suffice. '
       r'Plain text supporting line breaks and blank lines. In JSON encode a line break once as \n, not \\n: the decoded string must contain a real newline, not literal backslash-n text. Do not JSON-encode the body separately. Markdown and HTML are not rendered.',
 };
 

@@ -21,8 +21,9 @@ import 'app_dialog.dart';
 import 'dialog_action_button.dart';
 import 'chat_header.dart';
 import 'program_task_panel.dart';
+import 'private_goal_panel.dart';
 
-/// Reserves space below the chat header so the announcement cannot cover messages.
+/// Reserves space for announcements, pinned messages, then tasks in both chat kinds.
 class GroupAnnouncementBanner extends StatefulWidget {
   const GroupAnnouncementBanner({
     super.key,
@@ -33,7 +34,7 @@ class GroupAnnouncementBanner extends StatefulWidget {
   });
   final ChatController controller;
   final Future<void> Function(String) onLocate;
-  final String? groupId;
+  final String groupId;
   final Widget Function(BuildContext context, double announcementHeight)
   builder;
 
@@ -52,6 +53,8 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
   late final StreamSubscription<String> _marks;
   int _loadId = 0;
   double _noticeHeight = 0;
+  bool get _isGroup =>
+      widget.controller.activeConversation.kind == ConversationKind.group;
 
   @override
   void initState() {
@@ -79,12 +82,13 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
   Future<void> _load() async {
     final request = ++_loadId;
     final id = widget.groupId;
-    if (id == null) return;
     await runUiAction(context, () async {
       final (value, dismissed, pinRow) = await (
-        GroupAnnouncementStore(
-          widget.controller.groupStore,
-        ).read(id, MessageSender.localUser.id),
+        _isGroup
+            ? GroupAnnouncementStore(
+                widget.controller.groupStore,
+              ).read(id, MessageSender.localUser.id)
+            : Future<GroupAnnouncement?>.value(null),
         _dismissals.read(id, MessageSender.localUser.id),
         GroupMessageMarks(widget.controller.groupStore).pinned(id),
       ).wait;
@@ -112,7 +116,7 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
   }
 
   Future<void> _dismiss() async {
-    final id = widget.groupId!;
+    final id = widget.groupId;
     final value = _value!;
     await runUiAction(context, () async {
       await _dismissals.dismiss(
@@ -133,7 +137,7 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
       MaterialPageRoute(
         builder: (_) => GroupAnnouncementPage(
           controller: widget.controller,
-          groupId: widget.groupId!,
+          groupId: widget.groupId,
         ),
       ),
     );
@@ -149,7 +153,7 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
             : AiContactPage(
                 controller: widget.controller,
                 senderId: senderId,
-                groupId: widget.groupId,
+                groupId: _isGroup ? widget.groupId : null,
               ),
       ),
     );
@@ -163,9 +167,18 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
   }
 
   Future<void> _dismissPin() async {
-    final id = widget.groupId!;
+    final id = widget.groupId;
     final stamp = _pinStamp!;
     final messageId = _pin!.id;
+    if (!_isGroup) {
+      await runUiAction(
+        context,
+        () => GroupMessageMarks(
+          widget.controller.groupStore,
+        ).pin(id, messageId, false),
+      );
+      return;
+    }
     final action = await showDialog<String>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: .24),
@@ -220,31 +233,29 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
   Widget build(BuildContext context) {
     final value = _value;
     final pin = _pin;
-    final height = widget.groupId == null ? 0.0 : _noticeHeight;
+    final height = _noticeHeight;
     return Stack(
       children: [
         Positioned.fill(child: widget.builder(context, height)),
-        if (widget.groupId != null)
-          Positioned(
-            top:
-                View.of(context).padding.top /
-                    View.of(context).devicePixelRatio +
-                ChatHeader.toolbarHeight,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
-                child: _NoticeSize(
-                  onChanged: (size) {
-                    if (mounted && _noticeHeight != size.height) {
-                      setState(() => _noticeHeight = size.height);
-                    }
-                  },
-                  child: ProgramTaskPanel(
-                    controller: widget.controller,
-                    conversationId: widget.groupId!,
-                    child: Padding(
+        Positioned(
+          top:
+              View.of(context).padding.top / View.of(context).devicePixelRatio +
+              ChatHeader.toolbarHeight,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: _NoticeSize(
+                onChanged: (size) {
+                  if (mounted && _noticeHeight != size.height) {
+                    setState(() => _noticeHeight = size.height);
+                  }
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Column(
                         children: [
@@ -266,6 +277,7 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
                               time: messageTime(pin.createdAt),
                               preview: groupSavedMessagePreview(pin),
                               announcement: false,
+                              dismissLabel: _isGroup ? null : '取消置顶',
                               onOpen: () => widget.onLocate(pin.id),
                               onDismiss: _dismissPin,
                               onOpenProfile: () => _openProfile(pin.sender.id),
@@ -275,11 +287,24 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
                         ],
                       ),
                     ),
-                  ),
+                    if (_isGroup)
+                      ProgramTaskPanel(
+                        controller: widget.controller,
+                        conversationId: widget.groupId,
+                        child: const SizedBox.shrink(),
+                      )
+                    else
+                      PrivateGoalPanel(
+                        store: widget.controller.privateTaskState,
+                        controller: widget.controller,
+                        builder: (_, _) => const SizedBox.shrink(),
+                      ),
+                  ],
                 ),
               ),
             ),
           ),
+        ),
       ],
     );
   }

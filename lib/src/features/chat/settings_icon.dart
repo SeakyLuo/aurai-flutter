@@ -333,12 +333,34 @@ class _SettingsIconPainter extends CustomPainter {
           pen,
         );
       case SettingsIconType.tasks:
-        canvas.drawCircle(const Offset(12, 12), 9, pen);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(3, 3, 18, 18),
+            const Radius.circular(3),
+          ),
+          pen,
+        );
         canvas.drawPath(
           Path()
-            ..moveTo(12, 6)
-            ..lineTo(12, 12)
-            ..lineTo(8.5, 15.5),
+            ..moveTo(6, 7.5)
+            ..lineTo(7.2, 8.7)
+            ..lineTo(9.3, 6.5)
+            ..moveTo(12, 7.5)
+            ..lineTo(18, 7.5)
+            ..moveTo(6, 12)
+            ..lineTo(7.2, 13.2)
+            ..lineTo(9.3, 11)
+            ..moveTo(12, 12)
+            ..lineTo(18, 12)
+            ..moveTo(12, 16.5)
+            ..lineTo(16, 16.5),
+          pen,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(6.2, 15.2, 2.6, 2.6),
+            const Radius.circular(.6),
+          ),
           pen,
         );
       case SettingsIconType.goal:

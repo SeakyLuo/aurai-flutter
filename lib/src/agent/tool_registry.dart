@@ -1,4 +1,5 @@
 import '../domain/tool_customization.dart';
+import 'compact_context_tool.dart';
 import 'tool_search.dart';
 import '../domain/capability.dart';
 import '../domain/tool_models.dart';
@@ -15,6 +16,8 @@ class ToolRegistry {
        } {
     final search = ToolSearch(this);
     _tools[search.definition.name] = search;
+    const compact = CompactContextTool();
+    _tools[compact.definition.name] = compact;
   }
 
   final Map<String, AgentTool> _tools;
@@ -63,6 +66,7 @@ class ToolRegistry {
             tool.name == 'searchTools' ||
             tool.name == 'askUser' ||
             tool.name == 'hideThinking' ||
+            tool.name == 'compactContext' ||
             tool.name == 'readInteractiveMessage' ||
             tool.name == 'clickInteractiveMessage' ||
             const [
