@@ -1,3 +1,4 @@
+import '../features/chat/app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 
 import '../features/chat/question_icon.dart';
@@ -9,7 +10,7 @@ Future<SkillSort?> showSkillSortPicker(
   BuildContext context,
   SkillSort selected,
 ) {
-  return showModalBottomSheet<SkillSort>(
+  return showAppBottomSheet<SkillSort>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

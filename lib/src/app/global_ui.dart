@@ -172,7 +172,7 @@ abstract final class GlobalUI {
         shape: const RoundedRectangleBorder(
           borderRadius: bottomSheetBorderRadius,
         ),
-        clipBehavior: Clip.antiAlias,
+        clipBehavior: Clip.antiAliasWithSaveLayer,
         showDragHandle: true,
         surfaceTintColor: Colors.transparent,
       ),

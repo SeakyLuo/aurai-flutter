@@ -1,3 +1,4 @@
+import '../features/chat/app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 
 import '../features/chat/question_icon.dart';
@@ -14,7 +15,7 @@ Future<SkillPermissionSelection?> showSkillPermissionPicker(
   BuildContext context,
   SkillPermission selected, {
   bool defaults = false,
-}) => showModalBottomSheet<SkillPermissionSelection>(
+}) => showAppBottomSheet<SkillPermissionSelection>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,

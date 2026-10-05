@@ -5,7 +5,7 @@ extension GroupRunTools on ChatController {
     required List<AgentTool> tools,
     required Conversation parent,
     required Conversation member,
-    required _ReplyContext reply,
+    required ExecutionReplyContext reply,
     required List<AgentMessage> observed,
     required List<String> publishedIds,
     required void Function() onSleep,
@@ -97,7 +97,7 @@ extension GroupRunTools on ChatController {
           final actorMember = members.firstWhere((m) => m.sender.id == actorId);
           if ((all || senderIds.length > 1) && !actorMember.role.canManage)
             throw StateError('只有群主和群管理员可以批量暂停或恢复接话');
-          final state = _executionStates[groupId];
+          final state = _executions.sessions[groupId];
           final dispatcher = state?.groupDispatcher;
           final active =
               dispatcher != null && !dispatcher.closed && !dispatcher.stopped;

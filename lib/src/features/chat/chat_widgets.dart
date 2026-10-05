@@ -1,3 +1,4 @@
+import '../../domain/model_failure.dart';
 import '../../domain/message_quote.dart';
 import 'message_quote_view.dart';
 import '../../domain/message_file.dart';
@@ -246,8 +247,10 @@ class ExecutionProgress extends StatelessWidget {
       return TaskFailureCard(
         onRetry: onRetry,
         error: errorDetail ?? '任务执行失败',
-        actionLabel: '继续',
-        continuing: true,
+        actionLabel: classifyModelFailure(errorDetail ?? '').canContinue
+            ? '继续'
+            : '重试',
+        continuing: classifyModelFailure(errorDetail ?? '').canContinue,
       );
     }
 

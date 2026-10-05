@@ -23,8 +23,8 @@ extension MiniappContextCompactionActions on ChatController {
       for (final item in [
         ..._conversations,
         _viewConversation,
-        _executionStates[id]?.conversation,
-        _executionStates[id]?.runningConversation,
+        _executions.sessions[id]?.conversation,
+        _executions.sessions[id]?.runningConversation,
       ])
         if (item != null && item.id == id) item,
     };
@@ -41,7 +41,7 @@ extension MiniappContextCompactionActions on ChatController {
       );
       final snapshot = MiniappProgram.decode(eventRows.single['snapshot_json']);
       if (!snapshot.containsKey('pendingContextChange')) return false;
-      final dispatcher = _executionStates[id]?.groupDispatcher;
+      final dispatcher = _executions.sessions[id]?.groupDispatcher;
       dispatcher?.hold();
       for (final conversation in conversations) {
         conversation.isCompacting = true;

@@ -1,3 +1,4 @@
+import '../features/chat/app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/question_icon.dart';
@@ -10,7 +11,7 @@ Future<String?> showSkillIconPicker(
 }) {
   final media = MediaQuery.of(context);
   final height = media.size.height - media.viewPadding.top;
-  return showModalBottomSheet<String>(
+  return showAppBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -74,7 +75,7 @@ Future<String?> showSkillIconPicker(
                       color: isSelected
                           ? Theme.of(
                               context,
-                              ).colorScheme.onSurface.withValues(alpha: .06)
+                            ).colorScheme.onSurface.withValues(alpha: .06)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(16),
                       child: InkWell(

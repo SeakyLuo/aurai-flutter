@@ -1,3 +1,5 @@
+import 'app_bottom_sheet.dart';
+import 'app_sheet_surface.dart';
 import 'task_playback_icon.dart';
 import 'tool_activity_view.dart';
 import 'chat_header_background.dart';
@@ -9,7 +11,6 @@ import 'group_member_header_actions.dart';
 import 'glass_surface.dart';
 import 'header_action_menu.dart';
 import '../../app/glass_notice.dart';
-import '../../app/global_ui.dart';
 import 'group_status_builder.dart';
 import 'package:flutter/material.dart';
 
@@ -32,7 +33,7 @@ Future<void> showGroupActivitySheet(
   BuildContext context, {
   required ChatController controller,
   required String conversationId,
-}) => showModalBottomSheet<void>(
+}) => showAppBottomSheet<void>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -347,7 +348,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
         ],
       );
       if (!mounted) return;
-      await showModalBottomSheet<void>(
+      await showAppBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
@@ -370,7 +371,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
   }
 
   Future<void> _openPauseDetails(GroupMemberActivity activity) =>
-      showModalBottomSheet<void>(
+      showAppBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
@@ -385,7 +386,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       );
 
   Future<void> _openDetails(GroupMemberActivity activity) =>
-      showModalBottomSheet<void>(
+      showAppBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
@@ -660,10 +661,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       },
     );
     if (widget._asSheet) {
-      return ClipRRect(
-        borderRadius: GlobalUI.bottomSheetBorderRadius,
-        child: SafeArea(top: false, child: content),
-      );
+      return AppSheetSurface(child: SafeArea(top: false, child: content));
     }
     return Scaffold(
       extendBodyBehindAppBar: true,

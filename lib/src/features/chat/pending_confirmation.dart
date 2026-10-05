@@ -18,30 +18,6 @@ String _approvalDetail(ToolCall call, ToolDefinition definition) =>
       _ => definition.description,
     };
 
-class PendingConfirmation {
-  PendingConfirmation(
-    this.call,
-    this.definition,
-    this.conversationId,
-    this.senderId,
-    this.senderName,
-    this.label,
-  ) : deadline = call.confirmationTimeoutSeconds == null
-          ? null
-          : DateTime.now().add(
-              Duration(seconds: call.confirmationTimeoutSeconds!),
-            );
-  final String conversationId;
-  final String senderId;
-  final String senderName;
-  final String label;
-  final DateTime? deadline;
-  final ToolCall call;
-  final ToolDefinition definition;
-  String scope = 'once';
-  final completer = Completer<bool>();
-}
-
 extension _PendingConfirmationActions on ChatController {
   Future<bool> _confirm(
     ToolCall call,
@@ -50,6 +26,8 @@ extension _PendingConfirmationActions on ChatController {
     String? conversationId,
     String senderId = 'agent:aurai',
     bool screenAccess = false,
+    String? taskTitle,
+    Future<void>? cancellation,
   }) async {
     if (_removedGroupMembers.contains(senderId) &&
         _groupRuns.containsKey(senderId))
@@ -77,7 +55,9 @@ extension _PendingConfirmationActions on ChatController {
       whereArgs: [senderId],
       limit: 1,
     )).single;
-    final senderName = sender['name'] as String;
+    final senderName = taskTitle == null
+        ? sender['name'] as String
+        : '${sender['name']} · $taskTitle';
     final label =
         '$senderName · ${definition.authorizationLabel ?? (call.name == 'runSkill' ? '技能：${call.arguments['name']}（版本 ${call.arguments['revision']}）' : toolTitle(call.name))}';
     if (!existing)
@@ -91,10 +71,11 @@ extension _PendingConfirmationActions on ChatController {
     _confirmingSenderId = senderId;
     notifyListeners();
     final bool approved;
+    var resolved = false;
     try {
-      var scope = existing
-          ? 'once'
-          : await _confirmInApp(
+      final request = existing
+          ? Future.value('once')
+          : _confirmInApp(
               approvalId,
               call,
               definition,
@@ -107,6 +88,21 @@ extension _PendingConfirmationActions on ChatController {
                   isScreenTool(call.name) &&
                   !definition.singleUseConfirmation,
             );
+      var scope = cancellation == null
+          ? await request
+          : await Future.any([
+              request,
+              cancellation.then((_) async {
+                if (!resolved) {
+                  if (identical(pendingConfirmation?.call, call))
+                    _execution.resolveConfirmation(false);
+                  if (accessibilityAvailable)
+                    await _platform.cancelPendingInteraction();
+                }
+                return 'deny';
+              }),
+            ]);
+      if (scope == 'deny') await request;
       // Native screen actions still validate their observation and issue a
       // one-use execution token after the user has approved in the app.
       if (scope != 'deny' &&
@@ -123,6 +119,7 @@ extension _PendingConfirmationActions on ChatController {
         );
         if (nativeScope == 'deny') scope = 'deny';
       }
+      resolved = true;
       approved = scope != 'deny';
       if (approved && !definition.singleUseConfirmation) {
         await toolApprovals.grant(
@@ -135,6 +132,7 @@ extension _PendingConfirmationActions on ChatController {
         );
       }
     } finally {
+      resolved = true;
       _confirmingSenderId = null;
       notifyListeners();
       await _platform.updateAttentionNotification(conversationId, 'approval');
@@ -162,14 +160,13 @@ extension _PendingConfirmationActions on ChatController {
       senderName,
       label,
     );
-    pendingConfirmation = request;
+    final confirmation = _execution.requestConfirmation(request);
     final id = 'tool:$approvalId';
     final db = _store.database;
     var nativeSettled = false;
     var nativePending = false;
     Future<void>? nativeWait;
     (Object, StackTrace)? nativeFailure;
-    Timer? timer;
     try {
       await ApprovalCenterStore.insert(db, {
         'id': id,
@@ -239,21 +236,14 @@ extension _PendingConfirmationActions on ChatController {
         ApprovalCenterStore.announce(id);
       }
       notifyListeners();
-      timer = call.confirmationTimeoutSeconds == null
-          ? null
-          : Timer(Duration(seconds: call.confirmationTimeoutSeconds!), () {
-              if (!request.completer.isCompleted)
-                request.completer.complete(false);
-            });
-      final approved = await request.completer.future;
-      return approved ? request.scope : 'deny';
+      return await confirmation;
     } finally {
-      timer?.cancel();
+      if (identical(pendingConfirmation, request))
+        _execution.resolveConfirmation(false);
       nativeSettled = true;
       if (nativePending) await _platform.cancelPendingInteraction();
       await nativeWait;
       ApprovalCenterStore.liveTools.remove(id);
-      if (identical(pendingConfirmation, request)) pendingConfirmation = null;
       await ApprovalCenterStore.finish(
         db,
         id,

@@ -1,3 +1,4 @@
+import '../features/chat/app_bottom_sheet.dart';
 import '../app/global_ui.dart';
 import '../features/chat/settings_appearance.dart';
 import '../app/glass_notice.dart';
@@ -27,7 +28,7 @@ Future<(String, Set<String>, List<ResourceScope>)?> showSkillVisibilityPicker(
   required String visibility,
   required Set<String> selected,
   required List<ResourceScope> scopes,
-}) => showModalBottomSheet<(String, Set<String>, List<ResourceScope>)>(
+}) => showAppBottomSheet<(String, Set<String>, List<ResourceScope>)>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -72,7 +73,7 @@ class _SkillVisibilityPickerState extends State<SkillVisibilityPicker> {
       final avatars = await widget.store.visibilityGroupAvatars();
       if (!mounted) return;
       final result =
-          await showModalBottomSheet<(Set<String>, List<ResourceScope>)>(
+          await showAppBottomSheet<(Set<String>, List<ResourceScope>)>(
             context: context,
             isScrollControlled: true,
             useSafeArea: true,

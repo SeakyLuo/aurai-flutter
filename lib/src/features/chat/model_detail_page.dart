@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'provider_settings_draft.dart';
 import 'package:flutter/material.dart';
 
@@ -236,7 +237,7 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
 
   Future<void> _pickPurposes() async {
     final selected = {..._purposes};
-    final result = await showModalBottomSheet<Set<ModelPurpose>>(
+    final result = await showAppBottomSheet<Set<ModelPurpose>>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -418,7 +419,7 @@ class _ProjectMemoryPageState extends State<ProjectMemoryPage> {
   }
 
   Future<void> _chooseMode() async {
-    final mode = await showModalBottomSheet<ProjectMemoryMode>(
+    final mode = await showAppBottomSheet<ProjectMemoryMode>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

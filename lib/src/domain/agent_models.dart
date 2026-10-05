@@ -1,4 +1,5 @@
 import 'tool_customization.dart';
+import 'tool_models.dart';
 import '../html_games/html_game.dart';
 import 'interactive_message.dart';
 import 'message_quote.dart';
@@ -288,7 +289,25 @@ class AgentMessage {
   );
 }
 
-enum AgentStepStatus { running, completed, failed, cancelled }
+enum AgentStepStatus {
+  running,
+  completed,
+  failed,
+  cancelled;
+
+  static AgentStepStatus fromResult(ToolResult result) {
+    if (result.status == ToolResultStatus.success &&
+        result.output['pending'] == true &&
+        result.output['newQuestionShown'] != false) {
+      return running;
+    }
+    return switch (result.status) {
+      ToolResultStatus.success => completed,
+      ToolResultStatus.cancelled => cancelled,
+      ToolResultStatus.denied || ToolResultStatus.error => failed,
+    };
+  }
+}
 
 class AgentStep {
   const AgentStep({
@@ -542,6 +561,7 @@ String toolTitle(String name) =>
     ToolCustomizations.values[name]?.title ?? _defaultToolTitle(name);
 
 String _defaultToolTitle(String name) => switch (name) {
+  'runSubagent' => '子代理',
   'createGoal' => '建立目标',
   'clearGoal' => '清除目标',
   'readGroupPersonalDetails' => '读取群个人资料',

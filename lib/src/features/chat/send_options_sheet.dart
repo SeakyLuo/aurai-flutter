@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/message_sender.dart';
@@ -36,7 +37,7 @@ class _SendOptionsSheetState extends State<SendOptionsSheet> {
   };
 
   Future<void> _edit(DraftVisibilityMode mode) async {
-    final result = await showModalBottomSheet<DraftVisibility>(
+    final result = await showAppBottomSheet<DraftVisibility>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

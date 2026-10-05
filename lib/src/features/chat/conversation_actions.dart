@@ -97,7 +97,7 @@ extension ConversationActions on ChatController {
       _restoreSearchWindow(conversation);
       _store.writer.retain([
         ...conversation.messages,
-        for (final state in _executionStates.values)
+        for (final state in _executions.sessions.values)
           if (state.runningConversation != null &&
               state.conversation != conversation)
             ...state.conversation!.messages,
@@ -381,7 +381,7 @@ extension ConversationActions on ChatController {
       source,
       _viewConversation,
       ..._conversations,
-      for (final state in _executionStates.values)
+      for (final state in _executions.sessions.values)
         if (state.conversation != null) state.conversation!,
     }.where((conversation) => conversation.id == source.id);
     for (final copy in copies) {
@@ -417,7 +417,7 @@ extension ConversationActions on ChatController {
           ..._runningConversation!.messages,
       ]);
     }
-    _pendingMessageQueues.remove(removed.id);
+    _executions.removePendingMessages(removed.id);
     _conversations.removeWhere((conversation) => conversation.id == removed.id);
     _updateConversationList();
     _conversationChanged();
@@ -468,7 +468,7 @@ extension ConversationActions on ChatController {
         );
       });
     }
-    _pendingMessageQueues.remove(removed.id);
+    _executions.removePendingMessages(removed.id);
     _conversations.removeWhere((conversation) => conversation.id == removed.id);
     _updateConversationList();
     _conversationChanged();

@@ -5,7 +5,7 @@ extension ConversationRun on ChatController {
     Conversation runConversation, {
     bool scheduled = false,
     bool callbacksOnly = false,
-    required _ReplyContext reply,
+    required ExecutionReplyContext reply,
     List<AgentMessage>? groupHistory,
     AgentMessage? groupUser,
     Conversation? groupParent,
@@ -187,6 +187,25 @@ extension ConversationRun on ChatController {
           _notifyMember(runConversation, groupParent);
         }, sender: reply.sender),
       )..addAll(_thinkingTools(runConversation, groupParent, reply));
+      tools.add(
+        RunSubagentTool(
+          (call, cancelled) => _prepareSubagent(
+            call,
+            cancelled,
+            parentRunId: runId,
+            reply: reply,
+            conversation: runConversation,
+            parent: groupParent,
+            memory: memory,
+            skills: skills,
+            documents: documents,
+            history: observed,
+            systemPrompt: systemPrompt,
+            customInstructions: customInstructions,
+          ),
+          onError: (error) => _recordRunError(error, summaryOwner.id),
+        ),
+      );
       final registry = await _createMemberToolRegistry(
         currentProjectId: () => documents.project?.id,
         tools: tools,
@@ -283,6 +302,7 @@ extension ConversationRun on ChatController {
             groupParent?.privateContextSummaries[reply.senderId],
         personalContext: () async => [
           responsePreferences.instructions,
+          RunSubagentTool.instructions,
           if (groupParent != null && sleepDraft.isNotEmpty)
             '你上次休眠前留下的私人草稿（尚未发送）：\n$sleepDraft\n请结合最新消息决定保留、改写或放弃；不要自动发送，也不要当作用户的新指令。',
           if (customInstructions.isNotEmpty) '用户自定义指令：\n$customInstructions',

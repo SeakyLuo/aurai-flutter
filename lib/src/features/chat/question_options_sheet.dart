@@ -1,7 +1,7 @@
+import 'app_sheet_surface.dart';
 import 'package:flutter/material.dart';
 
 import '../../agent/ask_user_tool.dart';
-import '../../app/global_ui.dart';
 import 'question_icon.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -22,18 +22,22 @@ Future<Set<int>?> showQuestionOptionsSheet(
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: false,
+    backgroundColor: Colors.transparent,
+    elevation: 0,
     capturedThemes: InheritedTheme.capture(
       from: context,
       to: navigator.context,
     ),
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-    builder: (_) => _QuestionOptionsSheet(
-      options: options,
-      selected: selected,
-      multiple: multiple,
-      readOnly: readOnly,
-      minimum: minimum,
-      maximum: maximum,
+    builder: (_) => AppSheetSurface(
+      child: _QuestionOptionsSheet(
+        options: options,
+        selected: selected,
+        multiple: multiple,
+        readOnly: readOnly,
+        minimum: minimum,
+        maximum: maximum,
+      ),
     ),
   );
   closeWhen.then((_) {
@@ -156,8 +160,7 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
   late final _selected = {...widget.selected};
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: GlobalUI.bottomSheetBorderRadius,
+  Widget build(BuildContext context) => AppSheetSurface(
     child: SafeArea(
       top: false,
       child: ConstrainedBox(

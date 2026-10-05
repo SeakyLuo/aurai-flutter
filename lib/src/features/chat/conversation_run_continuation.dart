@@ -13,7 +13,7 @@ extension ConversationRunContinuation on ChatController {
 
   Future<List<Map<String, Object?>>> _runContinuation({
     required Conversation conversation,
-    required _ReplyContext reply,
+    required ExecutionReplyContext reply,
     required AgentMessage userMessage,
     required bool direct,
     required bool hasCallbacks,

@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 import '../../app/ui_action.dart';
@@ -46,7 +47,7 @@ class _ProjectDirectoriesPageState extends State<ProjectDirectoriesPage> {
 
   Future<void> _add() async {
     final selection =
-        await showModalBottomSheet<(String?, List<ProjectDirectory>)>(
+        await showAppBottomSheet<(String?, List<ProjectDirectory>)>(
           context: context,
           isScrollControlled: true,
           useSafeArea: true,

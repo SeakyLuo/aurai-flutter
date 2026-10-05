@@ -1,8 +1,73 @@
 part of 'chat_controller.dart';
 
 final _recordedRunErrors = Expando<String>('recorded run error conversation');
+final _recoveryOptions =
+    Expando<({String key, Future<Map<String, bool?>> value})>();
 
 extension ConversationRunFailure on ChatController {
+  Future<Map<String, bool?>> failedRecoveryOptions() {
+    final conversation = activeConversation;
+    final failures = conversation.messages.where((m) => m.isFailure).toList();
+    final key =
+        '${conversation.id}:${identityHashCode(conversation)}:${config.service.name}/${config.model}:${failures.map((m) => m.id).join(',')}:${_groupReplies.values.map((r) => '${r.config.service.name}/${r.config.model}').join(',')}';
+    final cached = _recoveryOptions[this];
+    if (cached?.key == key) return cached!.value;
+    final future = _loadFailedRecoveryOptions(conversation, failures);
+    _recoveryOptions[this] = (key: key, value: future);
+    return future;
+  }
+
+  Future<Map<String, bool?>> _loadFailedRecoveryOptions(
+    Conversation conversation,
+    List<AgentMessage> failures,
+  ) async {
+    if (failures.isEmpty) return {};
+    final records = await Future.wait<Object>([
+      _store.database.query(
+        'agent_runs',
+        columns: [
+          'id',
+          'sender_id',
+          'status',
+          'provider',
+          'model',
+          'error_detail',
+        ],
+        where:
+            'conversation_id = ? AND id IN (${List.filled(failures.length, '?').join(',')})',
+        whereArgs: [conversation.id, ...failures.map((m) => m.runId)],
+      ),
+      _store.groups.groupProfiles(conversation.id),
+      groupStore.mutedMembers(conversation.id),
+    ]);
+    final runs = {
+      for (final r in records[0] as List<Map<String, Object?>>) r['id']: r,
+    };
+    final configs = {
+      for (final p in records[1] as List<AiProfile>) p.sender.id: aiConfig(p),
+    };
+    final muted = records[2] as Map<String, GroupMute>;
+    return {
+      for (final m in failures)
+        m.id:
+            configs[m.senderId]?.isConfigured != true ||
+                muted[m.senderId]?.isActive == true
+            ? null
+            : runs[m.runId]?['sender_id'] == m.senderId &&
+                  (runs[m.runId]?['status'] == 'interrupted' ||
+                      classifyModelFailure(
+                        runs[m.runId]?['error_detail'] as String? ?? '',
+                      ).canContinue) &&
+                  const [
+                    'failed',
+                    'interrupted',
+                  ].contains(runs[m.runId]?['status']) &&
+                  configs[m.senderId]?.service.name ==
+                      runs[m.runId]?['provider'] &&
+                  configs[m.senderId]?.model == runs[m.runId]?['model'],
+    };
+  }
+
   Future<String> _logRunFailure(
     Object error,
     StackTrace stack, {
@@ -81,21 +146,40 @@ extension ConversationRunFailure on ChatController {
       throw StateError('该成员已不在群聊中');
     }
     if (member.isMuted) throw StateError('该成员已被禁言，不能重试');
+    final profiles = await _store.groups.groupProfiles(conversation.id);
+    final reply = _groupReplyContext(
+      profiles.singleWhere((p) => p.sender.id == message.senderId),
+    );
+    if (!reply.config.isConfigured)
+      throw StateError('请先配置 ${reply.sender.name} 使用的模型');
+    final options = await _loadFailedRecoveryOptions(conversation, [message]);
+    _recoveryOptions[this] = null;
+    final continuation = options[message.id] == true ? message.runId : null;
+    if (continuation != null) {
+      await loadFailedRunProtocol(
+        _store.database,
+        conversation.id,
+        message.senderId,
+        continuation,
+        reply.config,
+      );
+    }
     if (resumeAutoReply) {
       await resumeGroupAutoReply(conversation.id, message.senderId);
     }
     await _groupSleeps.remove(conversation.id, message.senderId);
     final dispatcher = _groupDispatcher;
     if (dispatcher != null && !dispatcher.closed && !dispatcher.stopped) {
+      _groupReplies[message.senderId] = reply;
       dispatcher.hold();
       try {
         await beforeRemoval?.call();
         await _removeFailedGroupMessage(conversation, message);
         dispatcher.history.removeWhere((entry) => entry.id == message.id);
-        if (message.runId case final runId?) {
+        if (continuation case final runId?) {
           _execution.groupContinuationRuns[message.senderId] = runId;
         }
-        dispatcher.receiveTargeted(const [], {message.senderId});
+        dispatcher.runOnce(message.senderId);
         _notifyRun(conversation);
       } finally {
         dispatcher.release();
@@ -110,8 +194,9 @@ extension ConversationRunFailure on ChatController {
           await _executeGroupChat(
             conversation,
             wakeMembers: {message.senderId},
+            runOnceMembers: {message.senderId},
             continuationRuns: {
-              if (message.runId case final runId?) message.senderId: runId,
+              if (continuation case final runId?) message.senderId: runId,
             },
           );
         } finally {

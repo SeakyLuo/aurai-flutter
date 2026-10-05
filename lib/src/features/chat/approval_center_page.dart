@@ -65,7 +65,21 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
-    appBar: SettingsAppBar(title: '审批中心', onBack: () => Navigator.pop(context)),
+    appBar: SettingsAppBar(
+      title: '',
+      titleWidget: SearchTypeSegment(
+        files: !_pending,
+        labels: const ['待审批', '已审批'],
+        onChanged: (value) {
+          setState(() {
+            _pending = !value;
+            _rows.clear();
+          });
+          _load(reset: true);
+        },
+      ),
+      onBack: () => Navigator.pop(context),
+    ),
     body: SettingsPageBody(
       child: SafeArea(
         top: false,
@@ -74,97 +88,86 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage> {
             constraints: const BoxConstraints(maxWidth: 640),
             child: Column(
               children: [
-                Padding(
-                  padding: settingsPagePadding(
-                    context,
-                    const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                  ),
-                  child: Center(
-                    child: SearchTypeSegment(
-                      files: !_pending,
-                      labels: const ['待处理', '已处理'],
-                      onChanged: (value) {
-                        setState(() {
-                          _pending = !value;
-                          _rows.clear();
-                        });
-                        _load(reset: true);
-                      },
-                    ),
-                  ),
-                ),
+                SizedBox(height: settingsHeaderHeight(context)),
                 Expanded(
                   child: PaginationListener(
                     hasMore: _more && !_loading && !_failed,
                     failed: _failed,
                     onRetry: () => _load(reset: true),
                     loadMore: _load,
-                    child: CustomScrollView(
-                      slivers: [
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                          sliver: SliverList.list(
-                            children: [
-                              for (final row in _rows)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: Material(
-                                    color: settingsFieldColor(context),
-                                    borderRadius: BorderRadius.circular(26),
-                                    clipBehavior: Clip.antiAlias,
-                                    child: ListTile(
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 18,
-                                            vertical: 10,
+                    child: !_loading && !_failed && _rows.isEmpty
+                        ? EmptyDataView(title: _pending ? '暂无待审批申请' : '暂无已审批记录')
+                        : CustomScrollView(
+                            slivers: [
+                              SliverPadding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  8,
+                                  16,
+                                  24,
+                                ),
+                                sliver: SliverList.list(
+                                  children: [
+                                    for (final row in _rows)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 12,
+                                        ),
+                                        child: Material(
+                                          color: settingsFieldColor(context),
+                                          borderRadius: BorderRadius.circular(
+                                            26,
                                           ),
-                                      leading: const SettingsIcon(
-                                        type: SettingsIconType.permission,
+                                          clipBehavior: Clip.antiAlias,
+                                          child: ListTile(
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 18,
+                                                  vertical: 10,
+                                                ),
+                                            leading: const SettingsIcon(
+                                              type: SettingsIconType.permission,
+                                            ),
+                                            title: Text(
+                                              '${row['title']}',
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            subtitle: Text(
+                                              '${row['sender_name']} · ${approvalTime(row['requested_at'] as int)}\n${approvalStatus(row['status'] as String)}',
+                                            ),
+                                            trailing: const SettingsIcon(
+                                              type: SettingsIconType.chevron,
+                                            ),
+                                            onTap: () => runUiAction(
+                                              context,
+                                              () async {
+                                                final current = await widget
+                                                    .store
+                                                    .read(row['id'] as String);
+                                                if (context.mounted)
+                                                  await showApprovalRequest(
+                                                    context,
+                                                    widget.store,
+                                                    current,
+                                                  );
+                                              },
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                      title: Text(
-                                        '${row['title']}',
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
+                                    if (_loading)
+                                      const Padding(
+                                        padding: EdgeInsets.all(24),
+                                        child: Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
                                       ),
-                                      subtitle: Text(
-                                        '${row['sender_name']} · ${approvalTime(row['requested_at'] as int)}\n${approvalStatus(row['status'] as String)}',
-                                      ),
-                                      trailing: const SettingsIcon(
-                                        type: SettingsIconType.chevron,
-                                      ),
-                                      onTap: () =>
-                                          runUiAction(context, () async {
-                                            final current = await widget.store
-                                                .read(row['id'] as String);
-                                            if (context.mounted)
-                                              await showApprovalRequest(
-                                                context,
-                                                widget.store,
-                                                current,
-                                              );
-                                          }),
-                                    ),
-                                  ),
+                                  ],
                                 ),
-                              if (_loading)
-                                const Padding(
-                                  padding: EdgeInsets.all(24),
-                                  child: Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                ),
+                              ),
                             ],
                           ),
-                        ),
-                        if (!_loading && !_failed && _rows.isEmpty)
-                          SliverFillRemaining(
-                            hasScrollBody: false,
-                            child: EmptyDataView(
-                              title: _pending ? '暂无待处理审批' : '暂无审批记录',
-                            ),
-                          ),
-                      ],
-                    ),
                   ),
                 ),
               ],

@@ -30,7 +30,7 @@ object MiniappProgram {
             ScriptableObject.putProperty(scope, "__input", input)
             // Execute the reducer without a wall-clock timeout.
             val output = Context.toString(compiled.exec(cx, scope))
-            require(output != "undefined" && output.length <= 262144) { "小程序必须返回不超过 256 KB 的 JSON" }
+            require(output != "undefined") { "小程序必须返回 JSON" }
             output
         }
     }

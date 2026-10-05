@@ -6,7 +6,7 @@ extension GlobalTools on ChatController {
     required List<AgentTool> tools,
     required Conversation? parent,
     required Conversation member,
-    required _ReplyContext reply,
+    required ExecutionReplyContext reply,
     required List<AgentMessage> observed,
     required List<String> publishedIds,
     required VoidCallback onSleep,
@@ -191,7 +191,7 @@ extension GlobalTools on ChatController {
                 )).single;
                 final peer = _peerSessions[target.id];
                 final dispatchers = [
-                  if (_executionStates[target.id]?.groupDispatcher
+                  if (_executions.sessions[target.id]?.groupDispatcher
                       case final dispatcher?)
                     dispatcher,
                   if (peer != null) (await peer).dispatcher,

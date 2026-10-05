@@ -1,3 +1,11 @@
+import '../../agent/run_subagent_tool.dart';
+import '../../agent/deferred_tool.dart';
+import '../../agent/subagent_tool_scope.dart';
+import '../../storage/subagent_runs.dart';
+import 'execution/conversation_execution_manager.dart';
+import 'execution/conversation_execution_session.dart';
+import 'execution/pending_confirmation.dart';
+export 'execution/pending_confirmation.dart' show PendingConfirmation;
 import '../../storage/home_conversations.dart';
 import '../../domain/tool_detail_target.dart';
 import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
@@ -163,6 +171,7 @@ import '../../domain/ai_profile.dart';
 import '../../domain/conversation_completion.dart';
 import '../../domain/capability.dart';
 import '../../domain/model_provider.dart';
+import '../../domain/model_failure.dart';
 import '../../domain/music_model_selection.dart';
 import '../../domain/tool_models.dart';
 import '../../platform/android_network_tools.dart';
@@ -224,6 +233,7 @@ part 'draft_attachment_actions.dart';
 part 'asset_library_actions.dart';
 part 'conversation_search_navigation.dart';
 part 'conversation_run.dart';
+part 'subagent_execution.dart';
 part 'run_summary_attachment.dart';
 part 'run_tool_logging.dart';
 part 'conversation_run_failure.dart';
@@ -310,30 +320,18 @@ class ChatController extends ChangeNotifier {
   late Conversation _newConversation;
   final List<Conversation> _conversations = [];
   late Conversation _viewConversation;
-  final _pendingMessageQueues = <String, PendingMessageQueue>{};
-  final _executionStates = <String, _ConversationExecutionState>{};
+  late final _executions = ConversationExecutionManager(
+    onChanged: notifyListeners,
+  );
   final _uiZone = Zone.current;
-  var _viewExecution = _ConversationExecutionState();
   Conversation get _activeConversation => _viewConversation;
   set _activeConversation(Conversation value) {
-    _executionStates.removeWhere(
-      (id, state) =>
-          id != value.id &&
-          state.leases == 0 &&
-          state.runningConversation == null &&
-          !state.submitting,
-    );
     _viewConversation = value;
-    _viewExecution = _executionStates.putIfAbsent(
-      value.id,
-      _ConversationExecutionState.new,
-    )..conversation = value;
+    _executions.show(value);
   }
 
   Conversation get activeConversation =>
-      (Zone.current[_executionZoneKey] as _ConversationExecutionState?)
-          ?.conversation ??
-      _viewConversation;
+      _executions.current.conversation ?? _viewConversation;
 
   @override
   void notifyListeners() => _uiZone.run(super.notifyListeners);
@@ -596,20 +594,18 @@ class ChatController extends ChangeNotifier {
 
   Future<void> openBatterySettings() => _platform.openBatterySettings();
 
-  void resolveConfirmation(bool approved) {
-    final request = pendingConfirmation;
-    if (request == null) return;
-    request.completer.complete(approved);
-    pendingConfirmation = null;
-    notifyListeners();
-  }
+  void resolveConfirmation(bool approved) =>
+      _execution.resolveConfirmation(approved);
 
   final _loadedMessageCounts = <String, int>{};
   Conversation? _pendingAiConversation;
   final _searchWindows = <String, Conversation>{};
   int _searchNavigationGeneration = 0;
 
-  void _conversationChanged() => notifyListeners();
+  void _conversationChanged() {
+    _recoveryOptions[this] = null;
+    notifyListeners();
+  }
 
   Future<void> refreshConversations() async {
     if (loadingConversations) return;

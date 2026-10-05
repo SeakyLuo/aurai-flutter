@@ -119,8 +119,7 @@ class HtmlMessageData {
       if (args['expectedVersion'] != game['version'])
         throw StateError('消息已更新，请重新读取版本');
       final data = (args['data'] as Map).cast<String, Object?>();
-      final encoded = jsonEncode(data);
-      if (utf8.encode(encoded).length > (runtime == null ? 65536 : 262144))
+      if (runtime == null && utf8.encode(jsonEncode(data)).length > 65536)
         throw ArgumentError('HTML 数据超过大小限制');
       final Object? view;
       if (runtime != null) {
@@ -142,8 +141,6 @@ class HtmlMessageData {
           'state': data['state'],
           'privateViews': data['privateViews'],
         });
-        if (utf8.encode(next).length > 262144)
-          throw ArgumentError('小程序状态最多 256 KB');
         await txn.update(
           'app_state',
           {'value': next},

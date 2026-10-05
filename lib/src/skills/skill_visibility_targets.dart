@@ -1,3 +1,4 @@
+import '../features/chat/app_sheet_surface.dart';
 import '../features/chat/chat_header_background.dart';
 import '../domain/message_sender.dart';
 import '../storage/development_projects.dart';
@@ -67,129 +68,133 @@ class _SkillVisibilityTargetsState extends State<SkillVisibilityTargets> {
     final projects = widget.store.projects
         .where((p) => (p['name'] as String).toLowerCase().contains(query))
         .toList();
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * .85,
-        child: SafeArea(
-          top: false,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Positioned.fill(
-                child: FloatingSearchLayout(
-                  key: ValueKey(_category),
-                  itemCount: switch (_category) {
-                    0 =>
-                      widget.store.members
-                          .where((m) => m.id != widget.store.ownerId)
-                          .length,
-                    1 => widget.store.groups.length,
-                    _ => widget.store.projects.length,
-                  },
-                  controller: _search,
-                  onChanged: (_) => setState(() {}),
-                  hintText: '搜索${_labels[_category]}',
-                  enabled: true,
-                  bottom: 16,
-                  child:
-                      [
-                        members.isEmpty,
-                        groups.isEmpty,
-                        projects.isEmpty,
-                      ][_category]
-                      ? Center(
-                          child: EmptyDataView(
-                            title: query.isEmpty
-                                ? '暂无可选${_labels[_category]}'
-                                : '没有匹配的${_labels[_category]}',
+    return AppSheetSurface(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * .85,
+          child: SafeArea(
+            top: false,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Positioned.fill(
+                  child: FloatingSearchLayout(
+                    key: ValueKey(_category),
+                    itemCount: switch (_category) {
+                      0 =>
+                        widget.store.members
+                            .where((m) => m.id != widget.store.ownerId)
+                            .length,
+                      1 => widget.store.groups.length,
+                      _ => widget.store.projects.length,
+                    },
+                    controller: _search,
+                    onChanged: (_) => setState(() {}),
+                    hintText: '搜索${_labels[_category]}',
+                    enabled: true,
+                    bottom: 16,
+                    child:
+                        [
+                          members.isEmpty,
+                          groups.isEmpty,
+                          projects.isEmpty,
+                        ][_category]
+                        ? Center(
+                            child: EmptyDataView(
+                              title: query.isEmpty
+                                  ? '暂无可选${_labels[_category]}'
+                                  : '没有匹配的${_labels[_category]}',
+                            ),
+                          )
+                        : ListView(
+                            padding: const EdgeInsets.fromLTRB(
+                              16,
+                              68,
+                              16,
+                              FloatingSearchLayout.clearance,
+                            ),
+                            children: [
+                              if (_category == 0)
+                                for (final member in members)
+                                  GroupMemberChoice(
+                                    sender: member,
+                                    selected: _members.contains(member.id),
+                                    onTap: () => setState(() {
+                                      if (!_members.remove(member.id))
+                                        _members.add(member.id);
+                                    }),
+                                  ),
+                              if (_category == 1)
+                                for (final group in groups) _groupTile(group),
+                              if (_category == 2)
+                                for (final project in projects)
+                                  _projectTile(
+                                    DevelopmentProject.fromRow(project),
+                                  ),
+                            ],
                           ),
-                        )
-                      : ListView(
-                          padding: const EdgeInsets.fromLTRB(
-                            16,
-                            68,
-                            16,
-                            FloatingSearchLayout.clearance,
-                          ),
-                          children: [
-                            if (_category == 0)
-                              for (final member in members)
-                                GroupMemberChoice(
-                                  sender: member,
-                                  selected: _members.contains(member.id),
-                                  onTap: () => setState(() {
-                                    if (!_members.remove(member.id))
-                                      _members.add(member.id);
-                                  }),
-                                ),
-                            if (_category == 1)
-                              for (final group in groups) _groupTile(group),
-                            if (_category == 2)
-                              for (final project in projects)
-                                _projectTile(
-                                  DevelopmentProject.fromRow(project),
-                                ),
-                          ],
-                        ),
-                ),
-              ),
-              const Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 76,
-                child: IgnorePointer(child: ChatHeaderBackground()),
-              ),
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Row(
-                    children: [
-                      RoundAction(
-                        label: '关闭',
-                        icon: Icons.close_rounded,
-                        iconWidget: const QuestionIcon(
-                          type: QuestionIconType.close,
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                      Expanded(
-                        child: Center(
-                          child: SearchTypeSegment.indexed(
-                            labels: _labels,
-                            index: _category,
-                            onChanged: _changeCategory,
-                          ),
-                        ),
-                      ),
-                      RoundAction(
-                        label: '完成',
-                        icon: Icons.check_rounded,
-                        iconWidget: SettingsIcon(
-                          type: SettingsIconType.check,
-                          color: Theme.of(context).colorScheme.onSurface
-                              .withValues(
-                                alpha: _members.isEmpty && _scopes.isEmpty
-                                    ? .3
-                                    : 1,
-                              ),
-                        ),
-                        onPressed: _members.isEmpty && _scopes.isEmpty
-                            ? null
-                            : () => Navigator.pop(context, (
-                                _members,
-                                _scopes.toList(),
-                              )),
-                      ),
-                    ],
                   ),
                 ),
-              ),
-            ],
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 76,
+                  child: IgnorePointer(child: ChatHeaderBackground()),
+                ),
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Row(
+                      children: [
+                        RoundAction(
+                          label: '关闭',
+                          icon: Icons.close_rounded,
+                          iconWidget: const QuestionIcon(
+                            type: QuestionIconType.close,
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        Expanded(
+                          child: Center(
+                            child: SearchTypeSegment.indexed(
+                              labels: _labels,
+                              index: _category,
+                              onChanged: _changeCategory,
+                            ),
+                          ),
+                        ),
+                        RoundAction(
+                          label: '完成',
+                          icon: Icons.check_rounded,
+                          iconWidget: SettingsIcon(
+                            type: SettingsIconType.check,
+                            color: Theme.of(context).colorScheme.onSurface
+                                .withValues(
+                                  alpha: _members.isEmpty && _scopes.isEmpty
+                                      ? .3
+                                      : 1,
+                                ),
+                          ),
+                          onPressed: _members.isEmpty && _scopes.isEmpty
+                              ? null
+                              : () => Navigator.pop(context, (
+                                  _members,
+                                  _scopes.toList(),
+                                )),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

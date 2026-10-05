@@ -1,3 +1,5 @@
+import 'app_bottom_sheet.dart';
+import 'app_sheet_surface.dart';
 import 'package:flutter/material.dart';
 import '../../domain/speech_voice.dart';
 
@@ -11,7 +13,6 @@ import '../../domain/speech_preview_mode.dart';
 import 'floating_search_layout.dart';
 import 'speech_voice_filter.dart';
 import 'chat_header_background.dart';
-import '../../app/global_ui.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'speech_voice_list_skeleton.dart';
@@ -27,7 +28,7 @@ Future<String?> showVoiceChoiceSheet(
   required Future<bool> Function(SpeechVoice) onRename,
   Future<List<SpeechVoice>> Function()? loadVoices,
   bool Function()? hasMore,
-}) => showModalBottomSheet<String>(
+}) => showAppBottomSheet<String>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -193,8 +194,7 @@ class _VoiceChoiceSheetState extends State<_VoiceChoiceSheet> {
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: FractionallySizedBox(
         heightFactor: .8,
-        child: ClipRRect(
-          borderRadius: GlobalUI.bottomSheetBorderRadius,
+        child: AppSheetSurface(
           child: SafeArea(
             top: false,
             child: Stack(

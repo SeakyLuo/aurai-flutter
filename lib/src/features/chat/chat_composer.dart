@@ -24,7 +24,7 @@ extension _ChatComposer on _ChatPageState {
       final members = await widget.controller.groupStore.members(id);
       if (!mounted || _conversationId != id) return;
       _focusNode.unfocus();
-      await showModalBottomSheet<void>(
+      await showAppBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,

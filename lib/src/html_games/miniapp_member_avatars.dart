@@ -112,6 +112,8 @@ class MiniappMemberAvatars {
       owner.buildScope(root);
       owner.finalizeTree();
       pipeline.rootNode = null;
+      view.child = null;
+      boundary.dispose();
       view.dispose();
       pipeline.dispose();
       focus.dispose();

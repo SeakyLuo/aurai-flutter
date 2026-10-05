@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'floating_search_layout.dart';
 import 'provider_settings_draft.dart';
 import '../../widgets/empty_data_view.dart';
@@ -119,7 +120,7 @@ class _ProviderModelManagementPageState
         (_draft?.config ??
         widget.controller.modelSettings.profile(widget.service));
     final selection =
-        await showModalBottomSheet<({bool useAll, List<String> models})>(
+        await showAppBottomSheet<({bool useAll, List<String> models})>(
           context: context,
           isScrollControlled: true,
           useSafeArea: true,

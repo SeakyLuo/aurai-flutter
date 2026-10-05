@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'floating_search_layout.dart';
 import 'conversation_list_tile.dart';
 import '../../widgets/empty_data_view.dart';
@@ -117,7 +118,7 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
 
   Future<void> _select(Conversation item) async {
     FocusScope.of(context).unfocus();
-    final sent = await showModalBottomSheet<bool>(
+    final sent = await showAppBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

@@ -1,3 +1,4 @@
+import '../features/chat/app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'glass_notice.dart';
@@ -10,7 +11,7 @@ Future<void> showNoticeDetailsSheet(
   BuildContext context, {
   required InlineSpan text,
   required TextStyle style,
-}) => showModalBottomSheet<void>(
+}) => showAppBottomSheet<void>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,

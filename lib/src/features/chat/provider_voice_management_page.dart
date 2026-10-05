@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'floating_search_layout.dart';
 import 'speech_voice_filter.dart';
 import 'speech_voice_pages.dart';
@@ -149,7 +150,7 @@ class _ProviderVoiceManagementPageState
 
   Future<void> _choose() async {
     _preview.stop();
-    final result = await showModalBottomSheet<VoiceSelection>(
+    final result = await showAppBottomSheet<VoiceSelection>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

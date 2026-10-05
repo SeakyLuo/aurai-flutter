@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -80,7 +81,7 @@ class _SendFavoritePageState extends State<_SendFavoritePage> {
               ).entryForMessage(item.message.id),
             );
       if (!mounted) return;
-      final sent = await showModalBottomSheet<bool>(
+      final sent = await showAppBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,

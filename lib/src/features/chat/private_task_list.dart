@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import '../../widgets/empty_data_view.dart';
 import '../../storage/private_task_state.dart';
 import 'dart:async';
@@ -168,7 +169,7 @@ class _TaskProgressListState extends State<TaskProgressList> {
     );
   }
 
-  Future<void> _showSteps() => showModalBottomSheet<void>(
+  Future<void> _showSteps() => showAppBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

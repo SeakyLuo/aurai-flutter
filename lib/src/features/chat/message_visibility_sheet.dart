@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -24,7 +25,7 @@ Future<void> showMessageVisibilitySheet(
   );
   final members = rows.map(MessageSender.fromRow).toList();
   if (!context.mounted) return;
-  await showModalBottomSheet<void>(
+  await showAppBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

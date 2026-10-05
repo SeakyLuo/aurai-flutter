@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'floating_search_layout.dart';
 import '../../widgets/empty_data_view.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +13,7 @@ Future<void> showModelTypePreviewSheet(
   required Future<List<Map<String, dynamic>>> Function() loadEntries,
   required String Function(Map<String, dynamic>) purposeLabel,
   required Future<void> Function(Map<String, dynamic>) onOpen,
-}) => showModalBottomSheet<void>(
+}) => showAppBottomSheet<void>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,

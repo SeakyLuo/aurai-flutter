@@ -1,3 +1,5 @@
+import 'app_bottom_sheet.dart';
+import 'app_sheet_surface.dart';
 import 'package:flutter/material.dart';
 import '../../app/global_ui.dart';
 import '../../domain/speech_voice.dart';
@@ -11,7 +13,7 @@ Future<void> showSpeechVoiceDetails(
   BuildContext context,
   SpeechVoice voice, {
   Future<bool> Function(SpeechVoice)? onRename,
-}) => showModalBottomSheet<void>(
+}) => showAppBottomSheet<void>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -60,8 +62,7 @@ class _SpeechVoiceDetailsSheetState extends State<_SpeechVoiceDetailsSheet> {
     final colors = Theme.of(context).colorScheme;
     final details = _voice.details;
     final gender = details?.gender;
-    return ClipRRect(
-      borderRadius: GlobalUI.bottomSheetBorderRadius,
+    return AppSheetSurface(
       child: SafeArea(
         top: false,
         child: Column(

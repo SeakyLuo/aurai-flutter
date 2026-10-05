@@ -8,8 +8,8 @@ import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'tool_action_icon.dart';
 import 'tool_detail_page.dart';
+import 'tool_library_group.dart';
 import 'tool_approvals_page.dart';
-import 'resource_scope_filter.dart';
 import 'floating_search_layout.dart';
 import '../../domain/resource_scope.dart';
 import '../../widgets/empty_data_view.dart';
@@ -35,7 +35,7 @@ class ToolsPage extends StatefulWidget {
 class _ToolsPageState extends State<ToolsPage> {
   final _detailSplitKey = GlobalKey<LibraryDetailSplitState>();
   ChatController get controller => widget.controller;
-  late ResourceScope? _scope = widget.groupId != null
+  late final ResourceScope? _scope = widget.groupId != null
       ? ResourceScope.group(widget.groupId!)
       : widget.projectId != null
       ? ResourceScope.project(widget.projectId!)
@@ -46,7 +46,6 @@ class _ToolsPageState extends State<ToolsPage> {
       ? matchesResourceScope(scopes, null, projectId: widget.projectId)
       : matchesResourceFilter(scopes, filter, _groups);
   List<Map<String, Object?>> _groups = [];
-  List<Map<String, Object?>> _projects = [];
   @override
   void dispose() {
     _search.dispose();
@@ -61,14 +60,10 @@ class _ToolsPageState extends State<ToolsPage> {
 
   Future<void> _loadGroups() async {
     try {
-      final rows = await Future.wait([
-        ToolCustomizations.groups(),
-        ToolCustomizations.projects(),
-      ]);
+      final rows = await ToolCustomizations.groups();
       if (mounted)
         setState(() {
-          _groups = rows[0];
-          _projects = rows[1];
+          _groups = rows;
         });
     } on Object catch (error) {
       if (mounted)
@@ -81,7 +76,8 @@ class _ToolsPageState extends State<ToolsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final resourceCount = controller.globalToolDefinitions
+    final tools = controller.globalToolDefinitions;
+    final resourceCount = tools
         .where(
           (tool) => _matches(
             ToolCustomizations.values[tool.name]?.scopes ?? [],
@@ -93,8 +89,8 @@ class _ToolsPageState extends State<ToolsPage> {
           ),
         )
         .length;
-    final groups = <String, List<ToolDefinition>>{};
-    for (final tool in controller.globalToolDefinitions) {
+    final groups = <ToolLibraryGroup, List<ToolDefinition>>{};
+    for (final tool in tools) {
       if (!_matches(
             ToolCustomizations.values[tool.name]?.scopes ?? [],
             _scope,
@@ -106,24 +102,11 @@ class _ToolsPageState extends State<ToolsPage> {
                 _search.text.toLowerCase(),
               )))
         continue;
-      final name = tool.name == 'runSkill'
-          ? '技能'
-          : switch (tool.capabilityId) {
-              'web.read' || 'web.images' => '网页与搜索',
-              'memory.manage' => '记忆',
-              'skills' => '技能',
-              'interactiveDecision' => '交互消息',
-              'android.scheduled_tasks' => '定时任务',
-              'android.network' => '网络',
-              'android.notifications.observe' ||
-              'android.notifications.send' => '通知',
-              'android.documents' || 'local.attachments' => '文件与文档',
-              'local.history' || 'local.ai_contacts' => '会话与朋友',
-              'model.settings' || 'model.balance' || 'model.topUp' => '模型账户',
-              _ => '设备与其他工具',
-            };
-      groups.putIfAbsent(name, () => []).add(tool);
+      final group = ToolLibraryGroup.forTool(tool);
+      groups.putIfAbsent(group, () => []).add(tool);
     }
+    final orderedGroups = groups.entries.toList()
+      ..sort((a, b) => a.key.index.compareTo(b.key.index));
     return LibraryDetailSplit(
       key: _detailSplitKey,
       child: Scaffold(
@@ -141,14 +124,6 @@ class _ToolsPageState extends State<ToolsPage> {
             hintText: '搜索工具',
             enabled: true,
             bottom: 16,
-            trailingAction: widget.senderId != null || resourceCount < 20
-                ? null
-                : ResourceScopeFilter(
-                    groups: _groups,
-                    projects: _projects,
-                    value: _scope,
-                    onChanged: (value) => setState(() => _scope = value),
-                  ),
             child: groups.isEmpty
                 ? const Center(child: EmptyDataView(title: '没有匹配的工具'))
                 : ListView(
@@ -194,11 +169,11 @@ class _ToolsPageState extends State<ToolsPage> {
                           ),
                         ),
                       ),
-                      for (final group in groups.entries) ...[
+                      for (final group in orderedGroups) ...[
                         Padding(
                           padding: const EdgeInsets.fromLTRB(12, 24, 12, 10),
                           child: Text(
-                            group.key,
+                            group.key.label,
                             style: TextStyle(
                               fontSize: 14,
                               color: Theme.of(

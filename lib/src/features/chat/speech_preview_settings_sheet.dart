@@ -1,5 +1,6 @@
+import 'app_bottom_sheet.dart';
+import 'app_sheet_surface.dart';
 import 'package:flutter/material.dart';
-import '../../app/global_ui.dart';
 import '../../domain/speech_preview_mode.dart';
 import 'choice_sheet.dart';
 import 'model_choice_sheet.dart';
@@ -21,7 +22,7 @@ Future<SpeechPreviewSettings?> showSpeechPreviewSettingsSheet(
   required bool hasDefaultAudio,
   String model = '',
   List<({String id, String name})>? models,
-}) => showModalBottomSheet<SpeechPreviewSettings>(
+}) => showAppBottomSheet<SpeechPreviewSettings>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -133,8 +134,7 @@ class _SpeechPreviewSettingsSheetState
   );
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: GlobalUI.bottomSheetBorderRadius,
+  Widget build(BuildContext context) => AppSheetSurface(
     child: Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SafeArea(

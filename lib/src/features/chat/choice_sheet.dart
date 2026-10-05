@@ -1,6 +1,7 @@
+import 'app_bottom_sheet.dart';
+import 'app_sheet_surface.dart';
 import 'floating_search_layout.dart';
 import 'package:flutter/material.dart';
-import '../../app/global_ui.dart';
 import '../../widgets/empty_data_view.dart';
 import 'question_icon.dart';
 import 'settings_appearance.dart';
@@ -21,7 +22,7 @@ Future<T?> showChoiceSheet<T>(
   bool showSelection = true,
   Widget? Function(T)? leadingBuilder,
   String Function(T)? searchText,
-}) => showModalBottomSheet<T>(
+}) => showAppBottomSheet<T>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -100,8 +101,7 @@ class _ChoiceSheetState<T> extends State<_ChoiceSheet<T>> {
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: FractionallySizedBox(
         heightFactor: expanded ? .8 : null,
-        child: ClipRRect(
-          borderRadius: GlobalUI.bottomSheetBorderRadius,
+        child: AppSheetSurface(
           child: SafeArea(
             top: false,
             child: SearchSheetBody(

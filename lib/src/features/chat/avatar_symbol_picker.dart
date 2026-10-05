@@ -1,5 +1,6 @@
+import 'app_bottom_sheet.dart';
+import 'app_sheet_surface.dart';
 import 'chat_header_background.dart';
-import '../../app/global_ui.dart';
 import 'floating_search_layout.dart';
 import 'package:flutter/material.dart';
 
@@ -34,14 +35,13 @@ Future<String?> showAvatarSymbolPicker(
   } else {
     height = screenHeight * .78;
   }
-  return showModalBottomSheet<String>(
+  return showAppBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: false,
     barrierColor: Colors.black.withValues(alpha: .24),
-    builder: (_) => ClipRRect(
-      borderRadius: GlobalUI.bottomSheetBorderRadius,
+    builder: (_) => AppSheetSurface(
       child: _AvatarSymbolPicker(
         selected: selected,
         color: color,

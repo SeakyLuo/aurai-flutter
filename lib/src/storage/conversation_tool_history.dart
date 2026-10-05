@@ -9,7 +9,7 @@ Future<List<String>> recentConversationTools(
   final runs = await database.query(
     'agent_runs',
     columns: ['id'],
-    where: 'conversation_id = ?',
+    where: 'parent_run_id IS NULL AND conversation_id = ?',
     whereArgs: [conversationId],
     orderBy: 'started_at DESC',
     limit: 20,

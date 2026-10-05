@@ -169,15 +169,6 @@ class MePage extends StatelessWidget {
                 ),
                 _entry(
                   context,
-                  '已归档',
-                  ConversationMenuIcon(
-                    type: ConversationMenuIconType.archive,
-                    color: iconColor,
-                  ),
-                  () => _archive(context),
-                ),
-                _entry(
-                  context,
                   '审批中心',
                   const SettingsIcon(type: SettingsIconType.permission),
                   () => Navigator.push<void>(
@@ -190,6 +181,15 @@ class MePage extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
+                _entry(
+                  context,
+                  '已归档',
+                  ConversationMenuIcon(
+                    type: ConversationMenuIconType.archive,
+                    color: iconColor,
+                  ),
+                  () => _archive(context),
                 ),
                 _entry(
                   context,

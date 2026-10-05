@@ -1,8 +1,8 @@
 part of 'chat_controller.dart';
 
 extension PendingMessageSubmission on ChatController {
-  PendingMessageQueue get pendingMessageQueue => _pendingMessageQueues
-      .putIfAbsent(activeConversation.id, PendingMessageQueue.new);
+  PendingMessageQueue get pendingMessageQueue =>
+      _executions.pendingMessages(activeConversation.id);
 
   bool get shouldQueuePrivateMessage =>
       activeConversation.kind == ConversationKind.direct &&
@@ -15,11 +15,12 @@ extension PendingMessageSubmission on ChatController {
           "key GLOB 'pending_message_queue:*' AND substr(key, 23) IN (SELECT id FROM conversations)",
     );
     for (final row in rows) {
-      _pendingMessageQueues[(row['key'] as String).substring(
-        22,
-      )] = PendingMessageQueue.restore(
-        row['value'] as String,
-        _imageStore.directory,
+      _executions.restorePendingMessages(
+        (row['key'] as String).substring(22),
+        PendingMessageQueue.restore(
+          row['value'] as String,
+          _imageStore.directory,
+        ),
       );
     }
   }
@@ -229,20 +230,15 @@ extension PendingMessageSubmission on ChatController {
       if (!reply.config.isConfigured) return true;
       if (isBusy) {
         delivery = Completer<List<Map<String, Object?>>>();
-        if (_runtime == null && conversation.runState == ChatRunState.running) {
-          _execution.userInputs.add(delivery.future);
-          deliveredToRun = true;
-        } else {
-          deliveredToRun = _runtime?.enqueueUserInput(delivery.future) == true;
-        }
+        deliveredToRun = _execution.submitInput(delivery.future);
         if (deliveredToRun) {
           _execution.liveUserMessageIds.addAll(
             batch.map((message) => message.id),
           );
         } else {
           final finished = identical(_privateConversation, conversation)
-              ? _execution.privateRunFinished?.future
-              : _execution.runFinished?.future;
+              ? _execution.privateRunFinished
+              : _execution.runFinished;
           await finished;
         }
       }

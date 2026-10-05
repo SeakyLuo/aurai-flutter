@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/source_reference.dart';
@@ -7,7 +8,7 @@ Future<void> showSourcesSheet(
   BuildContext context, {
   required List<SourceReference> sources,
   required ValueChanged<String?> onOpenLink,
-}) => showModalBottomSheet<void>(
+}) => showAppBottomSheet<void>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,

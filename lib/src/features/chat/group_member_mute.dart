@@ -5,7 +5,7 @@ extension GroupMemberMute on ChatController {
     String groupId, {
     required Duration? duration,
   }) async {
-    final state = _executionStates[groupId];
+    final state = _executions.sessions[groupId];
     final dispatcher = state?.groupDispatcher;
     final held = dispatcher != null && !dispatcher.closed;
     if (held) dispatcher.hold();
@@ -67,7 +67,7 @@ extension GroupMemberMute on ChatController {
     required Duration? duration,
     String actorId = 'user:local',
   }) async {
-    final state = _executionStates[groupId];
+    final state = _executions.sessions[groupId];
     final dispatcher = state?.groupDispatcher;
     // Keep the dispatcher alive while persisting and cancelling an active turn.
     final held = dispatcher != null && !dispatcher.closed;

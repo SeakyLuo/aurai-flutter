@@ -1,16 +1,8 @@
 part of 'chat_controller.dart';
 
-typedef _ReplyContext = ({
-  String senderId,
-  MessageSender sender,
-  ModelConfig config,
-  String? systemPrompt,
-  AiProfile profile,
-});
-
 extension GroupReplyContext on ChatController {
   Future<String?> _memberSystemPrompt(
-    _ReplyContext reply, {
+    ExecutionReplyContext reply, {
     required bool group,
   }) async {
     if (group) {
@@ -23,7 +15,7 @@ extension GroupReplyContext on ChatController {
         : '${reply.systemPrompt ?? agentSystemPrompt}\n\n$muteContext';
   }
 
-  Future<_ReplyContext> _directReplyContext(Conversation conversation) async {
+  Future<ExecutionReplyContext> _directReplyContext(Conversation conversation) async {
     var profile = await groupStore.loadAi(conversation.defaultSenderId);
     if (!conversation.usesPersonalization) {
       profile = profile.copyWith(
@@ -38,10 +30,10 @@ extension GroupReplyContext on ChatController {
     return _profileReplyContext(profile, group: false);
   }
 
-  _ReplyContext _groupReplyContext(AiProfile profile) =>
+  ExecutionReplyContext _groupReplyContext(AiProfile profile) =>
       _profileReplyContext(profile, group: true);
 
-  _ReplyContext _profileReplyContext(AiProfile profile, {required bool group}) {
+  ExecutionReplyContext _profileReplyContext(AiProfile profile, {required bool group}) {
     final sender = profile.sender;
     return (
       senderId: sender.id,

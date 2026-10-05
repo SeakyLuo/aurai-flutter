@@ -1,7 +1,7 @@
+import 'app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
-import '../../app/global_ui.dart';
 import 'message_action.dart';
-import 'glass_surface.dart';
+import 'app_sheet_surface.dart';
 import 'chat_viewport.dart';
 
 Future<MessageMenuResult?> showMessageMenuSheet(
@@ -11,11 +11,9 @@ Future<MessageMenuResult?> showMessageMenuSheet(
   builder,
 }) async {
   const color = Colors.transparent;
-  const shape = RoundedRectangleBorder(
-    borderRadius: GlobalUI.bottomSheetBorderRadius,
-  );
+  final shape = Theme.of(context).bottomSheetTheme.shape;
   if (!preserveSelection) {
-    return showModalBottomSheet<MessageMenuResult>(
+    return showAppBottomSheet<MessageMenuResult>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -136,9 +134,7 @@ class _MessageMenuSurfaceState extends State<_MessageMenuSurface> {
 
   @override
   Widget build(BuildContext context) => BackdropGroup(
-    child: GlassSurface(
-      borderRadius: GlobalUI.bottomSheetBorderRadius,
-      tintOpacity: .72,
+    child: AppSheetSurface(
       child: SafeArea(
         top: false,
         child: Column(

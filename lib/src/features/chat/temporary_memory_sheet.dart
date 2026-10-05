@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 
 import 'question_icon.dart';
@@ -7,7 +8,7 @@ import 'visibility_option_tile.dart';
 Future<bool?> showTemporaryMemorySheet(
   BuildContext context, {
   required bool personalized,
-}) => showModalBottomSheet<bool>(
+}) => showAppBottomSheet<bool>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,

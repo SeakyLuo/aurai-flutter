@@ -1,3 +1,5 @@
+import 'app_bottom_sheet.dart';
+import 'app_sheet_surface.dart';
 import 'package:flutter/material.dart';
 import '../../app/global_ui.dart';
 import '../../domain/speech_voice.dart';
@@ -86,7 +88,7 @@ Future<SpeechVoiceFilter?> showSpeechVoiceFilter(
   BuildContext context, {
   required List<SpeechVoice> voices,
   required SpeechVoiceFilter selected,
-}) => showModalBottomSheet<SpeechVoiceFilter>(
+}) => showAppBottomSheet<SpeechVoiceFilter>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -173,8 +175,7 @@ class _VoiceFilterSheetState extends State<_VoiceFilterSheet> {
       for (final voice in widget.voices)
         if (voice.details?.gender case final String gender) gender,
     }.toList()..sort();
-    return ClipRRect(
-      borderRadius: GlobalUI.bottomSheetBorderRadius,
+    return AppSheetSurface(
       child: SafeArea(
         top: false,
         child: ConstrainedBox(

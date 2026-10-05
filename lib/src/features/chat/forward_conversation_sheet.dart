@@ -1,3 +1,4 @@
+import 'app_sheet_surface.dart';
 import 'pagination_listener.dart';
 import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
@@ -85,8 +86,7 @@ class _ForwardConversationSheetState extends State<ForwardConversationSheet> {
   @override
   Widget build(BuildContext context) => SizedBox(
     height: double.infinity,
-    child: ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+    child: AppSheetSurface(
       child: ScaffoldMessenger(
         key: _messenger,
         child: Scaffold(

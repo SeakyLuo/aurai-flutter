@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'floating_search_layout.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
@@ -13,7 +14,7 @@ Future<List<MessageSender>?> showGroupMentionSheet(
   BuildContext context,
   GroupChatStore store,
   String conversationId,
-) => showModalBottomSheet<List<MessageSender>>(
+) => showAppBottomSheet<List<MessageSender>>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,

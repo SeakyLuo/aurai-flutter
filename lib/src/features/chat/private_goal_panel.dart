@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'private_goal_sheet.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -256,7 +257,7 @@ class _PrivateGoalPanelState extends State<PrivateGoalPanel> {
     return succeeded;
   }
 
-  Future<void> _showGoal({bool editing = false}) => showModalBottomSheet<void>(
+  Future<void> _showGoal({bool editing = false}) => showAppBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

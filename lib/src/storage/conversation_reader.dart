@@ -239,7 +239,7 @@ class ConversationReader {
     final runs = await database.query(
       'agent_runs',
       where:
-          "conversation_id = ? AND (status IN ('failed', 'cancelled', 'interrupted') OR (status = 'completed' AND (final_message_id IS NULL OR final_message_id NOT IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != '')))) AND (status = 'cancelled' OR id = ? OR id IN (SELECT run_id FROM tool_calls))",
+          "parent_run_id IS NULL AND conversation_id = ? AND (status IN ('failed', 'cancelled', 'interrupted') OR (status = 'completed' AND (final_message_id IS NULL OR final_message_id NOT IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != '')))) AND (status = 'cancelled' OR id = ? OR id IN (SELECT run_id FROM tool_calls))",
       whereArgs: [conversation.id, conversation.activeRunId],
       orderBy: 'started_at, id',
     );

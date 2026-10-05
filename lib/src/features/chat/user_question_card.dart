@@ -1,8 +1,8 @@
+import 'app_sheet_surface.dart';
 import 'package:flutter/material.dart';
+import '../../app/global_ui.dart';
 
 import '../../agent/ask_user_tool.dart';
-import '../../app/global_ui.dart';
-import 'glass_surface.dart';
 import 'question_icon.dart';
 import 'user_question_answer.dart';
 import 'user_question_skip_button.dart';
@@ -94,19 +94,7 @@ class _UserQuestionCardState extends State<UserQuestionCard> {
               MediaQuery.paddingOf(context).top,
         ),
         child: BackdropGroup(
-          child: GlassSurface(
-            borderRadius: GlobalUI.bottomSheetBorderRadius,
-            gradientColors: Theme.of(context).brightness == Brightness.dark
-                ? const [
-                    Color(0xe038383c),
-                    Color(0xcc29292e),
-                    Color(0xe02e2e33),
-                  ]
-                : const [
-                    Color(0xefffffff),
-                    Color(0xd6ffffff),
-                    Color(0xe6f5f5f8),
-                  ],
+          child: AppSheetSurface(
             child: SafeArea(
               top: false,
               child: Padding(

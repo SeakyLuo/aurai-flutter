@@ -49,6 +49,7 @@ import '../../platform/aurai_platform.dart';
 import 'image_attachments.dart';
 import 'task_summary_view.dart';
 import 'run_timeline_sheet.dart';
+import '../../domain/model_failure.dart';
 import 'task_failure_card.dart';
 import 'reasoning_message_view.dart';
 import 'message_actions_menu.dart';

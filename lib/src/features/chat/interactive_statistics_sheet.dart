@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/interactive_selection.dart';
 import 'interactive_message_paging.dart';
@@ -27,7 +28,7 @@ Future<void> showInteractiveStatistics(
   required String messageId,
 }) {
   final snapshot = InteractivePageScope.of(context)?.snapshot;
-  return showModalBottomSheet<void>(
+  return showAppBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -215,7 +216,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
     }
   }
 
-  Future<void> _openParticipant(String id) => showModalBottomSheet<void>(
+  Future<void> _openParticipant(String id) => showAppBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

@@ -13,6 +13,10 @@
         android:label="Aurai"
         android:name=".AuraiApplication"
         android:icon="@mipmap/ic_aurai_brand">
+        <!-- Avoid the Adreno Vulkan allocation failure observed in the raster thread. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
         <receiver android:name=".ScheduledTaskReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

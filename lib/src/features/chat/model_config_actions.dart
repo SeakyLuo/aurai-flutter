@@ -276,7 +276,7 @@ extension ModelConfigActions on ChatController {
         when affectedIds.contains(active.sender.id)) {
       _activeAi = active.copyWith(modelSelection: targetSelection);
     }
-    for (final state in {_execution, ..._executionStates.values}) {
+    for (final state in {_execution, ..._executions.sessions.values}) {
       for (final id in state.groupReplies.keys.toList()) {
         if (!affectedIds.contains(id)) continue;
         final profile = state.groupReplies[id]!.profile.copyWith(

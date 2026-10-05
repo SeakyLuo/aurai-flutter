@@ -13,7 +13,7 @@ extension PrivateGoalActions on ChatController {
       if (objective.trim().isEmpty) throw ArgumentError('请输入目标');
       if (tokenBudget != null && tokenBudget <= 0)
         throw ArgumentError('Token 预算必须大于 0');
-      final finished = _execution.runFinished?.future;
+      final finished = _execution.runFinished;
       if (finished != null) {
         await _stopConversation();
         await finished;
@@ -66,7 +66,7 @@ extension PrivateGoalActions on ChatController {
       }
       final state = await store.read();
       if (state['status'] == 'active') {
-        final finished = _execution.runFinished?.future;
+        final finished = _execution.runFinished;
         await _stopConversation();
         await finished;
       }

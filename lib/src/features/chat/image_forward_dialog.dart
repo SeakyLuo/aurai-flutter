@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../domain/agent_models.dart';
@@ -70,7 +71,7 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
       );
       if (!mounted) return;
       FocusScope.of(context).unfocus();
-      await showModalBottomSheet<void>(
+      await showAppBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
@@ -148,7 +149,7 @@ class _ImageForwardDialogState extends State<ImageForwardDialog> {
             ? null
             : () {
                 FocusScope.of(context).unfocus();
-                showModalBottomSheet<void>(
+                showAppBottomSheet<void>(
                   context: context,
                   isScrollControlled: true,
                   useSafeArea: true,

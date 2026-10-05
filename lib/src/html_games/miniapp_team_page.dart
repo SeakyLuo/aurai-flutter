@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../app/ui_action.dart';
 import '../domain/message_sender.dart';
-import '../features/chat/app_confirmation_dialog.dart';
 import '../features/chat/delete_confirmation_dialog.dart';
 import '../features/chat/member_avatar.dart';
 import '../features/chat/header_action_menu.dart';
@@ -12,7 +11,6 @@ import '../scheduling/task_action_menu.dart';
 import '../features/chat/pagination_listener.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
-import 'miniapp_requests_page.dart';
 import 'miniapp_team_picker.dart';
 import 'miniapp_team_store.dart';
 
@@ -82,16 +80,6 @@ class _MiniappTeamPageState extends State<MiniappTeamPage> {
       ),
     );
     if (members == null || !mounted) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AppConfirmationDialog(
-        title: '添加开发成员',
-        description:
-            '允许 ${members.map((member) => member.name).join('、')} 编辑此小程序？',
-        confirmLabel: '添加',
-      ),
-    );
-    if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
     await runUiAction(
       context,
@@ -240,40 +228,6 @@ class _MiniappTeamPageState extends State<MiniappTeamPage> {
                     const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   ),
                   children: [
-                    if (manager)
-                      Material(
-                        color: settingsFieldColor(context),
-                        borderRadius: BorderRadius.circular(26),
-                        clipBehavior: Clip.antiAlias,
-                        child: ListTile(
-                          contentPadding: const EdgeInsetsDirectional.only(
-                            start: 16,
-                            end: 12,
-                          ),
-                          leading: const TaskActionIcon('edit'),
-                          title: const Text('修改申请'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if ((data!['pendingCount'] as int) > 0)
-                                Text('${data['pendingCount']}'),
-                              const SizedBox(width: 8),
-                              const SettingsIcon(
-                                type: SettingsIconType.chevron,
-                              ),
-                            ],
-                          ),
-                          onTap: () => Navigator.push<void>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => MiniappRequestsPage(
-                                store: widget.store,
-                                appId: _id,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
                     if (creator != null) ...[
                       _sectionLabel('创建人'),
                       _memberRow(creator, creator: true, manager: manager),

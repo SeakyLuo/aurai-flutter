@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'dart:async';
@@ -12,7 +13,7 @@ Future<void> showAccessibilityRequestSheet(
   ChatController controller,
 ) async {
   final messenger = ScaffoldMessenger.of(context);
-  await showModalBottomSheet<void>(
+  await showAppBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

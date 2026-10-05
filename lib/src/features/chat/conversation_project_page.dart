@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 
 import '../../storage/development_projects.dart';
@@ -37,7 +38,7 @@ class ConversationProjectSheet extends StatefulWidget {
     required ChatController controller,
     required List<DevelopmentProject> projects,
     required String? selectedProjectId,
-  }) => showModalBottomSheet<ConversationProjectSelection>(
+  }) => showAppBottomSheet<ConversationProjectSelection>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

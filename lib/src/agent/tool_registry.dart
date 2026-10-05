@@ -65,6 +65,7 @@ class ToolRegistry {
         (tool) =>
             tool.name == 'searchTools' ||
             tool.name == 'askUser' ||
+            tool.name == 'runSubagent' ||
             tool.name == 'hideThinking' ||
             tool.name == 'compactContext' ||
             tool.name == 'readInteractiveMessage' ||

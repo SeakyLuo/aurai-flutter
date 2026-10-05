@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/workspace_file_changes.dart';
@@ -10,7 +11,7 @@ class WorkspaceChangesView extends StatelessWidget {
   const WorkspaceChangesView({super.key, required this.changes});
   final WorkspaceFileChanges changes;
 
-  Future<void> showAll(BuildContext context) => showModalBottomSheet<void>(
+  Future<void> showAll(BuildContext context) => showAppBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

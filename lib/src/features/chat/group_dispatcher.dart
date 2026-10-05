@@ -93,6 +93,18 @@ class GroupDispatcher {
     _finishIfIdle();
   }
 
+  /// Explicit user recovery runs once without enabling automatic replies.
+  void runOnce(String id) {
+    if (stopped || closed || isMuted(id)) return;
+    final mailbox = _members[id]!;
+    mailbox.runOnce = true;
+    mailbox.timer?.cancel();
+    mailbox.timer = null;
+    mailbox.sleepUntil = null;
+    _markPending(mailbox);
+    _schedule(id, mailbox);
+  }
+
   void pause(String id) {
     paused.add(id);
     final mailbox = _members[id];
@@ -100,6 +112,7 @@ class GroupDispatcher {
     if (mailbox != null) {
       mailbox.timer = null;
       mailbox.pending = false;
+      mailbox.runOnce = false;
       mailbox.sleepUntil = null;
     }
     _finishIfIdle();
@@ -112,6 +125,7 @@ class GroupDispatcher {
     mailbox.timer?.cancel();
     mailbox.timer = null;
     mailbox.pending = false;
+    mailbox.runOnce = false;
     mailbox.sleepUntil = null;
     _finishIfIdle();
   }
@@ -167,7 +181,7 @@ class GroupDispatcher {
 
   void _schedule(String id, _Mailbox mailbox) {
     if (stopped ||
-        paused.contains(id) ||
+        (paused.contains(id) && !mailbox.runOnce) ||
         isMuted(id) ||
         mailbox.active ||
         mailbox.timer != null)
@@ -181,6 +195,7 @@ class GroupDispatcher {
         mailbox.active = true;
         _activeCount++;
         mailbox.pending = false;
+        mailbox.runOnce = false;
         final snapshot = List<AgentMessage>.unmodifiable(history);
         unawaited(_run(id, mailbox, snapshot));
       },
@@ -230,4 +245,5 @@ class _Mailbox {
   bool wokeFromSleep = false;
   bool active = false;
   bool pending = false;
+  bool runOnce = false;
 }

@@ -1,4 +1,5 @@
 import 'private_task_state.dart';
+import 'subagent_runs.dart';
 import 'speech_provider_migration.dart';
 import 'speech_configuration_migration.dart';
 import 'speech_voice_catalog_migration.dart';
@@ -39,7 +40,7 @@ import 'project_resource_migration.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 88,
+  version: 89,
   onOpen: (db) async {
     await db.update('approval_requests', {
       'status': 'cancelled',
@@ -482,7 +483,10 @@ Future<Database> openConversationDatabase() async => openDatabase(
       await batch.commit(noResult: true);
     }
     if (oldVersion < 87) await migrateHtmlEventIdentities(db);
-    if (oldVersion < 88) {
+    final approvalTables = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'approval_requests'",
+    );
+    if (oldVersion < 89 && approvalTables.isEmpty) {
       for (final statement in approvalCenterSchema) {
         await db.execute(statement);
       }
@@ -494,12 +498,20 @@ Future<Database> openConversationDatabase() async => openDatabase(
           app_id, sender_id, requested_at
         FROM miniapp_edit_requests WHERE status = 'pending' ''');
     }
+    final runColumns = await db.rawQuery('PRAGMA table_info(agent_runs)');
+    if (oldVersion < 89 &&
+        !runColumns.any((column) => column['name'] == 'parent_run_id')) {
+      for (final statement in subagentRunSchema) {
+        await db.execute(statement);
+      }
+    }
   },
   onCreate: (db, version) async {
     final batch = db.batch();
     for (final statement in [
       ..._schema,
       privateTaskStateSchema,
+      ...subagentRunSchema,
       ...assetLibrarySchema,
       projectRecordSchema,
       ...projectDirectorySchema,

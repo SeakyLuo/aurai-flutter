@@ -3,13 +3,18 @@ part of 'chat_controller.dart';
 extension RunToolLogging on ChatController {
   Future<void> Function(ToolResult) _runToolCompletionListener(
     Conversation conversation,
-    _ReplyContext reply,
+    ExecutionReplyContext reply,
     ModelConfig config,
     String runId,
     ProjectRunSnapshots snapshots,
     Map<String, Object?> diagnosticCalls,
   ) => (result) async {
     await _store.runs.finishTool(runId, result);
+    if (result.toolName == 'runSubagent') {
+      if (result.output['runId'] case final String childRunId) {
+        subagentRuns.changed(childRunId);
+      }
+    }
     await _updateLiveProjectChanges(snapshots, result, runId);
     final argumentShape = diagnosticCalls.remove(result.callId);
     if (result.status != ToolResultStatus.error) return;

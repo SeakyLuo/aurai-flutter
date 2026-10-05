@@ -38,14 +38,6 @@ class GroupMemberActivity {
   final bool thinkingHidden;
 }
 
-class _GroupMemberThoughts {
-  _GroupMemberThoughts(this.runId);
-  final String runId;
-  final turns = <Object, AgentTaskActivity>{};
-  final steps = <int, AgentStep>{};
-  Object? latest;
-}
-
 extension GroupMemberActivities on ChatController {
   Future<void> setGroupMemberAutoReply(
     String groupId,
@@ -102,7 +94,7 @@ extension GroupMemberActivities on ChatController {
     final ids = await GroupParticipation(
       _store.database,
     ).pauseAll(groupId, reason: '${MessageSender.localUser.name}暂停了全部成员的自动接话');
-    final dispatcher = _executionStates[groupId]?.groupDispatcher;
+    final dispatcher = _executions.sessions[groupId]?.groupDispatcher;
     for (final id in ids) {
       dispatcher?.pause(id);
     }
@@ -119,7 +111,7 @@ extension GroupMemberActivities on ChatController {
       MessageSender.localUser.id,
     );
     final ids = await GroupParticipation(_store.database).resumeAll(groupId);
-    _executionStates[groupId]?.groupDispatcher?.paused.removeAll(ids);
+    _executions.sessions[groupId]?.groupDispatcher?.paused.removeAll(ids);
     groupActivityChanges.value++;
     notifyListeners();
     return ids.length;
@@ -128,7 +120,7 @@ extension GroupMemberActivities on ChatController {
   List<AgentTool> _thinkingTools(
     Conversation member,
     Conversation? parent,
-    _ReplyContext reply,
+    ExecutionReplyContext reply,
   ) {
     member.thinkingHidden =
         parent != null &&
@@ -217,7 +209,7 @@ extension GroupMemberActivities on ChatController {
     if (_callbacksDisposed) return;
     final cache = _execution.groupThoughts;
     if (cache[senderId]?.runId != runId) {
-      cache[senderId] = _GroupMemberThoughts(runId);
+      cache[senderId] = GroupMemberThoughts(runId);
     }
     final thoughts = cache[senderId]!;
     final key = (turn, messageIndex, isReasoning);
@@ -233,7 +225,7 @@ extension GroupMemberActivities on ChatController {
     if (_callbacksDisposed) return;
     final cache = _execution.groupThoughts;
     if (cache[senderId]?.runId != runId) {
-      cache[senderId] = _GroupMemberThoughts(runId);
+      cache[senderId] = GroupMemberThoughts(runId);
     }
     final thoughts = cache[senderId]!;
     for (var i = 0; i < steps.length; i++) {
@@ -269,7 +261,7 @@ extension GroupMemberActivities on ChatController {
     String senderId,
     String runId,
   ) {
-    final state = _executionStates[conversationId];
+    final state = _executions.sessions[conversationId];
     final thoughts = state?.groupThoughts[senderId];
     if (thoughts == null || thoughts.runId != runId) return null;
     final hidden =
@@ -287,7 +279,7 @@ extension GroupMemberActivities on ChatController {
     Map<String, String> pausedReasons = const {},
     Map<String, GroupMute> mutedMembers = const {},
   }) {
-    final state = _executionStates[conversationId];
+    final state = _executions.sessions[conversationId];
     final conversation = state?.runningConversation;
     if (conversation?.kind != ConversationKind.group ||
         conversation?.runState != ChatRunState.running) {
@@ -367,7 +359,7 @@ extension GroupMemberActivities on ChatController {
     required String runId,
     bool currentOnly = false,
   }) async {
-    final state = _executionStates[conversationId];
+    final state = _executions.sessions[conversationId];
     final member = state?.groupRuns[senderId];
     // A row can finish or start a new run between rendering and the tap.
     if (state?.runningConversation == null ||

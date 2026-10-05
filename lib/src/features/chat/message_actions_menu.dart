@@ -70,12 +70,6 @@ Future<MessageMenuResult?> showMessageActionsMenu(
           ? Theme.of(context).colorScheme.onSurfaceVariant
           : const Color(0xff222222);
       final actions = [
-        if (allowReadAloud)
-          (
-            const MessageActionResult(MessageAction.readAloud),
-            SettingsIcon(type: SettingsIconType.sound, color: iconColor),
-            '朗读',
-          ),
         if (allowRetry)
           (
             const MessageActionResult(MessageAction.retry),
@@ -126,15 +120,6 @@ Future<MessageMenuResult?> showMessageActionsMenu(
               color: iconColor,
             ),
             message.htmlGame != null ? '分享' : '转发',
-          ),
-        if (allowBranch)
-          (
-            const MessageActionResult(MessageAction.branch),
-            ConversationMenuIcon(
-              type: ConversationMenuIconType.branch,
-              color: iconColor,
-            ),
-            '在新聊天继续',
           ),
         if (allowCopy && message.htmlGame == null && message.text.isNotEmpty)
           (
@@ -204,6 +189,21 @@ Future<MessageMenuResult?> showMessageActionsMenu(
               color: iconColor,
             ),
             '撤回',
+          ),
+        if (allowReadAloud)
+          (
+          const MessageActionResult(MessageAction.readAloud),
+          SettingsIcon(type: SettingsIconType.sound, color: iconColor),
+          '朗读',
+          ),
+        if (allowBranch)
+          (
+          const MessageActionResult(MessageAction.branch),
+          ConversationMenuIcon(
+            type: ConversationMenuIconType.branch,
+            color: iconColor,
+          ),
+          '在新聊天继续',
           ),
       ];
       return ConstrainedBox(

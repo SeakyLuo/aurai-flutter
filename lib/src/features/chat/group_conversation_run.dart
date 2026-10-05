@@ -42,6 +42,7 @@ extension GroupConversationRun on ChatController {
     Set<String>? wakeMembers,
     bool callbacksOnly = false,
     Map<String, String> continuationRuns = const {},
+    Set<String> runOnceMembers = const {},
   }) async {
     _execution.groupContinuationRuns.addAll(continuationRuns);
     final callbackStarts = callbacksOnly ? {...wakeMembers!} : <String>{};
@@ -108,11 +109,7 @@ extension GroupConversationRun on ChatController {
         groupChat: true,
       );
       sessionStarted = true;
-      _groupRuns.clear();
-      _execution.groupThoughts.clear();
-      _execution.hiddenThinkingMembers.clear();
-      _execution.groupReplyDrafts.clear();
-      final dispatcher = GroupDispatcher(
+      final dispatcher = _execution.startGroup(
         history: history,
         members: ids,
         paused: paused,
@@ -183,7 +180,6 @@ extension GroupConversationRun on ChatController {
           }
         },
       );
-      _groupDispatcher = dispatcher;
       final sleeps = _groupSleeps.forGroup(conversation.id);
       final mentioned = {
         ..._groupNoticeMentions([user]),
@@ -196,9 +192,13 @@ extension GroupConversationRun on ChatController {
         sleeps.removeWhere((id, _) => mentioned.contains(id));
       }
       dispatcher.restoreSleeps(sleeps);
+      for (final id in runOnceMembers) {
+        dispatcher.runOnce(id);
+      }
       dispatcher.start([
         for (final id in ids)
           if ((wakeMembers == null || wakeMembers.contains(id)) &&
+              !runOnceMembers.contains(id) &&
               (wakeMembers != null || user.canView(id)) &&
               (wakeMembers != null || id != user.senderId) &&
               !paused.contains(id))
@@ -239,16 +239,7 @@ extension GroupConversationRun on ChatController {
           );
       } finally {
         conversation.replyingSenderName = null;
-        _groupDispatcher = null;
-        _groupReplies.clear();
-        _groupSenders.clear();
-        _groupRuns.clear();
-        _execution.groupThoughts.clear();
-        _execution.hiddenThinkingMembers.clear();
-        _execution.groupReplyDrafts.clear();
-        _execution.groupContinuationRuns.clear();
-        _groupRuntimes.clear();
-        _groupStreaming.clear();
+        _execution.finishGroup();
         await _persistRun(conversation);
         _notifyRun(conversation);
       }

@@ -75,8 +75,7 @@ class _GroupRunDetailsLayoutState extends State<GroupRunDetailsLayout> {
   }
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: GlobalUI.bottomSheetBorderRadius,
+  Widget build(BuildContext context) => AppSheetSurface(
     child: SizedBox(
       height: MediaQuery.sizeOf(context).height * .8,
       child: SafeArea(

@@ -8,19 +8,25 @@ extension _FailureRetry on _MessageItemState {
         controller,
         controller.groupActivityChanges,
       ]),
-      builder: (context, _) => Padding(
-        padding: const EdgeInsets.only(top: 6, bottom: 8),
-        child: MenuPressHighlight(
-          onLongPressStart: (_) => _openBubbleMenu(),
-          borderRadius: BorderRadius.circular(24),
-          child: TaskFailureCard(
-            error: message.text,
-            padding: EdgeInsets.zero,
-            actionLabel: '继续',
-            continuing: true,
-            enabled: widget.onRetry != null,
-            busy: _retryingFailure || controller.isFailedReplyActive(message),
-            onRetry: widget.onRetry == null ? null : _retryFailure,
+      builder: (context, _) => FutureBuilder<Map<String, bool?>>(
+        future: controller.failedRecoveryOptions(),
+        builder: (context, snapshot) => Padding(
+          padding: const EdgeInsets.only(top: 6, bottom: 8),
+          child: MenuPressHighlight(
+            onLongPressStart: (_) => _openBubbleMenu(),
+            borderRadius: BorderRadius.circular(24),
+            child: TaskFailureCard(
+              error: message.text,
+              padding: EdgeInsets.zero,
+              actionLabel: snapshot.data?[message.id] == true ? '继续' : '重试',
+              continuing: snapshot.data?[message.id] == true,
+              enabled:
+                  (snapshot.hasError || snapshot.data?[message.id] != null) &&
+                  widget.onRetry != null &&
+                  controller.canOfferFailedRetry(message),
+              busy: _retryingFailure || controller.isFailedReplyActive(message),
+              onRetry: widget.onRetry == null ? null : _retryFailure,
+            ),
           ),
         ),
       ),
@@ -175,6 +181,21 @@ extension _MessageItemActions on _MessageItemState {
     final snapshot = message;
     var hasHistory = false;
     var allowRetry = widget.onRetry != null && snapshot.isFailure;
+    var retryLabel =
+        classifyModelFailure(
+          ImageActionScope.of(context).activeConversation.errorDetail ?? '',
+        ).canContinue
+        ? '继续'
+        : '重试';
+    if (allowRetry) {
+      final controller = ImageActionScope.of(context);
+      final options = await controller.failedRecoveryOptions();
+      if (!mounted) return;
+      retryLabel = options[snapshot.id] == true ? '继续' : '重试';
+      allowRetry =
+          options[snapshot.id] != null &&
+          controller.canOfferFailedRetry(snapshot);
+    }
     final database = ImageActionScope.of(context).groupStore.database;
     if (widget.onRetry != null && !snapshot.isFailure) {
       try {
@@ -303,7 +324,7 @@ extension _MessageItemActions on _MessageItemState {
             allowQuote: widget.onQuote != null,
             allowRecall: widget.onRecall != null,
             allowRetry: allowRetry,
-            retryLabel: '继续',
+            retryLabel: retryLabel,
             allowForward:
                 !widget.streaming &&
                 (message.htmlGame != null ||

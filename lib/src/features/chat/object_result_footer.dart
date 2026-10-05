@@ -1,6 +1,7 @@
+import 'app_bottom_sheet.dart';
+import 'app_sheet_surface.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../../app/global_ui.dart';
 import '../../domain/tool_detail_target.dart';
 import 'object_detail_navigation.dart';
 import 'question_icon.dart';
@@ -25,7 +26,7 @@ class ObjectResultFooter extends StatelessWidget {
       open: () async {
         final target = targets.length == 1
             ? targets.single
-            : await showModalBottomSheet<ToolDetailTarget>(
+            : await showAppBottomSheet<ToolDetailTarget>(
                 context: context,
                 isScrollControlled: true,
                 useSafeArea: true,
@@ -45,8 +46,7 @@ class _ResultTargetsSheet extends StatelessWidget {
   final List<ToolDetailTarget> targets;
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: GlobalUI.bottomSheetBorderRadius,
+  Widget build(BuildContext context) => AppSheetSurface(
     child: SafeArea(
       top: false,
       child: ConstrainedBox(

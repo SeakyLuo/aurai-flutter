@@ -1,5 +1,4 @@
 import '../features/chat/library_detail_split.dart';
-import '../features/chat/resource_scope_filter.dart';
 import '../domain/resource_scope.dart';
 import '../features/chat/floating_search_layout.dart';
 import '../widgets/empty_data_view.dart';
@@ -60,7 +59,7 @@ class _SkillsPageState extends State<SkillsPage> {
       .length;
   final _search = TextEditingController();
   String _status = 'enabled';
-  late ResourceScope? _scope = widget.groupId != null
+  late final ResourceScope? _scope = widget.groupId != null
       ? ResourceScope.group(widget.groupId!)
       : widget.projectId != null
       ? ResourceScope.project(widget.projectId!)
@@ -99,7 +98,7 @@ class _SkillsPageState extends State<SkillsPage> {
       builder: (_) => SkillEditor(
         store: widget.store,
         skill: SavedSkill(
-          scopes: [if (_scope != null) _scope!],
+          scopes: [if (_scope != null) _scope],
           name: '',
           description: '',
           instructions: '',
@@ -287,20 +286,6 @@ class _SkillsPageState extends State<SkillsPage> {
                       controller: _search,
                       onChanged: (_) => setState(() {}),
                       hintText: '搜索技能',
-                      trailingAction: _resourceCount < 20
-                          ? null
-                          : ResourceScopeFilter(
-                              groups: widget.store.groups,
-                              projects: widget.store.projects,
-                              value: _scope,
-                              onChanged: (value) =>
-                                  setState(() => _scope = value),
-                              status: _status,
-                              onStatus:
-                                  !widget.library && _filter == 'installed'
-                                  ? (value) => setState(() => _status = value)
-                                  : null,
-                            ),
                       enabled: true,
                       bottom: 16,
                       child: ListenableBuilder(

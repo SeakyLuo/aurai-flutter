@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/model_provider.dart';
+import '../domain/model_failure.dart';
 
 List<Map<String, Object?>>? _safeProtocolItems(
   Iterable<Map<String, Object?>> turns,
@@ -40,9 +41,9 @@ Future<List<Map<String, Object?>>> loadTaskContinuationProtocol(
 ) async {
   final runs = await database.query(
     'agent_runs',
-    columns: ['id', 'started_at'],
+    columns: ['id', 'started_at', 'error_detail', 'status'],
     where:
-        "conversation_id = ? AND user_message_id = ? AND provider = ? AND model = ? AND status IN ('completed', 'failed', 'cancelled', 'interrupted') AND (final_message_id IS NULL OR final_message_id NOT IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != ''))",
+        "parent_run_id IS NULL AND conversation_id = ? AND user_message_id = ? AND provider = ? AND model = ? AND status IN ('completed', 'failed', 'cancelled', 'interrupted') AND (final_message_id IS NULL OR final_message_id NOT IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != ''))",
     whereArgs: [
       conversationId,
       userMessageId,
@@ -85,6 +86,9 @@ Future<List<Map<String, Object?>>> loadTaskContinuationProtocol(
       return (b['started_at']! as int).compareTo(a['started_at']! as int);
     });
   for (final run in orderedRuns) {
+    if (run['status'] == 'failed' &&
+        !classifyModelFailure(run['error_detail'] as String? ?? '').canContinue)
+      continue;
     final items = _continuationProtocolItems(
       turns[run['id']] ?? const <Map<String, Object?>>[],
       tools[run['id']] ?? const <Map<String, Object?>>[],
@@ -155,11 +159,13 @@ Future<List<Map<String, Object?>>> loadFailedRunProtocol(
   final runs = await database.query(
     'agent_runs',
     columns: ['status', 'provider', 'model'],
-    where: 'id = ? AND conversation_id = ? AND sender_id = ?',
+    where:
+        'parent_run_id IS NULL AND id = ? AND conversation_id = ? AND sender_id = ?',
     whereArgs: [runId, conversationId, senderId],
     limit: 1,
   );
-  if (runs.isEmpty || runs.single['status'] != 'failed') {
+  if (runs.isEmpty ||
+      !const ['failed', 'interrupted'].contains(runs.single['status'])) {
     throw StateError('这次执行已不能继续');
   }
   if (runs.single['provider'] != config.service.name ||
@@ -198,7 +204,7 @@ Future<Map<String, List<Map<String, Object?>>>> loadProtocolHistory(
   ModelConfig config,
 ) async {
   final selection =
-      'SELECT id FROM agent_runs WHERE conversation_id = ? '
+      'SELECT id FROM agent_runs WHERE parent_run_id IS NULL AND conversation_id = ? '
       "AND provider = ? AND model = ? AND status IN ('completed', 'failed', 'interrupted') "
       'AND id IN (SELECT run_id FROM messages WHERE conversation_id = ? AND created_at >= ?)';
   final args = [

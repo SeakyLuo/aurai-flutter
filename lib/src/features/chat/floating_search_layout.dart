@@ -1,10 +1,10 @@
+import 'app_sheet_surface.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'glass_surface.dart';
 import 'question_icon.dart';
 import 'sidebar_action_icon.dart';
 import 'chat_header_background.dart';
-import '../../app/global_ui.dart';
 
 /// The library search pattern, shared by pages and selection sheets.
 class FloatingSearchLayout extends StatefulWidget {
@@ -53,8 +53,7 @@ class SearchSheetBody extends StatelessWidget {
   final bool shrinkWrap;
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: GlobalUI.bottomSheetBorderRadius,
+  Widget build(BuildContext context) => AppSheetSurface(
     child: shrinkWrap
         ? Column(
             mainAxisSize: MainAxisSize.min,

@@ -1,4 +1,5 @@
 import '../domain/model_provider.dart';
+import '../domain/model_failure.dart';
 
 bool isProviderQuotaError(String detail) =>
     RegExp(
@@ -13,12 +14,7 @@ ModelProviderException providerResponseError(
 }) => ModelProviderException(
   isProviderQuotaError(detail) || statusCode == 402
       ? '模型服务余额不足，请先充值'
-      : switch (statusCode) {
-          401 || 403 => '模型服务认证失败，请检查 API 密钥',
-          429 => '模型服务当前繁忙或额度不足，请稍后重试',
-          final int code when code >= 500 => '模型服务暂时不可用，请稍后重试',
-          _ => '模型服务请求失败',
-        },
+      : classifyModelFailure(detail, statusCode: statusCode).title,
   detail: detail,
   statusCode: statusCode,
 );

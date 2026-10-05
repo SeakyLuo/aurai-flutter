@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import '../../app/global_ui.dart';
 import 'question_icon.dart';
@@ -54,7 +55,7 @@ class TaskNodeDescription extends StatelessWidget {
     );
   }
 
-  Future<void> _open(BuildContext context) => showModalBottomSheet<void>(
+  Future<void> _open(BuildContext context) => showAppBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

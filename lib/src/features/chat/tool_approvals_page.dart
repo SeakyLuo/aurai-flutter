@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import '../../app/ui_action.dart';
 import '../../widgets/empty_data_view.dart';
@@ -145,7 +146,7 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
 
   Future<void> _details(ToolApprovalEntry e) {
     var revoking = false;
-    return showModalBottomSheet<void>(
+    return showAppBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

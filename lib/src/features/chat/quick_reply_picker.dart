@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import 'floating_search_layout.dart';
 import 'package:flutter/material.dart';
 import '../../domain/emoji_catalog.dart';
@@ -16,7 +17,7 @@ Future<QuickReplyOption?> showQuickReplyPicker(
     EmojiCatalog.load(),
   ).wait;
   if (!context.mounted) return null;
-  return showModalBottomSheet<QuickReplyOption>(
+  return showAppBottomSheet<QuickReplyOption>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -93,7 +94,7 @@ class _QuickReplyPickerState extends State<_QuickReplyPicker> {
 
   Future<void> _variants(EmojiEntry entry) async {
     final options = widget.catalog.variants[entry.base]!;
-    final picked = await showModalBottomSheet<QuickReplyOption>(
+    final picked = await showAppBottomSheet<QuickReplyOption>(
       context: context,
       useSafeArea: true,
       isScrollControlled: true,

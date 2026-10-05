@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../domain/model_failure.dart';
 import 'package:flutter/services.dart';
 import '../../app/glass_notice.dart';
 import '../../app/ui_action.dart';
@@ -122,10 +123,13 @@ class TaskFailureCard extends StatelessWidget {
           children: [
             const TaskFailureIcon(size: 22),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: Text(
-                '回复出错',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                classifyModelFailure(error).title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -139,7 +143,7 @@ class TaskFailureCard extends StatelessWidget {
               onPressed: () => _copyError(context),
             ),
             RoundAction(
-              label: busy ? '正在继续' : actionLabel,
+              label: busy ? (continuing ? '正在继续' : '正在重试') : actionLabel,
               icon: Icons.refresh_rounded,
               iconWidget: busy
                   ? SizedBox.square(

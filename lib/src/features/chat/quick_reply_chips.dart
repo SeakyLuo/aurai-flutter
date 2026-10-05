@@ -1,3 +1,4 @@
+import 'app_bottom_sheet.dart';
 import '../../app/glass_notice.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
@@ -31,7 +32,7 @@ class QuickReplyChips extends StatelessWidget {
         for (final row in rows) row['id'] as String: MessageSender.fromRow(row),
       };
       if (!context.mounted) return;
-      await showModalBottomSheet<void>(
+      await showAppBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
