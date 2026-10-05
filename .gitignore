@@ -12,6 +12,7 @@
 .swiftpm/
 migrate_working_dir/
 /.codex*/
+/tmp/
 
 # IntelliJ related
 *.iml
