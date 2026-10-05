@@ -224,7 +224,7 @@ extension MessageQuickReplies on ChatController {
           )
           ..senderName = source.senderId == MessageSender.localUser.id
               ? MessageSender.localUser.name
-              : source.sender?.name ?? 'AI';
+              : source.sender?.name ?? '联系人';
     return AgentMessage(
       id: newMessageId(),
       role: AgentMessageRole.user,

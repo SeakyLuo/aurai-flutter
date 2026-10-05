@@ -127,7 +127,9 @@ class _ConversationNotificationsState extends State<ConversationNotifications>
   void _onMemoryNotice() {
     final notice = widget.controller.memory.notices.value;
     if (notice == null) return;
-    ScaffoldMessenger.of(context).showToast(SnackBar(content: Text(notice)));
+    ScaffoldMessenger.of(
+      context,
+    ).showToast(SnackBar(content: Text(notice)), kind: ToastKind.error);
   }
 
   void _onCompleted() {

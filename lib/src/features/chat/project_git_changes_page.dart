@@ -206,9 +206,10 @@ class _ProjectGitChangesPageState extends State<ProjectGitChangesPage> {
         ),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showToast(const SnackBar(content: Text('已撤销全部修改')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('已撤销全部修改')),
+        kind: ToastKind.success,
+      );
       await _load();
     });
     if (mounted) setState(() => _busy = false);
@@ -229,9 +230,10 @@ class _ProjectGitChangesPageState extends State<ProjectGitChangesPage> {
     await runUiAction(context, () async {
       await _invoke('redoProjectGitTaskChanges');
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showToast(const SnackBar(content: Text('已重做全部修改')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('已重做全部修改')),
+        kind: ToastKind.success,
+      );
       await _load();
     });
     if (mounted) setState(() => _busy = false);

@@ -105,7 +105,7 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
           defaultText.service == widget.service &&
           defaultText.model == widget.model;
       if (aiCount > 0 || isDefault) {
-        _notice('此模型仍被文本功能使用。请先到模型设置或 AI 的模型设置中更换模型。', kind: ToastKind.warning);
+        _notice('此模型仍被文本功能使用。请先到模型设置或联系人的模型设置中更换模型。', kind: ToastKind.warning);
         return;
       }
     }

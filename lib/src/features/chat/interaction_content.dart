@@ -131,7 +131,7 @@ class InteractionContent extends StatelessWidget {
               button['selection'] != null,
         ))
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: EdgeInsets.only(bottom: question ? 0 : 8),
             child: InteractiveSelectionView(
               key: ValueKey((button['id'], view['round'])),
               button: button,

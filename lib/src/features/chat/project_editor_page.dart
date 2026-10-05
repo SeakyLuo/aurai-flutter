@@ -254,7 +254,7 @@ class _ProjectEditorPageState extends State<ProjectEditorPage> {
                       maxLines: 6,
                       maxLength: 1000,
                       decoration: InputDecoration(
-                        hintText: '作为背景信息提供给 AI',
+                        hintText: '提供项目背景信息',
                         filled: true,
                         fillColor: settingsFieldColor(context),
                         contentPadding: const EdgeInsets.all(18),
@@ -284,7 +284,7 @@ class _ProjectEditorPageState extends State<ProjectEditorPage> {
                       maxLength: projectInstructionsMaxLength,
                       onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
-                        hintText: '设置项目中 AI 应遵循的约定和工作方式',
+                        hintText: '设置项目成员应遵循的约定和工作方式',
                         filled: true,
                         fillColor: settingsFieldColor(context),
                         contentPadding: const EdgeInsets.all(18),

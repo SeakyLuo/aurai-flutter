@@ -73,7 +73,7 @@ class MiniappAgentCatalog {
     final capable = await library.messageCapable(unique.values.toList());
     final developmentIds = {
       for (final item in unique.entries)
-        if (!item.value.bundled) item.key: item.value.publicationId,
+        item.key: item.value.publicationId,
     };
     final access = await MiniappTeamStore(
       library.database,

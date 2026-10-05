@@ -19,7 +19,7 @@ class HtmlAiService {
   }) async {
     try {
       if (utf8.encode(encoded).length > 256 * 1024) {
-        throw ArgumentError('AI 请求不能超过 256 KB');
+        throw ArgumentError('模型请求不能超过 256 KB');
       }
       final args = (jsonDecode(encoded) as Map).cast<String, Object?>();
       if (args['operation'] == 'status') {
@@ -36,9 +36,9 @@ class HtmlAiService {
           if (!available) 'reason': '请先在 Aurai 设置默认文本模型',
         };
       }
-      if (args['operation'] != 'complete') throw ArgumentError('不支持的 AI 操作');
+      if (args['operation'] != 'complete') throw ArgumentError('不支持的 模型操作');
       if (_jobs.containsKey(id)) throw ArgumentError('请求正在处理中');
-      if (_jobs.length >= 4) throw StateError('同时最多处理 4 个 AI 请求，请稍后再试');
+      if (_jobs.length >= 4) throw StateError('同时最多处理 4 个 模型请求，请稍后再试');
       final messages = args['messages'];
       if (messages is! List || messages.isEmpty || messages.length > 100) {
         throw ArgumentError('请提供 1–100 条文本消息');
@@ -71,7 +71,7 @@ class HtmlAiService {
           const Duration(seconds: 120),
           onTimeout: () {
             unawaited(job.cancel());
-            throw TimeoutException('AI 请求超时，请重试');
+            throw TimeoutException('模型请求超时，请重试');
           },
         );
       } finally {
@@ -79,7 +79,7 @@ class HtmlAiService {
         _jobs.remove(id);
       }
     } on TimeoutException {
-      return {'error': 'AI 请求超时，请重试', 'code': 'timeout'};
+      return {'error': '模型请求超时，请重试', 'code': 'timeout'};
     } on ArgumentError catch (error) {
       return {'error': '${error.message}', 'code': 'invalid_request'};
     } on StateError catch (error) {
@@ -91,12 +91,12 @@ class HtmlAiService {
           401 || 403 => '默认模型认证失败，请检查 Aurai 的模型设置',
           402 => '默认模型服务余额不足',
           429 => '默认模型服务繁忙或额度不足，请稍后重试',
-          _ => 'AI 回复未完成，请检查模型配置或稍后重试',
+          _ => '模型回复未完成，请检查模型配置或稍后重试',
         },
         'code': 'model_error',
       };
     } on Object {
-      return {'error': 'AI 调用失败，请检查 Aurai 的默认模型设置', 'code': 'request_failed'};
+      return {'error': '模型调用失败，请检查 Aurai 的默认模型设置', 'code': 'request_failed'};
     }
   }
 
@@ -149,14 +149,14 @@ class HtmlAiService {
       onTextChanged: (text) {
         job.checkCancelled();
         if (utf8.encode(text).length > 512 * 1024) {
-          throw const ModelProviderException('AI 回复超过大小限制');
+          throw const ModelProviderException('模型回复超过大小限制');
         }
         if (format == 'text') onText(text);
       },
     );
     job.checkCancelled();
     if (response['status'] != 'completed') {
-      throw const ModelProviderException('AI 回复未完成');
+      throw const ModelProviderException('模型回复未完成');
     }
     if (format == 'json') {
       final result = resultTool.read(response);
@@ -165,7 +165,7 @@ class HtmlAiService {
       }
       final text = jsonEncode(result['value']);
       if (utf8.encode(text).length > 512 * 1024) {
-        throw const ModelProviderException('AI 回复超过大小限制');
+        throw const ModelProviderException('模型回复超过大小限制');
       }
       onText(text);
       return {'text': text, 'json': result['value'], 'model': config.model};
@@ -177,7 +177,7 @@ class HtmlAiService {
             if (part['type'] == 'output_text') part['text'] as String,
     ].join('\n');
     if (text.trim().isEmpty || utf8.encode(text).length > 512 * 1024) {
-      throw const ModelProviderException('AI 没有返回有效文本');
+      throw const ModelProviderException('模型没有返回有效文本');
     }
     return {'text': text, 'model': config.model};
   }
@@ -193,7 +193,7 @@ class _AiJob {
   ResponsesTransport? transport;
   bool cancelled = false;
   void checkCancelled() {
-    if (cancelled) throw StateError('AI 请求已取消');
+    if (cancelled) throw StateError('模型请求已取消');
   }
 
   Future<void> cancel() async {

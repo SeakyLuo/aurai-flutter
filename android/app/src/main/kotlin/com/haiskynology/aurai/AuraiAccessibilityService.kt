@@ -541,6 +541,7 @@ class AuraiAccessibilityService : AccessibilityService() {
             deadline = deadline,
             preview = preview,
             onDeny = ::denyPending,
+            onDismiss = ::hideOverlay,
             onAllow = { approvePending(callId, fingerprint, nodeRef, args) },
             onAlways = { confirmationScope = "always"; approvePending(callId, fingerprint, nodeRef, args) },
             onSession = { confirmationScope = "session"; approvePending(callId, fingerprint, nodeRef, args) },

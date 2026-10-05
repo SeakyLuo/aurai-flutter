@@ -132,7 +132,7 @@ class _DataManagementPageState extends State<DataManagementPage> {
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
       if (mounted) setState(() => _usage = usage);
-      _notice('缓存已清理');
+      _notice('缓存已清理', kind: ToastKind.success);
     } on Object catch (error) {
       _notice(errorMessage(error), kind: ToastKind.error);
     } finally {

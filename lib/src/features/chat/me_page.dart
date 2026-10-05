@@ -15,6 +15,8 @@ import 'settings_page.dart';
 import 'sidebar_action_icon.dart';
 import 'asset_library_page.dart';
 import 'file_tool_icon.dart';
+import 'approval_center_page.dart';
+import '../../storage/approval_center_store.dart';
 
 class MePage extends StatelessWidget {
   const MePage({super.key, required this.controller});
@@ -173,6 +175,21 @@ class MePage extends StatelessWidget {
                     color: iconColor,
                   ),
                   () => _archive(context),
+                ),
+                _entry(
+                  context,
+                  '审批中心',
+                  const SettingsIcon(type: SettingsIconType.permission),
+                  () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ApprovalCenterPage(
+                        store: ApprovalCenterStore(
+                          controller.htmlStore.database,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
                 _entry(
                   context,

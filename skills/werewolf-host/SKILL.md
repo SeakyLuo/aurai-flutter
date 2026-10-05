@@ -70,7 +70,7 @@ setChannels 替换完整频道列表，必须基于 channelDefinitions 保留仍
 
 狼队 night 收集省略 requests，由程序直接生成每位狼人的目标投票卡，包含合法玩家和弃权。讨论走狼队频道，投票走各自私密卡；收齐后按真实票数判断刀口和平票，不再让狼人先确认“袭击”。其他只有一个可用技能且单目标的行动也直接选择目标，多技能或多目标才分步。
 
-多人夜间收集会积累 nightActions；每次收齐不等于整夜应立即判死亡。读 collection、nightActions、suggestion 和规则，安排尚未收集的行动；整夜收齐后再统一裁定。必要的查验或其他私密反馈可单独 resolve 给对应玩家，此时不设置 applySuggested/consumeSkills，以免提前清空整夜行动和消耗其他技能，不提前公开整夜死亡。已经提前发送的反馈在最终裁定时不重复发送；若 applySuggested 会再次带出这些反馈，改用显式裁定加 consumeSkills=true。
+多人夜间收集会积累 nightActions；每次收齐不等于整夜应立即判死亡。读 collection、nightActions、suggestion 和规则，安排尚未收集的行动；整夜收齐后再统一裁定。查验等已经能确定、且不依赖后续行动的私密结果，在对应行动收齐后立即单独 resolve 给该玩家，再安排下一角色，不积压到整夜结算。此时不设置 applySuggested/consumeSkills，以免提前清空整夜行动和消耗其他技能，不提前公开整夜死亡。依赖整夜行动才能确定的结果在夜间最终裁定时反馈。已经提前发送的反馈在最终裁定时不重复发送；若 applySuggested 会再次带出这些反馈，改用显式裁定加 consumeSkills=true。普通提交、未使用技能等已有回执的信息不另发反馈。
 
 suggestion 是建议，不是最终判决。它支持部分常见效果，但狼刀平票、同守同救、自救、连续守护、死亡技能资格、连锁死亡及胜负必须核对本局规则。unsupported 不为空时手动裁定，不能强行 applySuggested。只有审核建议符合本局时才用 applySuggested=true；手动结算已有技能时按协议用 consumeSkills=true 记录次数和上一目标，不能同时重复消耗。
 

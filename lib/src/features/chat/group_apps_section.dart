@@ -10,7 +10,9 @@ class GroupAppsSection extends StatelessWidget {
     required this.onMarks,
     required this.onTools,
     required this.onSkills,
+    this.title = '群应用',
   });
+  final String title;
   final VoidCallback onTasks, onMarks, onTools, onSkills;
 
   @override
@@ -21,9 +23,9 @@ class GroupAppsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
-            child: Text('群应用', style: TextStyle(fontSize: 15)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(title, style: const TextStyle(fontSize: 15)),
           ),
           const SizedBox(height: 16),
           Row(
@@ -32,7 +34,7 @@ class GroupAppsSection extends StatelessWidget {
                 context,
                 '任务',
                 SettingsIcon(
-                  type: SettingsIconType.tasks,
+                  type: SettingsIconType.taskList,
                   color: colors.onSurfaceVariant,
                 ),
                 onTasks,

@@ -76,7 +76,7 @@ class AgentRunStore {
               whereArgs: [userMessageId, senderId, conversationId],
               limit: 1,
             );
-      if (target.isEmpty) throw StateError('该 AI 不在这条消息的回复对象中');
+      if (target.isEmpty) throw StateError('该成员不在这条消息的回复对象中');
       final senderRows = await txn.query(
         'message_senders',
         where: 'id = ?',

@@ -72,7 +72,10 @@ class _MessageStarButtonState extends State<MessageStarButton> {
       await _store.set(id, true);
       if (mounted) {
         if (widget.messageId == id) setState(() => _starred = value);
-        ScaffoldMessenger.of(context).showToast(SnackBar(content: Text('已收藏')));
+        ScaffoldMessenger.of(context).showToast(
+          const SnackBar(content: Text('已收藏')),
+          kind: ToastKind.success,
+        );
       }
     } on Object catch (error) {
       if (mounted) _notice(error, kind: ToastKind.error);

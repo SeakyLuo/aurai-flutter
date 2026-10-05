@@ -63,11 +63,11 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
     if (!mounted || result == null) return;
     setState(() {});
     final summary = [
-      if (result.aiCount > 0) '${result.aiCount} 个 AI',
+      if (result.aiCount > 0) '${result.aiCount} 位联系人',
       for (final affected in ModelPurpose.values)
         if (result.purposes.contains(affected)) affected.label,
     ].join('、');
-    _notice('已更换$summary');
+    _notice('已更换$summary', kind: ToastKind.success);
   }
 
   Future<void> _select(ModelPurpose purpose) async {

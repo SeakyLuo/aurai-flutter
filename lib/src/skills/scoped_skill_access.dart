@@ -10,11 +10,13 @@ mixin ScopedSkillAccess {
 
   List<SavedSkill> get scopedLibrary => store.library
       .where(
-        (skill) => matchesResourceScope(
-          skill.scopes,
-          groupId,
-          projectId: currentProjectId?.call(),
-        ),
+        (skill) =>
+            skill.visibleTo.contains(store.ownerId) ||
+            matchesResourceScope(
+              skill.scopes,
+              groupId,
+              projectId: currentProjectId?.call(),
+            ),
       )
       .toList();
 

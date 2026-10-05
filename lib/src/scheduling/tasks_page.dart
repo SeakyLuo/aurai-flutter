@@ -214,7 +214,7 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
       final filtered = tasks.tasks.where(_matches).toList();
       return Scaffold(
         extendBodyBehindAppBar: true,
-        extendBody: true,
+        extendBody: false,
         resizeToAvoidBottomInset: false,
         bottomNavigationBar: KeyboardInset(
           child: ListenableBuilder(
@@ -306,159 +306,181 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 640),
-              child: Column(
-                children: [
-                  if (!tasks.allowed && tasks.supported)
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        MediaQuery.paddingOf(context).top +
-                            SettingsAppBar.toolbarHeight,
-                        16,
-                        8,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  top:
+                      MediaQuery.paddingOf(context).top +
+                      SettingsAppBar.toolbarHeight,
+                ),
+                child: Column(
+                  children: [
+                    if (!tasks.allowed && tasks.supported)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                        child: Material(
+                          color: colors.onSurface.withValues(alpha: .035),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '开启准时执行权限，让任务按计划启动',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: colors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                FilledButton(
+                                  onPressed: _permission,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: colors.onSurface
+                                        .withValues(alpha: .08),
+                                    foregroundColor: colors.onSurface,
+                                    shape: const StadiumBorder(),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    minimumSize: const Size(0, 40),
+                                  ),
+                                  child: const Text('去开启'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '开启准时执行权限，让任务按计划启动',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: colors.onSurfaceVariant,
+                    Expanded(
+                      child: _loading
+                          ? const Center(child: CircularProgressIndicator())
+                          : filtered.isEmpty
+                          ? Center(
+                              child: EmptyDataView(
+                                title: _filter == 'all' ? '还没有任务' : '没有符合条件的任务',
+                                description: _filter == 'all'
+                                    ? '在下方说说要做什么和执行时间。'
+                                    : null,
                               ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: _permission,
-                            child: const Text('去开启'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  Expanded(
-                    child: _loading
-                        ? const Center(child: CircularProgressIndicator())
-                        : filtered.isEmpty
-                        ? Center(
-                            child: EmptyDataView(
-                              title: _filter == 'all' ? '还没有任务' : '没有符合条件的任务',
-                              description: _filter == 'all'
-                                  ? '在下方说说要做什么和执行时间。'
-                                  : null,
-                            ),
-                          )
-                        : ListView.builder(
-                            padding: EdgeInsets.fromLTRB(
-                              16,
-                              (!tasks.allowed && tasks.supported)
-                                  ? 12
-                                  : MediaQuery.paddingOf(context).top +
-                                        SettingsAppBar.toolbarHeight +
-                                        12,
-                              16,
-                              MediaQuery.paddingOf(context).bottom + 20,
-                            ),
-                            itemCount: filtered.length,
-                            itemBuilder: (context, index) {
-                              final task = filtered[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 18),
-                                child: MenuPressHighlight(
-                                  onLongPressStart: (details) =>
-                                      _taskMenu(task, details.globalPosition),
-                                  borderRadius: BorderRadius.circular(28),
-                                  child: Material(
-                                    color:
-                                        Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? const Color(0xff252525)
-                                        : Colors.white,
-                                    elevation: 7,
-                                    shadowColor: const Color(0x14000000),
-                                    surfaceTintColor: Colors.transparent,
+                            )
+                          : ListView.builder(
+                              padding: EdgeInsets.fromLTRB(
+                                16,
+                                12,
+                                16,
+                                MediaQuery.paddingOf(context).bottom + 20,
+                              ),
+                              itemCount: filtered.length,
+                              itemBuilder: (context, index) {
+                                final task = filtered[index];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 18),
+                                  child: MenuPressHighlight(
+                                    onLongPressStart: (details) =>
+                                        _taskMenu(task, details.globalPosition),
                                     borderRadius: BorderRadius.circular(28),
-                                    clipBehavior: Clip.antiAlias,
-                                    child: InkWell(
-                                      onTap: () async {
-                                        final request =
-                                            await Navigator.push<String>(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) => TaskDetailPage(
-                                                  controller: widget.controller,
-                                                  id: task['id'] as String,
+                                    child: Material(
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? const Color(0xff252525)
+                                          : Colors.white,
+                                      elevation: 7,
+                                      shadowColor: const Color(0x14000000),
+                                      surfaceTintColor: Colors.transparent,
+                                      borderRadius: BorderRadius.circular(28),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: InkWell(
+                                        onTap: () async {
+                                          final request =
+                                              await Navigator.push<String>(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      TaskDetailPage(
+                                                        controller:
+                                                            widget.controller,
+                                                        id:
+                                                            task['id']
+                                                                as String,
+                                                      ),
+                                                ),
+                                              );
+                                          if (request != null &&
+                                              context.mounted)
+                                            Navigator.pop(context, request);
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(20),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              Text(
+                                                task['scheduleLabel'] as String,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: GlobalUI.taskTimeColor(
+                                                    context,
+                                                  ),
                                                 ),
                                               ),
-                                            );
-                                        if (request != null && context.mounted)
-                                          Navigator.pop(context, request);
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(20),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.stretch,
-                                          children: [
-                                            Text(
-                                              task['scheduleLabel'] as String,
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w500,
-                                                color: GlobalUI.taskTimeColor(
-                                                  context,
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                task['title'] as String,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 17,
+                                                  fontWeight: FontWeight.w500,
                                                 ),
                                               ),
-                                            ),
-                                            const SizedBox(height: 12),
-                                            Text(
-                                              task['title'] as String,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 17,
-                                                fontWeight: FontWeight.w500,
+                                              const SizedBox(height: 10),
+                                              Text(
+                                                task['prompt'] as String,
+                                                maxLines: 3,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 15,
+                                                  height: 1.6,
+                                                  color:
+                                                      colors.onSurfaceVariant,
+                                                ),
                                               ),
-                                            ),
-                                            const SizedBox(height: 10),
-                                            Text(
-                                              task['prompt'] as String,
-                                              maxLines: 3,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontSize: 15,
-                                                height: 1.6,
-                                                color: colors.onSurfaceVariant,
+                                              const SizedBox(height: 18),
+                                              Divider(
+                                                height: 1,
+                                                color: colors.outlineVariant
+                                                    .withValues(alpha: .5),
                                               ),
-                                            ),
-                                            const SizedBox(height: 18),
-                                            Divider(
-                                              height: 1,
-                                              color: colors.outlineVariant
-                                                  .withValues(alpha: .5),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            Text(
-                                              task['state'] == 'scheduled'
-                                                  ? '下次 ${taskTime(task['runAt'] as int)}'
-                                                  : taskState(
-                                                      task['state'] as String,
-                                                    ),
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color: colors.onSurfaceVariant,
+                                              const SizedBox(height: 14),
+                                              Text(
+                                                task['state'] == 'scheduled'
+                                                    ? '下次 ${taskTime(task['runAt'] as int)}'
+                                                    : taskState(
+                                                        task['state'] as String,
+                                                      ),
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color:
+                                                      colors.onSurfaceVariant,
+                                                ),
                                               ),
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

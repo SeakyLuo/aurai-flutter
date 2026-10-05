@@ -212,7 +212,7 @@ class HtmlGameSession extends ChangeNotifier {
         notifyListeners();
       } else if (call.method == 'ai') {
         if (!_visible)
-          return jsonEncode({'error': '请打开小程序后使用 AI', 'code': 'inactive'});
+          return jsonEncode({'error': '请打开小程序后使用模型服务', 'code': 'inactive'});
         final args = (call.arguments as Map).cast<String, Object?>();
         final id = args['id'] as int;
         return jsonEncode(

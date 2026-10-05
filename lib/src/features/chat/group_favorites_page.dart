@@ -24,10 +24,12 @@ class GroupFavoritesPage extends StatefulWidget {
     required this.controller,
     required this.groupId,
     required this.groupTitle,
+    this.group = true,
   });
   final ChatController controller;
   final String groupId;
   final String groupTitle;
+  final bool group;
   @override
   State<GroupFavoritesPage> createState() => _GroupFavoritesPageState();
 }
@@ -144,7 +146,7 @@ class _GroupFavoritesPageState extends State<GroupFavoritesPage> {
                     : AiContactPage(
                         controller: widget.controller,
                         senderId: marker.id!,
-                        groupId: widget.groupId,
+                        groupId: widget.group ? widget.groupId : null,
                       ),
               ),
             ),
@@ -171,7 +173,7 @@ class _GroupFavoritesPageState extends State<GroupFavoritesPage> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        title: '群标记',
+        title: widget.group ? '群标记' : '标记',
         onBack: () => Navigator.pop(context),
       ),
       body: SettingsPageBody(
@@ -238,8 +240,8 @@ class _GroupFavoritesPageState extends State<GroupFavoritesPage> {
                               ),
                               removeMenuIconType:
                                   ConversationMenuIconType.unmark,
-                              removeMenuLabel: '取消群标记',
-                              backLabel: '返回群标记',
+                              removeMenuLabel: widget.group ? '取消群标记' : '取消标记',
+                              backLabel: widget.group ? '返回群标记' : '返回标记',
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 14,

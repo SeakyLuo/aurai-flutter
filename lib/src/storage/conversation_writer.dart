@@ -53,8 +53,8 @@ class ConversationWriter {
     if (conversation.kind == ConversationKind.direct &&
         conversation.messageCount == 0 &&
         conversation.messages.isEmpty &&
-        !conversation.isTemporary &&
         !conversation.isStored) {
+      if (conversation.isTemporary) return Future.value();
       return _draftStore.save(conversation);
     }
     final header = conversationRow(conversation);

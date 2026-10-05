@@ -65,16 +65,9 @@ class _AiContactsPageState extends State<AiContactsPage> {
   int? _count;
   bool _loading = false, _more = true, _failed = false;
   late bool _archived;
-  late bool _useMemory =
-      widget.conversationMode == ConversationMode.temporaryPersonalized;
   bool get _temporary =>
       widget.selectForConversation &&
       widget.conversationMode != ConversationMode.normal;
-  ConversationMode get _conversationMode => !_temporary
-      ? widget.conversationMode
-      : _useMemory
-      ? ConversationMode.temporaryPersonalized
-      : ConversationMode.temporaryPlain;
   @override
   void initState() {
     super.initState();
@@ -238,7 +231,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
       final id = await widget.controller.openAiConversation(
         ai,
         newConversation: true,
-        mode: _conversationMode,
+        mode: widget.conversationMode,
       );
       if (!mounted) return;
       await openHomeConversation(
@@ -246,8 +239,13 @@ class _AiContactsPageState extends State<AiContactsPage> {
         widget.controller,
         id,
         waitForClose: true,
-        resetStack: true,
+        resetStack: false,
       );
+      if (mounted &&
+          widget.selectForConversation &&
+          widget.controller.activeConversation.isStored) {
+        Navigator.pop(context);
+      }
     } on Object catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showToast(
@@ -367,7 +365,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
             root: widget.root,
             onBack: () => Navigator.pop(context),
             actions: [
-              if (widget.onToggleSearch != null && !_archived)
+              if (!_temporary && widget.onToggleSearch != null && !_archived)
                 SettingsGlassActionSurface(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -398,7 +396,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
                     ],
                   ),
                 )
-              else if (!_archived)
+              else if (!_temporary && !_archived)
                 SettingsGlassAction(
                   label: '添加朋友',
                   icon: Icons.add_rounded,
@@ -431,37 +429,6 @@ class _AiContactsPageState extends State<AiContactsPage> {
                     height: widget.embedded ? 0 : settingsHeaderHeight(context),
                   ),
                 ),
-                if (_temporary)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                      child: Material(
-                        color: settingsFieldColor(context),
-                        borderRadius: BorderRadius.circular(26),
-                        clipBehavior: Clip.antiAlias,
-                        child: SwitchListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 4,
-                          ),
-                          title: const Text(
-                            '使用记忆',
-                            style: TextStyle(fontSize: 15),
-                          ),
-                          subtitle: Text(
-                            _useMemory
-                                ? '使用已有记忆和自定义指令，不写入新记忆'
-                                : '不使用记忆和自定义指令，不写入新记忆',
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                          value: _useMemory,
-                          onChanged: _openingConversation
-                              ? null
-                              : (value) => setState(() => _useMemory = value),
-                        ),
-                      ),
-                    ),
-                  ),
                 if (!_archived && !widget.selectForConversation)
                   SliverToBoxAdapter(
                     child: Padding(
@@ -524,7 +491,9 @@ class _AiContactsPageState extends State<AiContactsPage> {
                                           ? '没有找到朋友'
                                           : _archived
                                           ? '没有已归档朋友'
-                                          : '点击右上角，创建你的第一个 AI',
+                                          : _temporary
+                                          ? '暂无可选朋友，请先在通讯录添加朋友'
+                                          : '点击右上角，创建你的第一个联系人',
                                     ),
                             ),
                     ),

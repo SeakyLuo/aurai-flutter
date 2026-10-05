@@ -27,7 +27,7 @@ extension InteractiveMessageActions on ChatController {
             (card.participation['callbackEvents'] as List? ?? const [])
                 .isNotEmpty) &&
         callbackSenderId == null)
-      throw ArgumentError('配置了 AI 通知时，请指定接收回调的 AI');
+      throw ArgumentError('配置了成员通知时，请指定接收通知的成员');
     final sender = callbackSenderId == null
         ? MessageSender.localUser
         : (await groupStore.loadAi(callbackSenderId)).sender;

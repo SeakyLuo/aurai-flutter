@@ -17,6 +17,7 @@ import 'group_announcement_store.dart';
 import '../html_games/miniapp_publication_schema.dart';
 import '../html_games/html_app_store.dart';
 import '../html_games/miniapp_team_schema.dart';
+import 'approval_center_store.dart';
 import 'interactive_action_history.dart';
 import 'message_callbacks.dart';
 import 'contact_relationships.dart';
@@ -38,7 +39,13 @@ import 'project_resource_migration.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 87,
+  version: 88,
+  onOpen: (db) async {
+    await db.update('approval_requests', {
+      'status': 'cancelled',
+      'resolved_at': DateTime.now().microsecondsSinceEpoch,
+    }, where: "kind = 'tool' AND status = 'pending'");
+  },
   onConfigure: (db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -475,6 +482,18 @@ Future<Database> openConversationDatabase() async => openDatabase(
       await batch.commit(noResult: true);
     }
     if (oldVersion < 87) await migrateHtmlEventIdentities(db);
+    if (oldVersion < 88) {
+      for (final statement in approvalCenterSchema) {
+        await db.execute(statement);
+      }
+      await db.execute('''INSERT INTO approval_requests
+        (id, kind, title, description, sender_name, app_id, sender_id, requested_at)
+        SELECT 'team:' || app_id || ':' || sender_id || ':' || requested_at,
+          'miniapp', '申请加入 ' || (SELECT title FROM html_apps WHERE id = app_id) || ' 的开发团队', reason,
+          (SELECT name FROM message_senders WHERE id = sender_id),
+          app_id, sender_id, requested_at
+        FROM miniapp_edit_requests WHERE status = 'pending' ''');
+    }
   },
   onCreate: (db, version) async {
     final batch = db.batch();
@@ -493,6 +512,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
       htmlAppSchema,
       htmlAppIndex,
       ...miniappTeamSchema,
+      ...approvalCenterSchema,
       miniappReleaseNotesSchema,
       miniappRecentIndex,
       ...miniappPublicationSchema,

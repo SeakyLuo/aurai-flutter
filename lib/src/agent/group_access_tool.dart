@@ -71,7 +71,7 @@ class GroupAccessTool
       authorizationScope: _scope,
       authorizationLabel: '操作群“$_title”',
       confirmationDescriptionBuilder: (args) =>
-          '允许 AI 在群“$_title”中$action？'
+          '允许该成员在群“$_title”中$action？'
           '\n$_preview'
           '${base.name == 'updateGroupAnnouncement' ? '\n\n${(args['content'] as String).trim().isEmpty ? '清空群公告' : args['content']}' : ''}',
     );

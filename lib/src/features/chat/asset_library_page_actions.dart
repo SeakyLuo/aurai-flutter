@@ -84,7 +84,7 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
         );
         if (confirmed != true || !mounted) return;
         await _mutate(_library.clearTrash);
-        if (mounted) _notice('回收站已清空');
+        if (mounted) _notice('回收站已清空', kind: ToastKind.success);
     }
   }
 
@@ -229,7 +229,7 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
     final name = await showAssetRename(context, asset.name);
     if (name == null || !mounted) return null;
     await _mutate(() => _library.rename(asset, name));
-    if (mounted) _notice('已重命名');
+    if (mounted) _notice('已重命名', kind: ToastKind.success);
     return LibraryAsset(
       id: asset.id,
       name: name,
@@ -276,7 +276,7 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
     if (!mounted) return;
     onDeleted?.call();
     if (widget.trash) {
-      _notice('已彻底删除');
+      _notice('已彻底删除', kind: ToastKind.success);
       return;
     }
     ScaffoldMessenger.of(context).showToast(
@@ -287,6 +287,7 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
           onPressed: () => _perform(() => _restore(ids)),
         ),
       ),
+      kind: ToastKind.success,
     );
   }
 
@@ -372,7 +373,7 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
               ),
       ),
     );
-    if (sent == true && mounted) _notice('已转发');
+    if (sent == true && mounted) _notice('已转发', kind: ToastKind.success);
     return sent == true;
   }
 

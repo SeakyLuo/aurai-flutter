@@ -37,6 +37,7 @@ enum SettingsIconType {
   check,
   reset,
   tasks,
+  taskList,
   goal,
   filter,
   sort,
@@ -333,6 +334,15 @@ class _SettingsIconPainter extends CustomPainter {
           pen,
         );
       case SettingsIconType.tasks:
+        canvas.drawCircle(const Offset(12, 12), 9, pen);
+        canvas.drawPath(
+          Path()
+            ..moveTo(12, 6)
+            ..lineTo(12, 12)
+            ..lineTo(8.5, 15.5),
+          pen,
+        );
+      case SettingsIconType.taskList:
         canvas.drawRRect(
           RRect.fromRectAndRadius(
             const Rect.fromLTWH(3, 3, 18, 18),

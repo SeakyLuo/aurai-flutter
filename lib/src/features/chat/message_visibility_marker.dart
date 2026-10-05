@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'settings_icon.dart';
 
 class MessageVisibilityMarker extends StatelessWidget {
+  static const width = 24.0;
   const MessageVisibilityMarker({
     super.key,
     required this.isOwnMessage,
@@ -30,14 +31,19 @@ class MessageVisibilityMarker extends StatelessWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
               onTap: onPressed,
-              child: const SizedBox(
-                width: 32,
+              child: SizedBox(
+                width: width,
                 height: 32,
                 child: Center(
                   child: SizedBox.square(
-                    dimension: 18,
+                    dimension: 16,
                     child: FittedBox(
-                      child: SettingsIcon(type: SettingsIconType.eye),
+                      child: SettingsIcon(
+                        type: SettingsIconType.eye,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xffaaaaaa)
+                            : const Color(0xff808080),
+                      ),
                     ),
                   ),
                 ),

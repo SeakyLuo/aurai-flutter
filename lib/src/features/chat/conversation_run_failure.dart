@@ -78,7 +78,7 @@ extension ConversationRunFailure on ChatController {
         .where((m) => m.sender.id == message.senderId)
         .firstOrNull;
     if (member == null || member.sender.kind != MessageSenderKind.agent) {
-      throw StateError('该 AI 已不在群聊中');
+      throw StateError('该成员已不在群聊中');
     }
     if (member.isMuted) throw StateError('该成员已被禁言，不能重试');
     if (resumeAutoReply) {

@@ -27,11 +27,17 @@ class MiniappShareMessage extends StatelessWidget {
         child: Container(
           constraints: BoxConstraints(
             maxWidth: groupBubble
-                ? constraints.maxWidth - GroupMessageHeading.contentInset
+                ? constraints.maxWidth - GroupMessageHeading.ownContentInset
                 : (constraints.maxWidth - 32) * .82,
           ),
           margin: EdgeInsets.fromLTRB(
-            groupBubble ? 18 : 16,
+            groupBubble
+                ? own
+                      ? message.hasRestrictedAudience
+                            ? GroupMessageHeading.restrictedRightInset
+                            : GroupMessageHeading.rightInset
+                      : 18
+                : 16,
             groupBubble ? 0 : 12,
             groupBubble ? 18 : 16,
             groupBubble ? 0 : 24,

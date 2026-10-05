@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/message_sender.dart';
+import '../storage/approval_center_store.dart';
 
 /// Source collaboration does not grant access to saved or session data.
 class MiniappTeamStore {
@@ -42,16 +43,15 @@ class MiniappTeamStore {
   }
 
   // Installed library copies share their original application's development
-  // team. Bundled apps are maintained by application updates.
+  // team, including bundled apps available in the local library.
   static Future<Map<String, Object?>> app(
     DatabaseExecutor db,
     String id,
   ) async {
-    if (id.startsWith('builtin.')) throw StateError('内置小程序随应用更新，不支持修改申请');
     final rows = await db.query(
       'html_apps',
       where: '''id = COALESCE((SELECT source_id FROM miniapp_installations
-        WHERE app_id = ? AND source_id NOT LIKE 'builtin.%'), ?)''',
+        WHERE app_id = ?), ?)''',
       whereArgs: [id, id],
       limit: 1,
     );
@@ -167,9 +167,34 @@ class MiniappTeamStore {
         'requested_at': now,
         'reviewed_by': null,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
+      final sender = (await txn.query(
+        'message_senders',
+        columns: ['name'],
+        where: 'id = ?',
+        whereArgs: [actor],
+      )).single;
+      await ApprovalCenterStore.insert(txn, {
+        'id': ApprovalCenterStore.teamKey(appId, actor, now),
+        'kind': 'miniapp',
+        'title': '申请加入 ${source['title']} 的开发团队',
+        'description': reason,
+        'sender_name': sender['name'],
+        'app_id': appId,
+        'sender_id': actor,
+        'requested_at': now,
+      });
       return {...base, 'status': 'pending', 'requestedAt': now};
     });
     changes.add(result['appId'] as String);
+    if (result['status'] == 'pending') {
+      ApprovalCenterStore.announce(
+        ApprovalCenterStore.teamKey(
+          result['appId'] as String,
+          actor,
+          result['requestedAt'] as int,
+        ),
+      );
+    }
     return result;
   }
 
@@ -218,6 +243,25 @@ class MiniappTeamStore {
         );
       }
       if (action != 'remove') {
+        final pendingApprovals = await txn.query(
+          'approval_requests',
+          columns: ['id'],
+          where:
+              "kind = 'miniapp' AND app_id = ? AND sender_id = ? AND status = 'pending'",
+          whereArgs: [appId, member],
+          limit: 1,
+        );
+        if (pendingApprovals.isNotEmpty) {
+          await ApprovalCenterStore.finish(
+            txn,
+            pendingApprovals.single['id'] as String,
+            cancelling
+                ? 'cancelled'
+                : action == 'reject'
+                ? 'denied'
+                : 'approved',
+          );
+        }
         await txn.update(
           'miniapp_edit_requests',
           {
@@ -240,7 +284,53 @@ class MiniappTeamStore {
       };
     });
     changes.add(result['appId'] as String);
+    ApprovalCenterStore.changes.add(null);
     return result;
+  }
+
+  Future<void> addMembers(String id, String actor, Set<String> members) async {
+    if (members.isEmpty) throw ArgumentError('请选择开发成员');
+    final appId = await database.transaction((txn) async {
+      final source = await app(txn, id);
+      if (!canManage(source, actor)) throw StateError('只有创建人可以管理开发团队');
+      if (members.contains(source['creator_id']))
+        throw StateError('创建人已拥有编辑权限');
+      final placeholders = List.filled(members.length, '?').join(',');
+      final rows = await txn.query(
+        'message_senders',
+        columns: ['id'],
+        where: "id IN ($placeholders) AND kind = 'agent' AND archived = 0",
+        whereArgs: members.toList(),
+      );
+      if (rows.length != members.length) throw StateError('所选联系人不存在或已归档');
+      final appId = source['id'] as String;
+      final now = DateTime.now().microsecondsSinceEpoch;
+      final batch = txn.batch();
+      for (final member in members) {
+        batch.insert('miniapp_developers', {
+          'app_id': appId,
+          'sender_id': member,
+          'added_at': now,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+        batch.update(
+          'miniapp_edit_requests',
+          {'status': 'approved', 'reviewed_by': actor},
+          where: "app_id = ? AND sender_id = ? AND status = 'pending'",
+          whereArgs: [appId, member],
+        );
+      }
+      await batch.commit(noResult: true);
+      await txn.update(
+        'approval_requests',
+        {'status': 'approved', 'resolved_at': now},
+        where:
+            "kind = 'miniapp' AND app_id = ? AND sender_id IN ($placeholders) AND status = 'pending'",
+        whereArgs: [appId, ...members],
+      );
+      return appId;
+    });
+    changes.add(appId);
+    ApprovalCenterStore.changes.add(null);
   }
 
   static Future<void> _requireMember(DatabaseExecutor db, String id) async {
@@ -251,7 +341,7 @@ class MiniappTeamStore {
       whereArgs: [id],
       limit: 1,
     );
-    if (rows.isEmpty) throw StateError('该 AI 不存在或已归档');
+    if (rows.isEmpty) throw StateError('该联系人不存在或已归档');
   }
 
   Future<List<MessageSender>> candidates(

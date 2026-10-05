@@ -97,9 +97,10 @@ class _GroupMutePageState extends State<GroupMutePage> {
     );
     if (!mounted) return;
     if (saved) {
-      ScaffoldMessenger.of(
-        context,
-      ).showToast(const SnackBar(content: Text('已解除单独禁言')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('已解除单独禁言')),
+        kind: ToastKind.success,
+      );
       await _load();
     }
     if (mounted) setState(() => _busy = false);
@@ -142,9 +143,10 @@ class _GroupMutePageState extends State<GroupMutePage> {
     );
     if (!mounted) return;
     if (saved) {
-      ScaffoldMessenger.of(
-        context,
-      ).showToast(const SnackBar(content: Text('已设置成员禁言')));
+      ScaffoldMessenger.of(context).showToast(
+        const SnackBar(content: Text('已设置成员禁言')),
+        kind: ToastKind.success,
+      );
       await _load();
     }
     if (mounted) setState(() => _busy = false);

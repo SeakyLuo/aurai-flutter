@@ -104,7 +104,7 @@ class _TaskProgressListState extends State<TaskProgressList> {
                             dimension: 20,
                             child: FittedBox(
                               child: SettingsIcon(
-                                type: SettingsIconType.tasks,
+                                type: SettingsIconType.taskList,
                                 color: colors.onSurfaceVariant,
                               ),
                             ),
@@ -158,8 +158,6 @@ class _TaskProgressListState extends State<TaskProgressList> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    const SettingsIcon(type: SettingsIconType.chevron),
                   ],
                 ),
               ),

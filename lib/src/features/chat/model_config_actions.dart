@@ -178,7 +178,7 @@ extension ModelConfigActions on ChatController {
       from: from,
       to: to.model,
     );
-    if (!impact.hasChanges) throw StateError('当前没有 AI 使用该模型');
+    if (!impact.hasChanges) throw StateError('当前没有联系人使用该模型');
     if (impact.aiCount > 0 && !to.supportsText) throw StateError('新模型不支持文字回复');
     final unsupported = impact.purposes.difference(to.supportedPurposes);
     if (unsupported.isNotEmpty)
@@ -407,7 +407,7 @@ extension ModelConfigActions on ChatController {
           where: 'sender_id = ?',
           whereArgs: [senderId],
         );
-        if (profiles.isEmpty) throw StateError('AI 已不存在');
+        if (profiles.isEmpty) throw StateError('联系人已不存在');
         final senders = await txn.query(
           'message_senders',
           where: 'id = ?',

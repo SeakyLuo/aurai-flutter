@@ -31,7 +31,7 @@ extension ScheduledExecution on ChatController {
         ..isScheduledTask = true
         ..storedTitle = task['title'] as String;
       if (!(await _directReplyContext(conversation)).config.isConfigured)
-        throw StateError('请先配置任务所属 AI 的模型');
+        throw StateError('请先配置任务所属联系人的模型');
       final instruction =
           '现在执行已安排的任务，不要重复创建计划。原计划：${task['scheduleLabel']}。任务内容：\n${task['prompt']}';
       conversation.messages.add(

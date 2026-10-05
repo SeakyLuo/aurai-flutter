@@ -139,7 +139,7 @@ extension GroupMemberActivities on ChatController {
         ...targets,
         ...excluded,
       }.difference(candidates.keys.toSet());
-      if (unknown.isNotEmpty) throw StateError('只能隐藏当前会话中的 AI 成员思考');
+      if (unknown.isNotEmpty) throw StateError('只能隐藏当前会话中的成员思考');
       final requested = all
           ? candidates.keys.toSet()
           : targets.isEmpty
@@ -178,7 +178,7 @@ extension GroupMemberActivities on ChatController {
           ...targets,
           ...excluded,
         }.difference(candidates.keys.toSet()).isNotEmpty) {
-          throw StateError('只能隐藏当前会话中的 AI 成员思考');
+          throw StateError('只能隐藏当前会话中的成员思考');
         }
         final selected =
             (call.arguments['all'] == true

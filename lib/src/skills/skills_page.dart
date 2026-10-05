@@ -350,7 +350,7 @@ class _SkillsPageState extends State<SkillsPage> {
                                     query.isEmpty &&
                                         scope == 'installed' &&
                                         _status == 'enabled'
-                                    ? '安装并启用技能，让 AI 拥有更多能力，帮你处理各种任务。'
+                                    ? '安装并启用技能，拓展能力，帮你处理各种任务。'
                                     : null,
                                 actionText:
                                     query.isEmpty && scope == 'installed'

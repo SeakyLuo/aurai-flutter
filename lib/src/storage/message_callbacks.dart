@@ -186,7 +186,7 @@ class MessageCallbacks {
         txn,
         remaining,
         'failed',
-        error: error ?? (success ? 'AI 尚未把处理结果写回卡片' : 'AI 处理未完成，请重试'),
+        error: error ?? (success ? '尚未把处理结果写回卡片' : '处理未完成，请重试'),
       );
     });
     cardChanges.add(updates);

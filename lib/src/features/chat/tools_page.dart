@@ -22,9 +22,11 @@ class ToolsPage extends StatefulWidget {
     required this.controller,
     this.groupId,
     this.projectId,
+    this.senderId,
   });
   final ChatController controller;
   final String? groupId, projectId;
+  final String? senderId;
 
   @override
   State<ToolsPage> createState() => _ToolsPageState();
@@ -39,6 +41,10 @@ class _ToolsPageState extends State<ToolsPage> {
       ? ResourceScope.project(widget.projectId!)
       : null;
   final _search = TextEditingController();
+  bool _matches(List<ResourceScope> scopes, ResourceScope? filter) =>
+      widget.senderId != null
+      ? matchesResourceScope(scopes, null, projectId: widget.projectId)
+      : matchesResourceFilter(scopes, filter, _groups);
   List<Map<String, Object?>> _groups = [];
   List<Map<String, Object?>> _projects = [];
   @override
@@ -77,23 +83,21 @@ class _ToolsPageState extends State<ToolsPage> {
   Widget build(BuildContext context) {
     final resourceCount = controller.globalToolDefinitions
         .where(
-          (tool) => matchesResourceFilter(
+          (tool) => _matches(
             ToolCustomizations.values[tool.name]?.scopes ?? [],
             widget.groupId != null
                 ? ResourceScope.group(widget.groupId!)
                 : widget.projectId != null
                 ? ResourceScope.project(widget.projectId!)
                 : null,
-            _groups,
           ),
         )
         .length;
     final groups = <String, List<ToolDefinition>>{};
     for (final tool in controller.globalToolDefinitions) {
-      if (!matchesResourceFilter(
+      if (!_matches(
             ToolCustomizations.values[tool.name]?.scopes ?? [],
             _scope,
-            _groups,
           ) ||
           !(toolTitle(
                 tool.name,
@@ -125,7 +129,7 @@ class _ToolsPageState extends State<ToolsPage> {
       child: Scaffold(
         extendBodyBehindAppBar: true,
         appBar: SettingsAppBar(
-          title: '工具库',
+          title: widget.senderId == null ? '工具库' : '工具',
 
           onBack: () => Navigator.pop(context),
         ),
@@ -137,7 +141,7 @@ class _ToolsPageState extends State<ToolsPage> {
             hintText: '搜索工具',
             enabled: true,
             bottom: 16,
-            trailingAction: resourceCount < 20
+            trailingAction: widget.senderId != null || resourceCount < 20
                 ? null
                 : ResourceScopeFilter(
                     groups: _groups,
@@ -182,8 +186,10 @@ class _ToolsPageState extends State<ToolsPage> {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute<void>(
-                              builder: (_) =>
-                                  ToolApprovalsPage(controller: controller),
+                              builder: (_) => ToolApprovalsPage(
+                                controller: controller,
+                                senderId: widget.senderId,
+                              ),
                             ),
                           ),
                         ),

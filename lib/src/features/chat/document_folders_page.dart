@@ -73,7 +73,9 @@ class _DocumentFoldersPageState extends State<DocumentFoldersPage>
       'uri': uri,
     });
     await _load();
-    if (mounted && result['cancelled'] != true) _notice('文件夹已授权');
+    if (mounted && result['cancelled'] != true) {
+      _notice('文件夹已授权', kind: ToastKind.success);
+    }
   });
   Future<void> _open(Map<String, Object?> folder) async {
     if (folder['readable'] != true) {
@@ -124,7 +126,7 @@ class _DocumentFoldersPageState extends State<DocumentFoldersPage>
         name: name,
       );
       await _load();
-      if (mounted) _notice('已修改显示名称');
+      if (mounted) _notice('已修改显示名称', kind: ToastKind.success);
     });
   }
 

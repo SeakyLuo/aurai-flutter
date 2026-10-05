@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import '../app/ui_action.dart';
 import '../domain/message_sender.dart';
 import '../features/chat/floating_search_layout.dart';
-import '../features/chat/member_avatar.dart';
+import '../features/chat/group_member_choice.dart';
+import '../features/chat/settings_icon.dart';
 import '../features/chat/pagination_listener.dart';
 import '../features/chat/settings_appearance.dart';
 import '../widgets/empty_data_view.dart';
@@ -26,6 +27,7 @@ class MiniappTeamPicker extends StatefulWidget {
 class _MiniappTeamPickerState extends State<MiniappTeamPicker> {
   final _search = TextEditingController();
   final _members = <MessageSender>[];
+  final _selected = <String, MessageSender>{};
   bool _loading = false, _more = true, _failed = false;
   int _generation = 0;
   Timer? _debounce;
@@ -76,6 +78,16 @@ class _MiniappTeamPickerState extends State<MiniappTeamPicker> {
     appBar: SettingsAppBar(
       title: '添加开发成员',
       onBack: () => Navigator.pop(context),
+      actions: [
+        SettingsGlassAction(
+          label: '完成',
+          icon: Icons.check_rounded,
+          iconWidget: const SettingsIcon(type: SettingsIconType.check),
+          onPressed: _selected.isEmpty
+              ? null
+              : () => Navigator.pop(context, _selected.values.toList()),
+        ),
+      ],
     ),
     body: SettingsPageBody(
       child: SafeArea(
@@ -114,13 +126,16 @@ class _MiniappTeamPickerState extends State<MiniappTeamPicker> {
                       SliverList.list(
                         children: [
                           for (final member in _members)
-                            ListTile(
-                              leading: MemberAvatar(sender: member, size: 40),
-                              title: Text(member.name),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              onTap: () => Navigator.pop(context, member),
+                            GroupMemberChoice(
+                              sender: member,
+                              selected: _selected.containsKey(member.id),
+                              onTap: () => setState(() {
+                                if (_selected.containsKey(member.id)) {
+                                  _selected.remove(member.id);
+                                } else {
+                                  _selected[member.id] = member;
+                                }
+                              }),
                             ),
                           if (_loading)
                             const Padding(

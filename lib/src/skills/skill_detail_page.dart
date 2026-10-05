@@ -51,7 +51,7 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
     setState(() => _busy = true);
     try {
       await action();
-      if (mounted) _notice(success);
+      if (mounted) _notice(success, kind: ToastKind.success);
     } on Object catch (e) {
       if (mounted) _notice(errorMessage(e), kind: ToastKind.error);
     } finally {
@@ -133,7 +133,7 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
         selected,
       );
       if (mounted)
-        _notice('已为 ${selected.length} 位 AI 安装技能', kind: ToastKind.success);
+        _notice('已为 ${selected.length} 位成员安装技能', kind: ToastKind.success);
     } on Object catch (error) {
       if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
     } finally {

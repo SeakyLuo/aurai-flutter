@@ -85,6 +85,9 @@ class GroupSearchMessageTile extends StatelessWidget {
               ),
               if (result.role == AgentMessageRole.assistant)
                 GroupMessageHeading(
+                  trailingInset: message.hasRestrictedAudience
+                      ? GroupMessageHeading.restrictedRightInset
+                      : GroupMessageHeading.rightInset,
                   sender: result.sender,
                   showName: result.html == null,
                   onOpenProfile: onOpenProfile,

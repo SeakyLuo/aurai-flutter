@@ -52,6 +52,7 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
   int? _pinStamp;
   late final StreamSubscription<String> _marks;
   int _loadId = 0;
+  bool _loadedStored = false;
   double _noticeHeight = 0;
   bool get _isGroup =>
       widget.controller.activeConversation.kind == ConversationKind.group;
@@ -71,7 +72,8 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
   @override
   void didUpdateWidget(GroupAnnouncementBanner oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.groupId != widget.groupId) {
+    if (oldWidget.groupId != widget.groupId ||
+        !_loadedStored && widget.controller.activeConversation.isStored) {
       _value = null;
       _pin = null;
       _noticeHeight = 0;
@@ -81,6 +83,8 @@ class _GroupAnnouncementBannerState extends State<GroupAnnouncementBanner> {
 
   Future<void> _load() async {
     final request = ++_loadId;
+    _loadedStored = widget.controller.activeConversation.isStored;
+    if (!_loadedStored) return;
     final id = widget.groupId;
     await runUiAction(context, () async {
       final (value, dismissed, pinRow) = await (

@@ -123,7 +123,7 @@ class _ProviderKeyDialogState extends State<ProviderKeyDialog> {
             ),
             const SizedBox(height: 12),
             Text(
-              '密钥仅加密保存在本机，不会发送给 AI。',
+              '密钥仅加密保存在本机，不会发送给模型。',
               style: TextStyle(
                 fontSize: 12,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,

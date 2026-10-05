@@ -88,22 +88,13 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
                           ),
                         ),
                       )
-                    : controller.activeConversation.isTemporary
-                    ? Text(
-                        controller.activeConversation.modeLabel,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 15),
-                      )
                     : const SizedBox.shrink(),
               ),
-              if (controller.activeConversation.isTemporary ||
-                  controller.messages.isNotEmpty ||
-                  controller.activeConversation.kind == ConversationKind.group)
-                ConversationMore(
-                  controller: controller,
-                  beforeDelete: beforeDelete,
-                  originTaskId: originTaskId,
-                ),
+              ConversationMore(
+                controller: controller,
+                beforeDelete: beforeDelete,
+                originTaskId: originTaskId,
+              ),
             ],
           ),
   );

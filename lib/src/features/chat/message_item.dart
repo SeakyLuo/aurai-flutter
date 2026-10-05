@@ -313,13 +313,13 @@ class _MessageItemState extends State<MessageItem> {
               maxWidth: ownMessage
                   ? widget.groupBubble
                         ? constraints.maxWidth -
-                              GroupMessageHeading.contentInset
+                              GroupMessageHeading.ownContentInset
                         : (constraints.maxWidth - 32) * 0.82
                   : constraints.maxWidth - (widget.groupBubble ? 0 : 36),
             ),
             margin: ownMessage
                 ? EdgeInsets.fromLTRB(
-                    widget.groupBubble ? 18 : 16,
+                    _ownMessageLeftInset,
                     widget.groupBubble ? 0 : MessageItem.userTopMargin,
                     widget.groupBubble ? 18 : 16,
                     widget.groupBubble ? 0 : 24,
@@ -360,11 +360,11 @@ class _MessageItemState extends State<MessageItem> {
           child: Container(
             constraints: BoxConstraints(
               maxWidth: widget.groupBubble
-                  ? constraints.maxWidth - GroupMessageHeading.contentInset
+                  ? constraints.maxWidth - GroupMessageHeading.ownContentInset
                   : (constraints.maxWidth - 32) * 0.82,
             ),
             margin: EdgeInsets.fromLTRB(
-              widget.groupBubble ? 18 : 16,
+              _ownMessageLeftInset,
               widget.groupBubble ? 0 : MessageItem.userTopMargin,
               widget.groupBubble ? 18 : 16,
               widget.groupBubble ? 0 : 24,
@@ -388,22 +388,23 @@ class _MessageItemState extends State<MessageItem> {
                       child: FileAttachmentCard(file: file),
                     ),
                   if (message.images.isNotEmpty)
-                    LayoutBuilder(
-                      builder: (context, imageConstraints) => Wrap(
-                        alignment: WrapAlignment.end,
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final image in message.images)
-                            ImageAttachment(
-                              image: image,
-                              gallery: message.images,
-                              size: message.images.length == 1
-                                  ? imageConstraints.maxWidth.clamp(80.0, 260.0)
-                                  : (imageConstraints.maxWidth - 8) / 2,
-                            ),
-                        ],
-                      ),
+                    Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final image in message.images)
+                          ImageAttachment(
+                            image: image,
+                            gallery: message.images,
+                            size: message.images.length == 1
+                                ? ((constraints.maxWidth - 32) * 0.72).clamp(
+                                    80.0,
+                                    260.0,
+                                  )
+                                : ((constraints.maxWidth - 32) * 0.82 - 8) / 2,
+                          ),
+                      ],
                     ),
                   if (message.htmlGame == null && message.interactive != null)
                     ForwardedInteractiveMessage(card: message.interactive!),

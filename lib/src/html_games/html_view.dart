@@ -464,7 +464,7 @@ class _HtmlViewState extends State<HtmlView>
     try {
       await widget.store.retryNotifications(widget.messageId);
       HtmlGameSignals.changes.add(widget.messageId);
-      _notice('已重新排队，AI 空闲后会继续');
+      _notice('已重新排队，空闲后会继续', kind: ToastKind.success);
     } on Object catch (error) {
       _notice('未能重新通知：${errorMessage(error)}', kind: ToastKind.error);
     } finally {
@@ -735,7 +735,7 @@ class _HtmlViewState extends State<HtmlView>
                   if (_card.canRetry)
                     TextButton(
                       onPressed: _retrying ? null : _retry,
-                      child: const Text('重试 AI 回合'),
+                      child: const Text('重试回合'),
                     ),
                   if (_card.displayMode == 'hybrid')
                     TextButton(

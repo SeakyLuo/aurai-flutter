@@ -31,7 +31,6 @@ import 'group_activity_avatars.dart';
 import 'group_activity_sheet.dart';
 import '../../platform/message_file_store.dart';
 import 'keyboard_inset.dart';
-import 'operation_request_sheet.dart';
 import 'dart:async';
 import '../../agent/ask_user_tool.dart';
 
@@ -51,6 +50,7 @@ import 'search_aurora_background.dart';
 import 'accessibility_request_sheet.dart';
 import 'chat_controller.dart';
 import 'chat_widgets.dart';
+import 'chat_empty_state.dart';
 import 'chat_header.dart';
 import 'thinking_indicator.dart';
 import 'chat_viewport.dart';
@@ -117,7 +117,6 @@ class _ChatPageState extends State<ChatPage>
   bool _positionSentMessage = false;
   String? _beforeSentMessageId;
   String? _sentMessageId;
-  PendingConfirmation? _shownConfirmation;
   late String _conversationId;
   Timer? _draftTimer;
   bool _preparingGoal = false;
@@ -153,6 +152,7 @@ class _ChatPageState extends State<ChatPage>
       if (!mounted) return;
       unawaited(_locateInitialMessage());
       _loadImages();
+      _focusNewConversation();
       if (widget.initialText case final text?) {
         _textController.text = text;
         unawaited(_send());
@@ -348,6 +348,11 @@ class _ChatPageState extends State<ChatPage>
         ),
       );
     }
+    final showWelcome =
+        timeline.isEmpty &&
+        !isGroup &&
+        !active.isTemporary &&
+        controller.conversations.isEmpty;
     return UserQuestionScope(
       question: pendingQuestion,
       onOpen: () => setState(() => _shownQuestion = null),
@@ -377,9 +382,7 @@ class _ChatPageState extends State<ChatPage>
               messageBuilder: _buildPinnedMessage,
               child: Scaffold(
                 key: _scaffoldKey,
-                backgroundColor: timeline.isEmpty && !isGroup
-                    ? Colors.transparent
-                    : null,
+                backgroundColor: showWelcome ? Colors.transparent : null,
                 extendBody: true,
                 extendBodyBehindAppBar: true,
                 resizeToAvoidBottomInset: false,
@@ -430,7 +433,7 @@ class _ChatPageState extends State<ChatPage>
                     final bottom = MediaQuery.paddingOf(context).bottom;
                     return Stack(
                       children: [
-                        if (timeline.isEmpty && !isGroup)
+                        if (showWelcome)
                           const Positioned.fill(
                             child: SearchAuroraBackground(),
                           ),
@@ -469,13 +472,16 @@ class _ChatPageState extends State<ChatPage>
                                   child: timeline.isEmpty && isGroup
                                       ? const SizedBox.expand()
                                       : timeline.isEmpty
-                                      ? RepaintBoundary(
-                                          child: EmptyConversation(
-                                            contentPadding: EdgeInsets.only(
-                                              top: top,
-                                            ),
-                                            onUseExample: _useExample,
-                                          ),
+                                      ? ChatEmptyState(
+                                          showWelcome: showWelcome,
+                                          temporary: active.isTemporary,
+                                          personalized:
+                                              active.usesPersonalization,
+                                          onPersonalizationChanged: controller
+                                              .setTemporaryChatPersonalization,
+                                          top: top,
+                                          bottom: bottom,
+                                          onUseExample: _useExample,
                                         )
                                       : isGroup &&
                                             controller.visibleMessages.every(
@@ -689,15 +695,7 @@ class _ChatPageState extends State<ChatPage>
         }
       });
     }
-    final confirmation = widget.controller.pendingConfirmation;
-    if (!widget.fromTask &&
-        confirmation != null &&
-        confirmation != _shownConfirmation) {
-      _shownConfirmation = confirmation;
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _showConfirmation(confirmation),
-      );
-    }
+
   }
 
   void _onTextChanged() {
@@ -727,14 +725,6 @@ class _ChatPageState extends State<ChatPage>
         );
       }
     }
-  }
-
-  void _useExample(String example) {
-    _textController.text = example;
-    _textController.selection = TextSelection.collapsed(
-      offset: _textController.text.length,
-    );
-    _focusNode.requestFocus();
   }
 
   Future<void> _continuePending() async {

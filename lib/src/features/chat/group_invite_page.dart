@@ -179,7 +179,7 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
             .toList(),
       );
       if (mounted) {
-        _notice('已邀请加入群聊');
+        _notice('已邀请加入群聊', kind: ToastKind.success);
         Navigator.pop(context);
       }
     } on Object catch (error) {
@@ -348,7 +348,7 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
                                                           _selected.length >=
                                                       GroupChatStore
                                                           .maxAiMembers) {
-                                                _notice('群聊最多可加入 32 位 AI');
+                                                _notice('群聊最多可加入 32 位联系人');
                                                 return;
                                               }
                                               setState(() {
@@ -385,7 +385,7 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
                                     child: EmptyDataView(
                                       title: _search.text.trim().isEmpty
                                           ? '暂无成员，点击右上方＋添加'
-                                          : '没有找到匹配的 AI',
+                                          : '没有找到匹配的联系人',
                                     ),
                                   ),
                                 ),

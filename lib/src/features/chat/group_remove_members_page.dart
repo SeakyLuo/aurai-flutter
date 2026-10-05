@@ -118,7 +118,7 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
                     : () {
                         if (!_selected.contains(member.sender.id) &&
                             _selected.length == _members.length - 1) {
-                          _notice('群聊至少保留一位 AI', kind: ToastKind.warning);
+                          _notice('群聊至少保留一位联系人', kind: ToastKind.warning);
                           return;
                         }
                         setState(() {

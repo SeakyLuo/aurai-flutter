@@ -234,6 +234,11 @@ class _ForwardConversationSheetState extends State<ForwardConversationSheet> {
                                               AgentMessageRole.assistant &&
                                           message.sender != null
                                       ? GroupMessageHeading(
+                                          trailingInset:
+                                              message.hasRestrictedAudience
+                                              ? GroupMessageHeading
+                                                    .restrictedRightInset
+                                              : GroupMessageHeading.rightInset,
                                           sender: message.sender!,
                                           showName: message.htmlGame == null,
                                           onOpenProfile: () {},

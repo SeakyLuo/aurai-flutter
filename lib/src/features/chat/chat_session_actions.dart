@@ -102,47 +102,4 @@ extension _ChatSessionActions on _ChatPageState {
     _draftTimer?.cancel();
     return true;
   }
-
-  Future<void> _showConfirmation(PendingConfirmation request) async {
-    if (!mounted) return;
-    final arguments = request.call.arguments;
-    final detail =
-        request.definition.confirmationDescriptionFor(arguments) ??
-        switch (request.call.name) {
-          'shell' => '将以 Aurai 自身权限执行命令：\n${arguments['command']}',
-          'startIntent' => '将启动 Android 操作：\n${_intentSummary(arguments)}',
-          'act' when arguments['action'] == 'inputText' =>
-            '将输入文字：\n${arguments['text']}',
-          'act' => switch (arguments['action']) {
-            'click' => '将点击当前屏幕中选定的控件。',
-            'scroll' => '将滚动当前页面。',
-            'back' => '将返回上一页。',
-            'home' => '将返回手机主屏幕。',
-            _ => '将操作当前屏幕中选定的控件。',
-          },
-          _ =>
-            request.definition.confirmationDescriptionFor(arguments) ??
-                request.definition.description,
-        };
-    if (!identical(widget.controller.pendingConfirmation, request)) return;
-    _focusNode.unfocus();
-    final approved = await showOperationRequestSheet(
-      context,
-      controller: widget.controller,
-      request: request,
-      detail: detail,
-    );
-    if (identical(widget.controller.pendingConfirmation, request)) {
-      widget.controller.resolveConfirmation(approved);
-    }
-    if (identical(_shownConfirmation, request)) _shownConfirmation = null;
-  }
-
-  String _intentSummary(Map<String, Object?> arguments) => <String>[
-    'Action: ${arguments['action']}',
-    if (arguments['data'] != null) 'Data: ${arguments['data']}',
-    if (arguments['mimeType'] != null) 'Type: ${arguments['mimeType']}',
-    if (arguments['packageName'] != null) 'App: ${arguments['packageName']}',
-    if (arguments['extras'] != null) 'Extras: ${arguments['extras']}',
-  ].join('\n');
 }

@@ -95,7 +95,7 @@ class _ProjectFilesPageState extends State<ProjectFilesPage> {
                     padding: const EdgeInsets.all(32),
                     child: const EmptyDataView(
                       title: '还没有项目文件',
-                      description: '添加文档、图片或其他素材，AI 可以从项目工作目录中读取。',
+                      description: '添加文档、图片或其他素材，供项目成员从工作目录中读取。',
                     ),
                   ),
                 )

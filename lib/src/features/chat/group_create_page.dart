@@ -581,9 +581,7 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
                                   hasScrollBody: false,
                                   child: const Padding(
                                     padding: EdgeInsets.symmetric(vertical: 16),
-                                    child: EmptyDataView(
-                                      title: '暂无 AI 成员，点击＋添加',
-                                    ),
+                                    child: EmptyDataView(title: '暂无联系人，点击＋添加'),
                                   ),
                                 ),
                             ],

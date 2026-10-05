@@ -33,6 +33,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   bool allowReadAloud = false,
   bool allowStar = false,
   bool allowGroupMarks = false,
+  bool allowMarks = false,
   bool allowPin = false,
   bool pinned = false,
   bool groupFavorite = false,
@@ -163,7 +164,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             ),
             pinned ? '取消置顶' : '置顶消息',
           ),
-        if (allowGroupMarks) ...[
+        if (allowMarks || allowGroupMarks) ...[
           (
             const MessageActionResult(MessageAction.groupFavorite),
             ConversationMenuIcon(
@@ -172,7 +173,9 @@ Future<MessageMenuResult?> showMessageActionsMenu(
                   : ConversationMenuIconType.mark,
               color: iconColor,
             ),
-            groupFavorite ? '取消群标记' : '添加群标记',
+            groupFavorite
+                ? (allowGroupMarks ? '取消群标记' : '取消标记')
+                : (allowGroupMarks ? '添加群标记' : '添加标记'),
           ),
         ],
         if (allowSelect &&

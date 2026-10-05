@@ -4,7 +4,7 @@ import '../../domain/error_message.dart';
 import '../../domain/message_sender.dart';
 import 'package:flutter/material.dart';
 import 'chat_controller.dart';
-import 'group_avatar.dart';
+import 'group_picker_tile.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'pagination_listener.dart';
@@ -112,23 +112,9 @@ class _AiGroupListState extends State<AiGroupList> {
                       },
                     ),
                   for (final group in _groups)
-                    ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 6),
-                      horizontalTitleGap: 12,
-                      minTileHeight: 72,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      title: Text(
-                        group['title'] as String,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      leading: GroupAvatar(
-                        members: _avatars[group['id']]!,
-                        size: 48,
-                      ),
+                    GroupPickerTile(
+                      title: group['title'] as String,
+                      members: _avatars[group['id']]!,
                       onTap: () => widget.onSelected(group),
                     ),
                   if (_loading)

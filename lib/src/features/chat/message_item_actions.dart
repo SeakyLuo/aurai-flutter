@@ -38,6 +38,12 @@ extension _FailureRetry on _MessageItemState {
 }
 
 extension _MessageItemActions on _MessageItemState {
+  double get _ownMessageLeftInset => widget.groupBubble
+      ? message.hasRestrictedAudience
+            ? GroupMessageHeading.restrictedRightInset
+            : GroupMessageHeading.rightInset
+      : 16;
+
   Widget _withBubbleStatus(Widget child) => _withGroupFavorite(
     widget.groupBubble && message.hasRestrictedAudience
         ? MessageVisibilityMarker(
@@ -279,6 +285,7 @@ extension _MessageItemActions on _MessageItemState {
                 : null,
             allowStar: allowStar,
             allowGroupMarks: groupMark?.isGroup ?? false,
+            allowMarks: groupMark != null,
             allowPin: groupMark != null,
             pinned: groupMark?.pinned ?? false,
             groupFavorite: groupMark?.favorite ?? false,
@@ -379,9 +386,10 @@ extension _MessageItemActions on _MessageItemState {
           } else {
             await store.set(snapshot.id, true);
             if (mounted)
-              ScaffoldMessenger.of(
-                context,
-              ).showToast(const SnackBar(content: Text('已收藏')));
+              ScaffoldMessenger.of(context).showToast(
+                const SnackBar(content: Text('已收藏')),
+                kind: ToastKind.success,
+              );
           }
         } on Object catch (error) {
           if (mounted)
@@ -460,9 +468,10 @@ extension _MessageItemActions on _MessageItemState {
               text: '已转发',
             );
           } else {
-            ScaffoldMessenger.of(
-              context,
-            ).showToast(const SnackBar(content: Text('已转发')));
+            ScaffoldMessenger.of(context).showToast(
+              const SnackBar(content: Text('已转发')),
+              kind: ToastKind.success,
+            );
           }
         }
       case MessageAction.branch:

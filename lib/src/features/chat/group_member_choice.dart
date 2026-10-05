@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../domain/message_sender.dart';
 import 'member_avatar.dart';
 import 'settings_icon.dart';
+import 'member_selection_mark.dart';
 
 class GroupMemberChoice extends StatelessWidget {
   const GroupMemberChoice({
@@ -20,7 +21,6 @@ class GroupMemberChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Semantics(
       checked: selected,
       enabled: onTap != null,
@@ -33,26 +33,7 @@ class GroupMemberChoice extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
             child: Row(
               children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  width: 22,
-                  height: 22,
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: selected ? colors.onSurface : Colors.transparent,
-                    border: Border.all(
-                      color: selected ? colors.onSurface : colors.outline,
-                      width: 1.4,
-                    ),
-                  ),
-                  child: selected
-                      ? SettingsIcon(
-                          type: SettingsIconType.check,
-                          color: colors.surface,
-                        )
-                      : null,
-                ),
+                MemberSelectionMark(selected: selected),
                 const SizedBox(width: 12),
                 Expanded(
                   child: InkWell(

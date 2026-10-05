@@ -84,7 +84,7 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
   Future<void> _chooseAi() async {
     final value = await showChoiceSheet<String>(
       context,
-      title: '选择 AI',
+      title: '选择联系人',
       selected: _selected!,
       choices: [
         for (final id in _entries.map((e) => e.sender).toSet())
@@ -99,7 +99,7 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
       context: context,
       builder: (_) => const DeleteConfirmationDialog(
         title: '撤销这项授权？',
-        description: '撤销后，AI 再次执行需要授权的操作时会重新询问。',
+        description: '撤销后，再次执行需要授权的操作时会重新询问。',
         confirmLabel: '撤销授权',
       ),
     );

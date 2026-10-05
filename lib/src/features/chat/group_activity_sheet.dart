@@ -621,7 +621,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                 ),
                 child: Center(
                   child: Text(
-                    widget._asSheet ? '当前没有成员在思考或睡眠' : '群内暂无 AI 成员',
+                    widget._asSheet ? '当前没有成员在思考或睡眠' : '群内暂无其他成员',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,

@@ -179,9 +179,10 @@ class _ImagePreviewState extends State<ImagePreview> {
         ),
       );
       if (sent == true && mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showToast(const SnackBar(content: Text('已转发')));
+        ScaffoldMessenger.of(context).showToast(
+          const SnackBar(content: Text('已转发')),
+          kind: ToastKind.success,
+        );
       return;
     }
     if (action == 'locate') {

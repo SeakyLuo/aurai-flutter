@@ -66,7 +66,7 @@ class ScheduleTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
       if (operation != 'list' && operation != 'create') {
         await tasks.reload();
         if (!tasks.tasks.any((task) => task['id'] == a['id'] && owned(task)))
-          throw StateError('任务不属于当前 AI 或已不存在');
+          throw StateError('任务不属于当前联系人或已不存在');
       }
       switch (operation) {
         case 'list':

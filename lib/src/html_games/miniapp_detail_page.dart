@@ -127,6 +127,12 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
         items: [
           if (_entry.canEditMetadata)
             (value: 'edit', label: '编辑', icon: const TaskActionIcon('edit')),
+          if (!_entry.bundled || _entry.installedId != null)
+            (
+              value: 'team',
+              label: '开发团队',
+              icon: const SettingsIcon(type: SettingsIconType.contacts),
+            ),
           (
             value: 'forward',
             label: '分享',
@@ -150,6 +156,16 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
       switch (action) {
         case 'edit':
           await _edit();
+        case 'team':
+          await Navigator.push<void>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MiniappTeamPage(
+                store: MiniappTeamStore(widget.store.database),
+                appId: _entry.publicationId,
+              ),
+            ),
+          );
         case 'forward':
           await forwardMiniapp(context, _entry);
         case 'favorite':
@@ -273,32 +289,6 @@ class _MiniappDetailPageState extends State<MiniappDetailPage> {
                       style: Theme.of(
                         context,
                       ).textTheme.bodyMedium?.copyWith(height: 1.6),
-                    ),
-                  ],
-                  if (!entry.bundled) ...[
-                    const SizedBox(height: 24),
-                    Material(
-                      color: settingsFieldColor(context),
-                      borderRadius: BorderRadius.circular(22),
-                      clipBehavior: Clip.antiAlias,
-                      child: ListTile(
-                        leading: const SettingsIcon(
-                          type: SettingsIconType.contacts,
-                        ),
-                        title: const Text('开发团队'),
-                        trailing: const SettingsIcon(
-                          type: SettingsIconType.chevron,
-                        ),
-                        onTap: () => Navigator.push<void>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => MiniappTeamPage(
-                              store: MiniappTeamStore(widget.store.database),
-                              appId: entry.publicationId,
-                            ),
-                          ),
-                        ),
-                      ),
                     ),
                   ],
                   if (entry.revision > 0)

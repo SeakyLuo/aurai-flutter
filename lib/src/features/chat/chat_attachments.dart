@@ -105,6 +105,7 @@ extension _ChatAttachments on _ChatPageState {
                 PlatformException(code: 'no_available_camera') => '当前设备没有可用的相机',
                 _ => '图片添加失败，请重新选择：${errorMessage(error)}',
               },
+        kind: ToastKind.error,
         action: permissionDenied
             ? SnackBarAction(
                 label: '去设置',

@@ -54,7 +54,7 @@ class PeerAccessTool
       authorizationScope: _access?.scope,
       authorizationLabel: _access?.description,
       confirmationDescriptionBuilder: (args) => _access!.approval
-          ? '${_access!.description}\n是否允许？授权仅限此 AI、目标和操作。'
+          ? '${_access!.description}\n是否允许？授权仅限当前联系人、目标和操作。'
           : base.confirmationDescriptionFor(args) ?? base.description,
     );
   }

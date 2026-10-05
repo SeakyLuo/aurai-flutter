@@ -66,10 +66,10 @@ extension SkillBatchInstallOperations on SkillStore {
       if (memberIds.any(
         (id) => !currentIds.contains(id) || !agentIds.contains(id),
       )) {
-        throw StateError('所选 AI 已不在群内，请重新选择');
+        throw StateError('所选成员 已不在群内，请重新选择');
       }
       if (memberIds.any((id) => !_visibleFor(skill, id))) {
-        throw StateError('技能可见范围已变化，所选 AI 无法安装');
+        throw StateError('技能可见范围已变化，所选成员 无法安装');
       }
       final batch = txn.batch();
       for (final id in memberIds) {

@@ -1,6 +1,23 @@
 part of 'chat_page.dart';
 
 extension _ChatComposer on _ChatPageState {
+  void _focusNewConversation() {
+    final conversation = widget.controller.activeConversation;
+    if (widget.initialText == null &&
+        conversation.kind == ConversationKind.direct &&
+        !conversation.isStored) {
+      _focusNode.requestFocus();
+    }
+  }
+
+  void _useExample(String example) {
+    _textController.text = example;
+    _textController.selection = TextSelection.collapsed(
+      offset: _textController.text.length,
+    );
+    _focusNode.requestFocus();
+  }
+
   Future<void> _chooseDraftVisibility() async {
     final id = _conversationId;
     await runUiAction(context, () async {
@@ -48,6 +65,8 @@ extension _ChatComposer on _ChatPageState {
                       DraftVisibilityMode.everyone
                   ? ''
                   : _draftVisibility[_conversationId]?.label ?? ''
+            : controller.activeConversation.isTemporary
+            ? '和 ${controller.activeAi!.sender.name} 临时聊天'
             : '回复 ${controller.activeAi!.sender.name}',
         quote: _editing != null
             ? _editing!.message.quote

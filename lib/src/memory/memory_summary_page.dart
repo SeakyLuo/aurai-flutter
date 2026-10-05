@@ -254,7 +254,7 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
                               child: EmptyDataView(
                                 title: '还没有记忆',
                                 description: memory.projectShared
-                                    ? '这里会记录项目中所有 AI 共享的背景与约定。你可以在下方补充信息。'
+                                    ? '这里会记录项目成员共享的背景与约定。你可以在下方补充信息。'
                                     : memory.scope.isEmpty
                                     ? '这里会逐渐记录对你的了解。你可以在下方补充希望记住的信息。'
                                     : '这里会记录在这个群聊中形成的记忆。你可以在下方补充信息。',

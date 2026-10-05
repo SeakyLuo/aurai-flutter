@@ -41,7 +41,7 @@ class HtmlDataAccessTool
       singleUseConfirmation: true,
       authorizationLabel: '${write ? '修改' : '读取'}小程序“$_title”的实例数据',
       confirmationDescriptionBuilder: (_) =>
-          '是否允许此 AI ${write ? '修改' : '读取'}已发送的小程序“$_title”的数据？仅限此消息实例，可能包含私密数据；不会修改模板或其他实例。',
+          '是否允许该联系人${write ? '修改' : '读取'}已发送的小程序“$_title”的数据？仅限此消息实例，可能包含私密数据；不会修改模板或其他实例。',
     );
   }
 

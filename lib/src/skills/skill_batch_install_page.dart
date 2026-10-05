@@ -57,7 +57,7 @@ class _SkillBatchInstallPageState extends State<SkillBatchInstallPage> {
         onBack: () => Navigator.pop(context),
         actions: [
           SettingsGlassAction(
-            label: '安装所选 AI',
+            label: '为所选成员安装',
             icon: Icons.check_rounded,
             iconWidget: SettingsIcon(
               type: SettingsIconType.check,
@@ -85,7 +85,7 @@ class _SkillBatchInstallPageState extends State<SkillBatchInstallPage> {
                         ? Center(
                             child: EmptyDataView(
                               title: widget.candidates.isEmpty
-                                  ? '群内暂无 AI'
+                                  ? '群内暂无其他成员'
                                   : '没有匹配的成员',
                             ),
                           )

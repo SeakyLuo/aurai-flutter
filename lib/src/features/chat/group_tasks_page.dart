@@ -27,7 +27,7 @@ class GroupTasksPage extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
-      title: privateStore == null ? '群任务' : '任务清单',
+      title: privateStore == null ? '群任务' : '任务',
       onBack: () => Navigator.pop(context),
     ),
     body: ListenableBuilder(

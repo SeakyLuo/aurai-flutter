@@ -59,7 +59,7 @@ class SkillTool
     singleUseConfirmation: operation == 'update' || operation == 'delete',
     confirmationDescriptionBuilder: (a) => operation == 'read'
         ? '读取技能“${scopedRead(a['name'] as String).name}”的使用说明和执行脚本。'
-        : '${operation == 'delete' ? '删除' : '修改'}公共技能“${_editTarget!.name}”。当前 AI 不是创建人或最近更新人，此操作会影响共享技能。是否允许本次操作？',
+        : '${operation == 'delete' ? '删除' : '修改'}公共技能“${_editTarget!.name}”。当前联系人不是创建人或最近更新人，此操作会影响共享技能。是否允许本次操作？',
     safety: operation == 'list' || operation == 'search' || operation == 'read'
         ? ToolSafety.readOnly
         : ToolSafety.lowRisk,

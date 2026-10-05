@@ -1,15 +1,15 @@
-import '../features/chat/floating_search_layout.dart';
-import 'package:flutter/material.dart';
-import '../domain/message_sender.dart';
-import '../features/chat/group_member_choice.dart';
-import '../features/chat/question_icon.dart';
+import '../app/global_ui.dart';
 import '../features/chat/settings_appearance.dart';
+import '../app/glass_notice.dart';
+import '../domain/error_message.dart';
+import 'package:flutter/material.dart';
+import '../features/chat/question_icon.dart';
 import '../features/chat/settings_icon.dart';
 import '../features/chat/visibility_option_tile.dart';
-import '../widgets/empty_data_view.dart';
 import 'skill_store.dart';
 import '../domain/resource_scope.dart';
 import '../features/chat/resource_scope_picker.dart';
+import 'skill_visibility_targets.dart';
 
 String skillVisibilityLabel(
   String value, {
@@ -17,7 +17,7 @@ String skillVisibilityLabel(
 }) => switch (value) {
   'public' => scopes.isEmpty ? '所有人可见' : '部分可见',
   'partial' => '部分可见',
-  'selected' => '指定人可见',
+  'selected' => '部分可见',
   _ => '仅自己可见',
 };
 
@@ -32,6 +32,8 @@ Future<(String, Set<String>, List<ResourceScope>)?> showSkillVisibilityPicker(
   isScrollControlled: true,
   useSafeArea: true,
   showDragHandle: false,
+  clipBehavior: Clip.antiAlias,
+  shape: RoundedRectangleBorder(borderRadius: GlobalUI.bottomSheetBorderRadius),
   builder: (_) => SkillVisibilityPicker(
     store: store,
     visibility: visibility,
@@ -58,58 +60,50 @@ class SkillVisibilityPicker extends StatefulWidget {
 
 class _SkillVisibilityPickerState extends State<SkillVisibilityPicker> {
   late String _visibility =
-      widget.visibility == 'public' && widget.scopes.isNotEmpty
+      widget.visibility == 'selected' ||
+          (widget.visibility == 'public' && widget.scopes.isNotEmpty)
       ? 'partial'
       : widget.visibility;
   late List<ResourceScope> _scopes = [...widget.scopes];
-
-  Future<void> _chooseScopes() async {
-    final scopes = await showModalBottomSheet<List<ResourceScope>>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => FractionallySizedBox(
-        heightFactor: .9,
-        child: ResourceScopePicker(
-          groups: widget.store.groups,
-          projects: widget.store.projects,
-          selected: _scopes,
-          requiredGroup: true,
-        ),
-      ),
-    );
-    if (!mounted || scopes == null) return;
-    setState(() {
-      _scopes = scopes;
-      _visibility = 'partial';
-    });
-  }
-
   late Set<String> _selected = {...widget.selected};
 
-  Future<void> _chooseMembers() async {
-    final selected = await showModalBottomSheet<Set<String>>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: false,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: _SkillVisibleMembersSheet(
-          members: widget.store.members
-              .where((m) => m.id != widget.store.ownerId)
-              .toList(),
-          selected: _selected,
-        ),
-      ),
-    );
-    if (!mounted || selected == null) return;
-    setState(() {
-      _visibility = 'selected';
-      _selected = selected;
-    });
+  Future<void> _chooseTargets() async {
+    try {
+      final avatars = await widget.store.visibilityGroupAvatars();
+      if (!mounted) return;
+      final result =
+          await showModalBottomSheet<(Set<String>, List<ResourceScope>)>(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            showDragHandle: false,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: GlobalUI.bottomSheetBorderRadius,
+            ),
+            builder: (_) => ClipRRect(
+              borderRadius: GlobalUI.bottomSheetBorderRadius,
+              child: SkillVisibilityTargets(
+                store: widget.store,
+                groupAvatars: avatars,
+                selected: _selected,
+                scopes: _scopes,
+              ),
+            ),
+          );
+      if (!mounted || result == null) return;
+      setState(() {
+        _selected = result.$1;
+        _scopes = result.$2;
+        _visibility = 'partial';
+      });
+    } on Object catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
+    }
   }
 
   @override
@@ -121,133 +115,48 @@ class _SkillVisibilityPickerState extends State<SkillVisibilityPicker> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _VisibilityHeader(
-            title: '技能可见范围',
+            title: '可见范围',
             actionLabel: '保存',
             onDone:
-                (_visibility == 'selected' && _selected.isEmpty) ||
-                    (_visibility == 'partial' && _scopes.isEmpty)
+                _visibility == 'partial' && _selected.isEmpty && _scopes.isEmpty
                 ? null
                 : () => Navigator.pop(context, (
-                    _visibility == 'partial' ? 'public' : _visibility,
-                    _selected,
-                    _visibility == 'public' ? <ResourceScope>[] : _scopes,
+                    _visibility == 'partial'
+                        ? (_scopes.isEmpty ? 'selected' : 'public')
+                        : _visibility,
+                    _visibility == 'partial' ? _selected : <String>{},
+                    _visibility == 'partial' ? _scopes : <ResourceScope>[],
                   )),
           ),
           const SizedBox(height: 12),
-          for (final value in ['public', 'partial', 'private', 'selected'])
+          for (final value in ['public', 'partial', 'private'])
             VisibilityOptionTile(
               selected: _visibility == value,
-              opensMembers: value == 'selected' || value == 'partial',
+              opensMembers: value == 'partial',
               title: skillVisibilityLabel(value),
-              subtitle: value == 'partial'
-                  ? (_scopes.isEmpty
-                        ? '选择群聊或项目'
-                        : resourceScopeLabel(
-                            _scopes,
-                            widget.store.groups,
-                            widget.store.projects,
-                          ))
-                  : value == 'selected' && _selected.isNotEmpty
-                  ? widget.store.members
-                        .where((m) => _selected.contains(m.id))
-                        .map((m) => m.name)
-                        .join('、')
-                  : switch (value) {
-                      'public' => '所有人均可查看和使用',
-                      'selected' => '选中的人可查看、安装，内容由你维护',
-                      _ => '只有自己可查看、安装和维护',
-                    },
+              subtitle:
+                  value == 'partial' &&
+                      (_selected.isNotEmpty || _scopes.isNotEmpty)
+                  ? [
+                      ...widget.store.members
+                          .where((m) => _selected.contains(m.id))
+                          .map((m) => m.name),
+                      if (_scopes.isNotEmpty)
+                        resourceScopeLabel(
+                          _scopes,
+                          widget.store.groups,
+                          widget.store.projects,
+                        ),
+                    ].join('、')
+                  : null,
               onTap: value == 'partial'
-                  ? _chooseScopes
-                  : value == 'selected'
-                  ? _chooseMembers
+                  ? _chooseTargets
                   : () => setState(() => _visibility = value),
             ),
         ],
       ),
     ),
   );
-}
-
-class _SkillVisibleMembersSheet extends StatefulWidget {
-  const _SkillVisibleMembersSheet({
-    required this.members,
-    required this.selected,
-  });
-  final List<MessageSender> members;
-  final Set<String> selected;
-  @override
-  State<_SkillVisibleMembersSheet> createState() =>
-      _SkillVisibleMembersSheetState();
-}
-
-class _SkillVisibleMembersSheetState extends State<_SkillVisibleMembersSheet> {
-  late final _selected = {...widget.selected};
-  final _search = TextEditingController();
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final query = _search.text.trim().toLowerCase();
-    final members = widget.members
-        .where((m) => m.name.toLowerCase().contains(query))
-        .toList();
-    return FractionallySizedBox(
-      heightFactor: .8,
-      child: SafeArea(
-        top: false,
-        child: SearchSheetBody(
-          header: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: _VisibilityHeader(
-              title: '选择可见成员',
-              onDone: _selected.isEmpty
-                  ? null
-                  : () => Navigator.pop(context, _selected),
-            ),
-          ),
-          child: FloatingSearchLayout(
-            itemCount: widget.members.length,
-            controller: _search,
-            onChanged: (_) => setState(() {}),
-            hintText: '搜索联系人',
-            enabled: true,
-            bottom: 16,
-            child: members.isEmpty
-                ? Center(
-                    child: EmptyDataView(
-                      title: widget.members.isEmpty ? '暂无可选联系人' : '没有找到匹配的成员',
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(
-                      20,
-                      68,
-                      20,
-                      FloatingSearchLayout.clearance,
-                    ),
-                    itemCount: members.length,
-                    itemBuilder: (_, index) {
-                      final member = members[index];
-                      return GroupMemberChoice(
-                        selected: _selected.contains(member.id),
-                        sender: member,
-                        onTap: () => setState(() {
-                          if (!_selected.remove(member.id))
-                            _selected.add(member.id);
-                        }),
-                      );
-                    },
-                  ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _VisibilityHeader extends StatelessWidget {
@@ -283,7 +192,12 @@ class _VisibilityHeader extends StatelessWidget {
           SettingsGlassAction(
             label: actionLabel,
             icon: Icons.check_rounded,
-            iconWidget: const SettingsIcon(type: SettingsIconType.check),
+            iconWidget: SettingsIcon(
+              type: SettingsIconType.check,
+              color: Theme.of(context).colorScheme.onSurface.withValues(
+                alpha: onDone == null ? .3 : 1,
+              ),
+            ),
             onPressed: onDone,
           ),
         ],

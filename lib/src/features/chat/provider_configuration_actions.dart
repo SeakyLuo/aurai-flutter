@@ -105,7 +105,7 @@ extension ProviderConfigurationActions on ChatController {
                     as Map)['speech']?['service'] ==
                 service.name,
       ))
-        throw StateError('还有 AI 使用该供应商，请先在 AI 的模型设置中更换供应商');
+        throw StateError('还有联系人使用该供应商，请先在联系人的模型设置中更换供应商');
       final runs = await txn.query(
         'agent_runs',
         columns: ['id'],

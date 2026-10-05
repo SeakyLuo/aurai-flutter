@@ -41,8 +41,12 @@ class GroupMessageMarks {
   Database get database => groups.database;
   static final changes = StreamController<String>.broadcast();
 
-  // Pins are conversation-wide; group favorites still require group membership.
-  Future<bool> _pinAccess(String id, {DatabaseExecutor? executor}) async {
+  // Marks and pins belong to a conversation. Group access requires membership;
+  // private conversations are managed by the local user.
+  Future<bool> _conversationAccess(
+    String id, {
+    DatabaseExecutor? executor,
+  }) async {
     final rows = await (executor ?? database).query(
       'conversations',
       columns: ['kind'],
@@ -55,7 +59,7 @@ class GroupMessageMarks {
     if (isGroup) {
       await _member(id, executor: executor);
     } else if (viewerId != 'user:local') {
-      throw StateError('只能操作自己的私聊置顶');
+      throw StateError('只能操作自己的私聊标记和置顶');
     }
     return isGroup;
   }
@@ -83,7 +87,7 @@ class GroupMessageMarks {
     );
     if (rows.isEmpty) return null;
     final groupId = rows.single['conversation_id'] as String;
-    final isGroup = await _pinAccess(groupId);
+    final isGroup = await _conversationAccess(groupId);
     final marks = await Future.wait([
       database.query(
         'group_pinned_messages',
@@ -120,11 +124,7 @@ class GroupMessageMarks {
     bool value,
   ) async {
     final notice = await database.transaction((txn) async {
-      final isGroup = table == 'group_pinned_messages'
-          ? await _pinAccess(groupId, executor: txn)
-          : true;
-      if (table != 'group_pinned_messages')
-        await _member(groupId, executor: txn);
+      final isGroup = await _conversationAccess(groupId, executor: txn);
       if (value) {
         final rows = await txn.query(
           'messages',
@@ -134,7 +134,7 @@ class GroupMessageMarks {
           whereArgs: [messageId, groupId],
         );
         if (rows.isEmpty) {
-          throw StateError(isGroup ? '只能操作本群对所有成员可见的消息' : '只能置顶本会话中的聊天消息');
+          throw StateError(isGroup ? '只能操作本群对所有成员可见的消息' : '只能操作本会话中的聊天消息');
         }
         await txn.insert(
           table,
@@ -175,7 +175,7 @@ class GroupMessageMarks {
   }
 
   Future<Map<String, Object?>?> pinned(String groupId) async {
-    await _pinAccess(groupId);
+    await _conversationAccess(groupId);
     final marks = await database.query(
       'group_pinned_messages',
       where: 'conversation_id = ?',
@@ -196,7 +196,7 @@ class GroupMessageMarks {
     int offset, {
     int limit = 40,
   }) async {
-    await _member(groupId);
+    await _conversationAccess(groupId);
     final marks = await database.query(
       'group_favorite_messages',
       where: 'conversation_id = ?',

@@ -2,7 +2,7 @@ import 'message_file.dart';
 import 'message_image.dart';
 
 enum AssetSource {
-  generated('AI 生成'),
+  generated('生成'),
   uploaded('我上传的');
 
   const AssetSource(this.label);

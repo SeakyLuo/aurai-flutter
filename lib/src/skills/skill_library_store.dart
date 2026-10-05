@@ -86,7 +86,7 @@ extension SkillLibraryOperations on SkillStore {
       throw StateError('仅创建者可以修改可见范围');
     }
     if (value.visibility == 'selected' && value.visibleTo.isEmpty)
-      throw StateError('请选择可见的人或 AI');
+      throw StateError('请选择可见的联系人');
     if (value.scopes.any(
       (s) => switch (s.type) {
         'group' => !_groups.any((g) => g['id'] == s.id),
@@ -107,7 +107,7 @@ extension SkillLibraryOperations on SkillStore {
       ownerId: creator,
       visibility: value.visibility,
       scopes: value.scopes.toSet().toList(),
-      visibleTo: value.visibility == 'selected'
+      visibleTo: value.visibility != 'private'
           ? value.visibleTo.toSet().toList()
           : [],
       name: name,

@@ -79,9 +79,10 @@ class _MiniappRunPageState extends State<MiniappRunPage>
       _lastError = session.error;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showToast(SnackBar(content: Text(_lastError!)));
+          ScaffoldMessenger.of(context).showToast(
+            SnackBar(content: Text(_lastError!)),
+            kind: ToastKind.error,
+          );
       });
     }
     if (session.failed) {

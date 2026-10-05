@@ -213,30 +213,24 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                     MemberAvatar(sender: recipient, size: 24),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            if (!answered && !card.closed)
-                              const TextSpan(text: '请 '),
-                            TextSpan(
-                              text: recipient.name,
-                              style: TextStyle(
-                                color: GlobalUI.highlightTextColor(context),
-                              ),
-                            ),
-                            TextSpan(
-                              text: answered
-                                  ? ' 已回答'
-                                  : card.closed
-                                  ? ' · 问题已结束'
-                                  : ' 回答这个问题',
-                            ),
-                          ],
-                        ),
+                      child: Text(
+                        recipient.name,
                         style: TextStyle(
                           fontSize: 13,
-                          color: colors.onSurfaceVariant,
+                          color: GlobalUI.highlightTextColor(context),
                         ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      answered
+                          ? '已回答'
+                          : card.closed
+                          ? '已结束'
+                          : '待回答',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],

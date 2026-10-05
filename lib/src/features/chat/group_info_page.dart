@@ -201,6 +201,7 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
           conversationProjectChangedMessage(_projects, selection.projectId),
         ),
       ),
+      kind: ToastKind.success,
     );
   });
 

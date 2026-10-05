@@ -103,7 +103,7 @@ extension GroupSleepRecovery on ChatController {
     };
     if (!senders.containsKey(actorId) ||
         senders[senderId]?.kind != MessageSenderKind.agent) {
-      throw StateError('只能唤醒当前群聊中的 AI 成员');
+      throw StateError('只能唤醒当前群聊中的成员');
     }
     if (!_groupSleeps.forGroup(conversationId).containsKey(senderId))
       return false;

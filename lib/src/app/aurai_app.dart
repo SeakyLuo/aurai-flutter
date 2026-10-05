@@ -1,4 +1,6 @@
 import '../features/chat/home_navigation.dart';
+import '../features/chat/approval_request_dialog.dart';
+import '../storage/approval_center_store.dart';
 import '../html_games/html_route_observer.dart';
 import '../features/chat/image_action_scope.dart';
 import 'package:flutter/material.dart';
@@ -41,7 +43,10 @@ class AuraiApp extends StatelessWidget {
                     ? Brightness.light
                     : Brightness.dark,
               ),
-          child: ImageActionScope(controller: controller, child: child!),
+          child: ApprovalPromptHost(
+            store: ApprovalCenterStore(controller.htmlStore.database),
+            child: ImageActionScope(controller: controller, child: child!),
+          ),
         );
       },
       routes: {'/': (_) => child!},

@@ -7,6 +7,8 @@ import '../domain/message_sender.dart';
 import '../features/chat/app_confirmation_dialog.dart';
 import '../features/chat/delete_confirmation_dialog.dart';
 import '../features/chat/member_avatar.dart';
+import '../features/chat/header_action_menu.dart';
+import '../scheduling/task_action_menu.dart';
 import '../features/chat/pagination_listener.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
@@ -73,22 +75,33 @@ class _MiniappTeamPageState extends State<MiniappTeamPage> {
   }
 
   Future<void> _add() async {
-    final member = await Navigator.push<MessageSender>(
+    final members = await Navigator.push<List<MessageSender>>(
       context,
       MaterialPageRoute(
         builder: (_) => MiniappTeamPicker(store: widget.store, appId: _id),
       ),
     );
-    if (member == null || !mounted) return;
+    if (members == null || !mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AppConfirmationDialog(
         title: '添加开发成员',
-        description: '允许 ${member.name} 编辑此小程序？',
+        description:
+            '允许 ${members.map((member) => member.name).join('、')} 编辑此小程序？',
         confirmLabel: '添加',
       ),
     );
-    if (confirmed == true && mounted) await _manage('add', member);
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    await runUiAction(
+      context,
+      () => widget.store.addMembers(
+        _id,
+        MessageSender.localUser.id,
+        members.map((member) => member.id).toSet(),
+      ),
+    );
+    if (mounted) setState(() => _busy = false);
   }
 
   Future<void> _remove(MessageSender member) async {
@@ -102,6 +115,69 @@ class _MiniappTeamPageState extends State<MiniappTeamPage> {
     );
     if (confirmed == true && mounted) await _manage('remove', member);
   }
+
+  Future<void> _memberMenu(BuildContext anchor, MessageSender member) async {
+    final action = await showHeaderActionMenu(
+      anchor,
+      items: [
+        (
+          value: 'remove',
+          label: '移出开发团队',
+          icon: const SettingsIcon(type: SettingsIconType.remove),
+        ),
+      ],
+    );
+    if (mounted && action == 'remove') await _remove(member);
+  }
+
+  Widget _sectionLabel(String label) => Padding(
+    padding: const EdgeInsets.fromLTRB(18, 24, 18, 10),
+    child: Text(
+      label,
+      style: TextStyle(
+        fontSize: 14,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    ),
+  );
+
+  Widget _memberRow(
+    MessageSender member, {
+    required bool creator,
+    required bool manager,
+  }) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Material(
+      color: settingsFieldColor(context),
+      borderRadius: BorderRadius.circular(26),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        child: Row(
+          children: [
+            MemberAvatar(sender: member, size: 44),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                member.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 16),
+              ),
+            ),
+            if (!creator && manager)
+              Builder(
+                builder: (anchor) => IconButton(
+                  tooltip: '更多',
+                  icon: const TaskActionIcon('more'),
+                  onPressed: _busy ? null : () => _memberMenu(anchor, member),
+                ),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
 
   Future<void> _manage(String action, MessageSender member) async {
     setState(() => _busy = true);
@@ -167,9 +243,14 @@ class _MiniappTeamPageState extends State<MiniappTeamPage> {
                     if (manager)
                       Material(
                         color: settingsFieldColor(context),
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(26),
                         clipBehavior: Clip.antiAlias,
                         child: ListTile(
+                          contentPadding: const EdgeInsetsDirectional.only(
+                            start: 16,
+                            end: 12,
+                          ),
+                          leading: const TaskActionIcon('edit'),
                           title: const Text('修改申请'),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -193,34 +274,13 @@ class _MiniappTeamPageState extends State<MiniappTeamPage> {
                           ),
                         ),
                       ),
-                    const SizedBox(height: 16),
-                    if (creator != null)
-                      ListTile(
-                        leading: MemberAvatar(sender: creator, size: 44),
-                        title: Text(creator.name),
-                        trailing: Text(
-                          '创建人',
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
+                    if (creator != null) ...[
+                      _sectionLabel('创建人'),
+                      _memberRow(creator, creator: true, manager: manager),
+                    ],
+                    if (_members.isNotEmpty) _sectionLabel('开发成员'),
                     for (final member in _members)
-                      ListTile(
-                        leading: MemberAvatar(sender: member, size: 44),
-                        title: Text(member.name),
-                        trailing: manager
-                            ? IconButton(
-                                tooltip: '移出开发团队',
-                                icon: const SettingsIcon(
-                                  type: SettingsIconType.remove,
-                                ),
-                                onPressed: _busy ? null : () => _remove(member),
-                              )
-                            : null,
-                      ),
+                      _memberRow(member, creator: false, manager: manager),
                     if (_loading)
                       const Padding(
                         padding: EdgeInsets.all(24),

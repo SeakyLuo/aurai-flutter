@@ -58,11 +58,11 @@ extension GroupToolAccess on ChatController {
             .where((m) => ids.contains(m.sender.id))
             .toList();
         if (targets.isEmpty || targets.length != ids.length)
-          throw ArgumentError('请选择群内现有 AI 成员');
+          throw ArgumentError('请选择群内现有成员');
         var approval = false;
         for (final target in targets) {
           if (target.sender.kind != MessageSenderKind.agent || target.isMuted)
-            throw StateError('只能调整未被禁言的 AI 成员');
+            throw StateError('只能调整未被禁言的成员');
           if (target.sender.id == actorId) continue;
           if (target.role == GroupMemberRole.owner ||
               actor.role == GroupMemberRole.member &&
@@ -98,7 +98,7 @@ extension GroupToolAccess on ChatController {
         }
       } else {
         if (target.sender.kind != MessageSenderKind.agent) {
-          throw StateError('只能调整 AI 成员的接话和唤醒状态');
+          throw StateError('只能调整 成员的接话和唤醒状态');
         }
         if (target.isMuted) throw StateError('该成员已被禁言，不能调整接话或唤醒');
       }

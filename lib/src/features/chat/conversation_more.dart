@@ -119,7 +119,7 @@ class _ConversationMoreState extends State<ConversationMore> {
       onPressed: () async {
         try {
           await controller.setConversationArchived(target.id, archived: false);
-          notice('已撤销归档');
+          notice('已撤销归档', kind: ToastKind.success);
         } on Object catch (error) {
           notice(
             '撤销归档失败，请在已归档会话中重试：${errorMessage(error)}',
@@ -442,6 +442,19 @@ class _ConversationMoreState extends State<ConversationMore> {
   }
 
   Future<void> _openDetails() async {
+    if (_conversation.kind == ConversationKind.direct &&
+        !_conversation.isStored) {
+      await openProfileRoute(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AiContactPage(
+            controller: widget.controller,
+            senderId: _conversation.defaultSenderId,
+          ),
+        ),
+      );
+      return;
+    }
     Widget details(BuildContext _) =>
         _conversation.kind == ConversationKind.group
         ? GroupInfoPage(
@@ -488,9 +501,9 @@ class _ConversationMoreState extends State<ConversationMore> {
           shadowOpacity: .8,
           child: RoundAction(
             icon: Icons.more_vert_rounded,
-            label: '会话详情',
+            label: _conversation.isStored ? '会话详情' : '查看资料',
             onPressed: _saving ? null : _openDetails,
-            onLongPress: _saving ? null : _openMenu,
+            onLongPress: _saving || !_conversation.isStored ? null : _openMenu,
           ),
         );
 }

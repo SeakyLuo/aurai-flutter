@@ -173,7 +173,7 @@ class _ModelSettingsSheetState extends State<ModelSettingsSheet> {
             ? '删除“${widget.controller.modelSettings.profile(service).displayName}”？'
             : '清除“${widget.controller.modelSettings.profile(service).displayName}”的密钥？',
         description: deleting
-            ? '将删除此供应商的配置和密钥。仍被模型或 AI 使用时，需要先更换供应商。'
+            ? '将删除此供应商的配置和密钥。仍被模型或联系人使用时，需要先更换供应商。'
             : '保留供应商配置，后续调用需要重新填写密钥。',
         confirmLabel: deleting ? '删除' : '清除密钥',
       ),

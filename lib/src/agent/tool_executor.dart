@@ -5,6 +5,7 @@ import '../domain/capability.dart';
 import '../domain/tool_models.dart';
 import 'tool_registry.dart';
 import 'ask_user_tool.dart';
+import 'html_app_team_tool.dart';
 
 typedef ToolConfirmation =
     Future<bool> Function(ToolCall call, ToolDefinition definition);
@@ -182,7 +183,10 @@ class ToolExecutor {
       try {
         final execution = tool.execute(call);
         // Questions own their deadline, including deferred user responses.
-        result = tool is AskUserTool
+        // Team applications wait for a decision rather than an execution timeout.
+        result =
+            tool is AskUserTool ||
+                (tool is HtmlAppTeamTool && call.name == 'requestHtmlAppEdit')
             ? await execution
             : await execution.timeout(tool.definition.executionTimeout);
       } on StateError catch (error) {

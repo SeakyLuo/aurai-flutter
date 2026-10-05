@@ -63,7 +63,7 @@ class InteractiveMessageStore {
       if (['queued', 'processing'].contains(pending?['status']) &&
           (pending?['buttonId'] ?? card.participants[actor.id]?['buttonId']) ==
               buttonId)
-        throw StateError('AI 正在处理这次操作，请等待结果');
+        throw StateError('正在处理这次操作，请等待结果');
       if (card.closed) throw StateError('这条交互消息已结束');
       final view = card.viewFor(actor.id);
       var button = view.buttons.firstWhere((b) => b['id'] == buttonId);

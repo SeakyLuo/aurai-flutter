@@ -49,7 +49,7 @@ class ProviderConfigurationTool
       'configureProviderBalance' =>
         '是否保存余额查询配置？\n${(args['balance'] as Map?)?['url'] ?? '恢复供应商预设'}',
       'configureProviderIcon' => '是否更改供应商图标？',
-      'requestModelProviderKey' => '是否打开供应商密钥填写弹框？密钥不会发送给 AI。',
+      'requestModelProviderKey' => '是否打开供应商密钥填写弹框？密钥不会发送给模型。',
       'checkModelProvider' => '是否向该供应商发送一条连接测试消息？可能产生少量费用。',
       _ => '是否使用已保存的密钥获取该供应商的模型列表？',
     },

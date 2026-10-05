@@ -586,6 +586,9 @@ List<ChatTimelineEntry> buildChatTimeline(
                   message.sender != null &&
                   message.interactive?.systemPresentation != true
               ? GroupMessageHeading(
+                  trailingInset: message.hasRestrictedAudience
+                      ? GroupMessageHeading.restrictedRightInset
+                      : GroupMessageHeading.rightInset,
                   groupId: conversation.id,
                   sender:
                       conversation.noticeMembers[message.senderId] ??

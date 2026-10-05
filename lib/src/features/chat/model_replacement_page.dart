@@ -92,11 +92,11 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
   };
 
   String get _allModelsLabel => widget.purpose == ModelPurpose.text
-      ? '全部 AI 当前模型'
+      ? '全部联系人当前模型'
       : '全部${_purposeLabel(widget.purpose)}模型';
 
   String _impactSummary(ModelReplacementImpact impact) => [
-    if (impact.aiCount > 0) '${impact.aiCount} 个 AI',
+    if (impact.aiCount > 0) '${impact.aiCount} 位联系人',
     for (final purpose in ModelPurpose.values)
       if (impact.purposes.contains(purpose))
         switch (purpose) {
@@ -346,7 +346,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
       context: context,
       barrierColor: Colors.black.withValues(alpha: .24),
       builder: (_) => AppConfirmationDialog(
-        title: all ? '批量修改全部 AI 模型？' : '批量修改 AI 模型？',
+        title: all ? '批量修改全部联系人模型？' : '批量修改联系人模型？',
         description: all
             ? '将把 $summary 当前使用的模型统一更换为“${_modelLabel(to.model)}”。默认文本模型不变。'
             : '将把使用“${_modelLabel(_from!)}”的 $summary 更换为“${_modelLabel(to.model)}”。默认文本模型不变。',
@@ -393,7 +393,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
-      title: '批量修改 AI 模型',
+      title: '批量修改联系人模型',
       onBack: _replacing ? null : () => Navigator.pop(context),
       actions: [
         SettingsGlassAction(
@@ -430,7 +430,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
                           _replacing
                       ? null
                       : _selectCurrentModel,
-                  subtitle: '不指定具体模型时，将修改所有 AI 当前使用的模型',
+                  subtitle: '不指定具体模型时，将修改所有联系人当前使用的模型',
                 ),
                 const SizedBox(height: 16),
                 _label('新模型'),

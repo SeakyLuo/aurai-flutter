@@ -80,7 +80,7 @@ extension GroupRunTools on ChatController {
                     .map((m) => m.sender.id)
                     .toSet()
               : senderIds;
-          if (targets.isEmpty) throw StateError('群内没有目标 AI 成员');
+          if (targets.isEmpty) throw StateError('群内没有目标成员');
           if (groups.isEmpty ||
               groups.single['kind'] != 'group' ||
               !members.any((m) => m.sender.id == actorId) ||
@@ -92,7 +92,7 @@ extension GroupRunTools on ChatController {
                       !m.isMuted,
                 ),
               )) {
-            throw StateError('只能调整你已加入的群聊中 AI 成员的自动接话');
+            throw StateError('只能调整你已加入的群聊中成员的自动接话');
           }
           final actorMember = members.firstWhere((m) => m.sender.id == actorId);
           if ((all || senderIds.length > 1) && !actorMember.role.canManage)

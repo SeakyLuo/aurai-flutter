@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../features/chat/glass_surface.dart';
-import '../features/chat/settings_icon.dart';
 import 'notice_details_sheet.dart';
 import 'global_ui.dart';
 
@@ -176,14 +175,14 @@ class _TopToastState extends State<_TopToast>
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final color = switch (widget.kind) {
       ToastKind.success =>
         dark ? const Color(0xff6ed4aa) : const Color(0xff24845d),
-      ToastKind.error || ToastKind.warning =>
-        dark ? GlobalUI.darkWarningRed : GlobalUI.warningRed,
-      ToastKind.info => colors.onSurfaceVariant,
+      ToastKind.error ||
+      ToastKind.warning => dark ? GlobalUI.darkWarningRed : GlobalUI.warningRed,
+      ToastKind.info =>
+        dark ? const Color(0xff64b5f6) : const Color(0xff2196f3),
     };
     final animation = _animation.drive(CurveTween(curve: Curves.easeOutCubic));
     return Positioned(
@@ -365,12 +364,10 @@ class _ToastIcon extends StatelessWidget {
   final ToastKind kind;
   final Color color;
   @override
-  Widget build(BuildContext context) => kind == ToastKind.info
-      ? SettingsIcon(type: SettingsIconType.info, color: color)
-      : CustomPaint(
-          size: const Size.square(24),
-          painter: _StatusPainter(kind, color),
-        );
+  Widget build(BuildContext context) => CustomPaint(
+    size: const Size.square(24),
+    painter: _StatusPainter(kind, color),
+  );
 }
 
 class _StatusPainter extends CustomPainter {
@@ -406,7 +403,14 @@ class _StatusPainter extends CustomPainter {
           paint..style = PaintingStyle.fill,
         );
       case ToastKind.info:
-        break;
+        canvas.drawCircle(const Offset(12, 12), 9, Paint()..color = color);
+        paint.color = Colors.white;
+        canvas.drawLine(const Offset(12, 10.5), const Offset(12, 16.5), paint);
+        canvas.drawCircle(
+          const Offset(12, 7.5),
+          .9,
+          paint..style = PaintingStyle.fill,
+        );
     }
   }
 

@@ -76,7 +76,7 @@ extension MiniappTemplateSending on ChatController {
     final target = await _forwardTarget(targetId!);
     if (target.kind == ConversationKind.direct &&
         !(await _directReplyContext(target)).config.isConfigured) {
-      throw StateError('请先为这个 AI 配置模型，再发送小程序');
+      throw StateError('请先为这位联系人配置模型，再发送小程序');
     }
     await _store.writer.flush();
     await _store.writer.save(target, makeActive: false);

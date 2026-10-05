@@ -84,7 +84,7 @@ class _ProjectDirectoriesPageState extends State<ProjectDirectoriesPage> {
       context: context,
       builder: (_) => AppConfirmationDialog(
         title: '取消关联此目录？',
-        description: '项目中的 AI 将不再访问此目录。文件和其他项目的关联保留。',
+        description: '项目成员 将不再访问此目录。文件和其他项目的关联保留。',
         confirmLabel: '取消关联',
         confirmRole: DialogActionRole.destructive,
       ),

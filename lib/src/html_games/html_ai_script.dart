@@ -14,7 +14,7 @@ const htmlAiScript = r'''
   document.addEventListener('aurai:pause',()=>{
     for(const id of pending.keys()){
       AuraiGameBridge.cancelAi(id);
-      finish(id,{error:'AI 请求已取消',code:'cancelled'});
+      finish(id,{error:'模型请求已取消',code:'cancelled'});
     }
   });
   window.__auraiAiUpdate=(id,text)=>{
@@ -22,20 +22,20 @@ const htmlAiScript = r'''
     try{entry.onText(text)}catch(error){console.error('AI onText callback failed',error)}
   };
   const request=(args,{signal,onText}={})=>new Promise((resolve,reject)=>{
-    if(signal?.aborted){reject(failure('AI 请求已取消','cancelled'));return}
+    if(signal?.aborted){reject(failure('模型请求已取消','cancelled'));return}
     const id=++serial;
     const cancel=()=>{
       AuraiGameBridge.cancelAi(id);
-      finish(id,{error:'AI 请求已取消',code:'cancelled'});
+      finish(id,{error:'模型请求已取消',code:'cancelled'});
     };
     const timer=timeout(()=>{
       AuraiGameBridge.cancelAi(id);
-      finish(id,{error:'AI 请求超时，请重试',code:'timeout'});
+      finish(id,{error:'模型请求超时，请重试',code:'timeout'});
     },130000);
     pending.set(id,{resolve,reject,onText,timer,cleanup:()=>signal?.removeEventListener('abort',cancel)});
     signal?.addEventListener('abort',cancel,{once:true});
     try{AuraiGameBridge.ai(id,JSON.stringify({...args,streamUpdates:typeof onText==='function'}))}
-    catch(error){finish(id,{error:'AI 接口不可用',code:'unavailable'})}
+    catch(error){finish(id,{error:'模型接口不可用',code:'unavailable'})}
   });
   window.__auraiAi=Object.freeze({
     version:1,

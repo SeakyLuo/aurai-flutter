@@ -26,6 +26,7 @@ class ScreenAuthorizationView(
     onAlways: () -> Unit,
     onSession: () -> Unit,
     private val onDeny: () -> Unit,
+    onDismiss: () -> Unit,
     onAllowPage: (() -> Unit)?,
 ) : LinearLayout(context) {
     private val dark = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
@@ -72,8 +73,8 @@ class ScreenAuthorizationView(
                     canvas.drawLine(width - inset, inset, inset, height - inset, pen)
                 }
             }.apply {
-                contentDescription = "拒绝并关闭"
-                setOnClickListener { onDeny() }
+                contentDescription = "关闭"
+                setOnClickListener { onDismiss() }
             }, LayoutParams(dp(48), dp(48)))
         }
         addView(header, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))

@@ -100,7 +100,7 @@ extension ImageGenerationActions on ChatController {
         images.add(
           await _imageStore.importBytes(
             bytes,
-            name: 'AI 生成的图片 ${images.length + 1}',
+            name: '生成的图片 ${images.length + 1}',
           ),
         );
       }

@@ -113,7 +113,9 @@ Future<ProjectActionResult?> showProjectActions(
         return ProjectActionResult.changed;
       case 'read':
         await controller.markProjectRead(project);
-        if (context.mounted) _notice(context, '项目会话已全部标为已读');
+        if (context.mounted) {
+          _notice(context, '项目会话已全部标为已读', kind: ToastKind.success);
+        }
         return ProjectActionResult.changed;
       case 'remove':
         final confirmed = await showDialog<bool>(

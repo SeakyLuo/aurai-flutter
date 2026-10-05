@@ -136,6 +136,7 @@ class _MiniappFavoritesListState extends State<MiniappFavoritesList> {
             },
           ),
         ),
+        kind: ToastKind.success,
       );
     } on Object catch (error) {
       if (mounted) _notice(error, kind: ToastKind.error);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../domain/tool_detail_target.dart';
 import '../domain/tool_models.dart';
 import '../html_games/miniapp_team_store.dart';
@@ -6,6 +7,41 @@ class HtmlAppTeamTool implements AgentTool, RuntimeCapabilityAgentTool {
   HtmlAppTeamTool(this.name, this.store, this.actor);
   final String name, actor;
   final MiniappTeamStore store;
+  Completer<Map<String, Object?>>? _waiting;
+  bool _cancelled = false;
+
+  Future<Map<String, Object?>> _request(String id, String reason) async {
+    final result = await store.request(id, actor, reason);
+    if (_cancelled) return {...result, 'waitingCancelled': true};
+    if (result['status'] != 'pending') return result;
+    final waiter = Completer<Map<String, Object?>>();
+    _waiting = waiter;
+    Future<void> readDecision() async {
+      final data = await store.read(id, actor);
+      final request = data['ownRequest'] as Map;
+      if (!waiter.isCompleted && request['status'] != 'pending') {
+        waiter.complete({...result, 'status': request['status']});
+      }
+    }
+
+    final subscription = MiniappTeamStore.changes.stream
+        .where((app) => app == result['appId'])
+        .asyncMap((_) => readDecision())
+        .listen(
+          (_) {},
+          onError: (Object error, StackTrace stack) {
+            if (!waiter.isCompleted) waiter.completeError(error, stack);
+          },
+        );
+    try {
+      await readDecision();
+      return {...result, ...await waiter.future};
+    } finally {
+      await subscription.cancel();
+      _waiting = null;
+    }
+  }
+
   static const names = [
     'readHtmlAppTeam',
     'requestHtmlAppEdit',
@@ -63,6 +99,7 @@ class HtmlAppTeamTool implements AgentTool, RuntimeCapabilityAgentTool {
 
   @override
   Future<ToolResult> execute(ToolCall call) async {
+    _cancelled = false;
     final args = call.arguments;
     final offset = args['offset'] as int? ?? 0;
     final Map<String, Object?> output;
@@ -76,7 +113,7 @@ class HtmlAppTeamTool implements AgentTool, RuntimeCapabilityAgentTool {
     } else {
       final id = args['appId'] as String;
       if (name == 'requestHtmlAppEdit') {
-        output = await store.request(id, actor, args['reason'] as String);
+        output = await _request(id, args['reason'] as String);
       } else if (name == 'manageHtmlAppTeam') {
         output = await store.manage(
           id,
@@ -134,11 +171,19 @@ class HtmlAppTeamTool implements AgentTool, RuntimeCapabilityAgentTool {
     return ToolResult(
       callId: call.id,
       toolName: name,
-      status: ToolResultStatus.success,
+      status: output['waitingCancelled'] == true
+          ? ToolResultStatus.cancelled
+          : ToolResultStatus.success,
       output: output,
     );
   }
 
   @override
-  Future<void> cancel() async {}
+  Future<void> cancel() async {
+    _cancelled = true;
+    final waiting = _waiting;
+    if (waiting != null && !waiting.isCompleted) {
+      waiting.complete({'status': 'pending', 'waitingCancelled': true});
+    }
+  }
 }

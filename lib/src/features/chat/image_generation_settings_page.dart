@@ -242,7 +242,7 @@ class _ImageGenerationSettingsPageState
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Text(
-                      '所有 AI 共用此生图模型，聊天模型保持不变。生成的图片会保存为文件，可用于后续编辑或发送。'
+                      '所有联系人共用此生图模型，聊天模型保持不变。生成的图片会保存为文件，可用于后续编辑或发送。'
                       '${_model == null
                           ? ''
                           : _model!.supportsReference

@@ -1,6 +1,13 @@
 part of 'chat_controller.dart';
 
 extension ConversationActions on ChatController {
+  void setTemporaryChatPersonalization(bool enabled) {
+    activeConversation.mode = enabled
+        ? ConversationMode.temporaryPersonalized
+        : ConversationMode.temporaryPlain;
+    notifyListeners();
+  }
+
   Future<void> createConversation() async {
     if (identical(activeConversation, _newConversation) &&
         activeConversation.isEmpty)
@@ -61,9 +68,10 @@ extension ConversationActions on ChatController {
       } else {
         if (conversation.kind == ConversationKind.direct &&
             conversation.messageCount == 0 &&
-            !conversation.isTemporary &&
             !conversation.isStored) {
-          await _newDraftStore.save(conversation);
+          if (!conversation.isTemporary) {
+            await _newDraftStore.save(conversation);
+          }
           await _store.selectNewConversation();
         } else {
           await _store.writer.save(conversation, saveMessages: false);
@@ -147,7 +155,7 @@ extension ConversationActions on ChatController {
   }
 
   Future<void> archiveTemporaryConversation(Conversation conversation) async {
-    if (!conversation.isTemporary) return;
+    if (!conversation.isTemporary || !conversation.isStored) return;
     final previouslyArchived = conversation.isArchived;
     conversation.isArchived = true;
     try {

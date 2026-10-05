@@ -366,7 +366,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                               size: 48,
                             ),
                             title: const Text('开始新会话'),
-                            subtitle: const Text('选择一个 AI 开始聊天'),
+                            subtitle: const Text('选择一位联系人开始聊天'),
                             onTap: _newConversation,
                           ),
                         ),

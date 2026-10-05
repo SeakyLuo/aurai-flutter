@@ -18,9 +18,6 @@ import '../features/chat/pagination_listener.dart';
 import 'miniapp_detail_page.dart';
 import 'miniapp_library_store.dart';
 import 'miniapp_message_catalog.dart';
-import 'miniapp_requests_page.dart';
-import 'miniapp_team_store.dart';
-import '../app/ui_action.dart';
 
 class MiniappLibraryPage extends StatefulWidget {
   const MiniappLibraryPage({
@@ -45,30 +42,12 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
   int _generation = 0;
   Timer? _debounce;
   final _messageCapable = <String>{};
-  int _pendingRequests = 0;
-  StreamSubscription<String>? _teamChanges;
 
   @override
   void initState() {
     super.initState();
     _load(reset: true);
     if (!widget.pickingMessage) _loadRecent();
-    if (!widget.pickingMessage) {
-      _loadRequests();
-      _teamChanges = MiniappTeamStore.changes.stream.listen(
-        (_) => _loadRequests(),
-      );
-    }
-  }
-
-  Future<void> _loadRequests() async {
-    await runUiAction(context, () async {
-      final rows = await _store.database.rawQuery(
-        "SELECT COUNT(*) AS count FROM miniapp_edit_requests WHERE status = 'pending'",
-      );
-      if (mounted)
-        setState(() => _pendingRequests = rows.single['count'] as int);
-    });
   }
 
   Future<void> _load({required bool reset, bool refresh = false}) async {
@@ -281,7 +260,6 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
 
   @override
   void dispose() {
-    _teamChanges?.cancel();
     _debounce?.cancel();
     _search.dispose();
     super.dispose();
@@ -379,41 +357,6 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
         appBar: SettingsAppBar(
           title: widget.pickingMessage ? '选择要发送的小程序' : '小程序',
           onBack: () => Navigator.pop(context),
-          actions: [
-            if (!widget.pickingMessage)
-              SettingsGlassAction(
-                label: _pendingRequests == 0
-                    ? '修改申请'
-                    : '修改申请，$_pendingRequests 条待处理',
-                icon: Icons.people_outline_rounded,
-                iconWidget: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    const SettingsIcon(type: SettingsIconType.permission),
-                    if (_pendingRequests > 0)
-                      Positioned(
-                        right: -3,
-                        top: -3,
-                        child: Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.error,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                onPressed: () => _detailSplitKey.currentState!.open(
-                  MaterialPageRoute(
-                    builder: (_) => MiniappRequestsPage(
-                      store: MiniappTeamStore(_store.database),
-                    ),
-                  ),
-                ),
-              ),
-          ],
         ),
         body: SettingsPageBody(
           child: SafeArea(

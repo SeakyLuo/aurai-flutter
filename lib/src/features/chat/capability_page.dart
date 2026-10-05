@@ -120,10 +120,11 @@ class _CapabilityPageState extends State<CapabilityPage>
   Future<void> _perform(Future<void> Function() action) async {
     try {
       await action();
-    } on Object {
+    } on Object catch (error) {
       if (mounted)
         _messenger.currentState!.showToast(
-          const SnackBar(content: Text('操作未完成，请稍后重试')),
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
         );
     }
   }

@@ -11,6 +11,12 @@ import 'ai_contact_page.dart';
 import 'chat_controller.dart';
 import 'conversation_rename_dialog.dart';
 import 'private_tasks_page.dart';
+import 'group_apps_section.dart';
+import 'group_favorites_page.dart';
+import 'tools_page.dart';
+import '../../skills/skills_page.dart';
+import '../../app/ui_action.dart';
+import 'group_pinned_message_entry.dart';
 import 'conversation_project_page.dart';
 import 'delete_confirmation_dialog.dart';
 import 'dialog_action_button.dart';
@@ -52,6 +58,17 @@ class _DirectConversationInfoPageState
   bool _failed = false;
   bool _busy = false;
   List<DevelopmentProject> _projects = const [];
+
+  Future<void> _openApp(Widget page) =>
+      Navigator.push<void>(context, MaterialPageRoute(builder: (_) => page));
+
+  Future<void> _openSkills() => runUiAction(context, () async {
+    final store = await widget.controller.aiSkills(
+      _conversation.defaultSenderId,
+    );
+    if (!mounted) return;
+    await _openApp(SkillsPage(store: store, controller: widget.controller));
+  }).then((_) {});
 
   @override
   void initState() {
@@ -170,6 +187,7 @@ class _DirectConversationInfoPageState
           conversationProjectChangedMessage(_projects, selection.projectId),
         ),
       ),
+      kind: ToastKind.success,
     );
   });
 
@@ -251,6 +269,36 @@ class _DirectConversationInfoPageState
                               type: SettingsIconType.chevron,
                             ),
                             onTap: _openProfile,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _surface(
+                          GroupAppsSection(
+                            title: '应用',
+                            onTasks: () => _openApp(
+                              PrivateTasksPage(
+                                controller: widget.controller,
+                                conversationId: _conversation.id,
+                                senderId: _conversation.defaultSenderId,
+                                originTaskId: widget.originTaskId,
+                              ),
+                            ),
+                            onMarks: () => _openApp(
+                              GroupFavoritesPage(
+                                controller: widget.controller,
+                                groupId: _conversation.id,
+                                groupTitle: _conversation.title,
+                                group: false,
+                              ),
+                            ),
+                            onTools: () => _openApp(
+                              ToolsPage(
+                                controller: widget.controller,
+                                senderId: _conversation.defaultSenderId,
+                                projectId: _conversation.projectId,
+                              ),
+                            ),
+                            onSkills: _openSkills,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -343,38 +391,28 @@ class _DirectConversationInfoPageState
                         ),
                         const SizedBox(height: 12),
                         _surface(
-                          _row(
-                            '查找聊天记录',
-                            () => Navigator.push<void>(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => GroupMessageSearchPage(
-                                  controller: widget.controller,
-                                  conversationId: _conversation.id,
-                                  group: false,
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _row(
+                                '查找聊天记录',
+                                () => Navigator.push<void>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => GroupMessageSearchPage(
+                                      controller: widget.controller,
+                                      conversationId: _conversation.id,
+                                      group: false,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _surface(
-                          _row(
-                            '任务清单',
-                            () => Navigator.push<void>(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => PrivateTasksPage(
-                                  controller: widget.controller,
-                                  conversationId: _conversation.id,
-                                  senderId: _conversation.defaultSenderId,
-                                  originTaskId: widget.originTaskId,
-                                ),
+                              GroupPinnedMessageEntry(
+                                controller: widget.controller,
+                                groupId: _conversation.id,
+                                embedded: true,
                               ),
-                            ),
-                            icon: const SettingsIcon(
-                              type: SettingsIconType.tasks,
-                            ),
+                            ],
                           ),
                         ),
                         if (!_conversation.isArchived &&

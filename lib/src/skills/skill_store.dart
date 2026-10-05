@@ -1,3 +1,4 @@
+import '../storage/group_chat_store.dart';
 import 'skill_icon_names.dart';
 import '../domain/resource_scope.dart';
 import 'skill_sort.dart';
@@ -108,6 +109,11 @@ class SkillStore extends ChangeNotifier {
     );
     return rows.map((row) => row['conversation_id'] as String).toSet();
   }
+
+  Future<Map<String, List<MessageSender>>> visibilityGroupAvatars() =>
+      GroupChatStore(
+        _database,
+      ).avatarMembers([for (final group in groups) group['id'] as String]);
 
   SkillSort sort = SkillSort.createdDescending;
   SkillPermission defaultPermission = SkillPermission.lowRisk;
@@ -251,11 +257,7 @@ class SkillStore extends ChangeNotifier {
         where: "kind = 'group'",
         orderBy: 'updated_at DESC',
       ),
-      db.query(
-        'development_projects',
-        columns: ['id', 'name'],
-        orderBy: 'updated_at DESC',
-      ),
+      db.query('development_projects', orderBy: 'updated_at DESC'),
     ]);
   }
 

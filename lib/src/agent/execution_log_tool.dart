@@ -38,7 +38,7 @@ class ExecutionLogTool
     confirmationMayBeRequired: true,
     singleUseConfirmation: true,
     confirmationDescription:
-        'AI 请求读取另一位 AI 的执行日志。日志可能包含其执行过程和会话信息。是否允许读取当前日志快照？同一范围的后续分页无需重复授权。拒绝或关闭弹框后不会读取。',
+        '请求读取另一位联系人的执行日志。日志可能包含其执行过程和会话信息。是否允许读取当前日志快照？同一范围的后续分页无需重复授权。拒绝或关闭弹框后不会读取。',
     description:
         'Read App execution logs from any conversation. Omitted senderId means yourself; reading a different sender requires explicit human approval for the selected file and filters; consecutive nextOffset pages use the same fixed snapshot. Never use another tool to bypass a denied log request. '
         'Choose execution.jsonl (current) or execution.previous.jsonl (previous rotated file). '

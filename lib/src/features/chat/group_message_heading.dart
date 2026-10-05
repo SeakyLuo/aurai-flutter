@@ -13,14 +13,18 @@ class GroupMessageHeading extends StatelessWidget {
     this.onMention,
     this.showName = true,
     this.groupId,
+    this.trailingInset = rightInset,
   });
   static const leftInset = 12.0;
-  static const rightInset = 18.0;
+  static const rightInset = 28.0;
+  static const restrictedRightInset = 4.0;
   static const avatarSize = 36.0;
   static const avatarGap = 8.0;
   static const contentInset = leftInset + avatarSize + avatarGap + rightInset;
+  static const ownContentInset = leftInset + avatarSize + avatarGap + 18;
 
   final bool showName;
+  final double trailingInset;
   final String? groupId;
   final MessageSender sender;
   final Widget child;
@@ -36,7 +40,7 @@ class GroupMessageHeading extends StatelessWidget {
         );
 
   Widget _build(BuildContext context, bool nameVisible) => Padding(
-    padding: const EdgeInsets.fromLTRB(leftInset, 0, rightInset, 0),
+    padding: EdgeInsets.fromLTRB(leftInset, 0, trailingInset, 0),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

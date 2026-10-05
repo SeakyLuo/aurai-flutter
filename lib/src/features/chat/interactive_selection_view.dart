@@ -130,25 +130,26 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
             config.options.length > 5 &&
             widget.submitted &&
             widget.self != null) ...[
-          Text(
-            '已回答',
-            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            widget.self!['label'] as String,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.5,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 12),
+          for (final (index, option) in config.options.indexed)
+            if (_saved.contains(option['id']))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: UserQuestionOptionTile(
+                  option: UserQuestionOption(
+                    content: option['label'] as String,
+                  ),
+                  number: index + 1,
+                  selected: true,
+                  multiple: config.multiple,
+                  onTap: null,
+                ),
+              ),
         ],
         if (widget.question && config.options.length > 5)
           QuestionOptionsField(
+            compact: widget.submitted || locked,
             label: widget.submitted || locked
-                ? '查看选项（${config.options.length} 项）'
+                ? '全部选项 · ${config.options.length}'
                 : _selected.isEmpty
                 ? '请选择（共 ${config.options.length} 项）'
                 : [

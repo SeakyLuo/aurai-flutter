@@ -612,7 +612,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       ]),
                       if (task['lastError'] != null)
                         TextButton(
-                          onPressed: () => _notice(task['lastError'] as String),
+                          onPressed: () => _notice(
+                            task['lastError'] as String,
+                            kind: ToastKind.error,
+                          ),
                           child: const Text('查看未完成原因'),
                         ),
                     ],

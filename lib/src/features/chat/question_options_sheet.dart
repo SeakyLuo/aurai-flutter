@@ -51,41 +51,86 @@ Future<Set<int>?> showQuestionOptionsSheet(
 }
 
 class QuestionOptionsField extends StatelessWidget {
-  const QuestionOptionsField({super.key, required this.label, this.onTap});
+  const QuestionOptionsField({
+    super.key,
+    required this.label,
+    this.onTap,
+    this.compact = false,
+  });
   final String label;
   final VoidCallback? onTap;
+  final bool compact;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .045),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(18),
-      side: BorderSide(
-        color: Theme.of(
-          context,
-        ).colorScheme.outlineVariant.withValues(alpha: .5),
-      ),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(fontSize: 15, height: 1.4),
+  Widget build(BuildContext context) {
+    if (compact) {
+      final color = Theme.of(context).colorScheme.onSurfaceVariant;
+      return Align(
+        alignment: Alignment.center,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      label,
+                      style: TextStyle(fontSize: 14, height: 1.4, color: color),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  SizedBox.square(
+                    dimension: 20,
+                    child: FittedBox(
+                      child: SettingsIcon(
+                        type: SettingsIconType.chevronDown,
+                        color: color,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 12),
-            const SettingsIcon(type: SettingsIconType.chevronDown),
-          ],
+          ),
+        ),
+      );
+    }
+    return Material(
+      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .045),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: Theme.of(
+            context,
+          ).colorScheme.outlineVariant.withValues(alpha: .5),
         ),
       ),
-    ),
-  );
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(fontSize: 15, height: 1.4),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const SettingsIcon(type: SettingsIconType.chevronDown),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _QuestionOptionsSheet extends StatefulWidget {
