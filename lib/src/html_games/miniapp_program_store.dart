@@ -347,6 +347,7 @@ class MiniappProgramStore {
       );
     }
     if (calls.pinMessage) change.pinActorId = actorId;
+    if (calls.markMessage) change.markActorId = actorId;
     final nicknames = calls.nicknames;
     await capabilities.members.setNicknames(
       txn,

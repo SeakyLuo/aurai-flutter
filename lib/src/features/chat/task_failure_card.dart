@@ -116,6 +116,26 @@ class TaskFailureCard extends StatelessWidget {
 
   Widget _errorContent(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final title = classifyModelFailure(error).title;
+    final lines = error.split('\n');
+    final heading = lines.first;
+    final headingTitle = ModelFailure.values
+        .map((failure) => failure.title)
+        .where(
+          (value) =>
+              heading == value ||
+              heading.startsWith('$value（HTTP ') ||
+              heading.startsWith('$value (HTTP '),
+        )
+        .firstOrNull;
+    final body = headingTitle == null
+        ? error
+        : heading == headingTitle
+        ? lines.skip(1).join('\n')
+        : [
+            heading.substring(headingTitle.length).trim(),
+            ...lines.skip(1),
+          ].join('\n');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -125,7 +145,7 @@ class TaskFailureCard extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                classifyModelFailure(error).title,
+                title,
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -170,59 +190,60 @@ class TaskFailureCard extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final style = DefaultTextStyle.of(context).style.merge(
-                TextStyle(
-                  fontSize: 14,
-                  height: 1.45,
-                  color: colors.onSurfaceVariant,
-                ),
-              );
-              final painter = TextPainter(
-                text: TextSpan(text: error, style: style),
-                textDirection: Directionality.of(context),
-                textScaler: MediaQuery.textScalerOf(context),
-                locale: Localizations.localeOf(context),
-                maxLines: 4,
-                ellipsis: '…',
-              )..layout(maxWidth: constraints.maxWidth);
-              final overflow = painter.didExceedMaxLines;
-              painter.dispose();
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    error,
-                    style: style,
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
+        if (body.isNotEmpty) const SizedBox(height: 4),
+        if (body.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final style = DefaultTextStyle.of(context).style.merge(
+                  TextStyle(
+                    fontSize: 14,
+                    height: 1.45,
+                    color: colors.onSurfaceVariant,
                   ),
-                  if (overflow) ...[
-                    const SizedBox(height: 12),
-                    InteractiveMessageButton(
-                      button: const {
-                        'label': '查看详情',
-                        'icon': 'none',
-                        'showArrow': true,
-                      },
-                      busy: false,
-                      locked: false,
-                      onPressed: () => showNoticeDetailsSheet(
-                        context,
-                        text: TextSpan(text: error),
-                        style: style,
-                      ),
+                );
+                final painter = TextPainter(
+                  text: TextSpan(text: body, style: style),
+                  textDirection: Directionality.of(context),
+                  textScaler: MediaQuery.textScalerOf(context),
+                  locale: Localizations.localeOf(context),
+                  maxLines: 4,
+                  ellipsis: '…',
+                )..layout(maxWidth: constraints.maxWidth);
+                final overflow = painter.didExceedMaxLines;
+                painter.dispose();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      body,
+                      style: style,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
                     ),
+                    if (overflow) ...[
+                      const SizedBox(height: 12),
+                      InteractiveMessageButton(
+                        button: const {
+                          'label': '查看详情',
+                          'icon': 'none',
+                          'showArrow': false,
+                        },
+                        busy: false,
+                        locked: false,
+                        onPressed: () => showNoticeDetailsSheet(
+                          context,
+                          text: TextSpan(text: error),
+                          style: style,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
-              );
-            },
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }

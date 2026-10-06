@@ -57,6 +57,56 @@ extension MiniappTemplateSending on ChatController {
     }
   }
 
+  Future<void> _updateBundledWerewolf() async {
+    final library = MiniappLibraryStore(_store.database);
+    final entry = (await library.bundled()).singleWhere(
+      (entry) => entry.id == 'builtin.werewolf',
+    );
+    if (entry.installedId != null &&
+        entry.installedRevision != entry.bundleVersion) {
+      await library.installBundled(entry);
+    }
+  }
+
+  Future<void> startNextWerewolf(
+    String conversationId,
+    String messageId,
+  ) async {
+    await _enqueueForward(() async {
+      final previous = await htmlStore.load(conversationId, messageId);
+      if (previous.appId != 'builtin.werewolf' ||
+          previous.state['winner'] == null) {
+        throw StateError('请在本局结束后开始下一局');
+      }
+      if (previous.state['phase'] == 'postgameDiscussion') {
+        await htmlStore.submitInteraction(conversationId, messageId, {
+          'eventId': newMessageId(),
+          'action': 'stop',
+          'data': null,
+          'notifyAi': false,
+        });
+      }
+      final entry = await MiniappLibraryStore(
+        _store.database,
+      ).entryForApp(previous.appId!);
+      final template = await MiniappTemplate.load(_store.database, entry);
+      await _sendMiniappTemplate(
+        conversationId,
+        template,
+        '',
+        initialConfiguration: {
+          'hostId': previous.state['hostId'],
+          'players': (previous.state['players'] as List)
+              .map((p) => (p as Map)['id'])
+              .toList(),
+          'roles': previous.state['roles'],
+          'rules': previous.state['rules'],
+          'assignments': <String, Object?>{},
+        },
+      );
+    });
+  }
+
   Future<void> sendMiniappTemplate(
     String? targetId,
     MiniappTemplate template,
@@ -71,6 +121,7 @@ extension MiniappTemplateSending on ChatController {
     String note, {
     Map<String, Object?>? fixedResult,
     String? fixedHtml,
+    Map<String, Object?>? initialConfiguration,
   }) async {
     // The recipient picker selects an existing conversation.
     final target = await _forwardTarget(targetId!);
@@ -126,6 +177,14 @@ extension MiniappTemplateSending on ChatController {
         'turnSenderId': null,
       },
     );
+    if (initialConfiguration != null) {
+      await htmlStore.submitInteraction(target.id, message.id, {
+        'eventId': newMessageId(),
+        'action': 'configure',
+        'data': initialConfiguration,
+        'notifyAi': false,
+      });
+    }
     await _inConversation(target, () async {
       if (target.kind == ConversationKind.direct) {
         target.pendingGoal = message.text;

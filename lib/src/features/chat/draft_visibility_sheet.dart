@@ -116,7 +116,7 @@ class _DraftVisibilitySheetState extends State<DraftVisibilitySheet> {
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(
                     20,
-                    4,
+                    68,
                     20,
                     FloatingSearchLayout.clearance,
                   ),
@@ -124,9 +124,6 @@ class _DraftVisibilitySheetState extends State<DraftVisibilitySheet> {
                     slivers: [
                       SliverList.list(
                         children: [
-                          const SizedBox(height: 12),
-
-                          const SizedBox(height: 8),
                           for (final member in widget.members.where(
                             (m) => m.name.toLowerCase().contains(_search),
                           ))

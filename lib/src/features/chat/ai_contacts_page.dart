@@ -100,13 +100,6 @@ class _AiContactsPageState extends State<AiContactsPage> {
 
   Future<void> _contactsChanged() async {
     final ai = widget.controller.contactsChanged.value!;
-    final index = _items.indexWhere((item) => item.sender.id == ai.sender.id);
-    if (index >= 0 &&
-        _items[index].sender.name == ai.sender.name &&
-        _items[index].sender.archived == ai.sender.archived) {
-      setState(() => _items[index] = ai);
-      return;
-    }
     final generation = _generation;
     final query = _search.text.trim();
     try {
@@ -121,7 +114,10 @@ class _AiContactsPageState extends State<AiContactsPage> {
       if (!mounted || generation != _generation) return;
       setState(() {
         final boundary = _more && _items.isNotEmpty
-            ? ContactNameOrder(_items.last.sender.id, _items.last.sender.name)
+            ? ContactNameOrder(
+                _items.last.sender.id,
+                _items.last.sender.displayName,
+              )
             : null;
         _items.removeWhere((item) => item.sender.id == ai.sender.id);
         _items.addAll(
@@ -130,7 +126,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
                 boundary == null ||
                 ContactNameOrder(
                       item.sender.id,
-                      item.sender.name,
+                      item.sender.displayName,
                     ).compareTo(boundary) <=
                     0,
           ),
@@ -138,8 +134,8 @@ class _AiContactsPageState extends State<AiContactsPage> {
         _items.sort(
           (a, b) => ContactNameOrder(
             a.sender.id,
-            a.sender.name,
-          ).compareTo(ContactNameOrder(b.sender.id, b.sender.name)),
+            a.sender.displayName,
+          ).compareTo(ContactNameOrder(b.sender.id, b.sender.displayName)),
         );
         _count = count;
         _more = _items.length < count;
@@ -527,11 +523,11 @@ class _AiContactsPageState extends State<AiContactsPage> {
                                   color: ai.sender.avatarColor,
                                   path: ai.sender.avatarPath,
                                 ),
-                                name: ai.sender.name,
+                                name: ai.sender.displayName,
                                 size: 44,
                               ),
                               title: Text(
-                                ai.sender.name,
+                                ai.sender.displayName,
                                 style: const TextStyle(fontSize: 16),
                               ),
                               subtitle: ai.description.isEmpty

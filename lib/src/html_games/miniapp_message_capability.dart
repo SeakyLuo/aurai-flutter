@@ -45,11 +45,13 @@ class MiniappMessageCapability {
         throw ArgumentError('小程序发送的消息不能为空');
       }
       final wakeAi = effect['wakeAi'] == true;
-      if (wakeAi && audience == null) throw ArgumentError('触发 AI 回复需要明确接收人');
       final wakeMemberIds = (effect['wakeMemberIds'] as List?)?.cast<String>();
+      if (wakeAi && audience == null && wakeMemberIds == null)
+        throw ArgumentError('触发 AI 回复需要明确唤醒成员');
       if (wakeMemberIds != null &&
           wakeMemberIds.any(
-            (id) => !agents.contains(id) || !(audience ?? []).contains(id),
+            (id) =>
+                !agents.contains(id) || !(audience ?? memberIds).contains(id),
           )) {
         throw ArgumentError('唤醒成员必须是消息可见范围内的 AI');
       }
@@ -70,7 +72,7 @@ class MiniappMessageCapability {
                 'visibility': 'private',
                 'summaryVisibility': 'private',
                 ...?definition['participation'] as Map?,
-                if (audience != null) 'audience': audience,
+                'audience': audience,
                 '_programMessage': messageId,
                 if (wakeAi) '_programWake': true,
                 if (wakeMemberIds != null) '_programWakeMembers': wakeMemberIds,
@@ -79,14 +81,16 @@ class MiniappMessageCapability {
             });
       card?.validateTransport(html: false);
       if (card != null) {
-        if (effect['event'] is! String || audience == null)
-          throw ArgumentError('行动卡需要事件和明确的接收人');
+        if (effect['event'] is! String) throw ArgumentError('行动卡需要事件');
         if (card.buttons.any((b) => b['notifyAi'] == true))
           throw ArgumentError('行动卡回调由小程序处理');
         if ((card.participation['callbackEvents'] as List?)?.isNotEmpty == true)
           throw ArgumentError('行动卡回调由小程序处理');
         final eligible = card.interaction['actors'] as List?;
-        if (eligible != null && eligible.any((id) => !audience.contains(id)))
+        if (eligible == null && audience == null)
+          throw ArgumentError('公开行动卡需要明确参与者');
+        if (eligible != null &&
+            eligible.any((id) => !(audience ?? memberIds).contains(id)))
           throw ArgumentError('行动卡参与者必须在消息可见范围内');
         bindings[id] = {
           'key': effect['key'],

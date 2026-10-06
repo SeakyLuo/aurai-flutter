@@ -195,7 +195,10 @@ class _GroupChatPageState extends State<GroupChatPage> {
                               leading: ConversationUnreadAvatar(
                                 controller: widget.controller,
                                 conversation: item,
-                                child: GroupAvatar(members: _avatars[item.id]!),
+                                child: GroupAvatar(
+                                  groupId: item.id,
+                                  members: _avatars[item.id]!,
+                                ),
                               ),
                               title: Text(
                                 item.title,

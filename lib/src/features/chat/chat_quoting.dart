@@ -54,21 +54,6 @@ extension _ChatQuoting on _ChatPageState {
     }
   }
 
-  Future<void> _openQuotedMessage(String id) async {
-    final controller = widget.controller;
-    final conversation = controller.activeConversation;
-    try {
-      if (!await controller.locateSearchMessage(id)) return;
-      if (!mounted || !identical(conversation, controller.activeConversation))
-        return;
-      _focusNode.unfocus();
-      _positionSearchResult(id);
-    } on Object catch (caughtError) {
-      if (mounted)
-        _imageNotice(
-          '原消息已不存在：${errorMessage(caughtError)}',
-          kind: ToastKind.error,
-        );
-    }
-  }
+  Future<void> _openQuotedMessage(String id) =>
+      _pinSplitKey.currentState!.open(id, pinned: false);
 }

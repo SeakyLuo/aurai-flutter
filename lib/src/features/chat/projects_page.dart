@@ -285,14 +285,18 @@ class _ProjectPageState extends State<ProjectPage> {
         controller: widget.controller,
         conversation: item,
         avatar: group
-            ? GroupAvatar(members: _groups[item.id]!, size: 48)
+            ? GroupAvatar(
+                groupId: item.id,
+                members: _groups[item.id]!,
+                size: 48,
+              )
             : ProfileAvatar(
                 style: AvatarStyle(
                   icon: sender!.avatarIcon,
                   color: sender.avatarColor,
                   path: sender.avatarPath,
                 ),
-                name: sender.name,
+                name: sender.displayName,
                 size: 48,
               ),
         onTap: () {
@@ -358,7 +362,7 @@ class _ProjectPageState extends State<ProjectPage> {
           color: _recipient!.sender.avatarColor,
           path: _recipient!.sender.avatarPath,
         ),
-        name: _recipient!.sender.name,
+        name: _recipient!.sender.displayName,
         size: 24,
       ),
     );
@@ -602,7 +606,7 @@ class _ProjectPageState extends State<ProjectPage> {
             focusNode: _focusNode,
             hintText: _recipient == null
                 ? '正在准备会话'
-                : '给 ${_recipient!.sender.name} 发消息',
+                : '给 ${_recipient!.sender.displayName} 发消息',
             enabled: true,
             draftEnabled: !_opening && _recipient != null,
             canSend:

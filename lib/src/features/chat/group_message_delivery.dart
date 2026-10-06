@@ -264,7 +264,7 @@ extension GroupMessageDelivery on ChatController {
           : 'active',
       if (participation == 'paused')
         'participationReason': arguments['participationReason'],
-      'instruction': '消息已发送，不要重复发送。当前意思表达完整就可以结束，无需主动寻找下一处补充。',
+      'instruction': '消息已发送，不要重复发送。',
     };
   }
 

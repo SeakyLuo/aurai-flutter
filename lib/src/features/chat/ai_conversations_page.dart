@@ -221,7 +221,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
-      title: widget.profile.sender.name,
+      title: widget.profile.sender.displayName,
       onBack: () => Navigator.pop(context),
       titleWidget: InkWell(
         onTap: () => Navigator.push<void>(
@@ -233,7 +233,7 @@ class _AiConversationsPageState extends State<AiConversationsPage>
             ),
           ),
         ),
-        child: Text(widget.profile.sender.name),
+        child: Text(widget.profile.sender.displayName),
       ),
     ),
     body: _items.isEmpty

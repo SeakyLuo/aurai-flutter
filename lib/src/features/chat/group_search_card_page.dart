@@ -95,7 +95,7 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
               padding: settingsPagePadding(context, const EdgeInsets.all(20)),
               children: [
                 Text(
-                  widget.result.sender.name,
+                  widget.result.sender.displayName,
                   style: TextStyle(
                     fontSize: 13,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,

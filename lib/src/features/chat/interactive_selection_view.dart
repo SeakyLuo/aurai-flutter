@@ -6,6 +6,9 @@ import 'interactive_message_button.dart';
 import '../../agent/ask_user_tool.dart';
 import 'user_question_option_tile.dart';
 import 'question_options_sheet.dart';
+import '../../utils/widget_utils.dart';
+import 'settings_icon.dart';
+import 'vote_selection_hint.dart';
 
 class InteractiveSelectionView extends StatefulWidget {
   const InteractiveSelectionView({
@@ -19,12 +22,21 @@ class InteractiveSelectionView extends StatefulWidget {
     required this.onSubmit,
     this.showSubmit = true,
     this.question = false,
+    required this.compactOptions,
+    required this.title,
+    required this.body,
+    this.sheetActions,
+    this.summary,
   });
   final Map<String, Object?> button;
   final Map? self;
   final bool locked, submitted, allowChange, busy;
   final bool showSubmit;
   final bool question;
+  final bool compactOptions;
+  final String title, body;
+  final Widget? sheetActions;
+  final String? summary;
   final ValueChanged<Object> onSubmit;
 
   @override
@@ -51,10 +63,16 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
             jsonEncode(widget.button['selection']) ||
         jsonEncode(oldWidget.self) != jsonEncode(widget.self)) {
       _selected = _saved;
-      _closePicker();
     }
-    if (!oldWidget.locked && widget.locked || !oldWidget.busy && widget.busy)
-      _closePicker();
+    if (_pickerClosed != null &&
+        (jsonEncode(oldWidget.button['selection']) !=
+                jsonEncode(widget.button['selection']) ||
+            oldWidget.locked != widget.locked ||
+            oldWidget.submitted != widget.submitted)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _closePicker();
+      });
+    }
   }
 
   bool get _locked =>
@@ -76,243 +94,208 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
 
   Future<void> _chooseOptions() async {
     if (_pickerClosed != null) return;
-    final config = selection;
     final closed = Completer<void>();
     _pickerClosed = closed;
-    final result = await showQuestionOptionsSheet(
+    final config = selection;
+    final selected = await showQuestionOptionsSheet(
       context,
       options: [
         for (final option in config.options)
           UserQuestionOption(content: option['label'] as String),
       ],
       selected: {
-        for (final (i, option) in config.options.indexed)
-          if (_selected.contains(option['id'])) i,
+        for (final (index, option) in config.options.indexed)
+          if (_selected.contains(option['id'])) index,
       },
       multiple: config.multiple,
-      readOnly: _locked,
+      vote: !widget.question,
       minimum: config.minimum,
       maximum: config.maximum,
+      readOnly:
+          widget.question && widget.submitted || _locked || !widget.showSubmit,
       closeWhen: closed.future,
+      actions: widget.sheetActions,
+      title: widget.title,
+      body: widget.body,
     );
-    if (!identical(_pickerClosed, closed)) return;
-    _closePicker();
-    if (!mounted || result == null || _locked) return;
-    setState(
-      () => _selected = {
-        for (final i in result) config.options[i]['id'] as String,
-      },
+    if (!mounted || selected == null || _locked || !widget.showSubmit) {
+      if (identical(_pickerClosed, closed)) _closePicker();
+      return;
+    }
+    setState(() {
+      _selected = {
+        for (final index in selected) config.options[index]['id'] as String,
+      };
+    });
+    widget.onSubmit(
+      config.multiple
+          ? [
+              for (final option in config.options)
+                if (_selected.contains(option['id'])) option['id'],
+            ]
+          : _selected.single,
     );
+    if (identical(_pickerClosed, closed)) _closePicker();
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => _buildContent(context);
+
+  Widget _buildContent(BuildContext context) {
     final config = selection;
     final colors = Theme.of(context).colorScheme;
     final locked = _locked;
+    final answeredQuestion = widget.question && widget.submitted;
+    final truncated =
+        !answeredQuestion && widget.compactOptions && config.options.length > 5;
     final valid =
         _selected.length >= config.minimum &&
         _selected.length <= config.maximum;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (config.multiple && widget.showSubmit)
+        if (!answeredQuestion &&
+            widget.showSubmit &&
+            (!widget.question ||
+                config.multiple ||
+                widget.summary?.isNotEmpty == true))
           Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              config.minimum == config.maximum
-                  ? '请选择 ${config.minimum} 项'
-                  : '请选择 ${config.minimum}–${config.maximum} 项',
-              style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
-            ),
+            padding: const EdgeInsets.only(bottom: 12),
+            child: !widget.question
+                ? VoteSelectionHint(
+                    minimum: config.minimum,
+                    maximum: config.maximum,
+                    selectedCount: _selected.length,
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          [
+                            if (config.multiple)
+                              config.minimum == config.maximum
+                                  ? '请选择 ${config.minimum} 项'
+                                  : !widget.question && config.minimum == 1
+                                  ? '最多选 ${config.maximum} 项'
+                                  : '请选择 ${config.minimum}–${config.maximum} 项',
+                            if (widget.summary?.isNotEmpty == true)
+                              widget.summary!,
+                          ].join(' · '),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
           ),
-        if (widget.question &&
-            config.options.length > 5 &&
-            widget.submitted &&
-            widget.self != null) ...[
-          for (final (index, option) in config.options.indexed)
-            if (_saved.contains(option['id']))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+        for (final (index, option)
+            in config.options
+                .take(truncated ? 4 : config.options.length)
+                .indexed
+                .where(
+                  (entry) =>
+                      !answeredQuestion || _selected.contains(entry.$2['id']),
+                ))
+          Builder(
+            builder: (context) {
+              final id = option['id'] as String;
+              final selected = _selected.contains(id);
+              final enabled =
+                  widget.showSubmit &&
+                  !locked &&
+                  (!config.multiple ||
+                      selected ||
+                      _selected.length < config.maximum);
+              void toggle() => setState(() {
+                if (!config.multiple) {
+                  _selected = {id};
+                } else if (selected) {
+                  _selected.remove(id);
+                } else {
+                  _selected.add(id);
+                }
+              });
+              void choose() {
+                toggle();
+                if (widget.question && !config.multiple) widget.onSubmit(id);
+              }
+
+              return Padding(
+                padding: EdgeInsets.only(bottom: answeredQuestion ? 0 : 8),
                 child: UserQuestionOptionTile(
                   option: UserQuestionOption(
                     content: option['label'] as String,
                   ),
                   number: index + 1,
-                  selected: true,
                   multiple: config.multiple,
-                  onTap: null,
+                  vote: !widget.question,
+                  selected: selected,
+                  onTap: answeredQuestion
+                      ? null
+                      : enabled
+                      ? choose
+                      : null,
                 ),
-              ),
-        ],
-        if (widget.question && config.options.length > 5)
-          QuestionOptionsField(
-            compact: widget.submitted || locked,
-            label: widget.submitted || locked
-                ? '全部选项 · ${config.options.length}'
-                : _selected.isEmpty
-                ? '请选择（共 ${config.options.length} 项）'
-                : [
-                    for (final option in config.options)
-                      if (_selected.contains(option['id']))
-                        option['label'] as String,
-                  ].join('、'),
-            onTap: widget.busy ? null : _chooseOptions,
-          )
-        else
-          for (final (index, option) in config.options.indexed)
-            Builder(
-              builder: (context) {
-                final id = option['id'] as String;
-                final selected = _selected.contains(id);
-                final enabled =
-                    !locked &&
-                    (!config.multiple ||
-                        selected ||
-                        _selected.length < config.maximum);
-                void toggle() => setState(() {
-                  if (!config.multiple) {
-                    _selected = {id};
-                  } else if (selected) {
-                    _selected.remove(id);
-                  } else {
-                    _selected.add(id);
-                  }
-                });
-                if (widget.question)
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: UserQuestionOptionTile(
-                      option: UserQuestionOption(
-                        content: option['label'] as String,
-                      ),
-                      number: index + 1,
-                      multiple: config.multiple,
-                      selected: selected,
-                      onTap: enabled ? toggle : null,
-                    ),
-                  );
-                return Semantics(
-                  checked: selected,
-                  inMutuallyExclusiveGroup: !config.multiple,
-                  enabled: enabled,
-                  label: option['label'] as String,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: enabled ? toggle : null,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(top: 1),
-                            child: CustomPaint(
-                              size: const Size.square(22),
-                              painter: _ChoicePainter(
-                                multiple: config.multiple,
-                                selected: selected,
-                                color: selected
-                                    ? Color.lerp(
-                                        colors.primary,
-                                        colors.onSurface,
-                                        .35,
-                                      )!
-                                    : colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              option['label'] as String,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: selected
-                                    ? FontWeight.w500
-                                    : FontWeight.w400,
-                                height: 1.5,
-                                color: enabled || selected
-                                    ? colors.onSurface
-                                    : colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-        if (widget.showSubmit) ...[
-          const SizedBox(height: 8),
-          InteractiveMessageButton(
-            button: {
-              ...widget.button,
-              if (widget.submitted && !widget.allowChange)
-                'label':
-                    widget.button['completedLabel'] ?? widget.button['label'],
+              );
             },
-            busy: widget.busy,
-            locked: locked || !valid,
-            onPressed: () => widget.onSubmit(
-              config.multiple
-                  ? [
-                      for (final option in config.options)
-                        if (_selected.contains(option['id'])) option['id'],
-                    ]
-                  : _selected.single,
+          ),
+        if (truncated)
+          QuestionOptionsField(
+            label: '查看全部选项',
+            compact: true,
+            arrow: SettingsIconType.chevron,
+            onTap: _chooseOptions,
+          ),
+        if (truncated &&
+            config.options
+                .skip(4)
+                .any((option) => _selected.contains(option['id'])))
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              '已选：${config.options.where((option) => _selected.contains(option['id'])).map((option) => option['label']).join('、')}',
+              style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
             ),
           ),
+        if (!answeredQuestion &&
+            widget.showSubmit &&
+            (!widget.question || config.multiple)) ...[
+          const SizedBox(height: 8),
+          if (!widget.question)
+            WidgetUtils.primaryButton(
+              text: '提交投票',
+              loading: widget.busy,
+              onPressed: locked || !valid
+                  ? null
+                  : () => widget.onSubmit(
+                      config.multiple
+                          ? [
+                              for (final option in config.options)
+                                if (_selected.contains(option['id']))
+                                  option['id'],
+                            ]
+                          : _selected.single,
+                    ),
+            )
+          else
+            InteractiveMessageButton(
+              button: {
+                ...widget.button,
+                if (widget.submitted && !widget.allowChange)
+                  'label':
+                      widget.button['completedLabel'] ?? widget.button['label'],
+              },
+              busy: widget.busy,
+              locked: locked || !valid,
+              onPressed: () => widget.onSubmit([
+                for (final option in config.options)
+                  if (_selected.contains(option['id'])) option['id'],
+              ]),
+            ),
         ],
       ],
     );
   }
-}
-
-class _ChoicePainter extends CustomPainter {
-  const _ChoicePainter({
-    required this.multiple,
-    required this.selected,
-    required this.color,
-  });
-  final bool multiple, selected;
-  final Color color;
-  @override
-  void paint(Canvas canvas, Size size) {
-    final pen = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.65
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    if (multiple) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          const Rect.fromLTWH(2, 2, 18, 18),
-          const Radius.circular(4),
-        ),
-        pen,
-      );
-      if (selected)
-        canvas.drawPath(
-          Path()
-            ..moveTo(6, 11)
-            ..lineTo(9.5, 14.5)
-            ..lineTo(16, 7.5),
-          pen,
-        );
-    } else {
-      canvas.drawCircle(const Offset(11, 11), 9, pen);
-      if (selected)
-        canvas.drawCircle(const Offset(11, 11), 5.5, Paint()..color = color);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_ChoicePainter old) =>
-      old.multiple != multiple ||
-      old.selected != selected ||
-      old.color != color;
 }

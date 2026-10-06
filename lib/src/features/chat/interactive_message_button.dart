@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import '../../app/global_ui.dart';
 import 'settings_icon.dart';
 import 'conversation_menu_icon.dart';
+import 'copy_icon.dart';
+import 'sidebar_action_icon.dart';
+import 'attachment_action_icon.dart';
+import 'conversation_icon.dart';
+import '../../skills/extra_skill_icon.dart';
 
 class InteractiveMessageButton extends StatelessWidget {
   const InteractiveMessageButton({
@@ -47,14 +52,8 @@ class InteractiveMessageButton extends StatelessWidget {
         : variant == 'info'
         ? (dark ? const Color(0xff342c46) : const Color(0xffeee8fa))
         : tone.withValues(alpha: dark ? .13 : .07);
-    final icon =
-        button['icon'] as String? ??
-        switch (button['action']) {
-          'openUrl' => 'open',
-          'openConversation' => 'open',
-          'acknowledge' => 'check',
-          _ => 'info',
-        };
+    final icon = button['icon'] as String? ?? 'none';
+    final hasIcon = icon != 'none';
     final storedLabel = button['label'] as String;
     final label =
         disabled &&
@@ -88,6 +87,9 @@ class InteractiveMessageButton extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
               child: Row(
+                mainAxisAlignment: hasIcon
+                    ? MainAxisAlignment.start
+                    : MainAxisAlignment.center,
                 children: [
                   if (busy) ...[
                     SizedBox.square(
@@ -98,16 +100,18 @@ class InteractiveMessageButton extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 10),
-                  ] else if (icon != 'none') ...[
+                  ] else if (hasIcon) ...[
                     SizedBox.square(
                       dimension: 18,
                       child: FittedBox(child: _icon(icon, foreground)),
                     ),
                     const SizedBox(width: 10),
                   ],
-                  Expanded(
+                  Flexible(
+                    fit: hasIcon ? FlexFit.tight : FlexFit.loose,
                     child: Text(
                       label,
+                      textAlign: hasIcon ? TextAlign.start : TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -138,6 +142,28 @@ class InteractiveMessageButton extends StatelessWidget {
   }
 
   Widget _icon(String name, Color color) => switch (name) {
+    'copy' => CopyIcon(color: color),
+    'edit' => ConversationMenuIcon(
+      type: ConversationMenuIconType.rename,
+      color: color,
+    ),
+    'search' => SidebarActionIcon(
+      type: SidebarActionIconType.search,
+      color: color,
+    ),
+    'download' => AttachmentActionIcon(
+      type: AttachmentActionIconType.download,
+      color: color,
+    ),
+    'share' => AttachmentActionIcon(
+      type: AttachmentActionIconType.forward,
+      color: color,
+    ),
+    'task' => SettingsIcon(type: SettingsIconType.taskList, color: color),
+    'calendar' => ExtraSkillIcon('calendar', color: color),
+    'message' => ConversationIcon(color: color),
+    'sound' => SettingsIcon(type: SettingsIconType.sound, color: color),
+    'tools' => SettingsIcon(type: SettingsIconType.tools, color: color),
     'statistics' => SettingsIcon(type: SettingsIconType.data, color: color),
     'delete' => ConversationMenuIcon(
       type: ConversationMenuIconType.delete,

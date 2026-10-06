@@ -99,6 +99,7 @@ import '../../domain/interactive_message.dart';
 import '../../domain/interactive_tool_view.dart';
 import '../../storage/interactive_completion.dart';
 import '../../storage/interactive_message_store.dart';
+import '../../storage/interactive_vote_withdrawal.dart';
 import '../../agent/interactive_message_tool.dart';
 import '../../agent/history_message_tools.dart';
 import '../../storage/group_sleep_store.dart';
@@ -408,6 +409,7 @@ class ChatController extends ChangeNotifier {
     _callbackChanges?.cancel();
     _programChanges?.cancel();
     MiniappProgramChange.compactContext = null;
+    HtmlGameSignals.startNextSession = null;
     _programTimer?.cancel();
     _callbackCardChanges?.cancel();
     removeListener(_drainMessageCallbacks);
@@ -474,6 +476,8 @@ class ChatController extends ChangeNotifier {
     );
     modelSettings = await _platform.loadModelSettings();
     await ToolCustomizations.initialize(_store.database);
+    await _updateBundledWerewolf();
+    HtmlGameSignals.startNextSession = startNextWerewolf;
     await _loadPendingMessageQueues();
     await _loadImageGeneration();
     await _migrateMusicGeneration();

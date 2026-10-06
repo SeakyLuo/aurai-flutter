@@ -1,6 +1,46 @@
 part of 'chat_controller.dart';
 
 extension GroupSleepRecovery on ChatController {
+  Future<void> wakeAndProcessGroupMember(
+    String groupId,
+    String senderId,
+  ) async {
+    await groupStore.requireManager(
+      _store.database,
+      groupId,
+      MessageSender.localUser.id,
+    );
+    final members = await groupStore.members(groupId);
+    final member = members.where((m) => m.sender.id == senderId).firstOrNull;
+    if (member == null || member.sender.kind != MessageSenderKind.agent) {
+      throw StateError('只能唤醒当前群聊中的 AI 成员');
+    }
+    if (member.isMuted) throw StateError('该成员已被禁言，不能唤醒');
+    await resumeGroupAutoReply(groupId, senderId);
+    final state = _executions.sessions[groupId];
+    if (state?.groupRuns[senderId]?.executionWatch?.isRunning == true) return;
+    final dispatcher = state?.groupDispatcher;
+    if (dispatcher != null && !dispatcher.closed && !dispatcher.stopped) {
+      dispatcher.hold();
+      try {
+        await _groupSleeps.remove(groupId, senderId);
+        if (state?.groupRuns[senderId]?.executionWatch?.isRunning == true)
+          return;
+        if (dispatcher.closed || dispatcher.stopped) {
+          await _groupSleeps.save(groupId, senderId, DateTime.now());
+        } else {
+          dispatcher.receiveTargeted(const [], {senderId});
+        }
+      } finally {
+        dispatcher.release();
+      }
+    } else {
+      await _groupSleeps.save(groupId, senderId, DateTime.now());
+    }
+    groupActivityChanges.value++;
+    notifyListeners();
+  }
+
   Future<void> manageGroupMemberSleep(
     String groupId,
     String senderId, {

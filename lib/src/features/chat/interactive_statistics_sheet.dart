@@ -133,6 +133,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
         throw StateError('该参与者的记录已不可查看');
       }
       final refreshHistory =
+          card.showHistory &&
           actor != null &&
           card.participants.containsKey(actor) &&
           (_card == null ||
@@ -252,13 +253,14 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
         ? '参与详情'
         : _option != null
         ? '参与者（${_optionParticipants(card!).length}）'
-        : '参与情况';
+        : '投票详情';
     return PopScope(
       canPop: _atOverview || actor != null,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) _back();
       },
-      child: SizedBox(
+      child: Container(
+        color: Theme.of(context).colorScheme.surface,
         height: MediaQuery.sizeOf(context).height * .8,
         child: SafeArea(
           top: false,
@@ -359,7 +361,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
     final people = _optionParticipants(card);
     return ListView(
       key: PageStorageKey(('option', option)),
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
       children: [
         Text(
           '选项：${option.$2}',
@@ -388,7 +390,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
     );
     return ListView(
       key: PageStorageKey(('participant', actor)),
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
       children: [
         const SizedBox(height: 12),
         Row(
@@ -453,34 +455,36 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
           const SizedBox(height: 8),
           Text(reason, style: const TextStyle(fontSize: 15, height: 1.5)),
         ],
-        const Divider(height: 32),
-        const Text(
-          '操作记录',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        for (final event in _history)
-          InteractiveHistoryTile(
-            key: ValueKey(event['sequence']),
-            database: widget.database,
-            messageId: widget.messageId,
-            actorId: actor,
-            event: event,
+        if (card.showHistory) ...[
+          const Divider(height: 32),
+          const Text(
+            '操作记录',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
           ),
-        if (_historyLoading)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: CircularProgressIndicator(strokeWidth: 2),
+          const SizedBox(height: 8),
+          for (final event in _history)
+            InteractiveHistoryTile(
+              key: ValueKey(event['sequence']),
+              database: widget.database,
+              messageId: widget.messageId,
+              actorId: actor,
+              event: event,
             ),
-          ),
-        if (_hasMore && !_historyLoading)
-          TextButton(onPressed: _loadHistory, child: const Text('查看更早记录')),
-        if (_history.isEmpty && !_historyLoading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Text('暂无操作记录'),
-          ),
+          if (_historyLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          if (_hasMore && !_historyLoading)
+            TextButton(onPressed: _loadHistory, child: const Text('查看更早记录')),
+          if (_history.isEmpty && !_historyLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Text('暂无操作记录'),
+            ),
+        ],
       ],
     );
   }

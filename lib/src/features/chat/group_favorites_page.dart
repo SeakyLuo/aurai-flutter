@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../app/ui_action.dart';
+import '../../app/glass_notice.dart';
 import '../../app/global_ui.dart';
 import '../../domain/message_sender.dart';
 import 'ai_contact_page.dart';
@@ -230,14 +231,22 @@ class _GroupFavoritesPageState extends State<GroupFavoritesPage> {
                               sourceLabel: _markerLabel(message.id),
                               controller: widget.controller,
                               onLocate: () => _open(message),
-                              onRemove: () async => runUiAction(
-                                context,
-                                () => _store.favorite(
-                                  widget.groupId,
-                                  message.id,
-                                  false,
-                                ),
-                              ),
+                              onRemove: () async {
+                                final success = await runUiAction(
+                                  context,
+                                  () => _store.favorite(
+                                    widget.groupId,
+                                    message.id,
+                                    false,
+                                  ),
+                                );
+                                if (success && context.mounted) {
+                                  ScaffoldMessenger.of(context).showToast(
+                                    const SnackBar(content: Text('已取消标记')),
+                                    kind: ToastKind.success,
+                                  );
+                                }
+                              },
                               removeMenuIconType:
                                   ConversationMenuIconType.unmark,
                               removeMenuLabel: widget.group ? '取消群标记' : '取消标记',

@@ -1,6 +1,9 @@
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../domain/message_sender.dart';
+import '../../domain/contact_display_names.dart';
+import '../../storage/contact_store.dart';
+import 'contact_remark_dialog.dart';
 import '../../storage/group_member_details.dart';
 import 'dialog_action_button.dart';
 import 'header_action_menu.dart';
@@ -45,6 +48,7 @@ class _AiContactPageState extends State<AiContactPage> {
   AiProfile? _ai;
   String _groupNickname = '';
   bool _busy = false;
+  bool _isFriend = false;
   @override
   void initState() {
     super.initState();
@@ -58,18 +62,26 @@ class _AiContactPageState extends State<AiContactPage> {
   Future<void> _reload() async {
     try {
       final groupId = widget.groupId;
-      final (ai, nickname) = await (
+      final (ai, nickname, friendship) = await (
         widget.controller.groupStore.loadAi(widget.senderId),
         groupId == null
             ? Future.value('')
             : GroupMemberDetailsStore(widget.controller.groupStore.database)
                   .read(groupId, senderId: widget.senderId)
                   .then((details) => details.nickname),
+        widget.controller.groupStore.database.query(
+          'contact_friendships',
+          columns: ['friend_id'],
+          where: "owner_id = 'user:local' AND friend_id = ?",
+          whereArgs: [widget.senderId],
+          limit: 1,
+        ),
       ).wait;
       if (mounted) {
         setState(() {
           _ai = ai;
           _groupNickname = nickname;
+          _isFriend = friendship.isNotEmpty;
         });
       }
     } on Object catch (error) {
@@ -154,6 +166,33 @@ class _AiContactPageState extends State<AiContactPage> {
     if (mounted) await _reload();
   }
 
+  Future<void> _remark() async {
+    final value = await showDialog<String>(
+      context: context,
+      builder: (_) => ContactRemarkDialog(senderId: widget.senderId),
+    );
+    if (value == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await ContactStore(
+        widget.controller.groupStore.database,
+      ).setRemark(widget.senderId, value);
+      widget.controller.contactsChanged.value = await widget
+          .controller
+          .groupStore
+          .loadAi(widget.senderId);
+      await widget.controller.refreshConversations();
+      if (mounted) {
+        setState(() {});
+        _notice(value.isEmpty ? '已恢复原名' : '备注名已保存', kind: ToastKind.success);
+      }
+    } on Object catch (error) {
+      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _addFriend() async {
     setState(() => _busy = true);
     try {
@@ -198,6 +237,17 @@ class _AiContactPageState extends State<AiContactPage> {
                                 color: Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
+                            if (_isFriend)
+                              (
+                                value: 'remark',
+                                label: '设置备注名',
+                                icon: SettingsIcon(
+                                  type: SettingsIconType.note,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                ),
+                              ),
                             if (!ai.sender.archived &&
                                 !ai.isTemporary &&
                                 ai.sender.id != MessageSender.aurai.id)
@@ -219,6 +269,8 @@ class _AiContactPageState extends State<AiContactPage> {
                               profile: ai,
                             ),
                           );
+                        } else if (action == 'remark') {
+                          await _remark();
                         } else if (action == 'archive') {
                           await _archive();
                         }
@@ -285,13 +337,25 @@ class _AiContactPageState extends State<AiContactPage> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    ai.sender.name,
+                    ai.sender.displayName,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  if (ContactDisplayNames.remark(ai.sender.id) != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        '名字：${ai.sender.name}',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
                   if (_groupNickname.isNotEmpty &&
                       _groupNickname != ai.sender.name)
                     Padding(

@@ -34,6 +34,10 @@ const htmlGameLifecycleScript = r'''
       const result=await appData({operation:'retryEvent',eventId});return result.events[0];
     },
     readData(name){return appData({operation:'read',name})},
+    startNextSession(){
+      if(!navigator.userActivation.isActive)return Promise.reject(new Error('Start a session from a user action'));
+      return appData({operation:'nextSession'});
+    },
     openProfile(senderId){
       if(!navigator.userActivation.isActive)return Promise.reject(new Error('Open profiles from a user action'));
       return appData({operation:'openProfile',senderId});

@@ -310,11 +310,11 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
                           color: _defaultHandler!.sender.avatarColor,
                           path: _defaultHandler!.sender.avatarPath,
                         ),
-                        name: _defaultHandler!.sender.name,
+                        name: _defaultHandler!.sender.displayName,
                         size: 24,
                       ),
                 _defaultHandler == null ? null : _selectDefaultHandler,
-                subtitle: _defaultHandler?.sender.name ?? '',
+                subtitle: _defaultHandler?.sender.displayName ?? '',
               ),
               _row(
                 '工具',

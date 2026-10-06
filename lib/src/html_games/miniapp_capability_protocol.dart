@@ -5,6 +5,7 @@ abstract final class MiniappCapabilityProtocol {
   static const operations = {
     'messages.send',
     'messages.pin',
+    'messages.mark',
     'messages.intercept',
     'cards.close',
     'cards.submit',
@@ -74,6 +75,10 @@ class MiniappCapabilityCalls {
         case 'messages.pin':
           if (args.isNotEmpty) throw ArgumentError('messages.pin 只置顶当前实例，无需参数');
           pinMessage = true;
+        case 'messages.mark':
+          if (args.isNotEmpty)
+            throw ArgumentError('messages.mark 只标记当前实例，无需参数');
+          markMessage = true;
         case 'messages.intercept':
           final action = args['action'] as String;
           if (action.isEmpty) throw ArgumentError('消息拦截需要处理事件');
@@ -119,6 +124,7 @@ class MiniappCapabilityCalls {
   final nicknames = <String, String>{};
   bool releaseReplies = false;
   bool pinMessage = false;
+  bool markMessage = false;
   bool timerChanged = false;
   int? wakeAt;
   String? contextInstructions;

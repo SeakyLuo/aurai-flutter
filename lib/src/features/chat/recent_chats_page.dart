@@ -415,7 +415,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
       conversation: item,
       project: _projects[item.projectId],
       avatar: group
-          ? GroupAvatar(members: _groups[item.id]!, size: 48)
+          ? GroupAvatar(groupId: item.id, members: _groups[item.id]!, size: 48)
           : ProfileAvatar(
               style: AvatarStyle(
                 icon: sender!.avatarIcon,

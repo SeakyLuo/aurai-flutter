@@ -1,4 +1,5 @@
 import 'interactive_button_layout.dart';
+import '../../app/global_ui.dart';
 import 'interactive_selection_view.dart';
 import '../../domain/interactive_selection.dart';
 import 'package:flutter/material.dart';
@@ -21,9 +22,13 @@ class InteractionContent extends StatelessWidget {
     this.pendingButtonId,
     required this.onClick,
     this.question = false,
+    required this.compactOptions,
+    required this.title,
+    required this.body,
     this.members = const {},
     this.onOpenMember,
     this.onStatistics,
+    this.onCancelVote,
   });
   final Map<String, Object?> view;
   final int buttonColumns;
@@ -32,9 +37,12 @@ class InteractionContent extends StatelessWidget {
   final String? busy;
   final String? pendingButtonId;
   final bool question;
+  final bool compactOptions;
+  final String title, body;
   final Map<String, MessageSender> members;
   final ValueChanged<String>? onOpenMember;
   final VoidCallback? onStatistics;
+  final VoidCallback? onCancelVote;
   final void Function(Map<String, Object?> button, {Object? value}) onClick;
 
   @override
@@ -46,7 +54,9 @@ class InteractionContent extends StatelessWidget {
         : const <Map<String, Object?>>[];
     final collecting = view['phase'] == 'collecting' && view['closed'] != true;
     final choosing = collecting && (!submitted || allowChange);
-    final editingSelection = choosing && eligible && !readOnly;
+    // Permission to change a vote is not an active edit. Submitted votes show
+    // their results until the participant cancels the recorded vote.
+    final editingSelection = choosing && eligible && !readOnly && !submitted;
     final components = (view['components'] as List);
     final hasDistribution = components.any(
       (component) => component['type'] == 'distribution',
@@ -75,20 +85,33 @@ class InteractionContent extends StatelessWidget {
         ? (eligible ? '进行中' : '进行中 · 仅可查看')
         : null;
     final participationSummary = [
-      if (status != null) status,
+      if (status != null && !editingSelection) status,
       if (!question && view['summaryVisible'] == true)
         '${view['submittedCount']} 人参与',
     ].join(' · ');
     final actions = participantButtons
+        .where((button) => !question || answer == null)
         .where((button) => button['selection'] == null)
         .where(
           (button) => button['action'] == 'nextRound'
               ? view['completed'] == true && view['closed'] != true
               : (button['action'] == 'submit' || !shared)
-              ? choosing
+              ? choosing && (onCancelVote == null || !submitted)
               : collecting,
         )
         .toList();
+    final actionButtons = InteractiveButtonLayout(
+      columns: buttonColumns,
+      children: [
+        for (final button in actions)
+          InteractiveMessageButton(
+            button: button,
+            busy: busy == button['id'],
+            locked: readOnly || busy != null || pendingButtonId == button['id'],
+            onPressed: () => onClick(button),
+          ),
+      ],
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -103,7 +126,11 @@ class InteractionContent extends StatelessWidget {
             child: switch (component['type']) {
               'distribution' => InteractionDistribution(
                 data: Map<String, Object?>.from(component as Map),
-                hideZeroVotes: true,
+                highlightHighest: view['completed'] == true,
+                hideZeroVotes:
+                    view['closed'] == true ||
+                    view['phase'] == 'closed' ||
+                    view['completed'] == true,
                 submissions: view['submissions'] as Map?,
                 members: members,
                 onOpenMember: onOpenMember,
@@ -122,7 +149,7 @@ class InteractionContent extends StatelessWidget {
               ),
             },
           ),
-        if (!question && participationSummary.isNotEmpty)
+        if (!question && !editingSelection && participationSummary.isNotEmpty)
           Text(
             participationSummary,
             style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
@@ -140,7 +167,7 @@ class InteractionContent extends StatelessWidget {
           (button) =>
               (question ||
                   editingSelection ||
-                  (collecting && !hasDistribution)) &&
+                  (collecting && !hasDistribution && !submitted)) &&
               button['selection'] != null,
         ))
           Padding(
@@ -149,6 +176,13 @@ class InteractionContent extends StatelessWidget {
               key: ValueKey((button['id'], view['round'])),
               button: button,
               question: question,
+              compactOptions: compactOptions,
+              title: title,
+              body: body,
+              summary: !question && editingSelection
+                  ? participationSummary
+                  : null,
+              sheetActions: actions.isEmpty ? null : actionButtons,
               self: question ? answer : self,
               locked:
                   readOnly ||
@@ -167,6 +201,20 @@ class InteractionContent extends StatelessWidget {
               onSubmit: (value) => onClick(button, value: value),
             ),
           ),
+        if (!question &&
+            submitted &&
+            choosing &&
+            eligible &&
+            !readOnly &&
+            onCancelVote != null) ...[
+          const SizedBox(height: 12),
+          InteractiveMessageButton(
+            button: const {'label': '取消投票'},
+            busy: busy == 'cancelVote',
+            locked: busy != null || pendingButtonId != null,
+            onPressed: onCancelVote!,
+          ),
+        ],
         if (selectedButton != null) ...[
           InteractiveMessageButton(
             button: {
@@ -181,29 +229,25 @@ class InteractionContent extends StatelessWidget {
           ),
           if (actions.isNotEmpty) const SizedBox(height: 8),
         ],
-        InteractiveButtonLayout(
-          columns: buttonColumns,
-          children: [
-            for (final button in actions)
-              InteractiveMessageButton(
-                button: button,
-                busy: busy == button['id'],
-                locked:
-                    readOnly || busy != null || pendingButtonId == button['id'],
-                onPressed: () => onClick(button),
-              ),
-          ],
-        ),
+        actionButtons,
       ],
     );
   }
 }
 
 class InteractionDistribution extends StatelessWidget {
+  static const inlineOptionLimit = 5;
+
+  static bool hidesOptions(List options, {required bool hideZeroVotes}) =>
+      options.where((option) => !hideZeroVotes || option['count'] != 0).length >
+          inlineOptionLimit ||
+      hideZeroVotes && options.any((option) => option['count'] == 0);
+
   const InteractionDistribution({
     super.key,
     required this.data,
     this.hideZeroVotes = false,
+    this.highlightHighest = false,
     this.submissions,
     this.members = const {},
     this.onOpenMember,
@@ -211,6 +255,7 @@ class InteractionDistribution extends StatelessWidget {
   });
   final Map<String, Object?> data;
   final bool hideZeroVotes;
+  final bool highlightHighest;
   final Map? submissions;
   final Map<String, MessageSender> members;
   final ValueChanged<String>? onOpenMember;
@@ -221,9 +266,16 @@ class InteractionDistribution extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final total = data['total'] as num;
     final selected = data['selected'] as Map?;
-    final options = data['items'] as List;
-    final items = hideZeroVotes && options.length >= 3
-        ? options.where((option) => option['count'] != 0).toList()
+    final options = (data['items'] as List)
+        .where((option) => !hideZeroVotes || option['count'] != 0)
+        .toList();
+    final highestCount = options.fold<num>(
+      0,
+      (highest, option) =>
+          (option['count'] as num) > highest ? option['count'] as num : highest,
+    );
+    final items = onShowAll != null && options.length > inlineOptionLimit
+        ? options.take(4).toList()
         : options;
     final voters = <(String, String), List<MessageSender>>{};
     if (items.length <= 2 && submissions != null) {
@@ -258,6 +310,8 @@ class InteractionDistribution extends StatelessWidget {
             child: Builder(
               builder: (context) {
                 final count = option['count'] as num;
+                final highest =
+                    highlightHighest && count > 0 && count == highestCount;
                 final ratio = total == 0 ? 0.0 : count / total;
                 final mine =
                     selected != null &&
@@ -274,7 +328,12 @@ class InteractionDistribution extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 15,
                         height: 1.4,
-                        fontWeight: mine ? FontWeight.w600 : FontWeight.w400,
+                        color: highest
+                            ? GlobalUI.highlightTextColor(context)
+                            : null,
+                        fontWeight: highest || mine
+                            ? FontWeight.w600
+                            : FontWeight.w400,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -296,7 +355,10 @@ class InteractionDistribution extends StatelessWidget {
                           '$count ${data['unit']} · ${(ratio * 100).round()}%',
                           style: TextStyle(
                             fontSize: 12,
-                            color: colors.onSurfaceVariant,
+                            color: highest
+                                ? GlobalUI.highlightTextColor(context)
+                                : colors.onSurfaceVariant,
+                            fontWeight: highest ? FontWeight.w600 : null,
                           ),
                         ),
                       ],

@@ -113,6 +113,7 @@ class _AiGroupListState extends State<AiGroupList> {
                     ),
                   for (final group in _groups)
                     GroupPickerTile(
+                      groupId: group['id'] as String,
                       title: group['title'] as String,
                       members: _avatars[group['id']]!,
                       onTap: () => widget.onSelected(group),

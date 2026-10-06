@@ -1,4 +1,5 @@
 import '../domain/message_summary.dart';
+import '../domain/interactive_message.dart';
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
@@ -42,7 +43,7 @@ Future<void> loadConversationListPreviews(
   };
   if (groups.isEmpty) return;
   final rows = await database.rawQuery(
-    '''SELECT id, conversation_id, sender_id, kind, text, json_extract(miniapp_share_json, '\$.title') AS share_title, CASE WHEN json_extract(interactive_json, '\$.participation.presentation') = 'message' THEN NULL ELSE json_extract(interactive_json, '\$.title') END AS interactive_title, json_extract(interactive_json, '\$.body') AS interactive_body, created_at
+    '''SELECT id, conversation_id, sender_id, kind, text, interactive_json, json_extract(miniapp_share_json, '\$.title') AS share_title, CASE WHEN json_extract(interactive_json, '\$.participation.presentation') = 'message' THEN NULL ELSE json_extract(interactive_json, '\$.title') END AS interactive_title, json_extract(interactive_json, '\$.body') AS interactive_body, created_at
        FROM messages WHERE id IN (
          SELECT (SELECT id FROM messages
            WHERE conversation_id = conversations.id AND kind NOT IN ('commentary', 'quick_reply', 'reasoning')
@@ -120,6 +121,12 @@ Future<void> loadConversationListPreviews(
           ? text
           : row['share_title'] as String?,
       interactiveTitle: row['interactive_title'] as String?,
+      interactiveVote:
+          row['interactive_title'] != null &&
+          InteractiveMessage.fromJson(
+            jsonDecode(row['interactive_json'] as String)
+                as Map<String, Object?>,
+          ).isVote,
       attachments: [
         for (final attachment in attachments[row['id']] ?? const [])
           MessageSummary.attachment(

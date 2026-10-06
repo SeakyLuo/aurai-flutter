@@ -212,6 +212,7 @@ class _SkillVisibilityTargetsState extends State<SkillVisibilityTargets> {
     return Semantics(
       checked: selected,
       child: GroupPickerTile(
+        groupId: id,
         title: group['title'] as String,
         members: widget.groupAvatars[id] ?? const [],
         prefix: MemberSelectionMark(selected: selected),

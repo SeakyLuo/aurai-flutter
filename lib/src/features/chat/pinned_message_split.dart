@@ -51,6 +51,7 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
   Completer<bool?>? _detailsResult;
   int _request = 0;
   bool _open = false;
+  bool _pinned = true;
   final _paneNavigator = GlobalKey<PaneNavigatorState>();
   bool _returningFromConversation = false;
 
@@ -67,7 +68,8 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
     super.initState();
     widget.controller.addListener(_syncMessage);
     _marks = GroupMessageMarks.changes.stream.listen((id) {
-      if (_open && _details == null && id == widget.conversationId) _checkPin();
+      if (_open && _pinned && _details == null && id == widget.conversationId)
+        _checkPin();
     });
     _interactive = InteractiveMessageStore.changes.stream.listen((id) {
       if (_open && _details == null && id == _message?.id) _load(id);
@@ -147,15 +149,19 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
     return result.future;
   }
 
-  Future<void> open(String id) async {
+  Future<void> open(String id, {bool pinned = true}) async {
     FocusManager.instance.primaryFocus?.unfocus();
     _detailsResult?.complete(null);
     _detailsResult = null;
     setState(() => _details = null);
-    await _load(id, opening: true);
+    await _load(id, opening: true, pinned: pinned);
   }
 
-  Future<void> _load(String id, {bool opening = false}) async {
+  Future<void> _load(
+    String id, {
+    bool opening = false,
+    bool pinned = true,
+  }) async {
     final request = ++_request;
     final groupId = widget.conversationId;
     await runUiAction(context, () async {
@@ -174,7 +180,10 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
       }
       setState(() {
         _message = message;
-        if (opening) _open = true;
+        if (opening) {
+          _open = true;
+          _pinned = pinned;
+        }
       });
       if (opening) _animation.forward();
     });
@@ -241,13 +250,14 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
 
   Widget _detail(BuildContext context, {required bool wide}) =>
       PinnedMessageDetail(
+        title: _pinned ? '置顶详情' : '消息详情',
         onBack: close,
         onLocate: () {
           final id = _message!.id;
           if (!wide) close();
           widget.onLocate(id);
         },
-        onMore: _menu,
+        onMore: _pinned ? _menu : null,
         child: widget.messageBuilder(context, _message!),
       );
 

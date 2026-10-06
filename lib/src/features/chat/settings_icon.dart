@@ -21,6 +21,7 @@ enum SettingsIconType {
   skills,
   personalization,
   personalInfo,
+  note,
   info,
   balance,
   appearance,
@@ -82,6 +83,21 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.note:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(5, 3, 15, 18),
+            const Radius.circular(2.5),
+          ),
+          pen,
+        );
+        canvas.drawLine(const Offset(8.5, 3), const Offset(8.5, 21), pen);
+        for (final y in [7.0, 12.0, 17.0]) {
+          canvas.drawLine(Offset(3.5, y), Offset(6.5, y), pen);
+        }
+        canvas.drawLine(const Offset(11.5, 8), const Offset(17, 8), pen);
+        canvas.drawLine(const Offset(11.5, 12), const Offset(17, 12), pen);
+        canvas.drawLine(const Offset(11.5, 16), const Offset(15, 16), pen);
       case SettingsIconType.sound:
         canvas.drawPath(
           Path()

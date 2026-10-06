@@ -20,6 +20,8 @@ import 'html_game_document.dart';
 import 'html_store.dart';
 
 abstract final class HtmlGameSignals {
+  static Future<void> Function(String conversationId, String messageId)?
+  startNextSession;
   static final callbackChanges = HtmlCallbackState.changes;
   static final changes = StreamController<String>.broadcast();
   static final appChanges = StreamController<String>.broadcast();
@@ -39,6 +41,7 @@ class HtmlGameSession extends ChangeNotifier {
     this.hostSafeBottomInset = 0,
     this.hostRightInset = 0,
     this.onOpenProfile,
+    this.onNextSession,
   }) {
     _readyTimeout = Timer(const Duration(seconds: 15), () {
       if (!_closed && !ready) {
@@ -72,6 +75,7 @@ class HtmlGameSession extends ChangeNotifier {
   HtmlGame? _pendingUpdate;
   final String surfaceId;
   final Future<void> Function(String)? onOpenProfile;
+  final Future<void> Function()? onNextSession;
   final bool fullscreen;
   final bool independent;
   final double hostTopInset;
@@ -239,6 +243,11 @@ class HtmlGameSession extends ChangeNotifier {
         try {
           final args = (jsonDecode(call.arguments as String) as Map)
               .cast<String, Object?>();
+          if (args['operation'] == 'nextSession') {
+            if (onNextSession == null) throw StateError('请从会话小程序开始下一局');
+            await onNextSession!();
+            return jsonEncode({'started': true});
+          }
           if (args['operation'] == 'openProfile') {
             final senderId = args['senderId'] as String;
             final members = await store.database.query(

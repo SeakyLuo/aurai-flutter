@@ -1,6 +1,31 @@
 part of 'chat_controller.dart';
 
 extension InteractiveMessageActions on ChatController {
+  Future<InteractiveMessage> cancelInteractiveVote(
+    String messageId,
+    int revision,
+    int participantRevision,
+  ) async {
+    final conversationId = activeConversation.id;
+    await _store.writer.flush();
+    try {
+      final card = await withdrawInteractiveVote(
+        _store.database,
+        conversationId: conversationId,
+        messageId: messageId,
+        actorId: MessageSender.localUser.id,
+        revision: revision,
+        participantRevision: participantRevision,
+      );
+      _replaceInteractiveCard(conversationId, messageId, card);
+      MessageCallbacks.changes.add(null);
+      return card;
+    } on InteractiveMessageChanged catch (error) {
+      _replaceInteractiveCard(conversationId, messageId, error.card);
+      rethrow;
+    }
+  }
+
   /// Program-created activities retain normal message semantics and do not wake an AI.
   Future<String> sendSystemInteractiveMessage(
     Map<String, Object?> definition, {
@@ -342,8 +367,10 @@ extension InteractiveMessageActions on ChatController {
     if (_privateConversation != null) _privateConversation!,
     ..._groupRuns.values,
     if (_executions.sessions[id]?.conversation case final target?) target,
-    if (_executions.sessions[id]?.runningConversation case final running?) running,
-    if (_executions.sessions[id]?.privateConversation case final private?) private,
+    if (_executions.sessions[id]?.runningConversation case final running?)
+      running,
+    if (_executions.sessions[id]?.privateConversation case final private?)
+      private,
     ...?_executions.sessions[id]?.groupRuns.values,
     ..._conversations,
     ..._searchWindows.values,

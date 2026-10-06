@@ -64,7 +64,7 @@ const sharedInteractionSchema = {
     'views': {
       'type': 'array',
       'description':
-          'Result components bound to the viewer-visible context. They do not control settlement. Context: round, phase(collecting/completed/closed), closed, completed, submitted, self, revealed (choices or summary available), summaryVisible. submittedCount/distribution require summary visibility; choices/submissions require individual visibility; state requires both because it can contain derived choices and counts. Each follows its own audience/timing. Never rely on a hidden field. Completion rules have full state, choices/submissions, submittedCount, round, phase, closed.',
+          'Result components bound to the viewer-visible context. They do not control settlement. Omit for a ballot with multiple fixed submit buttons to show default vote results after submission or closure; an explicit list controls the result components. Context: round, phase(collecting/completed/closed), closed, completed, submitted, self, revealed (choices or summary available), summaryVisible. submittedCount/distribution require summary visibility; choices/submissions require individual visibility; state requires both because it can contain derived choices and counts. Each follows its own audience/timing. Never rely on a hidden field. Completion rules have full state, choices/submissions, submittedCount, round, phase, closed.',
       'items': {
         'type': 'object',
         'properties': {

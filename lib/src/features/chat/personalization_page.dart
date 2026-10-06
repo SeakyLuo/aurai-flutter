@@ -173,7 +173,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
     child: Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        title: '${_profile.sender.name}的个性',
+        title: '${_profile.sender.displayName}的个性',
         onBack: _saving ? null : () => Navigator.maybePop(context),
         actions: [
           SettingsGlassAction(
@@ -233,7 +233,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                           ),
                   ),
                   _description(
-                    '这是 ${_profile.sender.name} 在与你对话时使用的主要语言风格和语气。这不会影响 ${_profile.sender.name} 的功能。',
+                    '这是 ${_profile.sender.displayName} 在与你对话时使用的主要语言风格和语气。这不会影响 ${_profile.sender.displayName} 的功能。',
                   ),
                   const SizedBox(height: 26),
                   _label('特征'),
@@ -259,7 +259,7 @@ class _PersonalizationPageState extends State<PersonalizationPage> {
                   _label('自定义指令'),
                   _field(
                     _instructions,
-                    '共享你希望 ${_profile.sender.name} 纳入其回复考虑范围的内容。',
+                    '共享你希望 ${_profile.sender.displayName} 纳入其回复考虑范围的内容。',
                   ),
                   const SizedBox(height: 26),
                   Align(

@@ -255,7 +255,11 @@ class _ImageForwardPageState extends State<ImageForwardPage> {
   );
   Widget _avatar(Conversation item) {
     if (item.kind == ConversationKind.group) {
-      return GroupAvatar(members: _groups[item.id]!, size: 48);
+      return GroupAvatar(
+        groupId: item.id,
+        members: _groups[item.id]!,
+        size: 48,
+      );
     }
     final sender = _senders[item.defaultSenderId]!;
     return ProfileAvatar(

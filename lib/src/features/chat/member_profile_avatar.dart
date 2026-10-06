@@ -42,7 +42,7 @@ class MemberProfileAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
     button: true,
-    label: '查看${sender.name}的资料',
+    label: '查看${sender.displayName}的资料',
     child: InkWell(
       borderRadius: BorderRadius.circular(size / 2),
       onTap:

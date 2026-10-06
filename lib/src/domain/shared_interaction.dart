@@ -121,6 +121,17 @@ class SharedInteraction {
     });
   }
 
+  SharedInteraction withdraw(String actorId) {
+    if (phase != 'collecting') throw StateError('本轮已结束，不能取消投票');
+    if (!allowChange) throw StateError('这张投票不允许改票');
+    if (!submissions.containsKey(actorId)) throw StateError('你还没有投票');
+    return SharedInteraction(definition, {
+      ...runtime,
+      'version': version + 1,
+      'submissions': {...submissions}..remove(actorId),
+    });
+  }
+
   Map<String, Object?> project(
     String actorId, {
     required bool closed,
@@ -131,7 +142,9 @@ class SharedInteraction {
     'round': round,
     'phase': phase,
     'closed': closed,
-    'completed': phase == 'completed',
+    // Presentation treats manual closure as ended too, matching the card's
+    // completed getter. Settlement still distinguishes closure from completion.
+    'completed': closed || phase != 'collecting',
     'submitted': submissions.containsKey(actorId),
     if (summaryVisible) 'submittedCount': submissions.length,
     'self': submissions[actorId],

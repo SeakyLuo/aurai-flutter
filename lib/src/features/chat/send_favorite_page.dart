@@ -62,7 +62,11 @@ class _SendFavoritePageState extends State<_SendFavoritePage> {
       final String recipientName;
       if (target.kind == ConversationKind.group) {
         final members = await controller.groupStore.avatarMembers([target.id]);
-        avatar = GroupAvatar(members: members[target.id]!, size: 48);
+        avatar = GroupAvatar(
+          groupId: target.id,
+          members: members[target.id]!,
+          size: 48,
+        );
         recipientName = '群聊';
       } else {
         final senders = await HomeConversations(
@@ -70,7 +74,7 @@ class _SendFavoritePageState extends State<_SendFavoritePage> {
         ).senders([target]);
         final sender = senders[target.defaultSenderId]!;
         avatar = MemberAvatar(sender: sender, size: 48);
-        recipientName = sender.name;
+        recipientName = sender.displayName;
       }
       if (!mounted) return;
       final message = item.message.htmlGame == null
@@ -257,7 +261,7 @@ class _FavoriteChoicesState extends State<_FavoriteChoices> {
                 htmlGame: result.html,
                 interactive: result.interactive,
               ),
-              result.sender.name,
+              result.sender.displayName,
               '',
               StarredMessageTile(
                 result: result,

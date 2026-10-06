@@ -357,6 +357,19 @@ class _HtmlViewState extends State<HtmlView>
         widget.store,
         surfaceId: widget.surfaceId,
         onOpenProfile: widget.onOpenProfile == null ? null : _openProfile,
+        onNextSession: () async {
+          final start = HtmlGameSignals.startNextSession;
+          if (start == null) throw StateError('会话尚未初始化');
+          await start(widget.conversationId, widget.messageId);
+          if (!mounted || !widget.fullscreen) return;
+          final split = context
+              .findAncestorStateOfType<PinnedMessageSplitState>();
+          if (split != null && split.supportsSplit) {
+            split.close();
+          } else {
+            Navigator.of(context).pop();
+          }
+        },
         fullscreen: widget.fullscreen,
         hostTopInset: widget.fullscreen
             ? MediaQuery.paddingOf(context).top + SettingsAppBar.toolbarHeight

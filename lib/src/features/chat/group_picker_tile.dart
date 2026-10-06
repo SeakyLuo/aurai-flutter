@@ -6,11 +6,13 @@ class GroupPickerTile extends StatelessWidget {
   const GroupPickerTile({
     super.key,
     required this.title,
+    required this.groupId,
     required this.members,
     required this.onTap,
     this.prefix,
   });
   final String title;
+  final String groupId;
   final List<MessageSender> members;
   final VoidCallback onTap;
   final Widget? prefix;
@@ -35,7 +37,7 @@ class GroupPickerTile extends StatelessWidget {
         child: Row(
           children: [
             if (prefix != null) ...[prefix!, const SizedBox(width: 14)],
-            GroupAvatar(members: members, size: 40),
+            GroupAvatar(groupId: groupId, members: members, size: 40),
           ],
         ),
       ),

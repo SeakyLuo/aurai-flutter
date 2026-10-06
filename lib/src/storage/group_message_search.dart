@@ -33,6 +33,7 @@ class GroupMessageSearchResult {
     this.html,
     this.miniappShare,
     this.interactive,
+    this.interactiveMembers = const {},
   });
   final AgentMessageRole role;
   final bool markdown;
@@ -41,6 +42,7 @@ class GroupMessageSearchResult {
   final HtmlGameCard? html;
   final MiniappShare? miniappShare;
   final InteractiveMessage? interactive;
+  final Map<String, MessageSender> interactiveMembers;
   final String id, text;
   final DateTime createdAt;
   final MessageSender sender;
@@ -98,7 +100,19 @@ class GroupMessageSearch {
   }) async {
     if (rows.isEmpty) return [];
     final ids = rows.map((r) => r['id']).toList();
-    final senderIds = rows.map((r) => r['sender_id']).toSet().toList();
+    final interactions = {
+      for (final row in rows)
+        if (row['interactive_json'] != null)
+          row['id']: InteractiveMessage.fromJson(
+            jsonDecode(row['interactive_json'] as String)
+                as Map<String, dynamic>,
+          ),
+    };
+    final senderIds = {
+      for (final row in rows) row['sender_id'],
+      for (final card in interactions.values) ...card.participants.keys,
+      for (final card in interactions.values) ...card.choices.keys,
+    }.toList();
     final related = await Future.wait([
       database.query(
         'message_senders',
@@ -154,12 +168,7 @@ class GroupMessageSearch {
     };
     return rows.map((row) {
       final id = row['id'] as String;
-      final metadata = row['interactive_json'] == null
-          ? null
-          : InteractiveMessage.fromJson(
-              jsonDecode(row['interactive_json'] as String)
-                  as Map<String, dynamic>,
-            );
+      final metadata = interactions[id];
       return GroupMessageSearchResult(
         id,
         row['text'] as String,
@@ -178,6 +187,16 @@ class GroupMessageSearch {
                 directory,
               ),
         interactive: metadata,
+        interactiveMembers: metadata == null
+            ? const {}
+            : {
+                for (final memberId in {
+                  ...metadata.participants.keys,
+                  ...metadata.choices.keys,
+                })
+                  if (senders.containsKey(memberId))
+                    memberId: senders[memberId]!,
+              },
       );
     }).toList();
   }

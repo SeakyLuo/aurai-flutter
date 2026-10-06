@@ -43,6 +43,17 @@ extension HtmlActions on ChatController {
       groupActivityChanges.value++;
     }
     _conversationChanged();
+    if (change.markActorId case final actorId?) {
+      try {
+        await GroupMessageMarks(
+          groupStore,
+          actorId: actorId,
+        ).favorite(change.conversationId, change.messageId, true);
+      } on Object catch (error, stack) {
+        developer.log('Miniapp mark failed', error: error, stackTrace: stack);
+        programErrors.value = '小程序标记失败：${errorMessage(error)}';
+      }
+    }
     if (change.pinActorId case final actorId?) {
       // Pinning is independent of the committed game state and AI delivery.
       try {

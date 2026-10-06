@@ -24,7 +24,7 @@ extension _FailureRetry on _MessageItemState {
                   (snapshot.hasError || snapshot.data?[message.id] != null) &&
                   widget.onRetry != null &&
                   controller.canOfferFailedRetry(message),
-              busy: _retryingFailure || controller.isFailedReplyActive(message),
+              busy: _retryingFailure,
               onRetry: widget.onRetry == null ? null : _retryFailure,
             ),
           ),
@@ -157,6 +157,10 @@ extension _MessageItemActions on _MessageItemState {
       !message.isReasoning &&
       !message.isFailure &&
       message.htmlGame == null &&
+      message.interactive == null &&
+      message.miniappShare == null &&
+      message.images.isEmpty &&
+      message.files.isEmpty &&
       message.text.isNotEmpty;
 
   Future<void> _readAloud(AgentMessage snapshot, {String? text}) async {
@@ -379,6 +383,12 @@ extension _MessageItemActions on _MessageItemState {
             await store.pin(mark.groupId, snapshot.id, !mark.pinned);
           } else {
             await store.favorite(mark.groupId, snapshot.id, !mark.favorite);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showToast(
+                SnackBar(content: Text(mark.favorite ? '已取消标记' : '已标记')),
+                kind: ToastKind.success,
+              );
+            }
           }
         });
       case MessageAction.retry:

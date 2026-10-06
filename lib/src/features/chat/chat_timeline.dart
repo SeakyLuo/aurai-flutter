@@ -60,9 +60,11 @@ List<ChatTimelineEntry> buildChatTimeline(
   final interactiveMembers = {...mentionSenders, ...conversation.noticeMembers};
   final ambiguousNames = <String>{};
   for (final sender in mentionSenders.values) {
-    if (mentionMembers.containsKey(sender.name))
-      ambiguousNames.add(sender.name);
-    mentionMembers[sender.name] = sender.id;
+    for (final name in {sender.name, sender.displayName}) {
+      if (mentionMembers.containsKey(name) && mentionMembers[name] != sender.id)
+        ambiguousNames.add(name);
+      mentionMembers[name] = sender.id;
+    }
   }
   mentionMembers.removeWhere((name, _) => ambiguousNames.contains(name));
   final isGroup = conversation.kind == ConversationKind.group;
@@ -73,7 +75,7 @@ List<ChatTimelineEntry> buildChatTimeline(
     ...conversation.noticeMembers.values,
   ]) {
     for (final name in {
-      sender.name,
+      sender.displayName,
       if (sender.originalName != null) sender.originalName!,
     }) {
       if (noticeNameIds.containsKey(name) && noticeNameIds[name] != sender.id) {

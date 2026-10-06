@@ -35,7 +35,7 @@ class GroupSearchResults extends StatelessWidget {
 
   Widget _avatar(GroupMessageSearchResult result, double size) => Semantics(
     button: true,
-    label: '查看${result.sender.name}的资料',
+    label: '查看${result.sender.displayName}的资料',
     child: InkWell(
       onTap: () => onOpenProfile(result),
       borderRadius: BorderRadius.circular(size / 2),
@@ -83,7 +83,7 @@ class GroupSearchResults extends StatelessWidget {
       const SizedBox(width: 8),
       Expanded(
         child: Text(
-          result.sender.name,
+          result.sender.displayName,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 13),
@@ -199,7 +199,7 @@ class GroupSearchResults extends StatelessWidget {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      r.sender.name,
+                                      r.sender.displayName,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(fontSize: 15),
@@ -223,6 +223,7 @@ class GroupSearchResults extends StatelessWidget {
                                 htmlTitle: r.html?.title,
                                 htmlPreview: r.html?.preview,
                                 interactiveTitle: r.interactive?.title,
+                                interactiveVote: r.interactive?.isVote == true,
                                 query: query,
                                 gallery: gallery,
                                 sourceMessageId: r.id,
@@ -258,7 +259,9 @@ class GroupSearchResults extends StatelessWidget {
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.only(bottom: FloatingSearchLayout.clearance),
+          padding: const EdgeInsets.only(
+            bottom: FloatingSearchLayout.clearance,
+          ),
           sliver: SliverMainAxisGroup(slivers: slivers),
         ),
       ],

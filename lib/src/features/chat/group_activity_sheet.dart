@@ -83,6 +83,13 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       context,
       position: position,
       items: [
+        if ((activity.idle || activity.sleeping) &&
+            !_waking.contains(activity.sender.id))
+          (
+            value: 'wakeAndProcess',
+            label: '唤醒并立即处理',
+            icon: const QuestionIcon(type: QuestionIconType.play),
+          ),
         (
           value: 'participation',
           label: activity.autoReplyPaused ? '恢复接话' : '暂停接话',
@@ -109,7 +116,20 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
       ],
     );
     if (!mounted || action == null) return;
-    if (action == 'participation') {
+    if (action == 'wakeAndProcess') {
+      setState(() => _waking.add(activity.sender.id));
+      try {
+        await runUiAction(
+          context,
+          () => widget.controller.wakeAndProcessGroupMember(
+            widget.conversationId,
+            activity.sender.id,
+          ),
+        );
+      } finally {
+        if (mounted) setState(() => _waking.remove(activity.sender.id));
+      }
+    } else if (action == 'participation') {
       await runUiAction(
         context,
         () => widget.controller.setGroupMemberAutoReply(
@@ -482,7 +502,7 @@ class _GroupActivitySheetState extends State<GroupActivityPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        activity.sender.name,
+                        activity.sender.displayName,
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,

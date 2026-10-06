@@ -1,4 +1,5 @@
 import 'group_unread_messages.dart';
+import 'contact_store.dart';
 import 'dart:convert';
 
 import 'package:sqflite/sqflite.dart';
@@ -55,6 +56,7 @@ class ConversationStore {
   ) async {
     database = await openConversationDatabase();
     try {
+      await ContactStore(database).loadLocalNames();
       reader = ConversationReader(database, imageDirectory);
       writer = ConversationWriter(database);
       runs = AgentRunStore(database);

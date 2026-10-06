@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/global_ui.dart';
 import '../../domain/interactive_selection.dart';
 import '../../domain/interactive_message.dart';
 import '../../domain/message_sender.dart';
@@ -32,6 +33,12 @@ class InteractiveStatisticsOverview extends StatelessWidget {
     final multiple = card.buttons.any(
       (button) => (button['selection'] as Map?)?['mode'] == 'multiple',
     );
+    final summary = card.summary;
+    final highestCount = summary.fold<num>(
+      0,
+      (highest, option) =>
+          (option['count'] as num) > highest ? option['count'] as num : highest,
+    );
     final groups = <InteractiveOptionKey, List<String>>{};
     if (peopleVisible) {
       for (final entry in card.choices.entries) {
@@ -48,7 +55,7 @@ class InteractiveStatisticsOverview extends StatelessWidget {
               .toList();
     return ListView(
       key: const PageStorageKey('statistics-overview'),
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
       children: [
         Text(
           card.title,
@@ -93,7 +100,7 @@ class InteractiveStatisticsOverview extends StatelessWidget {
             card.hasInteraction
                 ? card.completed
                       ? '投票结果'
-                      : '实时票数'
+                      : '当前票数'
                 : '最近操作',
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
           ),
@@ -108,10 +115,14 @@ class InteractiveStatisticsOverview extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 20),
-          for (final option in card.summary)
+          for (final option in summary)
             _option(
               context,
               option,
+              card.hasInteraction &&
+                  card.completed &&
+                  (option['count'] as num) > 0 &&
+                  option['count'] == highestCount,
               groups[(
                     option['buttonId'] as String,
                     option['label'] as String,
@@ -175,6 +186,7 @@ class InteractiveStatisticsOverview extends StatelessWidget {
   Widget _option(
     BuildContext context,
     Map<String, Object?> option,
+    bool highest,
     List<String> people,
   ) {
     final colors = Theme.of(context).colorScheme;
@@ -199,7 +211,14 @@ class InteractiveStatisticsOverview extends StatelessWidget {
                   Expanded(
                     child: Text(
                       option['label'] as String,
-                      style: const TextStyle(fontSize: 15, height: 1.4),
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.4,
+                        color: highest
+                            ? GlobalUI.highlightTextColor(context)
+                            : null,
+                        fontWeight: highest ? FontWeight.w600 : null,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -207,7 +226,10 @@ class InteractiveStatisticsOverview extends StatelessWidget {
                     '$count ${card.hasInteraction ? '票' : '人'}${card.hasInteraction ? ' · ${(ratio * 100).round()}%' : ''}',
                     style: TextStyle(
                       fontSize: 13,
-                      color: colors.onSurfaceVariant,
+                      color: highest
+                          ? GlobalUI.highlightTextColor(context)
+                          : colors.onSurfaceVariant,
+                      fontWeight: highest ? FontWeight.w600 : null,
                     ),
                   ),
                 ],
@@ -226,7 +248,7 @@ class InteractiveStatisticsOverview extends StatelessWidget {
                 const SizedBox(height: 10),
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    const avatarExtent = 44.0, spacing = 2.0;
+                    const avatarExtent = 40.0, spacing = 2.0;
                     final columns =
                         ((constraints.maxWidth + spacing) /
                                 (avatarExtent + spacing))
@@ -239,14 +261,14 @@ class InteractiveStatisticsOverview extends StatelessWidget {
                     final overflow = people.length > capacity;
                     final remaining = people.length - visibleCount + 1;
                     return Wrap(
-                      spacing: 2,
+                      spacing: spacing,
                       runSpacing: 4,
                       children: [
                         for (var index = 0; index < visibleCount; index++)
                           Tooltip(
                             message: statisticsName(card, people[index]),
                             child: Padding(
-                              padding: const EdgeInsets.all(6),
+                              padding: const EdgeInsets.all(4),
                               child: Stack(
                                 children: [
                                   MemberProfileAvatar(

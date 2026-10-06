@@ -1,4 +1,5 @@
 import '../../app/ui_action.dart';
+import 'group_avatar_page.dart';
 import '../../storage/development_projects.dart';
 import 'conversation_project_page.dart';
 import 'group_personal_details.dart';
@@ -498,6 +499,11 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                         builder: (remark, identity) => Column(
                           children: [
                             _section([
+                              GroupAvatarEntry(
+                                controller: widget.controller,
+                                conversation: _conversation,
+                                canEdit: _canManage,
+                              ),
                               ListTile(
                                 contentPadding:
                                     const EdgeInsetsDirectional.only(

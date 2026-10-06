@@ -66,8 +66,8 @@ extension _ChatComposer on _ChatPageState {
                   ? ''
                   : _draftVisibility[_conversationId]?.label ?? ''
             : controller.activeConversation.isTemporary
-            ? '和 ${controller.activeAi!.sender.name} 临时聊天'
-            : '回复 ${controller.activeAi!.sender.name}',
+            ? '和 ${controller.activeAi!.sender.displayName} 临时聊天'
+            : '回复 ${controller.activeAi!.sender.displayName}',
         quote: _editing != null
             ? _editing!.message.quote
             : controller.activeConversation.draftQuote,

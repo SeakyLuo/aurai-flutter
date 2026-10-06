@@ -225,11 +225,11 @@ class _TaskProgressListState extends State<TaskProgressList> {
                   .cast<Map>();
               return steps.isEmpty
                   ? const Padding(
-                      padding: EdgeInsets.fromLTRB(24, 76, 24, 24),
+                      padding: EdgeInsets.fromLTRB(16, 76, 16, 24),
                       child: EmptyDataView(title: '暂无任务'),
                     )
                   : SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(24, 76, 24, 16),
+                      padding: const EdgeInsets.fromLTRB(16, 76, 16, 16),
                       child: PrivateTaskListNodes(steps: steps),
                     );
             },

@@ -32,10 +32,13 @@ enum ModelFailure {
 }
 
 /// Reads structured error fields from the existing persisted error detail.
-/// Prose (including model refusals) is never used to infer provider error codes.
+/// Only structured codes and the gateway's exact stream-failure message are
+/// classified; arbitrary prose and model refusals do not imply error codes.
 ModelFailure classifyModelFailure(String detail, {int? statusCode}) {
   final codes = <String>{};
+  final messages = <String>{};
   void read(Map value) {
+    if (value['message'] case final String message) messages.add(message);
     for (final key in ['code', 'type', 'reason', 'finish_reason', 'status']) {
       if (value[key] case final String code) codes.add(code.toLowerCase());
     }
@@ -60,6 +63,11 @@ ModelFailure classifyModelFailure(String detail, {int? statusCode}) {
     }
   }
   bool has(Set<String> values) => codes.any(values.contains);
+  if (has({'upstream_stream_error'}) ||
+      (has({'api_error'}) &&
+          messages.contains('Upstream stream failed. Please retry.'))) {
+    return ModelFailure.connection;
+  }
   if (has({
     'content_filter',
     'content_policy_violation',

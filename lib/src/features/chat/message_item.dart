@@ -29,7 +29,8 @@ import 'interactive_message_view.dart';
 import 'group_message_heading.dart';
 import 'message_quote_view.dart';
 import 'image_action_scope.dart';
-import 'chat_controller.dart' show ConversationRunFailure;
+import 'chat_controller.dart'
+    show ConversationRunFailure, InteractiveMessageActions;
 import 'file_attachments.dart';
 import 'reply_image_syntax.dart';
 import 'reply_image_gallery.dart';
@@ -512,6 +513,12 @@ class _MessageItemState extends State<MessageItem> {
               readOnly: widget.readOnly || page?.snapshot != null,
               onClick: widget.onInteractiveClick!,
               onRetry: widget.onInteractiveRetry,
+              onCancelVote: (revision, participantRevision) =>
+                  ImageActionScope.of(context).cancelInteractiveVote(
+                    message.id,
+                    revision,
+                    participantRevision,
+                  ),
               onStatistics: !widget.readOnly || widget.onLocate != null
                   ? () => showInteractiveStatistics(
                       context,

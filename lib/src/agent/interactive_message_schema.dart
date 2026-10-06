@@ -1,7 +1,9 @@
+import '../domain/interactive_button_icons.dart';
+
 const interactiveSelectionSchema = {
   'type': 'object',
   'description':
-      'Native fixed-option selection followed by one explicit submit. Requires action:submit and a shared interaction. Single uses radio circles; multiple uses checkboxes. Options are not submitted until the confirmation button is pressed. Cannot combine with input. Works for humans and AI.',
+      'Native fixed-option selection followed by one explicit submit. Requires action:submit and a shared interaction. Single uses radio circles; multiple uses checkboxes. The UI renders the multiple-selection tag and min/max selection hint automatically. Do not repeat these in the title, body, or accompanying message (e.g. 可多选, 最多选3项). Configure mode and minSelections/maxSelections instead. Options are not submitted until the confirmation button is pressed. Cannot combine with input. Works for humans and AI.',
   'properties': {
     'mode': {
       'type': 'string',
@@ -58,7 +60,7 @@ const interactiveBodySchema = {
   'type': 'string',
   'maxLength': 10000,
   'description':
-      'Keep card copy concise: include only information needed to decide and essential constraints. Do not repeat the title, options, button actions, or submission instructions. Omit reminders such as choose a target, confirm submission, use the private card, or discussion does not count as a vote. An empty body is appropriate when the title and options suffice. '
+      'Keep card copy concise: include only information needed to decide and essential constraints. Do not repeat the title, options, button actions, or submission instructions. Selection mode and min/max counts are rendered by the UI; do not restate them in the title, body, or accompanying message. Omit reminders such as choose a target, confirm submission, use the private card, or discussion does not count as a vote. An empty body is appropriate when the title and options suffice. '
       r'Plain text supporting line breaks and blank lines. In JSON encode a line break once as \n, not \\n: the decoded string must contain a real newline, not literal backslash-n text. Do not JSON-encode the body separately. Markdown and HTML are not rendered.',
 };
 
@@ -89,18 +91,10 @@ const interactiveButtonsSchema = {
       },
       'icon': {
         'type': 'string',
-        'enum': [
-          'none',
-          'info',
-          'play',
-          'reset',
-          'delete',
-          'check',
-          'open',
-          'settings',
-        ],
+        'default': 'none',
+        'enum': interactiveButtonIcons,
         'description':
-            'Optional leading outline icon. Omit to choose from action; none hides it.',
+            'Optional leading outline icon. Defaults to none: no icon and centered text. An explicit icon aligns the content to the start.',
       },
       'showArrow': {
         'type': 'boolean',
@@ -142,6 +136,11 @@ const interactiveButtonsSchema = {
 const interactiveParticipationSchema = {
   'type': 'object',
   'properties': {
+    'showHistory': {
+      'type': 'boolean',
+      'description':
+          'Enable card history paging and participant operation history in the UI. Defaults to false for votes and true for other interactive messages. Does not delete recorded actions or change current results.',
+    },
     'excludedAudience': {
       'type': 'array',
       'minItems': 1,

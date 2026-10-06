@@ -252,7 +252,7 @@ class _DirectConversationInfoPageState
                               size: 48,
                             ),
                             title: Text(
-                              _profile!.sender.name,
+                              _profile!.sender.displayName,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,

@@ -145,7 +145,11 @@ class _MentionSheetState extends State<_MentionSheet> {
                               Navigator.pop(context, <MessageSender>[]),
                         ),
                         for (final member in _members!.where(
-                          (m) => m.sender.name.toLowerCase().contains(query),
+                          (m) =>
+                              m.sender.displayName.toLowerCase().contains(
+                                query,
+                              ) ||
+                              m.sender.name.toLowerCase().contains(query),
                         ))
                           ListTile(
                             contentPadding: EdgeInsets.zero,
@@ -159,7 +163,7 @@ class _MentionSheetState extends State<_MentionSheet> {
                               size: 44,
                             ),
                             title: Text(
-                              member.sender.name,
+                              member.sender.displayName,
                               style: const TextStyle(fontSize: 15),
                             ),
                             onTap: () =>
@@ -168,6 +172,9 @@ class _MentionSheetState extends State<_MentionSheet> {
                         if (query.isNotEmpty &&
                             !_members!.any(
                               (m) =>
+                                  m.sender.displayName.toLowerCase().contains(
+                                    query,
+                                  ) ||
                                   m.sender.name.toLowerCase().contains(query),
                             ))
                           const Padding(

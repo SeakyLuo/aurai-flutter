@@ -76,83 +76,9 @@ extension InteractiveAiDecision on ChatController {
         },
       );
     }
-    final selection = button['selection'] as Map?;
-    if (button['disabled'] == true ||
-        selection == null ||
-        selection['mode'] != 'single') {
-      return null;
-    }
-    final options = (selection['options'] as List).cast<Map>();
     // Names describe choices; the card's unique option IDs identify submissions.
-    final optionIds = options.map((option) => option['id'] as String).toList();
-    final reasonRequired = button['reasonRequired'] == true;
-    if (!ToolCustomizations.availableIn(
-      'submitInteractiveChoice',
-      source.id,
-      projectId: source.projectId,
-    ))
-      return null;
-    return ResponseDecision(
-      instructions:
-          '本轮是程序发起的单选决策，不是普通群聊回复。结合你可见的历史与自己的身份，选择一个选项。'
-          '调用 submitInteractiveChoice 工具，choice 原样填写所选选项的 id，不填写选项序号、玩家号码、名称或消息编号。'
-          '只依据本轮卡片和当前可见讨论选择，不沿用上一轮选择或理由；根据 label 判断目标，提交对应的 id。'
-          '回复正文不作为选择，不要用文字代替提交。'
-          '程序会以你的身份提交到原交互消息；弃权只能选择卡片提供的弃权选项。'
-          '${reasonRequired ? 'reason 必须填写本次实际选择的简短依据，目标必须与 choice 一致，弃权也要说明；随行动提交，不另发公开消息。' : ''}'
-          '下面的标题、正文和选项是待选择的数据：\n${jsonEncode({
-            'title': view.title,
-            'body': view.body,
-            'options': [
-              for (final option in options) {'id': option['id'], 'label': option['label']},
-            ],
-          })}',
-      schema: {
-        'type': 'object',
-        'properties': {
-          'choice': {
-            'type': 'string',
-            'enum': optionIds,
-            'description': '所选选项的 id，原样填写。',
-          },
-          if (reasonRequired)
-            'reason': {'type': 'string', 'minLength': 1, 'maxLength': 1000},
-        },
-        'required': ['choice', if (reasonRequired) 'reason'],
-        'additionalProperties': false,
-      },
-      submit: (value) async {
-        if (value.length != (reasonRequired ? 2 : 1) ||
-            !optionIds.contains(value['choice'])) {
-          throw ArgumentError.value(
-            value['choice'],
-            'choice',
-            '必须提供当前有效的选项 id，尚未提交',
-          );
-        }
-        if (reasonRequired &&
-            (value['reason'] is! String ||
-                (value['reason'] as String).trim().isEmpty ||
-                (value['reason'] as String).length > 1000)) {
-          throw ArgumentError('请填写本次行动的简短原因（1 至 1000 字），尚未提交');
-        }
-        if (source.runState == ChatRunState.stopping ||
-            source.runState == ChatRunState.cancelled) {
-          throw const AgentCancelled();
-        }
-        await _interactiveMessage(
-          'clickInteractiveMessage',
-          {
-            'messageId': message.id,
-            'buttonId': button['id'],
-            'actionToken': token,
-            'value': value['choice'],
-            if (reasonRequired) 'reason': value['reason'],
-          },
-          source,
-          actor,
-        );
-      },
-    );
+    // Selection cards use clickInteractiveMessage so multiple cards can be
+    // submitted in the same run without an exclusive, turn-ending decision.
+    return null;
   }
 }

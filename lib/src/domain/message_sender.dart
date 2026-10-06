@@ -1,3 +1,5 @@
+import 'contact_display_names.dart';
+
 class MessageSender {
   const MessageSender({
     required this.id,
@@ -12,6 +14,7 @@ class MessageSender {
 
   final String id;
   final String name;
+  String get displayName => ContactDisplayNames.remark(id) ?? name;
   final String? originalName;
   final MessageSenderKind kind;
   final String avatarIcon;

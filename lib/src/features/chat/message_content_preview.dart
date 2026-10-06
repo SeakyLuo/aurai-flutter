@@ -20,6 +20,7 @@ class MessageContentPreview extends StatelessWidget {
     this.htmlTitle,
     this.htmlPreview,
     this.interactiveTitle,
+    this.interactiveVote = false,
     this.maxLines = 3,
     this.query = '',
     this.style,
@@ -37,6 +38,7 @@ class MessageContentPreview extends StatelessWidget {
   final int? maxLines;
   final int maxImages;
   final bool markdown;
+  final bool interactiveVote;
   final TextStyle? style;
 
   @override
@@ -45,6 +47,7 @@ class MessageContentPreview extends StatelessWidget {
       text: text,
       htmlTitle: htmlTitle,
       interactiveTitle: interactiveTitle,
+      interactiveVote: interactiveVote,
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

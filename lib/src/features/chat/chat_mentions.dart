@@ -107,7 +107,7 @@ extension _ChatMentions on _ChatPageState {
     final prefix = start > 0 && !RegExp(r'\s').hasMatch(value.text[start - 1])
         ? ' '
         : '';
-    final label = '@${sender.name}';
+    final label = '@${sender.displayName}';
     final inserted = '$prefix$label ';
     _textController.value = TextEditingValue(
       text: value.text.replaceRange(start, end, inserted),

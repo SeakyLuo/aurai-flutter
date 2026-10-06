@@ -84,9 +84,9 @@ class _InteractiveMessagePagingState extends State<InteractiveMessagePaging> {
 
   @override
   Widget build(BuildContext context) => InteractivePageScope(
-    snapshot: _snapshot,
-    sequence: _sequence,
-    control: _count < 2
+    snapshot: widget.card.showHistory ? _snapshot : null,
+    sequence: widget.card.showHistory ? _sequence : null,
+    control: !widget.card.showHistory || _count < 2
         ? null
         : Semantics(
             button: true,

@@ -271,7 +271,30 @@ class _TopToastState extends State<_TopToast>
                   ellipsis: '…',
                 )..layout(maxWidth: constraints.maxWidth));
           final hasDetails = painter?.didExceedMaxLines ?? false;
+          final inlineAction =
+              action != null &&
+              painter != null &&
+              !hasDetails &&
+              painter.maxIntrinsicWidth +
+                      12 +
+                      _ToastActionButton.widthFor(context, action.label) <=
+                  constraints.maxWidth;
           painter?.dispose();
+          if (inlineAction) {
+            return Row(
+              children: [
+                Expanded(child: Text.rich(span, style: style)),
+                const SizedBox(width: 12),
+                _ToastActionButton(
+                  label: action.label,
+                  onPressed: () {
+                    _dismiss();
+                    action.onPressed();
+                  },
+                ),
+              ],
+            );
+          }
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,6 +362,25 @@ class _ToastActionButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;
 
+  static const _textStyle = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w500,
+  );
+
+  static double widthFor(BuildContext context, String label) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: Theme.of(context).textTheme.labelLarge!.merge(_textStyle),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    final width = (painter.width + 28).clamp(64.0, double.infinity);
+    painter.dispose();
+    return width;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -346,11 +388,11 @@ class _ToastActionButton extends StatelessWidget {
       onPressed: onPressed,
       style: TextButton.styleFrom(
         foregroundColor: theme.colorScheme.onSurface,
-        backgroundColor: GlobalUI.controlBackground(theme),
+        backgroundColor: GlobalUI.messageBackground(theme),
         minimumSize: const Size(64, 32),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         shape: const StadiumBorder(),
-        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        textStyle: theme.textTheme.labelLarge!.merge(_textStyle),
         visualDensity: VisualDensity.standard,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),

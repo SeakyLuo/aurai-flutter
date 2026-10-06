@@ -120,13 +120,6 @@ extension ConversationRunFailure on ChatController {
             activeConversation.activeRunId == message.runId &&
             !hasRunningTask;
 
-  bool isFailedReplyActive(AgentMessage message) =>
-      activeConversation.kind == ConversationKind.group
-      ? _groupRuns[message.senderId]?.runState == ChatRunState.running ||
-            _groupRuns[message.senderId]?.runState == ChatRunState.stopping ||
-            _groupDispatcher?.hasPending(message.senderId) == true
-      : hasRunningTask;
-
   Future<void> retryFailedMessage(
     AgentMessage message, {
     bool resumeAutoReply = false,

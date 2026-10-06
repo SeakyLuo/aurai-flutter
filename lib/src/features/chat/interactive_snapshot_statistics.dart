@@ -14,7 +14,7 @@ class InteractiveSnapshotStatistics extends StatelessWidget {
     final distribution = view?['distribution'] as List?;
     final submissions = view?['submissions'] as Map?;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
       children: [
         Text(
           '当前历史版本${view?['round'] == null ? '' : ' · 第 ${view!['round']} 轮'}',
@@ -23,9 +23,10 @@ class InteractiveSnapshotStatistics extends StatelessWidget {
         const SizedBox(height: 16),
         if (visible && distribution != null)
           InteractionDistribution(
+            highlightHighest: view!['completed'] == true,
             data: {
               'items': distribution,
-              'total': view!['submittedCount'],
+              'total': view['submittedCount'],
               'selected': view['self'],
               'unit': '人',
             },

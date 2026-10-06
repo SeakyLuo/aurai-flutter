@@ -1,0 +1,22 @@
+/// Shared by message validation and the tool schema so exposed icons stay valid.
+const interactiveButtonIcons = [
+  'none',
+  'info',
+  'play',
+  'reset',
+  'delete',
+  'check',
+  'open',
+  'settings',
+  'copy',
+  'edit',
+  'search',
+  'download',
+  'share',
+  'task',
+  'calendar',
+  'message',
+  'sound',
+  'tools',
+  'statistics',
+];

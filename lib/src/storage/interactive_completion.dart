@@ -55,7 +55,7 @@ Future<InteractiveMessage> enqueueInteractiveCompletion(
   };
   if (notifyVote) {
     final ownChoice = actorId == creatorId || choicesVisible;
-    final submission = current.choices[actorId]!;
+    final submission = current.choices[actorId];
     await MessageCallbacks.enqueue(
       db,
       id: newMessageId(),
@@ -65,12 +65,14 @@ Future<InteractiveMessage> enqueueInteractiveCompletion(
       payload: {
         ...result,
         'source': 'interactionVote',
-        'operationType': previous.choices.containsKey(actorId)
+        'operationType': submission == null
+            ? 'withdraw'
+            : previous.choices.containsKey(actorId)
             ? 'change'
             : 'submit',
         'actorId': actorId,
         'actorName': actorName,
-        if (ownChoice)
+        if (ownChoice && submission != null)
           'submission': {
             'buttonId': submission['buttonId'],
             'label': submission['label'],

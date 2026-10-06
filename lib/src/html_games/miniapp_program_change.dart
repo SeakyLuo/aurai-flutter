@@ -39,6 +39,7 @@ class MiniappProgramChange {
   final replyStates = <String, bool>{};
   bool memberNamesChanged = false;
   String? pinActorId;
+  String? markActorId;
   MiniappContextCompaction? contextCompaction;
 
   /// The application processes this effect after commit, before any AI wakes.
@@ -65,6 +66,7 @@ class MiniappProgramChange {
     'replyStates': replyStates,
     'memberNamesChanged': memberNamesChanged,
     if (pinActorId != null) 'pinActorId': pinActorId,
+    if (markActorId != null) 'markActorId': markActorId,
   };
 
   factory MiniappProgramChange.fromJson(
@@ -100,6 +102,7 @@ class MiniappProgramChange {
     );
     change.memberNamesChanged = json['memberNamesChanged'] as bool;
     change.pinActorId = json['pinActorId'] as String?;
+    change.markActorId = json['markActorId'] as String?;
     return change;
   }
 }

@@ -152,6 +152,7 @@ class _AssetChatPickerState extends State<AssetChatPicker> {
                                 conversation: item,
                                 avatar: item.kind == ConversationKind.group
                                     ? GroupAvatar(
+                                        groupId: item.id,
                                         members: _groups[item.id]!,
                                         size: 48,
                                       )

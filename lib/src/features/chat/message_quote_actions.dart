@@ -22,7 +22,7 @@ extension MessageQuoteActions on ChatController {
             [
               if (message.images.isNotEmpty) '[图片]',
               if (message.interactive != null)
-                '[交互消息] ${message.interactive!.title}',
+                '[${message.interactive!.isVote ? '投票' : '交互消息'}] ${message.interactive!.title}',
               if (message.htmlGame != null) '[小程序]',
               for (final file in message.files) '[文件] ${file.name}',
               if (message.text.isNotEmpty)

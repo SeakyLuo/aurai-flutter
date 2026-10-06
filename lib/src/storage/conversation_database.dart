@@ -22,6 +22,7 @@ import 'approval_center_store.dart';
 import 'interactive_action_history.dart';
 import 'message_callbacks.dart';
 import 'contact_relationships.dart';
+import 'contact_store.dart';
 import '../html_games/html_game_schema.dart';
 import '../html_games/html_event_identity.dart';
 import 'ai_identity_schema.dart';
@@ -40,7 +41,7 @@ import 'project_resource_migration.dart';
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 89,
+  version: 91,
   onOpen: (db) async {
     await db.update('approval_requests', {
       'status': 'cancelled',
@@ -52,6 +53,11 @@ Future<Database> openConversationDatabase() async => openDatabase(
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
+    if (oldVersion < 91)
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN group_avatar TEXT',
+      );
+    if (oldVersion < 90) await db.execute(contactSchema);
     if (oldVersion >= 20 && oldVersion < 85) {
       await db.execute(
         "ALTER TABLE html_games ADD COLUMN preview_theme TEXT CHECK(preview_theme IN ('light','dark'))",
@@ -543,6 +549,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
       groupParticipationSchema,
       temporaryAiColumn,
       ...contactRelationshipSchema,
+      contactSchema,
       ...skillSchema,
       ...memorySchema,
       ...messageQuickReplySchema,
@@ -590,6 +597,7 @@ const _schema = [
     project_id TEXT REFERENCES development_projects(id) ON DELETE SET NULL,
     join_approval_required INTEGER NOT NULL DEFAULT 0 CHECK(join_approval_required IN (0, 1)),
     managers_only_rename INTEGER NOT NULL DEFAULT 0 CHECK(managers_only_rename IN (0, 1)),
+    group_avatar TEXT,
     message_count INTEGER NOT NULL DEFAULT 0
   )''',
   '''CREATE TABLE agent_runs (

@@ -38,7 +38,7 @@ class VoteParticipantAvatars extends StatelessWidget {
                 final more = overflow && index == slots - 1;
                 final label = more
                     ? '查看其余 ${people.length - slots + 1} 位投票者'
-                    : sender.name;
+                    : sender.displayName;
                 return Tooltip(
                   message: label,
                   child: Semantics(

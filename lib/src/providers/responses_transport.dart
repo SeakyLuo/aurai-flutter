@@ -7,6 +7,7 @@ import 'model_context_limits.dart';
 import 'model_image_input.dart';
 import 'response_message_input.dart';
 import '../domain/error_message.dart';
+import '../domain/model_failure.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -65,7 +66,7 @@ class ResponsesTransport {
           );
         } on _RetryableFailure catch (failure) {
           checkCancelled();
-          if (hasText || attempt == 5) throw failure.error;
+          if (hasText || attempt == 3) throw failure.error;
           onReconnect?.call(attempt + 1);
           final waiter = Completer<void>();
           _retryWaiter = waiter;
@@ -199,8 +200,13 @@ class ResponsesTransport {
     } on ModelConnectionInterrupted catch (error) {
       checkCancelled();
       throw _RetryableFailure(error);
-    } on ModelProviderException {
+    } on ModelProviderException catch (error) {
       checkCancelled();
+      if (error.detail != null &&
+          classifyModelFailure(error.detail!, statusCode: error.statusCode) ==
+              ModelFailure.connection) {
+        throw _RetryableFailure(error);
+      }
       rethrow;
     } on HandshakeException catch (error) {
       checkCancelled();

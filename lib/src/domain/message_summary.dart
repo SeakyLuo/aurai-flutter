@@ -25,6 +25,7 @@ abstract final class MessageSummary {
     Iterable<String> attachments = const [],
     String? htmlTitle,
     String? interactiveTitle,
+    bool interactiveVote = false,
   }) {
     final labels = attachments.toSet();
     final htmlFiles = labels
@@ -45,7 +46,11 @@ abstract final class MessageSummary {
       else ...[
         ...htmlFiles,
         if (interactiveTitle != null)
-          body.isEmpty ? interactiveTitle : body
+          interactiveVote
+              ? '[投票] $interactiveTitle'
+              : body.isEmpty
+              ? interactiveTitle
+              : body
         else if (body.isNotEmpty)
           body,
       ],
@@ -76,6 +81,7 @@ abstract final class MessageSummary {
           : '${message.interactive!.title}\n${message.interactive!.body}',
       htmlTitle: message.htmlGame?.title ?? message.miniappShare?.title,
       interactiveTitle: message.interactive?.title,
+      interactiveVote: message.interactive?.isVote == true,
       attachments: includeAttachments
           ? [
               if (message.images.isNotEmpty) '[图片]',

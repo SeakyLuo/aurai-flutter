@@ -45,7 +45,7 @@ class GroupMemberChoice extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            sender.name,
+                            sender.displayName,
                             style: const TextStyle(fontSize: 16),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

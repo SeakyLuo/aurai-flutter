@@ -188,7 +188,11 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
 
   Widget _avatar(Conversation conversation) {
     if (conversation.kind == ConversationKind.group) {
-      return GroupAvatar(members: _groups[conversation.id]!, size: 48);
+      return GroupAvatar(
+        groupId: conversation.id,
+        members: _groups[conversation.id]!,
+        size: 48,
+      );
     }
     final sender = _senders[conversation.defaultSenderId]!;
     return ProfileAvatar(

@@ -199,7 +199,7 @@ class StarredMessageTile extends StatelessWidget {
                     children: [
                       Semantics(
                         button: true,
-                        label: '查看${result.sender.name}的资料',
+                        label: '查看${result.sender.displayName}的资料',
                         child: GestureDetector(
                           onTap: () => _openProfile(context),
                           child: MemberAvatar(sender: result.sender, size: 32),
@@ -211,7 +211,7 @@ class StarredMessageTile extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              result.sender.name,
+                              result.sender.displayName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -292,6 +292,7 @@ class StarredMessageTile extends StatelessWidget {
                         onEdit: null,
                         groupBubble: true,
                         readOnly: true,
+                        interactiveMembers: result.interactiveMembers,
                         onLocate: onLocate,
                         onInteractiveClick: (_, _, _, {value}) async {
                           onLocate();

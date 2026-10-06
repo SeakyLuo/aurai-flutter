@@ -46,7 +46,7 @@ class GroupMessageHeading extends StatelessWidget {
       children: [
         Semantics(
           button: true,
-          label: '查看${sender.name}的资料',
+          label: '查看${sender.displayName}的资料',
           child: InkWell(
             onTap: onOpenProfile,
             onLongPress: onMention,
@@ -67,7 +67,7 @@ class GroupMessageHeading extends StatelessWidget {
                       child: !nameVisible
                           ? const SizedBox.shrink()
                           : Text(
-                              sender.name,
+                              sender.displayName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(

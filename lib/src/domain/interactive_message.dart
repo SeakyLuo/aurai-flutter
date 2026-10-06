@@ -1,3 +1,4 @@
+import 'interactive_button_icons.dart';
 import 'interactive_selection.dart';
 import 'interaction_expression.dart';
 import 'shared_interaction.dart';
@@ -55,10 +56,31 @@ class InteractiveMessage {
   }
 
   bool get systemPresentation => participation['presentation'] == 'system';
+
+  /// Votes show current results by default; history is an opt-in UI feature.
+  bool get showHistory => participation['showHistory'] as bool? ?? !isVote;
   bool get shared => interaction.isNotEmpty;
   bool get hasInteraction => snapshotView != null || shared || singleChoice;
   Map<String, Object?> get interactionDefinition => shared
-      ? interaction
+      ? {
+          ...interaction,
+          // Fixed submit buttons form a ballot even without an explicit result
+          // view. Give ballots the same default results as single-choice votes.
+          if (!interaction.containsKey('views') && isVote)
+            'views': [
+              {
+                'type': 'distribution',
+                'unit': '票',
+                'when': {
+                  'op': 'or',
+                  'args': [
+                    {'ref': 'submitted'},
+                    {'ref': 'closed'},
+                  ],
+                },
+              },
+            ],
+        }
       : {
           'allowChange': true,
           'views': [
@@ -83,12 +105,16 @@ class InteractiveMessage {
             'version': 0,
             'phase': closed ? 'closed' : 'collecting',
             'state': <String, Object?>{},
-            'submissions': participants,
+            'submissions': choices,
           },
   );
   int get sessionVersion => shared ? engine.version : 0;
-  Map<String, Map<String, Object?>> get choices =>
-      shared ? engine.submissions : participants;
+  Map<String, Map<String, Object?>> get choices => shared
+      ? engine.submissions
+      : {
+          for (final entry in participants.entries)
+            if (entry.value['buttonId'] != null) entry.key: entry.value,
+        };
   num get totalWeight => choices.values.fold<num>(
     0,
     (total, choice) => total + (choice['weight'] as num? ?? 1),
@@ -140,6 +166,24 @@ class InteractiveMessage {
             ),
           ));
   bool get singleChoice => participation['selectionMode'] == 'singleChoice';
+  bool get isVote =>
+      singleChoice ||
+      shared &&
+          buttons
+                  .where(
+                    (button) =>
+                        button['action'] == 'submit' &&
+                        button['input'] == null &&
+                        button['selection'] == null,
+                  )
+                  .length >
+              1 ||
+      (interaction['views'] as List? ?? const []).any(
+        (view) => view['type'] == 'distribution',
+      ) ||
+      (snapshotView?['components'] as List? ?? const []).any(
+        (component) => component['type'] == 'distribution',
+      );
   bool visible(String field, {String actor = 'user:local'}) {
     if (hasInteraction &&
         field == 'summaryVisibility' &&
@@ -329,6 +373,10 @@ class InteractiveMessage {
       _validateButtons(stateButtons, stateIds);
     }
     final participation = json['participation'] as Map? ?? const {};
+    if (participation['showHistory'] != null &&
+        participation['showHistory'] is! bool) {
+      throw ArgumentError('showHistory 必须是布尔值');
+    }
     if (participation['audience'] != null &&
         participation['excludedAudience'] != null) {
       throw ArgumentError('部分可见和部分不可见不能同时设置');
@@ -467,17 +515,7 @@ class InteractiveMessage {
             'success',
           ].contains(b['style']))
         throw ArgumentError('不支持的按钮样式');
-      if (b['icon'] != null &&
-          ![
-            'none',
-            'info',
-            'play',
-            'reset',
-            'delete',
-            'check',
-            'open',
-            'settings',
-          ].contains(b['icon']))
+      if (b['icon'] != null && !interactiveButtonIcons.contains(b['icon']))
         throw ArgumentError('不支持的按钮图标');
       if (b['showArrow'] != null && b['showArrow'] is! bool)
         throw ArgumentError('箭头参数必须为布尔值');

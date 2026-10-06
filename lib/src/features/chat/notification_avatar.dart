@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import '../../domain/message_sender.dart';
 import '../../domain/avatar_portraits.dart';
 import '../../storage/group_chat_store.dart';
+import '../../storage/group_avatar_store.dart';
 import 'group_avatar.dart';
 import 'member_avatar.dart';
 import 'profile_avatar.dart';
@@ -67,7 +68,11 @@ class NotificationAvatar {
                   WidgetsBinding.instance.platformDispatcher.platformBrightness,
             ),
             child: group
-                ? GroupAvatar(members: senders, size: size)
+                ? GroupAvatar(
+                    groupId: conversationId,
+                    members: senders,
+                    size: size,
+                  )
                 : MemberAvatar(sender: senders.single, size: size),
           ),
         ),
@@ -76,6 +81,26 @@ class NotificationAvatar {
     final root = adapter.attachToRenderTree(owner);
     try {
       await Future.wait([
+        if (group &&
+            GroupAvatarStore.styles.value[conversationId]?.path != null)
+          precacheImage(
+            FileImage(
+              File(GroupAvatarStore.styles.value[conversationId]!.path!),
+            ),
+            root,
+          ),
+        if (group &&
+            avatarPortraits.containsKey(
+              GroupAvatarStore.styles.value[conversationId]?.icon,
+            ))
+          precacheImage(
+            avatarPortraitImage(
+              GroupAvatarStore.styles.value[conversationId]!.icon,
+              size,
+              3,
+            ),
+            root,
+          ),
         for (final sender in senders)
           if (sender.avatarPath != null)
             precacheImage(

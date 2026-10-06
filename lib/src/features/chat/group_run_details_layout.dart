@@ -82,7 +82,7 @@ class _GroupRunDetailsLayoutState extends State<GroupRunDetailsLayout> {
         top: false,
         child: SearchSheetBody(
           header: _ActivitySheetHeader(
-            title: widget.sender.name,
+            title: widget.sender.displayName,
             avatar: Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: MemberProfileAvatar(

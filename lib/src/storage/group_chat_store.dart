@@ -1,3 +1,5 @@
+import 'group_avatar_store.dart';
+import '../domain/contact_display_names.dart';
 import 'group_mute_schema.dart';
 import 'group_member_details.dart';
 import 'group_sleep_store.dart';
@@ -16,6 +18,7 @@ import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
 
 part 'group_management_store.dart';
+part 'group_avatar_members.dart';
 part 'group_mute_store.dart';
 
 class GroupChatStore {
@@ -43,39 +46,22 @@ class GroupChatStore {
   static const maxAiMembers = 32;
   static const maxAdministrators = 3;
 
-  Future<Map<String, List<MessageSender>>> avatarMembers(
-    List<String> groupIds,
-  ) async {
-    if (groupIds.isEmpty) return {};
-    final rows = await database.rawQuery('''
-      SELECT conversation_id, sender_id FROM (
-        SELECT conversation_id, sender_id,
-          ROW_NUMBER() OVER (PARTITION BY conversation_id ORDER BY position, sender_id) AS member_rank
-        FROM conversation_members
-        WHERE conversation_id IN (${_slots(groupIds.length)}) AND left_at IS NULL
-      ) WHERE member_rank <= 9 ORDER BY conversation_id, member_rank
-    ''', groupIds);
-    if (rows.isEmpty) return {};
-    final senders = await _senders(
-      database,
-      rows.map((row) => row['sender_id'] as String).toSet().toList(),
-    );
-    final result = <String, List<MessageSender>>{};
-    for (final row in rows) {
-      result
-          .putIfAbsent(row['conversation_id'] as String, () => [])
-          .add(senders[row['sender_id']]!);
-    }
-    return result;
-  }
+  Future<Map<String, List<MessageSender>>> avatarMembers(List<String> ids) =>
+      _avatarMembers(ids);
 
   Future<int> contactCount(String query, {required bool archived}) async {
     final rows = await database.query(
       'ai_profiles',
       columns: ['COUNT(*) AS count'],
       where:
-          'sender_id IN (SELECT friend_id FROM contact_friendships WHERE owner_id = ?) AND sender_id IN (SELECT id FROM message_senders WHERE archived = ? AND instr(lower(name), ?) > 0)',
-      whereArgs: ['user:local', archived ? 1 : 0, query.toLowerCase()],
+          'sender_id IN (SELECT friend_id FROM contact_friendships WHERE owner_id = ?) AND sender_id IN (SELECT id FROM message_senders WHERE archived = ? AND (instr(lower(name), ?) > 0 OR id IN (SELECT friend_id FROM contacts WHERE owner_id = ? AND instr(lower(remark_name), ?) > 0)))',
+      whereArgs: [
+        'user:local',
+        archived ? 1 : 0,
+        query.toLowerCase(),
+        'user:local',
+        query.toLowerCase(),
+      ],
     );
     return rows.single['count'] as int;
   }
@@ -92,11 +78,13 @@ class GroupChatStore {
       'message_senders',
       columns: ['id', 'name'],
       where:
-          'archived = ? AND instr(lower(name), ?) > 0 AND id IN '
+          'archived = ? AND (instr(lower(name), ?) > 0 OR id IN (SELECT friend_id FROM contacts WHERE owner_id = ? AND instr(lower(remark_name), ?) > 0)) AND id IN '
           '(SELECT friend_id FROM contact_friendships WHERE owner_id = ?) AND id IN '
           '(SELECT sender_id FROM ai_profiles)${senderId == null ? '' : ' AND id = ?'}',
       whereArgs: [
         archived ? 1 : 0,
+        query.toLowerCase(),
+        ownerId,
         query.toLowerCase(),
         ownerId,
         if (senderId != null) senderId,
@@ -105,8 +93,13 @@ class GroupChatStore {
     final ordered =
         index
             .map(
-              (row) =>
-                  ContactNameOrder(row['id'] as String, row['name'] as String),
+              (row) => ContactNameOrder(
+                row['id'] as String,
+                ownerId == 'user:local'
+                    ? ContactDisplayNames.remark(row['id'] as String) ??
+                          row['name'] as String
+                    : row['name'] as String,
+              ),
             )
             .toList()
           ..sort();

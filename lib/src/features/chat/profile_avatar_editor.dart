@@ -13,8 +13,10 @@ class ProfileAvatarEditor extends StatelessWidget {
     required this.style,
     required this.name,
     required this.onSelected,
+    this.preview,
   });
   final AvatarStyle style;
+  final Widget? preview;
   final String name;
   final ValueChanged<AvatarSource>? onSelected;
 
@@ -128,7 +130,7 @@ class ProfileAvatarEditor extends StatelessWidget {
               height: 96,
               child: Stack(
                 children: [
-                  ProfileAvatar(style: style, name: name),
+                  preview ?? ProfileAvatar(style: style, name: name),
                   Positioned(
                     right: 0,
                     bottom: 0,
