@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'vote_appearance.dart';
+import 'question_option_appearance.dart';
 import 'question_icon.dart';
 
 class VoteMessageHeading extends StatelessWidget {
@@ -54,7 +54,7 @@ class VoteMessageHeading extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: VoteAppearance.accent(context),
+                    color: QuestionOptionAppearance.accent(context),
                   ),
                 ),
               ),

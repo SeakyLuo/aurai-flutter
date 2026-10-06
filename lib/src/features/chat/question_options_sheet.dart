@@ -16,6 +16,7 @@ Future<Set<int>?> showQuestionOptionsSheet(
   BuildContext context, {
   required List<UserQuestionOption> options,
   required Set<int> selected,
+  ValueChanged<Set<int>>? onSelectionChanged,
   Future<void>? closeWhen,
   bool multiple = false,
   bool readOnly = false,
@@ -43,6 +44,7 @@ Future<Set<int>?> showQuestionOptionsSheet(
       child: _QuestionOptionsSheet(
         options: options,
         selected: selected,
+        onSelectionChanged: onSelectionChanged,
         multiple: multiple,
         readOnly: readOnly,
         vote: vote,
@@ -155,6 +157,7 @@ class _QuestionOptionsSheet extends StatefulWidget {
   const _QuestionOptionsSheet({
     required this.options,
     required this.selected,
+    this.onSelectionChanged,
     required this.multiple,
     required this.readOnly,
     required this.vote,
@@ -167,6 +170,7 @@ class _QuestionOptionsSheet extends StatefulWidget {
   });
   final List<UserQuestionOption> options;
   final Set<int> selected;
+  final ValueChanged<Set<int>>? onSelectionChanged;
   final bool multiple;
   final bool readOnly;
   final bool vote;
@@ -366,6 +370,9 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                                         _selected.add(optionIndex);
                                       }
                                     });
+                                    widget.onSelectionChanged?.call(
+                                      Set.of(_selected),
+                                    );
                                   }
                                 },
                         );
@@ -422,7 +429,7 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  ...[
+                  if (widget.multiple) ...[
                     VoteSelectionHint(
                       minimum: widget.minimum,
                       maximum: widget.maximum,
@@ -460,6 +467,9 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                                       _selected.add(index);
                                   });
                                 }
+                                widget.onSelectionChanged?.call(
+                                  Set.of(_selected),
+                                );
                               },
                       ),
                     ),

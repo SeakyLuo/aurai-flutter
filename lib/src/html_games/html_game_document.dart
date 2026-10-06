@@ -106,6 +106,7 @@ $htmlMessageComponentScript
  let lastSaved=formState(),saveTimer;
  const save=()=>{const encoded=formState();if(encoded!==lastSaved){lastSaved=encoded;AuraiGameBridge.localState(encoded)}};
  window.__auraiFlushForm=()=>{clearTimeout(saveTimer);save()};
+ document.addEventListener('aurai:pause',window.__auraiFlushForm);
  const scheduleSave=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(()=>{save();AuraiGameBridge.visualChanged()},180)};
  root.addEventListener('input',scheduleSave);root.addEventListener('change',scheduleSave);
  root.addEventListener('click',scheduleSave);

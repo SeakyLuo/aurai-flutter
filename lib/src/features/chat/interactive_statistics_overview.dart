@@ -6,6 +6,7 @@ import '../../domain/message_sender.dart';
 import 'member_profile_avatar.dart';
 import 'chat_controller.dart';
 import 'settings_icon.dart';
+import 'vote_message_heading.dart';
 
 typedef InteractiveOptionKey = (String, String);
 
@@ -55,16 +56,29 @@ class InteractiveStatisticsOverview extends StatelessWidget {
               .toList();
     return ListView(
       key: const PageStorageKey('statistics-overview'),
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      padding: card.isVote
+          ? const EdgeInsets.fromLTRB(20, 12, 20, 24)
+          : const EdgeInsets.fromLTRB(24, 24, 24, 24),
       children: [
-        Text(
-          card.title,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            height: 1.4,
+        if (card.isVote)
+          VoteMessageHeading(
+            title: card.title,
+            multiple: multiple,
+            ongoing: !card.closed && !card.completed,
+          )
+        else
+          Text(
+            card.title,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
           ),
-        ),
+        if (card.isVote && card.body.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text(card.body, style: const TextStyle(fontSize: 15, height: 1.5)),
+        ],
         const SizedBox(height: 10),
         Text(
           [
@@ -80,14 +94,17 @@ class InteractiveStatisticsOverview extends StatelessWidget {
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
-        if (card.hasInteraction) ...[
+        if (card.hasInteraction &&
+            (multiple ||
+                card.interaction.containsKey('actorWeights') ||
+                card.engine.allowChange)) ...[
           const SizedBox(height: 8),
           Text(
             '投票规则：${[card.interaction.containsKey('actorWeights')
                 ? '按参与者票值计票'
                 : multiple
                 ? '多选，每个所选项各计一票'
-                : '单选，每人一票', if (card.engine.allowChange) '改票会替换原票', if (multiple) '每个所选项分别计票'].join('；')}',
+                : null, if (card.engine.allowChange) '改票会替换原票'].whereType<String>().join('；')}',
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).colorScheme.onSurfaceVariant,

@@ -1,4 +1,6 @@
 import 'interactive_button_layout.dart';
+import 'dart:convert';
+import '../../storage/interactive_selection_drafts.dart';
 import '../../app/global_ui.dart';
 import 'interactive_selection_view.dart';
 import '../../domain/interactive_selection.dart';
@@ -29,6 +31,8 @@ class InteractionContent extends StatelessWidget {
     this.onOpenMember,
     this.onStatistics,
     this.onCancelVote,
+    this.draftOwner,
+    this.onSaveSelection,
   });
   final Map<String, Object?> view;
   final int buttonColumns;
@@ -43,6 +47,12 @@ class InteractionContent extends StatelessWidget {
   final ValueChanged<String>? onOpenMember;
   final VoidCallback? onStatistics;
   final VoidCallback? onCancelVote;
+  final ({String messageId, String actorId, int revision})? draftOwner;
+  final void Function(String buttonId, String version, Set<String> selected)?
+  onSaveSelection;
+
+  String _draftVersion(Map<String, Object?> button) =>
+      jsonEncode([view['round'], draftOwner!.revision, button['selection']]);
   final void Function(Map<String, Object?> button, {Object? value}) onClick;
 
   @override
@@ -174,6 +184,21 @@ class InteractionContent extends StatelessWidget {
             padding: EdgeInsets.only(bottom: question ? 0 : 8),
             child: InteractiveSelectionView(
               key: ValueKey((button['id'], view['round'])),
+              draftSelection: draftOwner == null || !editingSelection
+                  ? null
+                  : InteractiveSelectionDrafts.instance.read(
+                      draftOwner!.messageId,
+                      draftOwner!.actorId,
+                      button['id'] as String,
+                      _draftVersion(button),
+                    ),
+              onSelectionChanged: draftOwner == null || !editingSelection
+                  ? null
+                  : (selected) => onSaveSelection!(
+                      button['id'] as String,
+                      _draftVersion(button),
+                      selected,
+                    ),
               button: button,
               question: question,
               compactOptions: compactOptions,

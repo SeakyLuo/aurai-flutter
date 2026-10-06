@@ -27,6 +27,8 @@ class InteractiveSelectionView extends StatefulWidget {
     required this.body,
     this.sheetActions,
     this.summary,
+    this.draftSelection,
+    this.onSelectionChanged,
   });
   final Map<String, Object?> button;
   final Map? self;
@@ -37,6 +39,8 @@ class InteractiveSelectionView extends StatefulWidget {
   final String title, body;
   final Widget? sheetActions;
   final String? summary;
+  final Set<String>? draftSelection;
+  final ValueChanged<Set<String>>? onSelectionChanged;
   final ValueChanged<Object> onSubmit;
 
   @override
@@ -44,9 +48,12 @@ class InteractiveSelectionView extends StatefulWidget {
       _InteractiveSelectionViewState();
 }
 
-class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
+class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
+    with AutomaticKeepAliveClientMixin {
   Completer<void>? _pickerClosed;
-  late Set<String> _selected = _saved;
+  late Set<String> _selected = widget.draftSelection ?? _saved;
+  @override
+  bool get wantKeepAlive => widget.busy || _pickerClosed != null;
   InteractiveSelection get selection => InteractiveSelection(
     Map<String, Object?>.from(widget.button['selection'] as Map),
   );
@@ -73,6 +80,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
         if (mounted) _closePicker();
       });
     }
+    updateKeepAlive();
   }
 
   bool get _locked =>
@@ -84,11 +92,13 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
   void _closePicker() {
     _pickerClosed?.complete();
     _pickerClosed = null;
+    updateKeepAlive();
   }
 
   @override
   void dispose() {
-    _closePicker();
+    _pickerClosed?.complete();
+    _pickerClosed = null;
     super.dispose();
   }
 
@@ -96,6 +106,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
     if (_pickerClosed != null) return;
     final closed = Completer<void>();
     _pickerClosed = closed;
+    updateKeepAlive();
     final config = selection;
     final selected = await showQuestionOptionsSheet(
       context,
@@ -108,6 +119,14 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
           if (_selected.contains(option['id'])) index,
       },
       multiple: config.multiple,
+      onSelectionChanged: (selected) {
+        setState(() {
+          _selected = {
+            for (final index in selected) config.options[index]['id'] as String,
+          };
+        });
+        widget.onSelectionChanged?.call(Set.of(_selected));
+      },
       vote: !widget.question,
       minimum: config.minimum,
       maximum: config.maximum,
@@ -127,6 +146,8 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
         for (final index in selected) config.options[index]['id'] as String,
       };
     });
+    widget.onSelectionChanged?.call(Set.of(_selected));
+    updateKeepAlive();
     widget.onSubmit(
       config.multiple
           ? [
@@ -139,7 +160,10 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
   }
 
   @override
-  Widget build(BuildContext context) => _buildContent(context);
+  Widget build(BuildContext context) {
+    super.build(context);
+    return _buildContent(context);
+  }
 
   Widget _buildContent(BuildContext context) {
     final config = selection;
@@ -156,9 +180,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
       children: [
         if (!answeredQuestion &&
             widget.showSubmit &&
-            (!widget.question ||
-                config.multiple ||
-                widget.summary?.isNotEmpty == true))
+            (config.multiple || widget.summary?.isNotEmpty == true))
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: !widget.question
@@ -219,6 +241,8 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
               });
               void choose() {
                 toggle();
+                widget.onSelectionChanged?.call(Set.of(_selected));
+                updateKeepAlive();
                 if (widget.question && !config.multiple) widget.onSubmit(id);
               }
 

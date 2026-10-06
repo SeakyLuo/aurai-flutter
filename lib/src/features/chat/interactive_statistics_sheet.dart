@@ -266,38 +266,41 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
           top: false,
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: Row(
-                  children: [
-                    SettingsGlassAction(
-                      label: _atOverview || actor != null ? '关闭' : '返回',
-                      icon: _atOverview || actor != null
-                          ? Icons.close_rounded
-                          : Icons.arrow_back_rounded,
-                      iconWidget: _atOverview || actor != null
-                          ? const QuestionIcon(type: QuestionIconType.close)
-                          : const SettingsIcon(type: SettingsIconType.back),
-                      onPressed: _atOverview || actor != null
-                          ? () => Navigator.pop(context)
-                          : _back,
-                    ),
-                    Expanded(
-                      child: Text(
-                        title,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w600,
+              if (!(card?.isVote == true &&
+                  _atOverview &&
+                  widget.snapshot == null))
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    children: [
+                      SettingsGlassAction(
+                        label: _atOverview || actor != null ? '关闭' : '返回',
+                        icon: _atOverview || actor != null
+                            ? Icons.close_rounded
+                            : Icons.arrow_back_rounded,
+                        iconWidget: _atOverview || actor != null
+                            ? const QuestionIcon(type: QuestionIconType.close)
+                            : const SettingsIcon(type: SettingsIconType.back),
+                        onPressed: _atOverview || actor != null
+                            ? () => Navigator.pop(context)
+                            : _back,
+                      ),
+                      Expanded(
+                        child: Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 40),
-                  ],
+                      const SizedBox(width: 40),
+                    ],
+                  ),
                 ),
-              ),
               Expanded(
                 child: Stack(
                   fit: StackFit.expand,

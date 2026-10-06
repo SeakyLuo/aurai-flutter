@@ -96,6 +96,7 @@ class ChatViewportState extends State<ChatViewport> {
   final _entryHeights = <String, double>{};
   // Positioned-list jumps move entries between slivers. Preserve live HTML
   // subtrees across those parents instead of recreating their platform views.
+  // Interactive cards also retain unsubmitted selections across those moves.
   final _retainedEntryKeys = <String, GlobalKey>{};
   final _enteringToolEntries = <String>{};
   bool _contentBelow = false;

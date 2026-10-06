@@ -506,6 +506,7 @@ class _MessageItemState extends State<MessageItem> {
             ignoring: widget.readOnly && widget.onLocate != null,
             child: InteractiveMessageView(
               key: ValueKey(page?.sequence),
+              messageId: message.id,
               card: page?.snapshot ?? message.interactive!,
               members: widget.interactiveMembers,
               onOpenMember: widget.onOpenMember,

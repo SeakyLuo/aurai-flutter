@@ -110,6 +110,7 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
                     messageId: widget.result.id,
                   ),
                   child: InteractiveMessageView(
+                    messageId: widget.result.id,
                     card: _card!,
                     onRetry: (eventId) => widget.controller
                         .retryInteractiveCallback(widget.result.id, eventId),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'vote_appearance.dart';
+import 'question_option_appearance.dart';
 
 String voteSelectionHint(int minimum, int maximum) => minimum == maximum
     ? '请选择 $minimum 项'
@@ -37,7 +37,7 @@ class VoteSelectionHint extends StatelessWidget {
               TextSpan(
                 text: '$selectedCount',
                 style: TextStyle(
-                  color: VoteAppearance.accent(context),
+                  color: QuestionOptionAppearance.accent(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),

@@ -1,4 +1,5 @@
 import 'glass_notice.dart';
+import '../storage/interactive_selection_drafts.dart';
 import '../domain/error_message.dart';
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
@@ -43,6 +44,7 @@ class _AuraiStartupState extends State<AuraiStartup> {
       await Future.wait([
         AppearanceSettings.instance.load(),
         LanguageSettings.instance.load(),
+        InteractiveSelectionDrafts.instance.initialize(),
       ]);
       await controller.initialize();
       if (!mounted) {

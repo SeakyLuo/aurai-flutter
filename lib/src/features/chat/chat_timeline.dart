@@ -673,7 +673,7 @@ List<ChatTimelineEntry> buildChatTimeline(
             ),
             child: SizedBox(width: double.infinity, child: item),
           );
-        }, preserveState: message.htmlGame != null),
+        }, preserveState: message.htmlGame != null || message.interactive != null),
       if (!isGroup &&
           message.id != beforeMessageId &&
           (message.role != AgentMessageRole.assistant ||

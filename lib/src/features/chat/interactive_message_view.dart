@@ -1,4 +1,5 @@
 import '../../app/glass_notice.dart';
+import '../../storage/interactive_selection_drafts.dart';
 import 'interactive_button_layout.dart';
 import 'interaction_content.dart';
 import '../../domain/error_message.dart';
@@ -18,6 +19,7 @@ import 'vote_selection_hint.dart';
 class InteractiveMessageView extends StatefulWidget {
   const InteractiveMessageView({
     super.key,
+    this.messageId,
     required this.card,
     required this.onClick,
     required this.onOpenLink,
@@ -32,6 +34,7 @@ class InteractiveMessageView extends StatefulWidget {
     this.onOpenMember,
   });
   final InteractiveMessage card;
+  final String? messageId;
   final Map<String, MessageSender> members;
   final ValueChanged<String>? onOpenMember;
   final VoidCallback? onStatistics;
@@ -101,6 +104,17 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         _card.participantRevision(widget.actorId),
         value: value,
       );
+      if (result != null &&
+          widget.messageId != null &&
+          button['selection'] != null) {
+        await InteractiveSelectionDrafts.instance.save(
+          widget.messageId!,
+          widget.actorId,
+          button['id'] as String,
+          '',
+          {},
+        );
+      }
       if (result != null && mounted) {
         setState(() {
           _acceptCard(result.card);
@@ -123,6 +137,29 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         );
     } finally {
       if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  Future<void> _saveSelection(
+    String buttonId,
+    String version,
+    Set<String> selected,
+  ) async {
+    try {
+      await InteractiveSelectionDrafts.instance.save(
+        widget.messageId!,
+        widget.actorId,
+        buttonId,
+        version,
+        selected,
+      );
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
+      }
     }
   }
 
@@ -461,6 +498,18 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
             if (sharedView != null)
               InteractionContent(
                 key: ValueKey((widget.actorId, card.title, card.body)),
+                draftOwner:
+                    widget.messageId == null ||
+                        widget.readOnly ||
+                        widget.historical ||
+                        _card.snapshotView != null
+                    ? null
+                    : (
+                        messageId: widget.messageId!,
+                        actorId: widget.actorId,
+                        revision: _card.participantRevision(widget.actorId),
+                      ),
+                onSaveSelection: _saveSelection,
                 view: sharedView,
                 members: widget.members,
                 onOpenMember: widget.onOpenMember,
