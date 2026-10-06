@@ -15,11 +15,19 @@ class InteractiveMessageButton extends StatelessWidget {
     required this.busy,
     required this.locked,
     required this.onPressed,
+    this.primaryGradient = const LinearGradient(
+      colors: [Color(0xffa18ae8), Color(0xff8165d3)],
+    ),
+    this.radius = 12,
+    this.minimumHeight = 44,
+    this.fontSize = 14,
   });
   final Map<String, Object?> button;
   final bool busy;
   final bool locked;
   final VoidCallback onPressed;
+  final Gradient primaryGradient;
+  final double radius, minimumHeight, fontSize;
 
   @override
   Widget build(BuildContext context) {
@@ -64,16 +72,12 @@ class InteractiveMessageButton extends StatelessWidget {
         : storedLabel;
     return Material(
       color: background,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(radius),
       clipBehavior: Clip.antiAlias,
       child: Ink(
         decoration: BoxDecoration(
-          gradient: primary && !disabled
-              ? const LinearGradient(
-                  colors: [Color(0xffa18ae8), Color(0xff8165d3)],
-                )
-              : null,
-          borderRadius: BorderRadius.circular(12),
+          gradient: primary && !disabled ? primaryGradient : null,
+          borderRadius: BorderRadius.circular(radius),
           border: primary && !disabled
               ? null
               : Border.all(
@@ -83,7 +87,7 @@ class InteractiveMessageButton extends StatelessWidget {
         child: InkWell(
           onTap: locked || disabled ? null : onPressed,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 44),
+            constraints: BoxConstraints(minHeight: minimumHeight),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
               child: Row(
@@ -113,7 +117,7 @@ class InteractiveMessageButton extends StatelessWidget {
                       label,
                       textAlign: hasIcon ? TextAlign.start : TextAlign.center,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: fontSize,
                         fontWeight: FontWeight.w500,
                         height: 1.3,
                         color: foreground,

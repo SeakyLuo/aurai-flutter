@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../agent/ask_user_tool.dart';
-import '../../app/global_ui.dart';
 import 'settings_icon.dart';
+import 'vote_appearance.dart';
 
 class UserQuestionOptionTile extends StatelessWidget {
   const UserQuestionOptionTile({
@@ -26,7 +26,7 @@ class UserQuestionOptionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final accent = GlobalUI.highlightTextColor(context);
+    final accent = dark ? const Color(0xffc4b5fd) : const Color(0xff7959df);
     final marked = multiple || vote;
     return Semantics(
       selected: selected,
@@ -34,13 +34,17 @@ class UserQuestionOptionTile extends StatelessWidget {
       inMutuallyExclusiveGroup: !multiple,
       child: Material(
         color: selected
-            ? colors.primary.withValues(alpha: dark ? .19 : .14)
+            ? vote
+                  ? VoteAppearance.selectedBackground(context)
+                  : colors.primary.withValues(alpha: dark ? .19 : .14)
             : colors.onSurface.withValues(alpha: dark ? .08 : .045),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(marked ? 16 : 24),
           side: BorderSide(
             color: selected
-                ? accent.withValues(alpha: .38)
+                ? vote
+                      ? VoteAppearance.selectedBorder(context)
+                      : accent.withValues(alpha: .38)
                 : marked
                 ? colors.outlineVariant
                 : Colors.transparent,
@@ -91,8 +95,8 @@ class UserQuestionOptionTile extends StatelessWidget {
                             fontSize: 15,
                             height: 1.4,
                             fontWeight: FontWeight.w600,
-                            color: selected && marked
-                                ? accent
+                            color: vote && selected
+                                ? VoteAppearance.accent(context)
                                 : colors.onSurface,
                           ),
                         ),
@@ -103,11 +107,9 @@ class UserQuestionOptionTile extends StatelessWidget {
                         style: TextStyle(
                           fontSize: option.title == null ? 16 : 14,
                           height: 1.45,
-                          fontWeight: selected && marked
-                              ? FontWeight.w600
-                              : null,
-                          color: selected && marked
-                              ? accent
+                          fontWeight: vote && selected ? FontWeight.w600 : null,
+                          color: vote && selected
+                              ? VoteAppearance.accent(context)
                               : option.title == null
                               ? colors.onSurface
                               : colors.onSurfaceVariant,
@@ -124,14 +126,19 @@ class UserQuestionOptionTile extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: multiple ? BoxShape.rectangle : BoxShape.circle,
                       borderRadius: multiple ? BorderRadius.circular(6) : null,
-                      gradient: selected && multiple
-                          ? GlobalUI.primaryGradient
+                      color: selected && multiple
+                          ? vote
+                                ? null
+                                : colors.primary.withValues(alpha: .25)
+                          : null,
+                      gradient: vote && selected && multiple
+                          ? VoteAppearance.gradient
                           : null,
                       border: selected && multiple
                           ? null
                           : Border.all(
                               color: selected
-                                  ? colors.primary
+                                  ? accent
                                   : colors.onSurfaceVariant.withValues(
                                       alpha: .6,
                                     ),
@@ -140,12 +147,12 @@ class UserQuestionOptionTile extends StatelessWidget {
                     ),
                     child: selected
                         ? multiple
-                              ? const Padding(
+                              ? Padding(
                                   padding: EdgeInsets.all(3),
                                   child: FittedBox(
                                     child: SettingsIcon(
                                       type: SettingsIconType.check,
-                                      color: GlobalUI.onPrimary,
+                                      color: vote ? Colors.white : accent,
                                     ),
                                   ),
                                 )
@@ -153,9 +160,9 @@ class UserQuestionOptionTile extends StatelessWidget {
                                   child: Container(
                                     width: 12,
                                     height: 12,
-                                    decoration: const BoxDecoration(
+                                    decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      gradient: GlobalUI.primaryGradient,
+                                      color: accent,
                                     ),
                                   ),
                                 )

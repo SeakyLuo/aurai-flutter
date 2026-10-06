@@ -76,30 +76,35 @@ class QuestionSheetLayout extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ThinkingIndicator(
-                            label: title,
-                            animate: false,
-                            singleLine: true,
-                            leading: SizedBox.square(
-                              dimension: MediaQuery.textScalerOf(
-                                context,
-                              ).scale(18),
-                              child: const FittedBox(
-                                child: QuestionIcon(
-                                  type: QuestionIconType.question,
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minHeight: kMinInteractiveDimension,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ThinkingIndicator(
+                              label: title,
+                              animate: false,
+                              singleLine: true,
+                              leading: SizedBox.square(
+                                dimension: MediaQuery.textScalerOf(
+                                  context,
+                                ).scale(18),
+                                child: const FittedBox(
+                                  child: QuestionIcon(
+                                    type: QuestionIconType.question,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                        if (trailing case final trailing?) ...[
-                          const SizedBox(width: 12),
-                          trailing,
+                          if (trailing case final trailing?) ...[
+                            const SizedBox(width: 12),
+                            trailing,
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                     if (sender case final sender?)
                       Padding(

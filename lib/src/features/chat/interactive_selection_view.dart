@@ -6,9 +6,9 @@ import 'interactive_message_button.dart';
 import '../../agent/ask_user_tool.dart';
 import 'user_question_option_tile.dart';
 import 'question_options_sheet.dart';
-import '../../utils/widget_utils.dart';
 import 'settings_icon.dart';
 import 'vote_selection_hint.dart';
+import 'vote_appearance.dart';
 
 class InteractiveSelectionView extends StatefulWidget {
   const InteractiveSelectionView({
@@ -264,20 +264,17 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView> {
             (!widget.question || config.multiple)) ...[
           const SizedBox(height: 8),
           if (!widget.question)
-            WidgetUtils.primaryButton(
-              text: '提交投票',
-              loading: widget.busy,
-              onPressed: locked || !valid
-                  ? null
-                  : () => widget.onSubmit(
-                      config.multiple
-                          ? [
-                              for (final option in config.options)
-                                if (_selected.contains(option['id']))
-                                  option['id'],
-                            ]
-                          : _selected.single,
-                    ),
+            VoteSubmitButton(
+              busy: widget.busy,
+              locked: locked || !valid,
+              onPressed: () => widget.onSubmit(
+                config.multiple
+                    ? [
+                        for (final option in config.options)
+                          if (_selected.contains(option['id'])) option['id'],
+                      ]
+                    : _selected.single,
+              ),
             )
           else
             InteractiveMessageButton(

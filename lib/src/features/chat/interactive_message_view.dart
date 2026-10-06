@@ -308,21 +308,15 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               VoteMessageHeading(
                 title: card.title,
                 multiple: multiple,
+                ongoing: ongoingVote,
                 trailing: widget.titleTrailing,
               )
             else
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (question || vote) ...[
-                    QuestionIcon(
-                      color: ongoingVote
-                          ? GlobalUI.highlightTextColor(context)
-                          : null,
-                      type: question
-                          ? QuestionIconType.question
-                          : QuestionIconType.vote,
-                    ),
+                  if (question) ...[
+                    const QuestionIcon(type: QuestionIconType.question),
                     const SizedBox(width: 8),
                   ],
                   Expanded(
@@ -515,15 +509,16 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               ),
             if (statisticsVisible && widget.onStatistics != null) ...[
               const SizedBox(height: 12),
-              TextButton(
-                onPressed: widget.onStatistics!,
-                child: Text(
-                  sharedView?['submitted'] != true && hiddenVoteOptions
+              InteractiveMessageButton(
+                button: {
+                  'label': sharedView?['submitted'] != true && hiddenVoteOptions
                       ? '查看全部选项'
                       : '查看详情',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: GlobalUI.highlightTextColor(context)),
-                ),
+                  'icon': 'none',
+                },
+                busy: false,
+                locked: false,
+                onPressed: widget.onStatistics!,
               ),
             ],
           ],

@@ -10,7 +10,7 @@ import 'thinking_indicator.dart';
 import 'user_question_option_tile.dart';
 import 'vote_message_heading.dart';
 import 'vote_selection_hint.dart';
-import '../../utils/widget_utils.dart';
+import 'vote_appearance.dart';
 
 Future<Set<int>?> showQuestionOptionsSheet(
   BuildContext context, {
@@ -407,12 +407,7 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
               child: VoteMessageHeading(
                 title: widget.title!,
                 multiple: widget.multiple,
-                trailing: SettingsGlassAction(
-                  label: '关闭',
-                  icon: Icons.close_rounded,
-                  iconWidget: const QuestionIcon(type: QuestionIconType.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
+                ongoing: !widget.readOnly,
               ),
             ),
             Flexible(
@@ -474,11 +469,10 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
             if (!widget.readOnly)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                child: WidgetUtils.primaryButton(
-                  text: '提交投票',
-                  onPressed: valid
-                      ? () => Navigator.pop(context, _selected)
-                      : null,
+                child: VoteSubmitButton(
+                  busy: false,
+                  locked: !valid,
+                  onPressed: () => Navigator.pop(context, _selected),
                 ),
               ),
             if (widget.actions case final actions?)

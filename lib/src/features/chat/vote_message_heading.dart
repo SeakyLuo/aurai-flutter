@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../app/global_ui.dart';
+import 'vote_appearance.dart';
 import 'question_icon.dart';
 
 class VoteMessageHeading extends StatelessWidget {
@@ -8,11 +8,13 @@ class VoteMessageHeading extends StatelessWidget {
     super.key,
     required this.title,
     required this.multiple,
+    required this.ongoing,
     this.trailing,
   });
 
   final String title;
   final bool multiple;
+  final bool ongoing;
   final Widget? trailing;
 
   @override
@@ -27,7 +29,10 @@ class VoteMessageHeading extends StatelessWidget {
       children: [
         Row(
           children: [
-            QuestionIcon(type: QuestionIconType.vote, color: colors.primary),
+            QuestionIcon(
+              type: QuestionIconType.vote,
+              color: ongoing ? colors.primary : colors.onSurfaceVariant,
+            ),
             const SizedBox(width: 8),
             Text(
               '投票',
@@ -49,7 +54,7 @@ class VoteMessageHeading extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: GlobalUI.highlightTextColor(context),
+                    color: VoteAppearance.accent(context),
                   ),
                 ),
               ),
