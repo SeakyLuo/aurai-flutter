@@ -11,6 +11,9 @@ import 'user_question_option_tile.dart';
 import 'vote_message_heading.dart';
 import 'vote_selection_hint.dart';
 import 'vote_appearance.dart';
+import 'vote_other_input.dart';
+import 'vote_other_option_tile.dart';
+import 'interactive_message_button.dart';
 
 Future<Set<int>?> showQuestionOptionsSheet(
   BuildContext context, {
@@ -21,12 +24,18 @@ Future<Set<int>?> showQuestionOptionsSheet(
   bool multiple = false,
   bool readOnly = false,
   bool vote = false,
+  bool anonymous = false,
+  String? voteStatus,
   int minimum = 1,
   int maximum = 1,
   Widget? actions,
   String? title,
   String? body,
   QuestionIconType? headerIcon,
+  int? otherIndex,
+  String otherText = '',
+  int otherMaxLength = 50,
+  ValueChanged<String>? onOtherTextChanged,
 }) async {
   final navigator = Navigator.of(context);
   final route = ModalBottomSheetRoute<Set<int>>(
@@ -40,7 +49,8 @@ Future<Set<int>?> showQuestionOptionsSheet(
       to: navigator.context,
     ),
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-    builder: (_) => AppSheetSurface(
+    builder: (context) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: _QuestionOptionsSheet(
         options: options,
         selected: selected,
@@ -48,12 +58,18 @@ Future<Set<int>?> showQuestionOptionsSheet(
         multiple: multiple,
         readOnly: readOnly,
         vote: vote,
+        anonymous: anonymous,
+        voteStatus: voteStatus,
         minimum: minimum,
         maximum: maximum,
         actions: actions,
         title: title,
         body: body,
         headerIcon: headerIcon,
+        otherIndex: otherIndex,
+        otherText: otherText,
+        otherMaxLength: otherMaxLength,
+        onOtherTextChanged: onOtherTextChanged,
       ),
     ),
   );
@@ -161,12 +177,18 @@ class _QuestionOptionsSheet extends StatefulWidget {
     required this.multiple,
     required this.readOnly,
     required this.vote,
+    required this.anonymous,
+    this.voteStatus,
     required this.minimum,
     required this.maximum,
     this.actions,
     this.title,
     this.body,
     this.headerIcon,
+    this.otherIndex,
+    this.otherText = '',
+    this.otherMaxLength = 50,
+    this.onOtherTextChanged,
   });
   final List<UserQuestionOption> options;
   final Set<int> selected;
@@ -174,10 +196,16 @@ class _QuestionOptionsSheet extends StatefulWidget {
   final bool multiple;
   final bool readOnly;
   final bool vote;
+  final bool anonymous;
+  final String? voteStatus;
   final int minimum, maximum;
   final Widget? actions;
   final String? title, body;
   final QuestionIconType? headerIcon;
+  final int? otherIndex;
+  final String otherText;
+  final int otherMaxLength;
+  final ValueChanged<String>? onOtherTextChanged;
 
   @override
   State<_QuestionOptionsSheet> createState() => _QuestionOptionsSheetState();
@@ -185,10 +213,43 @@ class _QuestionOptionsSheet extends StatefulWidget {
 
 class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
   late final _selected = {...widget.selected};
+  late String _otherText = widget.otherText;
+  bool _editingOther = false;
+
+  void _finishOther(String text) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _otherText = text;
+      _editingOther = false;
+      if (!widget.multiple) _selected.clear();
+      _selected.add(widget.otherIndex!);
+    });
+    widget.onOtherTextChanged?.call(text);
+    widget.onSelectionChanged?.call(Set.of(_selected));
+  }
+
+  void _cancelOther() {
+    FocusScope.of(context).unfocus();
+    setState(() => _editingOther = false);
+  }
 
   @override
-  Widget build(BuildContext context) => widget.vote
-      ? _buildVote(context)
+  Widget build(BuildContext context) => _editingOther
+      ? PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) _cancelOther();
+          },
+          child: VoteOtherInput(
+            title: widget.title!,
+            initialText: _otherText,
+            maxLength: widget.otherMaxLength,
+            onCancel: _cancelOther,
+            onComplete: _finishOther,
+          ),
+        )
+      : widget.vote
+      ? AppSheetSurface(child: _buildVote(context))
       : AppSheetSurface(
           child: SafeArea(
             top: false,
@@ -233,7 +294,9 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                                     ),
                                     onPressed: () => Navigator.pop(context),
                                   ),
-                                  if (widget.multiple && !widget.readOnly) ...[
+                                  if (widget.multiple &&
+                                      !widget.readOnly &&
+                                      widget.title == null) ...[
                                     const VerticalDivider(
                                       width: 1,
                                       indent: 12,
@@ -290,7 +353,9 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                               ),
                             ),
                           ),
-                          if (widget.multiple && !widget.readOnly)
+                          if (widget.multiple &&
+                              !widget.readOnly &&
+                              widget.title == null)
                             SettingsGlassAction(
                               label: '确认',
                               icon: Icons.check_rounded,
@@ -310,15 +375,11 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                     ),
                   if (widget.multiple && !widget.readOnly)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        widget.minimum == widget.maximum
-                            ? '请选择 ${widget.minimum} 项'
-                            : '请选择 ${widget.minimum}–${widget.maximum} 项',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: VoteSelectionHint(
+                        minimum: widget.minimum,
+                        maximum: widget.maximum,
+                        selectedCount: _selected.length,
                       ),
                     ),
                   Flexible(
@@ -379,6 +440,20 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                       },
                     ),
                   ),
+                  if (widget.multiple &&
+                      !widget.readOnly &&
+                      widget.title != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: InteractiveMessageButton(
+                        button: const {'label': '提交回答', 'style': 'primary'},
+                        busy: false,
+                        locked:
+                            _selected.length < widget.minimum ||
+                            _selected.length > widget.maximum,
+                        onPressed: () => Navigator.pop(context, _selected),
+                      ),
+                    ),
                   if (widget.actions case final actions?)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -398,7 +473,8 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
         widget.body != '$hint。';
     final valid =
         _selected.length >= widget.minimum &&
-        _selected.length <= widget.maximum;
+        _selected.length <= widget.maximum &&
+        (!_selected.contains(widget.otherIndex) || _otherText.isNotEmpty);
     return SafeArea(
       top: false,
       child: ConstrainedBox(
@@ -414,7 +490,9 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
               child: VoteMessageHeading(
                 title: widget.title!,
                 multiple: widget.multiple,
-                ongoing: !widget.readOnly,
+                ongoing: widget.voteStatus == '进行中',
+                anonymous: widget.anonymous,
+                status: widget.voteStatus,
               ),
             ),
             Flexible(
@@ -442,36 +520,66 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                       padding: EdgeInsets.only(
                         bottom: index == widget.options.length - 1 ? 0 : 8,
                       ),
-                      child: UserQuestionOptionTile(
-                        option: option,
-                        number: index + 1,
-                        selected: _selected.contains(index),
-                        multiple: widget.multiple,
-                        vote: true,
-                        onTap:
-                            widget.readOnly ||
-                                widget.multiple &&
-                                    !_selected.contains(index) &&
-                                    _selected.length >= widget.maximum
-                            ? null
-                            : () {
-                                if (!widget.multiple) {
-                                  setState(() {
-                                    _selected
-                                      ..clear()
-                                      ..add(index);
-                                  });
-                                } else {
-                                  setState(() {
-                                    if (!_selected.remove(index))
-                                      _selected.add(index);
-                                  });
-                                }
-                                widget.onSelectionChanged?.call(
-                                  Set.of(_selected),
-                                );
-                              },
-                      ),
+                      child: index == widget.otherIndex
+                          ? VoteOtherOptionTile(
+                              text: _otherText,
+                              selected: _selected.contains(index),
+                              multiple: widget.multiple,
+                              number: index + 1,
+                              onEdit:
+                                  widget.readOnly ||
+                                      widget.multiple &&
+                                          !_selected.contains(index) &&
+                                          _selected.length >= widget.maximum
+                                  ? null
+                                  : () => setState(() => _editingOther = true),
+                              onToggle:
+                                  widget.readOnly ||
+                                      widget.multiple &&
+                                          !_selected.contains(index) &&
+                                          _selected.length >= widget.maximum
+                                  ? null
+                                  : () {
+                                      if (_selected.contains(index)) {
+                                        setState(() => _selected.remove(index));
+                                        widget.onSelectionChanged?.call(
+                                          Set.of(_selected),
+                                        );
+                                      } else {
+                                        setState(() => _editingOther = true);
+                                      }
+                                    },
+                            )
+                          : UserQuestionOptionTile(
+                              option: option,
+                              number: index + 1,
+                              selected: _selected.contains(index),
+                              multiple: widget.multiple,
+                              vote: true,
+                              onTap:
+                                  widget.readOnly ||
+                                      widget.multiple &&
+                                          !_selected.contains(index) &&
+                                          _selected.length >= widget.maximum
+                                  ? null
+                                  : () {
+                                      if (!widget.multiple) {
+                                        setState(() {
+                                          _selected
+                                            ..clear()
+                                            ..add(index);
+                                        });
+                                      } else {
+                                        setState(() {
+                                          if (!_selected.remove(index))
+                                            _selected.add(index);
+                                        });
+                                      }
+                                      widget.onSelectionChanged?.call(
+                                        Set.of(_selected),
+                                      );
+                                    },
+                            ),
                     ),
                 ],
               ),

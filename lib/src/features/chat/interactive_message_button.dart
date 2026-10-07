@@ -9,6 +9,7 @@ import 'conversation_icon.dart';
 import '../../skills/extra_skill_icon.dart';
 
 class InteractiveMessageButton extends StatelessWidget {
+  static const double defaultFontSize = 14;
   const InteractiveMessageButton({
     super.key,
     required this.button,
@@ -20,7 +21,7 @@ class InteractiveMessageButton extends StatelessWidget {
     ),
     this.radius = 12,
     this.minimumHeight = 44,
-    this.fontSize = 14,
+    this.fontSize = defaultFontSize,
   });
   final Map<String, Object?> button;
   final bool busy;

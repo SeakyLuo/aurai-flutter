@@ -27,6 +27,7 @@ Future<InteractiveMessage> enqueueInteractiveCompletion(
   final choicesVisible = current.visible('visibility', actor: creatorId);
   final result = <String, Object?>{
     'title': current.title,
+    if (current.anonymous) 'anonymous': true,
     'revision': current.revision,
     'round': round,
     'sessionVersion': current.sessionVersion,
@@ -54,7 +55,8 @@ Future<InteractiveMessage> enqueueInteractiveCompletion(
     if (current.shared && choicesVisible) 'state': current.engine.state,
   };
   if (notifyVote) {
-    final ownChoice = actorId == creatorId || choicesVisible;
+    final ownChoice =
+        !current.anonymous && (actorId == creatorId || choicesVisible);
     final submission = current.choices[actorId];
     await MessageCallbacks.enqueue(
       db,
@@ -70,8 +72,7 @@ Future<InteractiveMessage> enqueueInteractiveCompletion(
             : previous.choices.containsKey(actorId)
             ? 'change'
             : 'submit',
-        'actorId': actorId,
-        'actorName': actorName,
+        if (!current.anonymous) ...{'actorId': actorId, 'actorName': actorName},
         if (ownChoice && submission != null)
           'submission': {
             'buttonId': submission['buttonId'],

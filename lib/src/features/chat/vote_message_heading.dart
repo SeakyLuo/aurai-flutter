@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'question_option_appearance.dart';
 import 'question_icon.dart';
+import 'interactive_status_tag.dart';
 
 class VoteMessageHeading extends StatelessWidget {
   const VoteMessageHeading({
@@ -9,18 +9,22 @@ class VoteMessageHeading extends StatelessWidget {
     required this.title,
     required this.multiple,
     required this.ongoing,
+    required this.anonymous,
+    this.status,
     this.trailing,
   });
 
   final String title;
   final bool multiple;
   final bool ongoing;
+  final bool anonymous;
+  final String? status;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    // Selection mode already has its own label; omit the duplicate title suffix.
+    // Selection limits describe multiple choice; omit the redundant title suffix.
     final displayTitle = multiple
         ? title.replaceFirst(RegExp(r'\s*[（(]可多选[）)]\s*$'), '')
         : title;
@@ -31,38 +35,20 @@ class VoteMessageHeading extends StatelessWidget {
           children: [
             QuestionIcon(
               type: QuestionIconType.vote,
-              color: ongoing ? colors.primary : colors.onSurfaceVariant,
+              color: colors.onSurfaceVariant,
             ),
             const SizedBox(width: 8),
             Text(
-              '投票',
+              anonymous ? '匿名投票' : '投票',
               style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
             ),
             const Spacer(),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.primary.withValues(alpha: .2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 5,
-                ),
-                child: Text(
-                  multiple ? '多选' : '单选',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: QuestionOptionAppearance.accent(context),
-                  ),
-                ),
-              ),
-            ),
+            if (status != null)
+              InteractiveStatusTag(label: status!, highlighted: ongoing),
             if (trailing != null) ...[const SizedBox(width: 8), trailing!],
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 8),
         Text(
           displayTitle,
           style: TextStyle(

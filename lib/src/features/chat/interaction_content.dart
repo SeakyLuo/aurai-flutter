@@ -1,4 +1,5 @@
 import 'interactive_button_layout.dart';
+import 'participation_summary.dart';
 import 'dart:convert';
 import '../../storage/interactive_selection_drafts.dart';
 import '../../app/global_ui.dart';
@@ -24,6 +25,7 @@ class InteractionContent extends StatelessWidget {
     this.pendingButtonId,
     required this.onClick,
     this.question = false,
+    this.statusInHeading = false,
     required this.compactOptions,
     required this.title,
     required this.body,
@@ -41,6 +43,7 @@ class InteractionContent extends StatelessWidget {
   final String? busy;
   final String? pendingButtonId;
   final bool question;
+  final bool statusInHeading;
   final bool compactOptions;
   final String title, body;
   final Map<String, MessageSender> members;
@@ -48,7 +51,12 @@ class InteractionContent extends StatelessWidget {
   final VoidCallback? onStatistics;
   final VoidCallback? onCancelVote;
   final ({String messageId, String actorId, int revision})? draftOwner;
-  final void Function(String buttonId, String version, Set<String> selected)?
+  final void Function(
+    String buttonId,
+    String version,
+    Set<String> selected,
+    String otherText,
+  )?
   onSaveSelection;
 
   String _draftVersion(Map<String, Object?> button) =>
@@ -95,9 +103,16 @@ class InteractionContent extends StatelessWidget {
         ? (eligible ? '进行中' : '进行中 · 仅可查看')
         : null;
     final participationSummary = [
-      if (status != null && !editingSelection) status,
+      if (status != null &&
+          status != '已结束' &&
+          !editingSelection &&
+          !statusInHeading)
+        status,
       if (!question && view['summaryVisible'] == true)
-        '${view['submittedCount']} 人参与',
+        participationSummaryText(
+          view['submittedCount'] as int,
+          view['eligibleCount'] as int?,
+        ),
     ].join(' · ');
     final actions = participantButtons
         .where((button) => !question || answer == null)
@@ -192,15 +207,32 @@ class InteractionContent extends StatelessWidget {
                       button['id'] as String,
                       _draftVersion(button),
                     ),
+              draftOtherText: draftOwner == null || !editingSelection
+                  ? null
+                  : InteractiveSelectionDrafts.instance.readOtherText(
+                      draftOwner!.messageId,
+                      draftOwner!.actorId,
+                      button['id'] as String,
+                      _draftVersion(button),
+                    ),
               onSelectionChanged: draftOwner == null || !editingSelection
                   ? null
-                  : (selected) => onSaveSelection!(
+                  : (selected, otherText) => onSaveSelection!(
                       button['id'] as String,
                       _draftVersion(button),
                       selected,
+                      otherText,
                     ),
               button: button,
               question: question,
+              anonymous: view['anonymous'] == true,
+              voteStatus: question
+                  ? null
+                  : view['closed'] == true || view['phase'] == 'closed'
+                  ? '已结束'
+                  : view['completed'] == true
+                  ? '本轮已完成'
+                  : '进行中',
               compactOptions: compactOptions,
               title: title,
               body: body,
@@ -273,6 +305,7 @@ class InteractionDistribution extends StatelessWidget {
     required this.data,
     this.hideZeroVotes = false,
     this.highlightHighest = false,
+    this.showMyChoice = false,
     this.submissions,
     this.members = const {},
     this.onOpenMember,
@@ -281,6 +314,7 @@ class InteractionDistribution extends StatelessWidget {
   final Map<String, Object?> data;
   final bool hideZeroVotes;
   final bool highlightHighest;
+  final bool showMyChoice;
   final Map? submissions;
   final Map<String, MessageSender> members;
   final ValueChanged<String>? onOpenMember;
@@ -290,7 +324,7 @@ class InteractionDistribution extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final total = data['total'] as num;
-    final selected = data['selected'] as Map?;
+    final selected = showMyChoice ? data['selected'] as Map? : null;
     final options = (data['items'] as List)
         .where((option) => !hideZeroVotes || option['count'] != 0)
         .toList();

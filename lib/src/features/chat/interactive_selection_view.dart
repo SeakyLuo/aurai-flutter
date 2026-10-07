@@ -9,6 +9,8 @@ import 'question_options_sheet.dart';
 import 'settings_icon.dart';
 import 'vote_selection_hint.dart';
 import 'vote_appearance.dart';
+import 'vote_other_input.dart';
+import 'vote_other_option_tile.dart';
 
 class InteractiveSelectionView extends StatefulWidget {
   const InteractiveSelectionView({
@@ -22,12 +24,15 @@ class InteractiveSelectionView extends StatefulWidget {
     required this.onSubmit,
     this.showSubmit = true,
     this.question = false,
+    this.anonymous = false,
+    this.voteStatus,
     required this.compactOptions,
     required this.title,
     required this.body,
     this.sheetActions,
     this.summary,
     this.draftSelection,
+    this.draftOtherText,
     this.onSelectionChanged,
   });
   final Map<String, Object?> button;
@@ -35,12 +40,16 @@ class InteractiveSelectionView extends StatefulWidget {
   final bool locked, submitted, allowChange, busy;
   final bool showSubmit;
   final bool question;
+  final bool anonymous;
+  final String? voteStatus;
   final bool compactOptions;
   final String title, body;
   final Widget? sheetActions;
   final String? summary;
   final Set<String>? draftSelection;
-  final ValueChanged<Set<String>>? onSelectionChanged;
+  final String? draftOtherText;
+  final void Function(Set<String> selected, String otherText)?
+  onSelectionChanged;
   final ValueChanged<Object> onSubmit;
 
   @override
@@ -52,6 +61,32 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
     with AutomaticKeepAliveClientMixin {
   Completer<void>? _pickerClosed;
   late Set<String> _selected = widget.draftSelection ?? _saved;
+  late String _otherText = widget.draftOtherText ?? _savedOtherText;
+  String get _savedOtherText => widget.self?['buttonId'] == widget.button['id']
+      ? ((widget.self?['selections'] as List? ?? const [])
+                    .where(
+                      (option) =>
+                          option['optionId'] == InteractiveSelection.otherId,
+                    )
+                    .firstOrNull?['text']
+                as String? ??
+            '')
+      : '';
+  void _saveDraft() =>
+      widget.onSelectionChanged?.call(Set.of(_selected), _otherText);
+  Object _submission() {
+    final config = selection;
+    final selected = config.multiple
+        ? [
+            for (final option in config.options)
+              if (_selected.contains(option['id'])) option['id'],
+          ]
+        : _selected.single;
+    return config.hasOther && _selected.contains(InteractiveSelection.otherId)
+        ? {'options': selected, 'otherText': _otherText}
+        : selected;
+  }
+
   @override
   bool get wantKeepAlive => widget.busy || _pickerClosed != null;
   InteractiveSelection get selection => InteractiveSelection(
@@ -70,6 +105,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
             jsonEncode(widget.button['selection']) ||
         jsonEncode(oldWidget.self) != jsonEncode(widget.self)) {
       _selected = _saved;
+      _otherText = _savedOtherText;
     }
     if (_pickerClosed != null &&
         (jsonEncode(oldWidget.button['selection']) !=
@@ -114,6 +150,12 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
         for (final option in config.options)
           UserQuestionOption(content: option['label'] as String),
       ],
+      otherIndex: config.hasOther ? config.options.length - 1 : null,
+      otherText: _otherText,
+      otherMaxLength: config.otherMaxLength,
+      onOtherTextChanged: (text) {
+        setState(() => _otherText = text);
+      },
       selected: {
         for (final (index, option) in config.options.indexed)
           if (_selected.contains(option['id'])) index,
@@ -125,9 +167,11 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
             for (final index in selected) config.options[index]['id'] as String,
           };
         });
-        widget.onSelectionChanged?.call(Set.of(_selected));
+        _saveDraft();
       },
       vote: !widget.question,
+      anonymous: widget.anonymous,
+      voteStatus: widget.voteStatus,
       minimum: config.minimum,
       maximum: config.maximum,
       readOnly:
@@ -146,16 +190,9 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
         for (final index in selected) config.options[index]['id'] as String,
       };
     });
-    widget.onSelectionChanged?.call(Set.of(_selected));
+    _saveDraft();
     updateKeepAlive();
-    widget.onSubmit(
-      config.multiple
-          ? [
-              for (final option in config.options)
-                if (_selected.contains(option['id'])) option['id'],
-            ]
-          : _selected.single,
-    );
+    widget.onSubmit(_submission());
     if (identical(_pickerClosed, closed)) _closePicker();
   }
 
@@ -174,7 +211,17 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
         !answeredQuestion && widget.compactOptions && config.options.length > 5;
     final valid =
         _selected.length >= config.minimum &&
-        _selected.length <= config.maximum;
+        _selected.length <= config.maximum &&
+        (!_selected.contains(InteractiveSelection.otherId) ||
+            !config.hasOther ||
+            _otherText.isNotEmpty);
+    final visibleOptions = config.options
+        .take(truncated ? 4 : config.options.length)
+        .indexed
+        .where(
+          (entry) => !answeredQuestion || _selected.contains(entry.$2['id']),
+        )
+        .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -183,7 +230,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
             (config.multiple || widget.summary?.isNotEmpty == true))
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: !widget.question
+            child: !widget.question || config.multiple
                 ? VoteSelectionHint(
                     minimum: config.minimum,
                     maximum: config.maximum,
@@ -212,14 +259,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
                     ],
                   ),
           ),
-        for (final (index, option)
-            in config.options
-                .take(truncated ? 4 : config.options.length)
-                .indexed
-                .where(
-                  (entry) =>
-                      !answeredQuestion || _selected.contains(entry.$2['id']),
-                ))
+        for (final (index, option) in visibleOptions)
           Builder(
             builder: (context) {
               final id = option['id'] as String;
@@ -241,27 +281,49 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
               });
               void choose() {
                 toggle();
-                widget.onSelectionChanged?.call(Set.of(_selected));
+                _saveDraft();
                 updateKeepAlive();
                 if (widget.question && !config.multiple) widget.onSubmit(id);
               }
 
               return Padding(
-                padding: EdgeInsets.only(bottom: answeredQuestion ? 0 : 8),
-                child: UserQuestionOptionTile(
-                  option: UserQuestionOption(
-                    content: option['label'] as String,
-                  ),
-                  number: index + 1,
-                  multiple: config.multiple,
-                  vote: !widget.question,
-                  selected: selected,
-                  onTap: answeredQuestion
-                      ? null
-                      : enabled
-                      ? choose
-                      : null,
+                padding: EdgeInsets.only(
+                  bottom: answeredQuestion && index == visibleOptions.last.$1
+                      ? 0
+                      : 8,
                 ),
+                child: config.hasOther && id == InteractiveSelection.otherId
+                    ? VoteOtherOptionTile(
+                        text: _otherText,
+                        selected: selected,
+                        multiple: config.multiple,
+                        number: index + 1,
+                        fontSize: InteractiveMessageButton.defaultFontSize,
+                        onEdit: enabled ? _editOther : null,
+                        onToggle: enabled
+                            ? selected
+                                  ? () {
+                                      setState(() => _selected.remove(id));
+                                      _saveDraft();
+                                    }
+                                  : _editOther
+                            : null,
+                      )
+                    : UserQuestionOptionTile(
+                        option: UserQuestionOption(
+                          content: option['label'] as String,
+                        ),
+                        number: index + 1,
+                        multiple: config.multiple,
+                        vote: !widget.question,
+                        fontSize: InteractiveMessageButton.defaultFontSize,
+                        selected: selected,
+                        onTap: answeredQuestion
+                            ? null
+                            : enabled
+                            ? choose
+                            : null,
+                      ),
               );
             },
           ),
@@ -279,7 +341,9 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              '已选：${config.options.where((option) => _selected.contains(option['id'])).map((option) => option['label']).join('、')}',
+              '已选：${config.options.where((option) => _selected.contains(option['id'])).map((option) => config.hasOther && option['id'] == InteractiveSelection.otherId ? '其他：$_otherText' : option['label']).join('、')}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
             ),
           ),
@@ -289,21 +353,17 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
           const SizedBox(height: 8),
           if (!widget.question)
             VoteSubmitButton(
+              fontSize: InteractiveMessageButton.defaultFontSize,
               busy: widget.busy,
               locked: locked || !valid,
-              onPressed: () => widget.onSubmit(
-                config.multiple
-                    ? [
-                        for (final option in config.options)
-                          if (_selected.contains(option['id'])) option['id'],
-                      ]
-                    : _selected.single,
-              ),
+              onPressed: () => widget.onSubmit(_submission()),
             )
           else
             InteractiveMessageButton(
               button: {
                 ...widget.button,
+                'label': '提交回答',
+                'style': 'primary',
                 if (widget.submitted && !widget.allowChange)
                   'label':
                       widget.button['completedLabel'] ?? widget.button['label'],
@@ -318,5 +378,28 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
         ],
       ],
     );
+  }
+
+  Future<void> _editOther() async {
+    if (_pickerClosed != null) return;
+    final config = selection;
+    final closed = Completer<void>();
+    _pickerClosed = closed;
+    updateKeepAlive();
+    final text = await showVoteOtherInput(
+      context,
+      title: widget.title,
+      initialText: _otherText,
+      maxLength: config.otherMaxLength,
+      closeWhen: closed.future,
+    );
+    if (identical(_pickerClosed, closed)) _closePicker();
+    if (!mounted || text == null || _locked) return;
+    setState(() {
+      _otherText = text;
+      if (!config.multiple) _selected.clear();
+      _selected.add(InteractiveSelection.otherId);
+    });
+    _saveDraft();
   }
 }

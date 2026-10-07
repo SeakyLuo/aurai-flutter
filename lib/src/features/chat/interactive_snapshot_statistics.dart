@@ -23,6 +23,7 @@ class InteractiveSnapshotStatistics extends StatelessWidget {
         const SizedBox(height: 16),
         if (visible && distribution != null)
           InteractionDistribution(
+            showMyChoice: true,
             highlightHighest: view!['completed'] == true,
             data: {
               'items': distribution,

@@ -1,19 +1,35 @@
-/// Fixed options are resolved here for both human and AI submissions.
+import 'package:characters/characters.dart';
+
+/// Options and optional written answers are resolved for human and AI submissions.
 class InteractiveSelection {
   InteractiveSelection(this.config);
   final Map<String, Object?> config;
   bool get multiple => config['mode'] == 'multiple';
-  List<Map<String, Object?>> get options => (config['options'] as List)
-      .map((option) => Map<String, Object?>.from(option as Map))
-      .toList();
+  static const otherId = '__other__';
+  bool get hasOther => config['other'] != null;
+  int get otherMaxLength =>
+      (config['other'] as Map?)?['maxLength'] as int? ?? 50;
+  List<Map<String, Object?>> get options => [
+    for (final option in config['options'] as List)
+      Map<String, Object?>.from(option as Map),
+    if (hasOther) {'id': otherId, 'label': '其他'},
+  ];
   int get minimum => config['minSelections'] as int? ?? 1;
   int get maximum =>
       multiple ? config['maxSelections'] as int? ?? options.length : 1;
 
   void validate() {
+    if (hasOther &&
+        (config['other'] is! Map ||
+            (config['other'] as Map)['maxLength'] != null &&
+                (config['other'] as Map)['maxLength'] is! int ||
+            otherMaxLength < 1 ||
+            otherMaxLength > 500)) {
+      throw ArgumentError('其他选项字数上限须为 1–500，默认 50');
+    }
     if (!['single', 'multiple'].contains(config['mode']) ||
         options.isEmpty ||
-        options.length > 25 ||
+        (config['options'] as List).length > 25 ||
         minimum < 1 ||
         maximum < minimum ||
         maximum > options.length ||
@@ -36,6 +52,14 @@ class InteractiveSelection {
   }
 
   Map<String, Object?> resolve(Map<String, Object?> button, Object? input) {
+    String? otherText;
+    if (input is Map) {
+      if (!hasOther || input['otherText'] is! String) {
+        throw ArgumentError('这个选项不接受自填内容');
+      }
+      otherText = (input['otherText'] as String).trim();
+      input = input['options'];
+    }
     if (multiple ? input is! List : input is! String)
       throw ArgumentError(multiple ? '请提供所选选项标识数组' : '请提供所选选项标识');
     final ids = multiple ? List<Object?>.from(input as List) : [input];
@@ -45,6 +69,15 @@ class InteractiveSelection {
         ids.any((id) => !options.any((option) => option['id'] == id))) {
       throw ArgumentError('请选择 $minimum–$maximum 个有效且不重复的选项');
     }
+    if (hasOther && ids.contains(otherId)) {
+      if (otherText == null ||
+          otherText.isEmpty ||
+          otherText.characters.length > otherMaxLength) {
+        throw ArgumentError('请填写其他选项，最多 $otherMaxLength 字');
+      }
+    } else if (otherText != null) {
+      throw ArgumentError('填写内容必须同时选择其他选项');
+    }
     final selected = [
       for (final option in options)
         if (ids.contains(option['id']))
@@ -52,7 +85,10 @@ class InteractiveSelection {
             'buttonId': '${button['id']}/${option['id']}',
             'optionId': option['id'],
             'label': option['label'],
-            'value': option.containsKey('value')
+            if (hasOther && option['id'] == otherId) 'text': otherText,
+            'value': hasOther && option['id'] == otherId
+                ? otherText
+                : option.containsKey('value')
                 ? option['value']
                 : option['id'],
           },
@@ -91,7 +127,9 @@ List<Map<String, Object?>> interactionSummary(
 
   for (final button in buttons) {
     if (button['selection'] case final Map config) {
-      for (final option in config['options'] as List) {
+      for (final option in InteractiveSelection(
+        Map<String, Object?>.from(config),
+      ).options) {
         add({
           'buttonId': '${button['id']}/${option['id']}',
           'label': option['label'],

@@ -10,6 +10,8 @@ extension _FailureRetry on _MessageItemState {
       ]),
       builder: (context, _) => FutureBuilder<Map<String, bool?>>(
         future: controller.failedRecoveryOptions(),
+        // A recycled card must not briefly replace its resolved playback icon.
+        initialData: controller.resolvedFailedRecoveryOptions,
         builder: (context, snapshot) => Padding(
           padding: const EdgeInsets.only(top: 6, bottom: 8),
           child: MenuPressHighlight(
@@ -246,7 +248,7 @@ extension _MessageItemActions on _MessageItemState {
       }
       if (!mounted) return;
     }
-    if (snapshot.interactive != null &&
+    if (snapshot.interactive?.showHistory == true &&
         (!widget.readOnly || widget.onLocate != null)) {
       try {
         hasHistory = await hasInteractiveHistory(

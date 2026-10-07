@@ -11,14 +11,26 @@ Future<void> openMemberProfile(
   required ChatController controller,
   required MessageSender sender,
   String? groupId,
+}) => openMemberProfileById(
+  context,
+  controller: controller,
+  senderId: sender.id,
+  groupId: groupId,
+);
+
+Future<void> openMemberProfileById(
+  BuildContext context, {
+  required ChatController controller,
+  required String senderId,
+  String? groupId,
 }) => openProfileRoute(
   context,
   MaterialPageRoute<void>(
-    builder: (_) => sender.id == MessageSender.localUser.id
+    builder: (_) => senderId == MessageSender.localUser.id
         ? PersonalInfoPage(memory: controller.memory)
         : AiContactPage(
             controller: controller,
-            senderId: sender.id,
+            senderId: senderId,
             groupId: groupId,
           ),
   ),

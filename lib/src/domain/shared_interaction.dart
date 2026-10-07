@@ -147,6 +147,8 @@ class SharedInteraction {
     'completed': closed || phase != 'collecting',
     'submitted': submissions.containsKey(actorId),
     if (summaryVisible) 'submittedCount': submissions.length,
+    if (summaryVisible && definition['actors'] != null)
+      'eligibleCount': (definition['actors'] as List).length,
     'self': submissions[actorId],
     'revealed': choicesVisible || summaryVisible,
     'summaryVisible': summaryVisible,

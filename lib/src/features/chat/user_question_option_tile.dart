@@ -13,6 +13,9 @@ class UserQuestionOptionTile extends StatelessWidget {
     required this.onTap,
     this.multiple = false,
     this.vote = false,
+    this.fontSize,
+    this.onIndicatorTap,
+    this.contentMaxLines,
   });
 
   final UserQuestionOption option;
@@ -21,6 +24,9 @@ class UserQuestionOptionTile extends StatelessWidget {
   final VoidCallback? onTap;
   final bool multiple;
   final bool vote;
+  final double? fontSize;
+  final VoidCallback? onIndicatorTap;
+  final int? contentMaxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +94,7 @@ class UserQuestionOptionTile extends StatelessWidget {
                         Text(
                           option.title!,
                           style: TextStyle(
-                            fontSize: 15,
+                            fontSize: fontSize ?? 15,
                             height: 1.4,
                             fontWeight: FontWeight.w600,
                             color: colors.onSurface,
@@ -98,8 +104,13 @@ class UserQuestionOptionTile extends StatelessWidget {
                       ],
                       Text(
                         option.content,
+                        maxLines: contentMaxLines,
+                        overflow: contentMaxLines == null
+                            ? null
+                            : TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: option.title == null ? 16 : 14,
+                          fontSize:
+                              fontSize ?? (option.title == null ? 16 : 14),
                           height: 1.45,
                           color: option.title == null
                               ? colors.onSurface
@@ -111,48 +122,56 @@ class UserQuestionOptionTile extends StatelessWidget {
                 ),
                 if (marked) ...[
                   const SizedBox(width: 16),
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: multiple ? BoxShape.rectangle : BoxShape.circle,
-                      borderRadius: multiple ? BorderRadius.circular(6) : null,
-                      color: selected && multiple
-                          ? QuestionOptionAppearance.selectedIndicator(context)
+                  GestureDetector(
+                    onTap: onIndicatorTap,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: multiple ? BoxShape.rectangle : BoxShape.circle,
+                        borderRadius: multiple
+                            ? BorderRadius.circular(6)
+                            : null,
+                        color: selected && multiple
+                            ? QuestionOptionAppearance.selectedIndicator(
+                                context,
+                              )
+                            : null,
+                        border: selected && multiple
+                            ? null
+                            : Border.all(
+                                color: selected
+                                    ? accent
+                                    : colors.onSurfaceVariant.withValues(
+                                        alpha: .6,
+                                      ),
+                                width: 1.65,
+                              ),
+                      ),
+                      child: selected
+                          ? multiple
+                                ? Padding(
+                                    padding: EdgeInsets.all(3),
+                                    child: FittedBox(
+                                      child: SettingsIcon(
+                                        type: SettingsIconType.check,
+                                        color: accent,
+                                      ),
+                                    ),
+                                  )
+                                : Center(
+                                    child: Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: accent,
+                                      ),
+                                    ),
+                                  )
                           : null,
-                      border: selected && multiple
-                          ? null
-                          : Border.all(
-                              color: selected
-                                  ? accent
-                                  : colors.onSurfaceVariant.withValues(
-                                      alpha: .6,
-                                    ),
-                              width: 1.65,
-                            ),
                     ),
-                    child: selected
-                        ? multiple
-                              ? Padding(
-                                  padding: EdgeInsets.all(3),
-                                  child: FittedBox(
-                                    child: SettingsIcon(
-                                      type: SettingsIconType.check,
-                                      color: accent,
-                                    ),
-                                  ),
-                                )
-                              : Center(
-                                  child: Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: accent,
-                                    ),
-                                  ),
-                                )
-                        : null,
                   ),
                 ],
               ],

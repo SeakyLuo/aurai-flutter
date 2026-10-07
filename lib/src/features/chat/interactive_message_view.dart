@@ -6,15 +6,14 @@ import '../../domain/error_message.dart';
 import 'interactive_message_button.dart';
 import 'package:flutter/material.dart';
 import '../../domain/interactive_message.dart';
-import 'question_icon.dart';
 import '../../domain/message_sender.dart';
 import '../../app/global_ui.dart';
-import 'member_avatar.dart';
 import '../../domain/interactive_selection.dart';
 import '../../agent/ask_user_tool.dart';
 import 'question_sheet.dart';
 import 'vote_message_heading.dart';
 import 'vote_selection_hint.dart';
+import 'question_message_heading.dart';
 
 class InteractiveMessageView extends StatefulWidget {
   const InteractiveMessageView({
@@ -144,6 +143,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
     String buttonId,
     String version,
     Set<String> selected,
+    String otherText,
   ) async {
     try {
       await InteractiveSelectionDrafts.instance.save(
@@ -152,6 +152,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         buttonId,
         version,
         selected,
+        otherText: otherText,
       );
     } on Object catch (error) {
       if (mounted) {
@@ -252,10 +253,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
     final repeatedSelectionBody =
         selectionHint != null &&
         (card.body == selectionHint || card.body == '$selectionHint。');
-    final question =
-        !vote &&
-        (_card.interaction['actors'] as List?)?.length == 1 &&
-        card.buttons.any((button) => button['selection'] != null);
+    final question = _card.isQuestion;
     final recipient = question
         ? widget.members[(_card.interaction['actors'] as List).single]
         : null;
@@ -300,6 +298,19 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               ((sharedView?['choices'] as List?)?.firstOrNull as Map?))
         : null;
     final compactAnswered = question && answer != null;
+    Widget questionHeading() => QuestionMessageHeading(
+      title: card.title,
+      description: card.body,
+      multiple: multiple,
+      recipient: recipient,
+      status: answered
+          ? '已回答'
+          : card.closed
+          ? '已结束'
+          : '待回答',
+      onOpenMember: widget.onOpenMember,
+      trailing: widget.titleTrailing,
+    );
     Future<void> openAnsweredQuestion() async {
       final button = card.buttons.singleWhere(
         (button) => button['id'] == answer!['buttonId'],
@@ -312,8 +323,13 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         child: Builder(
           builder: (context) => QuestionSheetLayout(
             title: card.title,
+            heading: Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 16),
+              child: questionHeading(),
+            ),
             child: QuestionAnswerContent(
               question: card.body,
+              showQuestion: false,
               options: [
                 for (final option in config.options)
                   UserQuestionOption(content: option['label'] as String),
@@ -346,16 +362,20 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                 title: card.title,
                 multiple: multiple,
                 ongoing: ongoingVote,
+                anonymous: card.anonymous,
+                status: card.closed || sharedView?['closed'] == true
+                    ? '已结束'
+                    : sharedView?['completed'] == true
+                    ? '本轮已完成'
+                    : '进行中',
                 trailing: widget.titleTrailing,
               )
+            else if (question)
+              questionHeading()
             else
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (question) ...[
-                    const QuestionIcon(type: QuestionIconType.question),
-                    const SizedBox(width: 8),
-                  ],
                   Expanded(
                     child: Text.rich(
                       TextSpan(
@@ -404,50 +424,15 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                   if (widget.titleTrailing case final trailing?) trailing,
                 ],
               ),
-            if (recipient != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 4),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: widget.onOpenMember == null
-                      ? null
-                      : () => widget.onOpenMember!(recipient.id),
-                  child: Row(
-                    children: [
-                      MemberAvatar(sender: recipient, size: 24),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          recipient.name,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: GlobalUI.highlightTextColor(context),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        answered
-                            ? '已回答'
-                            : card.closed
-                            ? '已结束'
-                            : '待回答',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            if (card.body.isNotEmpty &&
+            if (!question &&
+                card.body.isNotEmpty &&
                 !(repeatedSelectionBody && selecting)) ...[
               const SizedBox(height: 8),
               Text(
                 card.body,
                 style: TextStyle(
                   fontSize: 15,
+                  fontWeight: FontWeight.w400,
                   height: 1.5,
                   color: colors.onSurface,
                 ),
@@ -511,6 +496,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                       ),
                 onSaveSelection: _saveSelection,
                 view: sharedView,
+                statusInHeading: vote,
                 members: widget.members,
                 onOpenMember: widget.onOpenMember,
                 onStatistics: widget.onStatistics,
@@ -567,7 +553,9 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                 },
                 busy: false,
                 locked: false,
-                onPressed: widget.onStatistics!,
+                onPressed: compactAnswered
+                    ? openAnsweredQuestion
+                    : widget.onStatistics!,
               ),
             ],
           ],

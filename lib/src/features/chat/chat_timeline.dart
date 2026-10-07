@@ -533,19 +533,7 @@ List<ChatTimelineEntry> buildChatTimeline(
                 ? onQuote
                 : null,
             onOpenQuote: onOpenQuote,
-            onOpenMember: (id) {
-              if (id == MessageSender.localUser.id) return;
-              openProfileRoute(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => AiContactPage(
-                    controller: controller,
-                    senderId: id,
-                    groupId: conversation.id,
-                  ),
-                ),
-              );
-            },
+            onOpenMember: (id) => openNoticeMember(context, id),
             onQuickReply:
                 !message.isSystem &&
                     !message.isReasoning &&

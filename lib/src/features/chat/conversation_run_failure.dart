@@ -2,9 +2,14 @@ part of 'chat_controller.dart';
 
 final _recordedRunErrors = Expando<String>('recorded run error conversation');
 final _recoveryOptions =
-    Expando<({String key, Future<Map<String, bool?>> value})>();
+    Expando<
+      ({String key, Future<Map<String, bool?>> value, Map<String, bool?>? data})
+    >();
 
 extension ConversationRunFailure on ChatController {
+  Map<String, bool?>? get resolvedFailedRecoveryOptions =>
+      _recoveryOptions[this]?.data;
+
   Future<Map<String, bool?>> failedRecoveryOptions() {
     final conversation = activeConversation;
     final failures = conversation.messages.where((m) => m.isFailure).toList();
@@ -12,8 +17,14 @@ extension ConversationRunFailure on ChatController {
         '${conversation.id}:${identityHashCode(conversation)}:${config.service.name}/${config.model}:${failures.map((m) => m.id).join(',')}:${_groupReplies.values.map((r) => '${r.config.service.name}/${r.config.model}').join(',')}';
     final cached = _recoveryOptions[this];
     if (cached?.key == key) return cached!.value;
-    final future = _loadFailedRecoveryOptions(conversation, failures);
-    _recoveryOptions[this] = (key: key, value: future);
+    late final Future<Map<String, bool?>> future;
+    future = _loadFailedRecoveryOptions(conversation, failures).then((options) {
+      if (identical(_recoveryOptions[this]?.value, future)) {
+        _recoveryOptions[this] = (key: key, value: future, data: options);
+      }
+      return options;
+    });
+    _recoveryOptions[this] = (key: key, value: future, data: null);
     return future;
   }
 

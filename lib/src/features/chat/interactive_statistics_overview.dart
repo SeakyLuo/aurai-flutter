@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../app/global_ui.dart';
+import 'participation_summary.dart';
 import '../../domain/interactive_selection.dart';
 import '../../domain/interactive_message.dart';
 import '../../domain/message_sender.dart';
 import 'member_profile_avatar.dart';
 import 'chat_controller.dart';
 import 'settings_icon.dart';
-import 'vote_message_heading.dart';
 
 typedef InteractiveOptionKey = (String, String);
 
@@ -31,9 +31,6 @@ class InteractiveStatisticsOverview extends StatelessWidget {
   Widget build(BuildContext context) {
     final summaryVisible = card.visible('summaryVisibility');
     final peopleVisible = card.visible('visibility');
-    final multiple = card.buttons.any(
-      (button) => (button['selection'] as Map?)?['mode'] == 'multiple',
-    );
     final summary = card.summary;
     final highestCount = summary.fold<num>(
       0,
@@ -60,13 +57,7 @@ class InteractiveStatisticsOverview extends StatelessWidget {
           ? const EdgeInsets.fromLTRB(20, 12, 20, 24)
           : const EdgeInsets.fromLTRB(24, 24, 24, 24),
       children: [
-        if (card.isVote)
-          VoteMessageHeading(
-            title: card.title,
-            multiple: multiple,
-            ongoing: !card.closed && !card.completed,
-          )
-        else
+        if (!card.isVote) ...[
           Text(
             card.title,
             style: const TextStyle(
@@ -75,43 +66,29 @@ class InteractiveStatisticsOverview extends StatelessWidget {
               height: 1.4,
             ),
           ),
-        if (card.isVote && card.body.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text(card.body, style: const TextStyle(fontSize: 15, height: 1.5)),
-        ],
-        const SizedBox(height: 10),
-        Text(
-          [
-            card.closed
-                ? '已结束'
-                : card.completed
-                ? '本轮已完成'
-                : '进行中',
-            if (summaryVisible) '${card.choices.length} 人参与',
-          ].join(' · '),
-          style: TextStyle(
-            fontSize: 13,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        if (card.hasInteraction &&
-            (multiple ||
-                card.interaction.containsKey('actorWeights') ||
-                card.engine.allowChange)) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
-            '投票规则：${[card.interaction.containsKey('actorWeights')
-                ? '按参与者票值计票'
-                : multiple
-                ? '多选，每个所选项各计一票'
-                : null, if (card.engine.allowChange) '改票会替换原票'].whereType<String>().join('；')}',
+            [
+              if (card.isVote && !summaryVisible) '统计尚未公开',
+              if (!card.isVote)
+                card.closed
+                    ? '已结束'
+                    : card.completed
+                    ? '本轮已完成'
+                    : '进行中',
+              if (summaryVisible)
+                participationSummaryText(
+                  card.choices.length,
+                  (card.interaction['actors'] as List?)?.length,
+                ),
+            ].join(' · '),
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 13,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
+          const SizedBox(height: 24),
         ],
-        const SizedBox(height: 24),
         if (summaryVisible) ...[
           Text(
             card.hasInteraction
@@ -169,7 +146,9 @@ class InteractiveStatisticsOverview extends StatelessWidget {
           if (!peopleVisible) ...[
             const SizedBox(height: 8),
             Text(
-              card.shared && !card.engine.revealed
+              card.anonymous
+                  ? '匿名投票，发起人也无法查看他人的选择'
+                  : card.shared && !card.engine.revealed
                   ? '本轮尚未公开参与者选择'
                   : card.participation['visibility'] == 'afterClose'
                   ? '结束后公开参与者记录'
@@ -210,6 +189,12 @@ class InteractiveStatisticsOverview extends StatelessWidget {
     final count = option['count'] as num;
     final ratio = card.choices.isEmpty ? 0.0 : count / card.totalWeight;
     final key = (option['buttonId'] as String, option['label'] as String);
+    final ownChoice = card.choices[MessageSender.localUser.id];
+    final mine =
+        ownChoice != null &&
+        selectionEntries(ownChoice).any(
+          (choice) => choice['buttonId'] == key.$1 && choice['label'] == key.$2,
+        );
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
       child: GestureDetector(
@@ -227,7 +212,7 @@ class InteractiveStatisticsOverview extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      option['label'] as String,
+                      '${option['label']}${mine ? ' · 我的选择' : ''}',
                       style: TextStyle(
                         fontSize: 15,
                         height: 1.4,
@@ -375,6 +360,7 @@ class InteractiveParticipantTile extends StatelessWidget {
     required this.actor,
     required this.onTap,
     this.showChoice = true,
+    this.detail,
   });
   final InteractiveMessage card;
   final ChatController controller;
@@ -383,6 +369,7 @@ class InteractiveParticipantTile extends StatelessWidget {
   final String actor;
   final VoidCallback onTap;
   final bool showChoice;
+  final String? detail;
   @override
   Widget build(BuildContext context) => ListTile(
     contentPadding: EdgeInsets.zero,
@@ -393,7 +380,9 @@ class InteractiveParticipantTile extends StatelessWidget {
       size: showChoice ? 40 : 32,
     ),
     title: Text(statisticsName(card, actor)),
-    subtitle: showChoice
+    subtitle: detail != null
+        ? Text(detail!)
+        : showChoice
         ? Text(
             card.shared
                 ? (card.choices[actor]?['label'] as String? ?? '本轮尚未提交')

@@ -3,7 +3,7 @@ import '../domain/interactive_button_icons.dart';
 const interactiveSelectionSchema = {
   'type': 'object',
   'description':
-      'Native fixed-option selection followed by one explicit submit. Requires action:submit and a shared interaction. Single uses radio circles; multiple uses checkboxes. The UI renders the multiple-selection tag and min/max selection hint automatically. Do not repeat these in the title, body, or accompanying message (e.g. 可多选, 最多选3项). Configure mode and minSelections/maxSelections instead. Options are not submitted until the confirmation button is pressed. Cannot combine with input. Works for humans and AI.',
+      'Native fixed-option selection for polls and questions. Requires action:submit and a shared interaction. Multiple uses checkboxes and submits all selected options together after confirmation; single-recipient single-choice questions submit on selection, while polls require confirmation. The UI renders min/max selection hints and selected counts for multiple selection automatically; single selection has no count hint. Do not repeat these in the title, body, or accompanying message (e.g. 可多选, 最多选3项). Configure mode and minSelections/maxSelections instead. Cannot combine with input. Works for humans and AI.',
   'properties': {
     'mode': {
       'type': 'string',
@@ -36,6 +36,21 @@ const interactiveSelectionSchema = {
       'type': 'integer',
       'minimum': 1,
       'description': 'Default all options for multiple, 1 for single.',
+    },
+    'other': {
+      'type': 'object',
+      'description':
+          'Optional write-in choice appended as 其他. Omit to disable. Counts as one choice toward min/max. Submit selected option IDs normally; when selecting __other__, submit value:{options:single ID or multiple ID array,otherText:written text}. Results aggregate under 其他; text follows existing choice visibility.',
+      'properties': {
+        'maxLength': {
+          'type': 'integer',
+          'minimum': 1,
+          'maximum': 500,
+          'default': 50,
+          'description': 'Maximum user-perceived characters; defaults to 50.',
+        },
+      },
+      'additionalProperties': false,
     },
   },
   'required': ['mode', 'options'],
@@ -136,10 +151,15 @@ const interactiveButtonsSchema = {
 const interactiveParticipationSchema = {
   'type': 'object',
   'properties': {
+    'anonymous': {
+      'type': 'boolean',
+      'description':
+          'Anonymous native poll. Default false; immutable after sending. No viewer, including the creator or an AI, can read other participants identities, ballots, reasons, or histories. Each participant can still read their own choice and change it if allowed. Aggregate visibility and reveal timing remain controlled separately. Vote callbacks omit actor identity and individual submission. The UI labels the card 匿名投票; do not repeat this in title/body. Not supported for HTML or miniapp action cards that pass participant identity to program code.',
+    },
     'showHistory': {
       'type': 'boolean',
       'description':
-          'Enable card history paging and participant operation history in the UI. Defaults to false for votes and true for other interactive messages. Does not delete recorded actions or change current results.',
+          'Enable card history paging and participant operation history in the UI. Questions addressed to one actor never show history. Defaults to false for votes and true for other interactive messages. Does not delete recorded actions or change current results.',
     },
     'excludedAudience': {
       'type': 'array',
@@ -204,7 +224,7 @@ const interactiveParticipationSchema = {
         'enum': ['vote', 'complete'],
       },
       'description':
-          'Register creator AI listeners: vote receives each submission/change (source=interactionVote, operationType=submit|change); complete receives completion/manual closure once (source=interactionComplete, completionType=conditionMet|manualClose, completionConditionMet). Registration takes effect immediately without an enable switch. Omit/empty means no listener. Both include revision, round, sessionVersion, phase, submittedCount, eligibleCount when actors are specified, summary, and individual choices/state only if permitted. Vote includes actorId/actorName and permitted submission. No result acknowledgment, participant waiting or system receipt. If both subscribed, the last vote emits vote then complete.',
+          'Register creator AI listeners: vote receives each submission/change (source=interactionVote, operationType=submit|change); complete receives completion/manual closure once (source=interactionComplete, completionType=conditionMet|manualClose, completionConditionMet). Registration takes effect immediately without an enable switch. Omit/empty means no listener. Both include revision, round, sessionVersion, phase, submittedCount, eligibleCount when actors are specified, summary, and individual choices/state only if permitted. Non-anonymous vote events include actorId/actorName and permitted submission. Anonymous events contain aggregates only, never participant identity, individual submission, choices, or runtime state. No result acknowledgment, participant waiting or system receipt. If both subscribed, the last vote emits vote then complete.',
     },
     'visibility': {
       'type': 'string',

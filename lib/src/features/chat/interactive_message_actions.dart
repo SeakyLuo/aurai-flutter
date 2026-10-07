@@ -252,6 +252,10 @@ extension InteractiveMessageActions on ChatController {
     }
     if (row['sender_id'] != senderId) throw StateError('只能更新自己发送的交互消息');
     if (args['revision'] != old.revision) throw StateError('消息已更新，请先重新读取');
+    final nextAnonymous = (args['participation'] as Map?)?['anonymous'];
+    if (nextAnonymous != null && nextAnonymous != old.anonymous) {
+      throw StateError('投票发布后不能更改匿名设置，请新建投票');
+    }
     final definitionChanged =
         [
           'title',

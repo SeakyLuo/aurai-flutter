@@ -1,4 +1,5 @@
 import 'interactive_button_icons.dart';
+import 'anonymous_vote.dart';
 import 'interactive_selection.dart';
 import 'interaction_expression.dart';
 import 'shared_interaction.dart';
@@ -37,10 +38,19 @@ class InteractiveMessage {
   }
 
   void validateTransport({required bool html}) {
+    if (anonymous &&
+        (!isVote || html || participation['_programMessage'] != null)) {
+      throw ArgumentError('匿名投票仅用于原生投票卡片，不支持需要读取参与者身份的小程序行动卡或 HTML 交互');
+    }
     final allButtons = [
       ...buttons,
       for (final state in states) ...(state['buttons'] as List).cast<Map>(),
     ];
+    if (anonymous && allButtons.any((button) => button['notifyAi'] == true)) {
+      throw ArgumentError(
+        '匿名投票使用 participation.callbackEvents，不支持携带参与者身份的按钮回调',
+      );
+    }
     if (allButtons.any(
       (b) =>
           b['notifyAi'] == true &&
@@ -58,7 +68,13 @@ class InteractiveMessage {
   bool get systemPresentation => participation['presentation'] == 'system';
 
   /// Votes show current results by default; history is an opt-in UI feature.
-  bool get showHistory => participation['showHistory'] as bool? ?? !isVote;
+  /// Questions always present the current answer without history navigation.
+  bool get showHistory =>
+      !isQuestion && (participation['showHistory'] as bool? ?? !isVote);
+  bool get isQuestion =>
+      !isVote &&
+      (interaction['actors'] as List?)?.length == 1 &&
+      buttons.any((button) => button['selection'] != null);
   bool get shared => interaction.isNotEmpty;
   bool get hasInteraction => snapshotView != null || shared || singleChoice;
   Map<String, Object?> get interactionDefinition => shared
@@ -121,6 +137,9 @@ class InteractiveMessage {
   );
   Map<String, Object?> interactionView(String actor, {String? viewer}) {
     requireViewer(viewer ?? actor);
+    if (anonymous && viewer != null && viewer != actor) {
+      throw StateError('匿名投票不能查看其他参与者的选择');
+    }
     if (snapshotView != null) return snapshotView!;
     final ctx = engine.project(
       actor,
@@ -150,7 +169,7 @@ class InteractiveMessage {
         });
       }
     }
-    return {...ctx, 'components': components};
+    return {...ctx, if (anonymous) 'anonymous': true, 'components': components};
   }
 
   final Map<String, Object?> participation;
@@ -166,8 +185,13 @@ class InteractiveMessage {
             ),
           ));
   bool get singleChoice => participation['selectionMode'] == 'singleChoice';
+  bool get anonymous => participation['anonymous'] == true;
   bool get isVote =>
       singleChoice ||
+      shared &&
+          buttons.any(
+            (button) => (button['selection'] as Map?)?['other'] != null,
+          ) ||
       shared &&
           buttons
                   .where(
@@ -185,6 +209,7 @@ class InteractiveMessage {
         (component) => component['type'] == 'distribution',
       );
   bool visible(String field, {String actor = 'user:local'}) {
+    if (anonymous && field == 'visibility') return false;
     if (hasInteraction &&
         field == 'summaryVisibility' &&
         participation['_creatorId'] == actor)
@@ -255,8 +280,12 @@ class InteractiveMessage {
             if (button['style'] != null) 'style': button['style'],
           },
       ],
-      participation: const {'closed': true},
-      snapshotView: hasInteraction ? interactionView(actor) : null,
+      participation: {'closed': true, if (anonymous) 'anonymous': true},
+      snapshotView: hasInteraction
+          ? anonymous
+                ? anonymousForwardView(interactionView(actor))
+                : interactionView(actor)
+          : null,
     );
   }
 
@@ -373,6 +402,10 @@ class InteractiveMessage {
       _validateButtons(stateButtons, stateIds);
     }
     final participation = json['participation'] as Map? ?? const {};
+    if (participation['anonymous'] != null &&
+        participation['anonymous'] is! bool) {
+      throw ArgumentError('anonymous 必须是布尔值');
+    }
     if (participation['showHistory'] != null &&
         participation['showHistory'] is! bool) {
       throw ArgumentError('showHistory 必须是布尔值');

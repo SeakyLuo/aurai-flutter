@@ -16,10 +16,12 @@ class VoteSubmitButton extends StatelessWidget {
     required this.locked,
     required this.onPressed,
     this.busy = false,
+    this.fontSize = 15,
   });
 
   final bool locked, busy;
   final VoidCallback onPressed;
+  final double fontSize;
 
   @override
   Widget build(BuildContext context) => InteractiveMessageButton(
@@ -30,6 +32,6 @@ class VoteSubmitButton extends StatelessWidget {
     primaryGradient: VoteAppearance.gradient,
     radius: 14,
     minimumHeight: 48,
-    fontSize: 15,
+    fontSize: fontSize,
   );
 }

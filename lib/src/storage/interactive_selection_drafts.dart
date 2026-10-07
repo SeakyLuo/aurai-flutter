@@ -41,12 +41,17 @@ class InteractiveSelectionDrafts {
     String actorId,
     String buttonId,
     String version,
-    Set<String> selected,
-  ) {
+    Set<String> selected, {
+    String otherText = '',
+  }) {
     final key = _key(messageId, actorId, buttonId);
-    final value = selected.isEmpty
+    final value = selected.isEmpty && otherText.isEmpty
         ? null
-        : jsonEncode({'version': version, 'selected': selected.toList()});
+        : jsonEncode({
+            'version': version,
+            'selected': selected.toList(),
+            'otherText': otherText,
+          });
     if (value == null) {
       _values.remove(key);
     } else {
@@ -66,5 +71,17 @@ class InteractiveSelectionDrafts {
         done.complete();
       }
     })();
+  }
+
+  String? readOtherText(
+    String messageId,
+    String actorId,
+    String buttonId,
+    String version,
+  ) {
+    final raw = _values[_key(messageId, actorId, buttonId)];
+    if (raw == null) return null;
+    final saved = jsonDecode(raw) as Map<String, dynamic>;
+    return saved['version'] == version ? saved['otherText'] as String? : null;
   }
 }

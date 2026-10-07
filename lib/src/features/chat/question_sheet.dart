@@ -13,6 +13,7 @@ import 'user_question_option_tile.dart';
 Future<void> showQuestionSheet(
   BuildContext context, {
   required Widget child,
+  Future<void>? closeWhen,
 }) async {
   final navigator = Navigator.of(context);
   final route = ModalBottomSheetRoute<void>(
@@ -33,6 +34,14 @@ Future<void> showQuestionSheet(
       child: child,
     ),
   );
+  closeWhen?.then((_) {
+    if (!route.isActive) return;
+    if (route.isCurrent) {
+      navigator.pop();
+    } else {
+      navigator.removeRoute(route);
+    }
+  });
   await navigator.push(route);
   // A popped sheet still owns its input focus until its exit finishes.
   await route.completed;
@@ -46,6 +55,7 @@ class QuestionSheetLayout extends StatelessWidget {
     required this.child,
     this.sender,
     this.onOpenSender,
+    this.heading,
   });
 
   final String title;
@@ -53,6 +63,7 @@ class QuestionSheetLayout extends StatelessWidget {
   final Widget? trailing;
   final MessageSender? sender;
   final VoidCallback? onOpenSender;
+  final Widget? heading;
 
   @override
   Widget build(BuildContext context) {
@@ -76,36 +87,37 @@ class QuestionSheetLayout extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minHeight: kMinInteractiveDimension,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: ThinkingIndicator(
-                              label: title,
-                              animate: false,
-                              singleLine: true,
-                              leading: SizedBox.square(
-                                dimension: MediaQuery.textScalerOf(
-                                  context,
-                                ).scale(18),
-                                child: const FittedBox(
-                                  child: QuestionIcon(
-                                    type: QuestionIconType.question,
+                    if (heading == null)
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minHeight: kMinInteractiveDimension,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ThinkingIndicator(
+                                label: title,
+                                animate: false,
+                                singleLine: true,
+                                leading: SizedBox.square(
+                                  dimension: MediaQuery.textScalerOf(
+                                    context,
+                                  ).scale(18),
+                                  child: const FittedBox(
+                                    child: QuestionIcon(
+                                      type: QuestionIconType.question,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                          if (trailing case final trailing?) ...[
-                            const SizedBox(width: 12),
-                            trailing,
+                            if (trailing case final trailing?) ...[
+                              const SizedBox(width: 12),
+                              trailing,
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
                     if (sender case final sender?)
                       Padding(
                         padding: const EdgeInsets.only(top: 4, bottom: 4),
@@ -145,7 +157,17 @@ class QuestionSheetLayout extends StatelessWidget {
                           ),
                         ),
                       ),
-                    Flexible(child: SingleChildScrollView(child: child)),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: heading == null
+                            ? child
+                            : Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [heading!, child],
+                              ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -168,6 +190,7 @@ class QuestionAnswerContent extends StatelessWidget {
     this.compactOptions = false,
     this.multiple = false,
     this.footer,
+    this.showQuestion = true,
   });
 
   final String question;
@@ -177,23 +200,25 @@ class QuestionAnswerContent extends StatelessWidget {
   final VoidCallback? onChooseOptions;
   final bool compactOptions, multiple;
   final Widget? footer;
+  final bool showQuestion;
 
   @override
   Widget build(BuildContext context) => Column(
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Padding(
-        padding: const EdgeInsets.only(top: 4, bottom: 16),
-        child: Text(
-          question,
-          style: const TextStyle(
-            fontSize: 17,
-            height: 1.5,
-            fontWeight: FontWeight.w600,
+      if (showQuestion)
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 16),
+          child: Text(
+            question,
+            style: const TextStyle(
+              fontSize: 17,
+              height: 1.5,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
-      ),
       if (compactOptions && options.length > 5)
         QuestionOptionsField(
           label: '选择回答（${options.length} 项）',

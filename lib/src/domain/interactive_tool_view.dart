@@ -32,6 +32,7 @@ Map<String, Object?> interactiveToolView(
   return {
     'messageId': messageId,
     'title': view.title,
+    if (card.anonymous) 'anonymous': true,
     'body': view.body,
     'actionToken': interactiveActionToken(messageId, card, actor),
     'eligible': eligible,
@@ -79,6 +80,7 @@ Map<String, Object?> interactiveChatView(
     return {
       'messageId': messageId,
       'title': view['title'],
+      if (card.anonymous) 'anonymous': true,
       'eligible': view['eligible'],
       'closed': view['closed'],
       if (state != null) 'submitted': state['submitted'],

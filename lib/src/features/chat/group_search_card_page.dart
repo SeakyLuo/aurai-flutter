@@ -13,6 +13,7 @@ import 'chat_controller.dart';
 import 'interactive_message_view.dart';
 import 'settings_appearance.dart';
 import 'menu_press_highlight.dart';
+import 'member_profile_avatar.dart';
 
 class GroupSearchCardPage extends StatefulWidget {
   const GroupSearchCardPage({
@@ -112,6 +113,12 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
                   child: InteractiveMessageView(
                     messageId: widget.result.id,
                     card: _card!,
+                    members: widget.result.interactiveMembers,
+                    onOpenMember: (id) => openMemberProfileById(
+                      context,
+                      controller: widget.controller,
+                      senderId: id,
+                    ),
                     onRetry: (eventId) => widget.controller
                         .retryInteractiveCallback(widget.result.id, eventId),
                     onClick:

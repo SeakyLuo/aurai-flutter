@@ -5,6 +5,7 @@ import '../../domain/interactive_selection.dart';
 import 'interactive_message_paging.dart';
 import 'interactive_snapshot_statistics.dart';
 import 'interactive_statistics_overview.dart';
+import 'vote_statistics_header.dart';
 import 'message_time.dart';
 import 'question_icon.dart';
 import 'interactive_history_page.dart';
@@ -249,6 +250,8 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
   Widget build(BuildContext context) {
     final card = _card;
     final actor = _perspective;
+    final fixedVoteHeader =
+        card?.isVote == true && _atOverview && widget.snapshot == null;
     final title = actor != null
         ? '参与详情'
         : _option != null
@@ -266,9 +269,9 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
           top: false,
           child: Column(
             children: [
-              if (!(card?.isVote == true &&
-                  _atOverview &&
-                  widget.snapshot == null))
+              if (fixedVoteHeader)
+                VoteStatisticsHeader(card: card!)
+              else
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: Row(
@@ -329,13 +332,14 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
                                   setState(() => _option = option),
                             ),
                     ),
-                    const Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: 20,
-                      child: IgnorePointer(child: ChatHeaderBackground()),
-                    ),
+                    if (!fixedVoteHeader)
+                      const Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: 20,
+                        child: IgnorePointer(child: ChatHeaderBackground()),
+                      ),
                   ],
                 ),
               ),
@@ -380,6 +384,15 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
             sender: statisticsSender(card, _senders, id),
             actor: id,
             showChoice: false,
+            detail:
+                selectionEntries(card.choices[id]!)
+                        .where(
+                          (choice) =>
+                              choice['buttonId'] == option.$1 &&
+                              choice['label'] == option.$2,
+                        )
+                        .firstOrNull?['text']
+                    as String?,
             onTap: () => _openParticipant(id),
           ),
       ],
@@ -446,6 +459,11 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
             height: 1.5,
           ),
         ),
+        for (final choice in selectionEntries(state))
+          if (choice['text'] case final String text) ...[
+            const SizedBox(height: 12),
+            Text(text, style: const TextStyle(fontSize: 15, height: 1.5)),
+          ],
         if (state['reason'] case final String reason) ...[
           const SizedBox(height: 20),
           Text(

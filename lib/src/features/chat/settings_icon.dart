@@ -49,6 +49,7 @@ enum SettingsIconType {
   sound,
   eye,
   eyeOff,
+  restrictedVisibility,
   grid,
   list,
   selectCircle,
@@ -239,6 +240,18 @@ class _SettingsIconPainter extends CustomPainter {
             ..moveTo(4, 12)
             ..cubicTo(4, 16, 20, 16, 20, 12),
           pen,
+        );
+      case SettingsIconType.restrictedVisibility:
+        canvas.drawPath(
+          Path()
+            ..moveTo(2.5, 13)
+            ..cubicTo(5, 4, 19, 4, 21.5, 13),
+          pen,
+        );
+        canvas.drawCircle(
+          const Offset(12, 14),
+          3.8,
+          Paint()..color = color,
         );
       case SettingsIconType.eye:
       case SettingsIconType.eyeOff:
