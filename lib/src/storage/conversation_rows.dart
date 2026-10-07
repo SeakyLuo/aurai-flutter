@@ -16,6 +16,7 @@ Map<String, Object?> conversationRow(Conversation value) => {
       : value.draftUpdatedAt?.microsecondsSinceEpoch ?? 0,
   'title': value.title,
   'kind': value.kind.name,
+  'personal_chat': value.isPersonalChat ? 1 : 0,
   'mode': value.mode.name,
   'creation_member_ids': jsonEncode(value.creationMemberIds),
   'default_sender_id': value.defaultSenderId,
@@ -43,6 +44,7 @@ Conversation conversationFromRow(Map<String, Object?> row) =>
         ),
       )
       ..isStored = true
+      ..isPersonalChat = row['personal_chat'] == 1
       ..kind = ConversationKind.values.byName(row['kind'] as String)
       ..mode = ConversationMode.values.byName(row['mode'] as String)
       ..creationMemberIds = row['creation_member_ids'] == null

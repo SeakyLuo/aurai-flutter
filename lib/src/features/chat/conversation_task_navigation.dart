@@ -30,7 +30,7 @@ Future<void> openConversationTask(
   );
   if (tasks.isEmpty) {
     ScaffoldMessenger.of(context).showToast(
-      const SnackBar(content: Text('关联任务已删除')),
+      const SnackBar(content: Text('关联定时任务已删除')),
       kind: ToastKind.success,
     );
     return;
@@ -44,7 +44,7 @@ Future<void> openConversationTask(
       context,
       anchor: box.localToGlobal(Offset.zero) & box.size,
       selected: originTaskId ?? '',
-      label: '查看任务',
+      label: '查看定时任务',
       choices: [
         for (final task in tasks)
           (value: task['id'] as String, label: task['title'] as String),

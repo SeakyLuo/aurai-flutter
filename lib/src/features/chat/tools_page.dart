@@ -98,6 +98,7 @@ class _ToolsPageState extends State<ToolsPage> {
           !(toolTitle(
                 tool.name,
               ).toLowerCase().contains(_search.text.toLowerCase()) ||
+              tool.summary.toLowerCase().contains(_search.text.toLowerCase()) ||
               tool.description.toLowerCase().contains(
                 _search.text.toLowerCase(),
               )))

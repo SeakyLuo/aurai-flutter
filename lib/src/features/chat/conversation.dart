@@ -24,6 +24,13 @@ class Conversation {
   final Map<String, String> pendingQuestionPreviews = {};
   String? get questionPreview => pendingQuestionPreviews.values.lastOrNull;
   bool isStored = false;
+  bool isPersonalChat = false;
+  bool get isTask => kind == ConversationKind.direct && !isPersonalChat;
+  String get typeLabel => kind == ConversationKind.group
+      ? '群聊'
+      : isPersonalChat
+      ? '私聊'
+      : '任务';
   ConversationKind kind = ConversationKind.direct;
   ConversationMode mode = ConversationMode.normal;
   bool get isTemporary => mode != ConversationMode.normal;
@@ -98,6 +105,7 @@ class Conversation {
     privateContextSummaries,
   );
   bool isCompacting = false;
+  bool hasRunningTasks = false;
   MessageQuote? draftQuote;
   String draft = '';
   final List<DraftMention> draftMentions = [];
@@ -131,7 +139,7 @@ class Conversation {
       ? storedTitle!
       : messages.isEmpty
       ? (draft.isEmpty && draftImages.isEmpty && draftFiles.isEmpty
-            ? '新对话'
+            ? '新任务'
             : '未发送的草稿')
       : (messages.first.text.isEmpty
             ? (messages.first.files.isEmpty
@@ -159,13 +167,17 @@ class Conversation {
     if (draftPreview != null) return draftPreview;
     final latest = _previewMessage;
     if (latest != null)
-      return MessageSummary.fromMessage(latest, withSender: true);
+      return MessageSummary.fromMessage(
+        latest,
+        withSender: kind == ConversationKind.group,
+      );
     return storedPreview ?? creationMessage;
   }
 
   Map<String, Object?> toJson() => {
     'id': id,
     'kind': kind.name,
+    'isPersonalChat': isPersonalChat,
     'mode': mode.name,
     'creationMemberIds': creationMemberIds,
     'defaultSenderId': defaultSenderId,
@@ -209,6 +221,7 @@ class Conversation {
     conversation.kind = ConversationKind.values.byName(
       json['kind'] as String? ?? 'direct',
     );
+    conversation.isPersonalChat = json['isPersonalChat'] == true;
     conversation.mode = ConversationMode.values.byName(
       json['mode'] as String? ?? 'normal',
     );

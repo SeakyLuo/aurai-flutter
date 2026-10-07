@@ -52,6 +52,8 @@ extension ConversationActions on ChatController {
           ? _pendingAiConversation!
           : _liveConversation(id) != null
           ? _liveConversation(id)!
+          : _personalChatDrafts.containsKey(id)
+          ? _personalChatDrafts[id]!
           : await _store.load(
               id,
               messageLimit:
@@ -183,7 +185,7 @@ extension ConversationActions on ChatController {
   }
 
   Future<void> _reloadConversations() async {
-    final page = await _store.reader.list();
+    final page = await _store.reader.list(tasksOnly: true);
     _conversations
       ..clear()
       ..addAll(
@@ -229,6 +231,7 @@ extension ConversationActions on ChatController {
     if (id == null || id == activeConversation.id) return activeConversation;
     final live = _liveConversation(id);
     if (live != null) return live;
+    if (_personalChatDrafts.containsKey(id)) return _personalChatDrafts[id]!;
     for (final conversation in _conversations) {
       if (conversation.id == id) return conversation;
     }
@@ -241,7 +244,12 @@ extension ConversationActions on ChatController {
   Future<List<Conversation>> archivedConversations({
     Conversation? after,
     int limit = ConversationReader.pageSize,
-  }) => _store.reader.list(after: after, limit: limit, archived: true);
+  }) => _store.reader.list(
+    after: after,
+    limit: limit,
+    archived: true,
+    tasksOnly: true,
+  );
 
   Future<void> setConversationArchived(
     String id, {
@@ -249,6 +257,7 @@ extension ConversationActions on ChatController {
   }) async {
     final conversation = await _targetConversation(id);
     final previous = conversation.isArchived;
+    if (archived && !conversation.isTask) throw StateError('只有任务可以归档');
     if (archived &&
         conversation.id == activeConversation.id &&
         (_submitting || changingConversation)) {
@@ -289,9 +298,12 @@ extension ConversationActions on ChatController {
     String actorId = 'user:local',
   }) async {
     final name = title.trim();
-    if (name.isEmpty) throw ArgumentError('请输入会话名称');
+    if (name.isEmpty) throw ArgumentError('请输入名称');
     final conversation = await _targetConversation(id);
     final previous = conversation.storedTitle;
+    if (conversation.isPersonalChat) {
+      throw StateError('私聊使用联系人名字，请在资料页修改名字或备注');
+    }
     if (previous == name) return;
     if (conversation.kind == ConversationKind.group) {
       await groupStore.requireRenamePermission(_store.database, id, actorId);
@@ -359,6 +371,10 @@ extension ConversationActions on ChatController {
   ) async {
     await _store.writer.updateMetadata(conversation, values);
     _syncConversationMetadata(conversation, values);
+    if (conversation.isPersonalChat && !conversation.isStored) {
+      _conversationChanged();
+      return;
+    }
     if (conversation.id == activeConversation.id) {
       _updateConversationList();
     } else {

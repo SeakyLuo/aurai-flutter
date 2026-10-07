@@ -1,4 +1,5 @@
 import 'group_unread_messages.dart';
+import 'home_task_activity.dart';
 import 'conversation_visibility.dart';
 import 'group_list_preview.dart';
 import '../domain/message_sender.dart';
@@ -11,8 +12,51 @@ class HomeConversations {
   HomeConversations(this.store);
   final GroupChatStore store;
   static const pageSize = 50;
+  // List headers resolve their previews separately. Full error details are
+  // loaded with the conversation, not transferred for every list refresh.
+  static const _headerColumns = [
+    'id',
+    'created_at',
+    'updated_at',
+    'draft_updated_at',
+    'title',
+    'kind',
+    'personal_chat',
+    'mode',
+    'creation_member_ids',
+    'default_sender_id',
+    'pinned',
+    'archived',
+    'scheduled_task',
+    'project_id',
+    'draft',
+    'draft_quote_json',
+    'pending_goal',
+    'run_state',
+    'active_run_id',
+    'message_count',
+  ];
   static const _groupsWhere =
       "kind = 'group' AND archived = 0 AND $visibleConversation AND $localUserConversation";
+
+  Future<List<Conversation>> chats({
+    int offset = 0,
+    int limit = pageSize,
+  }) async {
+    final rows = await store.database.query(
+      'conversations',
+      columns: _headerColumns,
+      where:
+          "(kind = 'group' OR (kind = 'direct' AND personal_chat = 1)) AND archived = 0 AND $localUserConversation",
+      orderBy:
+          'pinned DESC, MAX(draft_updated_at, COALESCE((SELECT created_at FROM messages WHERE conversation_id = conversations.id AND $conversationListMessageVisibility ORDER BY created_at DESC, id DESC LIMIT 1), created_at)) DESC, id DESC',
+      limit: limit,
+      offset: offset,
+    );
+    final items = await _headers(rows);
+    await loadHomeTaskActivity(store.database, items);
+    return items;
+  }
 
   Future<List<Conversation>> recent({
     int offset = 0,
@@ -20,7 +64,9 @@ class HomeConversations {
   }) async {
     final rows = await store.database.query(
       'conversations',
-      where: 'archived = 0 AND $visibleConversation AND $localUserConversation',
+      columns: _headerColumns,
+      where:
+          "kind = 'direct' AND personal_chat = 0 AND archived = 0 AND $visibleConversation AND $localUserConversation",
       orderBy: 'pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC',
       limit: limit,
       offset: offset,
@@ -31,6 +77,7 @@ class HomeConversations {
   Future<List<Conversation>> forwardTargets(String query, int offset) async {
     final rows = await store.database.query(
       'conversations',
+      columns: _headerColumns,
       where: "archived = 0 AND instr(lower(title), ?) > 0",
       whereArgs: [query.toLowerCase()],
       orderBy: 'MAX(updated_at, draft_updated_at) DESC, id DESC',
@@ -56,6 +103,7 @@ class HomeConversations {
   }) async {
     final rows = await store.database.query(
       'conversations',
+      columns: _headerColumns,
       where:
           'project_id = ? AND archived = 0 AND $visibleConversation AND $localUserConversation',
       whereArgs: [projectId],
@@ -72,6 +120,7 @@ class HomeConversations {
   }) async {
     final rows = await store.database.query(
       'conversations',
+      columns: _headerColumns,
       where:
           '$_groupsWhere'
           "${after == null ? '' : ' AND (pinned < ? OR (pinned = ? AND (MAX(updated_at, draft_updated_at) < ? OR (MAX(updated_at, draft_updated_at) = ? AND id < ?))))'}",
@@ -97,14 +146,26 @@ class HomeConversations {
   }) async {
     final rows = await store.database.query(
       'conversations',
+      columns: _headerColumns,
       where:
-          "kind = 'direct' AND default_sender_id = ? AND archived = 0 AND $visibleConversation AND $localUserConversation",
+          "kind = 'direct' AND personal_chat = 0 AND default_sender_id = ? AND archived = 0 AND $visibleConversation AND $localUserConversation",
       whereArgs: [senderId],
       orderBy: 'pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC',
       limit: limit,
       offset: offset,
     );
     return _headers(rows);
+  }
+
+  Future<int> unreadCompletionsForAi(String senderId) async {
+    final rows = await store.database.query(
+      'conversations',
+      columns: ['COUNT(*) AS count'],
+      where:
+          "kind = 'direct' AND personal_chat = 0 AND default_sender_id = ? AND archived = 0 AND $visibleConversation AND $localUserConversation AND run_state = 'idle' AND active_run_id IS NOT NULL AND pending_goal IS NULL AND NOT EXISTS (SELECT 1 FROM app_state WHERE key = 'seen_run:' || conversations.id AND value = conversations.active_run_id)",
+      whereArgs: [senderId],
+    );
+    return rows.single['count'] as int;
   }
 
   Future<List<Conversation>> _headers(List<Map<String, Object?>> rows) async {

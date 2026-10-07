@@ -1,6 +1,34 @@
 part of 'chat_controller.dart';
 
 extension ConversationSearchNavigation on ChatController {
+  Future<List<ConversationSearchResult>> searchConversations(
+    String query,
+    int offset, {
+    bool includeReasoning = false,
+    String? projectId,
+    bool chatsOnly = false,
+  }) => _store.reader.search(
+    query,
+    offset,
+    includeReasoning: includeReasoning,
+    projectId: projectId,
+    chatsOnly: chatsOnly,
+  );
+
+  Future<List<AttachmentSearchResult>> searchAttachments(
+    String query,
+    int offset, {
+    int limit = AttachmentSearch.pageSize,
+    String? projectId,
+    bool chatsOnly = false,
+  }) => AttachmentSearch(_store.database, _imageStore.directory).search(
+    query,
+    offset,
+    limit: limit,
+    projectId: projectId,
+    chatsOnly: chatsOnly,
+  );
+
   Future<String?> firstUnreadMessageId() async {
     final conversation = activeConversation;
     if (conversation.kind == ConversationKind.group) {

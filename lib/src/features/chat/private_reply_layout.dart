@@ -1,5 +1,6 @@
 import '../../domain/agent_models.dart';
 import '../../domain/message_sender.dart';
+import '../../domain/goal_completion.dart';
 
 /// Cards retain their message identities while sharing one private reply shell.
 class PrivateReplyPart {
@@ -9,6 +10,7 @@ class PrivateReplyPart {
     required this.copyText,
     required this.summary,
     this.gitChanges,
+    this.goalElapsed,
   });
 
   final bool first;
@@ -16,6 +18,7 @@ class PrivateReplyPart {
   final String copyText;
   final AgentTaskSummary? summary;
   final ProjectGitTaskChanges? gitChanges;
+  final Duration? goalElapsed;
 }
 
 Set<String> richReplyRuns(Iterable<AgentMessage> messages) => {
@@ -100,6 +103,7 @@ Map<String, PrivateReplyPart> privateReplyLayout(
         copyText: copyText,
         summary: i == start ? process : null,
         gitChanges: i == end - 1 ? gitChanges : null,
+        goalElapsed: i == end - 1 ? goalCompletionElapsed(summary) : null,
       );
     }
     start = end;

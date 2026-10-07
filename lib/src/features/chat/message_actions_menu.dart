@@ -49,7 +49,6 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   bool allowRetry = false,
   String retryLabel = '重试',
   bool allowForward = false,
-  bool allowBranch = false,
   bool allowQuickReply = false,
   Set<String> sentQuickReplyKeys = const {},
 }) async {
@@ -90,8 +89,8 @@ Future<MessageMenuResult?> showMessageActionsMenu(
         if (allowTimeline)
           (
             const MessageActionResult(MessageAction.timeline),
-            SettingsIcon(type: SettingsIconType.tasks, color: iconColor),
-            '查看任务线',
+            SettingsIcon(type: SettingsIconType.execution, color: iconColor),
+            '查看执行过程',
           ),
         if (message.htmlGame != null &&
             message.htmlGame!.displayMode != 'inline')
@@ -195,15 +194,6 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             const MessageActionResult(MessageAction.readAloud),
             SettingsIcon(type: SettingsIconType.sound, color: iconColor),
             '朗读',
-          ),
-        if (allowBranch)
-          (
-            const MessageActionResult(MessageAction.branch),
-            ConversationMenuIcon(
-              type: ConversationMenuIconType.branch,
-              color: iconColor,
-            ),
-            '在新聊天继续',
           ),
       ];
       return ConstrainedBox(

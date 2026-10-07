@@ -180,7 +180,7 @@ class ResponsesContext {
               .map(
                 (tool) => {
                   'name': tool.name,
-                  'description': tool.description,
+                  'description': tool.modelDescription,
                   'parameters': tool.modelInputSchema,
                 },
               )

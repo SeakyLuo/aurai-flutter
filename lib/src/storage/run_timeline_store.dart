@@ -11,11 +11,13 @@ class RunTimelinePage {
     this.entries,
     this.hasEarlier,
     this.firstEventId,
+    this.turnEventIds,
   );
   final Map<String, Object?> run;
   final List<RunTimelineEntry> entries;
   final bool hasEarlier;
   final int? firstEventId;
+  final Set<int> turnEventIds;
 }
 
 class RunTimelineEntry {
@@ -29,6 +31,26 @@ class RunTimelineEntry {
 class RunTimelineStore {
   const RunTimelineStore(this.database);
   final Database database;
+
+  Future<bool> hasProcess(String runId) async {
+    final rows = await database.rawQuery(
+      '''SELECT
+      EXISTS(SELECT 1 FROM messages WHERE run_id = ?
+        AND kind IN ('commentary', 'reasoning') AND text != '')
+      OR EXISTS(SELECT 1 FROM tool_calls WHERE run_id = ?
+        AND name != 'sendGroupMessage')
+      OR EXISTS(SELECT 1 FROM model_turns t, json_each(t.response_json, '\$.output') item
+        WHERE t.run_id = ? AND json_extract(item.value, '\$.type') = 'message'
+        AND EXISTS(SELECT 1 FROM json_each(item.value, '\$.content') part
+          WHERE json_extract(part.value, '\$.type') = 'output_text'
+          AND json_extract(part.value, '\$.text') != ''
+          AND NOT EXISTS(SELECT 1 FROM messages m WHERE m.run_id = t.run_id
+            AND m.model_turn_id = t.id AND m.role = 'assistant'
+            AND m.text = json_extract(part.value, '\$.text')))) AS present''',
+      [runId, runId, runId],
+    );
+    return rows.single['present'] == 1;
+  }
 
   Future<RunTimelinePage> read(String runId, {int? before}) async {
     final results = await Future.wait([
@@ -84,7 +106,7 @@ class RunTimelineStore {
     };
     final turns = await database.query(
       'model_turns',
-      columns: ['ordinal', 'started_at', 'response_json'],
+      columns: ['id', 'ordinal', 'started_at', 'response_json'],
       where:
           'run_id = ? AND (id IN (${turnIds.isEmpty ? 'NULL' : List.filled(turnIds.length, '?').join(',')}) '
           '${before == null ? 'OR id = (SELECT id FROM model_turns WHERE run_id = ? ORDER BY ordinal DESC LIMIT 1)' : ''})',
@@ -110,10 +132,42 @@ class RunTimelineStore {
       entries.add(
         RunTimelineEntry(-(turn['ordinal'] as int) - 1, {
           'id': 'turn:${turn['ordinal']}',
+          'model_turn_id': turn['id'],
           'kind': 'commentary',
           'text': text,
           'created_at': turn['started_at'],
         }, null),
+      );
+    }
+    // A model response can also be persisted as a delivered message.
+    // Check the whole run so paging does not show the same reply twice.
+    if (entries.isNotEmpty) {
+      final delivered = await database.query(
+        'messages',
+        distinct: true,
+        columns: ['model_turn_id', 'text'],
+        where:
+            "run_id = ? AND role = 'assistant' AND EXISTS (SELECT 1 FROM json_each(?) expected WHERE json_extract(expected.value, '\$.turn') = messages.model_turn_id AND json_extract(expected.value, '\$.text') = messages.text)",
+        whereArgs: [
+          runId,
+          jsonEncode([
+            for (final entry in entries)
+              {
+                'turn': entry.message!['model_turn_id'],
+                'text': entry.message!['text'],
+              },
+          ]),
+        ],
+        limit: entries.length,
+      );
+      final texts = delivered
+          .map((message) => (message['model_turn_id'], message['text']))
+          .toSet();
+      entries.removeWhere(
+        (entry) => texts.contains((
+          entry.message!['model_turn_id'],
+          entry.message!['text'],
+        )),
       );
     }
     for (final event in events) {
@@ -137,6 +191,7 @@ class RunTimelineStore {
       entries,
       results[1].length > 60,
       events.isEmpty ? null : events.first['id'] as int,
+      {for (final turn in turns) -(turn['ordinal'] as int) - 1},
     );
   }
 }

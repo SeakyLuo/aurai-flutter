@@ -10,8 +10,6 @@ import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
 import 'group_unread_messages.dart';
 
-enum ProjectMemoryMode { shared, projectOnly }
-
 const projectNameMaxLength = 40;
 const projectInstructionsMaxLength = 10000;
 
@@ -40,7 +38,6 @@ class DevelopmentProject {
     required this.updatedAt,
     this.archived = false,
     this.pinned = false,
-    this.memoryMode = ProjectMemoryMode.shared,
     this.defaultSenderId = 'agent:aurai',
     this.directories = const [],
   });
@@ -55,7 +52,6 @@ class DevelopmentProject {
   final DateTime updatedAt;
   final bool archived;
   final bool pinned;
-  final ProjectMemoryMode memoryMode;
   final String defaultSenderId;
   final List<ProjectDirectory> directories;
 
@@ -71,7 +67,6 @@ class DevelopmentProject {
         updatedAt: updatedAt,
         archived: archived,
         pinned: pinned,
-        memoryMode: memoryMode,
         defaultSenderId: defaultSenderId,
         directories: values,
       );
@@ -88,7 +83,6 @@ class DevelopmentProject {
     updatedAt: DateTime.fromMicrosecondsSinceEpoch(row['updated_at'] as int),
     archived: row['archived'] == 1,
     pinned: row['pinned'] == 1,
-    memoryMode: ProjectMemoryMode.values.byName(row['memory_mode'] as String),
     defaultSenderId: row['default_sender_id'] as String,
   );
 
@@ -103,7 +97,6 @@ class DevelopmentProject {
     'updated_at': updatedAt.microsecondsSinceEpoch,
     'archived': archived ? 1 : 0,
     'pinned': pinned ? 1 : 0,
-    'memory_mode': memoryMode.name,
     'default_sender_id': defaultSenderId,
   };
 }
@@ -210,14 +203,6 @@ class DevelopmentProjects {
     where: 'id = ?',
     whereArgs: [id],
   );
-
-  Future<void> setMemoryMode(String id, ProjectMemoryMode mode) =>
-      database.update(
-        'development_projects',
-        {'memory_mode': mode.name},
-        where: 'id = ?',
-        whereArgs: [id],
-      );
 
   Future<void> setDefaultSender(String id, String senderId) => database.update(
     'development_projects',
@@ -366,11 +351,14 @@ class DevelopmentProjects {
   }) => database.transaction((txn) async {
     final rows = await txn.query(
       'conversations',
-      columns: ['kind'],
+      columns: ['kind', 'personal_chat'],
       where: 'id = ?',
       whereArgs: [conversationId],
       limit: 1,
     );
+    if (rows.single['personal_chat'] == 1) {
+      throw StateError('长期私聊不能加入项目，请新建项目任务');
+    }
     if (rows.single['kind'] == 'group') {
       await GroupChatStore(
         database,

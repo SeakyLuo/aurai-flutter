@@ -74,7 +74,7 @@ class InteractiveStatisticsOverview extends StatelessWidget {
                 card.closed
                     ? '已结束'
                     : card.completed
-                    ? '本轮已完成'
+                    ? '已完成'
                     : '进行中',
               if (summaryVisible)
                 participationSummaryText(

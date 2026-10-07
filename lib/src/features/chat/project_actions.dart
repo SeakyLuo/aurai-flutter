@@ -123,7 +123,7 @@ Future<ProjectActionResult?> showProjectActions(
           barrierColor: Colors.black.withValues(alpha: .24),
           builder: (_) => DeleteConfirmationDialog(
             title: '移除项目？',
-            description: '项目中的会话会移回普通会话列表。已关联的目录和文件保留。',
+            description: '项目中的任务会移回普通任务列表。已关联的目录和文件保留。',
             confirmLabel: '移除',
           ),
         );

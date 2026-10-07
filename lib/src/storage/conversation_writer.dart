@@ -275,6 +275,11 @@ class ConversationWriter {
     Conversation conversation,
     Map<String, Object?> values,
   ) {
+    // Unsent personal chats only own a local draft. Their database row and
+    // membership are inserted with the first message by save().
+    if (conversation.isPersonalChat && !conversation.isStored) {
+      return _draftStore.save(conversation);
+    }
     final initial = conversationRow(conversation);
     return mutate(
       () => database.transaction((txn) async {

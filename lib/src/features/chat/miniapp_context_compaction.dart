@@ -51,81 +51,15 @@ extension MiniappContextCompactionActions on ChatController {
         // Older runs must not overwrite the explicit checkpoint after it commits.
         _store.writer.invalidateHistory(id);
         final historyVersion = _store.writer.historyVersion(id);
-        final stored = await _store.load(id);
-        final roster = await MiniappProgramStore.members(_store.database, id);
-        final agents = [
-          for (final member in roster)
-            if (member['kind'] == 'agent') member['id'] as String,
-        ];
-        final checkpoint = await _store.earliestGroupContextCheckpoint(
-          stored,
-          agents,
-        );
-        final history = await _store.reader.messages(
-          id,
-          forModel: true,
-          includeSystem: true,
-          throughMessageId: request.throughMessageId,
-          afterCheckpoint: checkpoint,
-        );
-        final summaryConfig = modelSettings.activeConfig;
-        if (!summaryConfig.isConfigured) throw StateError('请先配置用于压缩上下文的默认模型');
-        final indices = {
-          for (final (index, message) in history.indexed) message.id: index,
-        };
-        List<AgentMessage> after(ContextSummary? previous) {
-          final cut = previous == null
-              ? -1
-              : indices[previous.throughMessageId];
-          if (cut == null) {
-            throw StateError('上下文检查点已变化，请重新触发压缩');
-          }
-          return history.skip(cut + 1).toList();
-        }
-
-        final publicText = await _summarizeMiniappHistory(
-          _groupHistory(
-            after(
-              stored.contextSummary,
-            ).where((message) => !message.hasRestrictedAudience).toList(),
-            'system:public-summary',
-          ),
-          stored.contextSummary?.text ?? '',
-          request.instructions,
-          summaryConfig,
-        );
         final publicSummary = ContextSummary(
-          text: publicText,
+          text: '',
           throughMessageId: request.throughMessageId,
         );
+        // The checkpoint is local; no histories or model summaries are generated.
         final privateSummaries = <String, ContextSummary>{};
-        // All histories were loaded once. Bound concurrent model calls to four.
-        for (var start = 0; start < agents.length; start += 4) {
-          await Future.wait([
-            for (final senderId in agents.skip(start).take(4))
-              () async {
-                final previous = stored.privateContextSummaries[senderId];
-                final text = await _summarizeMiniappHistory(
-                  _groupHistory(
-                    after(previous)
-                        .where((message) => message.hasRestrictedAudience)
-                        .toList(),
-                    senderId,
-                  ),
-                  previous?.text ?? '',
-                  request.instructions,
-                  summaryConfig,
-                );
-                privateSummaries[senderId] = ContextSummary(
-                  text: text,
-                  throughMessageId: request.throughMessageId,
-                );
-              }(),
-          ]);
-        }
         await _store.writer.mutate(() async {
           if (_store.writer.historyVersion(id) != historyVersion) {
-            throw StateError('压缩期间历史消息发生变化，请重新触发压缩');
+            throw StateError('设置窗口边界时历史消息发生变化，请重新执行');
           }
           await _store.database.transaction((txn) async {
             final pending = await txn.query(
@@ -201,32 +135,5 @@ extension MiniappContextCompactionActions on ChatController {
         ? compact()
         : contexts[index].exclusive(() => lock(index + 1));
     return lock(0);
-  }
-
-  Future<String> _summarizeMiniappHistory(
-    List<AgentMessage> messages,
-    String previous,
-    String instructions,
-    ModelConfig config,
-  ) async {
-    if (messages.isEmpty && previous.isEmpty) return '';
-    final input = await responseMessageInput(
-      messages,
-      supportsImages: configSupportsImageInput(config),
-    );
-    final transport = ResponsesTransport(config)..beginTurn();
-    final context = ResponsesContext(
-      ModelContextLimits.forConfig(config),
-      systemPrompt: instructions,
-    );
-    return context.summarizeHistory(
-      [
-        if (messages.isEmpty)
-          {'role': 'assistant', 'content': 'Earlier memory:\n$previous'},
-        for (final items in input) ...items,
-      ],
-      messages.isEmpty ? '' : previous,
-      (content) => transport.summarize(content, instructions: instructions),
-    );
   }
 }

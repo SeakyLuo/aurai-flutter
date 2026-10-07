@@ -1,4 +1,3 @@
-import 'app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -17,6 +16,7 @@ import 'project_directories_page.dart';
 import '../../storage/development_projects.dart';
 import 'ai_contacts_page.dart';
 import 'chat_controller.dart';
+import 'home_navigation.dart';
 import 'conversation_menu_icon.dart';
 import 'delete_confirmation_dialog.dart';
 import 'dialog_action_button.dart';
@@ -24,7 +24,6 @@ import 'file_tool_icon.dart';
 import 'project_editor_page.dart';
 import 'project_icon.dart';
 import 'profile_avatar.dart';
-import 'question_icon.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 
@@ -197,7 +196,7 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
       barrierColor: Colors.black.withValues(alpha: .24),
       builder: (_) => DeleteConfirmationDialog(
         title: '移除项目？',
-        description: '项目中的会话会移回普通会话列表。已关联的目录和文件保留。',
+        description: '项目中的任务会移回普通任务列表。已关联的目录和文件保留。',
         confirmLabel: '移除',
       ),
     );
@@ -284,9 +283,7 @@ class _ProjectProfilePageState extends State<ProjectProfilePage> {
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 _memory,
-                subtitle: _project.memoryMode == ProjectMemoryMode.shared
-                    ? '默认记忆'
-                    : '仅限项目的记忆',
+                subtitle: '项目共享资料',
               ),
               _row(
                 '项目目录',
@@ -394,9 +391,8 @@ class ProjectMemoryPage extends StatefulWidget {
 }
 
 class _ProjectMemoryPageState extends State<ProjectMemoryPage> {
-  late DevelopmentProject _project = widget.project;
+  late final DevelopmentProject _project = widget.project;
   MemoryController? _memory;
-  bool _busy = false;
 
   @override
   void initState() {
@@ -418,34 +414,6 @@ class _ProjectMemoryPageState extends State<ProjectMemoryPage> {
     }
   }
 
-  Future<void> _chooseMode() async {
-    final mode = await showAppBottomSheet<ProjectMemoryMode>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: false,
-      builder: (_) => _ProjectMemoryModeSheet(selected: _project.memoryMode),
-    );
-    if (mode == null || mode == _project.memoryMode || !mounted) return;
-    setState(() => _busy = true);
-    try {
-      final project = await widget.controller.setProjectMemoryMode(
-        _project,
-        mode,
-      );
-      if (mounted) setState(() => _project = project);
-    } on Object catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showToast(
-          SnackBar(content: Text('记忆范围保存失败：${errorMessage(error)}')),
-          kind: ToastKind.error,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final memory = _memory;
@@ -462,143 +430,12 @@ class _ProjectMemoryPageState extends State<ProjectMemoryPage> {
     return MemorySummaryPage(
       memory: memory,
       title: '项目记忆',
-      actions: [
-        SettingsGlassAction(
-          label: '记忆范围',
-          icon: Icons.tune_rounded,
-          iconWidget: SettingsIcon(
-            type: SettingsIconType.modelSettings,
-            color: SettingsGlassAction.foregroundColor(
-              context,
-              enabled: !_busy,
-            ),
-          ),
-          onPressed: _busy ? null : _chooseMode,
-        ),
-      ],
-    );
-  }
-}
-
-class _ProjectMemoryModeSheet extends StatelessWidget {
-  const _ProjectMemoryModeSheet({required this.selected});
-
-  final ProjectMemoryMode selected;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                SettingsGlassAction(
-                  label: '关闭',
-                  icon: Icons.close_rounded,
-                  iconWidget: const QuestionIcon(type: QuestionIconType.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                const Expanded(
-                  child: Text(
-                    '记忆范围',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                const SizedBox(width: 48),
-              ],
-            ),
-            const SizedBox(height: 18),
-            _option(
-              context,
-              ProjectMemoryMode.shared,
-              '默认记忆',
-              '成员可以读取自己的私有记忆，并共同使用这个项目的共享记忆。',
-              colors,
-            ),
-            const SizedBox(height: 10),
-            _option(
-              context,
-              ProjectMemoryMode.projectOnly,
-              '仅限项目的记忆',
-              '成员只使用这个项目的共享记忆，不读取项目外的私有记忆。',
-              colors,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _option(
-    BuildContext context,
-    ProjectMemoryMode mode,
-    String title,
-    String description,
-    ColorScheme colors,
-  ) {
-    final active = selected == mode;
-    return Material(
-      color: settingsFieldColor(context),
-      borderRadius: BorderRadius.circular(24),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => Navigator.pop(context, mode),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colors.onSurfaceVariant,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                width: 22,
-                height: 22,
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: active ? colors.onSurface : Colors.transparent,
-                  border: Border.all(
-                    color: active ? colors.onSurface : colors.outline,
-                    width: 1.4,
-                  ),
-                ),
-                child: active
-                    ? SettingsIcon(
-                        type: SettingsIconType.check,
-                        color: colors.surface,
-                      )
-                    : null,
-              ),
-            ],
-          ),
-        ),
+      onOpenSource: (source) => openHomeConversation(
+        context,
+        widget.controller,
+        source['conversation_id'] as String,
+        messageId: source['focus_message_id'] as String?,
+        waitForClose: true,
       ),
     );
   }

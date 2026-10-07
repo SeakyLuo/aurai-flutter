@@ -119,7 +119,11 @@ class _ApplyMemory
     final rejected = await preflight(call);
     if (rejected != null) return rejected;
     try {
-      await owner.memory.applyChanges(owner.plan!);
+      await owner.memory.applyChanges(
+        owner.plan!,
+        conversationId: owner.conversationId,
+        messageId: owner.messageId,
+      );
       owner.plan = null;
       return _result(call, ToolResultStatus.success, {'saved': true});
     } on Object catch (error) {

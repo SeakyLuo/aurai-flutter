@@ -1,6 +1,7 @@
 import '../domain/tool_customization.dart';
-import 'compact_context_tool.dart';
+import 'dart:convert';
 import 'tool_search.dart';
+import 'tool_loader.dart';
 import '../domain/capability.dart';
 import '../domain/tool_models.dart';
 
@@ -16,8 +17,8 @@ class ToolRegistry {
        } {
     final search = ToolSearch(this);
     _tools[search.definition.name] = search;
-    const compact = CompactContextTool();
-    _tools[compact.definition.name] = compact;
+    final loader = ToolLoader(this);
+    _tools[loader.definition.name] = loader;
   }
 
   final Map<String, AgentTool> _tools;
@@ -64,10 +65,11 @@ class ToolRegistry {
       .where(
         (tool) =>
             tool.name == 'searchTools' ||
+            tool.name == 'loadTools' ||
             tool.name == 'askUser' ||
             tool.name == 'runSubagent' ||
+            tool.name == 'runTask' ||
             tool.name == 'hideThinking' ||
-            tool.name == 'compactContext' ||
             tool.name == 'readInteractiveMessage' ||
             tool.name == 'clickInteractiveMessage' ||
             const [
@@ -108,13 +110,33 @@ class ToolRegistry {
 
   void load(Iterable<String> names) {
     final available = catalog.map((tool) => tool.name).toSet()
-      ..removeAll(['searchTools', 'askUser']);
+      ..removeAll(['searchTools', 'loadTools', 'askUser']);
     for (final name in names) {
       if (!available.contains(name) || _retained.contains(name)) continue;
       _loaded.remove(name);
       _loaded.add(name);
     }
     if (_loaded.length > 20) _loaded.removeRange(0, _loaded.length - 20);
+  }
+
+  /// Restore useful tools, without carrying large historical schemas into every reply.
+  /// Explicit tool loading in this run still supplies complete definitions normally.
+  void restore(Iterable<String> names) {
+    final definitions = {for (final tool in catalog) tool.name: tool};
+    final selected = <String>[];
+    var remaining = 16000;
+    for (final name in names.toList().reversed.toSet()) {
+      final tool = definitions[name];
+      if (tool == null) continue;
+      final size =
+          tool.modelDescription.length +
+          jsonEncode(tool.modelInputSchema).length;
+      if (size > remaining) continue;
+      selected.add(name);
+      remaining -= size;
+      if (selected.length == 20) break;
+    }
+    load(selected.reversed);
   }
 
   void retain(String name) {

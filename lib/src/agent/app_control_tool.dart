@@ -13,7 +13,7 @@ class AppControlTool implements AgentTool, RuntimeCapabilityAgentTool {
     'setConversationPinned':
         'Set an accessible conversation pinned or unpinned. pinned is required.',
     'setConversationArchived':
-        'Archive or restore an accessible conversation, preserving history. archived is required.',
+        'Archive or restore an accessible task conversation, preserving history. Private and group chats cannot be archived. archived is required.',
     'deleteConversation':
         'Permanently delete an accessible conversation and its attachments only on explicit user request. Running conversations cannot be deleted.',
     'sendConversationMessage':
@@ -123,9 +123,7 @@ class AppControlTool implements AgentTool, RuntimeCapabilityAgentTool {
         callId: call.id,
         toolName: name,
         status: ToolResultStatus.error,
-        output: {
-          'message': error.toString(),
-        },
+        output: {'message': error.toString()},
       );
     }
   }

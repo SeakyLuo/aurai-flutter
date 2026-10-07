@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../domain/message_summary.dart';
 import '../../domain/model_failure.dart';
 import 'package:flutter/services.dart';
 import '../../app/glass_notice.dart';
@@ -13,7 +14,7 @@ import 'question_icon.dart';
 import 'interactive_message_button.dart';
 import '../../app/notice_details_sheet.dart';
 
-class TaskFailureCard extends StatelessWidget {
+class TaskFailureCard extends StatefulWidget {
   const TaskFailureCard({
     super.key,
     required this.onRetry,
@@ -48,7 +49,9 @@ class TaskFailureCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
+  State<TaskFailureCard> createState() => _TaskFailureCardState();
+
+  Widget _build(BuildContext context, String title) => Padding(
     padding: padding,
     child: Container(
       padding: paused == null
@@ -64,7 +67,7 @@ class TaskFailureCard extends StatelessWidget {
         ),
       ),
       child: paused == null
-          ? _errorContent(context)
+          ? _errorContent(context, title)
           : Row(
               children: [
                 const TaskFailureIcon(size: 22),
@@ -114,10 +117,10 @@ class TaskFailureCard extends StatelessWidget {
     ),
   );
 
-  Widget _errorContent(BuildContext context) {
+  Widget _errorContent(BuildContext context, String title) {
     final colors = Theme.of(context).colorScheme;
-    final title = classifyModelFailure(error).title;
-    final lines = error.split('\n');
+    final preview = MessageSummary.preview(error, limit: 1024);
+    final lines = preview.split('\n');
     final heading = lines.first;
     final headingTitle = ModelFailure.values
         .map((failure) => failure.title)
@@ -129,7 +132,7 @@ class TaskFailureCard extends StatelessWidget {
         )
         .firstOrNull;
     final body = headingTitle == null
-        ? error
+        ? preview
         : heading == headingTitle
         ? lines.skip(1).join('\n')
         : [
@@ -211,7 +214,8 @@ class TaskFailureCard extends StatelessWidget {
                   maxLines: 4,
                   ellipsis: '…',
                 )..layout(maxWidth: constraints.maxWidth);
-                final overflow = painter.didExceedMaxLines;
+                final overflow =
+                    error.length > 1024 || painter.didExceedMaxLines;
                 painter.dispose();
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -247,4 +251,25 @@ class TaskFailureCard extends StatelessWidget {
       ],
     );
   }
+}
+
+class _TaskFailureCardState extends State<TaskFailureCard> {
+  late String _title;
+
+  @override
+  void initState() {
+    super.initState();
+    _title = classifyModelFailure(widget.error).title;
+  }
+
+  @override
+  void didUpdateWidget(TaskFailureCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.error != widget.error) {
+      _title = classifyModelFailure(widget.error).title;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget._build(context, _title);
 }

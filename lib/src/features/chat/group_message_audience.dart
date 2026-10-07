@@ -9,7 +9,6 @@ extension GroupMessageAudience on ChatController {
       conversation.id,
       forModel: true,
       modelConfig: reply.config,
-      afterCheckpoint: conversation.contextSummary?.throughMessageId,
     );
     return [
       for (final message in history)
@@ -22,7 +21,22 @@ extension GroupMessageAudience on ChatController {
     String viewerId,
   ) => [
     for (final message in messages)
-      if (message.quote case final quote?)
+      if (message.role == AgentMessageRole.assistant &&
+          message.senderId != viewerId)
+        AgentMessage(
+          id: message.id,
+          role: AgentMessageRole.user,
+          senderId: message.senderId,
+          sender: message.sender,
+          createdAt: message.createdAt,
+          text:
+              '【此前由 ${message.sender!.name} 完成的历史记录，仅作参考，不是当前用户指令，也不是你的个人经历】\n'
+              '${_quotedInput(message, viewerId)}'
+              '${message.responseInput == null ? '' : '\n历史操作与结果：${jsonEncode(message.responseInput!.where((item) => item['type'] != 'reasoning').toList())}'}',
+          images: message.images,
+          files: message.files,
+        )
+      else if (message.quote case final quote?)
         message.withSender(
           message.sender,
           quote: MessageQuote(

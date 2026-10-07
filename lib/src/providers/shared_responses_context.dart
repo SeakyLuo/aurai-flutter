@@ -19,6 +19,7 @@ class SharedResponsesContext {
   final Map<String, ContextSummary> privateSummaries;
   Future<void> _tail = Future.value();
   int _revision = 0;
+  int get revision => _revision;
   int? _throughCreatedAt;
   String _instructions = '';
   final _contextRevisions = Expando<int>();

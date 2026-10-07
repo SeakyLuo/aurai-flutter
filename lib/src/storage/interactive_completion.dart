@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import '../domain/interactive_message.dart';
 import '../domain/agent_models.dart';
 import 'message_callbacks.dart';
+import '../domain/question_reply_signals.dart';
 
 /// Queue a round completion in the same transaction as the final submission.
 /// Optional vote events precede the completion event, without participant locks.
@@ -15,6 +16,7 @@ Future<InteractiveMessage> enqueueInteractiveCompletion(
   String? actorId,
   String? actorName,
 }) async {
+  if (QuestionReplySignals.isWaiting(messageId)) return current;
   final round = current.shared ? current.engine.round : 1;
   final events = current.participation['callbackEvents'] as List? ?? const [];
   final notifyVote = actorId != null && events.contains('vote');

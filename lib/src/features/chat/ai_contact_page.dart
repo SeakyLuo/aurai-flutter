@@ -1,11 +1,12 @@
+import 'subagent_detail_page.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../domain/message_sender.dart';
 import '../../domain/contact_display_names.dart';
-import '../../storage/contact_store.dart';
-import 'contact_remark_dialog.dart';
+import 'contact_remark_action.dart';
+import 'friend_notification.dart';
 import '../../storage/group_member_details.dart';
-import 'dialog_action_button.dart';
+import '../../storage/home_conversations.dart';
 import 'header_action_menu.dart';
 import 'conversation_menu_icon.dart';
 import 'tool_approvals_page.dart';
@@ -24,7 +25,6 @@ import 'chat_controller.dart';
 import 'ai_contact_editor.dart';
 import 'ai_model_page.dart';
 import 'ai_speech_page.dart';
-import 'ai_group_picker.dart';
 import 'profile_avatar.dart';
 import 'glass_surface.dart';
 import 'settings_appearance.dart';
@@ -49,6 +49,7 @@ class _AiContactPageState extends State<AiContactPage> {
   String _groupNickname = '';
   bool _busy = false;
   bool _isFriend = false;
+  int _unreadCompletedTasks = 0;
   @override
   void initState() {
     super.initState();
@@ -62,7 +63,7 @@ class _AiContactPageState extends State<AiContactPage> {
   Future<void> _reload() async {
     try {
       final groupId = widget.groupId;
-      final (ai, nickname, friendship) = await (
+      final (ai, nickname, friendship, completedTasks) = await (
         widget.controller.groupStore.loadAi(widget.senderId),
         groupId == null
             ? Future.value('')
@@ -76,12 +77,16 @@ class _AiContactPageState extends State<AiContactPage> {
           whereArgs: [widget.senderId],
           limit: 1,
         ),
+        HomeConversations(
+          widget.controller.groupStore,
+        ).unreadCompletionsForAi(widget.senderId),
       ).wait;
       if (mounted) {
         setState(() {
           _ai = ai;
           _groupNickname = nickname;
           _isFriend = friendship.isNotEmpty;
+          _unreadCompletedTasks = completedTasks;
         });
       }
     } on Object catch (error) {
@@ -127,32 +132,24 @@ class _AiContactPageState extends State<AiContactPage> {
       await _page(
         MemorySummaryPage(
           memory: memory,
-          initialGroup: widget.groupId != null,
-          groupMemories: AiGroupList(
-            controller: widget.controller,
-            senderId: widget.senderId,
-            onSelected: (group) async {
-              try {
-                final memory = await widget.controller.aiMemory(
-                  _ai!,
-                  scope: group['id'] as String,
-                );
-                if (mounted)
-                  await _page(
-                    MemorySummaryPage(
-                      memory: memory,
-                      title: group['title'] as String,
-                    ),
-                  );
-              } on Object catch (error) {
-                if (mounted)
-                  _notice(
-                    '记忆读取失败：${errorMessage(error)}',
-                    kind: ToastKind.error,
-                  );
-              }
-            },
-          ),
+          onOpenSource: (source) async {
+            if (source['parent_run_id'] != null) {
+              await _page(
+                SubagentDetailPage(
+                  controller: widget.controller,
+                  runId: source['run_id'] as String,
+                ),
+              );
+            } else {
+              await openHomeConversation(
+                context,
+                widget.controller,
+                source['conversation_id'] as String,
+                messageId: source['focus_message_id'] as String?,
+                waitForClose: true,
+              );
+            }
+          },
         ),
       );
     } on Object catch (error) {
@@ -167,27 +164,9 @@ class _AiContactPageState extends State<AiContactPage> {
   }
 
   Future<void> _remark() async {
-    final value = await showDialog<String>(
-      context: context,
-      builder: (_) => ContactRemarkDialog(senderId: widget.senderId),
-    );
-    if (value == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      await ContactStore(
-        widget.controller.groupStore.database,
-      ).setRemark(widget.senderId, value);
-      widget.controller.contactsChanged.value = await widget
-          .controller
-          .groupStore
-          .loadAi(widget.senderId);
-      await widget.controller.refreshConversations();
-      if (mounted) {
-        setState(() {});
-        _notice(value.isEmpty ? '已恢复原名' : '备注名已保存', kind: ToastKind.success);
-      }
-    } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error), kind: ToastKind.error);
+      await editContactRemark(context, widget.controller, widget.senderId);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -196,7 +175,15 @@ class _AiContactPageState extends State<AiContactPage> {
   Future<void> _addFriend() async {
     setState(() => _busy = true);
     try {
-      await widget.controller.saveAi(_ai!.copyWith(isTemporary: false));
+      final notifyFriend = await showDialog<bool>(
+        context: context,
+        builder: (_) => AddFriendDialog(name: _ai!.sender.displayName),
+      );
+      if (notifyFriend == null || !mounted) return;
+      await widget.controller.addAiFriend(
+        _ai!.copyWith(isTemporary: false),
+        notifyFriend: notifyFriend,
+      );
       await _reload();
       if (mounted) _notice('已添加到通讯录', kind: ToastKind.success);
     } catch (caughtError) {
@@ -249,7 +236,7 @@ class _AiContactPageState extends State<AiContactPage> {
                                 ),
                               ),
                             if (!ai.sender.archived &&
-                                !ai.isTemporary &&
+                                _isFriend &&
                                 ai.sender.id != MessageSender.aurai.id)
                               (
                                 value: 'archive',
@@ -435,14 +422,28 @@ class _AiContactPageState extends State<AiContactPage> {
                       ),
                     ),
                   ),
+                  if (!ai.sender.archived && _isFriend)
+                    _row(
+                      '任务',
+                      SettingsIconType.job,
+                      () => _page(
+                        AiConversationsPage(
+                          controller: widget.controller,
+                          profile: ai,
+                        ),
+                      ),
+                      value: _unreadCompletedTasks == 0
+                          ? null
+                          : '$_unreadCompletedTasks 项已完成',
+                    ),
                   const SizedBox(height: 24),
                   WidgetUtils.primaryButton(
                     text: ai.sender.archived
                         ? '恢复朋友'
-                        : ai.isTemporary
+                        : !_isFriend
                         ? '添加朋友'
                         : '发消息',
-                    onPressed: !ai.sender.archived && !ai.isTemporary
+                    onPressed: !ai.sender.archived && _isFriend
                         ? _message
                         : _busy
                         ? null
@@ -450,21 +451,6 @@ class _AiContactPageState extends State<AiContactPage> {
                         ? _archive
                         : _addFriend,
                   ),
-                  if (!ai.sender.archived && !ai.isTemporary) ...[
-                    const SizedBox(height: 12),
-                    DialogActionButton(
-                      text: '会话列表',
-                      role: DialogActionRole.secondary,
-                      onPressed: _busy
-                          ? null
-                          : () => _page(
-                              AiConversationsPage(
-                                controller: widget.controller,
-                                profile: ai,
-                              ),
-                            ),
-                    ),
-                  ],
                 ],
               ),
       ),
@@ -476,6 +462,7 @@ class _AiContactPageState extends State<AiContactPage> {
     SettingsIconType icon,
     VoidCallback onTap, {
     String? subtitle,
+    String? value,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 10),
     child: Material(
@@ -490,7 +477,22 @@ class _AiContactPageState extends State<AiContactPage> {
         subtitle: subtitle == null
             ? null
             : Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: const SettingsIcon(type: SettingsIconType.chevron),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (value != null) ...[
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            const SettingsIcon(type: SettingsIconType.chevron),
+          ],
+        ),
         onTap: onTap,
       ),
     ),

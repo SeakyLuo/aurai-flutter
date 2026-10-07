@@ -24,10 +24,14 @@ class GroupMessageSearchPage extends StatefulWidget {
     required this.controller,
     required this.conversationId,
     this.group = true,
+    this.task = false,
+    this.initialType = GroupSearchType.all,
   });
   final ChatController controller;
   final String conversationId;
   final bool group;
+  final bool task;
+  final GroupSearchType initialType;
   @override
   State<GroupMessageSearchPage> createState() => _GroupMessageSearchPageState();
 }
@@ -38,7 +42,7 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
   final _pages = {
     for (final type in GroupSearchType.values) type: _SearchPageState(),
   };
-  GroupSearchType _type = GroupSearchType.all;
+  late GroupSearchType _type = widget.initialType;
   Timer? _debounce;
   int _generation = 0;
   String _query = '';
@@ -66,6 +70,7 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
           _load();
       });
     }
+    if (_type != GroupSearchType.all) _load();
   }
 
   void _changed(String value) {
@@ -207,7 +212,11 @@ class _GroupMessageSearchPageState extends State<GroupMessageSearchPage> {
                       _load();
                     }
                   },
-                  hintText: widget.group ? '搜索群消息和文件名' : '搜索聊天消息和文件名',
+                  hintText: widget.task
+                      ? '搜索任务消息和文件名'
+                      : widget.group
+                      ? '搜索群消息和文件名'
+                      : '搜索聊天消息和文件名',
                   enabled: true,
                   bottom: 16,
                   child: RetainedTabView(

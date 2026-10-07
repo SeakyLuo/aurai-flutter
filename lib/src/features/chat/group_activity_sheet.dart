@@ -1,6 +1,5 @@
 import 'app_bottom_sheet.dart';
 import 'app_sheet_surface.dart';
-import 'floating_search_layout.dart';
 import 'task_playback_icon.dart';
 import 'tool_activity_view.dart';
 import 'chat_header_background.dart';

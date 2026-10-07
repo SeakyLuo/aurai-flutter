@@ -5,7 +5,10 @@ List<({int start, int end})> toolActivityGroups(List<String?> tools) {
   while (start < tools.length) {
     var end = start + 1;
     final tool = tools[start];
-    if (tool != null && tool != 'askUser' && tool != 'runSubagent') {
+    if (tool != null &&
+        tool != 'askUser' &&
+        tool != 'runSubagent' &&
+        tool != 'runTask') {
       while (end < tools.length && tools[end] == tool) {
         end++;
       }

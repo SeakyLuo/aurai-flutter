@@ -23,10 +23,20 @@ class MemoryRecordTool
       if (operation == 'list') ...{
         'query': {
           'type': 'string',
-          'description': 'Search memory text; empty lists all.',
+          'description':
+              'Search text, names, evidenced aliases and specific keywords. Empty lists recent memories. Older memories remain searchable.',
         },
         'offset': {'type': 'integer', 'minimum': 0},
+        'preferCurrentProject': {
+          'type': 'boolean',
+          'description':
+              'Use true for normal current-project work. Use false when the user asks about another project or compares projects. This changes ranking only; all this AI memories remain searchable.',
+        },
       },
+      if (operation == 'read')
+        'sourceOffset': {'type': 'integer', 'minimum': 0},
+      if (hasId && !reading)
+        'expectedVersion': {'type': 'integer', 'minimum': 1},
       if (hasId)
         'id': {
           'type': 'string',
@@ -34,7 +44,11 @@ class MemoryRecordTool
               'Memory ID returned by listMemories/readMemory. Never ask the user to supply an ID.',
         },
       if (operation == 'create' || operation == 'update')
-        'text': {'type': 'string', 'minLength': 1, 'maxLength': 300},
+        'text': {
+          'type': 'string',
+          'minLength': 1,
+          'maxLength': memoryTextLimit,
+        },
       if (!reading)
         'expectedRevision': {
           'type': 'integer',
@@ -46,7 +60,7 @@ class MemoryRecordTool
       name: operation == 'list' ? 'listMemories' : '${operation}Memory',
       description: switch (operation) {
         'list' =>
-          '${memory.projectShared ? "Search or list shared memories belonging to the current project, available to every AI in this project" : "Search or list this AI own memories across private chat and all groups"}, newest updated first, 20 per page. Returns IDs, device-local creation/update timestamps with explicit UTC offset, source references and revision. Use nextOffset for more. IDs are internal, do not display them to users.',
+          '${memory.projectShared ? "Search or list shared memories belonging to the current project, available to every AI in this project" : "Search or list this AI own memories across private chat and all groups"}, ranked by keyword relevance and recency, 20 per page. Returns IDs, device-local creation/update timestamps with explicit UTC offset, source references and revision. Use nextOffset for more. IDs are internal, do not display them to users.',
         'read' =>
           'Read one memory available to the current memory owner (this AI or the current project), including creation/update times, source references and revision.',
         'create' =>
@@ -70,7 +84,6 @@ class MemoryRecordTool
   @override
   Future<ToolResult?> preflight(ToolCall call) async {
     try {
-      if (hasId && !reading) memory.entryById(call.arguments['id'] as String);
       if (!reading && call.arguments['expectedRevision'] != memory.revision) {
         throw StateError('记忆已变化，请重新查询后操作');
       }
@@ -89,37 +102,29 @@ class MemoryRecordTool
       if (operation == 'list') {
         final query = (args['query'] as String).toLowerCase();
         final offset = args['offset'] as int;
-        final matches =
-            (await memory.readableMemories())
-                .where(
-                  (entry) =>
-                      (entry['text'] as String).toLowerCase().contains(query),
-                )
-                .toList()
-              ..sort((a, b) {
-                final order = (b['updated_at'] as int).compareTo(
-                  a['updated_at'] as int,
-                );
-                return order == 0
-                    ? (a['id'] as String).compareTo(b['id'] as String)
-                    : order;
-              });
+        final matches = await memory.readableMemories(
+          query: query,
+          offset: offset,
+          preferCurrentProject: args['preferCurrentProject'] as bool,
+        );
         return result(call, ToolResultStatus.success, {
-          'memories': matches
-              .skip(offset)
-              .take(20)
-              .map(memory.contextualRecord)
-              .toList(),
-          'total': matches.length,
+          'memories': matches.take(20).map(memory.contextualRecord).toList(),
           'revision': memory.revision,
-          'nextOffset': offset + 20 < matches.length ? offset + 20 : null,
+          'nextOffset': matches.length > 20 ? offset + 20 : null,
         });
       }
       if (operation == 'read') {
         final row = await memory.readableMemory(args['id'] as String);
         if (row == null) throw StateError('这条记忆已删除，请重新查询');
+        final offset = args['sourceOffset'] as int;
+        final sources = await memory.sources(
+          args['id'] as String,
+          offset: offset,
+        );
         return result(call, ToolResultStatus.success, {
           'memory': memory.contextualRecord(row),
+          'sources': sources.take(20).toList(),
+          'nextSourceOffset': sources.length > 20 ? offset + 20 : null,
           'revision': memory.revision,
         });
       }
@@ -127,6 +132,7 @@ class MemoryRecordTool
         operation,
         id: args['id'] as String?,
         text: args['text'] as String?,
+        expectedVersion: args['expectedVersion'] as int?,
         expectedRevision: args['expectedRevision'] as int,
         conversationId: conversationId,
         messageId: messageId,

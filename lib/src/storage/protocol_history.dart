@@ -38,17 +38,19 @@ Future<List<Map<String, Object?>>> loadTaskContinuationProtocol(
   String conversationId,
   String userMessageId,
   ModelConfig config,
+  String senderId,
 ) async {
   final runs = await database.query(
     'agent_runs',
     columns: ['id', 'started_at', 'error_detail', 'status'],
     where:
-        "parent_run_id IS NULL AND conversation_id = ? AND user_message_id = ? AND provider = ? AND model = ? AND status IN ('completed', 'failed', 'cancelled', 'interrupted') AND (final_message_id IS NULL OR final_message_id NOT IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != ''))",
+        "parent_run_id IS NULL AND conversation_id = ? AND user_message_id = ? AND provider = ? AND model = ? AND sender_id = ? AND status IN ('completed', 'failed', 'cancelled', 'interrupted') AND (final_message_id IS NULL OR final_message_id NOT IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != ''))",
     whereArgs: [
       conversationId,
       userMessageId,
       config.service.name,
       config.model,
+      senderId,
     ],
     orderBy: 'started_at DESC, id DESC',
   );

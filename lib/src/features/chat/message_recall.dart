@@ -106,7 +106,8 @@ extension MessageRecall on ChatController {
 
   Future<void> recallMessage(AgentMessage message) async {
     final conversation = activeConversation;
-    if (conversation.kind != ConversationKind.group ||
+    if ((conversation.kind != ConversationKind.group &&
+            !conversation.isPersonalChat) ||
         message.senderId != MessageSender.localUser.id ||
         message.isSystem)
       return;
@@ -303,7 +304,7 @@ extension MessageRecall on ChatController {
             (id) => !dispatcher.paused.contains(id) && (notice.canView(id)),
           ),
         );
-      } else if (userInitiated) {
+      } else if (userInitiated && conversation.kind == ConversationKind.group) {
         await _receiveGroupSystemNotice(conversation.id, notice);
       }
     } finally {

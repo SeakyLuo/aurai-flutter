@@ -1,10 +1,10 @@
+import 'dart:async';
+import 'memory_source_list.dart';
 import '../app/glass_notice.dart';
 import '../widgets/empty_data_view.dart';
-import '../features/chat/retained_tab_view.dart';
 import '../domain/error_message.dart';
 import '../features/chat/delete_confirmation_dialog.dart';
 import '../features/chat/dialog_action_button.dart';
-import '../features/chat/search_type_segment.dart';
 import 'package:flutter/material.dart';
 
 import '../features/chat/glass_surface.dart';
@@ -26,14 +26,12 @@ class MemorySummaryPage extends StatefulWidget {
     super.key,
     required this.memory,
     this.title = '记忆',
-    this.groupMemories,
-    this.initialGroup = false,
+    this.onOpenSource,
     this.actions = const [],
   });
   final MemoryController memory;
   final String title;
-  final Widget? groupMemories;
-  final bool initialGroup;
+  final OpenMemorySource? onOpenSource;
   final List<Widget> actions;
 
   @override
@@ -41,8 +39,9 @@ class MemorySummaryPage extends StatefulWidget {
 }
 
 class _MemorySummaryPageState extends State<MemorySummaryPage> {
-  late bool _group = widget.initialGroup;
-  late bool _groupVisited = widget.initialGroup;
+  final _search = TextEditingController();
+  Timer? _searchTimer;
+  bool _loadingMore = false;
   final _text = TextEditingController();
   final _focus = FocusNode();
   bool _saving = false;
@@ -50,6 +49,44 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
   int _request = 0;
   MemoryPlan? _plan;
   ResponsesTransport? _transport;
+
+  @override
+  void initState() {
+    super.initState();
+    _search.text = memory.searchQuery;
+    _searchMemories(_search.text);
+  }
+
+  Future<void> _searchMemories(String value) async {
+    try {
+      memory.searchQuery = value;
+      await memory.reload();
+    } on Object catch (error) {
+      if (mounted)
+        memoryToast(context, error.toString(), kind: ToastKind.error);
+    }
+  }
+
+  Future<void> _retryMemories() async {
+    try {
+      await memory.retryFailed();
+    } on Object catch (error) {
+      if (mounted)
+        memoryToast(context, error.toString(), kind: ToastKind.error);
+    }
+  }
+
+  Future<void> _more() async {
+    setState(() => _loadingMore = true);
+    try {
+      await memory.loadMore();
+    } on Object catch (error) {
+      if (mounted)
+        memoryToast(context, error.toString(), kind: ToastKind.error);
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
 
   void _cancelPlan() {
     _request++;
@@ -68,6 +105,8 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
   void dispose() {
     _request++;
     _transport?.cancel();
+    _searchTimer?.cancel();
+    _search.dispose();
     _text.dispose();
     _focus.dispose();
     super.dispose();
@@ -99,7 +138,11 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
     FocusScope.of(context).unfocus();
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => MemoryEditor(memory: memory, entry: entry),
+        builder: (_) => MemoryEditor(
+          memory: memory,
+          entry: entry,
+          onOpenSource: widget.onOpenSource,
+        ),
       ),
     );
   }
@@ -205,126 +248,89 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
           extendBody: true,
           extendBodyBehindAppBar: true,
           resizeToAvoidBottomInset: false,
-          bottomNavigationBar: _group ? null : KeyboardInset(child: _footer()),
+          bottomNavigationBar: KeyboardInset(child: _footer()),
           appBar: SettingsAppBar(
             title: widget.title,
             actions: widget.actions,
 
-            titleWidget: widget.groupMemories == null
-                ? null
-                : SearchTypeSegment(
-                    files: _group,
-                    labels: const ['私聊', '群聊'],
-                    onChanged: (group) {
-                      if (_saving || _planning) return;
-                      _focus.unfocus();
-                      setState(() {
-                        _group = group;
-                        _groupVisited |= group;
-                      });
-                    },
-                  ),
             onBack: _saving ? null : _leave,
           ),
-          body: RetainedTabView(
-            index: _group ? 1 : 0,
-            swipeEnabled:
-                !_saving && !_planning && widget.groupMemories != null,
-            onChanged: (index) {
-              _focus.unfocus();
-              setState(() {
-                _group = index == 1;
-                _groupVisited |= _group;
-              });
-            },
-            children: [
-              Builder(
-                builder: (context) => SafeArea(
-                  top: false,
-                  bottom: false,
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 640),
-                      child: _plan == null && memory.entries.isEmpty
-                          ? Padding(
-                              padding: EdgeInsets.only(
-                                top: settingsHeaderHeight(context),
-                                bottom: MediaQuery.paddingOf(context).bottom,
-                              ),
-                              child: EmptyDataView(
-                                title: '还没有记忆',
-                                description: memory.projectShared
-                                    ? '这里会记录项目成员共享的背景与约定。你可以在下方补充信息。'
-                                    : memory.scope.isEmpty
-                                    ? '这里会逐渐记录对你的了解。你可以在下方补充希望记住的信息。'
-                                    : '这里会记录在这个群聊中形成的记忆。你可以在下方补充信息。',
-                              ),
-                            )
-                          : ListView(
-                              keyboardDismissBehavior:
-                                  ScrollViewKeyboardDismissBehavior.onDrag,
-                              padding: EdgeInsets.fromLTRB(
-                                8,
-                                MediaQuery.paddingOf(context).top + 8,
-                                8,
-                                MediaQuery.paddingOf(context).bottom + 28,
-                              ),
-                              children: [
-                                if (_plan != null)
-                                  MemoryPlanPreview(plan: _plan!)
-                                else ...[
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                    ),
-                                    child: const Text(
-                                      '以下是对话中形成、或主动保存的记忆。',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Color(0xFF6B6B6B),
-                                      ),
-                                    ),
-                                  ),
-                                  if (memory.entries.isNotEmpty) ...[
-                                    const SizedBox(height: 20),
-                                    for (final entry in memory.entries)
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 8,
-                                        ),
-                                        child: MemoryEntryTile(
-                                          key: ValueKey(entry['id']),
-                                          text: entry['text'] as String,
-                                          enabled: !_saving && !_planning,
-                                          onEdit: () => _edit(entry),
-                                          onMenu: (position) =>
-                                              _menu(entry, position),
-                                        ),
-                                      ),
-                                  ],
-                                ],
-                              ],
-                            ),
+          body: SafeArea(
+            top: false,
+            bottom: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: settingsPagePadding(
+                    context,
+                    EdgeInsets.fromLTRB(
+                      16,
+                      12,
+                      16,
+                      130 + MediaQuery.viewInsetsOf(context).bottom,
                     ),
                   ),
+                  children: [
+                    TextField(
+                      controller: _search,
+                      enabled: !_planning && !_saving,
+                      decoration: InputDecoration(
+                        hintText: '搜索记忆、人物或关键词',
+                        filled: true,
+                        fillColor: settingsFieldColor(context),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (value) {
+                        _searchTimer?.cancel();
+                        _searchTimer = Timer(
+                          const Duration(milliseconds: 250),
+                          () => _searchMemories(value),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    if (memory.failedJobs > 0)
+                      TextButton(
+                        onPressed: _saving ? null : _retryMemories,
+                        child: const Text('重试未完成的记忆整理'),
+                      ),
+                    if (_plan != null)
+                      MemoryPlanPreview(plan: _plan!)
+                    else if (memory.entries.isEmpty)
+                      EmptyDataView(
+                        title: _search.text.isEmpty ? '还没有记忆' : '没有找到相关记忆',
+                        description: _search.text.isEmpty
+                            ? '聊天和任务中的有用信息会留在这里，也可以在下方补充。'
+                            : '换一个名字或关键词试试。',
+                      )
+                    else ...[
+                      for (final entry in memory.entries)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: MemoryEntryTile(
+                            key: ValueKey(entry['id']),
+                            text: entry['text'] as String,
+                            enabled: !_saving && !_planning,
+                            onEdit: () => _edit(entry),
+                            onMenu: (position) => _menu(entry, position),
+                          ),
+                        ),
+                      if (memory.hasMore)
+                        TextButton(
+                          onPressed: _loadingMore ? null : _more,
+                          child: Text(_loadingMore ? '正在加载' : '更多记忆'),
+                        ),
+                    ],
+                  ],
                 ),
               ),
-              if (_groupVisited)
-                Padding(
-                  padding: EdgeInsets.only(
-                    top:
-                        MediaQuery.paddingOf(context).top +
-                        SettingsAppBar.toolbarHeight,
-                  ),
-                  child: MediaQuery.removePadding(
-                    context: context,
-                    removeTop: true,
-                    child: widget.groupMemories!,
-                  ),
-                )
-              else
-                const SizedBox.shrink(),
-            ],
+            ),
           ),
         ),
       );

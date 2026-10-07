@@ -176,8 +176,8 @@ class _DefaultModelSettingsPageState extends State<DefaultModelSettingsPage> {
                     shape: const RoundedRectangleBorder(
                       borderRadius: BorderRadius.all(Radius.circular(20)),
                     ),
-                    title: const Text('上下文压缩'),
-                    subtitle: Text('压缩阈值 ${percent ?? 80}%'),
+                    title: const Text('上下文窗口'),
+                    subtitle: Text('窗口使用比例 ${percent ?? 80}%'),
                     trailing: const SettingsIcon(
                       type: SettingsIconType.chevron,
                     ),
@@ -266,7 +266,7 @@ class _DefaultModelSettingsPageState extends State<DefaultModelSettingsPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  _label('上下文压缩'),
+                  _label('上下文窗口'),
                   Material(
                     color: settingsFieldColor(context),
                     borderRadius: BorderRadius.circular(24),
@@ -274,7 +274,7 @@ class _DefaultModelSettingsPageState extends State<DefaultModelSettingsPage> {
                     child: ListTile(
                       minTileHeight: settingsCardHeight,
                       contentPadding: settingsCardPadding,
-                      title: Text('压缩阈值 ${percent ?? 80}%'),
+                      title: Text('窗口使用比例 ${percent ?? 80}%'),
                       trailing: const SettingsIcon(
                         type: SettingsIconType.chevron,
                       ),

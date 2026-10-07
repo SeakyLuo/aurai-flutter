@@ -35,7 +35,8 @@ extension ProjectControllerActions on ChatController {
     validateProjectName(name);
     final id = newMessageId();
     final createdDirectories = <ProjectDirectory>[];
-    for (final directoryName in directoryNames.isEmpty ? [name] : directoryNames) {
+    for (final directoryName
+        in directoryNames.isEmpty ? [name] : directoryNames) {
       final output = await _platform.deviceExtension('createManagedProject', {
         'id': newMessageId(),
         'name': directoryName,
@@ -130,15 +131,6 @@ extension ProjectControllerActions on ChatController {
     bool pinned,
   ) async {
     await projects.setPinned(project.id, pinned);
-    notifyListeners();
-    return projects.read(project.id);
-  }
-
-  Future<DevelopmentProject> setProjectMemoryMode(
-    DevelopmentProject project,
-    ProjectMemoryMode mode,
-  ) async {
-    await projects.setMemoryMode(project.id, mode);
     notifyListeners();
     return projects.read(project.id);
   }

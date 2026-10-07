@@ -14,7 +14,6 @@ import 'chat_controller.dart';
 import '../../domain/avatar_style.dart';
 import '../../domain/message_sender.dart';
 import '../../storage/home_conversations.dart';
-import 'group_avatar.dart';
 import 'profile_avatar.dart';
 import 'conversation_more.dart';
 import 'settings_appearance.dart';
@@ -31,7 +30,6 @@ class ArchivedConversationsPage extends StatefulWidget {
 class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
   final _items = <Conversation>[];
   final _senders = <String, MessageSender>{};
-  final _groups = <String, List<MessageSender>>{};
   bool _friends = false;
   bool _friendsOpened = false;
   bool _loading = true;
@@ -60,25 +58,17 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
         after: reset || _items.isEmpty ? null : _items.last,
         limit: limit,
       );
-      final avatars = await Future.wait<Object>([
-        HomeConversations(widget.controller.groupStore).senders(page),
-        widget.controller.groupStore.avatarMembers(
-          page
-              .where((item) => item.kind == ConversationKind.group)
-              .map((item) => item.id)
-              .toList(),
-        ),
-      ]);
+      final senders = await HomeConversations(
+        widget.controller.groupStore,
+      ).senders(page);
       if (!mounted) return;
       setState(() {
         if (reset) {
           _items.clear();
           _senders.clear();
-          _groups.clear();
         }
         _items.addAll(page);
-        _senders.addAll(avatars[0] as Map<String, MessageSender>);
-        _groups.addAll(avatars[1] as Map<String, List<MessageSender>>);
+        _senders.addAll(senders);
         _loaded = true;
         _hasMore = page.length == limit;
       });
@@ -86,7 +76,7 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
       if (!mounted) return;
       setState(() => _failed = true);
       ScaffoldMessenger.of(context).showToast(
-        SnackBar(content: Text('无法加载归档会话，请重试：${errorMessage(error)}')),
+        SnackBar(content: Text('无法加载归档记录，请重试：${errorMessage(error)}')),
         kind: ToastKind.error,
       );
     } finally {
@@ -95,13 +85,6 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
   }
 
   Widget _avatar(Conversation conversation) {
-    if (conversation.kind == ConversationKind.group) {
-      return GroupAvatar(
-        groupId: conversation.id,
-        members: _groups[conversation.id]!,
-        size: 48,
-      );
-    }
     final sender = _senders[conversation.defaultSenderId]!;
     return ProfileAvatar(
       style: AvatarStyle(
@@ -122,7 +105,7 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
         title: '已归档',
         titleWidget: SearchTypeSegment(
           files: _friends,
-          labels: const ['会话', '朋友'],
+          labels: const ['任务', '朋友'],
           onChanged: (value) => setState(() {
             _friends = value;
             if (value) _friendsOpened = true;
@@ -150,7 +133,7 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
                           MediaQuery.paddingOf(context).top +
                           SettingsAppBar.toolbarHeight,
                     ),
-                    child: Center(child: EmptyDataView(title: '没有已归档会话')),
+                    child: Center(child: EmptyDataView(title: '没有已归档任务')),
                   ),
                   padding: EdgeInsets.fromLTRB(
                     12,
@@ -166,7 +149,7 @@ class _ArchivedConversationsPageState extends State<ArchivedConversationsPage> {
                         key: ValueKey('loading'),
                         padding: EdgeInsets.all(8),
                         child: SearchSkeleton(
-                          label: '正在加载归档会话',
+                          label: '正在加载归档任务',
                           rowGap: 32,
                           avatarSize: 48,
                         ),

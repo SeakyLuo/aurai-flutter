@@ -25,9 +25,10 @@ extension PendingMessageSubmission on ChatController {
     }
   }
 
-  Future<void> _enqueuePrivateMessage(
+  Future<String> _enqueuePrivateMessage(
     String text, {
     required bool fromDraft,
+    bool dispatch = true,
   }) async {
     final conversation = activeConversation;
     final queue = pendingMessageQueue;
@@ -83,8 +84,9 @@ extension PendingMessageSubmission on ChatController {
       queue.busy = false;
       _submitting = false;
       _notifyRun(conversation);
-      _resumeForwardedReply();
+      if (dispatch) _resumeForwardedReply();
     }
+    return message.id;
   }
 
   Future<void> removePendingMessage(String id) =>

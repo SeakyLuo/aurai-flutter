@@ -8,12 +8,14 @@ class GroupAppsSection extends StatelessWidget {
     super.key,
     required this.onTasks,
     required this.onMarks,
-    required this.onTools,
-    required this.onSkills,
+    this.onTaskList,
+    this.onTools,
+    this.onSkills,
     this.title = '群应用',
   });
   final String title;
-  final VoidCallback onTasks, onMarks, onTools, onSkills;
+  final VoidCallback onTasks, onMarks;
+  final VoidCallback? onTaskList, onTools, onSkills;
 
   @override
   Widget build(BuildContext context) {
@@ -30,9 +32,19 @@ class GroupAppsSection extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
+              if (onTaskList != null)
+                _entry(
+                  context,
+                  '任务',
+                  SettingsIcon(
+                    type: SettingsIconType.job,
+                    color: colors.onSurfaceVariant,
+                  ),
+                  onTaskList!,
+                ),
               _entry(
                 context,
-                '任务',
+                '计划',
                 SettingsIcon(
                   type: SettingsIconType.taskList,
                   color: colors.onSurfaceVariant,
@@ -53,24 +65,26 @@ class GroupAppsSection extends StatelessWidget {
                 ),
                 onMarks,
               ),
-              _entry(
-                context,
-                '工具',
-                SettingsIcon(
-                  type: SettingsIconType.tools,
-                  color: colors.onSurfaceVariant,
+              if (onTools != null)
+                _entry(
+                  context,
+                  '工具',
+                  SettingsIcon(
+                    type: SettingsIconType.tools,
+                    color: colors.onSurfaceVariant,
+                  ),
+                  onTools!,
                 ),
-                onTools,
-              ),
-              _entry(
-                context,
-                '技能',
-                SettingsIcon(
-                  type: SettingsIconType.skills,
-                  color: colors.onSurfaceVariant,
+              if (onSkills != null)
+                _entry(
+                  context,
+                  '技能',
+                  SettingsIcon(
+                    type: SettingsIconType.skills,
+                    color: colors.onSurfaceVariant,
+                  ),
+                  onSkills!,
                 ),
-                onSkills,
-              ),
             ],
           ),
         ],

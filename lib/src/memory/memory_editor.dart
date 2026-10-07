@@ -1,3 +1,4 @@
+import 'memory_source_list.dart';
 import '../app/glass_notice.dart';
 import '../features/chat/delete_confirmation_dialog.dart';
 import '../domain/error_message.dart';
@@ -9,8 +10,14 @@ import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
 
 class MemoryEditor extends StatefulWidget {
-  const MemoryEditor({super.key, required this.memory, this.entry});
+  const MemoryEditor({
+    super.key,
+    required this.memory,
+    this.entry,
+    this.onOpenSource,
+  });
   final MemoryController memory;
+  final OpenMemorySource? onOpenSource;
   final Map<String, Object?>? entry;
 
   @override
@@ -100,7 +107,7 @@ class MemoryEditorState extends State<MemoryEditor> {
                   !busy &&
                       dirty &&
                       text.text.trim().isNotEmpty &&
-                      text.text.length <= 300
+                      text.text.length <= memoryTextLimit
                   ? () => _commit()
                   : null,
               iconWidget: Opacity(
@@ -108,7 +115,7 @@ class MemoryEditorState extends State<MemoryEditor> {
                     !busy &&
                         dirty &&
                         text.text.trim().isNotEmpty &&
-                        text.text.length <= 300
+                        text.text.length <= memoryTextLimit
                     ? 1
                     : .3,
                 child: const SettingsIcon(type: SettingsIconType.check),
@@ -130,13 +137,31 @@ class MemoryEditorState extends State<MemoryEditor> {
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '记忆内容',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ),
+                        Text(
+                          '${text.text.characters.length}/$memoryTextLimit',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: text,
                       autofocus: widget.entry == null,
                       enabled: !busy,
-                      minLines: 5,
+                      minLines: 4,
                       maxLines: null,
-                      maxLength: 300,
+                      maxLength: memoryTextLimit,
                       onChanged: (_) => setState(() {}),
                       style: TextStyle(
                         fontSize: 16,
@@ -157,12 +182,15 @@ class MemoryEditorState extends State<MemoryEditor> {
                           borderRadius: BorderRadius.circular(16),
                           borderSide: BorderSide.none,
                         ),
-                        counterStyle: TextStyle(
-                          fontSize: 12,
-                          color: colors.onSurfaceVariant,
-                        ),
+                        counterText: '',
                       ),
                     ),
+                    if (widget.entry != null)
+                      MemorySourceList(
+                        memory: widget.memory,
+                        entry: widget.entry!,
+                        onOpen: widget.onOpenSource,
+                      ),
                   ],
                 ),
               ),

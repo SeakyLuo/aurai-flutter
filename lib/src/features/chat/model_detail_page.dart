@@ -441,7 +441,7 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
                       shape: const RoundedRectangleBorder(
                         borderRadius: BorderRadius.all(Radius.circular(20)),
                       ),
-                      title: const Text('上下文压缩'),
+                      title: const Text('上下文窗口'),
                       subtitle: Text(
                         contextOverride == null
                             ? '继承默认 ${defaultPercent}%'
@@ -558,7 +558,7 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    _label('上下文压缩'),
+                    _label('上下文窗口'),
                     Material(
                       color: settingsFieldColor(context),
                       borderRadius: BorderRadius.circular(24),

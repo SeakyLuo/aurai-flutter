@@ -80,53 +80,57 @@ class _GroupRunDetailsLayoutState extends State<GroupRunDetailsLayout> {
       height: MediaQuery.sizeOf(context).height * .8,
       child: SafeArea(
         top: false,
-        child: SearchSheetBody(
-          header: _ActivitySheetHeader(
-            title: widget.sender.displayName,
-            avatar: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: MemberProfileAvatar(
-                controller: widget.controller,
-                sender: widget.sender,
-                groupId: widget.conversationId,
-                size: 24,
-              ),
-            ),
-            trailing: widget.activity == null
-                ? null
-                : _StopMemberButton(
-                    controller: widget.controller,
-                    conversationId: widget.conversationId!,
-                    activity: widget.activity!,
-                  ),
-          ),
-          child: ScrollAwareJumpStack(
-            fit: StackFit.expand,
-            children: [
-              NotificationListener<ScrollNotification>(
-                onNotification: _onScroll,
-                child: ListView(
-                  controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(24, 68, 24, 24),
-                  children: widget.children,
+        child: Column(
+          children: [
+            _ActivitySheetHeader(
+              title: widget.sender.displayName,
+              avatar: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: MemberProfileAvatar(
+                  controller: widget.controller,
+                  sender: widget.sender,
+                  groupId: widget.conversationId,
+                  size: 24,
                 ),
               ),
-              if (_showJumpToBottom)
-                Positioned(
-                  right: 16,
-                  bottom: 8,
-                  child: Center(
-                    child: JumpToBottomButton(
-                      iconOnly: true,
-                      onPressed: () {
-                        _followBottom = true;
-                        _scroll.jumpTo(_scroll.position.maxScrollExtent);
-                      },
+              trailing: widget.activity == null
+                  ? null
+                  : _StopMemberButton(
+                      controller: widget.controller,
+                      conversationId: widget.conversationId!,
+                      activity: widget.activity!,
+                    ),
+            ),
+            Expanded(
+              child: ScrollAwareJumpStack(
+                fit: StackFit.expand,
+                children: [
+                  NotificationListener<ScrollNotification>(
+                    onNotification: _onScroll,
+                    child: ListView(
+                      controller: _scroll,
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                      children: widget.children,
                     ),
                   ),
-                ),
-            ],
-          ),
+                  if (_showJumpToBottom)
+                    Positioned(
+                      right: 16,
+                      bottom: 8,
+                      child: Center(
+                        child: JumpToBottomButton(
+                          iconOnly: true,
+                          onPressed: () {
+                            _followBottom = true;
+                            _scroll.jumpTo(_scroll.position.maxScrollExtent);
+                          },
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     ),

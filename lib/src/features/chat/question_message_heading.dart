@@ -16,6 +16,8 @@ class QuestionMessageHeading extends StatelessWidget {
     this.recipient,
     this.onOpenMember,
     this.trailing,
+    this.pager,
+    this.modeLabel,
   });
 
   final String title, description, status;
@@ -23,6 +25,8 @@ class QuestionMessageHeading extends StatelessWidget {
   final MessageSender? recipient;
   final ValueChanged<String>? onOpenMember;
   final Widget? trailing;
+  final Widget? pager;
+  final String? modeLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -38,10 +42,11 @@ class QuestionMessageHeading extends StatelessWidget {
               '问题',
               style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
             ),
+            if (pager != null) pager!,
             const Spacer(),
-            InteractiveStatusTag(
-              label: multiple ? '多选' : '单选',
-              highlighted: true,
+            Text(
+              modeLabel ?? (multiple ? '多选' : '单选'),
+              style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
             ),
             if (trailing != null) ...[const SizedBox(width: 8), trailing!],
           ],
@@ -103,6 +108,13 @@ class QuestionMessageHeading extends StatelessWidget {
               const SizedBox(width: 12),
               InteractiveStatusTag(label: status, highlighted: status == '待回答'),
             ],
+          ),
+        ],
+        if (recipient == null && status.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            status,
+            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
           ),
         ],
       ],

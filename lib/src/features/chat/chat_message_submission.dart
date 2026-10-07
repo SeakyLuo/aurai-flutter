@@ -5,6 +5,7 @@ extension ChatMessageSubmission on _ChatPageState {
     final conversationId = widget.controller.activeConversation.id;
     final goal = _textController.text.trim();
     final visibility = _draftVisibility[conversationId];
+    final quoting = _quoteFocused;
     if ((goal.isEmpty &&
             widget.controller.draftImages.isEmpty &&
             widget.controller.draftFiles.isEmpty) ||
@@ -23,11 +24,11 @@ extension ChatMessageSubmission on _ChatPageState {
     }
     if (widget.controller.activeConversation.kind != ConversationKind.group)
       _focusNode.unfocus();
-    if (widget.controller.hasSearchWindow) _scrollToBottom();
+    if (!quoting && widget.controller.hasSearchWindow) _scrollToBottom();
     _beforeSentMessageId = widget.controller.messages.lastOrNull?.id;
     _positionSentMessage =
-        widget.controller.activeConversation.kind != ConversationKind.group;
-    if (!_positionSentMessage) {
+        !quoting && widget.controller.activeConversation.isTask;
+    if (!quoting && !_positionSentMessage) {
       _sentMessageId = null;
       _scrollToBottom();
     }
@@ -106,6 +107,9 @@ extension ChatMessageSubmission on _ChatPageState {
   Future<void> _sendQueuedMessages(String messageId) async {
     final controller = widget.controller;
     final conversationId = controller.activeConversation.id;
+    if (controller.activeConversation.isPersonalChat && !_quoteFocused) {
+      _scrollToBottom();
+    }
     try {
       final needsSettings = await controller.sendPendingMessages(
         messageId: messageId,

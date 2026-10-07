@@ -35,9 +35,14 @@ extension PrivateGoalActions on ChatController {
     });
   }
 
-  Future<void> controlPrivateGoal(String action) => _inConversation(
-    activeConversation,
-    () async {
+  Future<void> controlPrivateGoal(
+    String action, {
+    required String conversationId,
+  }) {
+    if (activeConversation.id != conversationId) {
+      throw StateError('请返回对应聊天或任务后操作目标');
+    }
+    return _inConversation(activeConversation, () async {
       final store = privateTaskState!;
       if (action == 'resume') {
         if (hasRunningTask || _submitting) throw StateError('请等待当前回复结束后继续目标');
@@ -77,6 +82,6 @@ extension PrivateGoalActions on ChatController {
           state.removeWhere((key, _) => key != 'steps' && key != 'explanation');
         });
       }
-    },
-  );
+    });
+  }
 }

@@ -5,6 +5,8 @@ class InteractiveSelection {
   InteractiveSelection(this.config);
   final Map<String, Object?> config;
   bool get multiple => config['mode'] == 'multiple';
+  bool get showConfirm => config['showConfirm'] == true;
+  bool get needsConfirmation => multiple || showConfirm;
   static const otherId = '__other__';
   bool get hasOther => config['other'] != null;
   int get otherMaxLength =>
@@ -19,6 +21,9 @@ class InteractiveSelection {
       multiple ? config['maxSelections'] as int? ?? options.length : 1;
 
   void validate() {
+    if (config['showConfirm'] != null && config['showConfirm'] is! bool) {
+      throw ArgumentError('showConfirm 必须是布尔值');
+    }
     if (hasOther &&
         (config['other'] is! Map ||
             (config['other'] as Map)['maxLength'] != null &&

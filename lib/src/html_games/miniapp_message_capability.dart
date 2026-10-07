@@ -14,6 +14,7 @@ class MiniappMessageCapability {
     required String messageId,
     required String actorId,
     String? continuationSenderId,
+    bool anonymousEvent = false,
     required Set<String> memberIds,
     required Set<String> agents,
     required Map<String, MessageSender> senders,
@@ -26,6 +27,9 @@ class MiniappMessageCapability {
     for (final raw in effects) {
       final effect = (raw as Map).cast<String, Object?>();
       final requestedSenderId = effect['senderId'] as String?;
+      if (anonymousEvent && requestedSenderId != null) {
+        throw ArgumentError('匿名投票回调只能发送程序消息，请省略 senderId');
+      }
       if (requestedSenderId != null && requestedSenderId != actorId) {
         throw ArgumentError('程序消息只能以当前操作人身份发送');
       }
@@ -81,6 +85,9 @@ class MiniappMessageCapability {
             });
       card?.validateTransport(html: false);
       if (card != null) {
+        if (card.anonymous && effect['requirePublicMessage'] == true) {
+          throw ArgumentError('匿名投票不能要求参与者先公开发言');
+        }
         if (effect['event'] is! String) throw ArgumentError('行动卡需要事件');
         if (card.buttons.any((b) => b['notifyAi'] == true))
           throw ArgumentError('行动卡回调由小程序处理');
@@ -97,6 +104,7 @@ class MiniappMessageCapability {
           'action': effect['event'],
           'data': effect['data'],
           'actors': card.interaction['actors'] ?? audience,
+          if (card.anonymous) 'anonymous': true,
           if (effect['requirePublicMessage'] == true)
             'publicMessageSince': DateTime.now().microsecondsSinceEpoch,
         };

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../domain/message_summary.dart';
 import '../../app/global_ui.dart';
 import 'conversation.dart';
 import 'conversation_status_dot.dart';
@@ -25,7 +26,9 @@ class ConversationPreviewText extends StatelessWidget {
     final question = conversation.questionPreview;
     final draft = question == null ? conversation.draftPreview : null;
     final text = MessagePreviewText(
-      text: question ?? draft ?? conversation.preview ?? emptyText,
+      text: MessageSummary.preview(
+        question ?? draft ?? conversation.preview ?? emptyText,
+      ),
       literal: draft != null || question != null,
       prefix: [
         if (prefix.isNotEmpty) TextSpan(text: prefix),

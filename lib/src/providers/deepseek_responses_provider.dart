@@ -2,6 +2,7 @@ import 'model_image_input.dart';
 
 import '../agent/system_prompt.dart';
 import 'responses_context.dart';
+import 'response_window.dart';
 import 'shared_responses_context.dart';
 import 'current_time_context.dart';
 import 'model_context_limits.dart';
@@ -13,41 +14,24 @@ class DeepSeekResponsesProvider implements ModelProvider {
   DeepSeekResponsesProvider(
     this.config, {
     required String? systemPrompt,
-    ModelConfig? summaryConfig,
-    this.sharedContext,
-    this.sharedContextOwnerId,
+    SharedResponsesContext? sharedContext,
   }) : _transport = ResponsesTransport(config),
-       _summaryTransport = ResponsesTransport(summaryConfig ?? config),
-       _context = ResponsesContext(
+       _context = ResponseWindow(
          ModelContextLimits.forConfig(config),
-         summaryLimits: ModelContextLimits.forConfig(summaryConfig ?? config),
          supportsImages: configSupportsImageInput(config),
+         sharedContext: sharedContext,
          systemPrompt: systemPrompt ?? agentSystemPrompt,
        );
 
   final ModelConfig config;
   final ResponsesTransport _transport;
-  final ResponsesContext _context;
-  final ResponsesTransport _summaryTransport;
-  final SharedResponsesContext? sharedContext;
-  final String? sharedContextOwnerId;
+  final ResponseWindow _context;
 
   @override
   Future<ModelTurn> respond(ModelRequest request) async {
     _transport.onReconnect = request.onReconnect;
     _transport.beginTurn();
-    _summaryTransport.beginTurn();
-    final instructions = contextCompactionInstructions(request);
-    Future<String> summarize(List<Map<String, Object?>> content) =>
-        _summaryTransport.summarize(content, instructions: instructions);
-    await (sharedContext == null
-        ? _context.prepare(request, summarize)
-        : sharedContext!.prepare(
-            _context,
-            request,
-            summarize,
-            sharedContextOwnerId!,
-          ));
+    await _context.prepare(request);
     _transport.checkCancelled();
     final json = await _transport.send(
       _requestBody(request),
@@ -66,14 +50,14 @@ class DeepSeekResponsesProvider implements ModelProvider {
     'stream': true,
     'max_output_tokens': _context.limits.outputTokens,
     'instructions':
-        '${_context.systemPrompt}\n${currentTimeContext()}\n${_capabilitySummary(request)}\n${request.personalContext}',
+        '${_context.systemPrompt}\n${currentTimeContext()}\n${_capabilitySummary(request)}\n${_context.refreshedContext ?? request.personalContext}',
     'input': _context.input,
     'tools': request.tools
         .map(
           (tool) => <String, Object?>{
             'type': 'function',
             'name': tool.name,
-            'description': tool.description,
+            'description': tool.modelDescription,
             'parameters': tool.modelInputSchema,
           },
         )
@@ -152,6 +136,6 @@ class DeepSeekResponsesProvider implements ModelProvider {
 
   @override
   Future<void> cancel() async {
-    await Future.wait([_transport.cancel(), _summaryTransport.cancel()]);
+    await _transport.cancel();
   }
 }

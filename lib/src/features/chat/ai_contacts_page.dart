@@ -226,7 +226,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
     try {
       final id = await widget.controller.openAiConversation(
         ai,
-        newConversation: true,
+        newConversation: widget.selectForConversation,
         mode: widget.conversationMode,
       );
       if (!mounted) return;
@@ -245,7 +245,7 @@ class _AiContactsPageState extends State<AiContactsPage> {
     } on Object catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showToast(
-          SnackBar(content: Text('无法新建会话，请重试：${errorMessage(error)}')),
+          SnackBar(content: Text('无法新建任务，请重试：${errorMessage(error)}')),
           kind: ToastKind.error,
         );
       }

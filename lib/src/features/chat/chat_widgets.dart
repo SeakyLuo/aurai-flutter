@@ -254,12 +254,13 @@ class ExecutionProgress extends StatelessWidget {
       );
     }
 
-    if (state == ChatRunState.running && compacting) {
+    if (compacting && state == ChatRunState.running) {
       return const Padding(
         padding: EdgeInsets.fromLTRB(18, 12, 18, 20),
-        child: ThinkingIndicator(label: '正在压缩上下文', singleLine: true),
+        child: ThinkingIndicator(label: '正在整理任务'),
       );
     }
+
     if (state == ChatRunState.running &&
         reconnectAttempt > 0 &&
         !replying &&
@@ -352,6 +353,7 @@ class ChatComposer extends StatelessWidget {
     required this.onSend,
     required this.onResume,
     required this.canResume,
+    this.resumeLabel = '继续任务',
     required this.onStop,
     required this.onAddImages,
     required this.images,
@@ -378,6 +380,7 @@ class ChatComposer extends StatelessWidget {
   final VoidCallback onSend;
   final VoidCallback onResume;
   final bool canResume;
+  final String resumeLabel;
   final VoidCallback onStop;
   final ValueChanged<BuildContext> onAddImages;
   final ValueChanged<MessageImage> onRemoveImage;
@@ -489,7 +492,7 @@ class ChatComposer extends StatelessWidget {
               ? (addingImages
                     ? '正在处理附件'
                     : resume
-                    ? '继续任务'
+                    ? resumeLabel
                     : queueing
                     ? '加入待发送'
                     : '发送')

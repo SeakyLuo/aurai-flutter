@@ -5,7 +5,7 @@ class SearchTypeSegment extends StatelessWidget {
     super.key,
     required this.files,
     required this.onChanged,
-    this.labels = const ['会话', '文件'],
+    this.labels = const ['任务', '文件'],
   }) : selectedIndex = null,
        onIndexChanged = null;
   const SearchTypeSegment.indexed({

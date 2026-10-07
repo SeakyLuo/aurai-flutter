@@ -241,6 +241,7 @@ extension InteractiveMessageActions on ChatController {
           result.notice!,
           source: source,
           notifyParticipants:
+              !result.card.isQuestion &&
               result.card.participants[senderId]?['callback'] == null,
         );
       MessageCallbacks.changes.add(null);
@@ -467,8 +468,9 @@ extension InteractiveMessageActions on ChatController {
     int revision,
     int participantRevision, {
     Object? value,
+    Conversation? source,
   }) async {
-    final conversation = activeConversation;
+    final conversation = source ?? activeConversation;
     await _store.writer.flush();
     final rows = await _store.database.query(
       'messages',
@@ -504,17 +506,23 @@ extension InteractiveMessageActions on ChatController {
         participantRevision: participantRevision,
         inputValue: value,
       );
-      _replaceInteractiveCard(conversation.id, messageId, result.card);
+      _replaceInteractiveCard(
+        conversation.id,
+        messageId,
+        result.card,
+        source: conversation,
+      );
       if (result.notice != null)
         _publishInteractiveChange(
           conversation.id,
           result.notice!,
           source: conversation,
           notifyParticipants:
+              !result.card.isQuestion &&
               result.card.participants[MessageSender
-                  .localUser
-                  .id]?['callback'] ==
-              null,
+                      .localUser
+                      .id]?['callback'] ==
+                  null,
         );
       MessageCallbacks.changes.add(null);
       return (card: result.card, url: result.url);

@@ -1,6 +1,41 @@
 part of 'chat_page.dart';
 
 extension _ChatGroupNavigation on _ChatPageState {
+  Widget _privateStatus(Conversation conversation) {
+    final controller = widget.controller;
+    final runId = conversation.activeRunId;
+    final active = conversation.runState == ChatRunState.running;
+    if (!active ||
+        runId == null ||
+        controller.pendingConfirmation != null ||
+        controller.pendingQuestion?.conversationId == conversation.id ||
+        controller.accessibilityRequestPending) {
+      return const SizedBox.shrink();
+    }
+    final sender = controller.activeAi!.sender;
+    return GroupActivityAvatars(
+      key: ValueKey('private:$runId'),
+      compact: true,
+      activities: [
+        GroupMemberActivity(
+          sender: sender,
+          runId: runId,
+          elapsed: conversation.executionWatch?.elapsed ?? Duration.zero,
+          description: '正在思考',
+        ),
+      ],
+      onPressed: () {
+        _focusNode.unfocus();
+        showTaskRunTimelineSheet(
+          context,
+          controller: controller,
+          runId: runId,
+          sender: sender,
+        );
+      },
+    );
+  }
+
   Widget _groupStatus(Conversation conversation) => GroupStatusBuilder(
     key: ValueKey(conversation.id),
     controller: widget.controller,

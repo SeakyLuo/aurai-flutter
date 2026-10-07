@@ -129,9 +129,13 @@ class _ToolActivityViewState extends State<ToolActivityView> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.toolName == 'runSubagent') {
-      return SubagentToolActivity(status: widget.status,
-        requestJson: widget.requestJson, resultJson: widget.resultJson);
+    if (widget.toolName == 'runSubagent' || widget.toolName == 'runTask') {
+      return SubagentToolActivity(
+        status: widget.status,
+        organizedTask: widget.toolName == 'runTask',
+        requestJson: widget.requestJson,
+        resultJson: widget.resultJson,
+      );
     }
     final skillIcon =
         widget.toolName == 'runSkill' && widget.requestJson != null
@@ -177,7 +181,10 @@ class _ToolActivityViewState extends State<ToolActivityView> {
         : widget.status == AgentStepStatus.cancelled ||
               questionResult?['cancelled'] == true
         ? '已停止'
-        : questionResult?['answer'] != null
+        : questionResult?['awaitingResponse'] == true
+        ? '已发送'
+        : questionResult?['answer'] != null ||
+              questionResult?['answers'] != null
         ? '已回答'
         : '未回答';
     final showCard = _expanded && canExpand;
@@ -447,10 +454,7 @@ class _ToolActivityViewState extends State<ToolActivityView> {
                 ),
               ),
             ),
-          KeyedSubtree(
-            key: const ValueKey('tool-content'),
-            child: content,
-          ),
+          KeyedSubtree(key: const ValueKey('tool-content'), child: content),
         ],
       ),
     );

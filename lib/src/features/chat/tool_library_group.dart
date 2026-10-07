@@ -48,7 +48,6 @@ enum ToolLibraryGroup {
       'renameProject' ||
       'setProjectIcon' ||
       'setProjectPinned' ||
-      'setProjectMemoryMode' ||
       'setCurrentConversationProject' => projects,
       'getDeviceExtensions' => commands,
       'getModelConfiguration' ||

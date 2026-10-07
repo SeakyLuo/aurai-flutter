@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import '../domain/interactive_message.dart';
+import 'miniapp_anonymous_vote.dart';
 import 'html_event_identity.dart';
 import 'miniapp_program_runner.dart';
 import 'miniapp_program_scheduler.dart';
@@ -172,7 +174,24 @@ class MiniappProgramStore {
     );
     final runtime = MiniappProgram.decode(saved.single['value']);
     final bindings = (runtime['bindings'] as Map).cast<String, Object?>();
-    final delegatedPlayer = data is Map ? data['submitForPlayerId'] : null;
+    Map<String, Object?>? sourceCard;
+    InteractiveMessage? anonymousCard;
+    if (cardId != null) {
+      final sources = await txn.query(
+        'messages',
+        columns: ['sender_id', 'interactive_json'],
+        where: 'id = ? AND conversation_id = ?',
+        whereArgs: [cardId, conversationId],
+      );
+      sourceCard = sources.single;
+      final card = InteractiveMessage.fromJson(
+        MiniappProgram.decode(sourceCard['interactive_json']),
+      );
+      if (card.anonymous) anonymousCard = card;
+    }
+    final delegatedPlayer = anonymousCard == null && data is Map
+        ? data['submitForPlayerId']
+        : null;
     final actorView = (runtime['privateViews'] as Map)[actorId] as Map?;
     final canSubmitForPlayers = actorView?['canSubmitForPlayers'] == true;
     final request = jsonEncode({
@@ -240,6 +259,13 @@ class MiniappProgramStore {
       throw StateError('只有主持人或创建人可以代玩家提交');
     }
     if (cardId == null &&
+        bindings.values.cast<Map>().any(
+          (binding) =>
+              binding['anonymous'] == true && binding['action'] == action,
+        )) {
+      throw StateError('匿名投票必须操作原生投票卡片，不能通过小程序事件直接提交或代投');
+    }
+    if (cardId == null &&
         (delegatedPlayer == null || delegatedPlayer == actorId) &&
         bindings.values.any((raw) {
           final binding = raw as Map;
@@ -256,33 +282,31 @@ class MiniappProgramStore {
           !(binding['actors'] as List).contains(actorId)) {
         throw StateError('这张行动卡已结束或不属于你');
       }
-      final source = await txn.query(
-        'messages',
-        columns: ['sender_id'],
-        where: 'id = ? AND conversation_id = ?',
-        whereArgs: [cardId, conversationId],
-      );
-      continuationSenderId = source.single['sender_id'] as String;
-      data = {
-        'context': binding['data'],
-        'value': data,
-        if (reason != null) 'reason': reason,
-      };
+      continuationSenderId = sourceCard!['sender_id'] as String;
+      data = anonymousCard != null
+          ? anonymousProgramVote(anonymousCard, cardId, binding['data'])
+          : {
+              'context': binding['data'],
+              'value': data,
+              if (reason != null) 'reason': reason,
+            };
     }
     if (expectedVersion != null && expectedVersion != row['version']) {
       throw StateError('小程序已更新，请重新读取后提交');
     }
     // A program may require a published speech before accepting its end card.
     final submittingActor = delegatedPlayer as String? ?? actorId;
-    final speechBinding = bindings.values
-        .cast<Map>()
-        .where(
-          (binding) =>
-              binding['action'] == action &&
-              (binding['actors'] as List).contains(submittingActor) &&
-              binding['publicMessageSince'] != null,
-        )
-        .firstOrNull;
+    final speechBinding = anonymousCard != null
+        ? null
+        : bindings.values
+              .cast<Map>()
+              .where(
+                (binding) =>
+                    binding['action'] == action &&
+                    (binding['actors'] as List).contains(submittingActor) &&
+                    binding['publicMessageSince'] != null,
+              )
+              .firstOrNull;
     if (speechBinding != null) {
       final published = await txn.query(
         'messages',
@@ -306,7 +330,11 @@ class MiniappProgramStore {
       MiniappCapabilityProtocol.wrap(script, declared),
       {
         'state': runtime['state'],
-        'event': {'actorId': actorId, 'action': action, 'data': data},
+        'event': {
+          'actorId': anonymousCard != null ? null : actorId,
+          'action': action,
+          'data': data,
+        },
         'members': roster,
         'ownerId': messages.single['sender_id'],
         'messageId': messageId,
@@ -314,6 +342,7 @@ class MiniappProgramStore {
       },
     );
     final calls = MiniappCapabilityCalls(output, declared);
+    if (anonymousCard != null) validateAnonymousVoteEffects(calls);
     if (calls.contextInstructions != null) {
       if (actorId != MessageSender.localUser.id &&
           actorId != messages.single['sender_id'] &&
@@ -411,6 +440,7 @@ class MiniappProgramStore {
         actorId: actorId,
         memberIds: memberIds,
         continuationSenderId: continuationSenderId,
+        anonymousEvent: anonymousCard != null,
         agents: agents,
         senders: senders,
         bindings: bindings,

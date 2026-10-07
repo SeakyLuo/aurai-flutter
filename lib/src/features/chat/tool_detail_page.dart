@@ -61,6 +61,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
 
   late final _name = TextEditingController(text: _savedTitle);
   late final _description = TextEditingController(text: _tool.description);
+  late final _summary = TextEditingController(text: _tool.summary);
   late final _parameters = TextEditingController(
     text: _encode(_tool.inputSchema),
   );
@@ -75,6 +76,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
         (ToolCustomizations.values[_tool.name]?.scopes ?? []).toSet(),
       ) ||
       _description.text != _tool.description ||
+      _summary.text != _tool.summary ||
       _parameters.text != _encode(_tool.inputSchema);
 
   Future<void> _copyName() async {
@@ -91,6 +93,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
   void dispose() {
     _name.dispose();
     _description.dispose();
+    _summary.dispose();
     _parameters.dispose();
     super.dispose();
   }
@@ -115,6 +118,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
       setState(() {
         _name.text = _savedTitle;
         _description.text = _tool.description;
+        _summary.text = _tool.summary;
         _parameters.text = _encode(_tool.inputSchema);
         _icon = _savedIcon;
         _scopes = ToolCustomizations.values[_tool.name]?.scopes ?? [];
@@ -131,9 +135,14 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      if (_name.text.trim().isEmpty || _description.text.trim().isEmpty) {
-        throw const FormatException('名称和使用说明不能为空');
+      if (_name.text.trim().isEmpty) {
+        throw const FormatException('名称不能为空');
       }
+      if (_description.text.trim().isEmpty && _summary.text.trim().isEmpty) {
+        throw const FormatException('简述和完整说明至少填写一项');
+      }
+      if (_summary.text.trim().characters.length > 300)
+        throw const FormatException('简述最多 300 字');
       final decoded = jsonDecode(_parameters.text);
       if (decoded is! Map ||
           decoded['type'] != 'object' ||
@@ -155,6 +164,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
         icon: _icon,
         scopes: _scopes,
         description: _description.text,
+        summary: _summary.text.trim(),
         inputSchema: decoded.cast<String, Object?>(),
       );
       await ToolCustomizations.save(_tool.name, customization);
@@ -166,6 +176,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
         _savedIcon = _icon;
         _name.text = _savedTitle;
         _parameters.text = _encode(_tool.inputSchema);
+        _summary.text = _tool.summary;
         _editing = false;
       });
     } on Object catch (error) {
@@ -173,9 +184,7 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
         ScaffoldMessenger.of(context).showToast(
           SnackBar(
             content: Text(
-              error is FormatException
-                  ? '参数格式有误：${error.message}'
-                  : '保存失败：$error',
+              error is FormatException ? error.message : '保存失败：$error',
             ),
           ),
           kind: ToastKind.error,
@@ -338,12 +347,25 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
                           ? null
                           : (scopes) => setState(() => _scopes = scopes),
                     ),
-                    _label('使用说明'),
+                    _label('简述'),
+                    _editing
+                        ? _editor(_summary, summary: true)
+                        : _surface(
+                            SelectableText(
+                              _tool.summary.trim().isEmpty
+                                  ? '未填写，搜索时使用完整说明的摘要。'
+                                  : _tool.summary,
+                              style: const TextStyle(fontSize: 15, height: 1.5),
+                            ),
+                          ),
+                    _label('完整说明'),
                     _editing
                         ? _editor(_description)
                         : _surface(
                             SelectableText(
-                              _tool.description,
+                              _tool.description.trim().isEmpty
+                                  ? '未填写，调用时使用简述。'
+                                  : _tool.description,
                               style: const TextStyle(fontSize: 15, height: 1.5),
                             ),
                           ),
@@ -371,29 +393,34 @@ class _ToolDetailPageState extends State<ToolDetailPage> {
     );
   }
 
-  Widget _editor(TextEditingController controller, {bool code = false}) =>
-      TextField(
-        controller: controller,
-        enabled: !_saving,
-        maxLines: null,
-        autocorrect: !code,
-        enableSuggestions: !code,
-        style: const TextStyle(fontSize: 15, height: 1.5),
-        onChanged: (_) => setState(() {}),
-        onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
-        decoration: InputDecoration(
-          filled: true,
-          fillColor: settingsFieldColor(context),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 18,
-            vertical: 20,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(26),
-            borderSide: BorderSide.none,
-          ),
-        ),
-      );
+  Widget _editor(
+    TextEditingController controller, {
+    bool code = false,
+    bool summary = false,
+  }) => TextField(
+    controller: controller,
+    enabled: !_saving,
+    maxLines: null,
+    maxLength: summary ? 300 : null,
+    autocorrect: !code,
+    enableSuggestions: !code,
+    style: const TextStyle(fontSize: 15, height: 1.5),
+    onChanged: (_) => setState(() {}),
+    onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+    decoration: InputDecoration(
+      helperText: summary
+          ? '通常 30–100 字，复杂工具最多 300 字。与完整说明至少填一项；留空时搜索展示完整说明的前 300 字。'
+          : null,
+      helperMaxLines: 3,
+      filled: true,
+      fillColor: settingsFieldColor(context),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(26),
+        borderSide: BorderSide.none,
+      ),
+    ),
+  );
 
   Widget _label(String text) => Padding(
     padding: const EdgeInsets.fromLTRB(18, 24, 18, 12),

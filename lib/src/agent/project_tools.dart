@@ -22,7 +22,6 @@ class ProjectTool
     'rename',
     'setIcon',
     'setPinned',
-    'setMemoryMode',
     'setCurrentConversation',
   ];
 
@@ -46,7 +45,6 @@ class ProjectTool
     'rename' => 'renameProject',
     'setIcon' => 'setProjectIcon',
     'setPinned' => 'setProjectPinned',
-    'setMemoryMode' => 'setProjectMemoryMode',
     _ => 'setCurrentConversationProject',
   };
 
@@ -76,10 +74,6 @@ class ProjectTool
         arguments['pinned'] == true
             ? '是否置顶项目“$_projectName”？'
             : '是否取消置顶项目“$_projectName”？',
-      'setMemoryMode' =>
-        arguments['memoryMode'] == 'projectOnly'
-            ? '是否将项目“$_projectName”设为仅使用项目记忆？'
-            : '是否将项目“$_projectName”设为使用默认记忆？',
       _ =>
         arguments['projectId'] == null
             ? '是否将当前会话移出项目？'
@@ -96,8 +90,6 @@ class ProjectTool
         'Change an existing project icon using the same icon library as Aurai tools. Read listProjects first and use its internal project reference.',
       'setPinned' =>
         'Pin or unpin an existing project. Read listProjects first and use its internal project reference.',
-      'setMemoryMode' =>
-        'Set whether AIs in a project may also read their own private memories. Every AI in the project always reads and writes the same project shared memory.',
       _ =>
         'Move the current conversation (private or group chat) into an existing project, or remove it from its project with null. Only the group owner or an administrator may change a group chat project. User approval does not override this role requirement. Read listProjects first when assigning a project.',
     },
@@ -123,15 +115,9 @@ class ProjectTool
           },
         if (operation == 'rename' ||
             operation == 'setIcon' ||
-            operation == 'setPinned' ||
-            operation == 'setMemoryMode')
+            operation == 'setPinned')
           'projectId': {'type': 'string'},
         if (operation == 'setPinned') 'pinned': {'type': 'boolean'},
-        if (operation == 'setMemoryMode')
-          'memoryMode': {
-            'type': 'string',
-            'enum': ['shared', 'projectOnly'],
-          },
         if (operation == 'setCurrentConversation')
           'projectId': {
             'type': ['string', 'null'],
@@ -144,7 +130,6 @@ class ProjectTool
         if (operation == 'rename') ...['projectId', 'name'],
         if (operation == 'setIcon') ...['projectId', 'icon', 'iconColor'],
         if (operation == 'setPinned') ...['projectId', 'pinned'],
-        if (operation == 'setMemoryMode') ...['projectId', 'memoryMode'],
         if (operation == 'setCurrentConversation') 'projectId',
       ],
       'additionalProperties': false,
@@ -165,7 +150,6 @@ class ProjectTool
                 'icon': project.icon,
                 'iconColor': project.iconColor,
                 'pinned': project.pinned,
-                'memoryMode': project.memoryMode.name,
                 'current': project.id == conversation.projectId,
               },
           ],
@@ -201,16 +185,6 @@ class ProjectTool
         await projects.setPinned(call.arguments['projectId'] as String, pinned);
         changed();
         output = {'updated': true, 'pinned': pinned};
-      } else if (operation == 'setMemoryMode') {
-        final mode = ProjectMemoryMode.values.byName(
-          call.arguments['memoryMode'] as String,
-        );
-        await projects.setMemoryMode(
-          call.arguments['projectId'] as String,
-          mode,
-        );
-        changed();
-        output = {'updated': true, 'memoryMode': mode.name};
       } else {
         final projectId = call.arguments['projectId'] as String?;
         await setConversationProject(conversation, projectId);

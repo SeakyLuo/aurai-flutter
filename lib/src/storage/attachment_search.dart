@@ -3,6 +3,8 @@ import 'package:sqflite/sqflite.dart';
 import '../domain/message_file.dart';
 import '../domain/message_image.dart';
 import 'conversation_rows.dart';
+import 'conversation_visibility.dart';
+import 'group_list_preview.dart';
 
 class AttachmentSearchResult {
   const AttachmentSearchResult({
@@ -33,7 +35,13 @@ class AttachmentSearch {
     int offset, {
     int limit = pageSize,
     String? projectId,
+    bool chatsOnly = false,
   }) async {
+    final messageVisibility = conversationListMessageVisibility
+        .replaceAllMapped(
+          RegExp(r'\b(kind|text|interactive_json)\b'),
+          (match) => 'm.${match[0]}',
+        );
     final rows = await database.rawQuery(
       '''
       SELECT a.*, c.title AS conversation_title,
@@ -41,7 +49,9 @@ class AttachmentSearch {
       FROM attachments a
       INNER JOIN messages m ON m.id = a.message_id
       INNER JOIN conversations c ON c.id = a.conversation_id
-      WHERE c.mode = 'normal'
+      WHERE c.mode = 'normal' AND ${chatsOnly ? "(c.kind = 'group' OR (c.kind = 'direct' AND c.personal_chat = 1))" : "c.kind = 'direct' AND c.personal_chat = 0"}
+      AND c.id IN (SELECT id FROM conversations WHERE $localUserConversation)
+      ${chatsOnly ? 'AND $messageVisibility' : ''}
       AND a.kind IN ('image', 'file')
       ${projectId == null ? '' : 'AND c.project_id = ?'}
       ${query.isEmpty ? '' : '''AND (instr(lower(coalesce(a.display_name, '')), ?) > 0

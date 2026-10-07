@@ -7,6 +7,8 @@ import '../../domain/avatar_style.dart';
 import '../../domain/message_sender.dart';
 import '../../storage/group_avatar_store.dart';
 import 'chat_controller.dart';
+import 'attachment_action_icon.dart';
+import 'conversation_menu_icon.dart';
 import 'custom_avatar_page.dart';
 import 'group_avatar.dart';
 import 'profile_avatar_editor.dart';
@@ -93,7 +95,7 @@ class _GroupAvatarPageState extends State<GroupAvatarPage> {
   bool _busy = false;
   AvatarStyle get _style =>
       GroupAvatarStore.styles.value[widget.conversation.id] ??
-      const AvatarStyle();
+      const AvatarStyle(icon: 'group');
 
   Future<void> _choose(AvatarSource source) async {
     setState(() => _busy = true);
@@ -162,15 +164,51 @@ class _GroupAvatarPageState extends State<GroupAvatarPage> {
         child: ListView(
           padding: settingsPagePadding(context, const EdgeInsets.all(16)),
           children: [
-            ProfileAvatarEditor(
-              style: _style,
-              name: widget.conversation.title,
-              preview: GroupAvatar(
-                groupId: widget.conversation.id,
-                members: widget.members,
-                size: 96,
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 28),
+              child: Center(
+                child: GroupAvatar(
+                  groupId: widget.conversation.id,
+                  members: widget.members,
+                  size: 96,
+                ),
               ),
-              onSelected: _busy ? null : _choose,
+            ),
+            Material(
+              color: settingsFieldColor(context),
+              borderRadius: BorderRadius.circular(18),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  for (final item in const [
+                    (AvatarSource.gallery, '上传图片'),
+                    (AvatarSource.camera, '拍照'),
+                    (AvatarSource.custom, '自定义头像'),
+                  ])
+                    ListTile(
+                      contentPadding: settingsCardPadding,
+                      minTileHeight: settingsCardHeight,
+                      enabled: !_busy,
+                      leading: item.$1 == AvatarSource.custom
+                          ? ConversationMenuIcon(
+                              type: ConversationMenuIconType.rename,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            )
+                          : AttachmentActionIcon(
+                              type: item.$1 == AvatarSource.gallery
+                                  ? AttachmentActionIconType.gallery
+                                  : AttachmentActionIconType.camera,
+                            ),
+                      title: Text(
+                        item.$2,
+                        style: const TextStyle(fontSize: 15),
+                      ),
+                      onTap: _busy ? null : () => _choose(item.$1),
+                    ),
+                ],
+              ),
             ),
             if (GroupAvatarStore.styles.value.containsKey(
               widget.conversation.id,

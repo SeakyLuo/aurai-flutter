@@ -1,21 +1,24 @@
+import '../../domain/avatar_style.dart';
+import 'profile_avatar.dart';
 import 'profile_navigation.dart';
 import '../../app/glass_notice.dart';
+import '../../app/ui_action.dart';
 import '../../domain/ai_profile.dart';
 import '../../domain/error_message.dart';
 import '../../storage/conversation_rows.dart';
 import '../../storage/development_projects.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'ai_conversations_page.dart';
 
 import 'ai_contact_page.dart';
+import 'ai_contacts_page.dart';
+import 'app_confirmation_dialog.dart';
+import 'contact_remark_action.dart';
 import 'chat_controller.dart';
 import 'conversation_rename_dialog.dart';
 import 'private_tasks_page.dart';
 import 'group_apps_section.dart';
 import 'group_favorites_page.dart';
-import 'tools_page.dart';
-import '../../skills/skills_page.dart';
-import '../../app/ui_action.dart';
 import 'group_pinned_message_entry.dart';
 import 'conversation_project_page.dart';
 import 'delete_confirmation_dialog.dart';
@@ -57,18 +60,23 @@ class _DirectConversationInfoPageState
   bool _loading = true;
   bool _failed = false;
   bool _busy = false;
+  bool _isFriend = false;
   List<DevelopmentProject> _projects = const [];
+  String get _detailsTitle =>
+      _conversation.isPersonalChat ? '聊天详情' : '${_conversation.typeLabel}详情';
 
-  Future<void> _openApp(Widget page) =>
-      Navigator.push<void>(context, MaterialPageRoute(builder: (_) => page));
-
-  Future<void> _openSkills() => runUiAction(context, () async {
-    final store = await widget.controller.aiSkills(
-      _conversation.defaultSenderId,
+  Future<void> _openApp(Widget page) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => page),
     );
     if (!mounted) return;
-    await _openApp(SkillsPage(store: store, controller: widget.controller));
-  }).then((_) {});
+    await runUiAction(
+      context,
+      () => widget.controller.selectConversation(_conversation.id),
+    );
+    if (mounted) await _reload();
+  }
 
   @override
   void initState() {
@@ -85,10 +93,15 @@ class _DirectConversationInfoPageState
           whereArgs: [widget.conversation.id],
           limit: 1,
         ),
-        widget.controller.groupStore.loadAi(
-          widget.conversation.defaultSenderId,
-        ),
+        widget.controller.groupStore.loadAi(_conversation.defaultSenderId),
         widget.controller.projects.list(),
+        widget.controller.groupStore.database.query(
+          'contact_friendships',
+          columns: ['friend_id'],
+          where: "owner_id = 'user:local' AND friend_id = ?",
+          whereArgs: [_conversation.defaultSenderId],
+          limit: 1,
+        ),
       ]);
       if (!mounted) return;
       final rows = results[0] as List<Map<String, Object?>>;
@@ -100,13 +113,14 @@ class _DirectConversationInfoPageState
         _conversation = conversationFromRow(rows.single);
         _profile = results[1] as AiProfile;
         _projects = results[2] as List<DevelopmentProject>;
+        _isFriend = (results[3] as List<Map<String, Object?>>).isNotEmpty;
         _failed = false;
       });
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _failed = true);
       ScaffoldMessenger.of(context).showToast(
-        SnackBar(content: Text('会话详情加载失败，请重试：${errorMessage(error)}')),
+        SnackBar(content: Text('$_detailsTitle加载失败：${errorMessage(error)}')),
         kind: ToastKind.error,
       );
     } finally {
@@ -142,18 +156,10 @@ class _DirectConversationInfoPageState
         controller: widget.controller,
         conversationId: _conversation.id,
         initialTitle: _conversation.title,
+        typeLabel: _conversation.typeLabel,
       ),
     ),
   );
-
-  Future<void> _copyConversationId() async {
-    await Clipboard.setData(ClipboardData(text: _conversation.id));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showToast(
-      const SnackBar(content: Text('已复制会话 ID')),
-      kind: ToastKind.success,
-    );
-  }
 
   Future<void> _openProfile() async {
     await openProfileRoute(
@@ -165,7 +171,54 @@ class _DirectConversationInfoPageState
         ),
       ),
     );
+    if (!mounted) return;
+    await runUiAction(
+      context,
+      () => widget.controller.selectConversation(_conversation.id),
+    );
     if (mounted) await _reload();
+  }
+
+  Future<void> _chooseHandler() async {
+    final handler = await Navigator.push<AiProfile>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AiContactsPage(
+          controller: widget.controller,
+          selectForConversation: true,
+          returnSelection: true,
+        ),
+      ),
+    );
+    if (!mounted ||
+        handler == null ||
+        handler.sender.id == _conversation.defaultSenderId)
+      return;
+    final stop = widget.controller.taskHandlerNeedsStop(_conversation.id);
+    if (stop) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AppConfirmationDialog(
+          title: '停止当前执行并更换处理人？',
+          description: '停止后由${handler.sender.displayName}接手，已有记录会保留。',
+          confirmLabel: '停止并更换',
+        ),
+      );
+      if (!mounted || confirmed != true) return;
+    }
+    await runUiAction(
+      context,
+      () => _perform(() async {
+        await widget.controller.setTaskHandler(
+          _conversation.id,
+          handler.sender.id,
+          stopRunning: stop,
+        );
+        _conversation = await widget.controller.conversationDetails(
+          _conversation.id,
+        );
+      }),
+    );
   }
 
   Future<void> _chooseProject() => _perform(() async {
@@ -199,7 +252,7 @@ class _DirectConversationInfoPageState
       context: context,
       barrierColor: Colors.black.withValues(alpha: .24),
       builder: (_) => DeleteConfirmationDialog(
-        title: '删除会话？',
+        title: '删除${_conversation.typeLabel}？',
         description: '“${_conversation.title}”的消息、草稿和图片将一并删除，无法恢复。',
       ),
     );
@@ -214,8 +267,25 @@ class _DirectConversationInfoPageState
     child: Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(
-        title: '会话详情',
+        title: _detailsTitle,
         onBack: _busy ? null : () => Navigator.pop(context),
+        actions: [
+          if (_conversation.isPersonalChat && _isFriend)
+            SettingsGlassAction(
+              label: '设置备注名',
+              icon: Icons.edit_outlined,
+              iconWidget: const SettingsIcon(type: SettingsIconType.note),
+              onPressed: _busy
+                  ? null
+                  : () => _perform(
+                      () => editContactRemark(
+                        context,
+                        widget.controller,
+                        _conversation.defaultSenderId,
+                      ),
+                    ),
+            ),
+        ],
       ),
       body: SafeArea(
         top: false,
@@ -238,158 +308,130 @@ class _DirectConversationInfoPageState
                         32,
                       ),
                       children: [
-                        _surface(
-                          ListTile(
-                            contentPadding:
-                                const EdgeInsetsDirectional.fromSTEB(
-                                  16,
-                                  8,
-                                  12,
-                                  8,
-                                ),
-                            leading: MemberAvatar(
-                              sender: _profile!.sender,
-                              size: 48,
-                            ),
-                            title: Text(
-                              _profile!.sender.displayName,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: _profile!.description.isEmpty
-                                ? null
-                                : Text(
-                                    _profile!.description,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                        if (_conversation.isPersonalChat) ...[
+                          _surface(
+                            ListTile(
+                              contentPadding:
+                                  const EdgeInsetsDirectional.fromSTEB(
+                                    16,
+                                    8,
+                                    12,
+                                    8,
                                   ),
-                            trailing: const SettingsIcon(
-                              type: SettingsIconType.chevron,
-                            ),
-                            onTap: _openProfile,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _surface(
-                          GroupAppsSection(
-                            title: '应用',
-                            onTasks: () => _openApp(
-                              PrivateTasksPage(
-                                controller: widget.controller,
-                                conversationId: _conversation.id,
-                                senderId: _conversation.defaultSenderId,
-                                originTaskId: widget.originTaskId,
+                              leading: MemberAvatar(
+                                sender: _profile!.sender,
+                                size: 48,
                               ),
-                            ),
-                            onMarks: () => _openApp(
-                              GroupFavoritesPage(
-                                controller: widget.controller,
-                                groupId: _conversation.id,
-                                groupTitle: _conversation.title,
-                                group: false,
+                              title: Text(
+                                _profile!.sender.displayName,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                            onTools: () => _openApp(
-                              ToolsPage(
-                                controller: widget.controller,
-                                senderId: _conversation.defaultSenderId,
-                                projectId: _conversation.projectId,
-                              ),
-                            ),
-                            onSkills: _openSkills,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _surface(
-                          ListTile(
-                            contentPadding: const EdgeInsetsDirectional.only(
-                              start: 16,
-                              end: 12,
-                            ),
-                            minTileHeight: settingsCardHeight,
-                            title: const Text(
-                              '会话名称',
-                              style: TextStyle(fontSize: 15),
-                            ),
-                            trailing: SizedBox(
-                              width: MediaQuery.sizeOf(context).width * .5,
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      _conversation.title,
+                              subtitle: _profile!.description.isEmpty
+                                  ? null
+                                  : Text(
+                                      _profile!.description,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.right,
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
-                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const SettingsIcon(
-                                    type: SettingsIconType.chevron,
-                                  ),
-                                ],
+                              trailing: const SettingsIcon(
+                                type: SettingsIconType.chevron,
+                              ),
+                              onTap: _openProfile,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        if (_conversation.isPersonalChat) ...[
+                          _surface(
+                            GroupAppsSection(
+                              title: '应用',
+                              onTaskList: () => _openApp(
+                                AiConversationsPage(
+                                  controller: widget.controller,
+                                  profile: _profile!,
+                                ),
+                              ),
+                              onTasks: () => _openApp(
+                                PrivateTasksPage(
+                                  controller: widget.controller,
+                                  conversationId: _conversation.id,
+                                  senderId: _conversation.defaultSenderId,
+                                  originTaskId: widget.originTaskId,
+                                ),
+                              ),
+                              onMarks: () => _openApp(
+                                GroupFavoritesPage(
+                                  controller: widget.controller,
+                                  groupId: _conversation.id,
+                                  groupTitle: _conversation.title,
+                                  group: false,
+                                ),
                               ),
                             ),
-                            onTap: _rename,
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        _surface(
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ListTile(
-                                contentPadding:
-                                    const EdgeInsetsDirectional.only(
-                                      start: 16,
-                                      end: 12,
-                                    ),
-                                minTileHeight: settingsCardHeight,
-                                title: const Text(
-                                  '所属项目',
-                                  style: TextStyle(fontSize: 15),
+                          const SizedBox(height: 12),
+                        ],
+                        if (!_conversation.isPersonalChat) ...[
+                          _surface(
+                            GroupAppsSection(
+                              title: '应用',
+                              onTasks: () => _openApp(
+                                PrivateTasksPage(
+                                  controller: widget.controller,
+                                  conversationId: _conversation.id,
+                                  senderId: _conversation.defaultSenderId,
+                                  originTaskId: widget.originTaskId,
                                 ),
-                                trailing: SizedBox(
-                                  width: MediaQuery.sizeOf(context).width * .5,
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          _conversation.projectId == null
-                                              ? '未加入项目'
-                                              : _assignedProject.name,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          textAlign: TextAlign.right,
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.onSurfaceVariant,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      const SettingsIcon(
-                                        type: SettingsIconType.chevron,
-                                      ),
-                                    ],
+                              ),
+                              onMarks: () => _openApp(
+                                GroupFavoritesPage(
+                                  controller: widget.controller,
+                                  groupId: _conversation.id,
+                                  groupTitle: _conversation.title,
+                                  group: false,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _surface(
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _detailRow(
+                                  '任务名称',
+                                  _conversation.title,
+                                  _rename,
+                                ),
+                                _detailRow(
+                                  '所属项目',
+                                  _conversation.projectId == null
+                                      ? '未加入项目'
+                                      : _assignedProject.name,
+                                  _chooseProject,
+                                ),
+                                _detailRow(
+                                  '处理人',
+                                  _profile!.sender.displayName,
+                                  _chooseHandler,
+                                  avatar: ProfileAvatar(
+                                    style: AvatarStyle(
+                                      icon: _profile!.sender.avatarIcon,
+                                      color: _profile!.sender.avatarColor,
+                                      path: _profile!.sender.avatarPath,
+                                    ),
+                                    name: _profile!.sender.displayName,
+                                    size: 24,
                                   ),
                                 ),
-                                onTap: _chooseProject,
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
+                          const SizedBox(height: 12),
+                        ],
                         _surface(
                           Column(
                             mainAxisSize: MainAxisSize.min,
@@ -403,6 +445,7 @@ class _DirectConversationInfoPageState
                                       controller: widget.controller,
                                       conversationId: _conversation.id,
                                       group: false,
+                                      task: _conversation.isTask,
                                     ),
                                   ),
                                 ),
@@ -423,35 +466,34 @@ class _DirectConversationInfoPageState
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                               ),
-                              title: const Text(
-                                '设为置顶',
+                              title: Text(
+                                _conversation.isPersonalChat ? '置顶聊天' : '置顶任务',
                                 style: TextStyle(fontSize: 15),
                               ),
                               value: _conversation.isPinned,
-                              onChanged: (_) => _perform(widget.onPin),
+                              onChanged: _busy
+                                  ? null
+                                  : (_) => _perform(widget.onPin),
                             ),
                           ),
                         ],
                         if (_conversation.isTemporary) ...[
                           const SizedBox(height: 12),
                           DialogActionButton(
-                            text: '保存此聊天',
+                            text: '保存此${_conversation.typeLabel}',
                             role: DialogActionRole.secondary,
                             onPressed: _busy
                                 ? null
                                 : () => _perform(widget.onSave),
                           ),
                         ],
-                        const SizedBox(height: 12),
-                        DialogActionButton(
-                          text: '复制会话 ID',
-                          role: DialogActionRole.secondary,
-                          onPressed: _busy ? null : _copyConversationId,
-                        ),
-                        if (!_conversation.isTemporary) ...[
+                        if (_conversation.isTask &&
+                            !_conversation.isTemporary) ...[
                           const SizedBox(height: 12),
                           DialogActionButton(
-                            text: _conversation.isArchived ? '取消归档' : '归档会话',
+                            text: _conversation.isArchived
+                                ? '取消归档'
+                                : '归档${_conversation.typeLabel}',
                             role: DialogActionRole.secondary,
                             onPressed: _busy
                                 ? null
@@ -461,18 +503,57 @@ class _DirectConversationInfoPageState
                                   ),
                           ),
                         ],
-                        const SizedBox(height: 12),
-                        DialogActionButton(
-                          text: '删除会话',
-                          role: DialogActionRole.reject,
-                          onPressed: _busy ? null : _confirmDelete,
-                        ),
+                        if (!_conversation.isPersonalChat) ...[
+                          const SizedBox(height: 12),
+                          DialogActionButton(
+                            text: '删除${_conversation.typeLabel}',
+                            role: DialogActionRole.reject,
+                            onPressed: _busy ? null : _confirmDelete,
+                          ),
+                        ],
                       ],
                     ),
                   ),
                 ),
               ),
       ),
+    ),
+  );
+
+  Widget _detailRow(
+    String label,
+    String value,
+    VoidCallback onTap, {
+    Widget? avatar,
+  }) => LayoutBuilder(
+    builder: (context, constraints) => ListTile(
+      contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 12),
+      minTileHeight: settingsCardHeight,
+      title: Text(label, style: const TextStyle(fontSize: 15)),
+      trailing: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: constraints.maxWidth * .55),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (avatar != null) ...[avatar, const SizedBox(width: 8)],
+            Flexible(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const SettingsIcon(type: SettingsIconType.chevron),
+          ],
+        ),
+      ),
+      onTap: onTap,
     ),
   );
 

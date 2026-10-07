@@ -97,8 +97,11 @@ extension MessageSubmission on ChatController {
       activeConversation.draft = '';
       activeConversation.draftMentions.clear();
       activeConversation.draftQuote = null;
-      if (activeConversation.messageCount == 0 &&
-          (previousTitle == '新会话' || previousTitle == '未发送的草稿')) {
+      if (activeConversation.isTask &&
+          activeConversation.messageCount == 0 &&
+          (previousTitle == '新任务' ||
+              previousTitle == '新会话' ||
+              previousTitle == '未发送的草稿')) {
         activeConversation.storedTitle = null;
       }
       messages.add(
@@ -154,11 +157,13 @@ extension MessageSubmission on ChatController {
       }
       onSubmitted?.call();
       if (wasNew) {
-        if (activeConversation.defaultSenderId == MessageSender.aurai.id) {
+        if (!activeConversation.isPersonalChat &&
+            activeConversation.defaultSenderId == MessageSender.aurai.id) {
           _newConversation = Conversation.empty();
         }
         await _newDraftStore.clear(
           senderId: activeConversation.defaultSenderId,
+          personalChat: activeConversation.isPersonalChat,
         );
       }
       _updateConversationList();

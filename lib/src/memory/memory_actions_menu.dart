@@ -79,7 +79,7 @@ Future<MemoryAction?> showMemoryActionsMenu(
                                           : ConversationMenuIconType.delete,
                                       color: action == MemoryAction.delete
                                           ? colors.error
-                                          : colors.onSurfaceVariant,
+                                          : colors.onSurface,
                                     ),
                                     const SizedBox(width: 14),
                                     Text(

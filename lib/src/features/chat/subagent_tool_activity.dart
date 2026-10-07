@@ -1,4 +1,6 @@
 import '../../app/glass_notice.dart';
+import '../../app/ui_action.dart';
+import 'home_navigation.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../domain/agent_models.dart';
@@ -14,8 +16,10 @@ class SubagentToolActivity extends StatelessWidget {
     required this.status,
     this.requestJson,
     this.resultJson,
+    this.organizedTask = false,
   });
   final AgentStepStatus status;
+  final bool organizedTask;
   final String? requestJson, resultJson;
 
   @override
@@ -26,21 +30,25 @@ class SubagentToolActivity extends StatelessWidget {
     final result = resultJson == null
         ? const <String, dynamic>{}
         : jsonDecode(resultJson!) as Map;
-    final title = request['title'] as String? ?? '子代理';
+    final title = organizedTask
+        ? (result['title'] ?? request['title']) as String? ?? '任务'
+        : request['title'] as String? ?? '子代理';
     final runId = result['runId'] as String?;
+    final taskId = result['taskId'] as String?;
+    final targetId = organizedTask ? taskId : runId;
     final error = result['error'] as String?;
     final label = switch (status) {
       AgentStepStatus.running => '执行中',
-      AgentStepStatus.completed => '已完成',
+      AgentStepStatus.completed => organizedTask ? '已返回结果' : '已完成',
       AgentStepStatus.cancelled => '已停止',
       AgentStepStatus.failed => '未完成',
     };
     return Semantics(
-      button: runId != null || error != null,
+      button: targetId != null || error != null,
       label: '$title，$label',
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: runId == null
+        onTap: targetId == null
             ? error == null
                   ? null
                   : () => ScaffoldMessenger.of(context).showToast(
@@ -49,12 +57,24 @@ class SubagentToolActivity extends StatelessWidget {
                     )
             : () {
                 final controller = ImageActionScope.of(context);
+                if (organizedTask) {
+                  runUiAction(
+                    context,
+                    () => openHomeConversation(
+                      context,
+                      controller,
+                      taskId!,
+                      waitForClose: true,
+                    ),
+                  );
+                  return;
+                }
                 Navigator.push<void>(
                   context,
                   MaterialPageRoute(
                     builder: (_) => SubagentDetailPage(
                       controller: controller,
-                      runId: runId,
+                      runId: runId!,
                     ),
                   ),
                 );
@@ -68,10 +88,14 @@ class SubagentToolActivity extends StatelessWidget {
                   leading: SizedBox.square(
                     dimension: 18,
                     child: FittedBox(
-                      child: SidebarActionIcon(
-                        type: SidebarActionIconType.group,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                      child: organizedTask
+                          ? const SettingsIcon(type: SettingsIconType.job)
+                          : SidebarActionIcon(
+                              type: SidebarActionIconType.group,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
                     ),
                   ),
                   label: '$title · $label',
@@ -79,7 +103,7 @@ class SubagentToolActivity extends StatelessWidget {
                   singleLine: true,
                 ),
               ),
-              if (runId != null)
+              if (targetId != null)
                 const SizedBox(
                   width: 20,
                   child: SettingsIcon(type: SettingsIconType.chevron),

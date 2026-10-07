@@ -1,6 +1,7 @@
 import 'profile_navigation.dart';
 import 'pinned_message_split.dart';
 import '../../app/glass_notice.dart';
+import '../../app/ui_action.dart';
 import '../../domain/error_message.dart';
 import 'dart:io';
 
@@ -20,6 +21,8 @@ import 'glass_surface.dart';
 import 'menu_press_highlight.dart';
 import 'project_profile_navigation.dart';
 import 'conversation_rename_dialog.dart';
+import 'contact_remark_action.dart';
+import 'settings_icon.dart';
 import 'delete_confirmation_dialog.dart';
 
 class ConversationMore extends StatefulWidget {
@@ -62,7 +65,7 @@ class _ConversationMoreState extends State<ConversationMore> {
     setState(() => _saving = true);
     try {
       await widget.controller.saveTemporaryConversation(_conversation.id);
-      _notice('已保存为正式会话', kind: ToastKind.success);
+      _notice('已保存为任务', kind: ToastKind.success);
     } on Object catch (error) {
       _notice('聊天保存失败，请重试：${errorMessage(error)}', kind: ToastKind.error);
     } finally {
@@ -90,6 +93,7 @@ class _ConversationMoreState extends State<ConversationMore> {
         context: context,
         barrierColor: Colors.black.withValues(alpha: .24),
         builder: (_) => ArchiveConfirmationDialog(
+          typeLabel: _conversation.typeLabel,
           isCurrent: target.id == controller.activeConversation.id,
         ),
       );
@@ -122,7 +126,7 @@ class _ConversationMoreState extends State<ConversationMore> {
           notice('已撤销归档', kind: ToastKind.success);
         } on Object catch (error) {
           notice(
-            '撤销归档失败，请在已归档会话中重试：${errorMessage(error)}',
+            '撤销归档失败，请在已归档中重试：${errorMessage(error)}',
             kind: ToastKind.error,
           );
         }
@@ -146,12 +150,16 @@ class _ConversationMoreState extends State<ConversationMore> {
         if (mounted) _closeDetails();
       }
       notice(
-        wasArchived ? '已取消归档' : '会话已归档',
+        wasArchived ? '已取消归档' : '${_conversation.typeLabel}已归档',
         action: wasArchived ? null : undo,
         kind: ToastKind.success,
       );
     } on Object {
-      notice('会话已归档，请返回会话列表', action: undo, kind: ToastKind.success);
+      notice(
+        '${_conversation.typeLabel}已归档',
+        action: undo,
+        kind: ToastKind.success,
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -164,7 +172,7 @@ class _ConversationMoreState extends State<ConversationMore> {
         context: context,
         barrierColor: Colors.black.withValues(alpha: .24),
         builder: (_) => DeleteConfirmationDialog(
-          title: '删除会话？',
+          title: '删除${_conversation.typeLabel}？',
           description: '“${_conversation.title}”的消息、草稿和图片将一并删除，无法恢复。',
         ),
       );
@@ -174,10 +182,13 @@ class _ConversationMoreState extends State<ConversationMore> {
     final deletedId = _conversation.id;
     try {
       await widget.controller.deleteConversation(deletedId);
-      _notice('会话已删除', kind: ToastKind.success);
+      _notice('${_conversation.typeLabel}已删除', kind: ToastKind.success);
       if (mounted && widget.conversation == null) _closeDetails();
     } on FileSystemException catch (error) {
-      _notice('会话已删除，部分图片文件清理失败：${errorMessage(error)}', kind: ToastKind.error);
+      _notice(
+        '${_conversation.typeLabel}已删除，部分图片文件清理失败：${errorMessage(error)}',
+        kind: ToastKind.error,
+      );
     } on Object catch (error) {
       _notice('删除失败，请重试：${errorMessage(error)}', kind: ToastKind.error);
     } finally {
@@ -205,7 +216,10 @@ class _ConversationMoreState extends State<ConversationMore> {
     return true;
   }
 
-  Future<void> _openMenu([Offset? position]) async {
+  Future<void> _openMenu([Offset? position]) =>
+      runUiAction(context, () => _showMenu(position)).then((_) {});
+
+  Future<void> _showMenu(Offset? position) async {
     final button = context.findRenderObject()! as RenderBox;
     final navigator = Navigator.of(context, rootNavigator: true);
     final overlay = navigator.overlay!.context.findRenderObject()! as RenderBox;
@@ -214,6 +228,17 @@ class _ConversationMoreState extends State<ConversationMore> {
     final isGroup = _conversation.kind == ConversationKind.group;
     final targetId = _conversation.id;
     final senderId = _conversation.defaultSenderId;
+    final friendships = _conversation.isPersonalChat
+        ? await widget.controller.groupStore.database.query(
+            'contact_friendships',
+            columns: ['friend_id'],
+            where: "owner_id = 'user:local' AND friend_id = ?",
+            whereArgs: [senderId],
+            limit: 1,
+          )
+        : const <Map<String, Object?>>[];
+    if (!mounted) return;
+    final canRemark = friendships.isNotEmpty;
     final hasTask = conversationTasks(
       widget.controller,
       targetId,
@@ -226,10 +251,13 @@ class _ConversationMoreState extends State<ConversationMore> {
     final menuHeight =
         (_conversation.isTemporary
             ? 202.0
+            : _conversation.isPersonalChat
+            ? 156.0
             : _conversation.isArchived
             ? 202.0
-            : 264.0) +
+            : (_conversation.isTask ? 264.0 : 210.0)) +
         (hasTask ? 54 : 0) +
+        (canRemark ? 54 : 0) +
         (hasProject ? 54 : 0);
     final anchor =
         (position == null ? null : overlay.globalToLocal(position)) ??
@@ -296,6 +324,17 @@ class _ConversationMoreState extends State<ConversationMore> {
                                   _MoreAction.members,
                                 ),
                               ),
+                            if (canRemark)
+                              GlassMenuItem(
+                                icon: const SettingsIcon(
+                                  type: SettingsIconType.note,
+                                ),
+                                label: '设置备注名',
+                                onTap: () => Navigator.pop(
+                                  menuContext,
+                                  _MoreAction.remark,
+                                ),
+                              ),
                             if (_conversation.isTemporary)
                               GlassMenuItem(
                                 icon: const ConversationMenuIcon(
@@ -312,7 +351,7 @@ class _ConversationMoreState extends State<ConversationMore> {
                                 icon: const ConversationMenuIcon(
                                   type: ConversationMenuIconType.task,
                                 ),
-                                label: '查看任务',
+                                label: '查看定时任务',
                                 onTap: () => Navigator.pop(
                                   menuContext,
                                   _MoreAction.task,
@@ -341,18 +380,20 @@ class _ConversationMoreState extends State<ConversationMore> {
                                 onTap: () =>
                                     Navigator.pop(menuContext, _MoreAction.pin),
                               ),
-                            GlassMenuItem(
-                              icon: const ConversationMenuIcon(
-                                type: ConversationMenuIconType.rename,
+                            if (!_conversation.isPersonalChat)
+                              GlassMenuItem(
+                                icon: const ConversationMenuIcon(
+                                  type: ConversationMenuIconType.rename,
+                                ),
+                                label: '重命名',
+                                onTap: () => Navigator.pop(
+                                  menuContext,
+                                  _MoreAction.rename,
+                                ),
                               ),
-                              label: '重命名',
-                              onTap: () => Navigator.pop(
-                                menuContext,
-                                _MoreAction.rename,
-                              ),
-                            ),
 
-                            if (!_conversation.isTemporary)
+                            if (_conversation.isTask &&
+                                !_conversation.isTemporary)
                               GlassMenuItem(
                                 icon: ConversationMenuIcon(
                                   type: _conversation.isArchived
@@ -361,7 +402,7 @@ class _ConversationMoreState extends State<ConversationMore> {
                                 ),
                                 label: _conversation.isArchived
                                     ? '取消归档'
-                                    : '归档会话',
+                                    : '归档${_conversation.typeLabel}',
                                 onTap: () => Navigator.pop(
                                   menuContext,
                                   _MoreAction.archive,
@@ -383,6 +424,13 @@ class _ConversationMoreState extends State<ConversationMore> {
     );
     if (!mounted) return;
     switch (action) {
+      case _MoreAction.remark:
+        setState(() => _saving = true);
+        try {
+          await editContactRemark(context, widget.controller, senderId);
+        } finally {
+          if (mounted) setState(() => _saving = false);
+        }
       case _MoreAction.profile:
         await openProfileRoute(
           context,
@@ -424,6 +472,7 @@ class _ConversationMoreState extends State<ConversationMore> {
           barrierDismissible: false,
           barrierColor: Colors.black.withValues(alpha: .24),
           builder: (_) => ConversationRenameDialog(
+            typeLabel: _conversation.typeLabel,
             controller: widget.controller,
             conversationId: targetId,
             initialTitle: _conversation.title,
@@ -462,7 +511,6 @@ class _ConversationMoreState extends State<ConversationMore> {
             conversation: _conversation,
             originTaskId: widget.originTaskId,
             onPin: _pin,
-            onArchive: _archive,
           )
         : DirectConversationInfoPage(
             controller: widget.controller,
@@ -501,11 +549,25 @@ class _ConversationMoreState extends State<ConversationMore> {
           shadowOpacity: .8,
           child: RoundAction(
             icon: Icons.more_vert_rounded,
-            label: _conversation.isStored ? '会话详情' : '查看资料',
+            label: _conversation.isStored
+                ? (_conversation.isPersonalChat
+                      ? '聊天详情'
+                      : '${_conversation.typeLabel}详情')
+                : '查看资料',
             onPressed: _saving ? null : _openDetails,
             onLongPress: _saving || !_conversation.isStored ? null : _openMenu,
           ),
         );
 }
 
-enum _MoreAction { profile, task, project, members, pin, rename, archive, save }
+enum _MoreAction {
+  profile,
+  remark,
+  task,
+  project,
+  members,
+  pin,
+  rename,
+  archive,
+  save,
+}

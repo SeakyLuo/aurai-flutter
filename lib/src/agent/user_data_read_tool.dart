@@ -53,6 +53,7 @@ class UserDataReadTool
     final base = original.definition;
     return ToolDefinition(
       name: base.name,
+      summary: base.summary,
       description:
           '${base.description} If the AI lacks access but the human user can read the target, this call requests approval to read using the user’s access. A refusal grants no access; do not repeatedly request it. This never permits sending, editing, joining groups or acting as the user.',
       inputSchema: base.inputSchema,

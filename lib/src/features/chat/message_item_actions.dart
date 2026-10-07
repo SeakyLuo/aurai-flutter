@@ -46,6 +46,109 @@ extension _FailureRetry on _MessageItemState {
 }
 
 extension _MessageItemActions on _MessageItemState {
+  void _quote({String? selectedText}) {
+    final source =
+        _quoteSourceKey.currentContext!.findRenderObject()! as RenderBox;
+    widget.onQuote!(
+      message,
+      selectedText: selectedText,
+      visual: QuoteFocusVisual(
+        createdAt: message.createdAt,
+        rect: source.localToGlobal(Offset.zero) & source.size,
+        sourceRect: () {
+          final current =
+              _quoteSourceKey.currentContext!.findRenderObject()! as RenderBox;
+          return current.localToGlobal(Offset.zero) & current.size;
+        },
+        builder: (maxHeight) => MessageItem(
+          message: message,
+          onEdit: null,
+          readOnly: true,
+          previewMaxHeight: maxHeight,
+          groupBubble: widget.groupBubble,
+          replyPart: widget.replyPart,
+          htmlView: widget.htmlView,
+          onInteractiveClick: widget.onInteractiveClick,
+          mentionMembers: widget.mentionMembers,
+          interactiveMembers: widget.interactiveMembers,
+          availableSources: widget.availableSources,
+        ),
+      ),
+    );
+  }
+
+  Widget _previewContent(Widget child) => widget.previewMaxHeight == null
+      ? child
+      : ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: widget.previewMaxHeight! - 24),
+          child: SingleChildScrollView(child: IgnorePointer(child: child)),
+        );
+
+  Future<void> _openLink(BuildContext context, String? href) async {
+    final memberLink = Uri.tryParse(href ?? '');
+    if (memberLink?.scheme == 'aurai' && memberLink?.host == 'miniapp') {
+      await openMiniappLink(context, memberLink!);
+      return;
+    }
+    if (memberLink?.scheme == 'aurai' &&
+        memberLink?.host == 'member' &&
+        memberLink!.pathSegments.length == 1) {
+      widget.onOpenMember?.call(memberLink.pathSegments.single);
+      return;
+    }
+    final file = href == null
+        ? null
+        : SourceReference.fromLocalLink(href, '本地文件');
+    if (file != null) {
+      try {
+        await AuraiPlatform.instance.openSourceFile(file.url);
+      } on PlatformException catch (error) {
+        if (context.mounted)
+          _notice(
+            context,
+            error.message ?? '无法打开此文件：${errorMessage(error)}',
+            kind: ToastKind.error,
+          );
+      } on Object catch (error) {
+        if (context.mounted)
+          _notice(
+            context,
+            '无法打开此文件：${errorMessage(error)}',
+            kind: ToastKind.error,
+          );
+      }
+      return;
+    }
+    final uri = Uri.tryParse(href ?? '');
+    if (uri == null ||
+        !{'https', 'http'}.contains(uri.scheme) ||
+        uri.host.isEmpty) {
+      _notice(context, '无法打开此链接', kind: ToastKind.error);
+      return;
+    }
+    try {
+      await AuraiPlatform.instance.startIntent({
+        'action': 'android.intent.action.VIEW',
+        'data': uri.toString(),
+      });
+    } on Object catch (error) {
+      if (context.mounted)
+        _notice(
+          context,
+          '无法打开链接，请稍后再试：${errorMessage(error)}',
+          kind: ToastKind.error,
+        );
+    }
+  }
+
+  void _notice(
+    BuildContext context,
+    String text, {
+    ToastKind kind = ToastKind.info,
+  }) => ScaffoldMessenger.of(
+    context,
+  ).showToast(SnackBar(content: Text(text)), kind: kind);
+
   double get _ownMessageLeftInset => widget.groupBubble
       ? message.hasRestrictedAudience
             ? GroupMessageHeading.restrictedRightInset
@@ -75,6 +178,7 @@ extension _MessageItemActions on _MessageItemState {
       : _openActions();
 
   Widget _selectableContent() {
+    if (widget.previewMaxHeight != null) return _content;
     if (message.interactive != null) return _content;
     if (_hasBubble && message.htmlGame == null) {
       if (_bubbleTextSelection) {
@@ -91,7 +195,7 @@ extension _MessageItemActions on _MessageItemState {
           },
           onQuote: widget.onQuote == null
               ? null
-              : (text) => widget.onQuote!(message, selectedText: text),
+              : (text) => _quote(selectedText: text),
           onStar: !widget.readOnly || widget.onLocate != null
               ? () => _openActions(directAction: MessageAction.star)
               : null,
@@ -124,7 +228,7 @@ extension _MessageItemActions on _MessageItemState {
                     final text = _selectedText;
                     selection.hideToolbar();
                     selection.clearSelection();
-                    widget.onQuote!(message, selectedText: text);
+                    _quote(selectedText: text);
                   },
                 ),
             ],
@@ -203,6 +307,18 @@ extension _MessageItemActions on _MessageItemState {
           controller.canOfferFailedRetry(snapshot);
     }
     final database = ImageActionScope.of(context).groupStore.database;
+    var hasProcess = false;
+    if (widget.groupBubble &&
+        snapshot.runId != null &&
+        snapshot.role == AgentMessageRole.assistant &&
+        !snapshot.isSystem) {
+      final loaded = await runUiAction(context, () async {
+        hasProcess = await RunTimelineStore(
+          database,
+        ).hasProcess(snapshot.runId!);
+      });
+      if (!loaded || !mounted) return;
+    }
     if (widget.onRetry != null && !snapshot.isFailure) {
       try {
         final runs = await database.query(
@@ -324,11 +440,7 @@ extension _MessageItemActions on _MessageItemState {
             allowEditing:
                 widget.onEdit != null && snapshot.miniappShare == null,
             allowHistory: hasHistory,
-            allowTimeline:
-                widget.groupBubble &&
-                snapshot.runId != null &&
-                snapshot.role == AgentMessageRole.assistant &&
-                !snapshot.isSystem,
+            allowTimeline: hasProcess,
             allowQuote: widget.onQuote != null,
             allowRecall: widget.onRecall != null,
             allowRetry: allowRetry,
@@ -339,7 +451,6 @@ extension _MessageItemActions on _MessageItemState {
                     message.text.isNotEmpty ||
                     message.images.isNotEmpty ||
                     message.files.isNotEmpty),
-            allowBranch: compactMenu && widget.onBranch != null,
             allowQuickReply:
                 widget.onQuickReply != null &&
                 (!widget.streaming ||
@@ -509,15 +620,10 @@ extension _MessageItemActions on _MessageItemState {
             );
           }
         }
-      case MessageAction.branch:
-        await widget.onBranch?.call(snapshot);
       case MessageAction.recall:
         await widget.onRecall?.call(snapshot);
       case MessageAction.quote:
-        widget.onQuote?.call(
-          snapshot,
-          selectedText: preserveSelection ? _selectedText : null,
-        );
+        _quote(selectedText: preserveSelection ? _selectedText : null);
       case MessageAction.copy:
         await _copy(
           context,

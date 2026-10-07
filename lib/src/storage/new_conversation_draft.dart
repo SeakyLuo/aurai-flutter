@@ -12,21 +12,66 @@ import '../features/chat/conversation.dart';
 class NewConversationDraft {
   final _preferences = SharedPreferencesAsync();
   static const _key = 'new_conversation_draft';
+  static const _personalPrefix = 'personal_chat_draft_';
   Future<void> _pending = Future.value();
 
-  String _senderKey(String senderId) =>
-      senderId == MessageSender.aurai.id ? _key : '${_key}_$senderId';
+  String _senderKey(String senderId, {bool personalChat = false}) =>
+      personalChat
+      ? '$_personalPrefix$senderId'
+      : senderId == MessageSender.aurai.id
+      ? _key
+      : '${_key}_$senderId';
 
-  Future<Conversation> load(String imageDirectory, {String? senderId}) async {
+  Future<Conversation> load(
+    String imageDirectory, {
+    String? senderId,
+    bool personalChat = false,
+  }) async {
     final owner = senderId ?? MessageSender.aurai.id;
-    final saved = await _preferences.getString(_senderKey(owner));
-    if (saved == null) return Conversation.empty()..defaultSenderId = owner;
+    final saved = await _preferences.getString(
+      _senderKey(owner, personalChat: personalChat),
+    );
+    if (saved == null) {
+      return Conversation.empty()
+        ..defaultSenderId = owner
+        ..isPersonalChat = personalChat;
+    }
     final data = (jsonDecode(saved) as Map).cast<String, Object?>();
+    return _restore(data, imageDirectory, owner, personalChat: personalChat);
+  }
+
+  Future<List<Conversation>> personalChats(String imageDirectory) async {
+    await _pending;
+    final keys = (await _preferences.getKeys())
+        .where((key) => key.startsWith(_personalPrefix))
+        .toSet();
+    if (keys.isEmpty) return [];
+    final saved = await _preferences.getAll(allowList: keys);
+    return [
+      for (final entry in saved.entries)
+        _restore(
+          (jsonDecode(entry.value as String) as Map).cast<String, Object?>(),
+          imageDirectory,
+          entry.key.substring(_personalPrefix.length),
+          personalChat: true,
+        ),
+    ].where((draft) => draft.draftPreview != null).toList();
+  }
+
+  Conversation _restore(
+    Map<String, Object?> data,
+    String imageDirectory,
+    String owner, {
+    required bool personalChat,
+  }) {
     return Conversation(
         id: data['id']! as String,
         createdAt: DateTime.parse(data['createdAt']! as String),
       )
       ..defaultSenderId = owner
+      ..isPersonalChat = personalChat
+      ..isPinned = data['pinned'] == true
+      ..isArchived = data['archived'] == true
       ..projectId = data['projectId'] as String?
       ..storedTitle = data['title'] as String?
       ..draft = data['text']! as String
@@ -65,6 +110,8 @@ class NewConversationDraft {
   Future<void> save(Conversation conversation) {
     final data = jsonEncode({
       'id': conversation.id,
+      'pinned': conversation.isPinned,
+      'archived': conversation.isArchived,
       'createdAt': conversation.createdAt.toIso8601String(),
       'text': conversation.draft,
       'draftUpdatedAt': conversation.draftUpdatedAt?.toIso8601String(),
@@ -79,12 +126,20 @@ class NewConversationDraft {
           .map((image) => image.toJson())
           .toList(),
     });
-    final key = _senderKey(conversation.defaultSenderId);
+    final key = _senderKey(
+      conversation.defaultSenderId,
+      personalChat: conversation.isPersonalChat,
+    );
     return _enqueue(() => _preferences.setString(key, data));
   }
 
-  Future<void> clear({String? senderId}) => _enqueue(
-    () => _preferences.remove(_senderKey(senderId ?? MessageSender.aurai.id)),
+  Future<void> clear({String? senderId, bool personalChat = false}) => _enqueue(
+    () => _preferences.remove(
+      _senderKey(
+        senderId ?? MessageSender.aurai.id,
+        personalChat: personalChat,
+      ),
+    ),
   );
 
   Future<void> _enqueue(Future<void> Function() operation) {

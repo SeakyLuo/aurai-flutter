@@ -10,7 +10,6 @@ import '../../scheduling/task_detail_page.dart';
 import '../../skills/skill_detail_page.dart';
 import '../../skills/skill_icon.dart';
 import 'ai_contact_page.dart';
-import 'archive_confirmation_dialog.dart';
 import 'chat_controller.dart';
 import 'group_info_page.dart';
 import 'image_action_scope.dart';
@@ -88,21 +87,6 @@ Future<void> openObjectDetail(
         controller: controller,
         conversation: conversation,
         onPin: () => controller.toggleConversationPin(target.id),
-        onArchive: () async {
-          if (!conversation.isArchived) {
-            final confirmed = await showDialog<bool>(
-              context: context,
-              builder: (_) => ArchiveConfirmationDialog(
-                isCurrent: target.id == controller.activeConversation.id,
-              ),
-            );
-            if (confirmed != true) return;
-          }
-          await controller.setConversationArchived(
-            target.id,
-            archived: !conversation.isArchived,
-          );
-        },
       );
   }
   if (!context.mounted) return;

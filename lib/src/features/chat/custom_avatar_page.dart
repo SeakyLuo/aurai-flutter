@@ -45,6 +45,7 @@ class _CustomAvatarPageState extends State<CustomAvatarPage> {
     const keys = [
       'app_logo_white',
       'initial',
+      'group',
       'portrait:dark_hair_boy',
       'portrait:brown_hair_girl',
       'portrait:little_robot',
@@ -60,7 +61,11 @@ class _CustomAvatarPageState extends State<CustomAvatarPage> {
       'smile',
     ];
     return [
-      for (final key in {..._recentSymbols, ...keys}.take(15))
+      for (final key in {
+        if (widget.initial.icon == 'group') 'group',
+        ..._recentSymbols,
+        ...keys,
+      }.take(15))
         MapEntry(key, key.startsWith('emoji:') ? 'Emoji' : avatarSymbols[key]!),
     ];
   }

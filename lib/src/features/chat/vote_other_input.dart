@@ -12,6 +12,8 @@ Future<String?> showVoteOtherInput(
   required String initialText,
   required int maxLength,
   Future<void>? closeWhen,
+  String heading = '填写其他选项',
+  String hint = '填写你的选项',
 }) async {
   String? result;
   await showQuestionSheet(
@@ -22,6 +24,8 @@ Future<String?> showVoteOtherInput(
         title: title,
         initialText: initialText,
         maxLength: maxLength,
+        heading: heading,
+        hint: hint,
         onCancel: () => Navigator.pop(context),
         onComplete: (text) {
           result = text;
@@ -43,9 +47,12 @@ class VoteOtherInput extends StatefulWidget {
     required this.maxLength,
     required this.onCancel,
     required this.onComplete,
+    this.heading = '填写其他选项',
+    this.hint = '填写你的选项',
   });
 
   final String title, initialText;
+  final String heading, hint;
   final int maxLength;
   final VoidCallback onCancel;
   final ValueChanged<String> onComplete;
@@ -65,7 +72,7 @@ class _VoteOtherInputState extends State<VoteOtherInput> {
 
   @override
   Widget build(BuildContext context) => QuestionSheetLayout(
-    title: '填写其他选项',
+    title: widget.heading,
     trailing: SettingsGlassActionSurface(
       child: IntrinsicHeight(
         child: Row(
@@ -120,7 +127,7 @@ class _VoteOtherInputState extends State<VoteOtherInput> {
           maxLines: 4,
           maxLength: widget.maxLength,
           textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(hintText: '填写你的选项'),
+          decoration: InputDecoration(hintText: widget.hint),
           onChanged: (_) => setState(() {}),
         ),
       ],

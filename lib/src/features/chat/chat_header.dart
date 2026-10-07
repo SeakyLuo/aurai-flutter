@@ -6,6 +6,9 @@ import '../../app/global_ui.dart';
 import 'glass_surface.dart';
 import 'conversation_more.dart';
 import 'chat_controller.dart';
+import 'member_avatar.dart';
+import 'ai_contact_page.dart';
+import 'profile_navigation.dart';
 
 class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
   const ChatHeader({
@@ -73,8 +76,61 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
               Expanded(
-                child:
-                    controller.activeConversation.kind == ConversationKind.group
+                child: controller.activeConversation.isPersonalChat
+                    ? Center(
+                        child: Semantics(
+                          button: true,
+                          label:
+                              '查看${controller.activeAi!.sender.displayName}的资料',
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () => openProfileRoute(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AiContactPage(
+                                  controller: controller,
+                                  senderId: controller
+                                      .activeConversation
+                                      .defaultSenderId,
+                                ),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  MemberAvatar(
+                                    sender: controller.activeAi!.sender,
+                                    size: 32,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Flexible(
+                                    child: Text(
+                                      controller.activeAi!.sender.displayName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        height: 1.2,
+                                        fontWeight: FontWeight.w500,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    : controller.activeConversation.kind ==
+                          ConversationKind.group
                     ? Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Text(

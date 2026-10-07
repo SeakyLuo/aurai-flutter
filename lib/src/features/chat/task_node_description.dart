@@ -1,4 +1,5 @@
 import 'app_bottom_sheet.dart';
+import '../../domain/message_summary.dart';
 import 'app_sheet_body.dart';
 import 'package:flutter/material.dart';
 import 'settings_icon.dart';
@@ -19,6 +20,7 @@ class TaskNodeDescription extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final preview = MessageSummary.preview(description, limit: 1024);
     final style = TextStyle(
       fontSize: 12,
       height: 1.5,
@@ -26,7 +28,7 @@ class TaskNodeDescription extends StatelessWidget {
     );
     final painter = TextPainter(
       text: TextSpan(
-        text: description,
+        text: preview,
         style: DefaultTextStyle.of(context).style.merge(style),
       ),
       textDirection: Directionality.of(context),
@@ -34,7 +36,7 @@ class TaskNodeDescription extends StatelessWidget {
       locale: Localizations.maybeLocaleOf(context),
       maxLines: 4,
     )..layout(maxWidth: width);
-    final overflow = painter.didExceedMaxLines;
+    final overflow = description.length > 1024 || painter.didExceedMaxLines;
     painter.dispose();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,7 +83,7 @@ class TaskNodeDescription extends StatelessWidget {
         if (description.isNotEmpty) ...[
           const SizedBox(height: 4),
           Text(
-            description,
+            preview,
             maxLines: 4,
             overflow: TextOverflow.ellipsis,
             style: style,

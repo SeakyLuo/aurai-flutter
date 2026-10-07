@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../agent/ask_user_tool.dart';
+import 'question_submission.dart';
 
 class UserQuestionSkipButton extends StatefulWidget {
   const UserQuestionSkipButton({super.key, required this.question});
@@ -73,7 +74,13 @@ class _UserQuestionSkipButtonState extends State<UserQuestionSkipButton> {
               ? null
               : () {
                   FocusScope.of(context).unfocus();
-                  question.answer(skipped: true);
+                  if (question.batch != null) {
+                    submitQuestionAnswers(context, question, {
+                      'skipQuestions': true,
+                    });
+                  } else {
+                    question.answer(skipped: true);
+                  }
                 },
           child: Text('跳过'),
         ),

@@ -29,8 +29,8 @@ class TaskProgressList extends StatefulWidget {
     super.key,
     required this.steps,
     required this.changes,
-    this.title = '任务清单',
-    this.label = '任务',
+    this.title = '执行计划',
+    this.label = '计划',
   });
   final List<Map> steps;
   final Stream<Map<String, dynamic>> changes;
@@ -58,7 +58,7 @@ class _TaskProgressListState extends State<TaskProgressList> {
       currentIndex = steps.indexWhere((step) => step['status'] == 'pending');
     final current = currentIndex == -1 ? null : steps[currentIndex];
     final position = currentIndex == -1 ? steps.length : currentIndex + 1;
-    final summary = current == null ? '任务已完成' : current['step'] as String;
+    final summary = current == null ? '计划已完成' : current['step'] as String;
     final colors = Theme.of(context).colorScheme;
     final accent = GlobalUI.highlightTextColor(context);
     final count = '$completed/' + steps.length.toString();
@@ -226,7 +226,7 @@ class _TaskProgressListState extends State<TaskProgressList> {
               return steps.isEmpty
                   ? const Padding(
                       padding: EdgeInsets.fromLTRB(16, 76, 16, 24),
-                      child: EmptyDataView(title: '暂无任务'),
+                      child: EmptyDataView(title: '暂无计划'),
                     )
                   : SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(16, 76, 16, 16),

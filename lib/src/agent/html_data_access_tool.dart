@@ -32,6 +32,7 @@ class HtmlDataAccessTool
     final write = base.name == 'updateHtmlData';
     return ToolDefinition(
       name: base.name,
+      summary: base.summary,
       description:
           '${base.description} If you lack instance access, this call requests user approval; do not hand the operation back to the user. Denial grants no access.',
       inputSchema: base.inputSchema,

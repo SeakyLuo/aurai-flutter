@@ -32,6 +32,7 @@ class AgentRuntime {
   final ToolExecutor _executor;
   String? get activeToolName => _executor.activeToolName;
   bool _cancelRequested = false;
+  Future<void> Function()? _cancelOrganization;
   bool _acceptingUserInput = true;
   final List<Future<List<Map<String, Object?>>>> _userInputs;
   DeferredToolResults? _deferred;
@@ -62,6 +63,8 @@ class AgentRuntime {
     Future<void> Function(ContextSummary)? onContextSummary,
     Future<void> Function(ContextSummary)? onPrivateContextSummary,
     void Function(bool)? onCompactionChanged,
+    Future<void> Function()? organizeTask,
+    Future<void> Function()? cancelOrganization,
     FutureOr<void> Function()? onTurnStarted,
     Future<void> Function(ModelTurn)? onTurnCompleted,
     Future<void> Function(ToolCall)? onToolStarted,
@@ -69,6 +72,7 @@ class AgentRuntime {
     List<String> Function()? takeUserUpdates,
     bool Function(ToolResult)? endsRun,
     ResponseDecision? decision,
+    bool streamOutput = true,
     void Function(String text)? onTextChanged,
     void Function(String text)? onReasoningChanged,
     void Function()? onProcessingStarted,
@@ -77,6 +81,7 @@ class AgentRuntime {
     void Function(int index)? onMessageCompleted,
   }) async {
     _cancelRequested = false;
+    _cancelOrganization = cancelOrganization;
     final steps = <AgentStep>[];
     final stepIndices = <String, int>{};
     String? continuationToken;
@@ -121,6 +126,20 @@ class AgentRuntime {
         _throwIfCancelled();
         await onTurnStarted?.call();
         final incomingMessages = takeUserUpdates?.call() ?? const <String>[];
+        String? pendingText;
+        String? pendingReasoning;
+        int? outputIndex;
+        void publishOutput() {
+          if (pendingReasoning case final text?) {
+            onReasoningChanged?.call(text);
+            pendingReasoning = null;
+          }
+          if (pendingText case final text?) {
+            onTextChanged?.call(text);
+            pendingText = null;
+          }
+        }
+
         final modelTurn = await _provider.respond(
           ModelRequest(
             messages: conversation,
@@ -134,8 +153,28 @@ class AgentRuntime {
             onContextSummary: onContextSummary,
             onPrivateContextSummary: onPrivateContextSummary,
             onCompactionChanged: onCompactionChanged,
-            onMessageStarted: onMessageStarted,
-            onMessageCompleted: onMessageCompleted,
+            organizeTask: organizeTask == null
+                ? null
+                : () async {
+                    _throwIfCancelled();
+                    await organizeTask();
+                    _throwIfCancelled();
+                    return [
+                      await personalContext?.call() ?? '',
+                      if (task != null) await task.context(),
+                      if (decision != null) decision.instructions,
+                    ].join('\n\n');
+                  },
+            onMessageStarted: (index) {
+              if (!streamOutput && outputIndex != index) publishOutput();
+              outputIndex = index;
+              onMessageStarted?.call(index);
+            },
+            onMessageCompleted: (index) {
+              _throwIfCancelled();
+              if (!streamOutput) publishOutput();
+              onMessageCompleted?.call(index);
+            },
             onReconnect: onReconnect,
             onProcessingStarted: () {
               _throwIfCancelled();
@@ -143,11 +182,21 @@ class AgentRuntime {
             },
             onReasoningChanged: (text) {
               _throwIfCancelled();
-              onReasoningChanged?.call(text);
+              if (streamOutput) {
+                onReasoningChanged?.call(text);
+              } else {
+                pendingReasoning = text;
+              }
             },
             onTextChanged: (text) {
               _throwIfCancelled();
-              if (decision == null) onTextChanged?.call(text);
+              if (decision == null) {
+                if (streamOutput) {
+                  onTextChanged?.call(text);
+                } else {
+                  pendingText = text;
+                }
+              }
             },
             tools: _registry.beginTurn(
               exclusiveTool: decision?.exclusive == true ? decision : null,
@@ -172,6 +221,7 @@ class AgentRuntime {
         continuationToken = modelTurn.continuationToken;
         _throwIfCancelled();
 
+        if (!streamOutput) publishOutput();
         if (decision == null &&
             modelTurn.text != null &&
             modelTurn.text!.isNotEmpty) {
@@ -376,6 +426,7 @@ class AgentRuntime {
       }
     } finally {
       _acceptingUserInput = false;
+      await _cancelOrganization?.call();
       _registry.endTurn();
       _userInputs.clear();
       if (task != null && (await task.read())['status'] == 'active') {
@@ -395,6 +446,7 @@ class AgentRuntime {
     _deferred?.wake();
     await Future.wait(<Future<void>>[
       _provider.cancel(),
+      if (_cancelOrganization != null) _cancelOrganization!(),
       _executor.cancel(),
       for (final tool in _registry.tools.whereType<DeferredAgentTool>())
         tool.cancel(),
@@ -419,7 +471,9 @@ class AgentRuntime {
     }
     if (result.toolName == 'askUser' &&
         result.status == ToolResultStatus.success) {
-      return result.output['pending'] == true
+      return result.output['awaitingResponse'] == true
+          ? '已发送问题卡片'
+          : result.output['pending'] == true
           ? '等待回答'
           : result.output['skipped'] == true
           ? '已跳过问题'

@@ -6,6 +6,11 @@ import 'package:sqflite/sqflite.dart';
 import '../features/chat/conversation.dart';
 import '../domain/message_sender.dart';
 
+const conversationListMessageVisibility =
+    r'''kind NOT IN ('commentary', 'quick_reply', 'reasoning')
+             AND NOT (kind = 'system' AND text = '私密交互消息已更新')
+             AND NOT EXISTS (SELECT 1 FROM (SELECT 'user:local' AS visibility_viewer) WHERE (json_extract(interactive_json, '$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(interactive_json, '$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(interactive_json, '$.participation.excludedAudience') WHERE value = visibility_viewer))''';
+
 Future<void> loadPendingQuestionPreviews(
   Database database,
   List<Conversation> conversations,
@@ -25,11 +30,15 @@ Future<void> loadPendingQuestionPreviews(
     final arguments = jsonDecode(row['arguments_json']! as String) as Map;
     final title = (arguments['title'] as String?)?.trim();
     final label = title == null || title.isEmpty
-        ? arguments['question']
+        ? arguments['questions'] is List
+              ? (arguments['questions'] as List).first['question']
+              : arguments['question']
         : title;
-    byId[row['conversation_id']]!.pendingQuestionPreviews[row['run_id']!
-            as String] =
-        '${row['sender_name']}：[问题] $label';
+    final conversation = byId[row['conversation_id']]!;
+    conversation.pendingQuestionPreviews[row['run_id']!
+        as String] = conversation.kind == ConversationKind.group
+        ? '${row['sender_name']}：[问题] $label'
+        : '[问题] $label';
   }
 }
 
@@ -43,12 +52,10 @@ Future<void> loadConversationListPreviews(
   };
   if (groups.isEmpty) return;
   final rows = await database.rawQuery(
-    '''SELECT id, conversation_id, sender_id, kind, text, interactive_json, json_extract(miniapp_share_json, '\$.title') AS share_title, CASE WHEN json_extract(interactive_json, '\$.participation.presentation') = 'message' THEN NULL ELSE json_extract(interactive_json, '\$.title') END AS interactive_title, json_extract(interactive_json, '\$.body') AS interactive_body, created_at
+    '''SELECT id, conversation_id, sender_id, kind, substr(text, 1, ${MessageSummary.previewLimit + 1}) AS text, interactive_json, json_extract(miniapp_share_json, '\$.title') AS share_title, CASE WHEN json_extract(interactive_json, '\$.participation.presentation') = 'message' THEN NULL ELSE json_extract(interactive_json, '\$.title') END AS interactive_title, json_extract(interactive_json, '\$.body') AS interactive_body, created_at
        FROM messages WHERE id IN (
          SELECT (SELECT id FROM messages
-           WHERE conversation_id = conversations.id AND kind NOT IN ('commentary', 'quick_reply', 'reasoning')
-             AND NOT (kind = 'system' AND text = '私密交互消息已更新')
-             AND NOT EXISTS (SELECT 1 FROM (SELECT 'user:local' AS visibility_viewer) WHERE (json_extract(interactive_json, '\$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.excludedAudience') WHERE value = visibility_viewer))
+           WHERE conversation_id = conversations.id AND $conversationListMessageVisibility
            ORDER BY created_at DESC, id DESC LIMIT 1)
          FROM conversations WHERE id IN (${_slots(groups.length)})
        )''',
@@ -138,12 +145,15 @@ Future<void> loadConversationListPreviews(
     );
     groups[row['conversation_id']]!.storedPreviewIsSystem =
         row['kind'] == 'system';
-    groups[row['conversation_id']]!.storedPreview = MessageSummary.sender(
-      body,
-      senderId: row['sender_id'] as String,
-      senderName: names[row['sender_id']]!,
-      isSystem: row['kind'] == 'system',
-    );
+    final conversation = groups[row['conversation_id']]!;
+    conversation.storedPreview = conversation.kind == ConversationKind.group
+        ? MessageSummary.sender(
+            body,
+            senderId: row['sender_id'] as String,
+            senderName: names[row['sender_id']]!,
+            isSystem: row['kind'] == 'system',
+          )
+        : body;
   }
 }
 

@@ -75,7 +75,7 @@ class GroupMessageSearch {
       'messages',
       where:
           '''conversation_id = ? AND NOT EXISTS (SELECT 1 FROM (SELECT 'user:local' AS visibility_viewer) WHERE (json_extract(interactive_json, '\$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.excludedAudience') WHERE value = visibility_viewer)) AND role IN ('user', 'assistant')
-        AND kind IN ('user', 'group_message', 'html_game')
+        AND kind IN ('user', 'final', 'group_message', 'html_game')
         AND ($filter)
         ${query.isEmpty ? '' : '''AND (instr(lower(text), ?) > 0
           OR EXISTS (SELECT 1 FROM attachments a WHERE a.message_id = messages.id

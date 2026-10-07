@@ -10,6 +10,7 @@ class ToolCustomization {
     this.title,
     required this.icon,
     this.description,
+    this.summary,
     this.inputSchema,
     this.scopes = const [],
   });
@@ -17,6 +18,7 @@ class ToolCustomization {
   final String? title;
   final String icon;
   final String? description;
+  final String? summary;
   final Map<String, Object?>? inputSchema;
   final List<ResourceScope> scopes;
 
@@ -28,6 +30,7 @@ class ToolCustomization {
     scopes: scopes,
     icon: row['icon']! as String,
     description: row['description'] as String?,
+    summary: row['summary'] as String?,
     inputSchema: row['input_schema_json'] == null
         ? null
         : (jsonDecode(row['input_schema_json']! as String) as Map)
@@ -39,6 +42,7 @@ class ToolCustomization {
     'title': title,
     'icon': icon,
     'description': description,
+    'summary': summary,
     'input_schema_json': inputSchema == null ? null : jsonEncode(inputSchema),
   };
 }
@@ -112,6 +116,7 @@ abstract final class ToolCustomizations {
     return ToolDefinition(
       name: tool.name,
       description: value.description ?? tool.description,
+      summary: value.summary ?? '',
       inputSchema: value.inputSchema ?? tool.inputSchema,
       safety: tool.safety,
       capabilityId: tool.capabilityId,

@@ -14,6 +14,8 @@ class ConversationListTile extends StatelessWidget {
     required this.avatar,
     required this.onTap,
     this.project,
+    this.showActivity = false,
+    this.displayName,
   });
 
   final ChatController controller;
@@ -21,6 +23,8 @@ class ConversationListTile extends StatelessWidget {
   final Widget avatar;
   final VoidCallback onTap;
   final DevelopmentProject? project;
+  final bool showActivity;
+  final String? displayName;
 
   @override
   Widget build(BuildContext context) {
@@ -50,12 +54,25 @@ class ConversationListTile extends StatelessWidget {
                 children: [
                   Flexible(
                     child: Text(
-                      item.title,
+                      displayName ?? item.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 16),
                     ),
                   ),
+                  if (showActivity &&
+                      (item.hasRunningTasks ||
+                          item.runState == ChatRunState.running))
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: Text(
+                        item.hasRunningTasks ? '任务执行中' : '正在回复',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ),
                   ListenableBuilder(
                     listenable: controller.scheduledTasks,
                     builder: (context, _) =>
@@ -93,7 +110,7 @@ class ConversationListTile extends StatelessWidget {
               : '',
           showFailure: true,
           conversation: item,
-          emptyText: '开始聊天',
+          emptyText: item.isTask ? '开始任务' : '开始聊天',
         ),
         onTap: onTap,
       ),

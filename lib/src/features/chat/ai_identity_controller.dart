@@ -1,6 +1,42 @@
 part of 'chat_controller.dart';
 
 extension AiIdentityController on ChatController {
+  Future<void> setContactRemark(String senderId, String value) async {
+    await ContactStore(_store.database).setRemark(senderId, value);
+    final ai = await groupStore.loadAi(senderId);
+    for (final conversation in {
+      ..._conversations,
+      _activeConversation,
+      _pendingAiConversation,
+      ..._personalChatDrafts.values,
+      ..._executions.sessions.values.map((state) => state.conversation),
+    }.nonNulls) {
+      if (conversation.isPersonalChat &&
+          conversation.defaultSenderId == senderId) {
+        conversation.storedTitle = ai.sender.displayName;
+      }
+    }
+    contactsChanged.value = ai;
+    _conversationChanged();
+  }
+
+  Future<List<Conversation>> personalChatDrafts() async {
+    final drafts = await _newDraftStore.personalChats(_imageStore.directory);
+    _personalChatDrafts
+      ..clear()
+      ..addEntries(
+        drafts.map(
+          (draft) => MapEntry(
+            draft.id,
+            draft.id == activeConversation.id ? activeConversation : draft,
+          ),
+        ),
+      );
+    return _personalChatDrafts.values
+        .where((draft) => !draft.isStored && !draft.isArchived)
+        .toList();
+  }
+
   void _onLocalProfileChanged() {
     final sender = MessageSender.localUser;
     final name = sender.name;
@@ -120,18 +156,18 @@ extension AiIdentityController on ChatController {
 
   Future<MemoryController> aiMemory(AiProfile ai, {String scope = ''}) async {
     if (ai.sender.id == MessageSender.aurai.id && scope.isEmpty) {
-      memory.modelConfig = () => aiConfig(ai);
+      memory.modelConfig = () => modelSettings.activeConfig;
       return memory;
     }
     final key = '${ai.sender.id}:$scope';
     final existing = _aiMemories[key];
     if (existing != null) {
-      existing.modelConfig = () => aiConfig(ai);
+      existing.modelConfig = () => modelSettings.activeConfig;
       return existing;
     }
     final store = MemoryController(
       _store.database,
-      () => aiConfig(ai),
+      () => modelSettings.activeConfig,
       ownerId: ai.sender.id,
       scope: scope,
     );
@@ -144,16 +180,15 @@ extension AiIdentityController on ChatController {
     DevelopmentProject project, {
     AiProfile? profile,
   }) async {
-    final ai = profile ?? await groupStore.loadAi(project.defaultSenderId);
     final key = 'project-shared:${project.id}';
     final existing = _aiMemories[key];
     if (existing != null) {
-      existing.modelConfig = () => aiConfig(ai);
+      existing.modelConfig = () => modelSettings.activeConfig;
       return existing;
     }
     final store = MemoryController(
       _store.database,
-      () => aiConfig(ai),
+      () => modelSettings.activeConfig,
       ownerId: 'project:${project.id}',
     );
     await store.initialize();
@@ -183,16 +218,14 @@ extension AiIdentityController on ChatController {
         : await DevelopmentProjects(
             _store.database,
           ).readWorkspace(conversation.projectId!);
-    final privateMemory =
-        project == null || project.memoryMode == ProjectMemoryMode.shared
-        ? await aiMemory(profile, scope: privateScope)
-        : null;
+    final ownMemory = await aiMemory(
+      profile,
+      scope: project == null ? privateScope : 'project:${project.id}',
+    );
     return (
       project: project,
-      privateMemory: privateMemory,
-      memory: project == null
-          ? privateMemory!
-          : await projectMemory(project, profile: profile),
+      privateMemory: project == null ? null : await projectMemory(project),
+      memory: ownMemory,
     );
   }
 
@@ -274,11 +307,47 @@ extension AiIdentityController on ChatController {
       _pendingAiConversation = conversation;
       return conversation.id;
     }
+    if (!newConversation) {
+      final rows = await _store.database.query(
+        'conversations',
+        columns: ['id'],
+        where: 'personal_chat = 1 AND default_sender_id = ?',
+        whereArgs: [ai.sender.id],
+      );
+      if (rows.isEmpty) {
+        final draft = await _newDraftStore.load(
+          _imageStore.directory,
+          senderId: ai.sender.id,
+          personalChat: true,
+        );
+        draft.storedTitle = ai.sender.displayName;
+        _pendingAiConversation = draft;
+        return draft.id;
+      }
+      final id = rows.single['id'] as String;
+      await _store.database.update(
+        'conversations',
+        {'archived': 0, 'title': ai.sender.displayName},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      for (final conversation in {
+        ..._conversations,
+        _activeConversation,
+        ..._executions.sessions.values.map((state) => state.conversation),
+      }) {
+        if (conversation?.id == id) {
+          conversation!.storedTitle = ai.sender.displayName;
+          conversation.isArchived = false;
+        }
+      }
+      return id;
+    }
     final rows = await _store.database.query(
       'conversations',
       columns: ['id'],
       where:
-          "kind = 'direct' AND mode = 'normal' AND default_sender_id = ? AND archived = 0 AND $localUserConversation"
+          "kind = 'direct' AND personal_chat = 0 AND mode = 'normal' AND default_sender_id = ? AND archived = 0 AND $localUserConversation"
           "${newConversation ? ' AND ($emptyDirectConversation)' : ''}",
       whereArgs: [ai.sender.id],
       orderBy: 'updated_at DESC, id DESC',
@@ -297,10 +366,58 @@ extension AiIdentityController on ChatController {
     return conversation.id;
   }
 
+  Future<void> addAiFriend(
+    AiProfile ai, {
+    bool create = false,
+    bool notifyFriend = true,
+  }) async {
+    final savedDraft = await _newDraftStore.load(
+      _imageStore.directory,
+      senderId: ai.sender.id,
+      personalChat: true,
+    );
+    final draft =
+        _viewConversation.isPersonalChat &&
+            _viewConversation.defaultSenderId == ai.sender.id &&
+            !_viewConversation.isStored
+        ? _viewConversation
+        : savedDraft;
+    await _store.writer.flush();
+    final result = await groupStore.addAiFriend(
+      ai,
+      create: create,
+      draft: draft,
+    );
+    final target = result.conversationId == draft.id
+        ? draft
+        : await _forwardTarget(result.conversationId);
+    target.isStored = true;
+    target.isArchived = false;
+    target.storedTitle = ai.sender.displayName;
+    if (!target.messages.any((message) => message.id == result.notice.id)) {
+      target.messages.add(result.notice);
+      target.messageCount++;
+    }
+    _store.writer.remember([result.notice]);
+    await _store.writer.save(target, makeActive: false, saveDraft: true);
+    await _newDraftStore.clear(senderId: ai.sender.id, personalChat: true);
+    _personalChatDrafts.remove(draft.id);
+    _updateConversationList(target);
+    _applySavedAi(ai, previousName: result.previousName);
+    if (notifyFriend) {
+      unawaited(
+        _inConversation(target, () async {
+          _execution.queuedUserMessageId = result.notice.id;
+          _resumeForwardedReply();
+        }),
+      );
+    }
+  }
+
   Future<void> saveAi(
     AiProfile ai, {
     bool create = false,
-    bool addToMyContacts = true,
+    bool addToMyContacts = false,
   }) async {
     String? previousName;
     if (create) {
@@ -311,6 +428,12 @@ extension AiIdentityController on ChatController {
         addToMyContacts: addToMyContacts,
       );
     }
+    await _store.database.update(
+      'conversations',
+      {'title': ai.sender.displayName},
+      where: 'personal_chat = 1 AND default_sender_id = ?',
+      whereArgs: [ai.sender.id],
+    );
     _applySavedAi(ai, previousName: previousName);
   }
 
@@ -351,6 +474,10 @@ extension AiIdentityController on ChatController {
       }
     }
     for (final conversation in {..._conversations, _activeConversation}) {
+      if (conversation.isPersonalChat &&
+          conversation.defaultSenderId == ai.sender.id) {
+        conversation.storedTitle = ai.sender.displayName;
+      }
       conversation.creationMembers = [
         for (final sender in conversation.creationMembers)
           sender.id == ai.sender.id ? ai.sender : sender,
@@ -358,7 +485,7 @@ extension AiIdentityController on ChatController {
     }
     for (final store in [memory, ..._aiMemories.values]) {
       if (store.ownerId == ai.sender.id) {
-        store.modelConfig = () => aiConfig(ai);
+        store.modelConfig = () => modelSettings.activeConfig;
       }
     }
     contactsChanged.value = ai;

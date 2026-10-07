@@ -9,11 +9,13 @@ import 'question_icon.dart';
 import 'question_options_sheet.dart';
 import 'thinking_indicator.dart';
 import 'user_question_option_tile.dart';
+import 'question_card_anchor.dart';
 
 Future<void> showQuestionSheet(
   BuildContext context, {
   required Widget child,
   Future<void>? closeWhen,
+  Rect? Function()? returnTarget,
 }) async {
   final navigator = Navigator.of(context);
   final route = ModalBottomSheetRoute<void>(
@@ -22,6 +24,13 @@ Future<void> showQuestionSheet(
     showDragHandle: false,
     backgroundColor: Colors.transparent,
     elevation: 0,
+    clipBehavior: Clip.none,
+    sheetAnimationStyle: returnTarget == null
+        ? null
+        : const AnimationStyle(
+            curve: Curves.linear,
+            reverseCurve: Curves.linear,
+          ),
     constraints: const BoxConstraints(maxWidth: double.infinity),
     capturedThemes: InheritedTheme.capture(
       from: context,
@@ -29,10 +38,17 @@ Future<void> showQuestionSheet(
     ),
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     modalBarrierColor: Theme.of(context).bottomSheetTheme.modalBarrierColor,
-    builder: (context) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: child,
-    ),
+    builder: (context) {
+      final content = Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: child,
+      );
+      return returnTarget == null
+          ? content
+          : QuestionReturnTransition(target: returnTarget, child: content);
+    },
   );
   closeWhen?.then((_) {
     if (!route.isActive) return;
@@ -56,6 +72,7 @@ class QuestionSheetLayout extends StatelessWidget {
     this.sender,
     this.onOpenSender,
     this.heading,
+    this.scrollBody = true,
   });
 
   final String title;
@@ -64,6 +81,7 @@ class QuestionSheetLayout extends StatelessWidget {
   final MessageSender? sender;
   final VoidCallback? onOpenSender;
   final Widget? heading;
+  final bool scrollBody;
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +93,8 @@ class QuestionSheetLayout extends StatelessWidget {
           maxWidth: double.infinity,
           maxHeight:
               MediaQuery.sizeOf(context).height -
-              MediaQuery.paddingOf(context).top,
+              MediaQuery.paddingOf(context).top -
+              MediaQuery.viewInsetsOf(context).bottom,
         ),
         child: BackdropGroup(
           child: AppSheetSurface(
@@ -158,15 +177,18 @@ class QuestionSheetLayout extends StatelessWidget {
                         ),
                       ),
                     Flexible(
-                      child: SingleChildScrollView(
-                        child: heading == null
-                            ? child
-                            : Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [heading!, child],
-                              ),
-                      ),
+                      child: !scrollBody
+                          ? child
+                          : SingleChildScrollView(
+                              child: heading == null
+                                  ? child
+                                  : Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [heading!, child],
+                                    ),
+                            ),
                     ),
                   ],
                 ),
@@ -191,6 +213,9 @@ class QuestionAnswerContent extends StatelessWidget {
     this.multiple = false,
     this.footer,
     this.showQuestion = true,
+    this.allowCustomAnswer = false,
+    this.customAnswer = '',
+    this.onCustomAnswer,
   });
 
   final String question;
@@ -201,44 +226,77 @@ class QuestionAnswerContent extends StatelessWidget {
   final bool compactOptions, multiple;
   final Widget? footer;
   final bool showQuestion;
+  final bool allowCustomAnswer;
+  final String customAnswer;
+  final VoidCallback? onCustomAnswer;
 
   @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      if (showQuestion)
-        Padding(
-          padding: const EdgeInsets.only(top: 4, bottom: 16),
-          child: Text(
-            question,
-            style: const TextStyle(
-              fontSize: 17,
-              height: 1.5,
-              fontWeight: FontWeight.w600,
+  Widget build(BuildContext context) {
+    final choices = [
+      ...options,
+      if (allowCustomAnswer && options.isNotEmpty)
+        UserQuestionOption(
+          title: customAnswer.isEmpty ? null : '自行撰写回复',
+          content: customAnswer.isEmpty ? '自行撰写回复' : customAnswer,
+        ),
+    ];
+    final truncated = compactOptions && choices.length >= 5;
+    final marked = {
+      ...selected,
+      if (allowCustomAnswer && customAnswer.isNotEmpty) options.length,
+    };
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showQuestion)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 16),
+            child: Text(
+              question,
+              style: const TextStyle(
+                fontSize: 17,
+                height: 1.5,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-        ),
-      if (compactOptions && options.length > 5)
-        QuestionOptionsField(
-          label: '选择回答（${options.length} 项）',
-          onTap: onChooseOptions,
-        )
-      else
-        for (final (index, option) in options.indexed)
+        for (final (index, option)
+            in choices.take(truncated ? 4 : choices.length).indexed)
           Padding(
             padding: EdgeInsets.only(
-              bottom: index == options.length - 1 ? 0 : 8,
+              bottom: index == choices.length - 1 ? 0 : 8,
             ),
             child: UserQuestionOptionTile(
               option: option,
               number: index + 1,
-              selected: selected.contains(index),
+              selected: marked.contains(index),
               multiple: multiple,
-              onTap: onSelect == null ? null : () => onSelect!(index),
+              onTap: index == options.length
+                  ? onCustomAnswer
+                  : onSelect == null
+                  ? null
+                  : () => onSelect!(index),
             ),
           ),
-      if (footer case final footer?) footer,
-    ],
-  );
+        if (truncated) ...[
+          QuestionOptionsField(label: '查看全部选项', onTap: onChooseOptions),
+          if (marked.any((index) => index >= 4))
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '已选：${choices.indexed.where((entry) => marked.contains(entry.$1)).map((entry) => entry.$2.content).join('、')}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+        if (footer case final footer?) footer,
+      ],
+    );
+  }
 }

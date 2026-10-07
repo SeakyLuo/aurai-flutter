@@ -67,7 +67,7 @@ class HomeTabBar extends StatelessWidget {
                     _tab(
                       context,
                       0,
-                      '会话',
+                      '聊天',
                       ConversationIcon(
                         color: Theme.of(context).brightness == Brightness.dark
                             ? Theme.of(context).colorScheme.onSurfaceVariant

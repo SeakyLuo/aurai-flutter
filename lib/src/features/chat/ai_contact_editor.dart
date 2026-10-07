@@ -1,6 +1,7 @@
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'dart:async';
+import 'friend_notification.dart';
 import 'contact_generator.dart';
 import 'glass_surface.dart';
 import 'random_contact.dart';
@@ -62,6 +63,7 @@ class _AiContactEditorState extends State<AiContactEditor> {
     path: widget.profile?.sender.avatarPath,
   );
   bool _saving = false, _changed = false, _allowPop = false;
+  bool _notifyFriend = true;
   final _draftPaths = <String>{};
   final _editedText = <TextEditingController>{};
   bool _avatarEdited = false;
@@ -247,8 +249,14 @@ class _AiContactEditorState extends State<AiContactEditor> {
       );
       if (widget.onSaveDraft != null) {
         await widget.onSaveDraft!(ai);
+      } else if (old == null) {
+        await widget.controller.addAiFriend(
+          ai,
+          create: true,
+          notifyFriend: _notifyFriend,
+        );
       } else {
-        await widget.controller.saveAi(ai, create: old == null);
+        await widget.controller.saveAi(ai, addToMyContacts: false);
       }
       _draftPaths.remove(_avatar.path);
       if (mounted) {
@@ -455,6 +463,18 @@ class _AiContactEditorState extends State<AiContactEditor> {
             lines: 4,
             hint: '描述工作方式，例如：规划旅行前先问预算，推荐时说明理由。',
           ),
+          if (widget.profile == null && widget.onSaveDraft == null) ...[
+            const SizedBox(height: 16),
+            FriendNotificationSwitch(
+              value: _notifyFriend,
+              onChanged: _saving || _rolling
+                  ? null
+                  : (value) => setState(() {
+                      _notifyFriend = value;
+                      _changed = true;
+                    }),
+            ),
+          ],
         ],
       ),
     ),

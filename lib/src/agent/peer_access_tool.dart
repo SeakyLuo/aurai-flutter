@@ -40,6 +40,7 @@ class PeerAccessTool
     final base = original.definition;
     return ToolDefinition(
       name: base.name,
+      summary: base.summary,
       description: '${base.description} 授权不能借用用户的群管理角色。',
       inputSchema: base.inputSchema,
       capabilityId: base.capabilityId,

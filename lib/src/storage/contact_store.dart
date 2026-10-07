@@ -54,6 +54,19 @@ class ContactStore {
         where: "owner_id = 'user:local' AND friend_id = ?",
         whereArgs: [friendId],
       );
+      final senders = await txn.query(
+        'message_senders',
+        columns: ['name'],
+        where: 'id = ?',
+        whereArgs: [friendId],
+        limit: 1,
+      );
+      await txn.update(
+        'conversations',
+        {'title': name.isEmpty ? senders.single['name'] as String : name},
+        where: 'personal_chat = 1 AND default_sender_id = ?',
+        whereArgs: [friendId],
+      );
     });
     ContactDisplayNames.set(friendId, name);
   }

@@ -34,6 +34,7 @@ extension ConversationRunContinuation on ChatController {
         conversation.id,
         userMessage.id,
         reply.config,
+        reply.senderId,
       );
     }
     return Future.value(const <Map<String, Object?>>[]);

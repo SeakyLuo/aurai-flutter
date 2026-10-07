@@ -61,9 +61,7 @@ class ConversationsDrawer extends StatelessWidget {
               .toSet();
           final conversations = controller.conversations
               .where(
-                (conversation) =>
-                    conversation.kind == ConversationKind.direct &&
-                    !conversation.isEmpty,
+                (conversation) => conversation.isTask && !conversation.isEmpty,
               )
               .toList();
           return Column(
@@ -92,7 +90,7 @@ class ConversationsDrawer extends StatelessWidget {
                       iconWidget: const SidebarActionIcon(
                         type: SidebarActionIconType.search,
                       ),
-                      label: '搜索会话',
+                      label: '搜索任务',
                       onPressed: () => _choose(ConversationAction.search),
                     ),
                   ],
@@ -130,7 +128,7 @@ class ConversationsDrawer extends StatelessWidget {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 24),
                 leading: const SettingsIcon(type: SettingsIconType.tasks),
                 title: const Text(
-                  '任务',
+                  '定时任务',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
                 onTap: () => _choose(ConversationAction.tasks),
@@ -138,7 +136,7 @@ class ConversationsDrawer extends StatelessWidget {
               Padding(
                 padding: EdgeInsets.fromLTRB(24, 12, 24, 12),
                 child: Text(
-                  '会话列表',
+                  '任务列表',
                   style: TextStyle(
                     fontSize: 13,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -153,7 +151,7 @@ class ConversationsDrawer extends StatelessWidget {
                         hasMore: controller.hasMoreConversations,
                         loadMore: controller.loadMoreConversations,
                         child: conversations.isEmpty
-                            ? const Center(child: Text('还没有会话，点击下方新建会话'))
+                            ? const Center(child: Text('还没有任务，点击下方新建任务'))
                             : ListView.builder(
                                 keyboardDismissBehavior:
                                     ScrollViewKeyboardDismissBehavior.onDrag,
@@ -303,7 +301,7 @@ class ConversationsDrawer extends StatelessWidget {
                         children: [
                           Expanded(
                             child: WidgetUtils.primaryButton(
-                              text: '新建会话',
+                              text: '新建任务',
                               fontSize: 14,
                               height: 40,
                               frosted: true,

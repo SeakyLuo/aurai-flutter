@@ -98,7 +98,7 @@ class InteractionContent extends StatelessWidget {
     final status = view['closed'] == true || view['phase'] == 'closed'
         ? (question && answer != null ? '已回答' : '已结束')
         : view['completed'] == true
-        ? '本轮已完成'
+        ? '已完成'
         : collecting
         ? (eligible ? '进行中' : '进行中 · 仅可查看')
         : null;
@@ -231,7 +231,7 @@ class InteractionContent extends StatelessWidget {
                   : view['closed'] == true || view['phase'] == 'closed'
                   ? '已结束'
                   : view['completed'] == true
-                  ? '本轮已完成'
+                  ? '已完成'
                   : '进行中',
               compactOptions: compactOptions,
               title: title,

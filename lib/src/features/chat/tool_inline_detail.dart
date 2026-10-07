@@ -17,7 +17,10 @@ String? toolInlineDetail(
       ? const <String, Object?>{}
       : jsonDecode(resultJson) as Map;
   final value = switch (name) {
-    'askUser' => request['title'],
+    'askUser' =>
+      request['questions'] is List
+          ? (request['questions'] as List).first['question']
+          : request['title'],
     'createTextFile' => request['fileName'],
     'deliverFile' => request['name'],
     'searchFiles' => request['query'],

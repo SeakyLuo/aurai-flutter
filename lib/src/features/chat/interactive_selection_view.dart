@@ -161,6 +161,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
           if (_selected.contains(option['id'])) index,
       },
       multiple: config.multiple,
+      showConfirm: config.showConfirm,
       onSelectionChanged: (selected) {
         setState(() {
           _selected = {
@@ -208,7 +209,9 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
     final locked = _locked;
     final answeredQuestion = widget.question && widget.submitted;
     final truncated =
-        !answeredQuestion && widget.compactOptions && config.options.length > 5;
+        !answeredQuestion &&
+        widget.compactOptions &&
+        config.options.length >= 5;
     final valid =
         _selected.length >= config.minimum &&
         _selected.length <= config.maximum &&
@@ -283,7 +286,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
                 toggle();
                 _saveDraft();
                 updateKeepAlive();
-                if (widget.question && !config.multiple) widget.onSubmit(id);
+                if (!config.needsConfirmation) widget.onSubmit(id);
               }
 
               return Padding(
@@ -330,7 +333,6 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
         if (truncated)
           QuestionOptionsField(
             label: '查看全部选项',
-            compact: true,
             arrow: SettingsIconType.chevron,
             onTap: _chooseOptions,
           ),
@@ -349,7 +351,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
           ),
         if (!answeredQuestion &&
             widget.showSubmit &&
-            (!widget.question || config.multiple)) ...[
+            config.needsConfirmation) ...[
           const SizedBox(height: 8),
           if (!widget.question)
             VoteSubmitButton(
@@ -401,5 +403,6 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
       _selected.add(InteractiveSelection.otherId);
     });
     _saveDraft();
+    if (!config.needsConfirmation) widget.onSubmit(_submission());
   }
 }

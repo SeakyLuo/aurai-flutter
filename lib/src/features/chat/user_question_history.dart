@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../agent/ask_user_tool.dart';
 import '../../domain/agent_models.dart';
 import 'user_question_option_tile.dart';
+import '../../domain/question_batch.dart';
+import 'question_batch_form.dart';
 
 class UserQuestionHistory extends StatelessWidget {
   const UserQuestionHistory({
@@ -25,6 +27,9 @@ class UserQuestionHistory extends StatelessWidget {
         ? null
         : jsonDecode(requestJson!) as Map;
     final result = resultJson == null ? null : jsonDecode(resultJson!) as Map;
+    if (request?['questions'] case final List questions) {
+      return _BatchHistory(questions: questions, result: result);
+    }
     final options = request == null
         ? const <UserQuestionOption>[]
         : (request['options'] as List)
@@ -72,4 +77,59 @@ class UserQuestionHistory extends StatelessWidget {
       ),
     );
   }
+}
+
+class _BatchHistory extends StatefulWidget {
+  const _BatchHistory({required this.questions, required this.result});
+  final List questions;
+  final Map? result;
+  @override
+  State<_BatchHistory> createState() => _BatchHistoryState();
+}
+
+class _BatchHistoryState extends State<_BatchHistory> {
+  late QuestionBatchController _controller;
+  void _load() {
+    _controller = QuestionBatchController(
+      QuestionBatch(widget.questions),
+      answers: {
+        for (final answer in widget.result?['answers'] as List? ?? const [])
+          answer['id'] as String: answer,
+      },
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(_BatchHistory oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _controller.dispose();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => QuestionBatchForm(
+    controller: _controller,
+    readOnly: true,
+    status: widget.result?['awaitingResponse'] == true
+        ? '已发送问题卡片'
+        : widget.result?['answers'] != null
+        ? '已回答'
+        : widget.result?['skipped'] == true
+        ? '已跳过'
+        : widget.result?['cancelled'] == true
+        ? '已取消'
+        : '待回答',
+  );
 }

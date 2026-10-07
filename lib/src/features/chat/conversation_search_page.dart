@@ -39,11 +39,13 @@ class ConversationSearchPage extends StatefulWidget {
     required this.controller,
     required this.preparingGoal,
     this.projectId,
+    this.chatsOnly = false,
   });
 
   final ChatController controller;
   final bool Function() preparingGoal;
   final String? projectId;
+  final bool chatsOnly;
 
   @override
   State<ConversationSearchPage> createState() => _ConversationSearchPageState();
@@ -126,6 +128,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
             reset ? 0 : _results.length,
             includeReasoning: _includeReasoning,
             projectId: widget.projectId,
+            chatsOnly: widget.chatsOnly,
           )
         else
           Future.value(<ConversationSearchResult>[]),
@@ -135,6 +138,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
             reset ? 0 : _files.length,
             limit: query.isEmpty ? 10 : AttachmentSearch.pageSize,
             projectId: widget.projectId,
+            chatsOnly: widget.chatsOnly,
           )
         else
           Future.value(<AttachmentSearchResult>[]),
@@ -273,6 +277,7 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
         0,
         limit: 10,
         projectId: widget.projectId,
+        chatsOnly: widget.chatsOnly,
       );
       final available = await Future.wait(
         files.map((result) async {
@@ -380,6 +385,9 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
             ? null
             : SearchTypeSegment(
                 files: _filesTab,
+                labels: widget.chatsOnly
+                    ? const ['会话', '文件']
+                    : const ['任务', '文件'],
                 onChanged: (files) {
                   setState(() => _filesTab = files);
                 },
@@ -395,39 +403,43 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
             children: [
               Expanded(
                 child: FloatingSearchLayout(
-                  trailingAction: Builder(
-                    builder: (anchor) => SettingsGlassAction(
-                      label: '搜索筛选',
-                      icon: Icons.filter_list_rounded,
-                      iconWidget: SettingsIcon(
-                        type: SettingsIconType.filter,
-                        color: _includeReasoning
-                            ? GlobalUI.highlightTextColor(context)
-                            : null,
-                      ),
-                      onPressed: () async {
-                        final box = anchor.findRenderObject()! as RenderBox;
-                        await showSearchFilterMenu(
-                          context,
-                          anchor: box.localToGlobal(Offset.zero) & box.size,
-                          includeReasoning: _includeReasoning,
-                          onChanged: (include) {
-                            _debounce?.cancel();
-                            _generation++;
-                            setState(() => _includeReasoning = include);
-                            if (_search.text.trim().isNotEmpty) {
-                              unawaited(_load(reset: true));
-                            }
-                          },
-                        );
-                      },
-                    ),
-                  ),
+                  trailingAction: widget.chatsOnly
+                      ? null
+                      : Builder(
+                          builder: (anchor) => SettingsGlassAction(
+                            label: '搜索筛选',
+                            icon: Icons.filter_list_rounded,
+                            iconWidget: SettingsIcon(
+                              type: SettingsIconType.filter,
+                              color: _includeReasoning
+                                  ? GlobalUI.highlightTextColor(context)
+                                  : null,
+                            ),
+                            onPressed: () async {
+                              final box =
+                                  anchor.findRenderObject()! as RenderBox;
+                              await showSearchFilterMenu(
+                                context,
+                                anchor:
+                                    box.localToGlobal(Offset.zero) & box.size,
+                                includeReasoning: _includeReasoning,
+                                onChanged: (include) {
+                                  _debounce?.cancel();
+                                  _generation++;
+                                  setState(() => _includeReasoning = include);
+                                  if (_search.text.trim().isNotEmpty) {
+                                    unawaited(_load(reset: true));
+                                  }
+                                },
+                              );
+                            },
+                          ),
+                        ),
                   controller: _search,
                   focusNode: _focus,
                   hintText: widget.projectId == null
-                      ? '搜索会话和文件'
-                      : '在项目中搜索会话和文件',
+                      ? (widget.chatsOnly ? '搜索会话和文件' : '搜索任务和文件')
+                      : '在项目中搜索任务和文件',
                   onSubmitted: (_) => _submit(),
                   onChanged: (value) {
                     if (value.isEmpty) _clear();
@@ -465,7 +477,13 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
             padding: EdgeInsets.only(
               bottom: media.viewPadding.bottom + FloatingSearchLayout.clearance,
             ),
-            child: EmptyDataView(title: filesTab ? '没有找到相关文件' : '没有找到相关会话'),
+            child: EmptyDataView(
+              title: filesTab
+                  ? '没有找到相关文件'
+                  : widget.chatsOnly
+                  ? '没有找到相关会话'
+                  : '没有找到相关任务',
+            ),
           )
         : PaginationListener(
             failed: _searchFailed,
@@ -540,7 +558,10 @@ class _ConversationSearchPageState extends State<ConversationSearchPage> {
                   avatar: _avatar(result.conversation),
                   conversation: result.conversation,
                   title: _highlight(
-                    result.conversation.title,
+                    result.conversation.isPersonalChat
+                        ? _senders[result.conversation.defaultSenderId]!
+                              .displayName
+                        : result.conversation.title,
                     archived: result.conversation.isArchived,
                   ),
                   subtitle: result.snippet.isEmpty

@@ -138,7 +138,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                   padding: const EdgeInsets.all(32),
                   child: EmptyDataView(
                     title: '还没有项目',
-                    description: '项目会把工作目录和相关会话放在一起。',
+                    description: '项目会把工作目录和相关任务放在一起。',
                     actionText: '添加项目',
                     onAction: _add,
                   ),
@@ -605,8 +605,8 @@ class _ProjectPageState extends State<ProjectPage> {
             controller: _message,
             focusNode: _focusNode,
             hintText: _recipient == null
-                ? '正在准备会话'
-                : '给 ${_recipient!.sender.displayName} 发消息',
+                ? '正在准备任务'
+                : '给 ${_recipient!.sender.displayName} 创建任务',
             enabled: true,
             draftEnabled: !_opening && _recipient != null,
             canSend:

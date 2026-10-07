@@ -239,7 +239,7 @@ class _PrivateGoalPanelState extends State<PrivateGoalPanel> {
         context: context,
         builder: (_) => const DeleteConfirmationDialog(
           title: '删除目标？',
-          description: '停止当前目标并移除目标提示，保留任务清单和聊天记录。',
+          description: '停止当前目标并移除目标提示，保留执行计划和聊天记录。',
           confirmLabel: '删除',
         ),
       );
@@ -251,7 +251,10 @@ class _PrivateGoalPanelState extends State<PrivateGoalPanel> {
     setState(() => _acting = action != 'resume');
     final succeeded = await runUiAction(
       context,
-      () => widget.controller.controlPrivateGoal(action),
+      () => widget.controller.controlPrivateGoal(
+        action,
+        conversationId: store.conversationId,
+      ),
     );
     if (mounted) setState(() => _acting = false);
     return succeeded;

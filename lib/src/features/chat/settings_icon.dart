@@ -38,7 +38,9 @@ enum SettingsIconType {
   check,
   reset,
   tasks,
+  execution,
   taskList,
+  job,
   goal,
   filter,
   sort,
@@ -84,6 +86,13 @@ class _SettingsIconPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     switch (type) {
+      case SettingsIconType.execution:
+        canvas.drawLine(const Offset(6, 7), const Offset(6, 10), pen);
+        canvas.drawLine(const Offset(6, 14), const Offset(6, 17), pen);
+        for (final y in [5.0, 12.0, 19.0]) {
+          canvas.drawCircle(Offset(6, y), 2, pen);
+          canvas.drawLine(Offset(11, y), Offset(y == 12 ? 18 : 20, y), pen);
+        }
       case SettingsIconType.note:
         canvas.drawRRect(
           RRect.fromRectAndRadius(
@@ -248,11 +257,7 @@ class _SettingsIconPainter extends CustomPainter {
             ..cubicTo(5, 4, 19, 4, 21.5, 13),
           pen,
         );
-        canvas.drawCircle(
-          const Offset(12, 14),
-          3.8,
-          Paint()..color = color,
-        );
+        canvas.drawCircle(const Offset(12, 14), 3.8, Paint()..color = color);
       case SettingsIconType.eye:
       case SettingsIconType.eyeOff:
         canvas.drawPath(
@@ -362,6 +367,35 @@ class _SettingsIconPainter extends CustomPainter {
             ..lineTo(13, 16),
           pen,
         );
+      case SettingsIconType.job:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(3, 7, 18, 14),
+            const Radius.circular(2.5),
+          ),
+          pen,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(8, 7)
+            ..lineTo(8, 5)
+            ..quadraticBezierTo(8, 3, 10, 3)
+            ..lineTo(14, 3)
+            ..quadraticBezierTo(16, 3, 16, 5)
+            ..lineTo(16, 7)
+            ..moveTo(3, 13)
+            ..lineTo(10.5, 13)
+            ..moveTo(13.5, 13)
+            ..lineTo(21, 13),
+          pen,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(10.5, 11.5, 3, 4),
+            const Radius.circular(.7),
+          ),
+          pen,
+        );
       case SettingsIconType.tasks:
         canvas.drawCircle(const Offset(12, 12), 9, pen);
         canvas.drawPath(
@@ -372,34 +406,39 @@ class _SettingsIconPainter extends CustomPainter {
           pen,
         );
       case SettingsIconType.taskList:
+        canvas.drawPath(
+          Path()
+            ..moveTo(8, 4.5)
+            ..lineTo(6, 4.5)
+            ..quadraticBezierTo(4, 4.5, 4, 6.5)
+            ..lineTo(4, 19.5)
+            ..quadraticBezierTo(4, 21.5, 6, 21.5)
+            ..lineTo(18, 21.5)
+            ..quadraticBezierTo(20, 21.5, 20, 19.5)
+            ..lineTo(20, 6.5)
+            ..quadraticBezierTo(20, 4.5, 18, 4.5)
+            ..lineTo(16, 4.5),
+          pen,
+        );
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            const Rect.fromLTWH(3, 3, 18, 18),
-            const Radius.circular(3),
+            const Rect.fromLTWH(8, 2, 8, 4.5),
+            const Radius.circular(1.5),
           ),
           pen,
         );
         canvas.drawPath(
           Path()
-            ..moveTo(6, 7.5)
-            ..lineTo(7.2, 8.7)
-            ..lineTo(9.3, 6.5)
-            ..moveTo(12, 7.5)
-            ..lineTo(18, 7.5)
-            ..moveTo(6, 12)
-            ..lineTo(7.2, 13.2)
-            ..lineTo(9.3, 11)
-            ..moveTo(12, 12)
-            ..lineTo(18, 12)
-            ..moveTo(12, 16.5)
-            ..lineTo(16, 16.5),
-          pen,
-        );
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTWH(6.2, 15.2, 2.6, 2.6),
-            const Radius.circular(.6),
-          ),
+            ..moveTo(7, 11)
+            ..lineTo(8.2, 12.2)
+            ..lineTo(10.3, 10)
+            ..moveTo(13, 11)
+            ..lineTo(17, 11)
+            ..moveTo(7, 16.5)
+            ..lineTo(8.2, 17.7)
+            ..lineTo(10.3, 15.5)
+            ..moveTo(13, 16.5)
+            ..lineTo(17, 16.5),
           pen,
         );
       case SettingsIconType.goal:

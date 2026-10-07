@@ -96,7 +96,11 @@ class _SubagentDetailPageState extends State<SubagentDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final question = widget.controller.pendingQuestion;
+    final question = _run == null
+        ? null
+        : widget.controller.questionForConversation(
+            _run!['conversation_id'] as String,
+          );
     final waiting = question?.executionRunId == widget.runId;
     final status = waiting
         ? '等你回复'

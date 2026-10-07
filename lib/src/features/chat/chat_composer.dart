@@ -68,9 +68,7 @@ extension _ChatComposer on _ChatPageState {
             : controller.activeConversation.isTemporary
             ? '和 ${controller.activeAi!.sender.displayName} 临时聊天'
             : '回复 ${controller.activeAi!.sender.displayName}',
-        quote: _editing != null
-            ? _editing!.message.quote
-            : controller.activeConversation.draftQuote,
+        quote: _editing != null ? _editing!.message.quote : null,
         onCancelQuote: _editing == null ? () => _quoteMessage(null) : null,
         focusNode: _focusNode,
         queueing: !isGroup && controller.shouldQueuePrivateMessage,
@@ -80,12 +78,8 @@ extension _ChatComposer on _ChatPageState {
             ? false
             : _editing != null
             ? !_editing!.saving
-            : controller.canEditDraft &&
-                  !_preparingGoal &&
-                  !controller.creatingConversationBranch,
-        enabled: controller.creatingConversationBranch
-            ? false
-            : isGroup
+            : controller.canEditDraft && !_preparingGoal,
+        enabled: isGroup
             ? true
             : _editing != null
             ? !_editing!.saving
@@ -130,10 +124,22 @@ extension _ChatComposer on _ChatPageState {
             !controller.isBusy &&
             _editing == null &&
             controller.pendingMessageQueue.messages.isEmpty &&
-            (controller.runState == ChatRunState.cancelled ||
-                controller.runState == ChatRunState.idle) &&
-            controller.pendingGoal != null,
-        onResume: _continuePending,
+            (controller.activeConversation.isPersonalChat
+                ? controller.runState == ChatRunState.failed ||
+                      controller.runState == ChatRunState.interrupted
+                : (controller.runState == ChatRunState.cancelled ||
+                          controller.runState == ChatRunState.idle) &&
+                      controller.pendingGoal != null),
+        resumeLabel: controller.activeConversation.isPersonalChat
+            ? controller.runState == ChatRunState.failed
+                  ? '重试回复'
+                  : '继续回复'
+            : '继续任务',
+        onResume:
+            controller.activeConversation.isPersonalChat &&
+                controller.runState == ChatRunState.failed
+            ? () => unawaited(_retryFailed())
+            : _continuePending,
         onStop: _stop,
       ),
     );

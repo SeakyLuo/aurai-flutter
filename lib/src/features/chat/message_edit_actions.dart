@@ -15,8 +15,8 @@ extension MessageEditActions on ChatController {
     List<MessageImage>? images,
     List<MessageFile>? files,
   }) async {
-    if (activeConversation.kind == ConversationKind.group) {
-      throw StateError('群聊消息请撤回后重新发送');
+    if (!activeConversation.isTask) {
+      throw StateError('聊天消息请撤回后重新发送');
     }
     if (isBusy ||
         addingImages ||

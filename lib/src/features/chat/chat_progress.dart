@@ -8,7 +8,7 @@ extension _ChatProgress on _ChatPageState {
     if (controller.runState == ChatRunState.cancelled) return;
     final message = errorMessage(error);
     final displayedInConversation =
-        controller.activeConversation.kind != ConversationKind.group &&
+        controller.activeConversation.isTask &&
         controller.groupRuns.isEmpty &&
         (controller.runState == ChatRunState.failed ||
             controller.runState == ChatRunState.interrupted) &&
@@ -22,6 +22,8 @@ extension _ChatProgress on _ChatPageState {
 
   Widget _buildProgress(ChatController controller) =>
       controller.groupRuns.isNotEmpty ||
+          controller.runState == ChatRunState.running ||
+          controller.runState == ChatRunState.stopping ||
           controller.activeConversation.kind == ConversationKind.group
       ? const SizedBox.shrink()
       : ExecutionProgress(

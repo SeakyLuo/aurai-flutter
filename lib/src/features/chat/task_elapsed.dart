@@ -22,6 +22,44 @@ class TaskElapsed extends StatefulWidget {
   State<TaskElapsed> createState() => _TaskElapsedState();
 }
 
+class StoppedTaskElapsed extends StatelessWidget {
+  const StoppedTaskElapsed({
+    super.key,
+    required this.elapsed,
+    this.cancelled = false,
+  });
+
+  final Duration elapsed;
+  final bool cancelled;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 18),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 48,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              cancelled
+                  ? '你在 ${taskDuration(elapsed)}后停止了'
+                  : '用时 ${taskDuration(elapsed)}',
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
+        const Divider(height: 1),
+        const SizedBox(height: 12),
+      ],
+    ),
+  );
+}
+
 class _TaskElapsedState extends State<TaskElapsed> {
   Timer? _timer;
   @override

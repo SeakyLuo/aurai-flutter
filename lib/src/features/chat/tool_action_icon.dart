@@ -146,7 +146,10 @@ class ToolActionIcon extends StatelessWidget {
               'getTaskList' ||
               'updateGoal' ||
               'createTaskList' ||
-              'updateTaskList' ||
+              'updateTaskList' => SettingsIcon(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                type: SettingsIconType.taskList,
+              ),
               'scheduledTask' ||
               'createScheduledTask' ||
               'updateScheduledTask' ||
@@ -159,6 +162,7 @@ class ToolActionIcon extends StatelessWidget {
               ),
               'askUser' => const QuestionIcon(type: QuestionIconType.question),
               'searchTools' ||
+              'loadTools' ||
               'searchWeb' ||
               'searchConversations' ||
               'searchMessages' => SidebarActionIcon(
@@ -187,7 +191,6 @@ class ToolActionIcon extends StatelessWidget {
               'renameProject' ||
               'setProjectIcon' ||
               'setProjectPinned' ||
-              'setProjectMemoryMode' ||
               'setCurrentConversationProject' => const SkillIcon('file'),
               'readWebPage' => const SkillIcon('browser'),
               'setSourceDates' => const SkillIcon('calendar'),

@@ -128,7 +128,7 @@ class PrivateTaskHistory extends StatelessWidget {
               ? (task['steps'] as List? ?? const []).isEmpty
               : task.isEmpty)
             Text(
-              isTaskList ? '暂无任务' : '暂无目标',
+              isTaskList ? '暂无计划' : '暂无目标',
               style: TextStyle(color: colors.onSurfaceVariant),
             ),
         ],

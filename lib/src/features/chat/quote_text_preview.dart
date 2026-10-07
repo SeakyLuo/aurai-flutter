@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../domain/message_summary.dart';
 import 'message_preview_text.dart';
 import '../../domain/markdown_plain_text.dart';
 
@@ -15,7 +16,9 @@ class QuoteTextPreview extends StatelessWidget {
   final TextStyle style;
   @override
   Widget build(BuildContext context) => MessagePreviewText(
-    text: markdown ? text : memberMentionsPlainText(text),
+    text: markdown
+        ? MessageSummary.preview(text, limit: 1024)
+        : memberMentionsPlainText(MessageSummary.preview(text, limit: 1024)),
     style: style,
     formatted: markdown,
     literal: !markdown,

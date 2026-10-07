@@ -33,6 +33,7 @@ List<SourceReference> _sources(Object record, String? tool, String? result) {
     'setSourceDates',
     'readDocument',
     'runSubagent',
+    'runTask',
   }.contains(tool))
     return const [];
   if (result == null) return const [];
@@ -42,7 +43,7 @@ List<SourceReference> _sources(Object record, String? tool, String? result) {
 List<SourceReference> _read(String tool, String result) {
   final output = jsonDecode(result) as Map<String, dynamic>;
   if (tool == 'readDocument' && output['sourceRead'] != true) return const [];
-  final entries = tool == 'runSubagent'
+  final entries = tool == 'runSubagent' || tool == 'runTask'
       ? (output['sources'] as List).cast<Map>()
       : tool != 'readWebPage' && tool != 'readDocument'
       ? (output['results'] as List).cast<Map>()

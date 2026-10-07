@@ -30,6 +30,7 @@ Future<InteractiveMessage> submitProgramCard(
     throw StateError('这张行动卡已结束或不属于当前小程序');
   }
   card.requireViewer(player.id);
+  if (card.anonymous) throw StateError('匿名投票必须由参与者本人提交，不能代投');
   final view = card.viewFor(player.id);
   var button = view.buttons.firstWhere(
     (button) => button['programEvent'] == programAction,

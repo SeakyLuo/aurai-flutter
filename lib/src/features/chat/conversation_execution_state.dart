@@ -1,6 +1,8 @@
 part of 'chat_controller.dart';
 
 extension ConversationExecutionState on ChatController {
+  UserQuestion? questionForConversation(String id) =>
+      _executions.sessions[id]?.pendingQuestion;
   ConversationExecutionSession get _execution => _executions.current;
 
   Future<T> _inConversation<T>(
@@ -85,8 +87,14 @@ extension ConversationExecutionState on ChatController {
   PendingConfirmation? get pendingConfirmation =>
       _execution.pendingConfirmation;
   UserQuestion? get pendingQuestion => _execution.pendingQuestion;
-  set pendingQuestion(UserQuestion? value) =>
-      _execution.pendingQuestion = value;
+  set pendingQuestion(UserQuestion? value) {
+    // An older question finishing must not clear another AI's pending question.
+    if (value == null &&
+        _execution.pendingQuestion?.result.isCompleted == false)
+      return;
+    _execution.pendingQuestion = value;
+  }
+
   Completer<Map<String, Object?>>? get _accessibilityRequest =>
       _execution.accessibilityRequest;
   set _accessibilityRequest(Completer<Map<String, Object?>>? value) =>

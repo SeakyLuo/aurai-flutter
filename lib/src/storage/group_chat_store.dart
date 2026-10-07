@@ -16,7 +16,10 @@ import '../domain/contact_name_order.dart';
 import '../domain/message_sender.dart';
 import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
+import 'personal_chats.dart';
+import 'system_notice.dart';
 
+part 'group_ai_profile_storage.dart';
 part 'group_management_store.dart';
 part 'group_avatar_members.dart';
 part 'group_mute_store.dart';
@@ -424,66 +427,6 @@ class GroupChatStore {
       rows[0].single,
     );
   }
-
-  Future<void> createAi(AiProfile profile, {String ownerId = 'user:local'}) =>
-      database.transaction((txn) async {
-        if (profile.sender.kind != MessageSenderKind.agent)
-          throw ArgumentError('AI 配置必须属于 AI 身份');
-        await txn.insert('message_senders', _senderRow(profile.sender));
-        await txn.insert('ai_profiles', _profileRow(profile));
-        if (!profile.isTemporary)
-          await ContactRelationships.befriend(txn, ownerId, profile.sender.id);
-      });
-
-  Future<String> updateAi(
-    AiProfile profile, {
-    bool addToMyContacts = false,
-  }) => database.transaction((txn) async {
-    if (profile.sender.id == MessageSender.aurai.id &&
-        profile.sender.archived) {
-      throw StateError('内置 Aurai 不能归档');
-    }
-    if (profile.sender.kind != MessageSenderKind.agent)
-      throw ArgumentError('AI 配置必须属于 AI 身份');
-    final previousSender = (await txn.query(
-      'message_senders',
-      columns: ['name'],
-      where: 'id = ?',
-      whereArgs: [profile.sender.id],
-      limit: 1,
-    )).single;
-    final previousName = previousSender['name'] as String;
-    final count = await txn.update(
-      'ai_profiles',
-      {..._profileRow(profile)..remove('created_at')},
-      where: 'sender_id = ? AND updated_at = ?',
-      whereArgs: [
-        profile.sender.id,
-        (profile.previousUpdatedAt ?? profile.updatedAt).microsecondsSinceEpoch,
-      ],
-    );
-    if (count != 1) throw StateError('AI 资料已变化，请重新打开后修改');
-    await txn.update(
-      'message_senders',
-      _senderRow(profile.sender),
-      where: 'id = ? AND kind = ?',
-      whereArgs: [profile.sender.id, 'agent'],
-    );
-    await refreshGroupNoticeName(
-      txn,
-      profile.sender.id,
-      previousName,
-      profile.sender.name,
-    );
-    if (addToMyContacts && !profile.isTemporary && !profile.sender.archived) {
-      await ContactRelationships.befriend(
-        txn,
-        MessageSender.localUser.id,
-        profile.sender.id,
-      );
-    }
-    return previousName;
-  });
 
   // Archive an identity rather than deleting the author of historical messages.
   Future<void> archiveAi(String senderId) => database.transaction((txn) async {

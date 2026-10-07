@@ -3,6 +3,9 @@ import 'interactive_completion.dart';
 import 'package:collection/collection.dart';
 import 'dart:async';
 import '../domain/interactive_selection.dart';
+import '../domain/question_batch.dart';
+import '../domain/question_reply_signals.dart';
+import 'question_answer_message.dart';
 import 'message_callbacks.dart';
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
@@ -82,6 +85,13 @@ class InteractiveMessageStore {
         button = InteractiveSelection(
           Map<String, Object?>.from(config),
         ).resolve(button, inputValue);
+      } else if (button['questions'] case final List questions) {
+        final answers = QuestionBatch(questions).resolve(inputValue);
+        button = {
+          ...button,
+          'value': answers,
+          'label': '已回答 ${answers.length} 个问题',
+        };
       } else if (inputValue != null) {
         if (rows.single['kind'] != 'html_game' ||
             action != 'submit' ||
@@ -100,7 +110,9 @@ class InteractiveMessageStore {
               'submit' => card.engine.submit(actor.id, actor.name, {
                 ...button,
                 if (reason != null) 'reason': reason.trim(),
-                if (inputValue != null && button['selection'] == null)
+                if (inputValue != null &&
+                    button['selection'] == null &&
+                    button['questions'] == null)
                   'value': inputValue,
               }),
               'nextRound' => card.engine.nextRound(actor.id),
@@ -178,6 +190,7 @@ class InteractiveMessageStore {
           'selections': button['selections'],
           'value': button['value'],
         },
+        if (button['questions'] != null) 'value': button['value'],
         'updatedAt': now,
       };
       var next = InteractiveMessage(
@@ -361,7 +374,17 @@ class InteractiveMessageStore {
           },
         );
       }
-      final notice = card.hasInteraction
+      final notice = button['questions'] != null
+          ? await writeQuestionAnswerMessage(
+              txn,
+              conversationId: conversationId,
+              messageId: messageId,
+              creatorId: rows.single['sender_id'] as String,
+              actor: actor,
+              card: card,
+              answers: button['value'] as List,
+            )
+          : card.hasInteraction
           ? null
           : await writeNotice(
               txn,
@@ -382,6 +405,7 @@ class InteractiveMessageStore {
                       ?.cast<String>(),
             );
       if (notice != null &&
+          button['questions'] == null &&
           callbackId == null &&
           actor.id == MessageSender.localUser.id) {
         final conversations = await txn.query(
@@ -421,6 +445,13 @@ class InteractiveMessageStore {
       );
     });
     await programChange?.publish();
+    if (result.card.buttons.any((b) => b['questions'] != null) &&
+        result.card.completed) {
+      QuestionReplySignals.complete(
+        messageId,
+        result.card.choices[actor.id]!['value'] as List,
+      );
+    }
     return result;
   }
 

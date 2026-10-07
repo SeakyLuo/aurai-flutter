@@ -7,6 +7,7 @@ import 'miniapp_share_notice.dart';
 import '../../html_games/miniapp_favorites.dart';
 import '../../html_games/miniapp_library_store.dart';
 import 'message_swipe_quote.dart';
+import 'quote_focus_view.dart';
 import '../../app/glass_notice.dart';
 import 'remove_favorite.dart';
 import '../../storage/starred_messages.dart';
@@ -39,17 +40,20 @@ import 'markdown_code_block.dart';
 import 'cjk_strong_syntax.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'organized_task_activities.dart';
 import 'package:flutter/foundation.dart';
 import '../../app/global_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import '../../domain/agent_models.dart';
+import '../../domain/goal_completion.dart';
 import '../../domain/source_reference.dart';
 import '../../domain/web_sources.dart';
 import '../../platform/aurai_platform.dart';
 import 'image_attachments.dart';
 import 'task_summary_view.dart';
 import 'run_timeline_sheet.dart';
+import '../../storage/run_timeline_store.dart';
 import '../../domain/model_failure.dart';
 import 'task_failure_card.dart';
 import 'reasoning_message_view.dart';
@@ -76,6 +80,7 @@ class MessageItem extends StatefulWidget {
     this.streaming = false,
     this.readOnly = false,
     this.groupBubble = false,
+    this.showSenderAvatar = true,
     this.onQuote,
     this.onRecall,
     this.onInteractiveClick,
@@ -86,11 +91,11 @@ class MessageItem extends StatefulWidget {
     this.onOpenMember,
     this.onQuickReply,
     this.onRetry,
-    this.onBranch,
     this.availableSources = const {},
     this.mentionMembers = const {},
     this.interactiveMembers = const {},
     this.excludedActivityMessageId,
+    this.previewMaxHeight,
   });
   final AgentMessage message;
   final PrivateReplyPart? replyPart;
@@ -105,17 +110,23 @@ class MessageItem extends StatefulWidget {
   })?
   onInteractiveClick;
   final Future<InteractiveMessage> Function(String)? onInteractiveRetry;
-  final void Function(AgentMessage message, {String? selectedText})? onQuote;
+  final void Function(
+    AgentMessage message, {
+    String? selectedText,
+    QuoteFocusVisual? visual,
+  })?
+  onQuote;
   final Future<void> Function(AgentMessage)? onRecall;
   final ValueChanged<String>? onOpenQuote;
   final ValueChanged<String>? onOpenMember;
   final Future<void> Function(AgentMessage message, String key)? onQuickReply;
   final Future<void> Function(AgentMessage message)? onRetry;
-  final Future<void> Function(AgentMessage message)? onBranch;
   final String? excludedActivityMessageId;
+  final double? previewMaxHeight;
   final bool streaming;
   final bool readOnly;
   final bool groupBubble;
+  final bool showSenderAvatar;
   final Widget? htmlView;
   final VoidCallback? onLocate;
   final Map<String, SourceReference> availableSources;
@@ -135,6 +146,7 @@ class _MessageItemState extends State<MessageItem> {
       setState(() => _retryingFailure = value);
   String? _selectedText;
   final _bubbleKey = GlobalKey();
+  final _quoteSourceKey = GlobalKey();
   final _selectionKey = GlobalKey<GroupMessageSelectionState>();
   Timer? _copyResetTimer;
 
@@ -165,6 +177,7 @@ class _MessageItemState extends State<MessageItem> {
     if (oldWidget.message != message ||
         (oldWidget.replyPart == null) != (widget.replyPart == null) ||
         oldWidget.groupBubble != widget.groupBubble ||
+        oldWidget.previewMaxHeight != widget.previewMaxHeight ||
         oldWidget.readOnly != widget.readOnly ||
         oldWidget.onLocate != widget.onLocate ||
         !mapEquals(oldWidget.mentionMembers, widget.mentionMembers) ||
@@ -187,14 +200,21 @@ class _MessageItemState extends State<MessageItem> {
                   !message.isReasoning
               ? MessageSwipeQuote(
                   belowAvatar:
+                      widget.showSenderAvatar &&
                       widget.groupBubble &&
                       message.role == AgentMessageRole.assistant &&
                       message.sender != null &&
                       message.interactive?.systemPresentation != true,
-                  onQuote: () => widget.onQuote!(message),
-                  child: _buildMessage(context),
+                  onQuote: () => _quote(),
+                  child: KeyedSubtree(
+                    key: _quoteSourceKey,
+                    child: _buildMessage(context),
+                  ),
                 )
-              : _buildMessage(context),
+              : KeyedSubtree(
+                  key: _quoteSourceKey,
+                  child: _buildMessage(context),
+                ),
         );
 
   Widget _buildMessage(BuildContext context) =>
@@ -219,6 +239,8 @@ class _MessageItemState extends State<MessageItem> {
       : Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (widget.groupBubble && message.taskSummary != null)
+              OrganizedTaskActivities(summary: message.taskSummary!),
             if (!widget.groupBubble &&
                 (widget.replyPart == null
                     ? message.taskSummary != null
@@ -271,21 +293,25 @@ class _MessageItemState extends State<MessageItem> {
                 },
                 onQuote: widget.onQuote == null
                     ? null
-                    : () =>
-                          widget.onQuote!(message, selectedText: _selectedText),
+                    : () => _quote(selectedText: _selectedText),
                 createdAt: message.createdAt,
+                goalElapsed: widget.replyPart == null
+                    ? goalCompletionElapsed(message.taskSummary)
+                    : widget.replyPart!.goalElapsed,
                 sources: _sources,
                 onOpenLink: (href) => _openLink(context, href),
               ),
           ],
         );
 
-  Widget _withActions(Widget child) => MenuPressHighlight(
-    keepHighlightWhileOpen: !_bubbleTextSelection,
-    onLongPressStart: (_) => _openBubbleMenu(),
-    borderRadius: BorderRadius.circular(22),
-    child: child,
-  );
+  Widget _withActions(Widget child) => widget.previewMaxHeight != null
+      ? child
+      : MenuPressHighlight(
+          keepHighlightWhileOpen: !_bubbleTextSelection,
+          onLongPressStart: (_) => _openBubbleMenu(),
+          borderRadius: BorderRadius.circular(22),
+          child: child,
+        );
 
   Widget _withGroupFavorite(Widget child) =>
       widget.groupBubble && !widget.readOnly && !message.isSystem
@@ -431,20 +457,22 @@ class _MessageItemState extends State<MessageItem> {
                               horizontal: 20,
                               vertical: 14,
                             ),
-                            child: GroupMentionText(
-                              text: message.text,
-                              members: widget.groupBubble
-                                  ? widget.mentionMembers
-                                  : const {},
-                              onOpen: widget.onOpenMember,
-                              style: TextStyle(
-                                color:
-                                    Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? const Color(0xffeee8f7)
-                                    : const Color(0xff352b43),
-                                fontSize: widget.groupBubble ? 15 : 16,
-                                height: widget.groupBubble ? 1.4 : 1.55,
+                            child: _previewContent(
+                              GroupMentionText(
+                                text: message.text,
+                                members: widget.groupBubble
+                                    ? widget.mentionMembers
+                                    : const {},
+                                onOpen: widget.onOpenMember,
+                                style: TextStyle(
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? const Color(0xffeee8f7)
+                                      : const Color(0xff352b43),
+                                  fontSize: widget.groupBubble ? 15 : 16,
+                                  height: widget.groupBubble ? 1.4 : 1.55,
+                                ),
                               ),
                             ),
                           ),
@@ -508,6 +536,7 @@ class _MessageItemState extends State<MessageItem> {
               key: ValueKey(page?.sequence),
               messageId: message.id,
               card: page?.snapshot ?? message.interactive!,
+              showQuestionRecipient: message.isGroupMessage,
               members: widget.interactiveMembers,
               onOpenMember: widget.onOpenMember,
               historical: page?.snapshot != null,
@@ -547,6 +576,7 @@ class _MessageItemState extends State<MessageItem> {
             removeBottom: true,
             child: MarkdownLinkUnderlines(
               child: MarkdownBody(
+                // Chat messages use single newlines intentionally, even when Markdown is enabled.
                 softLineBreak: true,
                 blockSyntaxes: [ReplyImageSyntax()],
                 inlineSyntaxes: [
@@ -668,7 +698,7 @@ class _MessageItemState extends State<MessageItem> {
       alignment: widget.groupBubble ? Alignment.centerLeft : Alignment.center,
       child: Container(
         margin: widget.groupBubble
-            ? const EdgeInsets.only(top: 6)
+            ? EdgeInsets.zero
             : const EdgeInsets.fromLTRB(18, 8, 18, 8),
         constraints: message.htmlGame?.width == null
             ? null
@@ -693,7 +723,7 @@ class _MessageItemState extends State<MessageItem> {
                     horizontal: 16,
                     vertical: 12,
                   ),
-                  child: content,
+                  child: _previewContent(content),
                 ),
               ),
             ),
@@ -739,69 +769,4 @@ class _MessageItemState extends State<MessageItem> {
           (widget.groupBubble && !message.markdown)
       ? memberMentionsPlainText(text)
       : markdownPlainText(text);
-
-  Future<void> _openLink(BuildContext context, String? href) async {
-    final memberLink = Uri.tryParse(href ?? '');
-    if (memberLink?.scheme == 'aurai' && memberLink?.host == 'miniapp') {
-      await openMiniappLink(context, memberLink!);
-      return;
-    }
-    if (memberLink?.scheme == 'aurai' &&
-        memberLink?.host == 'member' &&
-        memberLink!.pathSegments.length == 1) {
-      widget.onOpenMember?.call(memberLink.pathSegments.single);
-      return;
-    }
-    final file = href == null
-        ? null
-        : SourceReference.fromLocalLink(href, '本地文件');
-    if (file != null) {
-      try {
-        await AuraiPlatform.instance.openSourceFile(file.url);
-      } on PlatformException catch (error) {
-        if (context.mounted)
-          _notice(
-            context,
-            error.message ?? '无法打开此文件：${errorMessage(error)}',
-            kind: ToastKind.error,
-          );
-      } on Object catch (error) {
-        if (context.mounted)
-          _notice(
-            context,
-            '无法打开此文件：${errorMessage(error)}',
-            kind: ToastKind.error,
-          );
-      }
-      return;
-    }
-    final uri = Uri.tryParse(href ?? '');
-    if (uri == null ||
-        !{'https', 'http'}.contains(uri.scheme) ||
-        uri.host.isEmpty) {
-      _notice(context, '无法打开此链接', kind: ToastKind.error);
-      return;
-    }
-    try {
-      await AuraiPlatform.instance.startIntent({
-        'action': 'android.intent.action.VIEW',
-        'data': uri.toString(),
-      });
-    } on Object catch (error) {
-      if (context.mounted)
-        _notice(
-          context,
-          '无法打开链接，请稍后再试：${errorMessage(error)}',
-          kind: ToastKind.error,
-        );
-    }
-  }
-
-  void _notice(
-    BuildContext context,
-    String text, {
-    ToastKind kind = ToastKind.info,
-  }) => ScaffoldMessenger.of(
-    context,
-  ).showToast(SnackBar(content: Text(text)), kind: kind);
 }

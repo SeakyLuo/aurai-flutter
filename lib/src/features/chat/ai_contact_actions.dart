@@ -19,7 +19,7 @@ Future<void> openAiChat(
   } on Object catch (error) {
     if (context.mounted)
       ScaffoldMessenger.of(context).showToast(
-        SnackBar(content: Text('无法打开会话，请稍后重试：${errorMessage(error)}')),
+        SnackBar(content: Text('无法打开私聊，请稍后重试：${errorMessage(error)}')),
         kind: ToastKind.error,
       );
   }

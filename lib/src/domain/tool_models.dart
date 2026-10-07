@@ -12,6 +12,7 @@ class ToolDefinition {
   const ToolDefinition({
     required this.name,
     required this.description,
+    this.summary = '',
     required this.inputSchema,
     required this.safety,
     required this.capabilityId,
@@ -27,6 +28,21 @@ class ToolDefinition {
     this.authorizationScope,
     this.authorizationLabel,
   });
+
+  /// Built-in discovery copy is stored in the database and applied to definitions.
+  final String summary;
+
+  String get discoverySummary {
+    if (summary.trim().isNotEmpty) return summary;
+    final text = description.trim();
+    final characters = text.runes;
+    return characters.length <= 300
+        ? text
+        : '${String.fromCharCodes(characters.take(299))}…';
+  }
+
+  String get modelDescription =>
+      description.trim().isNotEmpty ? description : summary;
 
   final String name;
   final String description;

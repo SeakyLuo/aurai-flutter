@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import 'tool_summary_seeds.dart';
 
 const toolCustomizationSchema = '''CREATE TABLE tool_customizations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -6,6 +7,7 @@ const toolCustomizationSchema = '''CREATE TABLE tool_customizations (
   icon TEXT NOT NULL,
   title TEXT,
   description TEXT,
+  summary TEXT,
   input_schema_json TEXT
 )''';
 
@@ -38,8 +40,16 @@ const toolNamesByDefaultIcon = <String, List<String>>{
     'addGroupFavorite',
     'removeGroupFavorite',
   ],
-  'announcement': ['readGroupAnnouncement', 'updateGroupAnnouncement'],
+  'announcement': [
+    'readGroupAnnouncement',
+    'updateGroupAnnouncement',
+    'dismissGroupNotice',
+  ],
   'miniapp': [
+    'readHtmlData',
+    'updateHtmlData',
+    'readHtmlProgram',
+    'submitHtmlProgramEvent',
     'listHtmlApps',
     'readHtmlAppData',
     'writeHtmlAppData',
@@ -60,6 +70,9 @@ const toolNamesByDefaultIcon = <String, List<String>>{
     'withdrawHtmlApp',
   ],
   'conversation': [
+    'submitInteractiveChoice',
+    'finishCurrentAction',
+    'finishCurrentSpeech',
     'sendInteractiveMessage',
     'clickInteractiveMessage',
     'readInteractiveMessage',
@@ -71,6 +84,9 @@ const toolNamesByDefaultIcon = <String, List<String>>{
     'sendQuickReply',
   ],
   'group': [
+    'readGroupPersonalDetails',
+    'updateGroupPersonalDetails',
+    'setGroupAdministrators',
     'sendGroupMessage',
     'wakeGroupMember',
     'setGroupMemberMute',
@@ -132,6 +148,15 @@ const toolNamesByDefaultIcon = <String, List<String>>{
     'runSkill',
   ],
   'task': [
+    'runTask',
+    'runSubagent',
+    'createGoal',
+    'getGoal',
+    'updateGoal',
+    'clearGoal',
+    'createTaskList',
+    'getTaskList',
+    'updateTaskList',
     'scheduledTask',
     'createScheduledTask',
     'updateScheduledTask',
@@ -143,6 +168,7 @@ const toolNamesByDefaultIcon = <String, List<String>>{
   'question': ['askUser'],
   'search': [
     'searchTools',
+    'loadTools',
     'searchWeb',
     'searchConversations',
     'searchMessages',
@@ -151,6 +177,10 @@ const toolNamesByDefaultIcon = <String, List<String>>{
   'music': ['generateMusic'],
   'app-search': ['findApps', 'openAppPage', 'launchApp', 'startIntent'],
   'file': [
+    'listProjectTree',
+    'searchProjectText',
+    'copyDocument',
+    'moveDocument',
     'getDocumentFolders',
     'requestDocumentFolder',
     'searchFiles',
@@ -161,7 +191,6 @@ const toolNamesByDefaultIcon = <String, List<String>>{
     'createProject',
     'setProjectIcon',
     'setProjectPinned',
-    'setProjectMemoryMode',
     'setCurrentConversationProject',
   ],
   'browser': ['readWebPage'],
@@ -182,8 +211,26 @@ const toolNamesByDefaultIcon = <String, List<String>>{
   ],
   'create-file': ['createTextFile'],
   'share-file': ['shareFile', 'deliverFile'],
-  'code': ['inspectAndroidApi'],
-  'terminal': ['shell', 'executeShizuku', 'executeAndroidScript'],
+  'code': [
+    'inspectAndroidApi',
+    'readGitConfiguration',
+    'updateGitConfiguration',
+    'getProjectGitStatus',
+    'getProjectGitDiff',
+    'initializeProjectGit',
+    'setProjectGitRemote',
+    'commitProjectGit',
+    'pullProjectGit',
+    'pushProjectGit',
+    'mergeProjectBranch',
+    'checkoutProjectBranch',
+  ],
+  'terminal': [
+    'shell',
+    'executeShizuku',
+    'executeAndroidScript',
+    'runProjectCommand',
+  ],
   'permission': ['requestShizukuAccess', 'requestAccessibilityAccess'],
   'device': [
     'getDeviceExtensions',
@@ -213,7 +260,7 @@ const toolNamesByDefaultIcon = <String, List<String>>{
   'notification': ['getNotifications', 'sendNotification'],
   'settings': ['openSettings'],
   'clock': ['wait'],
-  'brain': ['hideThinking'],
+  'brain': ['hideThinking', 'compactContext'],
   'automation': [
     'readRequestAdapters',
     'previewRequestAdapter',
@@ -232,4 +279,8 @@ Future<void> seedToolCustomizations(DatabaseExecutor db) async {
     }
   }
   await batch.commit(noResult: true);
+  await seedToolSummaries(db, toolNamesByDefaultIcon);
 }
+
+Future<void> seedToolSummaryDefaults(DatabaseExecutor db) =>
+    seedToolSummaries(db, toolNamesByDefaultIcon);

@@ -15,11 +15,7 @@ extension PeerConversations on ChatController {
     final conversation = await _store.load(id);
     final members = await groupStore.members(id);
     conversation.beginSharedContext();
-    final history = await _store.reader.messages(
-      id,
-      forModel: true,
-      afterCheckpoint: conversation.contextSummary?.throughMessageId,
-    );
+    final history = await _store.reader.messages(id, forModel: true);
     final session = _PeerSession(conversation);
     session.dispatcher = GroupDispatcher(
       history: history,
@@ -128,7 +124,12 @@ extension PeerConversations on ChatController {
         '像正常朋友聊天，结合性格决定是否回复，不必每条都接，不要为续聊反复提问或客套。'
         '普通输出是私下思考，不会发送给好友。发言必须调用 sendConversationMessage，conversationId 使用当前会话；可以连续发多条。'
         '没有要说的就输出 [[NO_REPLY]]，等待对方新消息；不要循环查消息。私聊创建本身不强迫发言。';
-    final memory = await aiMemory(profile, scope: conversation.id);
+    final memory = await aiMemory(
+      profile,
+      scope: conversation.projectId == null
+          ? conversation.id
+          : 'project:${conversation.projectId}',
+    );
     final skills = await aiSkills(senderId);
     final project = conversation.projectId == null
         ? null
@@ -138,16 +139,12 @@ extension PeerConversations on ChatController {
         ? OpenAiResponsesProvider(
             config,
             systemPrompt: prompt,
-            summaryConfig: modelSettings.activeConfig,
             sharedContext: conversation.sharedContext,
-            sharedContextOwnerId: senderId,
           )
         : DeepSeekResponsesProvider(
             config,
             systemPrompt: prompt,
-            summaryConfig: modelSettings.activeConfig,
             sharedContext: conversation.sharedContext,
-            sharedContextOwnerId: senderId,
           );
     final runId = await _store.runs.start(
       conversation.id,
@@ -236,10 +233,12 @@ extension PeerConversations on ChatController {
             conversation.contextSummary = summary;
           }
         },
+        organizeTask: () => memory.organizeTask(runId),
+        cancelOrganization: () => memory.cancelTaskOrganization(runId),
         personalContext: () async => [
           profile.preferences.responses.instructions,
           profile.preferences.customInstructions,
-          await memory.sharedContext(),
+          await memory.sharedContext(query: snapshot.last.text),
         ].join('\n\n'),
         onStepsChanged: (_) {},
         onTurnStarted: () async {

@@ -518,6 +518,7 @@ class ModelRequest {
     this.onContextSummary,
     this.onPrivateContextSummary,
     this.onCompactionChanged,
+    this.organizeTask,
     this.onTextChanged,
     this.onReasoningChanged,
     this.onProcessingStarted,
@@ -540,6 +541,7 @@ class ModelRequest {
   final Future<void> Function(ContextSummary)? onContextSummary;
   final Future<void> Function(ContextSummary)? onPrivateContextSummary;
   final void Function(bool)? onCompactionChanged;
+  final Future<String> Function()? organizeTask;
   final List<ToolResult> toolResults;
   final List<String> userUpdates;
   final List<Map<String, Object?>> userMessageInput;

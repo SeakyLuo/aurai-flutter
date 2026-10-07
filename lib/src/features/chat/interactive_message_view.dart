@@ -14,6 +14,8 @@ import 'question_sheet.dart';
 import 'vote_message_heading.dart';
 import 'vote_selection_hint.dart';
 import 'question_message_heading.dart';
+import 'question_batch_card.dart';
+import 'dart:convert';
 
 class InteractiveMessageView extends StatefulWidget {
   const InteractiveMessageView({
@@ -31,6 +33,7 @@ class InteractiveMessageView extends StatefulWidget {
     this.onStatistics,
     this.members = const {},
     this.onOpenMember,
+    this.showQuestionRecipient = true,
   });
   final InteractiveMessage card;
   final String? messageId;
@@ -40,6 +43,7 @@ class InteractiveMessageView extends StatefulWidget {
   final String actorId;
   final bool readOnly;
   final bool historical;
+  final bool showQuestionRecipient;
   final Future<InteractiveMessage> Function(String eventId)? onRetry;
   final Future<InteractiveMessage> Function(
     int revision,
@@ -105,7 +109,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
       );
       if (result != null &&
           widget.messageId != null &&
-          button['selection'] != null) {
+          (button['selection'] != null || button['questions'] != null)) {
         await InteractiveSelectionDrafts.instance.save(
           widget.messageId!,
           widget.actorId,
@@ -254,8 +258,8 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         selectionHint != null &&
         (card.body == selectionHint || card.body == '$selectionHint。');
     final question = _card.isQuestion;
-    final recipient = question
-        ? widget.members[(_card.interaction['actors'] as List).single]
+    final recipient = question && widget.showQuestionRecipient
+        ? widget.members[(_card.interaction['actors'] as List?)?.single]
         : null;
     final answered =
         sharedView?['self'] != null ||
@@ -298,6 +302,39 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               ((sharedView?['choices'] as List?)?.firstOrNull as Map?))
         : null;
     final compactAnswered = question && answer != null;
+    final batchButton = card.buttons
+        .where((button) => button['questions'] != null)
+        .firstOrNull;
+    if (batchButton != null) {
+      final readOnly =
+          widget.readOnly ||
+          widget.historical ||
+          _card.snapshotView != null ||
+          card.closed ||
+          sharedView?['phase'] != 'collecting' ||
+          !(_card.interaction['actors'] as List).contains(widget.actorId);
+      return QuestionBatchCard(
+        key: ValueKey((widget.messageId, widget.actorId)),
+        questions: batchButton['questions'] as List,
+        buttonId: batchButton['id'] as String,
+        actorId: widget.actorId,
+        version: jsonEncode([card.revision, batchButton['questions']]),
+        messageId: widget.messageId,
+        answer: answer,
+        readOnly: readOnly,
+        recipient: recipient,
+        onOpenMember: widget.onOpenMember,
+        trailing: widget.titleTrailing,
+        status: answered
+            ? '已回答'
+            : card.closed || sharedView?['completed'] == true
+            ? '已结束'
+            : '待回答',
+        onSubmit: (value) => _click(batchButton, value: value),
+        onSave: (version, data) =>
+            _saveSelection(batchButton['id'] as String, version, {}, data),
+      );
+    }
     Widget questionHeading() => QuestionMessageHeading(
       title: card.title,
       description: card.body,
@@ -366,7 +403,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                 status: card.closed || sharedView?['closed'] == true
                     ? '已结束'
                     : sharedView?['completed'] == true
-                    ? '本轮已完成'
+                    ? '已完成'
                     : '进行中',
                 trailing: widget.titleTrailing,
               )

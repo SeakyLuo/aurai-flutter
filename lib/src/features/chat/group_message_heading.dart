@@ -12,6 +12,7 @@ class GroupMessageHeading extends StatelessWidget {
     required this.onOpenProfile,
     this.onMention,
     this.showName = true,
+    this.showAvatar = true,
     this.groupId,
     this.trailingInset = rightInset,
   });
@@ -24,6 +25,7 @@ class GroupMessageHeading extends StatelessWidget {
   static const ownContentInset = leftInset + avatarSize + avatarGap + 18;
 
   final bool showName;
+  final bool showAvatar;
   final double trailingInset;
   final String? groupId;
   final MessageSender sender;
@@ -44,17 +46,29 @@ class GroupMessageHeading extends StatelessWidget {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Semantics(
-          button: true,
-          label: '查看${sender.displayName}的资料',
-          child: InkWell(
-            onTap: onOpenProfile,
-            onLongPress: onMention,
-            borderRadius: BorderRadius.circular(18),
-            child: MemberAvatar(sender: sender, size: avatarSize),
+        if (showAvatar)
+          Padding(
+            padding: EdgeInsets.only(
+              top:
+                  nameVisible ||
+                      InteractivePageScope.of(context)?.control != null
+                  ? 0
+                  : 12 +
+                        MediaQuery.textScalerOf(context).scale(15) * 1.4 / 2 -
+                        avatarSize / 2,
+            ),
+            child: Semantics(
+              button: true,
+              label: '查看${sender.displayName}的资料',
+              child: InkWell(
+                onTap: onOpenProfile,
+                onLongPress: onMention,
+                borderRadius: BorderRadius.circular(18),
+                child: MemberAvatar(sender: sender, size: avatarSize),
+              ),
+            ),
           ),
-        ),
-        const SizedBox(width: avatarGap),
+        if (showAvatar) const SizedBox(width: avatarGap),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,6 +97,9 @@ class GroupMessageHeading extends StatelessWidget {
                       control,
                   ],
                 ),
+              if (nameVisible ||
+                  InteractivePageScope.of(context)?.control != null)
+                const SizedBox(height: 6),
               child,
             ],
           ),

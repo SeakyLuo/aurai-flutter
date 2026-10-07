@@ -1,6 +1,7 @@
 import 'interactive_button_icons.dart';
 import 'anonymous_vote.dart';
 import 'interactive_selection.dart';
+import 'question_batch.dart';
 import 'interaction_expression.dart';
 import 'shared_interaction.dart';
 
@@ -38,9 +39,17 @@ class InteractiveMessage {
   }
 
   void validateTransport({required bool html}) {
-    if (anonymous &&
-        (!isVote || html || participation['_programMessage'] != null)) {
-      throw ArgumentError('匿名投票仅用于原生投票卡片，不支持需要读取参与者身份的小程序行动卡或 HTML 交互');
+    if (buttons.any((button) => button['questions'] != null) &&
+        (html ||
+            !shared ||
+            (interaction['actors'] as List?)?.length != 1 ||
+            buttons.length != 1 ||
+            states.isNotEmpty ||
+            isVote)) {
+      throw ArgumentError('问题组使用原生卡片、一个提交按钮和一位回答人，不用于投票');
+    }
+    if (anonymous && (!isVote || html)) {
+      throw ArgumentError('匿名投票需要原生投票卡片，不能用于 HTML 输入或非投票行动');
     }
     final allButtons = [
       ...buttons,
@@ -72,9 +81,13 @@ class InteractiveMessage {
   bool get showHistory =>
       !isQuestion && (participation['showHistory'] as bool? ?? !isVote);
   bool get isQuestion =>
+      buttons.any((button) => button['questions'] != null) ||
       !isVote &&
-      (interaction['actors'] as List?)?.length == 1 &&
-      buttons.any((button) => button['selection'] != null);
+          (interaction['actors'] as List?)?.length == 1 &&
+          buttons.any(
+            (button) =>
+                button['selection'] != null || button['questions'] != null,
+          );
   bool get shared => interaction.isNotEmpty;
   bool get hasInteraction => snapshotView != null || shared || singleChoice;
   Map<String, Object?> get interactionDefinition => shared
@@ -277,6 +290,7 @@ class InteractiveMessage {
             'action': 'acknowledge',
             'repeatable': false,
             'disabled': true,
+            if (button['questions'] != null) 'questions': button['questions'],
             if (button['style'] != null) 'style': button['style'],
           },
       ],
@@ -528,6 +542,17 @@ class InteractiveMessage {
         if (b['action'] != 'submit' || b['input'] != null)
           throw ArgumentError('选择列表使用 submit，不能同时配置页面输入');
         InteractiveSelection(Map<String, Object?>.from(config)).validate();
+      }
+      if (b['questions'] != null && b['questions'] is! List) {
+        throw ArgumentError('questions 必须是问题列表');
+      }
+      if (b['questions'] case final List questions) {
+        if (b['action'] != 'submit' ||
+            b['input'] != null ||
+            b['selection'] != null) {
+          throw ArgumentError('问题组使用 submit，不能同时配置 selection 或 input');
+        }
+        QuestionBatch(questions).validate();
       }
       if (b['completedLabel'] != null &&
           (b['completedLabel'] is! String ||

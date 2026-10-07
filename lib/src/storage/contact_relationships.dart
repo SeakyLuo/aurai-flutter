@@ -1,3 +1,4 @@
+import 'personal_chats.dart';
 import 'package:sqflite/sqflite.dart';
 import '../domain/message_sender.dart';
 import '../features/chat/conversation.dart';
@@ -89,6 +90,17 @@ class ContactRelationships {
       limit: 1,
     );
     if (friendship.isEmpty) throw StateError('请先添加好友，再创建私聊');
+    if (owner == MessageSender.localUser.id ||
+        friend == MessageSender.localUser.id) {
+      final aiId = owner == MessageSender.localUser.id ? friend : owner;
+      final senders = await txn.query(
+        'message_senders',
+        where: 'id = ?',
+        whereArgs: [aiId],
+      );
+      final sender = MessageSender.fromRow(senders.single);
+      return PersonalChats.open(txn, aiId, sender.displayName);
+    }
     final pair = [owner, friend]..sort();
     final existing = await txn.query(
       'direct_conversation_pairs',

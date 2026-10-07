@@ -41,12 +41,13 @@ class ConversationReader {
     Conversation? after,
     int limit = pageSize,
     bool archived = false,
+    bool tasksOnly = false,
     ConversationKind? kind,
   }) async {
     final rows = await database.query(
       'conversations',
       where:
-          '$visibleConversation AND $localUserConversation AND archived = ?${kind == null ? '' : ' AND kind = ?'}${after == null ? '' : ' AND (pinned < ? OR (pinned = ? AND (MAX(updated_at, draft_updated_at) < ? OR (MAX(updated_at, draft_updated_at) = ? AND id < ?))))'}',
+          '$visibleConversation AND $localUserConversation AND archived = ?${tasksOnly ? " AND kind = 'direct' AND personal_chat = 0" : ''}${kind == null ? '' : ' AND kind = ?'}${after == null ? '' : ' AND (pinned < ? OR (pinned = ? AND (MAX(updated_at, draft_updated_at) < ? OR (MAX(updated_at, draft_updated_at) = ? AND id < ?))))'}',
       whereArgs: [
         archived ? 1 : 0,
         if (kind != null) kind.name,
@@ -379,7 +380,7 @@ class ConversationReader {
       where: selectionWhere,
       whereArgs: selectionArgs,
       orderBy: order,
-      limit: forModel ? null : limit,
+      limit: limit,
     );
     final selectedMessages =
         'SELECT id FROM messages WHERE $selectionWhere ORDER BY $order LIMIT ?';
@@ -418,10 +419,8 @@ class ConversationReader {
     final attachmentsAndSenders = await Future.wait([
       database.query(
         'attachments',
-        where: forModel
-            ? 'conversation_id = ? AND message_id IS NOT NULL'
-            : 'message_id IN ($selectedMessages)',
-        whereArgs: forModel ? [conversationId] : selectedArgs,
+        where: 'message_id IN ($selectedMessages)',
+        whereArgs: selectedArgs,
         orderBy: 'position',
       ),
       database.query(

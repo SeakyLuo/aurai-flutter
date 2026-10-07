@@ -12,7 +12,6 @@ enum MessageAction {
   quote,
   recall,
   forward,
-  branch,
   fullscreen,
   splitRun,
   history,

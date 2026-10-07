@@ -1,5 +1,7 @@
+import '../../agent/run_task_tool.dart';
 import '../../agent/run_subagent_tool.dart';
 import '../../agent/deferred_tool.dart';
+import '../../domain/web_sources.dart';
 import '../../agent/subagent_tool_scope.dart';
 import '../../storage/subagent_runs.dart';
 import 'execution/conversation_execution_manager.dart';
@@ -27,8 +29,6 @@ import '../../domain/context_summary.dart';
 import '../../domain/live_project_changes.dart';
 import '../../providers/request_adapter_runner.dart';
 import '../../providers/responses_transport.dart';
-import '../../providers/responses_context.dart';
-import '../../providers/model_context_limits.dart';
 import '../../providers/shared_responses_context.dart';
 import '../../providers/response_message_input.dart';
 import '../../providers/model_image_input.dart';
@@ -85,6 +85,7 @@ import '../../html_games/html_message_data.dart';
 import 'notification_avatar.dart';
 import '../../agent/friend_tools.dart';
 import '../../storage/contact_relationships.dart';
+import '../../storage/contact_store.dart';
 import '../../domain/error_message.dart';
 import '../../domain/message_lookup_error.dart';
 import '../../agent/execution_log_tool.dart';
@@ -202,11 +203,11 @@ part 'message_submission.dart';
 part 'message_quick_replies.dart';
 part 'global_tools.dart';
 part 'generated_file_actions.dart';
-part 'conversation_branching.dart';
 part 'group_reply_context.dart';
 part 'group_reply_draft.dart';
 part 'ai_identity_controller.dart';
 part 'project_controller_actions.dart';
+part 'task_handler_actions.dart';
 part 'group_conversation_run.dart';
 part 'group_member_activity.dart';
 part 'group_message_delivery.dart';
@@ -235,6 +236,8 @@ part 'asset_library_actions.dart';
 part 'conversation_search_navigation.dart';
 part 'conversation_run.dart';
 part 'subagent_execution.dart';
+part 'organized_task_execution.dart';
+part 'organized_task_context.dart';
 part 'run_summary_attachment.dart';
 part 'run_tool_logging.dart';
 part 'conversation_run_failure.dart';
@@ -341,8 +344,6 @@ class ChatController extends ChangeNotifier {
   bool loadingConversations = false;
   bool loadingEarlierMessages = false;
   bool changingConversation = false;
-  bool creatingConversationBranch = false;
-  ResponsesTransport? _conversationBranchTransport;
   List<Conversation> get conversations => List.unmodifiable(
     <Conversation>[..._conversations.where((item) => !item.isArchived)]
       ..sort((a, b) {
@@ -429,7 +430,6 @@ class ChatController extends ChangeNotifier {
 
   bool get isBusy =>
       _submitting ||
-      creatingConversationBranch ||
       identical(_runningConversation, activeConversation) ||
       identical(_privateConversation, activeConversation) ||
       runState == ChatRunState.running ||
@@ -484,8 +484,12 @@ class ChatController extends ChangeNotifier {
     groupStore.onSystemNotice = _receiveGroupSystemNotice;
     _detachGroupNotices = () => groupStore.onSystemNotice = null;
     _platform.notificationAvatar = NotificationAvatar(groupStore).render;
-    _memory = MemoryController(_store.database, () => config);
+    _memory = MemoryController(
+      _store.database,
+      () => modelSettings.activeConfig,
+    );
     await memory.initialize();
+    await memory.startConsolidation();
     _lastLocalName = memory.nickname.isEmpty
         ? MessageSender.localUser.name
         : memory.nickname;
@@ -603,6 +607,7 @@ class ChatController extends ChangeNotifier {
 
   final _loadedMessageCounts = <String, int>{};
   Conversation? _pendingAiConversation;
+  final _personalChatDrafts = <String, Conversation>{};
   final _searchWindows = <String, Conversation>{};
   int _searchNavigationGeneration = 0;
 
@@ -629,7 +634,10 @@ class ChatController extends ChangeNotifier {
     if (loadingConversations || !hasMoreConversations) return;
     loadingConversations = true;
     try {
-      final page = await _store.reader.list(after: _conversationCursor);
+      final page = await _store.reader.list(
+        after: _conversationCursor,
+        tasksOnly: true,
+      );
       final ids = _conversations.map((item) => item.id).toSet();
       _conversations.addAll(page.where((item) => !ids.contains(item.id)));
       if (page.isNotEmpty) _conversationCursor = page.last;
@@ -676,28 +684,6 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  Future<List<ConversationSearchResult>> searchConversations(
-    String query,
-    int offset, {
-    bool includeReasoning = false,
-    String? projectId,
-  }) => _store.reader.search(
-    query,
-    offset,
-    includeReasoning: includeReasoning,
-    projectId: projectId,
-  );
-
-  Future<List<AttachmentSearchResult>> searchAttachments(
-    String query,
-    int offset, {
-    int limit = AttachmentSearch.pageSize,
-    String? projectId,
-  }) => AttachmentSearch(
-    _store.database,
-    _imageStore.directory,
-  ).search(query, offset, limit: limit, projectId: projectId);
-
   void updateDraft(String text) {
     final conversation = activeConversation;
     if (conversation.draft == text) return;
@@ -743,7 +729,8 @@ class ChatController extends ChangeNotifier {
 
   Future<void> _removeEmptyDraft() async {
     final draft = activeConversation;
-    if (draft.kind != ConversationKind.direct ||
+    if (draft.isPersonalChat ||
+        draft.kind != ConversationKind.direct ||
         draft.messageCount != 0 ||
         !draft.isStored ||
         !draft.isEmpty)

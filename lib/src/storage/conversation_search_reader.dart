@@ -6,14 +6,18 @@ extension ConversationSearchReader on ConversationReader {
     int offset, {
     bool includeReasoning = false,
     String? projectId,
+    bool chatsOnly = false,
   }) async {
+    final kindFilter = chatsOnly
+        ? "(kind = 'group' OR (kind = 'direct' AND personal_chat = 1))"
+        : "kind = 'direct' AND personal_chat = 0";
     final projectFilter = projectId == null ? '' : ' AND project_id = ?';
     final projectArgs = projectId == null ? const <Object?>[] : [projectId];
     if (query.isEmpty) {
       final rows = await database.query(
         'conversations',
         where:
-            "$visibleConversation AND $localUserConversation AND mode = 'normal'$projectFilter",
+            "$visibleConversation AND $localUserConversation AND $kindFilter AND mode = 'normal'$projectFilter",
         whereArgs: projectArgs,
         orderBy: 'pinned DESC, updated_at DESC, id DESC',
         limit: ConversationReader.pageSize,
@@ -29,18 +33,20 @@ extension ConversationSearchReader on ConversationReader {
           ),
       ];
     }
-    final messageFilter = includeReasoning
+    final messageFilter = chatsOnly
+        ? conversationListMessageVisibility
+        : includeReasoning
         ? "kind NOT IN ('system', 'quick_reply')"
         : "kind NOT IN ('system', 'quick_reply', 'reasoning')";
     final hits = await database.rawQuery(
       '''SELECT id AS message_id, conversation_id, text, sender_id, created_at, id AS sort_id
-         FROM messages WHERE $messageFilter AND conversation_id IN (SELECT id FROM conversations WHERE $localUserConversation AND mode = 'normal'$projectFilter) AND instr(lower(text), ?) > 0
+         FROM messages WHERE $messageFilter AND conversation_id IN (SELECT id FROM conversations WHERE $localUserConversation AND $kindFilter AND mode = 'normal'$projectFilter) AND instr(lower(text), ?) > 0
          UNION ALL
          SELECT NULL AS message_id, id AS conversation_id,
            CASE WHEN instr(lower(draft), ?) > 0 THEN draft ELSE '' END AS text,
            NULL AS sender_id, created_at, id AS sort_id
          FROM conversations
-         WHERE $visibleConversation AND $localUserConversation AND mode = 'normal'$projectFilter AND (instr(lower(title), ?) > 0 OR instr(lower(draft), ?) > 0)
+         WHERE $visibleConversation AND $localUserConversation AND $kindFilter AND mode = 'normal'$projectFilter AND (instr(lower(title), ?) > 0 OR instr(lower(draft), ?) > 0 ${chatsOnly ? "OR (personal_chat = 1 AND default_sender_id IN (SELECT id FROM message_senders WHERE instr(lower(name), ?) > 0))" : ''})
            AND id NOT IN (
              SELECT conversation_id FROM messages WHERE $messageFilter AND instr(lower(text), ?) > 0
            )
@@ -53,6 +59,7 @@ extension ConversationSearchReader on ConversationReader {
         ...projectArgs,
         query,
         query,
+        if (chatsOnly) query,
         query,
         ConversationReader.pageSize,
         offset,

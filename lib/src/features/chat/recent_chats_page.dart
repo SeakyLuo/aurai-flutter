@@ -1,4 +1,5 @@
 import '../../widgets/empty_data_view.dart';
+import '../../domain/ai_profile.dart';
 import 'animated_entry_list.dart';
 import '../../app/glass_notice.dart';
 import 'conversation_list_skeleton.dart';
@@ -8,7 +9,8 @@ import 'conversation_search_page.dart';
 import 'conversation_list_tile.dart';
 import '../../domain/error_message.dart';
 import 'ai_contacts_page.dart';
-import 'conversation_icon.dart';
+import 'ai_contact_editor.dart';
+import 'ai_contact_page.dart';
 import 'header_action_menu.dart';
 import 'file_tool_icon.dart';
 import 'glass_surface.dart';
@@ -34,21 +36,51 @@ class RecentChatsPage extends StatefulWidget {
     super.key,
     required this.controller,
     this.groupsOnly = false,
+    this.tasksOnly = false,
+    this.profile,
   });
   final ChatController controller;
   final bool groupsOnly;
+  final bool tasksOnly;
+  final AiProfile? profile;
   @override
   State<RecentChatsPage> createState() => RecentChatsPageState();
 }
 
 class RecentChatsPageState extends State<RecentChatsPage> {
+  bool get _tasks => widget.tasksOnly || widget.profile != null;
+  bool get _root => !widget.groupsOnly && !_tasks;
   final _items = <Conversation>[];
+  List<Conversation> _drafts = [];
+  List<Conversation> get _visibleItems {
+    if (_drafts.isEmpty) return _items;
+    final storedIds = _items.map((item) => item.id).toSet();
+    DateTime listTime(Conversation item) {
+      final latest = item.lastMessageAt ?? item.createdAt;
+      final edited = item.draftUpdatedAt;
+      return edited != null && edited.isAfter(latest) ? edited : latest;
+    }
+
+    // Drafts are merged only for display; database pagination keeps its own
+    // offset so a virtual entry cannot skip or repeat a stored conversation.
+    return [
+      ..._items,
+      ..._drafts.where((draft) => !storedIds.contains(draft.id)),
+    ]..sort((a, b) {
+      final pinned = (b.isPinned ? 1 : 0).compareTo(a.isPinned ? 1 : 0);
+      if (pinned != 0) return pinned;
+      final time = listTime(b).compareTo(listTime(a));
+      return time != 0 ? time : b.id.compareTo(a.id);
+    });
+  }
+
   final _senders = <String, MessageSender>{};
   final _groups = <String, List<MessageSender>>{};
   final _projects = <String, DevelopmentProject>{};
   Timer? _updates;
   int _groupCount = 0;
   bool _loading = false, _more = true, _loaded = false;
+  bool _loadingMore = false;
   bool _reloadPending = false;
   @override
   void initState() {
@@ -86,10 +118,14 @@ class RecentChatsPageState extends State<RecentChatsPage> {
       if (reset) _reloadPending = true;
       return;
     }
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadingMore = !reset && _loaded;
+    });
     try {
       final reader = HomeConversations(widget.controller.groupStore);
       late final List<Conversation> page;
+      var drafts = _drafts;
       var groupCount = _groupCount;
       if (widget.groupsOnly) {
         final results = await Future.wait<Object>([
@@ -101,14 +137,27 @@ class RecentChatsPageState extends State<RecentChatsPage> {
         ]);
         page = results[0] as List<Conversation>;
         groupCount = results[1] as int;
+      } else if (widget.profile != null) {
+        page = await reader.forAi(
+          widget.profile!.sender.id,
+          offset: reset ? 0 : _items.length,
+          limit: limit,
+        );
+      } else if (_root) {
+        final results = await Future.wait([
+          reader.chats(offset: reset ? 0 : _items.length, limit: limit),
+          widget.controller.personalChatDrafts(),
+        ]);
+        page = results[0];
+        drafts = results[1];
       } else {
-        page = await reader.recent(
+        page = await (_tasks ? reader.recent : reader.chats)(
           offset: reset ? 0 : _items.length,
           limit: limit,
         );
       }
       final avatars = await Future.wait<Object>([
-        reader.senders(page),
+        reader.senders([...page, ...drafts]),
         widget.controller.groupStore.avatarMembers(
           page
               .where((item) => item.kind == ConversationKind.group)
@@ -127,6 +176,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
         }
         final existing = _items.map((item) => item.id).toSet();
         _items.addAll(page.where((item) => !existing.contains(item.id)));
+        _drafts = drafts;
         _senders.addAll(avatars[0] as Map<String, MessageSender>);
         _groups.addAll(avatars[1] as Map<String, List<MessageSender>>);
         _projects.addAll(avatars[2] as Map<String, DevelopmentProject>);
@@ -137,12 +187,15 @@ class RecentChatsPageState extends State<RecentChatsPage> {
     } on Object catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showToast(
-          SnackBar(content: Text('会话加载失败：${errorMessage(error)}')),
+          SnackBar(content: Text('列表加载失败：${errorMessage(error)}')),
           kind: ToastKind.error,
         );
     } finally {
       if (mounted) {
-        setState(() => _loading = false);
+        setState(() {
+          _loading = false;
+          _loadingMore = false;
+        });
         if (_reloadPending) {
           _reloadPending = false;
           unawaited(reload());
@@ -152,34 +205,79 @@ class RecentChatsPageState extends State<RecentChatsPage> {
   }
 
   bool _opening = false;
-  Future<void> _temporaryConversation() =>
-      _newConversation(mode: ConversationMode.temporaryPersonalized);
-
   Future<void> _newConversation({
     ConversationMode mode = ConversationMode.normal,
   }) async {
     if (_opening) return;
     _opening = true;
     try {
-      await Navigator.push<void>(
+      if (widget.profile != null) {
+        final id = await widget.controller.openAiConversation(
+          widget.profile!,
+          newConversation: true,
+          mode: mode,
+        );
+        if (!mounted) return;
+        await openHomeConversation(
+          context,
+          widget.controller,
+          id,
+          waitForClose: true,
+        );
+        if (mounted) await reload();
+        return;
+      }
+      final ai = await Navigator.push<AiProfile>(
         context,
         MaterialPageRoute(
           builder: (_) => AiContactsPage(
             controller: widget.controller,
             selectForConversation: true,
+            returnSelection: true,
             conversationMode: mode,
           ),
         ),
       );
+      if (!mounted || ai == null) return;
+      final id = await widget.controller.openAiConversation(
+        ai,
+        newConversation: _tasks || mode != ConversationMode.normal,
+        mode: mode,
+      );
+      if (!mounted) return;
+      await openHomeConversation(
+        context,
+        widget.controller,
+        id,
+        waitForClose: true,
+      );
+      if (mounted) await reload();
     } on Object catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showToast(
-          SnackBar(content: Text('无法新建会话，请重试：${errorMessage(error)}')),
+          SnackBar(content: Text('无法打开，请重试：${errorMessage(error)}')),
           kind: ToastKind.error,
         );
     } finally {
       _opening = false;
     }
+  }
+
+  Future<void> _addFriend() async {
+    final id = await Navigator.push<String>(
+      context,
+      MaterialPageRoute<String>(
+        builder: (_) => AiContactEditor(controller: widget.controller),
+      ),
+    );
+    if (!mounted || id == null) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            AiContactPage(controller: widget.controller, senderId: id),
+      ),
+    );
   }
 
   Future<void> _group() async {
@@ -198,15 +296,34 @@ class RecentChatsPageState extends State<RecentChatsPage> {
       );
   }
 
+  Future<void> _openTasks() => Navigator.push<void>(
+    context,
+    MaterialPageRoute(
+      builder: (_) =>
+          RecentChatsPage(controller: widget.controller, tasksOnly: true),
+    ),
+  );
+
+  Future<void> _openProjects() => Navigator.push<void>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => ProjectsPage(controller: widget.controller),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
-      title: widget.groupsOnly ? '群聊' : '会话',
+      title: widget.groupsOnly
+          ? '群聊'
+          : widget.profile == null
+          ? (_tasks ? '任务' : '聊天')
+          : '任务',
 
-      onBack: widget.groupsOnly ? () => Navigator.pop(context) : null,
-      root: !widget.groupsOnly,
-      leadingAction: widget.groupsOnly
+      onBack: widget.groupsOnly || _tasks ? () => Navigator.pop(context) : null,
+      root: _root,
+      leadingAction: !_root
           ? null
           : SettingsGlassAction(
               label: '项目',
@@ -218,12 +335,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                   enabled: true,
                 ),
               ),
-              onPressed: () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProjectsPage(controller: widget.controller),
-                ),
-              ),
+              onPressed: _openProjects,
             ),
       actions: [
         if (!widget.groupsOnly)
@@ -232,7 +344,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 RoundAction(
-                  label: '搜索会话',
+                  label: _tasks ? '搜索任务' : '搜索聊天',
                   icon: Icons.search_rounded,
                   iconWidget: const SidebarActionIcon(
                     type: SidebarActionIconType.search,
@@ -243,6 +355,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                       builder: (_) => ConversationSearchPage(
                         controller: widget.controller,
                         preparingGoal: () => false,
+                        chatsOnly: !_tasks,
                       ),
                     ),
                   ),
@@ -256,12 +369,16 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                 ),
                 Builder(
                   builder: (buttonContext) => RoundAction(
-                    label: '添加',
+                    label: _tasks ? '新建任务' : '添加',
                     icon: Icons.add_rounded,
                     iconWidget: const SidebarActionIcon(
                       type: SidebarActionIconType.add,
                     ),
                     onPressed: () async {
+                      if (_tasks) {
+                        await _newConversation();
+                        return;
+                      }
                       final iconColor =
                           Theme.of(buttonContext).brightness == Brightness.dark
                           ? Theme.of(buttonContext).colorScheme.onSurfaceVariant
@@ -270,15 +387,10 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                         buttonContext,
                         items: [
                           (
-                            value: 'conversation',
-                            label: '发起会话',
-                            icon: ConversationIcon(color: iconColor),
-                          ),
-                          (
-                            value: 'temporary',
-                            label: '临时聊天',
-                            icon: ConversationIcon(
-                              temporary: true,
+                            value: 'friend',
+                            label: '添加朋友',
+                            icon: SettingsIcon(
+                              type: SettingsIconType.contacts,
                               color: iconColor,
                             ),
                           ),
@@ -290,6 +402,15 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                               color: iconColor,
                             ),
                           ),
+                          if (_root)
+                            (
+                              value: 'taskList',
+                              label: '任务',
+                              icon: SettingsIcon(
+                                type: SettingsIconType.job,
+                                color: iconColor,
+                              ),
+                            ),
                           (
                             value: 'tasks',
                             label: '定时任务',
@@ -301,12 +422,12 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                         ],
                       );
                       if (!mounted) return;
-                      if (action == 'conversation') {
-                        await _newConversation();
-                      } else if (action == 'temporary') {
-                        await _temporaryConversation();
+                      if (action == 'friend') {
+                        await _addFriend();
                       } else if (action == 'group') {
                         await _group();
+                      } else if (action == 'taskList') {
+                        await _openTasks();
                       } else if (action == 'tasks') {
                         await openScheduledTasks(context, widget.controller);
                       }
@@ -365,17 +486,17 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                               name: 'Aurai',
                               size: 48,
                             ),
-                            title: const Text('开始新会话'),
-                            subtitle: const Text('选择一位联系人开始聊天'),
+                            title: Text(_tasks ? '开始新任务' : '发起聊天'),
+                            subtitle: Text(
+                              _tasks ? '选择一位 AI 开始任务' : '选择一位 AI 开始聊天',
+                            ),
                             onTap: _newConversation,
                           ),
                         ),
                       ),
                     ),
               children: [
-                if (_loading && _items.isEmpty)
-                  const Center(child: CircularProgressIndicator()),
-                for (final item in _items)
+                for (final item in _visibleItems)
                   ConversationMore(
                     key: ValueKey(item.id),
                     controller: widget.controller,
@@ -384,7 +505,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                     onChanged: reload,
                     child: _tile(item),
                   ),
-                if (_loading && _items.isNotEmpty)
+                if (_loadingMore)
                   const Padding(
                     padding: EdgeInsets.all(16),
                     child: Center(child: CircularProgressIndicator()),
@@ -414,6 +535,8 @@ class RecentChatsPageState extends State<RecentChatsPage> {
       controller: widget.controller,
       conversation: item,
       project: _projects[item.projectId],
+      showActivity: !_tasks,
+      displayName: item.isPersonalChat ? sender!.displayName : null,
       avatar: group
           ? GroupAvatar(groupId: item.id, members: _groups[item.id]!, size: 48)
           : ProfileAvatar(
@@ -431,12 +554,12 @@ class RecentChatsPageState extends State<RecentChatsPage> {
             context,
             widget.controller,
             item.id,
-            waitForClose: widget.groupsOnly,
+            waitForClose: true,
           );
         } on Object catch (error) {
           if (mounted)
             ScaffoldMessenger.of(context).showToast(
-              SnackBar(content: Text('无法打开会话，请重试：${errorMessage(error)}')),
+              SnackBar(content: Text('无法打开记录，请重试：${errorMessage(error)}')),
               kind: ToastKind.error,
             );
         }

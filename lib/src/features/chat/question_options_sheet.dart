@@ -22,6 +22,7 @@ Future<Set<int>?> showQuestionOptionsSheet(
   ValueChanged<Set<int>>? onSelectionChanged,
   Future<void>? closeWhen,
   bool multiple = false,
+  bool showConfirm = false,
   bool readOnly = false,
   bool vote = false,
   bool anonymous = false,
@@ -56,6 +57,7 @@ Future<Set<int>?> showQuestionOptionsSheet(
         selected: selected,
         onSelectionChanged: onSelectionChanged,
         multiple: multiple,
+        showConfirm: showConfirm,
         readOnly: readOnly,
         vote: vote,
         anonymous: anonymous,
@@ -93,7 +95,7 @@ class QuestionOptionsField extends StatelessWidget {
     required this.label,
     this.onTap,
     this.compact = false,
-    this.arrow = SettingsIconType.chevronDown,
+    this.arrow = SettingsIconType.chevron,
   });
   final String label;
   final VoidCallback? onTap;
@@ -160,7 +162,7 @@ class QuestionOptionsField extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              const SettingsIcon(type: SettingsIconType.chevronDown),
+              SettingsIcon(type: arrow),
             ],
           ),
         ),
@@ -177,6 +179,7 @@ class _QuestionOptionsSheet extends StatefulWidget {
     required this.multiple,
     required this.readOnly,
     required this.vote,
+    this.showConfirm = false,
     required this.anonymous,
     this.voteStatus,
     required this.minimum,
@@ -196,6 +199,7 @@ class _QuestionOptionsSheet extends StatefulWidget {
   final bool multiple;
   final bool readOnly;
   final bool vote;
+  final bool showConfirm;
   final bool anonymous;
   final String? voteStatus;
   final int minimum, maximum;
@@ -216,6 +220,8 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
   late String _otherText = widget.otherText;
   bool _editingOther = false;
 
+  bool get _confirm => widget.multiple || widget.showConfirm;
+
   void _finishOther(String text) {
     FocusScope.of(context).unfocus();
     setState(() {
@@ -226,6 +232,7 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
     });
     widget.onOtherTextChanged?.call(text);
     widget.onSelectionChanged?.call(Set.of(_selected));
+    if (!_confirm) Navigator.pop(context, _selected);
   }
 
   void _cancelOther() {
@@ -421,10 +428,11 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                                       _selected.length >= widget.maximum
                               ? null
                               : () {
-                                  if (!widget.multiple) {
+                                  if (!_confirm) {
                                     Navigator.pop(context, {optionIndex});
                                   } else {
                                     setState(() {
+                                      if (!widget.multiple) _selected.clear();
                                       if (selected) {
                                         _selected.remove(optionIndex);
                                       } else {
@@ -440,9 +448,7 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                       },
                     ),
                   ),
-                  if (widget.multiple &&
-                      !widget.readOnly &&
-                      widget.title != null)
+                  if (_confirm && !widget.readOnly && widget.title != null)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: InteractiveMessageButton(
@@ -578,13 +584,15 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                                       widget.onSelectionChanged?.call(
                                         Set.of(_selected),
                                       );
+                                      if (!_confirm)
+                                        Navigator.pop(context, _selected);
                                     },
                             ),
                     ),
                 ],
               ),
             ),
-            if (!widget.readOnly)
+            if (!widget.readOnly && _confirm)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                 child: VoteSubmitButton(

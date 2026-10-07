@@ -19,7 +19,6 @@ import 'group_invite_page.dart';
 import 'group_management_page.dart';
 import 'group_remove_members_page.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../domain/ai_profile.dart';
 import '../../domain/message_sender.dart';
@@ -43,14 +42,12 @@ class GroupInfoPage extends StatefulWidget {
     required this.controller,
     required this.conversation,
     required this.onPin,
-    required this.onArchive,
     this.originTaskId,
   });
 
   final ChatController controller;
   final Conversation conversation;
   final Future<void> Function() onPin;
-  final Future<void> Function() onArchive;
   final String? originTaskId;
 
   @override
@@ -173,6 +170,7 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
       barrierDismissible: false,
       barrierColor: Colors.black.withValues(alpha: .24),
       builder: (_) => ConversationRenameDialog(
+        typeLabel: '群聊',
         controller: widget.controller,
         conversationId: _conversation.id,
         initialTitle: _conversation.title,
@@ -241,15 +239,6 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
     ),
     onTap: _canManage ? _chooseProject : null,
   );
-
-  Future<void> _copyConversationId() async {
-    await Clipboard.setData(ClipboardData(text: _conversation.id));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showToast(
-      const SnackBar(content: Text('已复制会话 ID')),
-      kind: ToastKind.success,
-    );
-  }
 
   Future<void> _openManagement() async {
     final dissolved = await Navigator.push<bool>(
@@ -628,23 +617,6 @@ class _GroupInfoPageState extends State<GroupInfoPage> {
                             _surface(identity),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      DialogActionButton(
-                        text: '复制会话 ID',
-                        role: DialogActionRole.secondary,
-                        onPressed: _busy ? null : _copyConversationId,
-                      ),
-                      const SizedBox(height: 12),
-                      DialogActionButton(
-                        text: _conversation.isArchived ? '取消归档' : '归档群聊',
-                        role: DialogActionRole.secondary,
-                        onPressed: _busy
-                            ? null
-                            : () => _perform(
-                                widget.onArchive,
-                                leaveArchived: !_conversation.isArchived,
-                              ),
                       ),
                       const SizedBox(height: 12),
                       DialogActionButton(

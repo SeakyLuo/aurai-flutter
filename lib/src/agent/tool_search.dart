@@ -10,7 +10,7 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
   ToolDefinition get definition => const ToolDefinition(
     name: 'searchTools',
     description:
-        'Find and load tools for your next model turn. Start with offset 0; use nextOffset only to inspect more matches. Search by a specific task in Chinese or English, or exact tool name. Available domains: web, image generation/editing (generateImage), music generation (generateMusic), reusable skills, Aurai AI contacts/address book, group chat creation/members/management, memory, conversation history/database, projects and Git, scheduled tasks, notifications, model balance/top-up, Android UI/apps/settings, network diagnostics, Android API/scripts and shell. Returns at most 5 relevant matches and loads them; up to 20 search candidates are kept separately from tools used during the current run, which remain loaded. Recent tools are restored from this conversation on later user messages. Explicit tool names in a query restrict results to those tools. Call tools already provided directly; search only when a needed tool is absent. Searching does not execute the tool or grant permission.',
+        'Find tools by task, keyword or exact name. Searches both summaries and full descriptions; returns only names and brief summaries, never loads them. Start with offset 0; use nextOffset for more matches. Select needed tools with loadTools to receive their complete schemas on the next turn. Already supplied tools can be called directly. Available domains include web, images, music, miniapps, interactive cards, contacts, groups, memory, history, projects, Git, skills, scheduling, models and Android device operations. Search and loading grant no permission.',
     inputSchema: {
       'type': 'object',
       'properties': {
@@ -46,7 +46,9 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
         .toSet();
     final ranked = [
       for (final definition in catalog)
-        if (definition.name != 'searchTools' && definition.name != 'askUser')
+        if (definition.name != 'searchTools' &&
+            definition.name != 'loadTools' &&
+            definition.name != 'askUser')
           if (namedTools.isEmpty || namedTools.contains(definition.name))
             (definition: definition, score: _score(definition, query)),
     ]..removeWhere((entry) => entry.score == 0);
@@ -65,7 +67,6 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
         .take(5)
         .map((entry) => entry.definition)
         .toList();
-    registry.load(matches.reversed.map((tool) => tool.name));
     return ToolResult(
       callId: call.id,
       toolName: call.name,
@@ -73,14 +74,14 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
       output: {
         'tools': [
           for (final tool in matches)
-            {'name': tool.name, 'description': tool.description},
+            {'name': tool.name, 'summary': tool.discoverySummary},
         ],
         'hasMore': offset + matches.length < ranked.length,
         if (offset + matches.length < ranked.length)
           'nextOffset': offset + matches.length,
         'message': matches.isEmpty
             ? 'No matching available tools. Try another specific keyword or domain.'
-            : 'Matched tools are loaded for the next turn. Use their provided schemas; loading grants no permission.',
+            : 'Call loadTools with selected names to load their complete definitions. Search grants no permission.',
       },
     );
   }
@@ -128,7 +129,7 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
       _ => '',
     };
     final text =
-        '$name $title ${tool.description.toLowerCase()} ${tool.capabilityId} $aliases';
+        '$name $title ${tool.summary.toLowerCase()} ${tool.description.toLowerCase()} ${tool.capabilityId} $aliases';
     if (name == query) return 10000;
     var score = title.contains(query) || name.contains(query) ? 100 : 0;
     final words = RegExp(

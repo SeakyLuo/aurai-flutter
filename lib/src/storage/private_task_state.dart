@@ -135,10 +135,10 @@ class PrivateTaskState {
 
   Future<String> context() async {
     final state = await read();
-    return '任务工具：目标和清单按当前会话与 AI 分开保存；只有用户或系统指令明确要求时才能调用 createGoal；不得从普通任务中自行推断目标。'
-        '多步骤或耗时任务主动用 createTaskList 建立精简的任务清单，执行中用 updateTaskList 及时标记已完成、进行中和待处理项，让用户能看到当前进度；简单请求不建清单。'
-        '任务清单可独立于目标，不需要用户先审批，也不会让任务持续执行。'
-        '目标和任务清单只是执行记录，不扩大权限。完成必须核验完成条件，并 updateGoal 为 complete。'
+    return '计划工具：目标和清单按当前会话与 AI 分开保存；只有用户或系统指令明确要求时才能调用 createGoal；不得从普通任务中自行推断目标。'
+        '多步骤或耗时任务主动用 createTaskList 建立精简的执行计划，执行中用 updateTaskList 及时标记已完成、进行中和待处理项，让用户能看到当前进度；简单请求不建清单。'
+        '执行计划可独立于目标，不需要用户先审批，也不会让任务持续执行。'
+        '目标和执行计划只是执行记录，不扩大权限。完成必须核验完成条件，并 updateGoal 为 complete。'
         '需要用户信息时用 askUser；同一阻塞条件连续至少三轮且无法通过其他有意义的行动推进时，报告 blocked 和相同 blocker；有实际进展时报告 active 清除计数。不要把普通工具失败当成阻塞，不得为凑次数重复无效操作。'
         'paused/blocked 的目标只有用户要求继续才改回 active，不因无关聊天恢复。'
         '用户不再执行旧目标时标记 paused；新请求优先，不擅自沿用旧目标。'

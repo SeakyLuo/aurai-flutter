@@ -1,9 +1,6 @@
 import 'private_task_state.dart';
+import 'organized_task_schema.dart';
 import 'subagent_runs.dart';
-import 'speech_provider_migration.dart';
-import 'speech_configuration_migration.dart';
-import 'speech_voice_catalog_migration.dart';
-import 'speech_voice_details_migration.dart';
 import 'group_mute_schema.dart';
 import 'asset_library_schema.dart';
 import 'group_notice_dismissals.dart';
@@ -24,24 +21,29 @@ import 'message_callbacks.dart';
 import 'contact_relationships.dart';
 import 'contact_store.dart';
 import '../html_games/html_game_schema.dart';
-import '../html_games/html_event_identity.dart';
 import 'ai_identity_schema.dart';
 import 'group_participation.dart';
-import 'group_creation_migration.dart';
 import '../skills/skill_schema.dart';
 import '../skills/skill_library_schema.dart';
 import 'message_sender_schema.dart';
 import 'group_chat_schema.dart';
 import 'package:sqflite/sqflite.dart';
 import '../memory/memory_controller.dart';
+import '../memory/memory_storage_schema.dart';
 import 'message_quick_reply_schema.dart';
 import 'tool_customization_schema.dart';
 import 'resource_scope_schema.dart';
-import 'project_resource_migration.dart';
+
+const personalChatSchema = [
+  'ALTER TABLE conversations ADD COLUMN personal_chat INTEGER NOT NULL DEFAULT 0 '
+      "CHECK(personal_chat = 0 OR (kind = 'direct' AND mode = 'normal' AND project_id IS NULL))",
+  'CREATE UNIQUE INDEX personal_chat_owner ON conversations(default_sender_id) '
+      'WHERE personal_chat = 1',
+];
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 91,
+  version: 98,
   onOpen: (db) async {
     await db.update('approval_requests', {
       'status': 'cancelled',
@@ -53,471 +55,20 @@ Future<Database> openConversationDatabase() async => openDatabase(
     await db.rawQuery('PRAGMA journal_mode = WAL');
   },
   onUpgrade: (db, oldVersion, newVersion) async {
-    if (oldVersion < 91)
-      await db.execute(
-        'ALTER TABLE conversations ADD COLUMN group_avatar TEXT',
-      );
-    if (oldVersion < 90) await db.execute(contactSchema);
-    if (oldVersion >= 20 && oldVersion < 85) {
-      await db.execute(
-        "ALTER TABLE html_games ADD COLUMN preview_theme TEXT CHECK(preview_theme IN ('light','dark'))",
-      );
-      await db.update('html_games', {'preview': null});
-    }
-    if (oldVersion >= 2 && oldVersion < 77) {
-      await db.execute(
-        "ALTER TABLE memory_settings ADD COLUMN gender TEXT NOT NULL DEFAULT 'unknown' CHECK(gender IN ('male', 'female', 'unknown'))",
-      );
-    }
-    if (oldVersion >= 18 && oldVersion < 67) {
-      await db.execute(
-        'ALTER TABLE group_participation ADD COLUMN reason TEXT',
-      );
-      await db.update('group_participation', {
-        'reason': '',
-      }, where: 'paused = 1');
-    }
-    if (oldVersion >= 18 && oldVersion < 70) {
-      await db.update(
-        'group_participation',
-        {'reason': ''},
-        where: 'reason = ?',
-        whereArgs: ['此前关闭时未记录原因'],
-      );
-    }
-    // The version-54 device received project schema changes before its version
-    // was advanced. Inspect that upgrade range once instead of recreating them.
-    final projectColumns = oldVersion >= 52 && oldVersion < 62
-        ? (await db.rawQuery(
-            'PRAGMA table_info(development_projects)',
-          )).map((row) => row['name']).toSet()
-        : <Object?>{};
-    final existingObjects = oldVersion < 58
-        ? (await db.query(
-            'sqlite_master',
-            columns: ['name'],
-            where: 'name IN (?, ?, ?)',
-            whereArgs: [
-              'tool_customizations',
-              'project_conversation_updated',
-              'project_conversation_created',
-            ],
-          )).map((row) => row['name']).toSet()
-        : <Object?>{};
-    if (oldVersion >= 52 &&
-        oldVersion < 62 &&
-        !projectColumns.contains('instructions')) {
-      await db.execute(
-        "ALTER TABLE development_projects ADD COLUMN instructions TEXT NOT NULL DEFAULT ''",
-      );
-    }
-    if (oldVersion >= 52 &&
-        oldVersion < 61 &&
-        !projectColumns.contains('git_remote_url')) {
-      await db.execute(
-        "ALTER TABLE development_projects ADD COLUMN git_remote_url TEXT NOT NULL DEFAULT ''",
-      );
-    }
-    if (oldVersion >= 52 &&
-        oldVersion < 60 &&
-        !projectColumns.contains('default_sender_id')) {
-      await db.execute(
-        "ALTER TABLE development_projects ADD COLUMN default_sender_id TEXT NOT NULL DEFAULT 'agent:aurai'",
-      );
-    }
-    if (oldVersion >= 52 &&
-        oldVersion < 59 &&
-        !projectColumns.contains('description')) {
-      await db.execute(
-        "ALTER TABLE development_projects ADD COLUMN description TEXT NOT NULL DEFAULT ''",
-      );
-    }
-    if (oldVersion >= 52 && oldVersion < 58) {
-      if (!projectColumns.contains('pinned')) {
-        await db.execute(
-          'ALTER TABLE development_projects ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0 CHECK(pinned IN (0, 1))',
-        );
-      }
-      if (!projectColumns.contains('memory_mode')) {
-        await db.execute(
-          "ALTER TABLE development_projects ADD COLUMN memory_mode TEXT NOT NULL DEFAULT 'shared' CHECK(memory_mode IN ('shared', 'projectOnly'))",
-        );
-      }
-      if (!existingObjects.contains('project_conversation_updated')) {
-        await db.execute(projectConversationUpdateTrigger);
-      }
-      if (!existingObjects.contains('project_conversation_created')) {
-        await db.execute(projectConversationInsertTrigger);
-      }
-    }
-    if (oldVersion < 57 && !existingObjects.contains('tool_customizations')) {
-      await db.execute(toolCustomizationSchema);
-      await seedToolCustomizations(db);
-    }
-    if (oldVersion >= 52 &&
-        oldVersion < 54 &&
-        !projectColumns.contains('icon')) {
-      await db.execute(
-        "ALTER TABLE development_projects ADD COLUMN icon TEXT NOT NULL DEFAULT 'file'",
-      );
-    }
-    if (oldVersion >= 52 &&
-        oldVersion < 55 &&
-        !projectColumns.contains('icon_color')) {
-      await db.execute(
-        "ALTER TABLE development_projects ADD COLUMN icon_color TEXT NOT NULL DEFAULT 'default'",
-      );
-    }
-    if (oldVersion == 55) {
-      await db.update('development_projects', {
-        'icon_color': 'default',
-      }, where: "icon_color = 'slate'");
-    }
-    if (oldVersion < 53) {
-      await db.execute(
-        'ALTER TABLE conversations ADD COLUMN join_approval_required INTEGER NOT NULL DEFAULT 0 CHECK(join_approval_required IN (0, 1))',
-      );
-      await db.execute(
-        'ALTER TABLE conversations ADD COLUMN managers_only_rename INTEGER NOT NULL DEFAULT 0 CHECK(managers_only_rename IN (0, 1))',
-      );
-    }
-    if (oldVersion < 52) {
-      await db.execute(developmentProjectSchema);
-      await db.execute(
-        'ALTER TABLE conversations ADD COLUMN project_id TEXT REFERENCES development_projects(id) ON DELETE SET NULL',
-      );
-      await db.execute(
-        'CREATE INDEX conversation_project_order ON conversations(project_id, pinned DESC, updated_at DESC, id DESC)',
-      );
-      await db.execute(projectConversationUpdateTrigger);
-      await db.execute(projectConversationInsertTrigger);
-    }
-    if (oldVersion < 51) await db.execute(groupMemberDetailsSchema);
-    if (oldVersion >= 11 && oldVersion < 50) await migrateGroupRoles(db);
-    if (oldVersion == 48) {
-      await db.execute(
-        'ALTER TABLE group_favorite_messages ADD COLUMN marked_by TEXT',
-      );
-    }
-    if (oldVersion < 48) {
-      for (final statement in groupMessageMarksSchema) {
-        await db.execute(statement);
-      }
-    }
-    if (oldVersion < 47) await db.execute(groupAnnouncementSchema);
-    if (oldVersion < 42) await migrateMiniappMetadata(db);
-    if (oldVersion >= 33 && oldVersion < 35) {
-      await migrateMultipleQuickReplies(db);
-    }
-    if (oldVersion < 34) {
-      await db.execute(htmlAppSchema);
-      await db.execute(htmlAppIndex);
-    }
-    if (oldVersion < 33) {
-      for (final statement in messageQuickReplySchema) {
-        await db.execute(statement);
-      }
-    }
-    if (oldVersion < 43) await migrateMiniappRecents(db);
-    if (oldVersion < 36) {
-      await db.rawUpdate(
-        "UPDATE messages SET text = '👊 拳头' WHERE id IN (SELECT message_id FROM message_quick_replies WHERE reply_key = 'fist_bump')",
-      );
-    }
-    if (oldVersion >= 25 && oldVersion < 32) {
-      await db.execute(
-        'ALTER TABLE message_callbacks ADD COLUMN actor_id TEXT',
-      );
-      await db.execute(
-        'ALTER TABLE message_callbacks ADD COLUMN participant_revision INTEGER',
-      );
-      await db.execute(
-        "ALTER TABLE message_callbacks ADD COLUMN status TEXT NOT NULL DEFAULT 'legacy'",
-      );
-      await db.execute('DROP INDEX message_callbacks_pending');
-      await db.execute(messageCallbackIndex);
-    }
-    if (oldVersion >= 28 && oldVersion < 30) {
-      await db.execute(
-        'ALTER TABLE interactive_actions ADD COLUMN before_json TEXT',
-      );
-    }
-    if (oldVersion < 28) {
-      for (final statement in interactiveActionSchema) {
-        await db.execute(statement);
-      }
-    }
-    if (oldVersion < 27) {
-      await db.execute(
-        "ALTER TABLE conversations ADD COLUMN mode TEXT NOT NULL DEFAULT 'normal'",
-      );
-    }
-    if (oldVersion < 10) await migrateMessageSenders(db);
-    if (oldVersion < 11) await migrateGroupChats(db);
-    if (oldVersion < 12) await db.execute(temporaryAiColumn);
-    if (oldVersion < 9 && oldVersion >= 4) {
-      await db.execute('DROP TABLE forgotten_memories');
-    }
-    if (oldVersion < 9) {
-      await db.execute(
-        "ALTER TABLE attachments ADD COLUMN kind TEXT NOT NULL DEFAULT 'image'",
-      );
-      await db.execute('ALTER TABLE attachments ADD COLUMN display_name TEXT');
-      await db.execute('ALTER TABLE attachments ADD COLUMN byte_size INTEGER');
-    }
-    if (oldVersion < 8) {
-      await db.execute('ALTER TABLE model_turns ADD COLUMN response_json TEXT');
-    }
-    if (oldVersion == 6) {
-      await db.execute(
-        "ALTER TABLE skills ADD COLUMN icon TEXT NOT NULL DEFAULT 'skill'",
-      );
-    }
-    if (oldVersion < 6) {
-      final batch = db.batch();
-      for (final statement in skillSchema) {
-        batch.execute(statement);
-      }
-      await batch.commit(noResult: true);
-    }
-    if (oldVersion < 5) {
-      await db.execute(
-        'ALTER TABLE conversations ADD COLUMN scheduled_task INTEGER NOT NULL DEFAULT 0',
-      );
-    }
-    if (oldVersion < 3) {
-      await db.execute(
-        'ALTER TABLE conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0',
-      );
-      await db.execute(
-        'CREATE INDEX conversation_archive_order ON conversations(archived, pinned DESC, updated_at DESC, id DESC)',
-      );
-    }
-    if (oldVersion < 2) {
-      final batch = db.batch();
-      for (final statement in memorySchema) {
-        batch.execute(statement);
-      }
-      await batch.commit(noResult: true);
-    }
-    if (oldVersion < 13) await migrateAiIdentities(db);
-    if (oldVersion < 14) {
-      // Some version 13 databases already contain the group creation column.
-      final columns = await db.rawQuery('PRAGMA table_info(conversations)');
-      if (!columns.any((column) => column['name'] == 'creation_member_ids')) {
-        await db.execute(
-          'ALTER TABLE conversations ADD COLUMN creation_member_ids TEXT',
-        );
-      }
-    }
-    if (oldVersion < 15) await migrateGroupCreationData(db);
-    if (oldVersion < 16) await migrateAuraiAvatar(db);
-    if (oldVersion < 17) {
-      await db.execute('ALTER TABLE messages ADD COLUMN quote_json TEXT');
-      await db.execute(
-        'ALTER TABLE conversations ADD COLUMN draft_quote_json TEXT',
-      );
-    }
-    if (oldVersion < 19)
-      await db.execute('ALTER TABLE messages ADD COLUMN interactive_json TEXT');
-    if (oldVersion < 18) await db.execute(groupParticipationSchema);
-    if (oldVersion < 20) {
-      for (final statement in htmlGameSchema) {
-        await db.execute(statement);
-      }
-    }
-    if (oldVersion >= 20 && oldVersion < 22) {
-      await db.execute(
-        "ALTER TABLE html_games ADD COLUMN display_mode TEXT NOT NULL DEFAULT 'hybrid'",
-      );
-    }
-    if (oldVersion >= 20 && oldVersion < 23) {
-      await db.execute(
-        'ALTER TABLE html_games ADD COLUMN stateful INTEGER NOT NULL DEFAULT 0',
-      );
-    }
-    if (oldVersion >= 20 && oldVersion < 31) {
-      for (final column in [
-        'measured_width REAL',
-        'measured_height REAL',
-        'measured_scale REAL',
-        'measured_version INTEGER',
-      ]) {
-        await db.execute('ALTER TABLE html_games ADD COLUMN $column');
-      }
-    }
-    if (oldVersion < 21) {
-      for (final statement in contactRelationshipSchema) {
-        await db.execute(statement);
-      }
-    }
-    if (oldVersion < 24) await migrateAuraiDescription(db);
-    if (oldVersion >= 20 && oldVersion < 26) {
-      // This device may already have the column from the requested live data update.
-      final columns = await db.rawQuery('PRAGMA table_info(html_games)');
-      if (!columns.any((column) => column['name'] == 'background_mode')) {
-        await db.execute(
-          "ALTER TABLE html_games ADD COLUMN background_mode TEXT NOT NULL DEFAULT 'message' CHECK(background_mode IN ('message','transparent'))",
-        );
-      }
-    }
-    if (oldVersion < 25) {
-      await db.execute(messageCallbackSchema);
-      await db.execute(messageCallbackIndex);
-    }
-    if (oldVersion < 29) await migrateSkillLibrary(db);
-    if (oldVersion < 34) {
-      if (oldVersion >= 20) {
-        await db.execute(
-          'ALTER TABLE html_games ADD COLUMN app_id TEXT REFERENCES html_apps(id)',
-        );
-      }
-      await db.execute('CREATE INDEX html_games_app ON html_games(app_id)');
-      await db.execute(
-        '''INSERT INTO html_apps
-        (id, creator_id, title, legacy_html, state_json, stateful, version, updated_at)
-        SELECT message_id, creator_id, title, html, state_json, stateful, version, updated_at FROM html_games''',
-      );
-      await db.execute(
-        "UPDATE html_games SET app_id = message_id, html = '', state_json = '{}'",
-      );
-    }
-    if (oldVersion < 39) await migrateMiniappPublications(db);
-    if (oldVersion < 40) await migrateFavorites(db);
-    if (oldVersion < 44) await migrateMiniappCreatorCredits(db);
-    if (oldVersion < 45) await db.execute(miniappReleaseNotesSchema);
-    if (oldVersion < 46) {
-      final columns = await db.rawQuery('PRAGMA table_info(html_games)');
-      if (!columns.any((column) => column['name'] == 'session_data_json')) {
-        await db.execute(
-          'ALTER TABLE html_games ADD COLUMN session_data_json TEXT',
-        );
-      }
-    }
-    if (oldVersion < 63) await migrateGroupNoticeDismissals(db);
-    if (oldVersion < 64) await migrateProjectDirectories(db);
-    if (oldVersion >= 57 && oldVersion < 65) {
-      await migrateToolCustomizationPrimaryKey(db);
-    }
-    if (oldVersion < 66) {
-      await db.delete(
-        'app_state',
-        where: 'key LIKE ?',
-        whereArgs: ['git_task:%'],
-      );
-    }
-    if (oldVersion < 68) await migrateAssetLibrary(db);
-    if (oldVersion < 69) await db.execute(privateTaskStateSchema);
-    if (oldVersion < 71) {
-      await db.execute(groupMuteColumn);
-      await db.execute(groupWideMuteColumn);
-      await db.execute(groupMuteMessageTrigger);
-    }
-    if (oldVersion < 73) {
-      await db.execute(r"""
-        UPDATE private_task_state
-        SET state_json = json_remove(
-          json_set(state_json, '$.objective',
-            json_extract(state_json, '$.objective') || char(10) || char(10) ||
-            json_extract(state_json, '$.completionCriteria')),
-          '$.completionCriteria')
-        WHERE json_type(state_json, '$.completionCriteria') = 'text'
-      """);
-    }
-    if (oldVersion >= 71 && oldVersion < 74) {
-      await db.execute(groupWideMuteColumn);
-      await db.execute('DROP TRIGGER group_mute_message');
-      await db.execute(groupMuteMessageTrigger);
-    }
-    if (oldVersion < 75) await db.execute(messageMarkdownColumn);
-    if (oldVersion < 76) {
-      await db.execute(
-        'ALTER TABLE messages ADD COLUMN miniapp_share_json TEXT',
-      );
-      if (oldVersion >= 42) {
-        await db.execute(
-          "ALTER TABLE miniapp_metadata ADD COLUMN share_title TEXT NOT NULL DEFAULT ''",
-        );
-        await db.execute(
-          'ALTER TABLE miniapp_metadata ADD COLUMN share_image_path TEXT',
-        );
-      }
-    }
-    if (oldVersion < 78) await migrateSpeechProviders(db);
-    if (oldVersion < 79) await migrateSpeechConfiguration(db);
-    if (oldVersion < 80) await migrateSpeechVoiceCatalog(db);
-    if (oldVersion < 81) await migrateSpeechVoiceDetails(db);
-    if (oldVersion < 82) {
-      await db.execute(
-        'ALTER TABLE conversations ADD COLUMN draft_updated_at INTEGER NOT NULL DEFAULT 0',
-      );
-      for (final index in [
-        'conversation_order',
-        'conversation_archive_order',
-        'conversation_project_order',
-      ]) {
-        await db.execute('DROP INDEX $index');
-      }
-      await db.execute(
-        'CREATE INDEX conversation_order ON conversations(pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC)',
-      );
-      await db.execute(
-        'CREATE INDEX conversation_archive_order ON conversations(archived, pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC)',
-      );
-      await db.execute(
-        'CREATE INDEX conversation_project_order ON conversations(project_id, pinned DESC, MAX(updated_at, draft_updated_at) DESC, id DESC)',
-      );
-    }
-    if (oldVersion < 83) await migrateResourceScopes(db);
-    if (oldVersion < 84) await migrateWerewolfProjectResources(db);
-    if (oldVersion < 86) {
-      for (final statement in miniappTeamSchema) {
-        await db.execute(statement);
-      }
-      final batch = db.batch();
-      for (final name in [
-        'readHtmlAppTeam',
-        'requestHtmlAppEdit',
-        'manageHtmlAppTeam',
-        'listHtmlAppEditRequests',
-      ]) {
-        batch.insert('tool_customizations', {
-          'name': name,
-          'icon': 'skill:miniapp',
-        });
-      }
-      await batch.commit(noResult: true);
-    }
-    if (oldVersion < 87) await migrateHtmlEventIdentities(db);
-    final approvalTables = await db.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'approval_requests'",
-    );
-    if (oldVersion < 89 && approvalTables.isEmpty) {
-      for (final statement in approvalCenterSchema) {
-        await db.execute(statement);
-      }
-      await db.execute('''INSERT INTO approval_requests
-        (id, kind, title, description, sender_name, app_id, sender_id, requested_at)
-        SELECT 'team:' || app_id || ':' || sender_id || ':' || requested_at,
-          'miniapp', '申请加入 ' || (SELECT title FROM html_apps WHERE id = app_id) || ' 的开发团队', reason,
-          (SELECT name FROM message_senders WHERE id = sender_id),
-          app_id, sender_id, requested_at
-        FROM miniapp_edit_requests WHERE status = 'pending' ''');
-    }
-    final runColumns = await db.rawQuery('PRAGMA table_info(agent_runs)');
-    if (oldVersion < 89 &&
-        !runColumns.any((column) => column['name'] == 'parent_run_id')) {
-      for (final statement in subagentRunSchema) {
-        await db.execute(statement);
-      }
+    // Version 98 is the supported baseline; never silently advance an older backup.
+    if (oldVersion < 98) {
+      throw StateError('数据库版本低于 98，已不再支持自动升级此旧备份');
     }
   },
   onCreate: (db, version) async {
     final batch = db.batch();
     for (final statement in [
       ..._schema,
+      ...personalChatSchema,
       privateTaskStateSchema,
       ...subagentRunSchema,
+      organizedTaskSchema,
+      organizedTaskOrderIndex,
       ...assetLibrarySchema,
       projectRecordSchema,
       ...projectDirectorySchema,
@@ -559,6 +110,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
     }
     await batch.commit(noResult: true);
     await migrateAiIdentities(db);
+    await migrateMemoryStorage(db);
     await migrateSkillLibrary(db);
     await migrateAuraiAvatar(db);
     await migrateAuraiDescription(db);

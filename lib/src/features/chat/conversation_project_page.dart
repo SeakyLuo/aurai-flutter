@@ -18,8 +18,8 @@ String conversationProjectChangedMessage(
   List<DevelopmentProject> projects,
   String? projectId,
 ) => projectId == null
-    ? '已将会话移出项目'
-    : '已将会话加入“${projects.singleWhere((project) => project.id == projectId).name}”';
+    ? '已将任务移出项目'
+    : '已将任务加入“${projects.singleWhere((project) => project.id == projectId).name}”';
 
 class ConversationProjectSheet extends StatefulWidget {
   const ConversationProjectSheet({

@@ -199,10 +199,10 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
                   (state['steps'] as List? ?? const []).any(
                     (s) => s['status'] != 'completed',
                   )) {
-                throw StateError('已有未完成的任务清单，请使用 updateTaskList');
+                throw StateError('已有未完成的执行计划，请使用 updateTaskList');
               }
               if (name == 'updateTaskList' && !state.containsKey('steps')) {
-                throw StateError('当前没有任务清单，请先使用 createTaskList');
+                throw StateError('当前没有执行计划，请先使用 createTaskList');
               }
               final steps = (args['steps'] as List).cast<Map>();
               if (steps.length > 30 ||
@@ -216,7 +216,7 @@ class PrivateTaskTool implements AgentTool, RuntimeCapabilityAgentTool {
                           'completed',
                         ].contains(s['status']),
                   )) {
-                throw ArgumentError('任务清单最多 30 项，同时只能有一项进行中');
+                throw ArgumentError('执行计划最多 30 项，同时只能有一项进行中');
               }
               state['steps'] = steps;
               state['explanation'] = args['explanation'];

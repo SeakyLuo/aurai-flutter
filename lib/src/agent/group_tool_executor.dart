@@ -2,6 +2,8 @@ import 'dart:async';
 import '../domain/ui_tool_actions.dart';
 import '../domain/tool_models.dart';
 import 'tool_executor.dart';
+import 'ask_user_tool.dart';
+import 'tool_registry.dart';
 
 class GroupToolQueue {
   Future<void> _tail = Future.value();
@@ -38,7 +40,8 @@ class GroupToolExecutor extends ToolExecutor {
     required this.waitForInteraction,
     this.owner,
     this.surfaceOwner,
-  });
+  }) : _questionRegistry = registry;
+  final ToolRegistry _questionRegistry;
   final GroupToolQueue queue;
   final Object? owner;
   final Object? surfaceOwner;
@@ -59,7 +62,9 @@ class GroupToolExecutor extends ToolExecutor {
             ),
           )
         : super.execute(call);
-    if (call.name == 'askUser') {
+    final questionTool = _questionRegistry.find(call.name);
+    if (questionTool is AskUserTool &&
+        !questionTool.usesMessageCard(call.arguments)) {
       return Future.any([
         queue.questionsFor(owner ?? this).run(() async {
           await waitForInteraction();
@@ -167,7 +172,8 @@ class GroupToolExecutor extends ToolExecutor {
       );
     if (definition.safetyFor(call.arguments) != ToolSafety.readOnly &&
         call.name != 'askUser' &&
-        call.name != 'runSubagent') {
+        call.name != 'runSubagent' &&
+        call.name != 'runTask') {
       return queue.mutations.run(perform);
     }
     return perform();

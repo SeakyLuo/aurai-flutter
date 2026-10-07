@@ -25,6 +25,7 @@ void _attachRunSummary(
       id: answer.id,
       role: answer.role,
       isGroupMessage: answer.isGroupMessage,
+      markdown: answer.markdown,
       isReasoning: answer.isReasoning,
       senderId: answer.senderId,
       sender: answer.sender,

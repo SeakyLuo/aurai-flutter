@@ -29,7 +29,7 @@ extension GlobalTools on ChatController {
       capabilities: capabilities,
       groupId: groupId,
     );
-    registry.load(await recentConversationTools(_store.database, member.id));
+    registry.restore(await recentConversationTools(_store.database, member.id));
     registry.load([
       'sendGroupMessage',
       if (parent != null) ...[
@@ -57,6 +57,23 @@ extension GlobalTools on ChatController {
     String? groupId,
   }) {
     final conversationId = conversation.id;
+    questionTool.defaultToCard = !conversation.isTask || groupId != null;
+    questionTool.publishCard = (definition) => _interactiveMessage(
+      'sendInteractiveMessage',
+      {...definition, if (groupId != null) 'conversationId': groupId},
+      conversation,
+      senderId,
+    );
+    questionTool.submitCard = (id, answers) async {
+      await clickInteractiveMessage(
+        id,
+        'answer',
+        0,
+        0,
+        value: answers,
+        source: conversation,
+      );
+    };
     return <AgentTool>[
           // Goals/plans are isolated by conversation and member; scheduling remains independent.
           for (final name in PrivateTaskTool.names)

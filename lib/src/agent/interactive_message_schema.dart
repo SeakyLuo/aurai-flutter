@@ -1,10 +1,17 @@
 import '../domain/interactive_button_icons.dart';
+import 'question_batch_schema.dart';
 
 const interactiveSelectionSchema = {
   'type': 'object',
   'description':
-      'Native fixed-option selection for polls and questions. Requires action:submit and a shared interaction. Multiple uses checkboxes and submits all selected options together after confirmation; single-recipient single-choice questions submit on selection, while polls require confirmation. The UI renders min/max selection hints and selected counts for multiple selection automatically; single selection has no count hint. Do not repeat these in the title, body, or accompanying message (e.g. 可多选, 最多选3项). Configure mode and minSelections/maxSelections instead. Cannot combine with input. Works for humans and AI.',
+      'Native fixed-option selection for polls and questions. Requires action:submit and a shared interaction. Multiple uses checkboxes and submits all selected options together after confirmation; single choice submits on selection unless showConfirm is true, for both questions and polls. The UI renders min/max selection hints and selected counts for multiple selection automatically; single selection has no count hint. Do not repeat these in the title, body, or accompanying message (e.g. 可多选, 最多选3项). Configure mode and minSelections/maxSelections instead. Cannot combine with input. Works for humans and AI.',
   'properties': {
+    'showConfirm': {
+      'type': 'boolean',
+      'default': false,
+      'description':
+          'Single choice submits immediately by default. Set true for consequential choices that need confirmation. Multiple choice always submits the selected set together.',
+    },
     'mode': {
       'type': 'string',
       'enum': ['single', 'multiple'],
@@ -123,6 +130,7 @@ const interactiveButtonsSchema = {
       },
       'repeatable': {'type': 'boolean'},
       'selection': interactiveSelectionSchema,
+      'questions': questionBatchSchema,
       'input': {
         'type': 'string',
         'enum': ['text', 'json'],
@@ -154,7 +162,7 @@ const interactiveParticipationSchema = {
     'anonymous': {
       'type': 'boolean',
       'description':
-          'Anonymous native poll. Default false; immutable after sending. No viewer, including the creator or an AI, can read other participants identities, ballots, reasons, or histories. Each participant can still read their own choice and change it if allowed. Aggregate visibility and reveal timing remain controlled separately. Vote callbacks omit actor identity and individual submission. The UI labels the card 匿名投票; do not repeat this in title/body. Not supported for HTML or miniapp action cards that pass participant identity to program code.',
+          'Anonymous native poll. Default false; immutable after sending. No viewer, including the creator or an AI, can read other participants identities, ballots, reasons, or histories. Each participant can still read their own choice and change it if allowed. Aggregate visibility and reveal timing remain controlled separately. Vote callbacks omit actor identity and individual submission. The UI labels the card 匿名投票; do not repeat this in title/body. Miniapp native vote cards are supported: their reducer receives actorId:null and aggregate data only, never the submitted value or reason. HTML input and non-voting actions are not anonymous polls.',
     },
     'showHistory': {
       'type': 'boolean',

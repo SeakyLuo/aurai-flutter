@@ -33,12 +33,12 @@ extension ConversationRun on ChatController {
       reply.profile,
       privateScope: groupHistory == null ? '' : runConversation.id,
     );
-    final (:project, :memory, :privateMemory) = memoryContext;
+    final (:project, :memory, privateMemory: sharedProjectMemory) =
+        memoryContext;
     final skills = await aiSkills(reply.senderId);
     final documents = await _aiDocuments(reply.senderId, project);
     final customInstructions = reply.profile.preferences.customInstructions;
     final responsePreferences = reply.profile.preferences.responses;
-    final memoryRevision = memory.revision;
     final callbackEvents = await MessageCallbacks(
       _store.database,
     ).pending(runConversation.id, reply.senderId);
@@ -122,16 +122,12 @@ extension ConversationRun on ChatController {
           ? OpenAiResponsesProvider(
               runConfig,
               systemPrompt: systemPrompt,
-              summaryConfig: modelSettings.activeConfig,
-              sharedContext: groupParent?.sharedContext,
-              sharedContextOwnerId: groupParent == null ? null : reply.senderId,
+              sharedContext: (groupParent ?? runConversation).sharedContext,
             )
           : DeepSeekResponsesProvider(
               runConfig,
               systemPrompt: systemPrompt,
-              summaryConfig: modelSettings.activeConfig,
-              sharedContext: groupParent?.sharedContext,
-              sharedContextOwnerId: groupParent == null ? null : reply.senderId,
+              sharedContext: (groupParent ?? runConversation).sharedContext,
             );
       final webSources = WebSourceRegistry();
       final tools = _createTools(
@@ -157,7 +153,8 @@ extension ConversationRun on ChatController {
                 ? question.question
                 : title;
             final preview = '${reply.sender.name}：[问题] $label';
-            target.pendingQuestionPreviews[runId] = preview;
+            target.pendingQuestionPreviews[runId] =
+                target.kind == ConversationKind.group ? preview : '[问题] $label';
             questionNotifications.value = ConversationCompletion(
               conversationId: target.id,
               title: target.title,
@@ -188,23 +185,36 @@ extension ConversationRun on ChatController {
         }, sender: reply.sender),
       )..addAll(_thinkingTools(runConversation, groupParent, reply));
       tools.add(
-        RunSubagentTool(
-          (call, cancelled) => _prepareSubagent(
-            call,
-            cancelled,
-            parentRunId: runId,
-            reply: reply,
-            conversation: runConversation,
-            parent: groupParent,
-            memory: memory,
-            skills: skills,
-            documents: documents,
-            history: observed,
-            systemPrompt: systemPrompt,
-            customInstructions: customInstructions,
-          ),
-          onError: (error) => _recordRunError(error, summaryOwner.id),
-        ),
+        runConversation.isPersonalChat
+            ? RunTaskTool(
+                (call, cancelled) => _prepareTask(
+                  call,
+                  cancelled,
+                  source: runConversation,
+                  reply: reply,
+                  sourceMessageId:
+                      callbackEvents.lastOrNull?['message_id'] as String? ??
+                      userMessage.id,
+                ),
+                onError: (error) => _recordRunError(error, summaryOwner.id),
+              )
+            : RunSubagentTool(
+                (call, cancelled) => _prepareSubagent(
+                  call,
+                  cancelled,
+                  parentRunId: runId,
+                  reply: reply,
+                  conversation: runConversation,
+                  parent: groupParent,
+                  memory: memory,
+                  skills: skills,
+                  documents: documents,
+                  history: observed,
+                  systemPrompt: systemPrompt,
+                  customInstructions: customInstructions,
+                ),
+                onError: (error) => _recordRunError(error, summaryOwner.id),
+              ),
       );
       final registry = await _createMemberToolRegistry(
         currentProjectId: () => documents.project?.id,
@@ -269,6 +279,7 @@ extension ConversationRun on ChatController {
       String? reasoningMessageId;
       int? reasoningActivityIndex, outputMessageIndex;
       await runtime.run(
+        streamOutput: groupParent != null,
         decision: decision,
         endsRun: (result) =>
             result.toolName == 'sleepGroupChat' &&
@@ -300,19 +311,24 @@ extension ConversationRun on ChatController {
             : groupParent!.contextSummary,
         privateContextSummary:
             groupParent?.privateContextSummaries[reply.senderId],
+        organizeTask: () => memory.organizeTask(runId),
+        cancelOrganization: () => memory.cancelTaskOrganization(runId),
         personalContext: () async => [
+          if (runConversation.isPersonalChat)
+            '当前是你与用户的长期私聊，同一个联系人始终使用这段聊天。用户可以在这里闲聊或交代事情，按具体请求行动；已有任务是独立的工作记录。',
+          await _taskContext(runConversation),
           responsePreferences.instructions,
-          RunSubagentTool.instructions,
+          runConversation.isPersonalChat
+              ? RunTaskTool.instructions
+              : RunSubagentTool.instructions,
           if (groupParent != null && sleepDraft.isNotEmpty)
             '你上次休眠前留下的私人草稿（尚未发送）：\n$sleepDraft\n请结合最新消息决定保留、改写或放弃；不要自动发送，也不要当作用户的新指令。',
           if (customInstructions.isNotEmpty) '用户自定义指令：\n$customInstructions',
           if (runConversation.usesPersonalization)
-            if (project == null)
-              await memory.sharedContext()
-            else ...[
-              if (privateMemory != null) await privateMemory.sharedContext(),
-              memory.context,
-            ],
+            await memory.sharedContext(query: userMessage.text),
+          if (runConversation.usesPersonalization &&
+              sharedProjectMemory != null)
+            await sharedProjectMemory.sharedContext(query: userMessage.text),
           if (runConversation.isTemporary) '当前为临时会话，不得将本次内容写入长期记忆。',
           if (project != null) _projectContext(project),
           if (alongsideGroup) '群聊正在后台进行；当前私聊仍可使用完整工具集。共享手机界面和用户交互由执行器互斥协调。',
@@ -361,6 +377,14 @@ extension ConversationRun on ChatController {
           _notifyMember(runConversation, groupParent);
           await _persistMember(runConversation, groupParent);
           await _store.runs.finishTurn(modelTurnId, turn);
+          if (groupParent != null && !runConversation.isTemporary)
+            await memory.captureObserved(
+              runId,
+              observed.reversed
+                  .where((m) => m.canView(reply.senderId))
+                  .take(24)
+                  .map((m) => m.id),
+            );
         },
         onToolStarted: (call) async {
           diagnosticCalls[call.id] = ExecutionLog.argumentShape(call.arguments);
@@ -485,6 +509,7 @@ extension ConversationRun on ChatController {
             messages.add(
               AgentMessage(
                 id: turnMessageId!,
+                markdown: true,
                 role: AgentMessageRole.assistant,
                 senderId: reply.senderId,
                 sender: reply.sender,
@@ -507,6 +532,7 @@ extension ConversationRun on ChatController {
               modelTurnId: previous.modelTurnId,
               text: text,
               createdAt: previous.createdAt,
+              markdown: true,
             );
           }
           activities[turnActivityIndex!] = AgentTaskActivity(
@@ -750,13 +776,6 @@ extension ConversationRun on ChatController {
         if (callbackEvents.isEmpty &&
             outcome == 'completed' &&
             (groupParent == null || runMessageIds.isNotEmpty)) {
-          if (!runConversation.isTemporary)
-            memory.learn(
-              runConfig,
-              runConversation.id,
-              userMessage,
-              memoryRevision,
-            );
           if (groupHistory == null)
             completedReplies.value = ConversationCompletion(
               conversationId: runConversation.id,

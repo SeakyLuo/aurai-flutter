@@ -5,6 +5,7 @@ import 'speech_readout_button.dart';
 import 'message_quote_view.dart';
 import 'message_time.dart';
 import 'source_citation_view.dart';
+import 'settings_icon.dart';
 
 class MessageReplyFooter extends StatelessWidget {
   const MessageReplyFooter({
@@ -18,6 +19,7 @@ class MessageReplyFooter extends StatelessWidget {
     this.onQuote,
     this.onMore,
     this.onReadAloud,
+    this.goalElapsed,
   });
 
   final bool copied;
@@ -29,6 +31,7 @@ class MessageReplyFooter extends StatelessWidget {
   final DateTime createdAt;
   final List<SourceReference> sources;
   final ValueChanged<String?> onOpenLink;
+  final Duration? goalElapsed;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -79,16 +82,46 @@ class MessageReplyFooter extends StatelessWidget {
             ),
           ),
         const SizedBox(width: 6),
-        Tooltip(
-          message: messageTime(createdAt),
-          triggerMode: TooltipTriggerMode.tap,
-          child: Text(
-            messageTime(createdAt),
-            style: TextStyle(
-              fontSize: 12,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              height: 1.4,
-            ),
+        Flexible(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (goalElapsed case final elapsed?)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox.square(
+                      dimension: 16,
+                      child: SettingsIcon(type: SettingsIconType.selectCircle),
+                    ),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        'Goal achieved in ${_goalDuration(elapsed)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              Tooltip(
+                message: messageTime(createdAt),
+                triggerMode: TooltipTriggerMode.tap,
+                child: Text(
+                  messageTime(createdAt),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         if (sources.isNotEmpty) ...[
@@ -99,3 +132,10 @@ class MessageReplyFooter extends StatelessWidget {
     ),
   );
 }
+
+String _goalDuration(Duration elapsed) => [
+  if (elapsed.inHours > 0) '${elapsed.inHours}h',
+  if (elapsed.inMinutes.remainder(60) > 0)
+    '${elapsed.inMinutes.remainder(60)}m',
+  '${elapsed.inSeconds.remainder(60)}s',
+].join(' ');

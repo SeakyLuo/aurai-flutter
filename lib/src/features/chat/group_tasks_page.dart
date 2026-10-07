@@ -9,6 +9,7 @@ import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import '../../storage/private_task_state.dart';
 import 'private_task_panel.dart';
+import 'private_goal_panel.dart';
 
 class GroupTasksPage extends StatelessWidget {
   const GroupTasksPage({
@@ -27,7 +28,7 @@ class GroupTasksPage extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
     appBar: SettingsAppBar(
-      title: privateStore == null ? '群任务' : '任务',
+      title: privateStore == null ? '群计划' : '计划',
       onBack: () => Navigator.pop(context),
     ),
     body: ListenableBuilder(
@@ -49,14 +50,30 @@ class GroupTasksPage extends StatelessWidget {
             padding: padding,
             children: [
               if (privateStore != null)
-                PrivateTaskPanel(
+                PrivateGoalPanel(
                   store: privateStore!,
-                  empty: tasks.isEmpty
-                      ? SizedBox(
-                          height: constraints.maxHeight - padding.vertical,
-                          child: const EmptyDataView(title: '暂无任务'),
-                        )
-                      : null,
+                  controller: controller,
+                  showTasks: false,
+                  builder: (context, goal) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (goal != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: goal,
+                        ),
+                      PrivateTaskPanel(
+                        store: privateStore!,
+                        empty: tasks.isEmpty && goal == null
+                            ? SizedBox(
+                                height:
+                                    constraints.maxHeight - padding.vertical,
+                                child: const EmptyDataView(title: '暂无计划'),
+                              )
+                            : null,
+                      ),
+                    ],
+                  ),
                 )
               else
                 ProgramTaskPanel(
@@ -66,7 +83,7 @@ class GroupTasksPage extends StatelessWidget {
                   empty: tasks.isEmpty
                       ? SizedBox(
                           height: constraints.maxHeight - padding.vertical,
-                          child: const EmptyDataView(title: '暂无群任务'),
+                          child: const EmptyDataView(title: '暂无群计划'),
                         )
                       : null,
                   child: const SizedBox.shrink(),

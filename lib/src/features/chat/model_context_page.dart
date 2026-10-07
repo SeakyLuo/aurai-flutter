@@ -139,7 +139,7 @@ class _ModelContextPageState extends State<ModelContextPage> {
     }
     if (percentText.isNotEmpty &&
         (percent == null || percent < 65 || percent > 95)) {
-      _notice('压缩阈值需在 65%–95% 之间');
+      _notice('窗口使用比例需在 65%–95% 之间');
       return false;
     }
     if (window == null && percent == null) {
@@ -268,7 +268,7 @@ class _ModelContextPageState extends State<ModelContextPage> {
         defaultService: widget.controller.modelSettings.activeService,
       );
       if (!mounted) return;
-      if (widget.draft == null) _notice('上下文压缩设置已保存', kind: ToastKind.success);
+      if (widget.draft == null) _notice('上下文窗口设置已保存', kind: ToastKind.success);
       setState(() => _allowPop = true);
       Navigator.pop(context, true);
     } on Object catch (error) {
@@ -287,7 +287,7 @@ class _ModelContextPageState extends State<ModelContextPage> {
     }
     final action = await showDialog<String>(
       context: context,
-      builder: (_) => const TaskUnsavedDialog(description: '上下文压缩设置还有未保存的修改。'),
+      builder: (_) => const TaskUnsavedDialog(description: '上下文窗口设置还有未保存的修改。'),
     );
     if (!mounted) return;
     if (action == 'save') {
@@ -377,7 +377,7 @@ class _ModelContextPageState extends State<ModelContextPage> {
       return Scaffold(
         extendBodyBehindAppBar: true,
         appBar: SettingsAppBar(
-          title: '上下文压缩',
+          title: '上下文窗口',
           onBack: () => Navigator.pop(context),
         ),
         body: SettingsPageBody(
@@ -402,7 +402,7 @@ class _ModelContextPageState extends State<ModelContextPage> {
                     ),
                   ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                    title: const Text('压缩阈值'),
+                    title: const Text('窗口使用比例'),
                     subtitle: Text(
                       '${value?.compactPercent ?? inherited}%'
                       '${!_providerDefault && value?.compactPercent == null ? ' · 继承默认设置' : ''}',
@@ -423,7 +423,7 @@ class _ModelContextPageState extends State<ModelContextPage> {
       child: Scaffold(
         extendBodyBehindAppBar: true,
         appBar: SettingsAppBar(
-          title: '上下文压缩',
+          title: '上下文窗口',
           onBack: _saving ? null : _leave,
           actions: [
             SettingsGlassActionSurface(
@@ -506,7 +506,7 @@ class _ModelContextPageState extends State<ModelContextPage> {
                     ],
                     if (!_providerDefault || !widget.fixedModel)
                       const SizedBox(height: 24),
-                    _label('压缩阈值（%）'),
+                    _label('窗口使用比例（%）'),
                     TextField(
                       controller: _percent,
                       keyboardType: TextInputType.number,
@@ -524,7 +524,7 @@ class _ModelContextPageState extends State<ModelContextPage> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 18),
                         child: Text(
-                          '约 ${limits.compactThreshold} token 触发压缩'
+                          '约 ${limits.compactThreshold} token 用于近期上下文'
                           '${limits.isEstimated ? '（窗口容量为估算值）' : ''}',
                           style: TextStyle(
                             fontSize: 14,
@@ -540,8 +540,8 @@ class _ModelContextPageState extends State<ModelContextPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 18),
                       child: Text(
                         _providerDefault
-                            ? '此供应商下的文本模型默认继承该压缩阈值；每个模型按自己的上下文窗口计算。留空使用 80%。'
-                            : '留空继承默认模型设置。压缩阈值可设置为 65%–95%，计算时会预留输出和工具空间。',
+                            ? '此供应商下的文本模型默认继承该窗口使用比例；每个模型按自己的上下文窗口计算。留空使用 80%。'
+                            : '留空继承默认模型设置。窗口使用比例可设置为 65%–95%，计算时会预留输出和工具空间。',
                         style: TextStyle(
                           fontSize: 14,
                           color: Theme.of(context).colorScheme.onSurfaceVariant,

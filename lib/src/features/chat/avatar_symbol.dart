@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'settings_icon.dart';
+import 'sidebar_action_icon.dart';
 import '../../domain/avatar_portraits.dart';
 import '../../html_games/html_game_icon.dart';
 import '../../skills/extra_skill_icon.dart';
@@ -83,6 +84,7 @@ const avatarSymbols = <String, String>{
   'portrait:saturn': '土星',
   'portrait:sunglasses_bee': '墨镜蜜蜂',
   'person': '人物',
+  'group': '群聊',
   'spark': '灵感',
   'puzzle': '拼图',
   'memory': '记忆',
@@ -162,6 +164,9 @@ class AvatarSymbol extends StatelessWidget {
     }
     if (symbol == 'game')
       return HtmlGameIcon(HtmlGameIconType.game, color: color);
+    if (symbol == 'group') {
+      return SidebarActionIcon(type: SidebarActionIconType.group, color: color);
+    }
     if (symbol == 'app_logo_white') {
       return Image.asset(
         'assets/branding/symbol_white.png',

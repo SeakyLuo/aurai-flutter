@@ -103,7 +103,7 @@ class _PrivateTaskPanelState extends State<PrivateTaskPanel> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              '任务清单',
+              '执行计划',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             if (explanation != null && explanation.isNotEmpty) ...[

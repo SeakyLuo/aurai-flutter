@@ -3,6 +3,17 @@ import 'message_sender.dart';
 
 /// Shared content labels for saved list previews and live message previews.
 abstract final class MessageSummary {
+  static const previewLimit = 80;
+
+  /// Bound preview parsing and layout without modifying the original message.
+  static String preview(String text, {int limit = previewLimit}) {
+    if (text.length <= limit) return text;
+    var end = limit;
+    final last = text.codeUnitAt(end - 1);
+    if (last >= 0xd800 && last <= 0xdbff) end--;
+    return '${text.substring(0, end)}…';
+  }
+
   static String attachment({
     required String kind,
     required String mimeType,
