@@ -35,7 +35,7 @@ Future<void> showInteractiveStatistics(
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: false,
-    builder: (_) => _StatisticsSheet(
+    builder: (_) => InteractiveStatisticsSheet(
       database: database,
       controller: controller,
       messageId: messageId,
@@ -44,8 +44,8 @@ Future<void> showInteractiveStatistics(
   );
 }
 
-class _StatisticsSheet extends StatefulWidget {
-  const _StatisticsSheet({
+class InteractiveStatisticsSheet extends StatefulWidget {
+  const InteractiveStatisticsSheet({
     required this.database,
     required this.controller,
     required this.messageId,
@@ -58,10 +58,12 @@ class _StatisticsSheet extends StatefulWidget {
   final String? actor;
   final InteractiveMessage? snapshot;
   @override
-  State<_StatisticsSheet> createState() => _StatisticsSheetState();
+  State<InteractiveStatisticsSheet> createState() =>
+      _InteractiveStatisticsSheetState();
 }
 
-class _StatisticsSheetState extends State<_StatisticsSheet> {
+class _InteractiveStatisticsSheetState
+    extends State<InteractiveStatisticsSheet> {
   InteractiveMessage? _card;
   Map<String, MessageSender> _senders = {};
   String? _groupId;
@@ -224,7 +226,7 @@ class _StatisticsSheetState extends State<_StatisticsSheet> {
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: false,
-    builder: (_) => _StatisticsSheet(
+    builder: (_) => InteractiveStatisticsSheet(
       database: widget.database,
       controller: widget.controller,
       messageId: widget.messageId,

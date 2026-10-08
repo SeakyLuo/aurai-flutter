@@ -18,6 +18,8 @@ class QuestionMessageHeading extends StatelessWidget {
     this.trailing,
     this.pager,
     this.modeLabel,
+    this.sheetHeader = false,
+    this.senderHeading,
   });
 
   final String title, description, status;
@@ -27,31 +29,39 @@ class QuestionMessageHeading extends StatelessWidget {
   final Widget? trailing;
   final Widget? pager;
   final String? modeLabel;
+  final bool sheetHeader;
+  final Widget? senderHeading;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final showStatus = status.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            const QuestionIcon(type: QuestionIconType.question),
-            const SizedBox(width: 8),
-            Text(
-              '问题',
-              style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
-            ),
-            if (pager != null) pager!,
-            const Spacer(),
-            Text(
-              modeLabel ?? (multiple ? '多选' : '单选'),
-              style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
-            ),
-            if (trailing != null) ...[const SizedBox(width: 8), trailing!],
-          ],
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: sheetHeader ? kMinInteractiveDimension : 0,
+          ),
+          child: Row(
+            children: [
+              const QuestionIcon(type: QuestionIconType.question),
+              const SizedBox(width: 8),
+              Text(
+                '问题 · ${modeLabel ?? (multiple ? '多选' : '单选')}',
+                style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
+              ),
+              const Spacer(),
+              if (pager != null) pager!,
+              if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+            ],
+          ),
         ),
         const SizedBox(height: 8),
+        if (senderHeading != null) ...[
+          senderHeading!,
+          const SizedBox(height: 8),
+        ],
         Text(
           title,
           style: TextStyle(
@@ -105,12 +115,17 @@ class QuestionMessageHeading extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              InteractiveStatusTag(label: status, highlighted: status == '待回答'),
+              if (showStatus) ...[
+                const SizedBox(width: 12),
+                InteractiveStatusTag(
+                  label: status,
+                  highlighted: status == '待回答',
+                ),
+              ],
             ],
           ),
         ],
-        if (recipient == null && status.isNotEmpty) ...[
+        if (recipient == null && showStatus) ...[
           const SizedBox(height: 8),
           Text(
             status,

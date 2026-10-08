@@ -7,7 +7,21 @@ extension _ChatPinnedMessage on _ChatPageState {
       singleMessage: message,
       onEdit: _beginMessageEdit,
       onRecall: _recallMessage,
-      onQuote: _editing == null ? _quoteMessage : null,
+      onQuote: _editing == null
+          ? (message, {selectedText, visual}) async {
+              final route = ModalRoute.of(context)!;
+              if (route is PopupRoute) {
+                Navigator.pop(context);
+                await route.completed;
+              }
+              if (!mounted) return;
+              await _quoteMessage(
+                message,
+                selectedText: selectedText,
+                visual: visual,
+              );
+            }
+          : null,
       onMention: _editing == null ? _mentionMember : null,
       onOpenQuote: _openQuotedMessage,
       onQuickReply: _sendQuickReply,

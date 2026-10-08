@@ -7,6 +7,9 @@ import '../../domain/message_sender.dart';
 import 'member_profile_avatar.dart';
 import 'chat_controller.dart';
 import 'settings_icon.dart';
+import '../../agent/ask_user_tool.dart';
+import '../../domain/selection_option.dart';
+import 'rich_option_carousel.dart';
 
 typedef InteractiveOptionKey = (String, String);
 
@@ -90,6 +93,25 @@ class InteractiveStatisticsOverview extends StatelessWidget {
           const SizedBox(height: 24),
         ],
         if (summaryVisible) ...[
+          if (hasRichOptions(summary)) ...[
+            RichOptionCarousel(
+              options: [
+                for (final option in summary)
+                  UserQuestionOption.fromSelection(option),
+              ],
+              selected: {
+                for (final (index, option) in summary.indexed)
+                  if (card.choices[MessageSender.localUser.id] case final own?)
+                    if (selectionEntries(
+                      own,
+                    ).any((choice) => choice['buttonId'] == option['buttonId']))
+                      index,
+              },
+              multiple: true,
+              onSelect: null,
+            ),
+            const SizedBox(height: 16),
+          ],
           Text(
             card.hasInteraction
                 ? card.completed

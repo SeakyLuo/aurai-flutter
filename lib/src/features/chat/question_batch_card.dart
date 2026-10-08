@@ -27,6 +27,7 @@ class QuestionBatchCard extends StatefulWidget {
     this.recipient,
     this.onOpenMember,
     this.trailing,
+    this.compact = true,
   });
   final List questions;
   final String buttonId, actorId, version, status;
@@ -36,6 +37,7 @@ class QuestionBatchCard extends StatefulWidget {
   final MessageSender? recipient;
   final ValueChanged<String>? onOpenMember;
   final Widget? trailing;
+  final bool compact;
   final Future<void> Function(Map<String, Object?>) onSubmit;
   final Future<void> Function(String version, String data) onSave;
   @override
@@ -139,7 +141,13 @@ class _QuestionBatchCardState extends State<QuestionBatchCard> {
   }
 
   @override
-  Widget build(BuildContext context) => widget.messageId == null
+  Widget build(BuildContext context) => !widget.compact
+      ? QuestionSheetLayout(
+          title: '问题',
+          heading: const SizedBox.shrink(),
+          child: _form(compact: false),
+        )
+      : widget.messageId == null
       ? _form()
       : QuestionCardAnchor(
           messageId: widget.messageId!,
@@ -170,7 +178,7 @@ class _QuestionBatchCardState extends State<QuestionBatchCard> {
     }
     await showQuestionSheet(
       context,
-      returnTarget: () => QuestionCardAnchor.bounds(widget.messageId!),
+      messageId: widget.messageId,
       closeWhen: widget.readOnly ? null : _answered.future,
       child: QuestionSheetLayout(
         title: '问题',

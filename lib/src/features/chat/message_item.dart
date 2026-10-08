@@ -199,12 +199,14 @@ class _MessageItemState extends State<MessageItem> {
                   !widget.streaming &&
                   !message.isReasoning
               ? MessageSwipeQuote(
-                  belowAvatar:
-                      widget.showSenderAvatar &&
-                      widget.groupBubble &&
-                      message.role == AgentMessageRole.assistant &&
-                      message.sender != null &&
-                      message.interactive?.systemPresentation != true,
+                  anchorKey:
+                      !message.isFailure &&
+                          message.miniappShare == null &&
+                          message.htmlGame == null &&
+                          (message.text.isNotEmpty ||
+                              message.interactive != null)
+                      ? _bubbleKey
+                      : _quoteSourceKey,
                   onQuote: () => _quote(),
                   child: KeyedSubtree(
                     key: _quoteSourceKey,

@@ -61,6 +61,7 @@ class MemoryController extends ChangeNotifier {
   StreamSubscription<String>? _changes;
   bool hasMore = false;
   int failedJobs = 0;
+  String? latestFailure;
   String searchQuery = '';
   final notices = ValueNotifier<String?>(null);
 

@@ -1,6 +1,86 @@
 import 'package:sqflite/sqflite.dart';
 import 'memory_search.dart';
 
+Future<void> installMemoryQueueTriggers(DatabaseExecutor db) async {
+  for (final original in _schema.where(
+    (s) => s.startsWith('CREATE TRIGGER memory_'),
+  )) {
+    final name = original.split(' ')[2];
+    if (![
+      'memory_run_start',
+      'memory_live_input',
+      'memory_message_insert',
+      'memory_message_update',
+      'memory_turn_checkpoint',
+      'memory_tool_finish',
+      'memory_run_finish',
+    ].contains(name))
+      continue;
+    await db.execute('DROP TRIGGER $name');
+    if (name == 'memory_run_start') {
+      await db.execute(_queueRunStart);
+      continue;
+    }
+    var sql = original.replaceAll(
+      '(SELECT COALESCE(parent_run_id, id) FROM agent_runs WHERE id = NEW.run_id)',
+      '(SELECT job_id FROM memory_run_jobs WHERE run_id = (SELECT COALESCE(parent_run_id, id) FROM agent_runs WHERE id = NEW.run_id))',
+    );
+    if (name == 'memory_live_input') {
+      sql = sql
+          .replaceAll(
+            "SELECT active_run_id, 'message'",
+            "SELECT (SELECT job_id FROM memory_run_jobs WHERE run_id = active_run_id), 'message'",
+          )
+          .replaceAll(
+            'active_run_id IN (SELECT run_id FROM memory_jobs)',
+            'active_run_id IN (SELECT run_id FROM memory_run_jobs)',
+          );
+    }
+    if (name == 'memory_run_finish') {
+      sql = sql.replaceAll(
+        'COALESCE(NEW.parent_run_id, NEW.id)',
+        '(SELECT job_id FROM memory_run_jobs WHERE run_id = COALESCE(NEW.parent_run_id, NEW.id))',
+      );
+      final start = sql.indexOf('      UPDATE memory_jobs');
+      sql =
+          '${sql.substring(0, start)}'
+          "UPDATE memory_jobs SET state = 'pending', due_at = CASE WHEN EXISTS "
+          '(SELECT 1 FROM conversations WHERE id = memory_jobs.conversation_id AND personal_chat = 1) '
+          "THEN MIN(queued_at + 120000, CAST(strftime('%s','now') AS INTEGER) * 1000 + 30000) ELSE 0 END "
+          "WHERE run_id = (SELECT job_id FROM memory_run_jobs WHERE run_id = COALESCE(NEW.parent_run_id, NEW.id)) AND state = 'waiting'; END";
+    }
+    await db.execute(sql);
+  }
+}
+
+const _queueRunStart =
+    '''CREATE TRIGGER memory_run_start AFTER INSERT ON agent_runs
+WHEN NEW.parent_run_id IS NULL AND EXISTS (SELECT 1 FROM conversations WHERE id = NEW.conversation_id AND mode = 'normal')
+BEGIN
+  INSERT INTO memory_jobs(run_id, owner_id, scope, conversation_id, due_at, queued_at)
+  SELECT NEW.id, NEW.sender_id,
+    CASE WHEN c.project_id IS NOT NULL THEN 'project:' || c.project_id
+      WHEN c.kind = 'group' THEN c.id ELSE '' END,
+    c.id, 0, CAST(strftime('%s','now') AS INTEGER) * 1000 FROM conversations c
+  WHERE c.id = NEW.conversation_id AND NOT EXISTS (
+    SELECT 1 FROM memory_jobs j WHERE c.personal_chat = 1
+    AND j.conversation_id = c.id AND j.owner_id = NEW.sender_id
+    AND j.state IN ('waiting','pending') AND j.cursor = 0 AND j.batch_json IS NULL
+    AND j.queued_at + 120000 > CAST(strftime('%s','now') AS INTEGER) * 1000);
+  INSERT INTO memory_run_jobs(run_id, job_id)
+    SELECT NEW.id, run_id FROM memory_jobs WHERE conversation_id = NEW.conversation_id
+    AND owner_id = NEW.sender_id AND (run_id = NEW.id OR
+      (state IN ('waiting','pending') AND cursor = 0 AND batch_json IS NULL
+       AND queued_at + 120000 > CAST(strftime('%s','now') AS INTEGER) * 1000
+       AND EXISTS(SELECT 1 FROM conversations WHERE id = NEW.conversation_id AND personal_chat = 1)))
+    ORDER BY queued_at, run_id LIMIT 1;
+  UPDATE memory_jobs SET state = 'waiting' WHERE run_id =
+    (SELECT job_id FROM memory_run_jobs WHERE run_id = NEW.id);
+  INSERT INTO memory_evidence(run_id, kind, source_id)
+    SELECT job_id, 'message', NEW.user_message_id FROM memory_run_jobs
+    WHERE run_id = NEW.id AND NEW.user_message_id IS NOT NULL;
+END''';
+
 Future<void> unifyProjectMemories(DatabaseExecutor db) async {
   await db.execute('DROP TRIGGER memory_run_start');
   await db.execute(

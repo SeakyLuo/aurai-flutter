@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:sqflite/sqflite.dart';
 import 'group_chat_store.dart';
-import 'group_system_notice.dart';
+import 'system_notice.dart';
 
 const groupMessageMarksSchema = [
   '''CREATE TABLE group_pinned_messages (
@@ -153,6 +153,17 @@ class GroupMessageMarks {
         if (rows.isEmpty) {
           throw StateError(isGroup ? '只能操作本群对所有成员可见的消息' : '只能操作本会话中的聊天消息');
         }
+        if (table == 'group_pinned_messages') {
+          final pinned = await txn.query(
+            table,
+            columns: ['message_id'],
+            where: 'conversation_id = ?',
+            whereArgs: [groupId],
+            limit: 1,
+          );
+          if (pinned.isNotEmpty && pinned.single['message_id'] == messageId)
+            return null;
+        }
         await txn.insert(
           table,
           {
@@ -165,14 +176,14 @@ class GroupMessageMarks {
               ? ConflictAlgorithm.replace
               : ConflictAlgorithm.ignore,
         );
-        if (table == 'group_pinned_messages' && isGroup) {
+        if (table == 'group_pinned_messages') {
           final senders = await txn.query(
             'message_senders',
             columns: ['name'],
             where: 'id = ?',
             whereArgs: [actorId],
           );
-          return writeGroupNotice(
+          return writeSystemNotice(
             txn,
             groupId,
             '${senders.single['name']} 置顶了一条消息',

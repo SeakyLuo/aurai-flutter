@@ -19,8 +19,9 @@ import 'chat_completions_codec.dart';
 
 /// One cancellable transport for both visible replies and context summaries.
 class ResponsesTransport {
-  ResponsesTransport(this.config);
+  ResponsesTransport(this.config, {this.automaticRetries = true});
   final ModelConfig config;
+  final bool automaticRetries;
   HttpClient? _client;
   bool _cancelled = false;
   void Function(int attempt)? onReconnect;
@@ -66,7 +67,7 @@ class ResponsesTransport {
           );
         } on _RetryableFailure catch (failure) {
           checkCancelled();
-          if (hasText || attempt == 3) throw failure.error;
+          if (!automaticRetries || hasText || attempt == 3) throw failure.error;
           onReconnect?.call(attempt + 1);
           final waiter = Completer<void>();
           _retryWaiter = waiter;
@@ -150,9 +151,15 @@ class ResponsesTransport {
       checkCancelled();
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final detail = await utf8.decoder.bind(response).join();
-        final error = providerResponseError(
+        final original = providerResponseError(
           detail,
           statusCode: response.statusCode,
+        );
+        final error = ModelProviderException(
+          original.message,
+          detail: original.detail,
+          statusCode: original.statusCode,
+          retryAfter: response.headers.value(HttpHeaders.retryAfterHeader),
         );
         final quotaExhausted = isProviderQuotaError(detail);
         if (!quotaExhausted &&

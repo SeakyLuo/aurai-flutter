@@ -1,3 +1,5 @@
+import 'selection_option_schema.dart';
+
 const questionBatchSchema = {
   'type': 'array',
   'minItems': 1,
@@ -27,22 +29,14 @@ const questionBatchSchema = {
         'type': 'boolean',
         'default': false,
         'description':
-            'Set true to confirm a single answer before submission. Default false. Multiple-choice and multi-question groups still submit together.',
+            'Set true to confirm a single answer before submission. Default false. Rich-content options always require confirmation. Multiple-choice and multi-question groups still submit together.',
       },
       'options': {
         'type': 'array',
         'maxItems': 25,
         'description':
             'Empty for text questions; at least one option for single/multiple. Do not repeat selection-mode instructions in question text.',
-        'items': {
-          'type': 'object',
-          'properties': {
-            'id': {'type': 'string', 'minLength': 1},
-            'label': {'type': 'string', 'minLength': 1, 'maxLength': 240},
-          },
-          'required': ['id', 'label'],
-          'additionalProperties': false,
-        },
+        'items': selectionOptionSchema,
       },
     },
     'required': ['id', 'question', 'mode', 'options'],

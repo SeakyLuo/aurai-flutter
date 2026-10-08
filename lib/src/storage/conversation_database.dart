@@ -30,6 +30,7 @@ import 'group_chat_schema.dart';
 import 'package:sqflite/sqflite.dart';
 import '../memory/memory_controller.dart';
 import '../memory/memory_storage_schema.dart';
+import '../memory/memory_queue_schema.dart';
 import 'message_quick_reply_schema.dart';
 import 'tool_customization_schema.dart';
 import 'resource_scope_schema.dart';
@@ -43,7 +44,7 @@ const personalChatSchema = [
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 98,
+  version: 99,
   onOpen: (db) async {
     await db.update('approval_requests', {
       'status': 'cancelled',
@@ -58,6 +59,10 @@ Future<Database> openConversationDatabase() async => openDatabase(
     // Version 98 is the supported baseline; never silently advance an older backup.
     if (oldVersion < 98) {
       throw StateError('数据库版本低于 98，已不再支持自动升级此旧备份');
+    }
+    if (oldVersion < 99) {
+      await migrateMemoryQueue(db);
+      await installMemoryQueueTriggers(db);
     }
   },
   onCreate: (db, version) async {
@@ -111,6 +116,8 @@ Future<Database> openConversationDatabase() async => openDatabase(
     await batch.commit(noResult: true);
     await migrateAiIdentities(db);
     await migrateMemoryStorage(db);
+    await migrateMemoryQueue(db);
+    await installMemoryQueueTriggers(db);
     await migrateSkillLibrary(db);
     await migrateAuraiAvatar(db);
     await migrateAuraiDescription(db);

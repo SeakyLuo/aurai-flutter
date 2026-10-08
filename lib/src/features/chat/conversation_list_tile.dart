@@ -60,13 +60,11 @@ class ConversationListTile extends StatelessWidget {
                       style: const TextStyle(fontSize: 16),
                     ),
                   ),
-                  if (showActivity &&
-                      (item.hasRunningTasks ||
-                          item.runState == ChatRunState.running))
+                  if (showActivity && item.runState == ChatRunState.running)
                     Padding(
                       padding: const EdgeInsets.only(left: 6),
                       child: Text(
-                        item.hasRunningTasks ? '任务执行中' : '正在回复',
+                        '正在回复',
                         style: TextStyle(
                           fontSize: 12,
                           color: Theme.of(context).colorScheme.primary,
@@ -109,6 +107,7 @@ class ConversationListTile extends StatelessWidget {
               ? '[${item.unreadMessageCount}条] '
               : '',
           showFailure: true,
+          showRunning: item.isTask,
           conversation: item,
           emptyText: item.isTask ? '开始任务' : '开始聊天',
         ),

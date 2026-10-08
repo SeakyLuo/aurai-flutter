@@ -1,10 +1,11 @@
 import '../domain/interactive_button_icons.dart';
 import 'question_batch_schema.dart';
+import 'selection_option_schema.dart';
 
 const interactiveSelectionSchema = {
   'type': 'object',
   'description':
-      'Native fixed-option selection for polls and questions. Requires action:submit and a shared interaction. Multiple uses checkboxes and submits all selected options together after confirmation; single choice submits on selection unless showConfirm is true, for both questions and polls. The UI renders min/max selection hints and selected counts for multiple selection automatically; single selection has no count hint. Do not repeat these in the title, body, or accompanying message (e.g. 可多选, 最多选3项). Configure mode and minSelections/maxSelections instead. Cannot combine with input. Works for humans and AI.',
+      'Native fixed-option selection for polls and questions. Requires action:submit and a shared interaction. Multiple uses checkboxes and submits all selected options together after confirmation; text-only single choice submits on selection unless showConfirm is true. Rich-content options always require explicit submission, for both questions and polls. The UI renders selection hints and counts automatically. Do not repeat these in the title, body, or accompanying message (e.g. 可多选, 最多选3项). Configure mode and minSelections/maxSelections instead. Cannot combine with input. Works for humans and AI.',
   'properties': {
     'showConfirm': {
       'type': 'boolean',
@@ -20,19 +21,7 @@ const interactiveSelectionSchema = {
       'type': 'array',
       'minItems': 1,
       'maxItems': 25,
-      'items': {
-        'type': 'object',
-        'properties': {
-          'id': {'type': 'string', 'minLength': 1},
-          'label': {'type': 'string', 'minLength': 1},
-          'value': {
-            'description':
-                'JSON value saved when selected; defaults to option id.',
-          },
-        },
-        'required': ['id', 'label'],
-        'additionalProperties': false,
-      },
+      'items': selectionOptionSchema,
     },
     'minSelections': {
       'type': 'integer',

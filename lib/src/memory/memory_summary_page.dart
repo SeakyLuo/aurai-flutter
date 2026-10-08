@@ -1,4 +1,6 @@
 import 'dart:async';
+import '../features/chat/contacts_search_bar.dart';
+import '../features/chat/sidebar_action_icon.dart';
 import 'memory_source_list.dart';
 import '../app/glass_notice.dart';
 import '../widgets/empty_data_view.dart';
@@ -40,6 +42,10 @@ class MemorySummaryPage extends StatefulWidget {
 
 class _MemorySummaryPageState extends State<MemorySummaryPage> {
   final _search = TextEditingController();
+  final _searchFocus = FocusNode();
+  bool _searching = false;
+  String _searchValue = '';
+  String? _shownFailure;
   Timer? _searchTimer;
   bool _loadingMore = false;
   final _text = TextEditingController();
@@ -54,22 +60,49 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
   void initState() {
     super.initState();
     _search.text = memory.searchQuery;
+    _searching = _search.text.isNotEmpty;
+    _searchValue = _search.text;
+    _search.addListener(_searchChanged);
+    memory.addListener(_showFailure);
+    _shownFailure = memory.latestFailure;
     _searchMemories(_search.text);
+  }
+
+  void _showFailure() {
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+    final failure = memory.latestFailure;
+    if (failure == null || failure == _shownFailure) return;
+    _shownFailure = failure;
+    memoryToast(context, '记忆整理失败：$failure', kind: ToastKind.error);
+  }
+
+  void _searchChanged() {
+    if (_searchValue == _search.text) return;
+    _searchValue = _search.text;
+    _searchTimer?.cancel();
+    _searchTimer = Timer(
+      const Duration(milliseconds: 250),
+      () => _searchMemories(_search.text),
+    );
+  }
+
+  void _toggleSearch() {
+    if (_searching) {
+      _searchFocus.unfocus();
+      _search.clear();
+      _searchTimer?.cancel();
+      setState(() => _searching = false);
+      _searchMemories('');
+    } else {
+      _focus.unfocus();
+      setState(() => _searching = true);
+    }
   }
 
   Future<void> _searchMemories(String value) async {
     try {
       memory.searchQuery = value;
       await memory.reload();
-    } on Object catch (error) {
-      if (mounted)
-        memoryToast(context, error.toString(), kind: ToastKind.error);
-    }
-  }
-
-  Future<void> _retryMemories() async {
-    try {
-      await memory.retryFailed();
     } on Object catch (error) {
       if (mounted)
         memoryToast(context, error.toString(), kind: ToastKind.error);
@@ -106,7 +139,10 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
     _request++;
     _transport?.cancel();
     _searchTimer?.cancel();
+    _search.removeListener(_searchChanged);
+    memory.removeListener(_showFailure);
     _search.dispose();
+    _searchFocus.dispose();
     _text.dispose();
     _focus.dispose();
     super.dispose();
@@ -114,6 +150,10 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
 
   Future<void> _leave() async {
     if (_saving) return;
+    if (_searching) {
+      _toggleSearch();
+      return;
+    }
     if (_text.text.trim().isNotEmpty) {
       final discard = await showDialog<bool>(
         context: context,
@@ -240,7 +280,8 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
     listenable: memory,
     builder: (context, _) {
       return PopScope(
-        canPop: _allowPop || (!_saving && _text.text.trim().isEmpty),
+        canPop:
+            _allowPop || (!_searching && !_saving && _text.text.trim().isEmpty),
         onPopInvokedWithResult: (didPop, result) {
           if (!didPop && !_saving) _leave();
         },
@@ -248,10 +289,66 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
           extendBody: true,
           extendBodyBehindAppBar: true,
           resizeToAvoidBottomInset: false,
-          bottomNavigationBar: KeyboardInset(child: _footer()),
+          bottomNavigationBar: KeyboardInset(
+            child: Stack(
+              alignment: Alignment.bottomCenter,
+              children: [
+                IgnorePointer(
+                  ignoring: _searching,
+                  child: ExcludeSemantics(
+                    excluding: _searching,
+                    child: AnimatedSlide(
+                      offset: _searching ? const Offset(0, 1.5) : Offset.zero,
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeInOutCubic,
+                      child: _footer(),
+                    ),
+                  ),
+                ),
+                IgnorePointer(
+                  ignoring: !_searching,
+                  child: ExcludeSemantics(
+                    excluding: !_searching,
+                    child: AnimatedSlide(
+                      offset: _searching ? Offset.zero : const Offset(0, 1.5),
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeInOutCubic,
+                      onEnd: () {
+                        if (_searching) _searchFocus.requestFocus();
+                      },
+                      child: Center(
+                        heightFactor: 1,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 640),
+                          child: ContactsSearchBar(
+                            controller: _search,
+                            focusNode: _searchFocus,
+                            hintText: '搜索记忆、人物或关键词',
+                            onClose: _toggleSearch,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           appBar: SettingsAppBar(
             title: widget.title,
-            actions: widget.actions,
+            actions: [
+              ...widget.actions,
+              SettingsGlassAction(
+                label: _searching ? '关闭搜索' : '搜索记忆',
+                icon: Icons.search_rounded,
+                iconWidget: const SidebarActionIcon(
+                  type: SidebarActionIconType.search,
+                ),
+                onPressed: _saving || _planning || _plan != null
+                    ? null
+                    : _toggleSearch,
+              ),
+            ],
 
             onBack: _saving ? null : _leave,
           ),
@@ -274,32 +371,6 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
                     ),
                   ),
                   children: [
-                    TextField(
-                      controller: _search,
-                      enabled: !_planning && !_saving,
-                      decoration: InputDecoration(
-                        hintText: '搜索记忆、人物或关键词',
-                        filled: true,
-                        fillColor: settingsFieldColor(context),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      onChanged: (value) {
-                        _searchTimer?.cancel();
-                        _searchTimer = Timer(
-                          const Duration(milliseconds: 250),
-                          () => _searchMemories(value),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    if (memory.failedJobs > 0)
-                      TextButton(
-                        onPressed: _saving ? null : _retryMemories,
-                        child: const Text('重试未完成的记忆整理'),
-                      ),
                     if (_plan != null)
                       MemoryPlanPreview(plan: _plan!)
                     else if (memory.entries.isEmpty)

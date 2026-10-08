@@ -9,6 +9,7 @@ class GroupRunDetailsLayout extends StatefulWidget {
     this.conversationId,
     this.activity,
     this.followBottom = true,
+    this.trailing,
   });
 
   final ChatController controller;
@@ -17,6 +18,7 @@ class GroupRunDetailsLayout extends StatefulWidget {
   final GroupMemberActivity? activity;
   final List<Widget> children;
   final bool followBottom;
+  final Widget? trailing;
 
   @override
   State<GroupRunDetailsLayout> createState() => _GroupRunDetailsLayoutState();
@@ -93,13 +95,15 @@ class _GroupRunDetailsLayoutState extends State<GroupRunDetailsLayout> {
                   size: 24,
                 ),
               ),
-              trailing: widget.activity == null
-                  ? null
-                  : _StopMemberButton(
-                      controller: widget.controller,
-                      conversationId: widget.conversationId!,
-                      activity: widget.activity!,
-                    ),
+              trailing:
+                  widget.trailing ??
+                  (widget.activity == null
+                      ? null
+                      : _StopMemberButton(
+                          controller: widget.controller,
+                          conversationId: widget.conversationId!,
+                          activity: widget.activity!,
+                        )),
             ),
             Expanded(
               child: ScrollAwareJumpStack(

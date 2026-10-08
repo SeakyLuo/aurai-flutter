@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'package:crypto/crypto.dart';
 import 'package:sqflite/sqflite.dart';
 import '../domain/model_provider.dart';
 import '../providers/responses_transport.dart';
 import '../providers/model_context_limits.dart';
 import 'memory_evidence.dart';
+import 'memory_retry.dart';
 import 'memory_events.dart';
 import 'memory_search.dart';
 import 'memory_consolidation_prompt.dart';
@@ -20,6 +22,7 @@ class MemoryWorker {
   final _active = <String, ResponsesTransport>{};
   Timer? _timer;
   bool _stopped = false, _polling = false;
+  String? _configKey;
   static final _checkpoints = <String, Future<void>>{};
 
   Future<void> organize(String runId) async {
@@ -29,7 +32,13 @@ class MemoryWorker {
       where: 'id = ?',
       whereArgs: [runId],
     );
-    final root = (roots.single['parent_run_id'] ?? runId) as String;
+    final mappings = await database.query(
+      'memory_run_jobs',
+      columns: ['job_id'],
+      where: 'run_id = ?',
+      whereArgs: [roots.single['parent_run_id'] ?? runId],
+    );
+    final root = mappings.single['job_id'] as String;
     final previous = _checkpoints[root];
     final finished = Completer<void>();
     _checkpoints[root] = finished.future;
@@ -55,16 +64,21 @@ class MemoryWorker {
         whereArgs: [root, job['cursor']],
       );
       if (claimed != 1) throw StateError('任务记忆正在整理，旧上下文已保留');
-      final transport = ResponsesTransport(modelConfig());
+      final transport = ResponsesTransport(
+        modelConfig(),
+        automaticRetries: false,
+      );
       _active[root] = transport;
       await _process(job, transport, foreground: true, through: through);
       final saved = await database.query(
         'memory_jobs',
-        columns: ['cursor'],
+        columns: ['cursor', 'text_offset', 'text_fingerprint'],
         where: 'run_id = ?',
         whereArgs: [root],
       );
-      if ((saved.single['cursor'] as int) <= (job['cursor'] as int)) {
+      if (saved.single['cursor'] == job['cursor'] &&
+          saved.single['text_offset'] == job['text_offset'] &&
+          saved.single['text_fingerprint'] == job['text_fingerprint']) {
         throw StateError('任务整理结果未保存，旧上下文已保留');
       }
     } finally {
@@ -75,6 +89,10 @@ class MemoryWorker {
   }
 
   Future<void> start() async {
+    await database.update('memory_attempts', {
+      'status': 'interrupted',
+      'finished_at': DateTime.now().millisecondsSinceEpoch,
+    }, where: "status = 'working'");
     await database.update('memory_jobs', {
       'state': 'pending',
     }, where: "state = 'working'");
@@ -91,10 +109,22 @@ class MemoryWorker {
     try {
       final config = modelConfig();
       if (!config.isConfigured) return;
+      final key = sha256
+          .convert(utf8.encode(jsonEncode(config.toJson())))
+          .toString();
+      if (_configKey != key) {
+        await database.update(
+          'memory_jobs',
+          {'state': 'pending', 'retries': 0, 'conflicts': 0, 'due_at': 0},
+          where: "state = 'failed' AND config_key != ?",
+          whereArgs: [key],
+        );
+        _configKey = key;
+      }
       final jobs = await database.query(
         'memory_jobs',
         where:
-            "state = 'pending' AND due_at <= ? AND NOT EXISTS (SELECT 1 FROM agent_runs child WHERE child.parent_run_id = memory_jobs.run_id AND child.status = 'running')",
+            "state = 'pending' AND due_at <= ? AND NOT EXISTS (SELECT 1 FROM agent_runs child WHERE (child.id IN (SELECT run_id FROM memory_run_jobs WHERE job_id = memory_jobs.run_id) OR child.parent_run_id IN (SELECT run_id FROM memory_run_jobs WHERE job_id = memory_jobs.run_id)) AND child.status = 'running') AND NOT EXISTS (SELECT 1 FROM memory_jobs older WHERE older.owner_id = memory_jobs.owner_id AND older.conversation_id = memory_jobs.conversation_id AND older.state != 'done' AND older.rowid < memory_jobs.rowid)",
         whereArgs: [DateTime.now().millisecondsSinceEpoch],
         orderBy: 'due_at, run_id',
         limit: 2 - _active.length,
@@ -111,7 +141,7 @@ class MemoryWorker {
         );
         if (claimed == 0) continue;
         if (_stopped) break;
-        final transport = ResponsesTransport(config);
+        final transport = ResponsesTransport(config, automaticRetries: false);
         _active[id] = transport;
         unawaited(_process(job, transport));
       }
@@ -129,19 +159,42 @@ class MemoryWorker {
     int? through,
   }) async {
     final id = job['run_id'] as String;
+    int? attempt;
+    String? responseId;
     try {
-      final evidence = await MemoryEvidence.read(
-        database,
-        job,
-        through: through,
-      );
-      if (evidence.cursor == job['cursor']) {
+      final evidence = job['batch_json'] != null
+          ? MemoryEvidence.fromJson(job['batch_json'] as String)
+          : await MemoryEvidence.read(database, job, through: through);
+      if (evidence.records.isEmpty &&
+          evidence.cursor == job['cursor'] &&
+          evidence.offset == job['text_offset']) {
         await database.rawUpdate(
-          "UPDATE memory_jobs SET state = CASE WHEN EXISTS(SELECT 1 FROM agent_runs WHERE id = ? AND status = 'running') THEN 'waiting' ELSE 'done' END WHERE run_id = ?",
+          "UPDATE memory_jobs SET state = CASE WHEN EXISTS(SELECT 1 FROM agent_runs WHERE id IN (SELECT run_id FROM memory_run_jobs WHERE job_id = ?) AND status = 'running') THEN 'waiting' ELSE 'done' END WHERE run_id = ?",
           [id, id],
         );
         return;
       }
+      await database.update(
+        'memory_jobs',
+        {
+          'batch_json': jsonEncode(evidence.toJson()),
+          'config_key': sha256
+              .convert(utf8.encode(jsonEncode(transport.config.toJson())))
+              .toString(),
+        },
+        where: 'run_id = ?',
+        whereArgs: [id],
+      );
+      attempt = await database.insert('memory_attempts', {
+        'run_id': id,
+        'started_at': DateTime.now().millisecondsSinceEpoch,
+        'model': transport.config.apiModel,
+        'status': 'working',
+        'start_cursor': job['cursor'],
+        'end_cursor': evidence.cursor,
+        'start_offset': job['text_offset'],
+        'end_offset': evidence.offset,
+      });
       final search = MemorySearch(
         database,
         job['owner_id'] as String,
@@ -160,9 +213,7 @@ class MemoryWorker {
       );
       List<Map<String, Object?>> changes = [];
       final hasNewContent = evidence.records.any(
-        (record) =>
-            (record['event'] as int) > (job['cursor'] as int) &&
-            !(record['source'] as String).startsWith('run:'),
+        (record) => !(record['source'] as String).startsWith('run:'),
       );
       if (hasNewContent) {
         final response = await transport
@@ -191,6 +242,7 @@ class MemoryWorker {
                     'purpose':
                         'Select worthwhile memories from recent evidence, not a task checkpoint or log summary.',
                     'evidence': evidence.records,
+                    'context_only': evidence.context,
                     'existing': [
                       for (final e in candidates)
                         {
@@ -215,6 +267,7 @@ class MemoryWorker {
                 throw TimeoutException('Memory consolidation timed out');
               },
             );
+        responseId = response['id'] as String?;
         if (response['status'] != 'completed')
           throw StateError(
             'Memory consolidation incomplete: ${jsonEncode(response)}',
@@ -228,12 +281,43 @@ class MemoryWorker {
         if (foreground) throw StateError('任务整理已取消');
         return;
       }
-      final changed = await MemoryConsolidationStore(
+      await MemoryConsolidationStore(
         database,
-      ).commit(job, evidence, changes);
-      if (changed) MemoryEvents.changed(job['owner_id'] as String);
+      ).commit(job, evidence, changes, attempt, responseId);
+      MemoryEvents.changed(job['owner_id'] as String);
     } on Object catch (error) {
+      if (attempt != null) {
+        await database.update(
+          'memory_attempts',
+          {
+            'status': _stopped ? 'interrupted' : 'failed',
+            'response_id': responseId ?? memoryFailureResponseId(error),
+            'error': error.toString(),
+            'finished_at': DateTime.now().millisecondsSinceEpoch,
+          },
+          where: 'id = ?',
+          whereArgs: [attempt],
+        );
+      }
       if (!_stopped || foreground) {
+        final delay = memoryRetryDelay(error, job['retries'] as int);
+        if (delay != null) {
+          await database.update(
+            'memory_jobs',
+            {
+              'state': 'pending',
+              'error': error.toString(),
+              'retries': (job['retries'] as int) + 1,
+              'due_at':
+                  DateTime.now().millisecondsSinceEpoch + delay.inMilliseconds,
+            },
+            where: 'run_id = ?',
+            whereArgs: [id],
+          );
+          if (foreground) rethrow;
+          return;
+        }
+
         if (!foreground &&
             error is MemoryWriteConflict &&
             (job['conflicts'] as int) < 3) {

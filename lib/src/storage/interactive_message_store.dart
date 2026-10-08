@@ -19,6 +19,10 @@ class InteractiveMessageStore {
   InteractiveMessageStore(this.database);
   final Database database;
   static final changes = StreamController<String>.broadcast();
+  static final cardUpdates =
+      StreamController<
+        ({String messageId, InteractiveMessage card})
+      >.broadcast();
 
   Future<({InteractiveMessage card, AgentMessage? notice, String? url})> click(
     String conversationId,

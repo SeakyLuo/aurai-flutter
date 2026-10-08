@@ -11,11 +11,15 @@ import '../../app/global_ui.dart';
 import '../../domain/interactive_selection.dart';
 import '../../agent/ask_user_tool.dart';
 import 'question_sheet.dart';
+import 'question_card_anchor.dart';
 import 'vote_message_heading.dart';
 import 'vote_selection_hint.dart';
 import 'question_message_heading.dart';
 import 'question_batch_card.dart';
 import 'dart:convert';
+import 'dart:async';
+import '../../storage/interactive_message_store.dart';
+import 'user_question_skip_button.dart';
 
 class InteractiveMessageView extends StatefulWidget {
   const InteractiveMessageView({
@@ -34,6 +38,7 @@ class InteractiveMessageView extends StatefulWidget {
     this.members = const {},
     this.onOpenMember,
     this.showQuestionRecipient = true,
+    this.fullSheet = false,
   });
   final InteractiveMessage card;
   final String? messageId;
@@ -44,6 +49,7 @@ class InteractiveMessageView extends StatefulWidget {
   final bool readOnly;
   final bool historical;
   final bool showQuestionRecipient;
+  final bool fullSheet;
   final Future<InteractiveMessage> Function(String eventId)? onRetry;
   final Future<InteractiveMessage> Function(
     int revision,
@@ -66,6 +72,27 @@ class InteractiveMessageView extends StatefulWidget {
 class _InteractiveMessageViewState extends State<InteractiveMessageView> {
   String? _busy;
   late InteractiveMessage _card = widget.card;
+  late final StreamSubscription<({String messageId, InteractiveMessage card})>
+  _cardUpdates;
+
+  @override
+  void initState() {
+    super.initState();
+    // A sheet can submit independently of this timeline widget's onClick.
+    _cardUpdates = InteractiveMessageStore.cardUpdates.stream.listen((update) {
+      if (update.messageId != widget.messageId ||
+          widget.historical ||
+          widget.card.snapshotView != null)
+        return;
+      setState(() => _acceptCard(update.card));
+    });
+  }
+
+  @override
+  void dispose() {
+    _cardUpdates.cancel();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(InteractiveMessageView oldWidget) {
@@ -123,6 +150,11 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
           _acceptCard(result.card);
         });
         if (result.url != null) await widget.onOpenLink(result.url!);
+        if (!mounted) return;
+        if (widget.fullSheet) {
+          Navigator.pop(context);
+          return;
+        }
       }
     } on Object catch (error) {
       if (mounted && error is InteractiveMessageChanged)
@@ -301,7 +333,10 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         ? ((sharedView?['self'] as Map?) ??
               ((sharedView?['choices'] as List?)?.firstOrNull as Map?))
         : null;
-    final compactAnswered = question && answer != null;
+    final compactAnswered =
+        question &&
+        answer != null &&
+        card.buttons.any((button) => button['selection'] != null);
     final batchButton = card.buttons
         .where((button) => button['questions'] != null)
         .firstOrNull;
@@ -314,6 +349,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
           sharedView?['phase'] != 'collecting' ||
           !(_card.interaction['actors'] as List).contains(widget.actorId);
       return QuestionBatchCard(
+        compact: !widget.fullSheet,
         key: ValueKey((widget.messageId, widget.actorId)),
         questions: batchButton['questions'] as List,
         buttonId: batchButton['id'] as String,
@@ -324,7 +360,13 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         readOnly: readOnly,
         recipient: recipient,
         onOpenMember: widget.onOpenMember,
-        trailing: widget.titleTrailing,
+        trailing:
+            widget.titleTrailing ??
+            (!readOnly && UserQuestion.activeCards[widget.messageId] != null
+                ? UserQuestionSkipButton(
+                    question: UserQuestion.activeCards[widget.messageId]!,
+                  )
+                : null),
         status: answered
             ? '已回答'
             : card.closed || sharedView?['completed'] == true
@@ -335,7 +377,8 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
             _saveSelection(batchButton['id'] as String, version, {}, data),
       );
     }
-    Widget questionHeading() => QuestionMessageHeading(
+    Widget questionHeading({bool sheet = false}) => QuestionMessageHeading(
+      sheetHeader: sheet || widget.fullSheet,
       title: card.title,
       description: card.body,
       multiple: multiple,
@@ -352,40 +395,99 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
       final button = card.buttons.singleWhere(
         (button) => button['id'] == answer!['buttonId'],
       );
-      final config = InteractiveSelection(
-        Map<String, Object?>.from(button['selection'] as Map),
-      );
+      final selection = button['selection'] as Map?;
+      final config = selection == null
+          ? null
+          : InteractiveSelection(Map<String, Object?>.from(selection));
       await showQuestionSheet(
         context,
+        messageId: widget.messageId,
         child: Builder(
           builder: (context) => QuestionSheetLayout(
             title: card.title,
             heading: Padding(
               padding: const EdgeInsets.only(top: 8, bottom: 16),
-              child: questionHeading(),
+              child: questionHeading(sheet: true),
             ),
-            child: QuestionAnswerContent(
-              question: card.body,
-              showQuestion: false,
-              options: [
-                for (final option in config.options)
-                  UserQuestionOption(content: option['label'] as String),
-              ],
-              selected: {
-                for (final (index, option) in config.options.indexed)
-                  if ((answer!['selections'] as List).any(
-                    (selected) => selected['optionId'] == option['id'],
-                  ))
-                    index,
-              },
-              multiple: config.multiple,
-            ),
+            child: config == null
+                ? Text(
+                    answer!['label'] as String,
+                    style: const TextStyle(fontSize: 15, height: 1.5),
+                  )
+                : QuestionAnswerContent(
+                    question: card.body,
+                    showQuestion: false,
+                    options: [
+                      for (final option in config.options)
+                        UserQuestionOption.fromSelection(option),
+                    ],
+                    selected: {
+                      for (final (index, option) in config.options.indexed)
+                        if ((answer!['selections'] as List).any(
+                          (selected) => selected['optionId'] == option['id'],
+                        ))
+                          index,
+                    },
+                    multiple: config.multiple,
+                  ),
           ),
         ),
       );
     }
 
-    return GestureDetector(
+    final interaction = sharedView == null
+        ? null
+        : InteractionContent(
+            key: ValueKey((widget.actorId, card.title, card.body)),
+            draftOwner:
+                widget.messageId == null ||
+                    widget.readOnly ||
+                    widget.historical ||
+                    _card.snapshotView != null
+                ? null
+                : (
+                    messageId: widget.messageId!,
+                    actorId: widget.actorId,
+                    revision: _card.participantRevision(widget.actorId),
+                  ),
+            onSaveSelection: _saveSelection,
+            view: sharedView,
+            statusInHeading: vote,
+            members: widget.members,
+            onOpenMember: widget.onOpenMember,
+            onStatistics: question && answer != null
+                ? openAnsweredQuestion
+                : widget.onStatistics,
+            question: question,
+            compactOptions: question || vote,
+            fullSheet: widget.fullSheet,
+            showTextDetails: statisticsVisible,
+            title: card.title,
+            body: card.body,
+            shared: _card.shared,
+            buttons: card.buttons,
+            buttonColumns: card.buttonColumns,
+            readOnly:
+                widget.readOnly ||
+                widget.historical ||
+                _card.snapshotView != null,
+            pendingButtonId: pendingButtonId,
+            allowChange: _card.hasInteraction && _card.engine.allowChange,
+            eligible:
+                !_card.shared ||
+                _card.interaction['actors'] == null ||
+                (_card.interaction['actors'] as List).contains(widget.actorId),
+            busy: _busy,
+            onClick: _click,
+            onCancelVote: vote && widget.onCancelVote != null
+                ? _cancelVote
+                : null,
+          );
+    if (widget.fullSheet &&
+        interaction != null &&
+        card.buttons.any((button) => button['selection'] != null))
+      return interaction;
+    final content = GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: compactAnswered ? openAnsweredQuestion : null,
       child: SizedBox(
@@ -518,50 +620,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
             ],
             const SizedBox(height: 16),
             if (sharedView != null)
-              InteractionContent(
-                key: ValueKey((widget.actorId, card.title, card.body)),
-                draftOwner:
-                    widget.messageId == null ||
-                        widget.readOnly ||
-                        widget.historical ||
-                        _card.snapshotView != null
-                    ? null
-                    : (
-                        messageId: widget.messageId!,
-                        actorId: widget.actorId,
-                        revision: _card.participantRevision(widget.actorId),
-                      ),
-                onSaveSelection: _saveSelection,
-                view: sharedView,
-                statusInHeading: vote,
-                members: widget.members,
-                onOpenMember: widget.onOpenMember,
-                onStatistics: widget.onStatistics,
-                question: question,
-                compactOptions: question || vote,
-                title: card.title,
-                body: card.body,
-                shared: _card.shared,
-                buttons: card.buttons,
-                buttonColumns: card.buttonColumns,
-                readOnly:
-                    widget.readOnly ||
-                    widget.historical ||
-                    _card.snapshotView != null,
-                pendingButtonId: pendingButtonId,
-                allowChange: _card.hasInteraction && _card.engine.allowChange,
-                eligible:
-                    !_card.shared ||
-                    _card.interaction['actors'] == null ||
-                    (_card.interaction['actors'] as List).contains(
-                      widget.actorId,
-                    ),
-                busy: _busy,
-                onClick: _click,
-                onCancelVote: vote && widget.onCancelVote != null
-                    ? _cancelVote
-                    : null,
-              )
+              interaction!
             else
               InteractiveButtonLayout(
                 columns: card.buttonColumns,
@@ -579,7 +638,10 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                     ),
                 ],
               ),
-            if (statisticsVisible && widget.onStatistics != null) ...[
+            if (!question &&
+                !widget.fullSheet &&
+                statisticsVisible &&
+                widget.onStatistics != null) ...[
               const SizedBox(height: 12),
               InteractiveMessageButton(
                 button: {
@@ -599,5 +661,14 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         ),
       ),
     );
+    return widget.fullSheet
+        ? QuestionSheetLayout(
+            title: card.title,
+            heading: const SizedBox.shrink(),
+            child: content,
+          )
+        : question && widget.messageId != null
+        ? QuestionCardAnchor(messageId: widget.messageId!, child: content)
+        : content;
   }
 }

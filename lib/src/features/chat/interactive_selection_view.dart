@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../domain/interactive_selection.dart';
+import '../../domain/selection_option.dart';
+import 'rich_option_carousel.dart';
 import 'interactive_message_button.dart';
 import '../../agent/ask_user_tool.dart';
 import 'user_question_option_tile.dart';
@@ -34,6 +36,7 @@ class InteractiveSelectionView extends StatefulWidget {
     this.draftSelection,
     this.draftOtherText,
     this.onSelectionChanged,
+    this.fullSheet = false,
   });
   final Map<String, Object?> button;
   final Map? self;
@@ -43,6 +46,7 @@ class InteractiveSelectionView extends StatefulWidget {
   final bool anonymous;
   final String? voteStatus;
   final bool compactOptions;
+  final bool fullSheet;
   final String title, body;
   final Widget? sheetActions;
   final String? summary;
@@ -148,7 +152,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
       context,
       options: [
         for (final option in config.options)
-          UserQuestionOption(content: option['label'] as String),
+          UserQuestionOption.fromSelection(option),
       ],
       otherIndex: config.hasOther ? config.options.length - 1 : null,
       otherText: _otherText,
@@ -161,7 +165,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
           if (_selected.contains(option['id'])) index,
       },
       multiple: config.multiple,
-      showConfirm: config.showConfirm,
+      showConfirm: config.needsConfirmation,
       onSelectionChanged: (selected) {
         setState(() {
           _selected = {
@@ -206,10 +210,60 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
   Widget _buildContent(BuildContext context) {
     final config = selection;
     final colors = Theme.of(context).colorScheme;
+    if (widget.fullSheet) {
+      return QuestionOptionsSheet(
+        key: ValueKey(jsonEncode(widget.button['selection'])),
+        options: [
+          for (final option in config.options)
+            UserQuestionOption.fromSelection(option),
+        ],
+        selected: {
+          for (final (index, option) in config.options.indexed)
+            if (_selected.contains(option['id'])) index,
+        },
+        multiple: config.multiple,
+        showConfirm: config.needsConfirmation,
+        readOnly:
+            widget.question && widget.submitted ||
+            _locked ||
+            !widget.showSubmit,
+        vote: !widget.question,
+        anonymous: widget.anonymous,
+        voteStatus: widget.voteStatus,
+        minimum: config.minimum,
+        maximum: config.maximum,
+        title: widget.title,
+        body: widget.body,
+        actions: widget.sheetActions,
+        busy: widget.busy,
+        otherIndex: config.hasOther ? config.options.length - 1 : null,
+        otherText: _otherText,
+        otherMaxLength: config.otherMaxLength,
+        onOtherTextChanged: (text) {
+          _otherText = text;
+          _saveDraft();
+        },
+        onSelectionChanged: (indices) {
+          _selected = {
+            for (final index in indices) config.options[index]['id'] as String,
+          };
+          _saveDraft();
+        },
+        onSubmit: (indices) {
+          _selected = {
+            for (final index in indices) config.options[index]['id'] as String,
+          };
+          _saveDraft();
+          widget.onSubmit(_submission());
+        },
+      );
+    }
     final locked = _locked;
     final answeredQuestion = widget.question && widget.submitted;
+    final rich = hasRichOptions(config.options);
     final truncated =
         !answeredQuestion &&
+        !rich &&
         widget.compactOptions &&
         config.options.length >= 5;
     final valid =
@@ -262,74 +316,108 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
                     ],
                   ),
           ),
-        for (final (index, option) in visibleOptions)
-          Builder(
-            builder: (context) {
-              final id = option['id'] as String;
-              final selected = _selected.contains(id);
-              final enabled =
-                  widget.showSubmit &&
-                  !locked &&
-                  (!config.multiple ||
-                      selected ||
-                      _selected.length < config.maximum);
-              void toggle() => setState(() {
-                if (!config.multiple) {
-                  _selected = {id};
-                } else if (selected) {
-                  _selected.remove(id);
-                } else {
-                  _selected.add(id);
-                }
-              });
-              void choose() {
-                toggle();
-                _saveDraft();
-                updateKeepAlive();
-                if (!config.needsConfirmation) widget.onSubmit(id);
-              }
-
-              return Padding(
-                padding: EdgeInsets.only(
-                  bottom: answeredQuestion && index == visibleOptions.last.$1
-                      ? 0
-                      : 8,
-                ),
-                child: config.hasOther && id == InteractiveSelection.otherId
-                    ? VoteOtherOptionTile(
-                        text: _otherText,
-                        selected: selected,
-                        multiple: config.multiple,
-                        number: index + 1,
-                        fontSize: InteractiveMessageButton.defaultFontSize,
-                        onEdit: enabled ? _editOther : null,
-                        onToggle: enabled
-                            ? selected
-                                  ? () {
-                                      setState(() => _selected.remove(id));
-                                      _saveDraft();
-                                    }
-                                  : _editOther
-                            : null,
-                      )
-                    : UserQuestionOptionTile(
-                        option: UserQuestionOption(
-                          content: option['label'] as String,
-                        ),
-                        number: index + 1,
-                        multiple: config.multiple,
-                        vote: !widget.question,
-                        fontSize: InteractiveMessageButton.defaultFontSize,
-                        selected: selected,
-                        onTap: answeredQuestion
-                            ? null
-                            : enabled
-                            ? choose
-                            : null,
-                      ),
-              );
+        if (rich && visibleOptions.isNotEmpty)
+          RichOptionCarousel(
+            numbers: [for (final (index, _) in visibleOptions) index + 1],
+            options: [
+              for (final (_, option) in visibleOptions)
+                UserQuestionOption.fromSelection(option),
+            ],
+            selected: {
+              for (final (i, entry) in visibleOptions.indexed)
+                if (_selected.contains(entry.$2['id'])) i,
             },
-          ),
+            multiple: config.multiple,
+            maximum: config.maximum,
+            onSelect: answeredQuestion || locked || !widget.showSubmit
+                ? null
+                : (i) {
+                    final id = visibleOptions[i].$2['id'] as String;
+                    if (id == InteractiveSelection.otherId) {
+                      if (_selected.contains(id)) {
+                        setState(() => _selected.remove(id));
+                        _saveDraft();
+                      } else {
+                        _editOther();
+                      }
+                      return;
+                    }
+                    setState(() {
+                      if (!config.multiple) _selected.clear();
+                      if (!_selected.remove(id)) _selected.add(id);
+                    });
+                    _saveDraft();
+                  },
+          )
+        else
+          for (final (index, option) in visibleOptions)
+            Builder(
+              builder: (context) {
+                final id = option['id'] as String;
+                final selected = _selected.contains(id);
+                final enabled =
+                    widget.showSubmit &&
+                    !locked &&
+                    (!config.multiple ||
+                        selected ||
+                        _selected.length < config.maximum);
+                void toggle() => setState(() {
+                  if (!config.multiple) {
+                    _selected = {id};
+                  } else if (selected) {
+                    _selected.remove(id);
+                  } else {
+                    _selected.add(id);
+                  }
+                });
+                void choose() {
+                  toggle();
+                  _saveDraft();
+                  updateKeepAlive();
+                  if (!config.needsConfirmation) widget.onSubmit(id);
+                }
+
+                return Padding(
+                  padding: EdgeInsets.only(
+                    bottom: answeredQuestion && index == visibleOptions.last.$1
+                        ? 0
+                        : 8,
+                  ),
+                  child: config.hasOther && id == InteractiveSelection.otherId
+                      ? VoteOtherOptionTile(
+                          text: _otherText,
+                          selected: selected,
+                          multiple: config.multiple,
+                          number: index + 1,
+                          fontSize: InteractiveMessageButton.defaultFontSize,
+                          onEdit: enabled ? _editOther : null,
+                          onToggle: enabled
+                              ? selected
+                                    ? () {
+                                        setState(() => _selected.remove(id));
+                                        _saveDraft();
+                                      }
+                                    : _editOther
+                              : null,
+                        )
+                      : UserQuestionOptionTile(
+                          option: UserQuestionOption(
+                            content: option['label'] as String,
+                          ),
+                          number: index + 1,
+                          multiple: config.multiple,
+                          vote: !widget.question,
+                          fontSize: InteractiveMessageButton.defaultFontSize,
+                          selected: selected,
+                          onTap: answeredQuestion
+                              ? null
+                              : enabled
+                              ? choose
+                              : null,
+                        ),
+                );
+              },
+            ),
         if (truncated)
           QuestionOptionsField(
             label: '查看全部选项',
@@ -372,10 +460,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
               },
               busy: widget.busy,
               locked: locked || !valid,
-              onPressed: () => widget.onSubmit([
-                for (final option in config.options)
-                  if (_selected.contains(option['id'])) option['id'],
-              ]),
+              onPressed: () => widget.onSubmit(_submission()),
             ),
         ],
       ],

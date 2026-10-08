@@ -9,13 +9,14 @@ import 'question_icon.dart';
 import 'question_options_sheet.dart';
 import 'thinking_indicator.dart';
 import 'user_question_option_tile.dart';
+import 'rich_option_carousel.dart';
 import 'question_card_anchor.dart';
 
 Future<void> showQuestionSheet(
   BuildContext context, {
   required Widget child,
   Future<void>? closeWhen,
-  Rect? Function()? returnTarget,
+  String? messageId,
 }) async {
   final navigator = Navigator.of(context);
   final route = ModalBottomSheetRoute<void>(
@@ -25,12 +26,10 @@ Future<void> showQuestionSheet(
     backgroundColor: Colors.transparent,
     elevation: 0,
     clipBehavior: Clip.none,
-    sheetAnimationStyle: returnTarget == null
-        ? null
-        : const AnimationStyle(
-            curve: Curves.linear,
-            reverseCurve: Curves.linear,
-          ),
+    sheetAnimationStyle: const AnimationStyle(
+      curve: Curves.linear,
+      reverseCurve: Curves.linear,
+    ),
     constraints: const BoxConstraints(maxWidth: double.infinity),
     capturedThemes: InheritedTheme.capture(
       from: context,
@@ -38,16 +37,17 @@ Future<void> showQuestionSheet(
     ),
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     modalBarrierColor: Theme.of(context).bottomSheetTheme.modalBarrierColor,
-    builder: (context) {
-      final content = Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
+    builder: (sheetContext) {
+      return QuestionReturnTransition(
+        hasVisibleQuestion: () =>
+            QuestionCardAnchor.isVisible(context, messageId: messageId),
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+          ),
+          child: child,
         ),
-        child: child,
       );
-      return returnTarget == null
-          ? content
-          : QuestionReturnTransition(target: returnTarget, child: content);
     },
   );
   closeWhen?.then((_) {
@@ -85,7 +85,6 @@ class QuestionSheetLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Center(
       heightFactor: 1,
       child: ConstrainedBox(
@@ -138,43 +137,9 @@ class QuestionSheetLayout extends StatelessWidget {
                         ),
                       ),
                     if (sender case final sender?)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4, bottom: 4),
-                        child: Semantics(
-                          button: true,
-                          label: '查看${sender.displayName}的资料',
-                          child: InkWell(
-                            onTap: onOpenSender,
-                            borderRadius: BorderRadius.circular(12),
-                            child: Row(
-                              children: [
-                                MemberAvatar(sender: sender, size: 24),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text.rich(
-                                    TextSpan(
-                                      children: [
-                                        TextSpan(
-                                          text: sender.displayName,
-                                          style: TextStyle(
-                                            color: GlobalUI.highlightTextColor(
-                                              context,
-                                            ),
-                                          ),
-                                        ),
-                                        const TextSpan(text: '问了你一个问题'),
-                                      ],
-                                    ),
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: colors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                      QuestionSenderHeading(
+                        sender: sender,
+                        onOpenSender: onOpenSender,
                       ),
                     Flexible(
                       child: !scrollBody
@@ -240,7 +205,8 @@ class QuestionAnswerContent extends StatelessWidget {
           content: customAnswer.isEmpty ? '自行撰写回复' : customAnswer,
         ),
     ];
-    final truncated = compactOptions && choices.length >= 5;
+    final rich = choices.any((option) => option.messageId != null);
+    final truncated = !rich && compactOptions && choices.length >= 5;
     final marked = {
       ...selected,
       if (allowCustomAnswer && customAnswer.isNotEmpty) options.length,
@@ -261,24 +227,40 @@ class QuestionAnswerContent extends StatelessWidget {
               ),
             ),
           ),
-        for (final (index, option)
-            in choices.take(truncated ? 4 : choices.length).indexed)
-          Padding(
-            padding: EdgeInsets.only(
-              bottom: index == choices.length - 1 ? 0 : 8,
+        if (rich)
+          RichOptionCarousel(
+            options: choices,
+            selected: marked,
+            multiple: multiple,
+            onSelect: onSelect == null
+                ? null
+                : (index) {
+                    if (index == options.length) {
+                      onCustomAnswer?.call();
+                    } else {
+                      onSelect!(index);
+                    }
+                  },
+          )
+        else
+          for (final (index, option)
+              in choices.take(truncated ? 4 : choices.length).indexed)
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: index == choices.length - 1 ? 0 : 8,
+              ),
+              child: UserQuestionOptionTile(
+                option: option,
+                number: index + 1,
+                selected: marked.contains(index),
+                multiple: multiple,
+                onTap: index == options.length
+                    ? onCustomAnswer
+                    : onSelect == null
+                    ? null
+                    : () => onSelect!(index),
+              ),
             ),
-            child: UserQuestionOptionTile(
-              option: option,
-              number: index + 1,
-              selected: marked.contains(index),
-              multiple: multiple,
-              onTap: index == options.length
-                  ? onCustomAnswer
-                  : onSelect == null
-                  ? null
-                  : () => onSelect!(index),
-            ),
-          ),
         if (truncated) ...[
           QuestionOptionsField(label: '查看全部选项', onTap: onChooseOptions),
           if (marked.any((index) => index >= 4))
@@ -297,6 +279,56 @@ class QuestionAnswerContent extends StatelessWidget {
         ],
         if (footer case final footer?) footer,
       ],
+    );
+  }
+}
+
+class QuestionSenderHeading extends StatelessWidget {
+  const QuestionSenderHeading({
+    super.key,
+    required this.sender,
+    this.onOpenSender,
+  });
+  final MessageSender sender;
+  final VoidCallback? onOpenSender;
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 4),
+      child: Semantics(
+        button: true,
+        label: '查看${sender.displayName}的资料',
+        child: InkWell(
+          onTap: onOpenSender,
+          borderRadius: BorderRadius.circular(12),
+          child: Row(
+            children: [
+              MemberAvatar(sender: sender, size: 24),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: sender.displayName,
+                        style: TextStyle(
+                          color: GlobalUI.highlightTextColor(context),
+                        ),
+                      ),
+                      const TextSpan(text: '问了你一个问题'),
+                    ],
+                  ),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

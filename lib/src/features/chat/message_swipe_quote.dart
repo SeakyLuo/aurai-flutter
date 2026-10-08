@@ -2,19 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'message_quote_view.dart';
-import 'group_message_heading.dart';
 
 class MessageSwipeQuote extends StatefulWidget {
   const MessageSwipeQuote({
     super.key,
     required this.onQuote,
     required this.child,
-    this.belowAvatar = false,
+    required this.anchorKey,
   });
 
   final VoidCallback onQuote;
   final Widget child;
-  final bool belowAvatar;
+  final GlobalKey anchorKey;
 
   @override
   State<MessageSwipeQuote> createState() => _MessageSwipeQuoteState();
@@ -31,6 +30,8 @@ class _MessageSwipeQuoteState extends State<MessageSwipeQuote>
   );
   double _distance = 0;
   bool _hapticSent = false;
+  final _stackKey = GlobalKey();
+  Rect _bubbleBounds = Rect.zero;
 
   @override
   void dispose() {
@@ -52,6 +53,13 @@ class _MessageSwipeQuoteState extends State<MessageSwipeQuote>
     behavior: HitTestBehavior.translucent,
     onHorizontalDragStart: (_) {
       _offset.stop();
+      final stack = _stackKey.currentContext!.findRenderObject()! as RenderBox;
+      final bubble =
+          widget.anchorKey.currentContext!.findRenderObject()! as RenderBox;
+      _bubbleBounds =
+          (bubble.localToGlobal(Offset.zero, ancestor: stack) -
+              Offset(_offset.value, 0)) &
+          bubble.size;
       _distance = 0;
       _hapticSent = false;
     },
@@ -73,47 +81,44 @@ class _MessageSwipeQuoteState extends State<MessageSwipeQuote>
       animation: _offset,
       child: widget.child,
       builder: (context, child) => Stack(
+        key: _stackKey,
         alignment: Alignment.centerLeft,
         clipBehavior: Clip.none,
         children: [
           Positioned(
-            left: widget.belowAvatar
-                ? -GroupMessageHeading.avatarGap -
-                      GroupMessageHeading.avatarSize +
-                      2
-                : 16,
-            top: widget.belowAvatar ? 28 : null,
+            left: _bubbleBounds.left + 4,
+            top: _bubbleBounds.center.dy - 16,
             child: IgnorePointer(
               child: ExcludeSemantics(
                 child: Opacity(
                   opacity: (_offset.value / _threshold).clamp(0.0, 1.0),
-                  child: Transform.translate(
-                    offset: Offset(
-                      0,
-                      widget.belowAvatar
-                          ? -8 *
-                                (1 -
-                                    (_offset.value / _threshold).clamp(
-                                      0.0,
-                                      1.0,
-                                    ))
-                          : 0,
+                  child: ClipRect(
+                    clipper: _SwipeQuoteReveal(
+                      (_offset.value - 12).clamp(0, 32),
                     ),
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 160),
+                      curve: Curves.easeOutCubic,
                       width: 32,
                       height: 32,
-                      alignment: Alignment.center,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Theme.of(context).colorScheme.surface,
-                        border: Border.all(
-                          color: Theme.of(context).colorScheme.outlineVariant,
-                        ),
+                        color: Theme.of(context).colorScheme.onSurface
+                            .withValues(
+                              alpha: _offset.value >= _threshold ? .06 : 0,
+                            ),
                       ),
-                      child: QuoteIcon(
-                        color: _offset.value >= _threshold
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                      child: Center(
+                        child: AnimatedScale(
+                          scale: _offset.value >= _threshold ? 1.12 : 1,
+                          duration: MediaQuery.disableAnimationsOf(context)
+                              ? Duration.zero
+                              : const Duration(milliseconds: 160),
+                          curve: Curves.easeOutBack,
+                          child: QuoteIcon(),
+                        ),
                       ),
                     ),
                   ),
@@ -126,4 +131,16 @@ class _MessageSwipeQuoteState extends State<MessageSwipeQuote>
       ),
     ),
   );
+}
+
+/// Reveal only the space uncovered by the moving bubble. The icon stays put.
+class _SwipeQuoteReveal extends CustomClipper<Rect> {
+  const _SwipeQuoteReveal(this.width);
+  final double width;
+
+  @override
+  Rect getClip(Size size) => Rect.fromLTWH(0, 0, width, size.height);
+
+  @override
+  bool shouldReclip(_SwipeQuoteReveal oldClipper) => width != oldClipper.width;
 }

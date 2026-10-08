@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import 'chat_timeline.dart';
@@ -506,6 +507,8 @@ class ChatViewportState extends State<ChatViewport> {
   }
 
   void _preserveEntry(String id) {
+    // Layout changes must not cancel a drag or its ballistic scrolling.
+    if (_userScrolling) return;
     final revision = ++_scrollRevision;
     _keepSentMessageAtTop = false;
     final position = _positions.itemPositions.value.firstWhere(
@@ -660,15 +663,34 @@ class ChatViewportState extends State<ChatViewport> {
                     _userScrolling = true;
                     FocusManager.instance.primaryFocus?.unfocus();
                   }
+                  if (notification is UserScrollNotification &&
+                      notification.direction != ScrollDirection.idle &&
+                      !_userScrolling) {
+                    _scrollRevision++;
+                    _restoring = false;
+                    _keepSentMessageAtTop = false;
+                    _userScrolling = true;
+                  }
                   if (_userScrolling &&
                       (notification is ScrollUpdateNotification ||
                           notification is ScrollEndNotification)) {
+                    if (notification is ScrollUpdateNotification &&
+                        _listScrollPosition!.isScrollingNotifier.value) {
+                      // A previous end notification can still have a queued
+                      // callback when another drag or wheel scroll continues.
+                      _scrollRevision++;
+                      _restoring = false;
+                    }
                     widget.onUserScroll?.call();
                   }
                   if (notification is ScrollEndNotification && _userScrolling) {
                     final revision = _scrollRevision;
                     WidgetsBinding.instance.endOfFrame.then((_) {
-                      if (!mounted || revision != _scrollRevision) return;
+                      if (!mounted ||
+                          revision != _scrollRevision ||
+                          !_userScrolling ||
+                          _listScrollPosition!.isScrollingNotifier.value)
+                        return;
                       _rememberPosition();
                       _userScrolling = false;
                       if (_following) {

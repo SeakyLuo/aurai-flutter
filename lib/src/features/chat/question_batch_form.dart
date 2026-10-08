@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../utils/widget_utils.dart';
+import '../../app/glass_notice.dart';
+import 'question_navigation.dart';
 
 import '../../agent/ask_user_tool.dart';
 import '../../domain/message_sender.dart';
 import '../../domain/question_batch.dart';
-import 'interactive_message_button.dart';
+import '../../domain/selection_option.dart';
+import 'interaction_text_preview.dart';
 import 'message_composer.dart';
 import 'question_message_heading.dart';
 import 'question_pager.dart';
@@ -55,6 +57,7 @@ class QuestionBatchForm extends StatelessWidget {
     this.compact = false,
     this.scrollable = false,
     this.focusInput = false,
+    this.senderHeading,
     this.recipient,
     this.onOpenMember,
     this.trailing,
@@ -66,6 +69,7 @@ class QuestionBatchForm extends StatelessWidget {
   final bool busy, readOnly, compact;
   final bool scrollable;
   final bool focusInput;
+  final Widget? senderHeading;
   final MessageSender? recipient;
   final ValueChanged<String>? onOpenMember;
   final Widget? trailing;
@@ -75,6 +79,7 @@ class QuestionBatchForm extends StatelessWidget {
   bool get _immediateAnswer =>
       controller.batch.questions.length == 1 &&
       controller.batch.questions.single['mode'] != 'multiple' &&
+      !hasRichOptions(controller.batch.questions.single['options'] as List) &&
       controller.batch.questions.single['showConfirm'] != true;
 
   Future<void> _details(BuildContext context, {bool focusInput = false}) async {
@@ -90,6 +95,7 @@ class QuestionBatchForm extends StatelessWidget {
           child: QuestionBatchForm(
             scrollable: true,
             focusInput: focusInput,
+            senderHeading: senderHeading,
             controller: controller,
             onSubmit: () async {
               submit = true;
@@ -100,6 +106,7 @@ class QuestionBatchForm extends StatelessWidget {
             recipient: recipient,
             onOpenMember: onOpenMember,
             status: status,
+            trailing: trailing,
             closeWhen: closeWhen,
           ),
         ),
@@ -121,34 +128,57 @@ class QuestionBatchForm extends StatelessWidget {
       final selected = (answer['selected'] as List? ?? const []).toSet();
       final text = answer['text'] as String? ?? '';
       final multiple = question['mode'] == 'multiple';
-      final collapsed = compact && readOnly;
+      final collapsed = compact && readOnly && !hasRichOptions(options);
       final firstMissing = questions.indexWhere(
         (q) => !controller.batch.accepts(
           q,
           controller.answers[q['id']] as Map? ?? const {},
         ),
       );
+      Future<void> advance() async {
+        FocusScope.of(context).unfocus();
+        if (controller.index < questions.length - 1) {
+          controller.goTo(controller.index + 1);
+        } else if (firstMissing >= 0) {
+          controller.goTo(firstMissing);
+          ScaffoldMessenger.of(
+            context,
+          ).showToast(SnackBar(content: Text('请完成第 ${firstMissing + 1} 题')));
+        } else {
+          await onSubmit!();
+        }
+      }
+
       final content = Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           QuestionMessageHeading(
+            sheetHeader: !compact || scrollable,
+            senderHeading: senderHeading,
             title: question['question'] as String,
             description: question['description'] as String? ?? '',
             multiple: multiple,
-            modeLabel: question['mode'] == 'text' ? '文字' : null,
+            modeLabel:
+                '${question['mode'] == 'text'
+                    ? '文字'
+                    : multiple
+                    ? '多选'
+                    : '单选'}${!readOnly && questions.length > 1 ? ' · ${controller.index + 1}/${questions.length} 题' : ''}',
             status: status,
             recipient: recipient,
             onOpenMember: onOpenMember,
             trailing: trailing,
-            pager: QuestionPager(
-              index: controller.index,
-              count: questions.length,
-              onChanged: (index) {
-                FocusScope.of(context).unfocus();
-                controller.goTo(index);
-              },
-            ),
+            pager: readOnly
+                ? QuestionPager(
+                    index: controller.index,
+                    count: questions.length,
+                    onChanged: (index) {
+                      FocusScope.of(context).unfocus();
+                      controller.goTo(index);
+                    },
+                  )
+                : null,
           ),
           const SizedBox(height: 12),
           if (collapsed) ...[
@@ -157,24 +187,21 @@ class QuestionBatchForm extends StatelessWidget {
                 answer['skipped'] == true)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  answer['skipped'] == true
-                      ? '已跳过'
-                      : text.isNotEmpty
-                      ? text
-                      : options
-                            .where((o) => selected.contains(o['id']))
-                            .map((o) => o['label'])
-                            .join('、'),
-                  style: const TextStyle(fontSize: 15, height: 1.5),
-                ),
+                child: text.isNotEmpty && answer['skipped'] != true
+                    ? InteractionTextPreview(
+                        text: text,
+                        onShowDetails: () => _details(context),
+                      )
+                    : Text(
+                        answer['skipped'] == true
+                            ? '已跳过'
+                            : options
+                                  .where((o) => selected.contains(o['id']))
+                                  .map((o) => o['label'])
+                                  .join('、'),
+                        style: const TextStyle(fontSize: 15, height: 1.5),
+                      ),
               ),
-            InteractiveMessageButton(
-              button: {'label': readOnly ? '查看详情' : '查看全部选项'},
-              busy: false,
-              locked: false,
-              onPressed: () => _details(context),
-            ),
           ] else ...[
             QuestionAnswerContent(
               question: '',
@@ -191,7 +218,7 @@ class QuestionBatchForm extends StatelessWidget {
               customAnswer: text,
               options: [
                 for (final option in options)
-                  UserQuestionOption(content: option['label'] as String),
+                  UserQuestionOption.fromSelection(option as Map),
               ],
               selected: {
                 for (final (i, option) in options.indexed)
@@ -250,23 +277,7 @@ class QuestionBatchForm extends StatelessWidget {
               text: text,
               enabled: !busy,
               hint: question['mode'] == 'text' ? '填写回答' : '或自行撰写回复',
-              onSend: busy || text.trim().isEmpty
-                  ? null
-                  : () async {
-                      FocusScope.of(context).unfocus();
-                      if (controller.complete) {
-                        await onSubmit!();
-                      } else {
-                        controller.goTo(
-                          questions.indexWhere(
-                            (q) => !controller.batch.accepts(
-                              q,
-                              controller.answers[q['id']] as Map? ?? const {},
-                            ),
-                          ),
-                        );
-                      }
-                    },
+              onSend: busy || text.trim().isEmpty ? null : advance,
               onChanged: (value) => controller.answer({
                 'selected': <String>[],
                 'text': value,
@@ -293,45 +304,16 @@ class QuestionBatchForm extends StatelessWidget {
               ),
             if (!_immediateAnswer) ...[
               const SizedBox(height: 12),
-              if (controller.index < questions.length - 1 &&
-                  !controller.complete)
-                WidgetUtils.primaryButton(
-                  text: '下一题',
-                  onPressed: busy
-                      ? null
-                      : () {
-                          FocusScope.of(context).unfocus();
-                          controller.goTo(controller.index + 1);
-                        },
-                )
-              else
-                WidgetUtils.primaryButton(
-                  text: controller.complete || questions.length == 1
-                      ? '提交回答'
-                      : '继续填写',
-                  loading: busy,
-                  onPressed:
-                      busy ||
-                          !controller.complete &&
-                              firstMissing == controller.index
-                      ? null
-                      : () async {
-                          FocusScope.of(context).unfocus();
-                          if (!controller.complete) {
-                            controller.goTo(
-                              questions.indexWhere(
-                                (q) => !controller.batch.accepts(
-                                  q,
-                                  controller.answers[q['id']] as Map? ??
-                                      const {},
-                                ),
-                              ),
-                            );
-                          } else {
-                            await onSubmit!();
-                          }
-                        },
-                ),
+              QuestionNavigation(
+                index: controller.index,
+                count: questions.length,
+                busy: busy,
+                onPrevious: () {
+                  FocusScope.of(context).unfocus();
+                  controller.goTo(controller.index - 1);
+                },
+                onNext: advance,
+              ),
             ],
           ],
         ],

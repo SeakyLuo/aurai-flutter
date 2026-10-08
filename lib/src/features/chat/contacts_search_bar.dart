@@ -10,10 +10,12 @@ class ContactsSearchBar extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.onClose,
+    this.hintText = '搜索朋友',
   });
   final TextEditingController controller;
   final FocusNode focusNode;
   final VoidCallback onClose;
+  final String hintText;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -37,7 +39,7 @@ class ContactsSearchBar extends StatelessWidget {
                   style: const TextStyle(fontSize: 16, height: 1.4),
                   textAlignVertical: TextAlignVertical.center,
                   decoration: InputDecoration(
-                    hintText: '搜索朋友',
+                    hintText: hintText,
                     isDense: true,
                     filled: false,
                     border: InputBorder.none,

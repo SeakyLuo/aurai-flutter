@@ -18,17 +18,20 @@ class MemoryConsolidationStore {
     Map<String, Object?> job,
     MemoryEvidence evidence,
     List<Map<String, Object?>> changes,
+    int attempt,
+    String? responseId,
   ) => database.transaction((txn) async {
     final liveJob = await txn.query(
       'memory_jobs',
-      columns: ['cursor', 'state'],
+      columns: ['cursor', 'state', 'text_offset'],
       where: 'run_id = ?',
       whereArgs: [job['run_id']],
       limit: 1,
     );
     if (liveJob.isEmpty ||
         liveJob.single['state'] != 'working' ||
-        liveJob.single['cursor'] != job['cursor'])
+        liveJob.single['cursor'] != job['cursor'] ||
+        liveJob.single['text_offset'] != job['text_offset'])
       return false;
     final owner = job['owner_id'];
     final ids = changes
@@ -64,13 +67,6 @@ class MemoryConsolidationStore {
       whereArgs: [owner, jsonEncode(keys.toList())],
     );
     final forbidden = tombstones.map((r) => r['source_key']).toSet();
-    final latest = await txn.rawQuery(
-      '''SELECT kind || ':' || source_id AS source_key, MAX(id) AS id
-      FROM memory_evidence WHERE run_id = ? AND kind || ':' || source_id IN (SELECT value FROM json_each(?))
-      GROUP BY kind, source_id''',
-      [job['run_id'], jsonEncode(keys.toList())],
-    );
-    final versions = {for (final r in latest) r['source_key']: r['id']};
     final messageRecords = evidence.records
         .where((r) => r.containsKey('contentFingerprint'))
         .toList();
@@ -84,15 +80,24 @@ class MemoryConsolidationStore {
       for (final row in liveMessages)
         row['id']: memoryFingerprint(row['text'] as String),
     };
-    if (evidence.records.any((r) => versions[r['source']] != r['event']) ||
-        messageRecords.any(
-          (r) => fingerprintsNow[r['id']] != r['contentFingerprint'],
-        )) {
+    if (messageRecords.any(
+      (r) => fingerprintsNow[r['id']] != r['contentFingerprint'],
+    )) {
       await txn.update(
         'memory_jobs',
-        {'state': 'pending', 'due_at': 0},
+        {'state': 'pending', 'due_at': 0, 'batch_json': null, 'text_offset': 0},
         where: 'run_id = ?',
         whereArgs: [job['run_id']],
+      );
+      await txn.update(
+        'memory_attempts',
+        {
+          'status': 'superseded',
+          'response_id': responseId,
+          'finished_at': DateTime.now().millisecondsSinceEpoch,
+        },
+        where: 'id = ?',
+        whereArgs: [attempt],
       );
       return false;
     }
@@ -205,6 +210,10 @@ class MemoryConsolidationStore {
       'memory_jobs',
       {
         'cursor': evidence.cursor,
+        'text_offset': evidence.offset,
+        'text_fingerprint': evidence.fingerprint,
+        'batch_json': null,
+        'retries': 0,
         'state': 'done',
         'due_at': 0,
         'error': null,
@@ -214,8 +223,14 @@ class MemoryConsolidationStore {
       whereArgs: [job['run_id']],
     );
     await batch.commit(noResult: true);
+    await txn.update(
+      'memory_attempts',
+      {'status': 'completed', 'response_id': responseId, 'finished_at': now},
+      where: 'id = ?',
+      whereArgs: [attempt],
+    );
     await txn.rawUpdate(
-      "UPDATE memory_jobs SET state = CASE WHEN EXISTS(SELECT 1 FROM agent_runs WHERE id = ? AND status = 'running') THEN 'waiting' WHEN EXISTS(SELECT 1 FROM memory_evidence WHERE run_id = ? AND id > ?) THEN 'pending' ELSE 'done' END WHERE run_id = ?",
+      "UPDATE memory_jobs SET state = CASE WHEN EXISTS(SELECT 1 FROM agent_runs WHERE id IN (SELECT run_id FROM memory_run_jobs WHERE job_id = ?) AND status = 'running') THEN 'waiting' WHEN EXISTS(SELECT 1 FROM memory_evidence WHERE run_id = ? AND id > ?) THEN 'pending' ELSE 'done' END WHERE run_id = ?",
       [job['run_id'], job['run_id'], evidence.cursor, job['run_id']],
     );
     return changes.isNotEmpty;

@@ -1,4 +1,5 @@
 import 'interactive_button_layout.dart';
+import 'interaction_text_preview.dart';
 import 'participation_summary.dart';
 import 'dart:convert';
 import '../../storage/interactive_selection_drafts.dart';
@@ -9,6 +10,9 @@ import 'package:flutter/material.dart';
 import 'interactive_message_button.dart';
 import '../../domain/message_sender.dart';
 import 'vote_participant_avatars.dart';
+import '../../agent/ask_user_tool.dart';
+import '../../domain/selection_option.dart';
+import 'rich_option_carousel.dart';
 
 /// Renders projected data only. Rules and settlement live in the domain layer.
 class InteractionContent extends StatelessWidget {
@@ -35,6 +39,8 @@ class InteractionContent extends StatelessWidget {
     this.onCancelVote,
     this.draftOwner,
     this.onSaveSelection,
+    this.fullSheet = false,
+    this.showTextDetails = false,
   });
   final Map<String, Object?> view;
   final int buttonColumns;
@@ -45,6 +51,8 @@ class InteractionContent extends StatelessWidget {
   final bool question;
   final bool statusInHeading;
   final bool compactOptions;
+  final bool fullSheet;
+  final bool showTextDetails;
   final String title, body;
   final Map<String, MessageSender> members;
   final ValueChanged<String>? onOpenMember;
@@ -137,6 +145,68 @@ class InteractionContent extends StatelessWidget {
           ),
       ],
     );
+    Widget selectionView(Map<String, Object?> button) =>
+        InteractiveSelectionView(
+          fullSheet: fullSheet,
+          key: ValueKey((button['id'], view['round'])),
+          draftSelection: draftOwner == null || !editingSelection
+              ? null
+              : InteractiveSelectionDrafts.instance.read(
+                  draftOwner!.messageId,
+                  draftOwner!.actorId,
+                  button['id'] as String,
+                  _draftVersion(button),
+                ),
+          draftOtherText: draftOwner == null || !editingSelection
+              ? null
+              : InteractiveSelectionDrafts.instance.readOtherText(
+                  draftOwner!.messageId,
+                  draftOwner!.actorId,
+                  button['id'] as String,
+                  _draftVersion(button),
+                ),
+          onSelectionChanged: draftOwner == null || !editingSelection
+              ? null
+              : (selected, otherText) => onSaveSelection!(
+                  button['id'] as String,
+                  _draftVersion(button),
+                  selected,
+                  otherText,
+                ),
+          button: button,
+          question: question,
+          anonymous: view['anonymous'] == true,
+          voteStatus: question
+              ? null
+              : view['closed'] == true || view['phase'] == 'closed'
+              ? '已结束'
+              : view['completed'] == true
+              ? '已完成'
+              : '进行中',
+          compactOptions: compactOptions,
+          title: title,
+          body: body,
+          summary: !question && editingSelection ? participationSummary : null,
+          sheetActions: actions.isEmpty ? null : actionButtons,
+          self: question ? answer : self,
+          locked:
+              readOnly ||
+              !eligible ||
+              !collecting ||
+              busy != null ||
+              pendingButtonId == button['id'],
+          submitted: question ? answer != null : submitted,
+          allowChange: allowChange,
+          busy: busy == button['id'],
+          showSubmit:
+              eligible && !readOnly && collecting && (!question || choosing),
+          onSubmit: (value) => onClick(button, value: value),
+        );
+    if (fullSheet && buttons.any((button) => button['selection'] != null)) {
+      return selectionView(
+        buttons.singleWhere((button) => button['selection'] != null),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -168,9 +238,11 @@ class InteractionContent extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              _ => Text(
-                '${component['value'] ?? ''}',
-                style: const TextStyle(fontSize: 15, height: 1.5),
+              _ => InteractionTextPreview(
+                text: '${component['value'] ?? ''}',
+                onShowDetails: question && showTextDetails && !fullSheet
+                    ? onStatistics
+                    : null,
               ),
             },
           ),
@@ -197,66 +269,7 @@ class InteractionContent extends StatelessWidget {
         ))
           Padding(
             padding: EdgeInsets.only(bottom: question ? 0 : 8),
-            child: InteractiveSelectionView(
-              key: ValueKey((button['id'], view['round'])),
-              draftSelection: draftOwner == null || !editingSelection
-                  ? null
-                  : InteractiveSelectionDrafts.instance.read(
-                      draftOwner!.messageId,
-                      draftOwner!.actorId,
-                      button['id'] as String,
-                      _draftVersion(button),
-                    ),
-              draftOtherText: draftOwner == null || !editingSelection
-                  ? null
-                  : InteractiveSelectionDrafts.instance.readOtherText(
-                      draftOwner!.messageId,
-                      draftOwner!.actorId,
-                      button['id'] as String,
-                      _draftVersion(button),
-                    ),
-              onSelectionChanged: draftOwner == null || !editingSelection
-                  ? null
-                  : (selected, otherText) => onSaveSelection!(
-                      button['id'] as String,
-                      _draftVersion(button),
-                      selected,
-                      otherText,
-                    ),
-              button: button,
-              question: question,
-              anonymous: view['anonymous'] == true,
-              voteStatus: question
-                  ? null
-                  : view['closed'] == true || view['phase'] == 'closed'
-                  ? '已结束'
-                  : view['completed'] == true
-                  ? '已完成'
-                  : '进行中',
-              compactOptions: compactOptions,
-              title: title,
-              body: body,
-              summary: !question && editingSelection
-                  ? participationSummary
-                  : null,
-              sheetActions: actions.isEmpty ? null : actionButtons,
-              self: question ? answer : self,
-              locked:
-                  readOnly ||
-                  !eligible ||
-                  !collecting ||
-                  busy != null ||
-                  pendingButtonId == button['id'],
-              submitted: question ? answer != null : submitted,
-              allowChange: allowChange,
-              busy: busy == button['id'],
-              showSubmit:
-                  eligible &&
-                  !readOnly &&
-                  collecting &&
-                  (!question || choosing),
-              onSubmit: (value) => onClick(button, value: value),
-            ),
+            child: selectionView(button),
           ),
         if (!question &&
             submitted &&
@@ -333,6 +346,30 @@ class InteractionDistribution extends StatelessWidget {
       (highest, option) =>
           (option['count'] as num) > highest ? option['count'] as num : highest,
     );
+    if (hasRichOptions(options)) {
+      return RichOptionCarousel(
+        options: [
+          for (final option in options)
+            UserQuestionOption.fromSelection(option as Map),
+        ],
+        selected: {
+          for (final (index, option) in options.indexed)
+            if (selected != null &&
+                selectionEntries(Map<String, Object?>.from(selected)).any(
+                  (choice) =>
+                      choice['buttonId'] == option['buttonId'] &&
+                      choice['label'] == option['label'],
+                ))
+              index,
+        },
+        multiple: true,
+        onSelect: null,
+        captions: [
+          for (final option in options)
+            '${option['count']} ${data['unit']} · ${total == 0 ? 0 : ((option['count'] as num) / total * 100).round()}%',
+        ],
+      );
+    }
     final items = onShowAll != null && options.length > inlineOptionLimit
         ? options.take(4).toList()
         : options;

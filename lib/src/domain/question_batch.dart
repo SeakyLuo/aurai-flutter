@@ -1,11 +1,14 @@
 import 'package:characters/characters.dart';
+import 'selection_option.dart';
 
 /// One native question group is submitted atomically as one participant value.
 class QuestionBatch {
   QuestionBatch(List raw)
     : questions = raw
           .map((value) => Map<String, Object?>.from(value as Map))
-          .toList();
+          .toList() {
+    validate();
+  }
 
   final List<Map<String, Object?>> questions;
 
@@ -34,15 +37,18 @@ class QuestionBatch {
       }
       final optionIds = <String>{};
       for (final option in options) {
+        if (option is Map) validateSelectionOption(option);
         if (option is! Map ||
             option['id'] is! String ||
             (option['id'] as String).isEmpty ||
-            !optionIds.add(option['id'] as String) ||
-            option['label'] is! String ||
-            (option['label'] as String).trim().isEmpty) {
+            !optionIds.add(option['id'] as String)) {
           throw ArgumentError('选项标识须唯一，选项文字不能为空');
         }
       }
+      question['options'] = [
+        for (final (index, option) in options.indexed)
+          selectionOption(option as Map, index),
+      ];
       if (question['required'] != null && question['required'] is! bool ||
           question['showConfirm'] != null && question['showConfirm'] is! bool ||
           question['allowCustomAnswer'] != null &&

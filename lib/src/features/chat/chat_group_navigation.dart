@@ -31,6 +31,7 @@ extension _ChatGroupNavigation on _ChatPageState {
           controller: controller,
           runId: runId,
           sender: sender,
+          live: true,
         );
       },
     );

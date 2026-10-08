@@ -15,11 +15,13 @@ class MessagePreviewText extends StatelessWidget {
     this.prefix = const [],
     this.literal = false,
     this.formatted = false,
+    this.textWidthBasis = TextWidthBasis.parent,
   });
   final String text, query;
   final int? maxLines;
   final TextStyle? style;
   final bool snippet, literal, formatted;
+  final TextWidthBasis textWidthBasis;
   final List<InlineSpan> prefix;
 
   static TextSpan span(
@@ -80,6 +82,7 @@ class MessagePreviewText extends StatelessWidget {
           ),
           maxLines: maxLines,
           overflow: TextOverflow.ellipsis,
+          textWidthBasis: textWidthBasis,
           style: style,
         );
 }

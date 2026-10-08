@@ -13,6 +13,12 @@ import 'chat_controller.dart';
 import 'conversation_menu_icon.dart';
 import 'header_action_menu.dart';
 import 'pinned_message_detail.dart';
+import 'pinned_message_page.dart';
+import 'app_bottom_sheet.dart';
+import '../../agent/ask_user_tool.dart';
+import 'user_question_card.dart';
+import 'ai_contact_page.dart';
+import 'profile_navigation.dart';
 
 class PinnedMessageSplit extends StatefulWidget {
   const PinnedMessageSplit({
@@ -177,6 +183,51 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
           !message.canView(MessageSender.localUser.id)) {
         close();
         throw StateError('消息已删除、撤回或不可见');
+      }
+      if (opening && !pinned) {
+        final pending = UserQuestion.activeCards[id];
+        if (pending != null) {
+          await showUserQuestionSheet(
+            context,
+            question: pending,
+            showSender: false,
+            onOpenSender: () => openProfileRoute(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AiContactPage(
+                  controller: widget.controller,
+                  senderId: pending.sender.id,
+                  groupId: message.isGroupMessage ? groupId : null,
+                ),
+              ),
+            ),
+          );
+          return;
+        }
+      }
+      final interactiveReference =
+          !pinned &&
+          (message.interactive?.isQuestion == true ||
+              message.interactive?.isVote == true);
+      if (opening && (!supportsSplit || interactiveReference)) {
+        await showAppBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          showDragHandle: false,
+          builder: (_) => PinnedMessagePage(
+            controller: widget.controller,
+            conversationId: groupId,
+            messageId: id,
+            initialMessage: message,
+            pinned: pinned,
+            sheet: true,
+            interactiveReference: interactiveReference,
+            onLocate: widget.onLocate,
+            messageBuilder: widget.messageBuilder,
+          ),
+        );
+        return;
       }
       setState(() {
         _message = message;

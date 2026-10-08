@@ -14,6 +14,7 @@ import 'vote_appearance.dart';
 import 'vote_other_input.dart';
 import 'vote_other_option_tile.dart';
 import 'interactive_message_button.dart';
+import 'rich_option_carousel.dart';
 
 Future<Set<int>?> showQuestionOptionsSheet(
   BuildContext context, {
@@ -52,7 +53,7 @@ Future<Set<int>?> showQuestionOptionsSheet(
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     builder: (context) => Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: _QuestionOptionsSheet(
+      child: QuestionOptionsSheet(
         options: options,
         selected: selected,
         onSelectionChanged: onSelectionChanged,
@@ -171,8 +172,9 @@ class QuestionOptionsField extends StatelessWidget {
   }
 }
 
-class _QuestionOptionsSheet extends StatefulWidget {
-  const _QuestionOptionsSheet({
+class QuestionOptionsSheet extends StatefulWidget {
+  const QuestionOptionsSheet({
+    super.key,
     required this.options,
     required this.selected,
     this.onSelectionChanged,
@@ -192,6 +194,8 @@ class _QuestionOptionsSheet extends StatefulWidget {
     this.otherText = '',
     this.otherMaxLength = 50,
     this.onOtherTextChanged,
+    this.onSubmit,
+    this.busy = false,
   });
   final List<UserQuestionOption> options;
   final Set<int> selected;
@@ -210,17 +214,60 @@ class _QuestionOptionsSheet extends StatefulWidget {
   final String otherText;
   final int otherMaxLength;
   final ValueChanged<String>? onOtherTextChanged;
+  final ValueChanged<Set<int>>? onSubmit;
+  final bool busy;
 
   @override
-  State<_QuestionOptionsSheet> createState() => _QuestionOptionsSheetState();
+  State<QuestionOptionsSheet> createState() => _QuestionOptionsSheetState();
 }
 
-class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
+class _QuestionOptionsSheetState extends State<QuestionOptionsSheet> {
   late final _selected = {...widget.selected};
   late String _otherText = widget.otherText;
   bool _editingOther = false;
 
-  bool get _confirm => widget.multiple || widget.showConfirm;
+  @override
+  void didUpdateWidget(QuestionOptionsSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selected.length != oldWidget.selected.length ||
+        !widget.selected.containsAll(oldWidget.selected)) {
+      _selected
+        ..clear()
+        ..addAll(widget.selected);
+    }
+    if (widget.otherText != oldWidget.otherText) _otherText = widget.otherText;
+  }
+
+  void _submit(Set<int> selected) {
+    if (widget.onSubmit != null) {
+      widget.onSubmit!(Set.of(selected));
+    } else {
+      Navigator.pop(context, selected);
+    }
+  }
+
+  bool get _rich => widget.options.any((option) => option.messageId != null);
+  bool get _confirm => widget.multiple || widget.showConfirm || _rich;
+
+  Widget _carousel() => RichOptionCarousel(
+    options: widget.options,
+    selected: _selected,
+    multiple: widget.multiple,
+    maximum: widget.maximum,
+    onSelect: widget.readOnly || widget.busy
+        ? null
+        : (index) {
+            if (index == widget.otherIndex && !_selected.contains(index)) {
+              setState(() => _editingOther = true);
+              return;
+            }
+            setState(() {
+              if (!widget.multiple) _selected.clear();
+              if (!_selected.remove(index)) _selected.add(index);
+            });
+            widget.onSelectionChanged?.call(Set.of(_selected));
+          },
+  );
 
   void _finishOther(String text) {
     FocusScope.of(context).unfocus();
@@ -232,7 +279,7 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
     });
     widget.onOtherTextChanged?.call(text);
     widget.onSelectionChanged?.call(Set.of(_selected));
-    if (!_confirm) Navigator.pop(context, _selected);
+    if (!_confirm) _submit(_selected);
   }
 
   void _cancelOther() {
@@ -318,10 +365,7 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                                       onPressed:
                                           _selected.length >= widget.minimum &&
                                               _selected.length <= widget.maximum
-                                          ? () => Navigator.pop(
-                                              context,
-                                              _selected,
-                                            )
+                                          ? () => _submit(_selected)
                                           : null,
                                     ),
                                   ],
@@ -372,7 +416,7 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                               onPressed:
                                   _selected.length >= widget.minimum &&
                                       _selected.length <= widget.maximum
-                                  ? () => Navigator.pop(context, _selected)
+                                  ? () => _submit(_selected)
                                   : null,
                             )
                           else
@@ -394,7 +438,7 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                       shrinkWrap: true,
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       itemCount:
-                          widget.options.length +
+                          (_rich ? 1 : widget.options.length) +
                           (widget.body?.isNotEmpty == true ? 1 : 0),
                       separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
@@ -415,6 +459,7 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                           );
                         }
                         final optionIndex = index - (hasBody ? 1 : 0);
+                        if (_rich) return _carousel();
                         final selected = _selected.contains(optionIndex);
                         return UserQuestionOptionTile(
                           option: widget.options[optionIndex],
@@ -429,7 +474,7 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                               ? null
                               : () {
                                   if (!_confirm) {
-                                    Navigator.pop(context, {optionIndex});
+                                    _submit({optionIndex});
                                   } else {
                                     setState(() {
                                       if (!widget.multiple) _selected.clear();
@@ -448,16 +493,18 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                       },
                     ),
                   ),
-                  if (_confirm && !widget.readOnly && widget.title != null)
+                  if (_confirm &&
+                      !widget.readOnly &&
+                      (widget.title != null || _rich))
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: InteractiveMessageButton(
                         button: const {'label': '提交回答', 'style': 'primary'},
-                        busy: false,
+                        busy: widget.busy,
                         locked:
                             _selected.length < widget.minimum ||
                             _selected.length > widget.maximum,
-                        onPressed: () => Navigator.pop(context, _selected),
+                        onPressed: () => _submit(_selected),
                       ),
                     ),
                   if (widget.actions case final actions?)
@@ -521,74 +568,79 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  for (final (index, option) in widget.options.indexed)
-                    Padding(
-                      padding: EdgeInsets.only(
-                        bottom: index == widget.options.length - 1 ? 0 : 8,
-                      ),
-                      child: index == widget.otherIndex
-                          ? VoteOtherOptionTile(
-                              text: _otherText,
-                              selected: _selected.contains(index),
-                              multiple: widget.multiple,
-                              number: index + 1,
-                              onEdit:
-                                  widget.readOnly ||
-                                      widget.multiple &&
-                                          !_selected.contains(index) &&
-                                          _selected.length >= widget.maximum
-                                  ? null
-                                  : () => setState(() => _editingOther = true),
-                              onToggle:
-                                  widget.readOnly ||
-                                      widget.multiple &&
-                                          !_selected.contains(index) &&
-                                          _selected.length >= widget.maximum
-                                  ? null
-                                  : () {
-                                      if (_selected.contains(index)) {
-                                        setState(() => _selected.remove(index));
+                  if (_rich)
+                    _carousel()
+                  else
+                    for (final (index, option) in widget.options.indexed)
+                      Padding(
+                        padding: EdgeInsets.only(
+                          bottom: index == widget.options.length - 1 ? 0 : 8,
+                        ),
+                        child: index == widget.otherIndex
+                            ? VoteOtherOptionTile(
+                                text: _otherText,
+                                selected: _selected.contains(index),
+                                multiple: widget.multiple,
+                                number: index + 1,
+                                onEdit:
+                                    widget.readOnly ||
+                                        widget.multiple &&
+                                            !_selected.contains(index) &&
+                                            _selected.length >= widget.maximum
+                                    ? null
+                                    : () =>
+                                          setState(() => _editingOther = true),
+                                onToggle:
+                                    widget.readOnly ||
+                                        widget.multiple &&
+                                            !_selected.contains(index) &&
+                                            _selected.length >= widget.maximum
+                                    ? null
+                                    : () {
+                                        if (_selected.contains(index)) {
+                                          setState(
+                                            () => _selected.remove(index),
+                                          );
+                                          widget.onSelectionChanged?.call(
+                                            Set.of(_selected),
+                                          );
+                                        } else {
+                                          setState(() => _editingOther = true);
+                                        }
+                                      },
+                              )
+                            : UserQuestionOptionTile(
+                                option: option,
+                                number: index + 1,
+                                selected: _selected.contains(index),
+                                multiple: widget.multiple,
+                                vote: true,
+                                onTap:
+                                    widget.readOnly ||
+                                        widget.multiple &&
+                                            !_selected.contains(index) &&
+                                            _selected.length >= widget.maximum
+                                    ? null
+                                    : () {
+                                        if (!widget.multiple) {
+                                          setState(() {
+                                            _selected
+                                              ..clear()
+                                              ..add(index);
+                                          });
+                                        } else {
+                                          setState(() {
+                                            if (!_selected.remove(index))
+                                              _selected.add(index);
+                                          });
+                                        }
                                         widget.onSelectionChanged?.call(
                                           Set.of(_selected),
                                         );
-                                      } else {
-                                        setState(() => _editingOther = true);
-                                      }
-                                    },
-                            )
-                          : UserQuestionOptionTile(
-                              option: option,
-                              number: index + 1,
-                              selected: _selected.contains(index),
-                              multiple: widget.multiple,
-                              vote: true,
-                              onTap:
-                                  widget.readOnly ||
-                                      widget.multiple &&
-                                          !_selected.contains(index) &&
-                                          _selected.length >= widget.maximum
-                                  ? null
-                                  : () {
-                                      if (!widget.multiple) {
-                                        setState(() {
-                                          _selected
-                                            ..clear()
-                                            ..add(index);
-                                        });
-                                      } else {
-                                        setState(() {
-                                          if (!_selected.remove(index))
-                                            _selected.add(index);
-                                        });
-                                      }
-                                      widget.onSelectionChanged?.call(
-                                        Set.of(_selected),
-                                      );
-                                      if (!_confirm)
-                                        Navigator.pop(context, _selected);
-                                    },
-                            ),
-                    ),
+                                        if (!_confirm) _submit(_selected);
+                                      },
+                              ),
+                      ),
                 ],
               ),
             ),
@@ -596,9 +648,9 @@ class _QuestionOptionsSheetState extends State<_QuestionOptionsSheet> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                 child: VoteSubmitButton(
-                  busy: false,
+                  busy: widget.busy,
                   locked: !valid,
-                  onPressed: () => Navigator.pop(context, _selected),
+                  onPressed: () => _submit(_selected),
                 ),
               ),
             if (widget.actions case final actions?)

@@ -5,7 +5,6 @@ import 'user_question_answer.dart';
 import 'user_question_skip_button.dart';
 import 'question_batch_form.dart';
 import 'question_submission.dart';
-import 'question_card_anchor.dart';
 
 Future<void> showUserQuestionSheet(
   BuildContext context, {
@@ -17,9 +16,7 @@ Future<void> showUserQuestionSheet(
   try {
     await showQuestionSheet(
       context,
-      returnTarget: question.messageId == null
-          ? null
-          : () => QuestionCardAnchor.bounds(question.messageId!),
+      messageId: question.messageId,
       child: UserQuestionCard(
         question: question,
         showSender: showSender,
@@ -91,12 +88,19 @@ class _UserQuestionCardState extends State<UserQuestionCard> {
     scrollBody: _batch == null,
     heading: _batch == null ? null : const SizedBox.shrink(),
     trailing: UserQuestionSkipButton(question: widget.question),
-    sender: widget.showSender ? widget.question.sender : null,
+    sender: widget.showSender && _batch == null ? widget.question.sender : null,
     onOpenSender: widget.onOpenSender,
     child: _batch == null
         ? UserQuestionAnswer(question: widget.question)
         : QuestionBatchForm(
+            senderHeading: widget.showSender
+                ? QuestionSenderHeading(
+                    sender: widget.question.sender,
+                    onOpenSender: widget.onOpenSender,
+                  )
+                : null,
             controller: _batch!,
+            status: '待回答',
             scrollable: true,
             compact: true,
             trailing: UserQuestionSkipButton(question: widget.question),

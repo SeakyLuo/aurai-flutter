@@ -388,6 +388,7 @@ extension InteractiveMessageActions on ChatController {
     Conversation? source,
   }) {
     InteractiveMessageStore.changes.add(id);
+    InteractiveMessageStore.cardUpdates.add((messageId: id, card: card));
     for (final conversation in _interactiveConversations(
       conversationId,
       source,

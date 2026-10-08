@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 class QuestionCardAnchor extends StatefulWidget {
   const QuestionCardAnchor({
@@ -15,6 +16,25 @@ class QuestionCardAnchor extends StatefulWidget {
     final box = context.findRenderObject() as RenderBox;
     if (!box.hasSize) return null;
     return box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  static bool isVisible(BuildContext context, {String? messageId}) {
+    final id =
+        messageId ??
+        context.findAncestorWidgetOfExactType<QuestionCardAnchor>()?.messageId;
+    final anchor = _anchors[id];
+    if (anchor == null || !anchor.mounted) return false;
+    final box = anchor.findRenderObject() as RenderBox;
+    if (!box.hasSize) return false;
+    final rect = box.localToGlobal(Offset.zero) & box.size;
+    final viewport = RenderAbstractViewport.maybeOf(box) as RenderBox?;
+    final screen = Offset.zero & MediaQuery.sizeOf(anchor);
+    final visibleArea = viewport == null
+        ? screen
+        : (viewport.localToGlobal(Offset.zero) & viewport.size).intersect(
+            screen,
+          );
+    return rect.overlaps(visibleArea);
   }
 
   @override
@@ -37,14 +57,14 @@ class _QuestionCardAnchorState extends State<QuestionCardAnchor> {
   }
 }
 
-/// Counteracts the sheet's downward exit and returns it to its message bounds.
+/// Counteracts the downward exit only when its question is absent from the view.
 class QuestionReturnTransition extends StatefulWidget {
   const QuestionReturnTransition({
     super.key,
-    required this.target,
+    required this.hasVisibleQuestion,
     required this.child,
   });
-  final Rect? Function() target;
+  final bool Function() hasVisibleQuestion;
   final Widget child;
   @override
   State<QuestionReturnTransition> createState() =>
@@ -53,7 +73,7 @@ class QuestionReturnTransition extends StatefulWidget {
 
 class _QuestionReturnTransitionState extends State<QuestionReturnTransition> {
   Animation<double>? _animation;
-  Rect? _origin, _target;
+  Rect? _origin;
   double _start = 1;
   final _layoutKey = GlobalKey();
   @override
@@ -65,12 +85,19 @@ class _QuestionReturnTransitionState extends State<QuestionReturnTransition> {
   }
 
   void _status(AnimationStatus status) {
+    if (status == AnimationStatus.forward) {
+      _origin = null;
+      return;
+    }
     if (status != AnimationStatus.reverse ||
         MediaQuery.disableAnimationsOf(context))
       return;
+    if (widget.hasVisibleQuestion()) {
+      _origin = null;
+      return;
+    }
     final box = _layoutKey.currentContext!.findRenderObject()! as RenderBox;
     _origin = box.localToGlobal(Offset.zero) & box.size;
-    _target = widget.target();
     _start = _animation!.value;
   }
 
@@ -87,16 +114,12 @@ class _QuestionReturnTransitionState extends State<QuestionReturnTransition> {
       animation: _animation!,
       child: widget.child,
       builder: (context, child) {
-        if (_origin == null || _target == null || _start == 0) return child!;
+        if (_origin == null || _start == 0) return child!;
         final progress = ((_start - _animation!.value) / _start).clamp(
           0.0,
           1.0,
         );
-        final rect = Rect.lerp(
-          _origin,
-          _target,
-          Curves.easeInOutCubic.transform(progress),
-        )!;
+        final eased = Curves.easeInOutCubic.transform(progress);
         final sliding = Offset(
           0,
           _origin!.height * (_start - _animation!.value),
@@ -106,18 +129,8 @@ class _QuestionReturnTransitionState extends State<QuestionReturnTransition> {
           child: Transform(
             alignment: Alignment.topLeft,
             transform: Matrix4.identity()
-              ..translateByDouble(
-                rect.left - _origin!.left - sliding.dx,
-                rect.top - _origin!.top - sliding.dy,
-                0,
-                1,
-              )
-              ..scaleByDouble(
-                rect.width / _origin!.width,
-                rect.height / _origin!.height,
-                1,
-                1,
-              ),
+              ..translateByDouble(-sliding.dx, -64 * eased - sliding.dy, 0, 1)
+              ..scaleByDouble(1 - .06 * eased, 1 - .06 * eased, 1, 1),
             child: child,
           ),
         );

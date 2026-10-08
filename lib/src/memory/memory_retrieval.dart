@@ -7,10 +7,10 @@ extension MemoryRetrieval on MemoryController {
   ) async {
     await database.rawInsert(
       '''INSERT INTO memory_evidence(run_id, kind, source_id)
-      SELECT ?, 'message', id FROM messages
+      SELECT (SELECT job_id FROM memory_run_jobs WHERE run_id = ?), 'message', id FROM messages
       WHERE id IN (SELECT value FROM json_each(?)) AND kind != 'reasoning'
-        AND EXISTS(SELECT 1 FROM memory_jobs WHERE run_id = ?)
-        AND NOT EXISTS(SELECT 1 FROM memory_evidence WHERE run_id = ? AND kind = 'message' AND source_id = messages.id)
+        AND EXISTS(SELECT 1 FROM memory_run_jobs WHERE run_id = ?)
+        AND NOT EXISTS(SELECT 1 FROM memory_evidence WHERE run_id = (SELECT job_id FROM memory_run_jobs WHERE run_id = ?) AND kind = 'message' AND source_id = messages.id)
       ORDER BY created_at, id''',
       [runId, jsonEncode(messageIds.toList()), runId, runId],
     );
@@ -27,6 +27,17 @@ extension MemoryRetrieval on MemoryController {
       [ownerId],
     );
     failedJobs = rows.single['count'] as int;
+    final failures = await database.query(
+      'memory_jobs',
+      columns: ['error'],
+      where: "owner_id = ? AND state = 'failed'",
+      whereArgs: [ownerId],
+      orderBy: 'due_at DESC, run_id DESC',
+      limit: 1,
+    );
+    latestFailure = failures.isEmpty
+        ? null
+        : failures.single['error'] as String;
   }
 
   Future<void> reload() async {
@@ -60,7 +71,13 @@ extension MemoryRetrieval on MemoryController {
   Future<void> retryFailed() async {
     await database.update(
       'memory_jobs',
-      {'state': 'pending', 'error': null, 'due_at': 0, 'conflicts': 0},
+      {
+        'state': 'pending',
+        'error': null,
+        'due_at': 0,
+        'conflicts': 0,
+        'retries': 0,
+      },
       where: "owner_id = ? AND state = 'failed'",
       whereArgs: [ownerId],
     );

@@ -8,6 +8,7 @@ import '../../domain/error_message.dart';
 import '../../storage/conversation_rows.dart';
 import '../../storage/development_projects.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'ai_conversations_page.dart';
 
 import 'ai_contact_page.dart';
@@ -261,6 +262,15 @@ class _DirectConversationInfoPageState
     }
   }
 
+  Future<void> _copyTaskId() => runUiAction(context, () async {
+    await Clipboard.setData(ClipboardData(text: _conversation.id));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showToast(
+      const SnackBar(content: Text('已复制任务 ID')),
+      kind: ToastKind.success,
+    );
+  }).then((_) {});
+
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !_busy,
@@ -509,6 +519,14 @@ class _DirectConversationInfoPageState
                             text: '删除${_conversation.typeLabel}',
                             role: DialogActionRole.reject,
                             onPressed: _busy ? null : _confirmDelete,
+                          ),
+                        ],
+                        if (_conversation.isTask) ...[
+                          const SizedBox(height: 12),
+                          DialogActionButton(
+                            text: '复制任务 ID',
+                            role: DialogActionRole.secondary,
+                            onPressed: _busy ? null : _copyTaskId,
                           ),
                         ],
                       ],

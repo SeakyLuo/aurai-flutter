@@ -1,4 +1,5 @@
 import 'package:characters/characters.dart';
+import 'selection_option.dart';
 
 /// Options and optional written answers are resolved for human and AI submissions.
 class InteractiveSelection {
@@ -6,14 +7,15 @@ class InteractiveSelection {
   final Map<String, Object?> config;
   bool get multiple => config['mode'] == 'multiple';
   bool get showConfirm => config['showConfirm'] == true;
-  bool get needsConfirmation => multiple || showConfirm;
+  bool get needsConfirmation =>
+      multiple || showConfirm || hasRichOptions(options);
   static const otherId = '__other__';
   bool get hasOther => config['other'] != null;
   int get otherMaxLength =>
       (config['other'] as Map?)?['maxLength'] as int? ?? 50;
   List<Map<String, Object?>> get options => [
-    for (final option in config['options'] as List)
-      Map<String, Object?>.from(option as Map),
+    for (final (index, option) in (config['options'] as List).indexed)
+      selectionOption(option as Map, index),
     if (hasOther) {'id': otherId, 'label': '其他'},
   ];
   int get minimum => config['minSelections'] as int? ?? 1;
@@ -45,6 +47,9 @@ class InteractiveSelection {
       throw ArgumentError('请选择有效的单选或多选配置，选择数量须在选项数量范围内');
     }
     final ids = <String>{};
+    for (final option in config['options'] as List) {
+      validateSelectionOption(option as Map);
+    }
     for (final option in options) {
       if (option['id'] is! String ||
           (option['id'] as String).isEmpty ||
@@ -90,6 +95,7 @@ class InteractiveSelection {
             'buttonId': '${button['id']}/${option['id']}',
             'optionId': option['id'],
             'label': option['label'],
+            if (option['content'] != null) 'content': option['content'],
             if (hasOther && option['id'] == otherId) 'text': otherText,
             'value': hasOther && option['id'] == otherId
                 ? otherText
@@ -125,7 +131,12 @@ List<Map<String, Object?>> interactionSummary(
     final key = (option['buttonId'] as String, option['label'] as String);
     final entry = counts.putIfAbsent(
       key,
-      () => {'buttonId': key.$1, 'label': key.$2, 'count': 0},
+      () => {
+        'buttonId': key.$1,
+        'label': key.$2,
+        'count': 0,
+        if (option['content'] != null) 'content': option['content'],
+      },
     );
     entry['count'] = (entry['count'] as num) + count;
   }
@@ -138,6 +149,7 @@ List<Map<String, Object?>> interactionSummary(
         add({
           'buttonId': '${button['id']}/${option['id']}',
           'label': option['label'],
+          if (option['content'] != null) 'content': option['content'],
         }, 0);
       }
     } else {

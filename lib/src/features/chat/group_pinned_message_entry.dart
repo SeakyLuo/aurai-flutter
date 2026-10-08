@@ -10,6 +10,7 @@ import 'group_saved_message_preview.dart';
 import 'settings_icon.dart';
 import 'pinned_message_page.dart';
 import 'pinned_message_split.dart';
+import 'app_bottom_sheet.dart';
 
 class GroupPinnedMessageEntry extends StatefulWidget {
   const GroupPinnedMessageEntry({
@@ -56,6 +57,23 @@ class _GroupPinnedMessageEntryState extends State<GroupPinnedMessageEntry> {
 
   Future<void> _open(GroupMessageSearchResult message) async {
     final split = context.findAncestorStateOfType<PinnedMessageSplitState>();
+    if (MediaQuery.sizeOf(context).width < 600) {
+      await showAppBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: false,
+        builder: (_) => PinnedMessagePage(
+          controller: widget.controller,
+          conversationId: widget.groupId,
+          messageId: message.id,
+          sheet: true,
+          onLocate: split?.widget.onLocate,
+          messageBuilder: split?.widget.messageBuilder,
+        ),
+      );
+      return;
+    }
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => PinnedMessagePage(

@@ -9,9 +9,15 @@ import '../domain/tool_models.dart';
 import '../domain/message_sender.dart';
 
 class UserQuestionOption {
-  const UserQuestionOption({this.title, required this.content});
+  const UserQuestionOption({this.title, required this.content, this.messageId});
   final String? title;
+  final String? messageId;
   final String content;
+
+  factory UserQuestionOption.fromSelection(Map option) => UserQuestionOption(
+    content: option['label'] as String,
+    messageId: (option['content'] as Map?)?['messageId'] as String?,
+  );
 
   factory UserQuestionOption.fromValue(Object value) {
     if (value is String) return UserQuestionOption(content: value);

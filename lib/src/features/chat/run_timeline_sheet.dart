@@ -18,6 +18,9 @@ import 'tool_activity_view.dart';
 import 'cjk_strong_syntax.dart';
 import 'markdown_link_underlines.dart';
 import 'task_elapsed.dart';
+import 'settings_appearance.dart';
+import 'question_icon.dart';
+import 'thinking_indicator.dart';
 
 Future<void> showRunTimelineSheet(
   BuildContext context, {
@@ -35,13 +38,18 @@ Future<void> showTaskRunTimelineSheet(
   required ChatController controller,
   required String runId,
   required MessageSender sender,
+  bool live = false,
 }) => showAppBottomSheet<void>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
   showDragHandle: false,
-  builder: (_) =>
-      _RunTimelineSheet(controller: controller, runId: runId, sender: sender),
+  builder: (_) => _RunTimelineSheet(
+    controller: controller,
+    runId: runId,
+    sender: sender,
+    live: live,
+  ),
 );
 
 class _RunTimelineSheet extends StatefulWidget {
@@ -49,10 +57,12 @@ class _RunTimelineSheet extends StatefulWidget {
     required this.controller,
     required this.runId,
     required this.sender,
+    required this.live,
   });
   final ChatController controller;
   final String runId;
   final MessageSender sender;
+  final bool live;
   @override
   State<_RunTimelineSheet> createState() => _RunTimelineSheetState();
 }
@@ -66,6 +76,20 @@ class _RunTimelineSheetState extends State<_RunTimelineSheet> {
   bool _hasEarlier = false;
   int? _earliest;
   Timer? _updates;
+  bool _stopping = false;
+
+  Future<void> _stop() async {
+    setState(() => _stopping = true);
+    try {
+      await runUiAction(context, () async {
+        if (widget.controller.activeConversation.activeRunId == widget.runId) {
+          await widget.controller.stop();
+        }
+      });
+    } finally {
+      if (mounted) setState(() => _stopping = false);
+    }
+  }
 
   @override
   void initState() {
@@ -168,7 +192,15 @@ class _RunTimelineSheetState extends State<_RunTimelineSheet> {
       sender: widget.sender,
       conversationId: conversationId,
       activity: activity,
-      followBottom: false,
+      followBottom: widget.live,
+      trailing: widget.live && run?['status'] == 'running'
+          ? SettingsGlassAction(
+              label: _stopping ? '终止中' : '终止思考',
+              icon: Icons.stop_rounded,
+              iconWidget: const QuestionIcon(type: QuestionIconType.stop),
+              onPressed: _stopping ? null : _stop,
+            )
+          : null,
       children: [
         if (run == null)
           const Padding(
@@ -176,18 +208,25 @@ class _RunTimelineSheetState extends State<_RunTimelineSheet> {
             child: Center(child: CircularProgressIndicator()),
           )
         else ...[
-          Text(
-            '$status'
-            '${run['elapsed_ms'] == null ? '' : ' · ${taskDuration(Duration(milliseconds: run['elapsed_ms'] as int))}'}',
-            style: TextStyle(fontSize: 15, color: colors.onSurfaceVariant),
-          ),
-          const SizedBox(height: 16),
+          if (!widget.live) ...[
+            Text(
+              '$status'
+              '${run['elapsed_ms'] == null ? '' : ' · ${taskDuration(Duration(milliseconds: run['elapsed_ms'] as int))}'}',
+              style: TextStyle(fontSize: 15, color: colors.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+          ],
           if (_hasEarlier)
             TextButton(
               onPressed: _loading ? null : () => _load(earlier: true),
               child: const Text('查看更早过程'),
             ),
-          if (entries.isEmpty) const Text('本轮没有额外执行过程'),
+          if (entries.isEmpty)
+            ThinkingIndicator(
+              label: run['status'] == 'running' ? '正在思考' : '本轮已结束',
+              fontSize: 15,
+              animate: run['status'] == 'running' && !_stopping,
+            ),
           for (final entry in entries) _entry(entry),
         ],
       ],
@@ -217,6 +256,20 @@ class _RunTimelineSheetState extends State<_RunTimelineSheet> {
       );
     }
     final message = entry.message!;
+    if (widget.live) {
+      return Padding(
+        key: ValueKey(entry.eventId),
+        padding: const EdgeInsets.only(bottom: 16),
+        child: SelectableText(
+          memberMentionsPlainText(message['text'] as String),
+          style: TextStyle(
+            fontSize: 15,
+            height: 1.65,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      );
+    }
     final kind = message['kind'];
     final output =
         kind == 'group_message' ||

@@ -576,11 +576,17 @@ abstract interface class ModelProvider {
 }
 
 class ModelProviderException implements Exception {
-  const ModelProviderException(this.message, {this.detail, this.statusCode});
+  const ModelProviderException(
+    this.message, {
+    this.detail,
+    this.statusCode,
+    this.retryAfter,
+  });
 
   final String message;
   final String? detail;
   final int? statusCode;
+  final String? retryAfter;
 
   String get displayMessage {
     var reason = detail?.trim() ?? '';

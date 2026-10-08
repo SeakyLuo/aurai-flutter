@@ -14,6 +14,7 @@ import 'header_action_menu.dart';
 import 'home_navigation.dart';
 import 'image_action_scope.dart';
 import 'pinned_message_detail.dart';
+import 'interactive_reference_sheet.dart';
 
 class PinnedMessagePage extends StatefulWidget {
   const PinnedMessagePage({
@@ -23,31 +24,43 @@ class PinnedMessagePage extends StatefulWidget {
     required this.messageId,
     this.onLocate,
     this.messageBuilder,
+    this.sheet = false,
+    this.pinned = true,
+    this.initialMessage,
+    this.interactiveReference = false,
   });
   final ChatController controller;
   final String conversationId, messageId;
   final Future<void> Function(String)? onLocate;
   final Widget Function(BuildContext, AgentMessage)? messageBuilder;
+  final bool sheet, pinned;
+  final AgentMessage? initialMessage;
+  final bool interactiveReference;
   @override
   State<PinnedMessagePage> createState() => _PinnedMessagePageState();
 }
 
 class _PinnedMessagePageState extends State<PinnedMessagePage> {
   AgentMessage? _message;
+  int _request = 0;
+  bool _closing = false;
   late final StreamSubscription<String> _marks, _interactive;
   @override
   void initState() {
     super.initState();
+    widget.controller.addListener(_syncMessage);
     _marks = GroupMessageMarks.changes.stream.listen((id) {
-      if (id == widget.conversationId) _checkPin();
+      if (widget.pinned && id == widget.conversationId) _checkPin();
     });
     _interactive = InteractiveMessageStore.changes.stream.listen((id) {
       if (id == widget.messageId) _load();
     });
-    _load();
+    _message = widget.initialMessage;
+    if (_message == null) _load();
   }
 
   Future<void> _load() async {
+    final request = ++_request;
     final success = await runUiAction(context, () async {
       final root = await getApplicationSupportDirectory();
       final messages =
@@ -60,7 +73,7 @@ class _PinnedMessagePageState extends State<PinnedMessagePage> {
             includeMessageId: widget.messageId,
             limit: 1,
           );
-      if (!mounted) return;
+      if (!mounted || request != _request) return;
       final message = messages
           .where((m) => m.id == widget.messageId)
           .firstOrNull;
@@ -71,15 +84,37 @@ class _PinnedMessagePageState extends State<PinnedMessagePage> {
       }
       setState(() => _message = message);
     });
-    if (!success && mounted) Navigator.pop(context);
+    if (!success && mounted && request == _request) _close();
+  }
+
+  void _syncMessage() {
+    final message = widget.controller.visibleMessages
+        .where((message) => message.id == widget.messageId)
+        .firstOrNull;
+    if (message == null || identical(message, _message)) return;
+    if (message.isSystem || !message.canView(MessageSender.localUser.id)) {
+      _load();
+    } else {
+      setState(() => _message = message);
+    }
+  }
+
+  void _close() {
+    if (_closing) return;
+    _closing = true;
+    final route = ModalRoute.of(context)!;
+    if (route.isCurrent) {
+      Navigator.pop(context);
+    } else {
+      Navigator.of(context).removeRoute(route);
+    }
   }
 
   Future<void> _checkPin() => runUiAction(context, () async {
     final pin = await GroupMessageMarks(
       widget.controller.groupStore,
     ).pinned(widget.conversationId);
-    if (mounted && (pin == null || pin['id'] != widget.messageId))
-      Navigator.pop(context);
+    if (mounted && (pin == null || pin['id'] != widget.messageId)) _close();
   });
   Future<void> _menu(BuildContext anchor) async {
     final action = await showHeaderActionMenu(
@@ -104,6 +139,7 @@ class _PinnedMessagePageState extends State<PinnedMessagePage> {
   }
 
   Future<void> _locate() async {
+    if (widget.sheet) Navigator.pop(context);
     if (widget.onLocate != null) {
       await widget.onLocate!(widget.messageId);
     } else {
@@ -120,6 +156,7 @@ class _PinnedMessagePageState extends State<PinnedMessagePage> {
   void dispose() {
     _marks.cancel();
     _interactive.cancel();
+    widget.controller.removeListener(_syncMessage);
     super.dispose();
   }
 
@@ -129,10 +166,18 @@ class _PinnedMessagePageState extends State<PinnedMessagePage> {
     child: Builder(
       builder: (context) {
         final message = _message;
+        if (widget.interactiveReference && message != null) {
+          return InteractiveReferenceSheet(
+            controller: widget.controller,
+            message: message,
+          );
+        }
         return PinnedMessageDetail(
+          sheet: widget.sheet,
+          title: widget.pinned ? '置顶详情' : '消息详情',
           onBack: () => Navigator.pop(context),
           onLocate: () => runUiAction(context, _locate),
-          onMore: _menu,
+          onMore: widget.pinned ? _menu : null,
           child: message == null
               ? const SizedBox.shrink()
               : widget.messageBuilder != null
