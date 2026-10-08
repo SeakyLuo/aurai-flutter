@@ -397,6 +397,11 @@ extension InteractiveMessageActions on ChatController {
         conversation.messages,
         if (conversation.searchMessages != null) conversation.searchMessages!,
       ]) {
+        for (final message in history) {
+          if (message.quote?.messageId == id) {
+            message.quote!.resolveCard(card);
+          }
+        }
         final index = history.indexWhere((m) => m.id == id);
         if (index >= 0) {
           history[index] = history[index].withSender(
@@ -405,6 +410,9 @@ extension InteractiveMessageActions on ChatController {
           );
           _store.writer.remember([history[index]]);
         }
+      }
+      if (conversation.draftQuote?.messageId == id) {
+        conversation.draftQuote!.resolveCard(card);
       }
     }
     final dispatcher = _executions.sessions[conversationId]?.groupDispatcher;

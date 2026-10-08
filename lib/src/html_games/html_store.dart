@@ -167,11 +167,6 @@ class HtmlStore {
     });
   }
 
-  static void checkJson(Object? value, int limit, String label) {
-    if (utf8.encode(jsonEncode(value)).length > limit)
-      throw ArgumentError('$label过大');
-  }
-
   Future<Set<String>> _members(
     DatabaseExecutor db,
     String conversationId,
@@ -244,7 +239,6 @@ class HtmlStore {
         html.trim().isEmpty ||
         utf8.encode(html).length > HtmlAppStore.maxHtmlBytes)
       throw ArgumentError('请提供标题和不超过 4 MB 的 HTML');
-    checkJson(state, 64 * 1024, '游戏状态');
     final members = standalone
         ? <String>{}
         : await _members(txn, conversationId);
@@ -398,7 +392,6 @@ class HtmlStore {
         recipients.length > 8 ||
         recipients.toSet().length != recipients.length)
       throw ArgumentError('游戏事件格式不正确');
-    checkJson(nextState, 64 * 1024, '游戏状态');
     final request = jsonEncode({
       'actorId': actorId,
       'expectedVersion': expected,
@@ -503,7 +496,6 @@ class HtmlStore {
     Uint8List bytes,
     String theme,
   ) async {
-    if (bytes.length > 256 * 1024) return;
     final program = await database.query(
       'app_state',
       columns: ['key'],

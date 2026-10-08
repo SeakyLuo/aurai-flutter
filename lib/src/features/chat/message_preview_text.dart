@@ -66,6 +66,7 @@ class MessagePreviewText extends StatelessWidget {
           text: text,
           style: style ?? DefaultTextStyle.of(context).style,
           maxLines: maxLines,
+          textWidthBasis: textWidthBasis,
         )
       : Text.rich(
           TextSpan(
@@ -93,11 +94,13 @@ class _FormattedMessagePreview extends StatelessWidget {
     required this.text,
     required this.style,
     this.maxLines = 2,
+    this.textWidthBasis = TextWidthBasis.parent,
   });
 
   final String text;
   final TextStyle style;
   final int? maxLines;
+  final TextWidthBasis textWidthBasis;
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +120,7 @@ class _FormattedMessagePreview extends StatelessWidget {
         ],
       ),
       maxLines: maxLines,
+      textWidthBasis: textWidthBasis,
       overflow: TextOverflow.ellipsis,
       style: style,
     );

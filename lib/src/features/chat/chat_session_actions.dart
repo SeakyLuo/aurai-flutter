@@ -38,7 +38,7 @@ extension _ChatSessionActions on _ChatPageState {
     final conversation = widget.controller.activeConversation;
     if (_markReadScheduled || _locatingInitialMessage) return;
     AgentMessage? through;
-    if (conversation.kind == ConversationKind.group) {
+    if (!conversation.isTask) {
       final visible =
           _viewportKey.currentState?.visibleEntryIds ?? const <String>{};
       through = widget.controller.visibleMessages
@@ -64,8 +64,7 @@ extension _ChatSessionActions on _ChatPageState {
                 AppLifecycleState.resumed ||
             _scaffoldKey.currentState!.isDrawerOpen ||
             widget.controller.activeConversation != conversation ||
-            (conversation.kind != ConversationKind.group &&
-                !_hasVisibleActiveRunContent(conversation)))
+            (conversation.isTask && !_hasVisibleActiveRunContent(conversation)))
           return;
         await widget.controller.markActiveConversationRead(through: through);
       } on Object catch (caughtError) {

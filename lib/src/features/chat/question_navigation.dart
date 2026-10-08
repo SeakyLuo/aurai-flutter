@@ -51,7 +51,7 @@ class QuestionNavigation extends StatelessWidget {
                   ),
                   IgnorePointer(
                     child: TweenAnimationBuilder<double>(
-                      tween: Tween(end: index == 0 ? 0 : index / (count - 1)),
+                      tween: Tween(end: (index + 1) / count),
                       duration: MediaQuery.disableAnimationsOf(context)
                           ? Duration.zero
                           : const Duration(milliseconds: 220),

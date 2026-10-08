@@ -110,17 +110,21 @@ class _ConversationRenameDialogState extends State<ConversationRenameDialog> {
                         filled: false,
                         suffixIcon: _text.text.isEmpty
                             ? null
-                            : RoundAction(
-                                icon: Icons.cancel,
-                                iconWidget: const QuestionIcon(
-                                  type: QuestionIconType.close,
+                            : TextFieldTapRegion(
+                                child: ExcludeFocus(
+                                  child: RoundAction(
+                                    icon: Icons.cancel,
+                                    iconWidget: const QuestionIcon(
+                                      type: QuestionIconType.close,
+                                    ),
+                                    compact: true,
+                                    inkResponse: false,
+                                    label: '清空${widget.typeLabel}名称',
+                                    onPressed: _saving
+                                        ? null
+                                        : () => setState(_text.clear),
+                                  ),
                                 ),
-                                compact: true,
-                                inkResponse: false,
-                                label: '清空${widget.typeLabel}名称',
-                                onPressed: _saving
-                                    ? null
-                                    : () => setState(_text.clear),
                               ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 18,

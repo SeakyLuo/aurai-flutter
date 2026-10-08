@@ -119,8 +119,6 @@ class HtmlMessageData {
       if (args['expectedVersion'] != game['version'])
         throw StateError('消息已更新，请重新读取版本');
       final data = (args['data'] as Map).cast<String, Object?>();
-      if (runtime == null && utf8.encode(jsonEncode(data)).length > 65536)
-        throw ArgumentError('HTML 数据超过大小限制');
       final Object? view;
       if (runtime != null) {
         if (data['state'] is! Map ||

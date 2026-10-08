@@ -112,7 +112,7 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
             @JavascriptInterface fun loadState(): String =
                 if (stateful) preferences.getString(appId, "null")!! else "null"
             @JavascriptInterface fun saveStateAsync(requestId: Int, json: String) {
-                if (!stateful || json.toByteArray(Charsets.UTF_8).size > 65536) {
+                if (!stateful) {
                     web.post { if (!disposed) web.evaluateJavascript("window.__auraiSaved($requestId,false)", null) }
                     return
                 }
@@ -155,7 +155,7 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                 }
             }
             @JavascriptInterface fun localState(json: String) {
-                if (json.length <= 65536) web.post {
+                web.post {
                     if (!disposed) channel?.invokeMethod("localState", json)
                 }
             }
@@ -167,7 +167,7 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                     fun reply(value: String) {
                         if (!disposed && owner == lease) web.evaluateJavascript("window.__auraiAiReply?.($requestId,$value)", null)
                     }
-                    if (json.toByteArray(Charsets.UTF_8).size > 256 * 1024 || channel == null) {
+                    if (channel == null) {
                         reply("{\"error\":\"AI 请求过大或接口不可用\",\"code\":\"unavailable\"}")
                         return@post
                     }
@@ -185,7 +185,7 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                 web.post {
                     if (disposed) return@post
                     fun reply(value: String) { if (!disposed) web.evaluateJavascript("window.__auraiDataReply($requestId,$value)", null) }
-                    if (json.toByteArray(Charsets.UTF_8).size > 4 * 1024 * 1024 + 1024 || channel == null) {
+                    if (channel == null) {
                         reply("{\"error\":\"数据未保存，请检查文件大小后重试\"}")
                         return@post
                     }
@@ -200,7 +200,7 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                 web.post {
                     if (disposed) return@post
                     fun reply(value: String) { if (!disposed) web.evaluateJavascript("window.__auraiInteractionReply(${JSONObject.quote(eventId)},$value)", null) }
-                    if (json.toByteArray(Charsets.UTF_8).size > 16384 || channel == null) {
+                    if (channel == null) {
                         reply("{\"error\":\"操作未提交，请重试\"}")
                         return@post
                     }
@@ -212,7 +212,6 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                 }
             }
             @JavascriptInterface fun postMessage(json: String) {
-                if (json.length > 100000) return
                 web.post {
                     if (disposed || inFlight) return@post
                     inFlight = true

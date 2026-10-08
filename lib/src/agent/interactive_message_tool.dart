@@ -72,7 +72,7 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
           },
           'value': {
             'description':
-                'For selection submit buttons: option id for single, array of option ids for multiple. If selection.other is enabled, an extra __other__ choice accepts written content; selecting it requires value:{options:single option ID or multiple option ID array,otherText:written text}, within other.maxLength (default 50, maximum 500). The host resolves configured values and records labels. For HTML input-enabled endpoints: text or JSON (max 16 KB). Omit for ordinary fixed buttons.',
+                'For selection submit buttons: option id for single, array of option ids for multiple. If selection.other is enabled, an extra __other__ choice accepts written content; selecting it requires value:{options:single option ID or multiple option ID array,otherText:written text}, within other.maxLength (default 50, maximum 500). The host resolves configured values and records labels. For HTML input-enabled endpoints: text or JSON. Omit for ordinary fixed buttons.',
           },
           'buttonId': {'type': 'string'},
           'actionToken': {

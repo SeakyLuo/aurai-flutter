@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../agent/ask_user_tool.dart';
+import '../../domain/message_sender.dart';
 import 'question_sheet.dart';
 import 'user_question_answer.dart';
 import 'user_question_skip_button.dart';
@@ -101,6 +102,7 @@ class _UserQuestionCardState extends State<UserQuestionCard> {
                 : null,
             controller: _batch!,
             status: '待回答',
+            recipient: widget.showSender ? MessageSender.localUser : null,
             scrollable: true,
             compact: true,
             trailing: UserQuestionSkipButton(question: widget.question),

@@ -104,8 +104,6 @@ class InteractiveMessageStore {
         if (button['input'] == 'text' &&
             (inputValue is! String || inputValue.trim().isEmpty))
           throw ArgumentError('请填写文本内容');
-        if (utf8.encode(jsonEncode(inputValue)).length > 16384)
-          throw ArgumentError('提交数据不能超过 16 KB');
       } else if (button['input'] != null) {
         throw ArgumentError('请提供页面输入数据');
       }

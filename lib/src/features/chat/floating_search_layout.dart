@@ -2,7 +2,7 @@ import 'app_sheet_body.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'glass_surface.dart';
-import 'question_icon.dart';
+import 'input_clear_button.dart';
 import 'sidebar_action_icon.dart';
 
 /// The library search pattern, shared by pages and selection sheets.
@@ -119,87 +119,90 @@ class _FloatingSearchLayoutState extends State<FloatingSearchLayout> {
                                 radius: 28,
                                 child: Material(
                                   type: MaterialType.transparency,
-                                  child: ValueListenableBuilder<TextEditingValue>(
-                                    valueListenable: widget.controller,
-                                    builder: (context, value, _) => TextField(
-                                      controller: widget.controller,
-                                      focusNode: _searchFocus,
-                                      autofocus: widget.autofocus,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        height: 1.4,
-                                      ),
-                                      textAlignVertical:
-                                          TextAlignVertical.center,
-                                      onChanged: widget.onChanged,
-                                      onTapOutside: (_) =>
-                                          _searchFocus.unfocus(),
-                                      textInputAction: TextInputAction.search,
-                                      onSubmitted: (value) {
-                                        _searchFocus.unfocus();
-                                        widget.onSubmitted?.call(value);
-                                      },
-                                      decoration: InputDecoration(
-                                        hintText: widget.hintText,
-                                        isDense: true,
-                                        filled: false,
-                                        contentPadding:
-                                            const EdgeInsets.fromLTRB(
-                                              0,
-                                              10,
-                                              14,
-                                              10,
-                                            ),
-                                        border: InputBorder.none,
-                                        enabledBorder: InputBorder.none,
-                                        focusedBorder: InputBorder.none,
-                                        prefixIconConstraints:
-                                            const BoxConstraints(
-                                              minWidth: 40,
-                                              maxWidth: 40,
-                                              minHeight: FloatingSearchLayout
-                                                  .fieldHeight,
-                                              maxHeight: FloatingSearchLayout
-                                                  .fieldHeight,
-                                            ),
-                                        prefixIcon: Padding(
-                                          padding: const EdgeInsets.only(
-                                            left: 12,
-                                            right: 8,
-                                          ),
-                                          child: Center(
-                                            child: SizedBox.square(
-                                              dimension: 20,
-                                              child: SidebarActionIcon(
-                                                type: SidebarActionIconType
-                                                    .search,
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.onSurfaceVariant,
+                                  child:
+                                      ValueListenableBuilder<TextEditingValue>(
+                                        valueListenable: widget.controller,
+                                        builder: (context, value, _) =>
+                                            TextField(
+                                              controller: widget.controller,
+                                              focusNode: _searchFocus,
+                                              autofocus: widget.autofocus,
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                height: 1.4,
+                                              ),
+                                              textAlignVertical:
+                                                  TextAlignVertical.center,
+                                              onChanged: widget.onChanged,
+                                              onTapOutside: (_) =>
+                                                  _searchFocus.unfocus(),
+                                              textInputAction:
+                                                  TextInputAction.search,
+                                              onSubmitted: (value) {
+                                                _searchFocus.unfocus();
+                                                widget.onSubmitted?.call(value);
+                                              },
+                                              decoration: InputDecoration(
+                                                hintText: widget.hintText,
+                                                isDense: true,
+                                                filled: false,
+                                                contentPadding:
+                                                    const EdgeInsets.fromLTRB(
+                                                      0,
+                                                      10,
+                                                      14,
+                                                      10,
+                                                    ),
+                                                border: InputBorder.none,
+                                                enabledBorder: InputBorder.none,
+                                                focusedBorder: InputBorder.none,
+                                                prefixIconConstraints:
+                                                    const BoxConstraints(
+                                                      minWidth: 40,
+                                                      maxWidth: 40,
+                                                      minHeight:
+                                                          FloatingSearchLayout
+                                                              .fieldHeight,
+                                                      maxHeight:
+                                                          FloatingSearchLayout
+                                                              .fieldHeight,
+                                                    ),
+                                                prefixIcon: Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        left: 12,
+                                                        right: 8,
+                                                      ),
+                                                  child: Center(
+                                                    child: SizedBox.square(
+                                                      dimension: 20,
+                                                      child: SidebarActionIcon(
+                                                        type:
+                                                            SidebarActionIconType
+                                                                .search,
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurfaceVariant,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                suffixIcon:
+                                                    widget.suffixIcon ??
+                                                    (value.text.isEmpty
+                                                        ? null
+                                                        : InputClearButton(
+                                                            tooltip: '清除搜索',
+                                                            onPressed: () {
+                                                              widget.controller
+                                                                  .clear();
+                                                              widget.onChanged
+                                                                  ?.call('');
+                                                            },
+                                                          )),
                                               ),
                                             ),
-                                          ),
-                                        ),
-                                        suffixIcon:
-                                            widget.suffixIcon ??
-                                            (value.text.isEmpty
-                                                ? null
-                                                : IconButton(
-                                                    tooltip: '清除搜索',
-                                                    icon: const QuestionIcon(
-                                                      type: QuestionIconType
-                                                          .close,
-                                                    ),
-                                                    onPressed: () {
-                                                      widget.controller.clear();
-                                                      widget.onChanged?.call(
-                                                        '',
-                                                      );
-                                                    },
-                                                  )),
                                       ),
-                                    ),
-                                  ),
                                 ),
                               ),
                             )

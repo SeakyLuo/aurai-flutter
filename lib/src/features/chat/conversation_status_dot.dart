@@ -13,7 +13,7 @@ class ConversationStatusDot extends StatelessWidget {
   final Conversation conversation;
 
   static bool hasUnreadCompletion(Conversation conversation) =>
-      conversation.kind == ConversationKind.group
+      !conversation.isTask
       ? conversation.unreadMessageCount > 0
       : conversation.runState == ChatRunState.idle &&
             conversation.activeRunId != null &&

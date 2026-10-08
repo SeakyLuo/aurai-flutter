@@ -44,7 +44,7 @@ const personalChatSchema = [
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 99,
+  version: 100,
   onOpen: (db) async {
     await db.update('approval_requests', {
       'status': 'cancelled',
@@ -63,6 +63,14 @@ Future<Database> openConversationDatabase() async => openDatabase(
     if (oldVersion < 99) {
       await migrateMemoryQueue(db);
       await installMemoryQueueTriggers(db);
+    }
+    if (oldVersion < 100) {
+      await db.execute(
+        r"UPDATE messages SET quote_json = json_set(json_remove(quote_json, '$.questions'), '$.excerpt', json(CASE WHEN json_extract(quote_json, '$.excerpt') = 1 THEN 'true' ELSE 'false' END)) WHERE quote_json IS NOT NULL",
+      );
+      await db.execute(
+        r"UPDATE conversations SET draft_quote_json = json_set(json_remove(draft_quote_json, '$.questions'), '$.excerpt', json(CASE WHEN json_extract(draft_quote_json, '$.excerpt') = 1 THEN 'true' ELSE 'false' END)) WHERE draft_quote_json IS NOT NULL",
+      );
     }
   },
   onCreate: (db, version) async {

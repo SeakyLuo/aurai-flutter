@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/physics.dart';
+import 'package:flutter/gestures.dart';
 
 import 'message_quote_view.dart';
 
@@ -20,14 +22,21 @@ class MessageSwipeQuote extends StatefulWidget {
 }
 
 class _MessageSwipeQuoteState extends State<MessageSwipeQuote>
-    with SingleTickerProviderStateMixin {
-  static const _threshold = 64.0;
+    with TickerProviderStateMixin {
+  double _threshold = 64;
   static const _maximum = 88.0;
-  late final _offset = AnimationController(
-    vsync: this,
-    upperBound: _maximum,
-    duration: const Duration(milliseconds: 180),
+  static const _returnSpring = SpringDescription(
+    mass: 1,
+    stiffness: 360,
+    damping: 22,
   );
+  static const _feedbackSpring = SpringDescription(
+    mass: 1,
+    stiffness: 340,
+    damping: 14,
+  );
+  late final _offset = AnimationController.unbounded(vsync: this);
+  late final _feedback = AnimationController.unbounded(vsync: this);
   double _distance = 0;
   bool _hapticSent = false;
   final _stackKey = GlobalKey();
@@ -36,6 +45,7 @@ class _MessageSwipeQuoteState extends State<MessageSwipeQuote>
   @override
   void dispose() {
     _offset.dispose();
+    _feedback.dispose();
     super.dispose();
   }
 
@@ -43,16 +53,22 @@ class _MessageSwipeQuoteState extends State<MessageSwipeQuote>
     _distance = 0;
     if (MediaQuery.disableAnimationsOf(context)) {
       _offset.value = 0;
+      _feedback.value = 0;
     } else {
-      _offset.animateTo(0, curve: Curves.easeOutCubic);
+      _offset.animateWith(SpringSimulation(_returnSpring, _offset.value, 0, 0));
+      _feedback.animateWith(
+        SpringSimulation(_feedbackSpring, _feedback.value, 0, 0),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) => GestureDetector(
     behavior: HitTestBehavior.translucent,
+    dragStartBehavior: DragStartBehavior.down,
     onHorizontalDragStart: (_) {
       _offset.stop();
+      _feedback.stop();
       final stack = _stackKey.currentContext!.findRenderObject()! as RenderBox;
       final bubble =
           widget.anchorKey.currentContext!.findRenderObject()! as RenderBox;
@@ -60,12 +76,34 @@ class _MessageSwipeQuoteState extends State<MessageSwipeQuote>
           (bubble.localToGlobal(Offset.zero, ancestor: stack) -
               Offset(_offset.value, 0)) &
           bubble.size;
-      _distance = 0;
+      _threshold = (bubble.size.width / 2).clamp(32.0, 64.0);
+      _distance = _offset.value.clamp(0, _maximum);
+      _feedback.value = _distance >= _threshold ? 1 : 0;
       _hapticSent = false;
     },
     onHorizontalDragUpdate: (details) {
+      final wasReady = _distance >= _threshold;
       _distance = (_distance + details.delta.dx).clamp(0.0, _maximum);
       _offset.value = _distance;
+      if (_distance < _threshold) {
+        if (wasReady) {
+          if (MediaQuery.disableAnimationsOf(context)) {
+            _feedback.value = 0;
+          } else {
+            _feedback.animateWith(
+              SpringSimulation(_returnSpring, _feedback.value, 0, 0),
+            );
+          }
+        }
+      } else if (!wasReady) {
+        if (MediaQuery.disableAnimationsOf(context)) {
+          _feedback.value = 1;
+        } else {
+          _feedback.animateWith(
+            SpringSimulation(_feedbackSpring, _feedback.value, 1, 9),
+          );
+        }
+      }
       if (_distance >= _threshold && !_hapticSent) {
         _hapticSent = true;
         HapticFeedback.selectionClick();
@@ -78,46 +116,53 @@ class _MessageSwipeQuoteState extends State<MessageSwipeQuote>
     },
     onHorizontalDragCancel: _reset,
     child: AnimatedBuilder(
-      animation: _offset,
+      animation: Listenable.merge([_offset, _feedback]),
       child: widget.child,
-      builder: (context, child) => Stack(
-        key: _stackKey,
-        alignment: Alignment.centerLeft,
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            left: _bubbleBounds.left + 4,
-            top: _bubbleBounds.center.dy - 16,
-            child: IgnorePointer(
-              child: ExcludeSemantics(
-                child: Opacity(
-                  opacity: (_offset.value / _threshold).clamp(0.0, 1.0),
-                  child: ClipRect(
-                    clipper: _SwipeQuoteReveal(
-                      (_offset.value - 12).clamp(0, 32),
-                    ),
-                    child: AnimatedContainer(
-                      duration: MediaQuery.disableAnimationsOf(context)
-                          ? Duration.zero
-                          : const Duration(milliseconds: 160),
-                      curve: Curves.easeOutCubic,
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Theme.of(context).colorScheme.onSurface
-                            .withValues(
-                              alpha: _offset.value >= _threshold ? .06 : 0,
-                            ),
+      builder: (context, child) {
+        final readyProgress = _feedback.value.clamp(0.0, 1.5);
+        final indicatorInset = (40 - _threshold).clamp(0.0, 8.0);
+        return Stack(
+          key: _stackKey,
+          alignment: Alignment.centerLeft,
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: _bubbleBounds.left - indicatorInset,
+              top: _bubbleBounds.center.dy - 20,
+              child: IgnorePointer(
+                child: ExcludeSemantics(
+                  child: Opacity(
+                    opacity: Curves.easeIn.transform(
+                      ((_offset.value - 12) / (_threshold - 12)).clamp(
+                        0.0,
+                        1.0,
                       ),
-                      child: Center(
-                        child: AnimatedScale(
-                          scale: _offset.value >= _threshold ? 1.12 : 1,
-                          duration: MediaQuery.disableAnimationsOf(context)
-                              ? Duration.zero
-                              : const Duration(milliseconds: 160),
-                          curve: Curves.easeOutBack,
-                          child: QuoteIcon(),
+                    ),
+                    child: ClipRect(
+                      clipper: _SwipeQuoteReveal(
+                        (_offset.value + indicatorInset).clamp(0, 40),
+                      ),
+                      child: SizedBox.square(
+                        dimension: 40,
+                        child: Center(
+                          child: Transform.scale(
+                            scale: 1 + .08 * readyProgress,
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Theme.of(context).colorScheme.onSurface
+                                    .withValues(alpha: .075 * readyProgress),
+                              ),
+                              child: Center(
+                                child: Transform.scale(
+                                  scale: 1 + .14 * readyProgress,
+                                  child: const QuoteIcon(),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -125,10 +170,10 @@ class _MessageSwipeQuoteState extends State<MessageSwipeQuote>
                 ),
               ),
             ),
-          ),
-          Transform.translate(offset: Offset(_offset.value, 0), child: child),
-        ],
-      ),
+            Transform.translate(offset: Offset(_offset.value, 0), child: child),
+          ],
+        );
+      },
     ),
   );
 }

@@ -15,6 +15,7 @@ import 'question_card_anchor.dart';
 import 'vote_message_heading.dart';
 import 'vote_selection_hint.dart';
 import 'question_message_heading.dart';
+import 'question_response.dart';
 import 'question_batch_card.dart';
 import 'dart:convert';
 import 'dart:async';
@@ -290,9 +291,18 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         selectionHint != null &&
         (card.body == selectionHint || card.body == '$selectionHint。');
     final question = _card.isQuestion;
-    final recipient = question && widget.showQuestionRecipient
-        ? widget.members[(_card.interaction['actors'] as List?)?.single]
+    final recipientId = question
+        ? (_card.interaction['actors'] as List).single as String
         : null;
+    final showRecipient =
+        question &&
+        (widget.showQuestionRecipient ||
+            recipientId != MessageSender.localUser.id);
+    final recipient = !showRecipient
+        ? null
+        : recipientId == MessageSender.localUser.id
+        ? MessageSender.localUser
+        : widget.members[recipientId];
     final answered =
         sharedView?['self'] != null ||
         (sharedView?['choices'] as List?)?.isNotEmpty == true ||
@@ -362,9 +372,14 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         onOpenMember: widget.onOpenMember,
         trailing:
             widget.titleTrailing ??
-            (!readOnly && UserQuestion.activeCards[widget.messageId] != null
-                ? UserQuestionSkipButton(
-                    question: UserQuestion.activeCards[widget.messageId]!,
+            (!readOnly
+                ? QuestionSkipButton(
+                    onPressed: _busy != null
+                        ? null
+                        : () => _click(
+                            batchButton,
+                            value: {'skipQuestions': true},
+                          ),
                   )
                 : null),
         status: answered
@@ -409,27 +424,31 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               padding: const EdgeInsets.only(top: 8, bottom: 16),
               child: questionHeading(sheet: true),
             ),
-            child: config == null
-                ? Text(
-                    answer!['label'] as String,
-                    style: const TextStyle(fontSize: 15, height: 1.5),
-                  )
-                : QuestionAnswerContent(
-                    question: card.body,
-                    showQuestion: false,
-                    options: [
-                      for (final option in config.options)
-                        UserQuestionOption.fromSelection(option),
-                    ],
-                    selected: {
-                      for (final (index, option) in config.options.indexed)
-                        if ((answer!['selections'] as List).any(
-                          (selected) => selected['optionId'] == option['id'],
-                        ))
-                          index,
-                    },
-                    multiple: config.multiple,
-                  ),
+            child: QuestionResponse(
+              recipient: recipient,
+              onOpenMember: widget.onOpenMember,
+              child: config == null
+                  ? Text(
+                      answer!['label'] as String,
+                      style: const TextStyle(fontSize: 15, height: 1.5),
+                    )
+                  : QuestionAnswerContent(
+                      question: card.body,
+                      showQuestion: false,
+                      options: [
+                        for (final option in config.options)
+                          UserQuestionOption.fromSelection(option),
+                      ],
+                      selected: {
+                        for (final (index, option) in config.options.indexed)
+                          if ((answer!['selections'] as List).any(
+                            (selected) => selected['optionId'] == option['id'],
+                          ))
+                            index,
+                      },
+                      multiple: config.multiple,
+                    ),
+            ),
           ),
         ),
       );
@@ -620,7 +639,11 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
             ],
             const SizedBox(height: 16),
             if (sharedView != null)
-              interaction!
+              QuestionResponse(
+                recipient: compactAnswered ? recipient : null,
+                onOpenMember: widget.onOpenMember,
+                child: interaction!,
+              )
             else
               InteractiveButtonLayout(
                 columns: card.buttonColumns,

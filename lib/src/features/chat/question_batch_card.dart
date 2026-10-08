@@ -164,7 +164,7 @@ class _QuestionBatchCardState extends State<QuestionBatchCard> {
       await showUserQuestionSheet(
         context,
         question: pending,
-        showSender: false,
+        showSender: widget.recipient != null,
         onOpenSender: () => widget.onOpenMember?.call(pending.sender.id),
       );
       if (mounted)

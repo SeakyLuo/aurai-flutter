@@ -35,7 +35,6 @@ const __effects = [];
 const __allowed = ${jsonEncode(declared.toList())};
 const __host = Object.freeze({call: function(name, args) {
   if (__allowed.indexOf(name) < 0) throw new Error('Undeclared capability: ' + name);
-  if (__effects.length >= 128) throw new Error('Too many capability calls');
   __effects.push({name: name, args: JSON.parse(JSON.stringify(args))});
 }});
 const __result = (function(ctx, host) {
@@ -54,7 +53,6 @@ return {state: __result.state, view: __result.view,
 class MiniappCapabilityCalls {
   MiniappCapabilityCalls(Map<String, Object?> output, Set<String> declared) {
     final calls = output['effects'] as List;
-    if (calls.length > 128) throw ArgumentError('单次事件最多调用 128 次能力');
     final singleton = <String>{};
     for (final raw in calls) {
       final call = raw as Map;
@@ -110,7 +108,6 @@ class MiniappCapabilityCalls {
           contextInstructions = instructions;
       }
     }
-    if (messages.length > 64) throw ArgumentError('单次事件最多产生 64 条消息');
     if (releaseReplies && replyStates.isNotEmpty) {
       throw ArgumentError('同一事件不能同时设置和释放接话控制');
     }

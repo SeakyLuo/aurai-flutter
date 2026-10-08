@@ -9,6 +9,7 @@ import '../../domain/selection_option.dart';
 import 'interaction_text_preview.dart';
 import 'message_composer.dart';
 import 'question_message_heading.dart';
+import 'question_response.dart';
 import 'question_pager.dart';
 import 'question_sheet.dart';
 import 'user_question_option_tile.dart';
@@ -187,20 +188,24 @@ class QuestionBatchForm extends StatelessWidget {
                 answer['skipped'] == true)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: text.isNotEmpty && answer['skipped'] != true
-                    ? InteractionTextPreview(
-                        text: text,
-                        onShowDetails: () => _details(context),
-                      )
-                    : Text(
-                        answer['skipped'] == true
-                            ? '已跳过'
-                            : options
-                                  .where((o) => selected.contains(o['id']))
-                                  .map((o) => o['label'])
-                                  .join('、'),
-                        style: const TextStyle(fontSize: 15, height: 1.5),
-                      ),
+                child: QuestionResponse(
+                  recipient: recipient,
+                  onOpenMember: onOpenMember,
+                  child: text.isNotEmpty && answer['skipped'] != true
+                      ? InteractionTextPreview(
+                          text: text,
+                          onShowDetails: () => _details(context),
+                        )
+                      : Text(
+                          answer['skipped'] == true
+                              ? '已跳过'
+                              : options
+                                    .where((o) => selected.contains(o['id']))
+                                    .map((o) => o['label'])
+                                    .join('、'),
+                          style: const TextStyle(fontSize: 15, height: 1.5),
+                        ),
+                ),
               ),
           ] else ...[
             QuestionAnswerContent(
@@ -243,9 +248,13 @@ class QuestionBatchForm extends StatelessWidget {
                     },
             ),
             if (readOnly && (text.isNotEmpty || answer['skipped'] == true))
-              Text(
-                answer['skipped'] == true ? '已跳过' : text,
-                style: const TextStyle(fontSize: 15, height: 1.5),
+              QuestionResponse(
+                recipient: recipient,
+                onOpenMember: onOpenMember,
+                child: Text(
+                  answer['skipped'] == true ? '已跳过' : text,
+                  style: const TextStyle(fontSize: 15, height: 1.5),
+                ),
               ),
           ],
         ],

@@ -28,7 +28,6 @@ class HtmlAppStore {
   HtmlAppStore(this.database);
   final Database database;
   static const maxHtmlBytes = 4 * 1024 * 1024;
-  static const maxDataBytes = 4 * 1024 * 1024;
 
   static Future<Directory> directory(String id) async {
     final support = await getApplicationSupportDirectory();
@@ -122,16 +121,8 @@ class HtmlAppStore {
 
   static Future<Map<String, Object?>> _read(File file) async {
     if (!await file.exists()) return {'revision': 0, 'value': null};
-    final handle = await file.open();
-    try {
-      if (await handle.length() > maxDataBytes) throw StateError('数据文件超过 4 MB');
-      final bytes = await handle.read(maxDataBytes + 1);
-      if (bytes.length > maxDataBytes) throw StateError('数据文件超过 4 MB');
-      final json = utf8.decode(bytes);
-      return (jsonDecode(json) as Map).cast<String, Object?>();
-    } finally {
-      await handle.close();
-    }
+    return (jsonDecode(await file.readAsString()) as Map)
+        .cast<String, Object?>();
   }
 
   /// Both the page and AI use this transaction to serialize versioned writes.
@@ -182,8 +173,6 @@ class HtmlAppStore {
           };
           documents[name] = next;
           final encoded = jsonEncode(documents);
-          if (utf8.encode(encoded).length > maxDataBytes)
-            throw ArgumentError('本条消息的数据最多 4 MB');
           await txn.update(
             'html_games',
             {
@@ -210,7 +199,6 @@ class HtmlAppStore {
           'value': value,
         };
         final bytes = utf8.encode(jsonEncode(next));
-        if (bytes.length > maxDataBytes) throw ArgumentError('单个数据文件最多 4 MB');
         await commit!.replace(txn, bytes);
         final version = (apps.single['version'] as int) + 1;
         await txn.update(

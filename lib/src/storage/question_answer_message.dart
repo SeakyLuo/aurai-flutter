@@ -29,7 +29,7 @@ Future<AgentMessage> writeQuestionAnswerMessage(
     audience: (card.participation['audience'] as List?)?.cast<String>(),
     excludedAudience: (card.participation['excludedAudience'] as List?)
         ?.cast<String>(),
-  );
+  )..resolveCard(card);
   final creator = (await db.query(
     'message_senders',
     columns: ['name'],

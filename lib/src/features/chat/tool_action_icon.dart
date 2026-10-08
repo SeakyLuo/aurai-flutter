@@ -77,7 +77,10 @@ class ToolActionIcon extends StatelessWidget {
               'sendConversationMessage' ||
               'readMessage' ||
               'locateMessage' ||
-              'sendQuickReply' => const ConversationIcon(),
+              'sendQuickReply' ||
+              'sleepChat' ||
+              'pauseAutoReply' ||
+              'resumeAutoReply' => const ConversationIcon(),
               'wakeGroupMember' ||
               'setGroupMemberMute' ||
               'pauseGroupAutoReply' ||

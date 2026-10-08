@@ -15,9 +15,7 @@ class GroupUnreadMessages {
   }, conflictAlgorithm: ConflictAlgorithm.ignore);
 
   Future<void> load(List<Conversation> conversations) async {
-    final groups = conversations
-        .where((c) => c.kind == ConversationKind.group)
-        .toList();
+    final groups = conversations.where((c) => !c.isTask).toList();
     if (groups.isEmpty) return;
     final states = await database.query(
       'app_state',
@@ -28,18 +26,47 @@ class GroupUnreadMessages {
       for (final row in states) row['key']: row['value'] as String,
     };
     final baseline = int.parse(values[baselineKey]!);
+    // Seed private-chat message cursors from the previous run-read checkpoint
+    // and the user's latest reply, so switching to message reads preserves history.
+    final privateIds = [
+      for (final c in groups)
+        if (c.isPersonalChat && !values.containsKey('group_read:${c.id}')) c.id,
+    ];
+    final previousReads = privateIds.isEmpty
+        ? <Map<String, Object?>>[]
+        : await database.rawQuery(
+            '''SELECT conversation_id, created_at, id FROM messages WHERE id IN (
+              SELECT (SELECT id FROM messages WHERE conversation_id = conversations.id
+                AND (sender_id = ? OR run_id = (SELECT value FROM app_state
+                  WHERE key = 'seen_run:' || conversations.id))
+                ORDER BY created_at DESC, id DESC LIMIT 1)
+              FROM conversations WHERE id IN (${List.filled(privateIds.length, '?').join(',')})
+            )''',
+            [MessageSender.localUser.id, ...privateIds],
+          );
+    final privateCursors = {
+      for (final row in previousReads) row['conversation_id']: row,
+    };
     for (final group in groups) {
       final saved = values['group_read:${group.id}'];
       final cursor = saved == null ? null : jsonDecode(saved) as Map;
       group.groupReadAt = cursor == null ? baseline : cursor['at'] as int;
       group.groupReadId = cursor == null ? '' : cursor['id'] as String;
+      final previous = privateCursors[group.id];
+      if (cursor == null && previous != null) {
+        final at = previous['created_at'] as int;
+        if (at >= group.groupReadAt) {
+          group.groupReadAt = at;
+          group.groupReadId = previous['id'] as String;
+        }
+      }
       group.unreadMessageCount = 0;
     }
     final rows = await database.rawQuery(
       '''
       SELECT conversation_id, COUNT(*) AS unread FROM messages
       WHERE sender_id != ? AND role = 'assistant'
-        AND kind NOT IN ('commentary', 'system')
+        AND kind NOT IN ('commentary', 'system', 'reasoning')
         AND NOT EXISTS (SELECT 1 FROM (SELECT ? AS visibility_viewer) WHERE (json_extract(interactive_json, '\$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.excludedAudience') WHERE value = visibility_viewer)) AND (
           ${groups.map((_) => '(conversation_id = ? AND (created_at > ? OR (created_at = ? AND id > ?)))').join(' OR ')}
         ) GROUP BY conversation_id

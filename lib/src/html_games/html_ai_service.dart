@@ -18,9 +18,6 @@ class HtmlAiService {
     required void Function(String) onText,
   }) async {
     try {
-      if (utf8.encode(encoded).length > 256 * 1024) {
-        throw ArgumentError('模型请求不能超过 256 KB');
-      }
       final args = (jsonDecode(encoded) as Map).cast<String, Object?>();
       if (args['operation'] == 'status') {
         final config =
@@ -38,10 +35,9 @@ class HtmlAiService {
       }
       if (args['operation'] != 'complete') throw ArgumentError('不支持的 模型操作');
       if (_jobs.containsKey(id)) throw ArgumentError('请求正在处理中');
-      if (_jobs.length >= 4) throw StateError('同时最多处理 4 个 模型请求，请稍后再试');
       final messages = args['messages'];
-      if (messages is! List || messages.isEmpty || messages.length > 100) {
-        throw ArgumentError('请提供 1–100 条文本消息');
+      if (messages is! List || messages.isEmpty) {
+        throw ArgumentError('请提供文本消息');
       }
       for (final message in messages) {
         if (message is! Map ||
@@ -55,8 +51,8 @@ class HtmlAiService {
       if (format != 'text' && format != 'json')
         throw ArgumentError('responseFormat 必须为 text 或 json');
       final maxTokens = args['maxOutputTokens'] ?? 4096;
-      if (maxTokens is! int || maxTokens < 1 || maxTokens > 32768) {
-        throw ArgumentError('maxOutputTokens 必须为 1–32768 的整数');
+      if (maxTokens is! int || maxTokens < 1) {
+        throw ArgumentError('maxOutputTokens 必须为正整数');
       }
       final job = _AiJob();
       _jobs[id] = job;
@@ -67,12 +63,6 @@ class HtmlAiService {
           format as String,
           maxTokens,
           args['streamUpdates'] == true ? onText : (_) {},
-        ).timeout(
-          const Duration(seconds: 120),
-          onTimeout: () {
-            unawaited(job.cancel());
-            throw TimeoutException('模型请求超时，请重试');
-          },
         );
       } finally {
         await job.cancel();
@@ -148,9 +138,6 @@ class HtmlAiService {
       },
       onTextChanged: (text) {
         job.checkCancelled();
-        if (utf8.encode(text).length > 512 * 1024) {
-          throw const ModelProviderException('模型回复超过大小限制');
-        }
         if (format == 'text') onText(text);
       },
     );
@@ -164,9 +151,6 @@ class HtmlAiService {
         throw FormatException('页面结果工具必须提供 value', jsonEncode(result));
       }
       final text = jsonEncode(result['value']);
-      if (utf8.encode(text).length > 512 * 1024) {
-        throw const ModelProviderException('模型回复超过大小限制');
-      }
       onText(text);
       return {'text': text, 'json': result['value'], 'model': config.model};
     }
@@ -176,7 +160,7 @@ class HtmlAiService {
           for (final part in (item['content'] as List).cast<Map>())
             if (part['type'] == 'output_text') part['text'] as String,
     ].join('\n');
-    if (text.trim().isEmpty || utf8.encode(text).length > 512 * 1024) {
+    if (text.trim().isEmpty) {
       throw const ModelProviderException('模型没有返回有效文本');
     }
     return {'text': text, 'model': config.model};

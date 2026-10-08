@@ -3,11 +3,10 @@ const htmlAiScript = r'''
 (()=>{
   let serial=0;
   const pending=new Map();
-  const timeout=window.setTimeout.bind(window),clear=window.clearTimeout.bind(window);
   const failure=(message,code)=>Object.assign(new Error(message),{code});
   const finish=(id,value)=>{
     const entry=pending.get(id);if(!entry)return;
-    pending.delete(id);clear(entry.timer);entry.cleanup();
+    pending.delete(id);entry.cleanup();
     value.error?entry.reject(failure(value.error,value.code)):entry.resolve(value);
   };
   window.__auraiAiReply=finish;
@@ -28,11 +27,7 @@ const htmlAiScript = r'''
       AuraiGameBridge.cancelAi(id);
       finish(id,{error:'模型请求已取消',code:'cancelled'});
     };
-    const timer=timeout(()=>{
-      AuraiGameBridge.cancelAi(id);
-      finish(id,{error:'模型请求超时，请重试',code:'timeout'});
-    },130000);
-    pending.set(id,{resolve,reject,onText,timer,cleanup:()=>signal?.removeEventListener('abort',cancel)});
+    pending.set(id,{resolve,reject,onText,cleanup:()=>signal?.removeEventListener('abort',cancel)});
     signal?.addEventListener('abort',cancel,{once:true});
     try{AuraiGameBridge.ai(id,JSON.stringify({...args,streamUpdates:typeof onText==='function'}))}
     catch(error){finish(id,{error:'模型接口不可用',code:'unavailable'})}

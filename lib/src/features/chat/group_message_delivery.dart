@@ -140,8 +140,8 @@ extension GroupMessageDelivery on ChatController {
                 text: source.text,
                 markdown: source.markdown,
               )
-              ..senderName =
-                  source.sender?.name ?? MessageSender.localUser.name);
+              ..senderName = source.sender?.name ?? MessageSender.localUser.name
+              ..resolveSource(source));
       mentions.addAll(ids);
       final inlineMentions = RegExp(
         r'\]\(aurai://member/([^)]+)\)',

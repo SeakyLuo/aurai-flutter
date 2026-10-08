@@ -70,6 +70,9 @@ const toolNamesByDefaultIcon = <String, List<String>>{
     'withdrawHtmlApp',
   ],
   'conversation': [
+    'sleepChat',
+    'pauseAutoReply',
+    'resumeAutoReply',
     'submitInteractiveChoice',
     'finishCurrentAction',
     'finishCurrentSpeech',

@@ -90,6 +90,13 @@ extension PrivateGroupMessage on ChatController {
         text: source['text'] as String,
         markdown: isGroup ? source['markdown'] == 1 : true,
       );
+      if (metadata != null) {
+        quote.resolveCard(
+          InteractiveMessage.fromJson(
+            jsonDecode(metadata) as Map<String, dynamic>,
+          ),
+        );
+      }
       final authors = await _store.database.query(
         'message_senders',
         columns: ['name'],

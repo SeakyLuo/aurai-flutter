@@ -42,8 +42,6 @@ class MessageCallbacks {
     bool html = false,
   }) async {
     final encoded = jsonEncode(payload);
-    if (utf8.encode(encoded).length > 16384)
-      throw ArgumentError('操作回调最多 16 KB');
     final existing = await db.query(
       'message_callbacks',
       where: 'id = ?',
@@ -96,7 +94,11 @@ class MessageCallbacks {
       "AND NOT EXISTS (SELECT 1 FROM conversation_members member "
       "WHERE member.conversation_id = message_callbacks.conversation_id "
       "AND member.sender_id = message_callbacks.sender_id AND member.left_at IS NULL "
-      "AND (${effectiveGroupMuteSql('member')} = -1 OR ${effectiveGroupMuteSql('member')} > CAST((julianday('now') - 2440587.5) * 86400000000 AS INTEGER)))";
+      "AND (${effectiveGroupMuteSql('member')} = -1 OR ${effectiveGroupMuteSql('member')} > CAST((julianday('now') - 2440587.5) * 86400000000 AS INTEGER)))"
+      " AND NOT EXISTS (SELECT 1 FROM group_participation participation "
+      "WHERE participation.conversation_id = message_callbacks.conversation_id "
+      "AND participation.sender_id = message_callbacks.sender_id AND participation.paused = 1 "
+      "AND participation.conversation_id IN (SELECT id FROM conversations WHERE kind != 'group'))";
 
   Future<DateTime?> nextMuteExpiry() async {
     final rows = await database.query(

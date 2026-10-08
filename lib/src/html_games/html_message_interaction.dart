@@ -260,8 +260,6 @@ extension HtmlMessageInteraction on HtmlStore {
     final nextState = args['state'] == null
         ? savedState
         : jsonEncode(args['state']);
-    if (utf8.encode(nextState).length > 65536)
-      throw ArgumentError('状态最多 64 KB');
     if (!presentationChanged &&
         nextState == savedState &&
         html == null &&

@@ -203,7 +203,7 @@ extension ConversationActions on ChatController {
 
   Future<void> markActiveConversationRead({AgentMessage? through}) async {
     final conversation = activeConversation;
-    if (conversation.kind == ConversationKind.group) {
+    if (!conversation.isTask) {
       if (!conversation.needsGroupReadCheckpoint) return;
       final latest = through ?? conversation.messages.last;
       await _store.writer.flush();

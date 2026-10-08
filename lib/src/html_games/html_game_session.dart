@@ -481,10 +481,7 @@ class HtmlGameSession extends ChangeNotifier {
       final bytes = await _channel
           ?.invokeMethod<Uint8List>('snapshot')
           .timeout(const Duration(seconds: 1));
-      if (bytes != null &&
-          bytes.length <= 256 * 1024 &&
-          version == game.version &&
-          captureTheme == theme) {
+      if (bytes != null && version == game.version && captureTheme == theme) {
         preview = bytes;
         previewVersion = version;
         previewTheme = captureTheme.brightness.name;

@@ -118,6 +118,8 @@ import '../../storage/conversation_visibility.dart';
 import '../../domain/message_quote.dart';
 import '../../agent/group_message_tool.dart';
 import '../../agent/group_sleep_tool.dart';
+import '../../agent/chat_rest_tool.dart';
+import '../../domain/local_time.dart';
 import '../../storage/group_participation.dart';
 import 'group_dispatcher.dart';
 import '../../agent/group_chat_tools.dart';
@@ -251,6 +253,7 @@ part 'private_goal_actions.dart';
 part 'conversation_execution_state.dart';
 part 'live_project_changes.dart';
 part 'group_sleep_recovery.dart';
+part 'private_chat_rest.dart';
 part 'group_run_tools.dart';
 part 'group_member_mute.dart';
 part 'user_data_read_access.dart';
@@ -532,7 +535,7 @@ class ChatController extends ChangeNotifier {
     });
     await MessageCallbacks(_store.database).recoverInterrupted();
     await scheduledTasks.initialize(_runScheduled);
-    await _groupSleeps.initialize(_store.database, _recoverGroupSleep);
+    await _groupSleeps.initialize(_store.database, _recoverConversationSleep);
     _programChanges = MiniappProgramStore.changes.stream.listen(
       _receiveProgramChange,
     );

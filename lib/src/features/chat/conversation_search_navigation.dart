@@ -31,12 +31,12 @@ extension ConversationSearchNavigation on ChatController {
 
   Future<String?> firstUnreadMessageId() async {
     final conversation = activeConversation;
-    if (conversation.kind == ConversationKind.group) {
+    if (!conversation.isTask) {
       await _store.writer.flush();
       await GroupUnreadMessages(_store.database).load([conversation]);
       if (conversation.unreadMessageCount == 0) return null;
       final rows = await _store.database.rawQuery(
-        "SELECT COALESCE((SELECT parent_message_id FROM message_quick_replies WHERE message_id = messages.id), id) AS target FROM messages WHERE conversation_id = ? AND sender_id != ? AND role = 'assistant' AND kind NOT IN ('commentary', 'system') AND (created_at > ? OR (created_at = ? AND id > ?)) AND NOT EXISTS (SELECT 1 FROM (SELECT ? AS visibility_viewer) WHERE (json_extract(interactive_json, '\$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.excludedAudience') WHERE value = visibility_viewer)) ORDER BY created_at, id LIMIT 1",
+        "SELECT COALESCE((SELECT parent_message_id FROM message_quick_replies WHERE message_id = messages.id), id) AS target FROM messages WHERE conversation_id = ? AND sender_id != ? AND role = 'assistant' AND kind NOT IN ('commentary', 'system', 'reasoning') AND (created_at > ? OR (created_at = ? AND id > ?)) AND NOT EXISTS (SELECT 1 FROM (SELECT ? AS visibility_viewer) WHERE (json_extract(interactive_json, '\$.participation.audience') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.audience') WHERE value = visibility_viewer)) OR EXISTS (SELECT 1 FROM json_each(interactive_json, '\$.participation.excludedAudience') WHERE value = visibility_viewer)) ORDER BY created_at, id LIMIT 1",
         [
           conversation.id,
           MessageSender.localUser.id,

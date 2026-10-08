@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../domain/message_quote.dart';
-import 'settings_appearance.dart';
 import 'quote_text_preview.dart';
 
 class MessageQuoteView extends StatelessWidget {
@@ -17,47 +16,77 @@ class MessageQuoteView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme.onSurfaceVariant;
+    final questions = quote.canView('user:local')
+        ? quote.questions
+        : const <String>[];
+    final style = TextStyle(fontSize: 12, height: 1.35, color: color);
     return Material(
-      color: settingsFieldColor(context),
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
+      color: Colors.transparent,
       child: InkWell(
+        borderRadius: BorderRadius.circular(4),
         onTap: quote.canView('user:local') ? onTap : null,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 9, 8, 9),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 2,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: .4),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              Flexible(
+                child: Stack(
                   children: [
-                    Text(
-                      quote.senderName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: color,
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 1.5,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: .25),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    QuoteTextPreview(
-                      text: quote.textFor('user:local'),
-                      markdown: quote.markdown,
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.35,
-                        color: color,
+                    Padding(
+                      padding: const EdgeInsets.only(left: 9.5),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            quote.senderName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: color,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          if (questions.isNotEmpty)
+                            for (final (index, question)
+                                in questions.take(2).indexed)
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  top: index == 0 ? 0 : 2,
+                                ),
+                                child: QuoteTextPreview(
+                                  text: questions.length == 1
+                                      ? '[问题] $question'
+                                      : '[问题${index + 1}] $question${index == 1 && questions.length > 2 ? '…' : ''}',
+                                  markdown: false,
+                                  maxLines: 1,
+                                  style: style,
+                                ),
+                              )
+                          else
+                            QuoteTextPreview(
+                              text: quote.textFor('user:local'),
+                              markdown: quote.markdown,
+                              maxLines: 2,
+                              style: style,
+                            ),
+                        ],
                       ),
                     ),
                   ],

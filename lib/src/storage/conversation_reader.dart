@@ -1,4 +1,5 @@
 import 'group_unread_messages.dart';
+import 'quote_source_reader.dart';
 import 'group_member_details.dart';
 import '../html_games/html_store.dart';
 import '../html_games/html_game.dart';
@@ -128,12 +129,16 @@ class ConversationReader {
         .toList();
     if (quotes.isEmpty) return;
     final ids = quotes.map((q) => q.senderId).toSet();
-    final rows = await database.query(
-      'message_senders',
-      columns: ['id', 'name'],
-      where: 'id IN (${_slots(ids.length)})',
-      whereArgs: ids.toList(),
-    );
+    final results = await Future.wait([
+      database.query(
+        'message_senders',
+        columns: ['id', 'name'],
+        where: 'id IN (${_slots(ids.length)})',
+        whereArgs: ids.toList(),
+      ),
+      loadQuoteSources(database, quotes),
+    ]);
+    final rows = results[0] as List<Map<String, Object?>>;
     final names = {for (final row in rows) row['id']: row['name'] as String};
     for (final quote in quotes) {
       quote.senderName = names[quote.senderId]!;
@@ -460,6 +465,10 @@ class ConversationReader {
         )
       else
         Future.value(<Map<String, Object?>>[]),
+      loadQuoteSources(
+        database,
+        quotes.values,
+      ).then((_) => <Map<String, Object?>>[]),
     ]);
     final richRuns = attachmentsAndSenders[2]
         .map((row) => row['run_id'])

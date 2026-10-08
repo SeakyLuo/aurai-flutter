@@ -42,18 +42,15 @@ $htmlAiScript
 $htmlGameLifecycleScript
 (()=>{
  let snapshot=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('$snapshot'),c=>c.charCodeAt(0))));
- const listeners=new Set();let pending=null;let timedOut=false;
+ const listeners=new Set();let pending=null;
  const publish=value=>{snapshot=value;for(const fn of listeners){try{fn(structuredClone(snapshot))}catch(e){AuraiGameBridge.reportError(String(e.message||e))}}};
  window.AuraiGame=Object.freeze({
    get snapshot(){return structuredClone(snapshot)},
    subscribe(fn){listeners.add(fn);fn(structuredClone(snapshot));return ()=>listeners.delete(fn)},
    commit(args){
-     if(timedOut)return Promise.reject(new Error('操作未确认，请关闭后重新打开游戏确认状态'));
      if(pending)return Promise.reject(new Error('请等待当前操作完成'));
      return new Promise((resolve,reject)=>{
        pending={resolve,reject};
-       const timer=setTimeout(()=>{if(pending){pending=null;timedOut=true;AuraiGameBridge.reopen();reject(new Error('操作未确认，请重新打开游戏确认状态后再继续'))}},15000);
-       pending.timer=timer;
        AuraiGameBridge.postMessage(JSON.stringify(args));
      });
    }
@@ -65,7 +62,7 @@ $htmlGameLifecycleScript
  window.__auraiGameState=value=>{if(value.version>snapshot.version||(value.version===snapshot.version&&newerInteraction(value.interaction,snapshot.interaction))){publish(value);document.dispatchEvent(new Event('aurai:messageupdate'))}};
  window.__auraiGameReply=value=>{
    if(value.version!==undefined && value.version>snapshot.version)publish(value);
-   const current=pending;pending=null;if(!current)return;clearTimeout(current.timer);
+   const current=pending;pending=null;if(!current)return;
    if(value.error)current.reject(new Error(value.error));else current.resolve(value);
  };
 })();

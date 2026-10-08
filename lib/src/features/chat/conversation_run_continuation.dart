@@ -18,7 +18,9 @@ extension ConversationRunContinuation on ChatController {
     required bool direct,
     required bool hasCallbacks,
     String? runId,
+    String? sleepWakeReason,
   }) {
+    if (sleepWakeReason != null) return Future.value(const []);
     if (runId != null) {
       return loadFailedRunProtocol(
         _store.database,

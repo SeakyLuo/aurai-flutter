@@ -20,21 +20,24 @@ class QuestionPager extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     Widget arrow(bool previous) {
       final enabled = previous ? index > 0 : index < count - 1;
-      return IconButton(
-        constraints: const BoxConstraints.tightFor(width: 32, height: 40),
-        padding: const EdgeInsets.all(4),
-        visualDensity: VisualDensity.compact,
-        tooltip: previous ? '上一题' : '下一题',
-        onPressed: enabled
-            ? () => onChanged(index + (previous ? -1 : 1))
-            : null,
-        icon: RotatedBox(
-          quarterTurns: previous ? 2 : 0,
-          child: SettingsIcon(
-            type: SettingsIconType.chevron,
-            color: enabled
-                ? colors.onSurfaceVariant
-                : colors.onSurface.withValues(alpha: .25),
+      return Semantics(
+        button: true,
+        enabled: enabled,
+        label: previous ? '上一题' : '下一题',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: enabled ? () => onChanged(index + (previous ? -1 : 1)) : null,
+          child: SizedBox.square(
+            dimension: 24,
+            child: RotatedBox(
+              quarterTurns: previous ? 2 : 0,
+              child: SettingsIcon(
+                type: SettingsIconType.chevron,
+                color: enabled
+                    ? colors.onSurfaceVariant
+                    : colors.onSurface.withValues(alpha: .25),
+              ),
+            ),
           ),
         ),
       );
@@ -44,6 +47,7 @@ class QuestionPager extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         arrow(true),
+        const SizedBox(width: 2),
         Semantics(
           label: '第 ${index + 1} 题，共 $count 题',
           child: Text(
@@ -51,6 +55,7 @@ class QuestionPager extends StatelessWidget {
             style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
           ),
         ),
+        const SizedBox(width: 2),
         arrow(false),
       ],
     );

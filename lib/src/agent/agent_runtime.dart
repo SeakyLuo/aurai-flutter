@@ -86,6 +86,7 @@ class AgentRuntime {
     final stepIndices = <String, int>{};
     String? continuationToken;
     var invalidArgumentTurns = 0;
+    var endedForSleep = false;
     var toolResults = const <ToolResult>[];
 
     final task = decision == null
@@ -419,6 +420,7 @@ class AgentRuntime {
               (endsRun?.call(result) == true &&
                   !deferred.hasPending &&
                   !deferred.hasUpdates)) {
+            endedForSleep = result.toolName == 'sleepChat';
             return AgentRunResult(answer: '', steps: List.unmodifiable(steps));
           }
         }
@@ -430,7 +432,11 @@ class AgentRuntime {
       _registry.endTurn();
       _userInputs.clear();
       if (task != null && (await task.read())['status'] == 'active') {
-        await task.pause(_cancelRequested ? '用户停止了当前执行' : '执行已中断，等待继续');
+        if (endedForSleep && !_cancelRequested) {
+          await task.stopClock();
+        } else {
+          await task.pause(_cancelRequested ? '用户停止了当前执行' : '执行已中断，等待继续');
+        }
       }
       await Future.wait([
         for (final tool in _registry.tools.whereType<DeferredAgentTool>())

@@ -34,6 +34,7 @@ extension ConversationExecutionState on ChatController {
     pendingMessageQueue.paused = true;
     _execution.queuedUserMessageId = null;
     _execution.userInputs.clear();
+    await _groupSleeps.remove(activeConversation.id);
     if (identical(activeConversation, _privateConversation)) {
       _privateConversation!.runState = ChatRunState.stopping;
       await _runtime?.cancel();
@@ -42,9 +43,6 @@ extension ConversationExecutionState on ChatController {
     final conversation = _execution.beginStop();
     if (conversation == null) return;
     _queuedSystemNotices.remove(conversation.id);
-    if (conversation.kind == ConversationKind.group) {
-      await _groupSleeps.remove(conversation.id);
-    }
     await _persistRun(conversation);
     _execution.resolveConfirmation(false);
     _finishAccessibility({'granted': false, 'reason': 'User stopped the task'});

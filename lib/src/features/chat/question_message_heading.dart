@@ -5,6 +5,7 @@ import '../../domain/message_sender.dart';
 import 'member_avatar.dart';
 import 'question_icon.dart';
 import 'interactive_status_tag.dart';
+import 'user_question_skip_button.dart';
 
 class QuestionMessageHeading extends StatelessWidget {
   const QuestionMessageHeading({
@@ -52,8 +53,12 @@ class QuestionMessageHeading extends StatelessWidget {
                 style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
               ),
               const Spacer(),
-              if (pager != null) pager!,
-              if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+              if (pager != null)
+                Transform.translate(offset: const Offset(4, 0), child: pager!),
+              if (trailing != null) ...[
+                const SizedBox(width: 8),
+                QuestionSkipStyle(compact: !sheetHeader, child: trailing!),
+              ],
             ],
           ),
         ),
@@ -82,56 +87,50 @@ class QuestionMessageHeading extends StatelessWidget {
             ),
           ),
         ],
-        if (recipient case final person?) ...[
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Semantics(
-                  button: onOpenMember != null,
-                  label: '查看${person.displayName}的资料',
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onOpenMember == null
-                        ? null
-                        : () => onOpenMember!(person.id),
-                    child: Row(
-                      children: [
-                        MemberAvatar(sender: person, size: 24),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            person.displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: GlobalUI.highlightTextColor(context),
+        if (status != '已回答')
+          if (recipient case final person?) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Semantics(
+                    button: onOpenMember != null,
+                    label: '查看${person.displayName}的资料',
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onOpenMember == null
+                          ? null
+                          : () => onOpenMember!(person.id),
+                      child: Row(
+                        children: [
+                          MemberAvatar(sender: person, size: 24),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              person.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: GlobalUI.highlightTextColor(context),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              if (showStatus) ...[
-                const SizedBox(width: 12),
-                InteractiveStatusTag(
-                  label: status,
-                  highlighted: status == '待回答',
-                ),
+                if (showStatus) ...[
+                  const SizedBox(width: 12),
+                  InteractiveStatusTag(
+                    label: status,
+                    highlighted: status == '待回答',
+                  ),
+                ],
               ],
-            ],
-          ),
-        ],
-        if (recipient == null && showStatus) ...[
-          const SizedBox(height: 8),
-          Text(
-            status,
-            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
-          ),
-        ],
+            ),
+          ],
       ],
     );
   }

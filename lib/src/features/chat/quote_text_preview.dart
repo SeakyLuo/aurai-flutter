@@ -10,9 +10,11 @@ class QuoteTextPreview extends StatelessWidget {
     required this.text,
     required this.style,
     this.markdown = true,
+    this.maxLines = 2,
   });
   final String text;
   final bool markdown;
+  final int maxLines;
   final TextStyle style;
   @override
   Widget build(BuildContext context) => MessagePreviewText(
@@ -22,5 +24,7 @@ class QuoteTextPreview extends StatelessWidget {
     style: style,
     formatted: markdown,
     literal: !markdown,
+    maxLines: maxLines,
+    textWidthBasis: TextWidthBasis.longestLine,
   );
 }

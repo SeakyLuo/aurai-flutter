@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'glass_surface.dart';
+import 'input_clear_button.dart';
 import 'question_icon.dart';
 import 'settings_appearance.dart';
 import 'sidebar_action_icon.dart';
@@ -68,12 +69,9 @@ class ContactsSearchBar extends StatelessWidget {
                     ),
                     suffixIcon: value.text.isEmpty
                         ? null
-                        : IconButton(
+                        : InputClearButton(
                             tooltip: '清空输入',
                             onPressed: controller.clear,
-                            icon: const QuestionIcon(
-                              type: QuestionIconType.close,
-                            ),
                           ),
                   ),
                 ),

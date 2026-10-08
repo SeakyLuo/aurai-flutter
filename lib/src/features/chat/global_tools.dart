@@ -32,6 +32,7 @@ extension GlobalTools on ChatController {
     registry.restore(await recentConversationTools(_store.database, member.id));
     registry.load([
       'sendGroupMessage',
+      if (parent == null) ...ChatRestTool.names,
       if (parent != null) ...[
         'sleepGroupChat',
         'wakeGroupMember',
@@ -367,6 +368,8 @@ extension GlobalTools on ChatController {
             (arguments) => _sendPrivateGroupMessage(arguments, senderId),
           ),
           ..._groupAutoReplyTools(groupId, senderId),
+          if (conversation.kind != ConversationKind.group)
+            ..._privateRestTools(conversation, senderId),
           GroupSleepTool(
             (targetGroupId, duration, draft, reason) => _sleepInTargetGroup(
               targetGroupId,

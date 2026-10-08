@@ -124,7 +124,7 @@ const interactiveButtonsSchema = {
         'type': 'string',
         'enum': ['text', 'json'],
         'description':
-            'HTML messages only: this submit endpoint accepts page-provided text or JSON, max 16 KB. Native cards use fixed button values instead. The host binds the authenticated participant.',
+            'HTML messages only: this submit endpoint accepts page-provided text or JSON. Native cards use fixed button values instead. The host binds the authenticated participant.',
       },
       'value': {
         'description':

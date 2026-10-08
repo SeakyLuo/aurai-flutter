@@ -21,7 +21,6 @@ class MiniappMessageCapability {
     required Map<String, Object?> bindings,
     required List effects,
   }) async {
-    if (effects.length > 64) throw ArgumentError('单次事件最多产生 64 条消息');
     final created = <({AgentMessage message, bool wakeAi})>[];
     final batch = txn.batch();
     for (final raw in effects) {

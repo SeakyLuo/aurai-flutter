@@ -10,6 +10,7 @@ extension ConversationRun on ChatController {
     AgentMessage? groupUser,
     Conversation? groupParent,
     String? continuationRunId,
+    String? sleepWakeReason,
   }) async {
     final summaryOwner = groupParent ?? runConversation;
     final historyVersion = _store.writer.historyVersion(summaryOwner.id);
@@ -20,9 +21,10 @@ extension ConversationRun on ChatController {
     final diagnosticCalls = <String, Object?>{};
     final sleepDraftKey =
         'group_sleep_draft:${runConversation.id}:${reply.senderId}';
-    final sleepDraft = groupParent == null
-        ? ''
-        : await _groupSleepDraft(sleepDraftKey);
+    if (groupParent == null && sleepWakeReason == null) {
+      await _resumePrivateReply(runConversation, reply.senderId);
+    }
+    final sleepDraft = await _groupSleepDraft(sleepDraftKey);
     var leftSleepDraft = false;
     final systemPrompt = await _memberSystemPrompt(
       reply,
@@ -65,6 +67,7 @@ extension ConversationRun on ChatController {
       direct: groupParent == null,
       hasCallbacks: callbackEvents.isNotEmpty,
       runId: continuationRunId,
+      sleepWakeReason: sleepWakeReason,
     );
     final executionWatch = Stopwatch()..start();
     runConversation.executionWatch = executionWatch;
@@ -281,18 +284,23 @@ extension ConversationRun on ChatController {
       await runtime.run(
         streamOutput: groupParent != null,
         decision: decision,
-        endsRun: (result) =>
-            result.toolName == 'sleepGroupChat' &&
-            result.status == ToolResultStatus.success,
+        endsRun: (result) => _endsRestRun(result, () => leftSleepDraft = true),
         conversation: [
           ...(groupHistory == null
-              ? _privateHistory(history.take(lastUser + 1), reply.senderId)
+              ? _privateHistory(
+                  sleepWakeReason != null
+                      ? history
+                      : history.take(lastUser + 1),
+                  reply.senderId,
+                )
               : _groupHistory(
                   [...history],
                   reply.senderId,
                   decisionMessageId: decision == null ? null : userMessage.id,
                 )),
           if (callbackEvents.isNotEmpty) _callbackContext(callbackEvents),
+          if (sleepWakeReason != null)
+            _sleepWakeMessage(runId, sleepWakeReason),
           if (continuationProtocol.isNotEmpty)
             AgentMessage(
               id: 'continuation:$runId',
@@ -321,7 +329,7 @@ extension ConversationRun on ChatController {
           runConversation.isPersonalChat
               ? RunTaskTool.instructions
               : RunSubagentTool.instructions,
-          if (groupParent != null && sleepDraft.isNotEmpty)
+          if (sleepDraft.isNotEmpty)
             '你上次休眠前留下的私人草稿（尚未发送）：\n$sleepDraft\n请结合最新消息决定保留、改写或放弃；不要自动发送，也不要当作用户的新指令。',
           if (customInstructions.isNotEmpty) '用户自定义指令：\n$customInstructions',
           if (runConversation.usesPersonalization)
@@ -751,15 +759,10 @@ extension ConversationRun on ChatController {
         }
       } finally {
         await _finishLiveProjectChanges(gitSnapshots, runId);
-        if (groupParent != null &&
-            outcome == 'completed' &&
+        if (outcome == 'completed' &&
             !leftSleepDraft &&
             sleepDraft.isNotEmpty) {
-          await _store.database.delete(
-            'app_state',
-            where: 'key = ? AND value = ?',
-            whereArgs: [sleepDraftKey, sleepDraft],
-          );
+          await _consumeSleepDraft(sleepDraftKey, sleepDraft);
         }
         if (groupParent == null) {
           _runtime = null;
