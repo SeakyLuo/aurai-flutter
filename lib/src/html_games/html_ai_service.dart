@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import '../domain/model_provider.dart';
 import '../platform/aurai_platform.dart';
 import '../providers/model_context_limits.dart';
+import '../providers/model_image_input.dart';
 import '../providers/responses_transport.dart';
 
 /// A page-scoped, tool-free client. Credentials and app conversations stay native.
@@ -29,6 +30,7 @@ class HtmlAiService {
         return {
           'version': 1,
           'available': available,
+          'supportsImages': available && configSupportsImageInput(config),
           if (available) 'model': config.model,
           if (!available) 'reason': '请先在 Aurai 设置默认文本模型',
         };
@@ -37,14 +39,13 @@ class HtmlAiService {
       if (_jobs.containsKey(id)) throw ArgumentError('请求正在处理中');
       final messages = args['messages'];
       if (messages is! List || messages.isEmpty) {
-        throw ArgumentError('请提供文本消息');
+        throw ArgumentError('请提供消息');
       }
       for (final message in messages) {
         if (message is! Map ||
             !const ['system', 'user', 'assistant'].contains(message['role']) ||
-            message['content'] is! String ||
-            (message['content'] as String).trim().isEmpty) {
-          throw ArgumentError('消息必须包含有效的 role 和非空文本 content');
+            !_validContent(message['content'])) {
+          throw ArgumentError('消息必须包含有效的 role 和非空文本或图片 content');
         }
       }
       final format = args['responseFormat'] ?? 'text';
@@ -105,6 +106,16 @@ class HtmlAiService {
         config.baseUrl.isEmpty) {
       throw StateError('请先在 Aurai 设置默认文本模型');
     }
+    final hasImages = messages.any(
+      (message) =>
+          message['content'] is List &&
+          (message['content'] as List).any(
+            (part) => part['type'] == 'input_image',
+          ),
+    );
+    if (hasImages && !configSupportsImageInput(config)) {
+      throw StateError('当前默认模型不支持看图，请在模型设置中选择支持图片的模型');
+    }
     final transport = ResponsesTransport(config);
     job.transport = transport;
     const resultTool = StructuredResultTool(
@@ -119,7 +130,7 @@ class HtmlAiService {
     );
     final response = await transport.send(
       {
-        'model': config.model,
+        'model': config.apiModel,
         'stream': true,
         'store': false,
         'max_output_tokens': math.min(
@@ -170,6 +181,24 @@ class HtmlAiService {
 
   Future<void> cancelAll() async {
     await Future.wait(_jobs.values.toList().map((job) => job.cancel()));
+  }
+
+  bool _validContent(Object? content) {
+    if (content is String) return content.trim().isNotEmpty;
+    if (content is! List || content.isEmpty) return false;
+    return content.every((part) {
+      if (part is! Map) return false;
+      if (part['type'] == 'input_text') {
+        return part['text'] is String &&
+            (part['text'] as String).trim().isNotEmpty;
+      }
+      if (part['type'] != 'input_image' || part['image_url'] is! String) {
+        return false;
+      }
+      final url = part['image_url'] as String;
+      return url.startsWith('https://') ||
+          RegExp(r'^data:image/(png|jpeg|webp);base64,\S+$').hasMatch(url);
+    });
   }
 }
 

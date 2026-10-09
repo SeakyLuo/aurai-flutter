@@ -49,6 +49,10 @@ const avatarPortraits = <String, ({String name, String asset})>{
   'portrait:polar_bear': (name: '白熊', asset: 'assets/avatars/polar_bear.webp'),
   'portrait:lion': (name: '小狮子', asset: 'assets/avatars/lion.webp'),
   'portrait:baby_tiger': (name: '小老虎', asset: 'assets/avatars/baby_tiger.webp'),
+  'portrait:cheetah_police': (
+    name: '猎豹警官',
+    asset: 'assets/avatars/cheetah_police.webp',
+  ),
   'portrait:schnauzer': (name: '雪纳瑞', asset: 'assets/avatars/schnauzer.webp'),
   'portrait:capybara': (name: '水豚', asset: 'assets/avatars/capybara.webp'),
   'portrait:lizard': (name: '树袋熊', asset: 'assets/avatars/koala.webp'),
@@ -147,6 +151,7 @@ const avatarPortraitScales = <String, double>{
   'portrait:saturn': .88,
   'portrait:sunglasses_bee': .9,
   'portrait:baby_tiger': .9,
+  'portrait:cheetah_police': .9,
   'portrait:schnauzer': .9,
   'portrait:dumpling': .9,
   'portrait:double_scoop_ice_cream': .92,

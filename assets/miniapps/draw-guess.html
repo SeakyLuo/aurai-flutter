@@ -1,0 +1,146 @@
+<script type="application/json" id="aurai-send-action">{"type":"program"}</script>
+<script type="application/json" id="aurai-capabilities">["messages.send","replies.set","replies.release","timer.set"]</script>
+<script type="application/aurai-program">
+var s=ctx.state,e=ctx.event,d=e.data||{},members=ctx.members,byId={};
+members.forEach(function(m){byId[m.id]=m;});
+var words=['苹果','香蕉','西瓜','草莓','菠萝','猫','狗','兔子','熊猫','大象','鱼','蝴蝶','蜗牛','章鱼','长颈鹿','房子','雨伞','自行车','汽车','飞机','火箭','帆船','太阳','月亮','雪人','花','树','仙人掌','蘑菇','山','眼镜','时钟','钥匙','剪刀','吉他','冰淇淋','蛋糕','披萨','汉堡','杯子'];
+var aliases={'猫':['小猫','猫咪'],'狗':['小狗','狗狗'],'兔子':['兔'],'鱼':['小鱼'],'房子':['房屋'],'雨伞':['伞'],'自行车':['单车'],'汽车':['小汽车'],'帆船':['船'],'花':['花朵'],'树':['大树'],'山':['山峰'],'时钟':['钟'],'冰淇淋':['冰激凌'],'披萨':['比萨'],'汉堡':['汉堡包'],'杯子':['水杯']};
+var messages=[],release=false;
+function require(ok,message){if(!ok)throw new Error(message);}
+function isPlayer(id){return s.players.some(function(p){return p.id===id;});}
+function manage(){require(e.actorId===ctx.ownerId||e.actorId==='user:local','只有发起人可以管理对局');}
+function clean(text){return text.toLowerCase().replace(/[\s，。！？、,.!?]/g,'');}
+function announce(text){messages.push({text:text});}
+function notify(ids,text){var ai=ids.filter(function(id){return byId[id].kind==='agent';});if(ai.length)messages.push({text:text,audience:ids,wakeAi:true,wakeMemberIds:ai});}
+function finishRound(winner){
+ s.phase='result';s.nextAt=ctx.now+5000;s.pendingWake=null;
+ if(winner){s.players.forEach(function(p){if(p.id===winner)p.score+=3;if(p.id===s.painter)p.score+=2;});announce(byId[winner].name+'猜中了：'+s.word+'。');}
+ else announce('本题答案：'+s.word+'。');
+ s.history.push({round:s.round,painter:s.painter,word:s.word,winner:winner});
+}
+function startRound(){
+ if(s.round>=s.total){s.phase='finished';release=true;var high=Math.max.apply(null,s.players.map(function(p){return p.score;}));announce('你画我猜结束，'+s.players.filter(function(p){return p.score===high;}).map(function(p){return p.name;}).join('、')+'获胜。');return;}
+ s.round++;s.painter=s.players[(s.round-1)%s.players.length].id;s.phase='drawing';s.deadline=ctx.now+s.seconds*1000;s.nextAt=null;s.pendingWake=null;s.canvasVersion=0;s.strokes=[];s.guesses=[];s.guessedVersions={};
+ if(!s.remaining.length)s.remaining=s.words.slice();
+ var index=Math.floor(Math.random()*s.remaining.length);s.word=s.remaining.splice(index,1)[0];
+ announce('第'+s.round+'题 · '+byId[s.painter].name+'画，其他人猜。');
+ notify([s.painter],'轮到你画画。读取本局小程序的私密题目，提交笔画，不要说出答案。');
+}
+function validateStrokes(strokes){
+ require(Array.isArray(strokes),'请提供笔画数组');
+ strokes.forEach(function(stroke){require(/^#[0-9a-fA-F]{6}$/.test(stroke.color)&&typeof stroke.width==='number'&&isFinite(stroke.width)&&stroke.width>0,'画笔颜色或粗细无效');require(Array.isArray(stroke.points)&&stroke.points.length>0,'笔画不能为空');stroke.points.forEach(function(p){require(Array.isArray(p)&&p.length===2&&p.every(function(v){return typeof v==='number'&&isFinite(v)&&v>=0&&v<=1;}),'笔画坐标必须在 0 到 1 之间');});});
+}
+if(e.action==='configure'){
+ manage();require(!s.phase||s.phase==='setup'||s.phase==='finished','请先结束当前对局');require(Array.isArray(d.players)&&d.players.length>=2,'至少选择两位群成员');
+ var chosen={};d.players.forEach(function(id){require(byId[id]&&!chosen[id],'请选择当前群成员，不要重复选择');chosen[id]=true;});
+ require([60,90,120,180].indexOf(d.seconds)>=0&&[1,2,3].indexOf(d.cycles)>=0,'回合设置无效');
+ if(d.words){require(Array.isArray(d.words)&&d.words.length>0,'词库不能为空');d.words.forEach(function(word){require(typeof word==='string'&&word.trim().length>0&&word.length<=20,'词语应为 1–20 个字');});words=d.words;}
+ s={phase:'drawing',round:0,players:d.players.map(function(id){return {id:id,name:byId[id].name,score:0};}),words:words,remaining:[],history:[],seconds:d.seconds,total:d.players.length*d.cycles};startRound();
+}else if(e.action==='draw'){
+ require(s.phase==='drawing'&&ctx.now<s.deadline&&e.actorId===s.painter,'只有当前回合的画手能修改画作');require(d.round===s.round,'回合已变化');require(Number.isInteger(d.seq)&&d.seq>s.canvasVersion,'画作版本已变化，请读取当前画作');
+ validateStrokes(d.strokes);s.strokes=d.strokes;s.canvasVersion=d.seq;s.pendingWake=ctx.now+1800;
+}else if(e.action==='guess'){
+ require(s.phase==='drawing'&&ctx.now<s.deadline&&isPlayer(e.actorId)&&e.actorId!==s.painter,'当前不能猜题');require(s.strokes.length>0,'请等待画手落笔');require(d.round===s.round&&d.canvasVersion===s.canvasVersion,'画作已变化，请查看最新画作');require(typeof d.text==='string'&&d.text.trim().length>0&&d.text.length<=40,'请输入简短的猜测');
+ if(byId[e.actorId].kind==='agent')require(s.guessedVersions[e.actorId]!==s.canvasVersion,'本版画作已猜过，请等待新画作');
+ s.guessedVersions[e.actorId]=s.canvasVersion;var text=d.text.trim();s.guesses.push({actorId:e.actorId,text:text,version:s.canvasVersion});messages.push({text:text,senderId:e.actorId});
+ if([s.word].concat(aliases[s.word]||[]).some(function(a){return clean(a)===clean(text);}))finishRound(e.actorId);
+}else if(e.action==='skip'){
+ require(s.phase==='drawing'&&(e.actorId===s.painter||e.actorId===ctx.ownerId||e.actorId==='user:local'),'只有画手或发起人可以跳过');finishRound(null);
+}else if(e.action==='stop'){
+ manage();require(s.phase&&s.phase!=='finished','对局尚未开始');s.phase='finished';s.pendingWake=null;release=true;announce('你画我猜已结束。');
+}else if(e.action==='next'){
+ manage();require(s.phase==='result','本题尚未结束');startRound();
+}else if(e.action==='timer'){
+ if(s.phase==='drawing'){
+  if(ctx.now>=s.deadline)finishRound(null);
+  else if(s.pendingWake!==null&&ctx.now>=s.pendingWake){s.pendingWake=null;if(s.strokes.length)notify(s.players.filter(function(p){return p.id!==s.painter&&s.guessedVersions[p.id]!==s.canvasVersion;}).map(function(p){return p.id;}),'画作已更新，请读取本局小程序看图猜词，只提交一个猜测。');}
+ }else if(s.phase==='result'&&ctx.now>=s.nextAt)startRound();
+}else throw new Error('不支持的游戏操作');
+if(release)host.call('replies.release',{});
+else if(s.phase==='drawing'||s.phase==='result'){
+ var controls={};members.forEach(function(m){if(m.kind==='agent')controls[m.id]=s.phase==='drawing'&&isPlayer(m.id)&&(m.id===s.painter?s.canvasVersion===0:s.canvasVersion>0&&s.guessedVersions[m.id]!==s.canvasVersion);});host.call('replies.set',{states:controls});
+}
+messages.forEach(function(message){host.call('messages.send',message);});
+var at=null;if(s.phase==='drawing')at=s.pendingWake===null?s.deadline:Math.min(s.deadline,s.pendingWake);else if(s.phase==='result')at=s.nextAt;host.call('timer.set',{at:at});
+var privateViews={},protocol='你在参加群聊你画我猜，主持人是小程序系统，不需要任何 AI 主持。先 readHtmlProgram，按自己的角色操作。画手私密视图含 word，绝不发出词语或文字提示；用 submitHtmlProgramEvent action:draw data:{round,seq:canvasVersion+1,strokes:[{color:"#25252b",width:8,points:[[x,y],...]}]} 画图。画布为 768×768，坐标 x/y 是 0–1 的归一化位置，每项是一条连续圆头笔画，可画多条曲线或单点；尽量用清楚简洁的图形表达题目，不要写字。猜题者读取状态时会收到画作图片；根据图片提交 action:guess data:{round,canvasVersion,text:"一个简短中文名词"}，不要用 sendGroupMessage 重复发言，也不需要解释。每版画作只猜一次，未猜中就等待下一次唤醒，不要轮询。版本冲突时重新读实际状态再决定；结束后停止操作。不支持看图的模型不要凭空猜测。';
+if(s.players)s.players.forEach(function(p){privateViews[p.id]={protocol:protocol,isPainter:p.id===s.painter,word:p.id===s.painter&&s.phase==='drawing'?s.word:null};});
+return {state:s,view:{phase:s.phase||'setup',round:s.round||0,total:s.total||0,players:s.players||[],painter:s.painter||null,deadline:s.deadline||null,canvasVersion:s.canvasVersion||0,canvas:{width:768,height:768,background:'#ffffff',strokes:s.strokes||[]},guesses:s.guesses||[],answer:s.phase==='result'||s.phase==='finished'?s.word:null,history:s.history||[],taskProgress:s.players?{id:'draw:'+ctx.messageId,title:'你画我猜',steps:Array.from({length:s.total},function(_,i){return {step:'第'+(i+1)+'题 · '+s.players[i%s.players.length].name,status:i<s.history.length?'completed':i===s.round-1&&s.phase==='drawing'?'in_progress':s.phase==='finished'?'skipped':'pending',description:i<s.history.length?s.history[i].word:''};})}:null},privateViews:privateViews};
+</script>
+<main class="aurai-ui aurai-stack" id="game">
+ <header><h1>你画我猜</h1><span id="progress" class="aurai-muted"></span></header>
+ <section id="template" class="welcome"><h2>轮流画画，一起猜</h2><p class="aurai-muted">系统主持 · 群成员参与<br>在群聊中发送此小程序即可开局</p></section>
+ <form id="setup" class="aurai-stack" hidden>
+  <p class="aurai-muted">群成员轮流画画，先猜中得 3 分，画手得 2 分。</p><div id="members" class="members"></div>
+  <div class="aurai-row"><label class="aurai-field">每题时间<select id="seconds"><option value="60">60 秒</option><option value="90" selected>90 秒</option><option value="120">120 秒</option><option value="180">180 秒</option></select></label><label class="aurai-field">每人画几题<select id="cycles"><option value="1">1 题</option><option value="2">2 题</option><option value="3">3 题</option></select></label></div>
+  <details><summary>词库</summary><div class="aurai-stack"><label class="aurai-field"><span class="aurai-muted">留空使用内置词库，一行一个词</span><textarea id="words" rows="4" placeholder="苹果&#10;雨伞&#10;自行车"></textarea></label><button id="makeWords" class="aurai-button" type="button">让默认模型出词</button></div></details>
+  <button id="start" class="aurai-button aurai-button--primary" type="submit">开始游戏</button>
+ </form>
+ <section id="play" class="aurai-stack" hidden>
+  <div class="topic-row"><div><span class="aurai-muted" id="role"></span><h2 id="topic"></h2></div><span class="aurai-muted" id="clock"></span></div>
+  <div class="paper" data-aurai-gestures="exclusive"><canvas id="canvas" width="768" height="768" aria-label="共享画板"></canvas><span id="paperHint"></span></div>
+  <div id="toolbar" class="toolbar" hidden><div class="palette" id="palette"></div><div class="tools">
+   <button type="button" class="icon-button" id="width" aria-label="调整画笔粗细"><span class="width-dot"></span></button>
+   <button type="button" class="icon-button" id="eraser" aria-label="橡皮" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="m13 3 8 8-10 10H7l-5-5L13 3Z M7 11l8 8 M11 21h11"/></svg></button>
+   <button type="button" class="icon-button" id="undo" aria-label="撤销"><svg viewBox="0 0 24 24"><path d="m9 5-5 5 5 5 M4 10h10a6 6 0 0 1 0 12"/></svg></button>
+   <button type="button" class="icon-button" id="clear" aria-label="清空"><svg viewBox="0 0 24 24"><path d="M4 6h16 M9 6V3h6v3 M6 6l1 15h10l1-15 M10 10v7 M14 10v7"/></svg></button>
+  </div></div>
+  <form id="guessForm" class="aurai-row" hidden><input id="guessText" placeholder="猜猜画的是什么" autocomplete="off" maxlength="40" required><button class="aurai-button aurai-button--primary" id="guessButton" type="submit">猜</button></form>
+  <div class="aurai-row" id="guesses" aria-live="polite"></div><div id="players" class="members"></div>
+  <div class="aurai-row"><button type="button" class="aurai-button" id="skip" hidden>跳过本题</button><button type="button" class="aurai-button aurai-button--primary" id="next" hidden>下一题</button><button type="button" class="aurai-button" id="again" hidden>下一局</button><button type="button" class="aurai-button" id="stop" hidden>结束游戏</button></div>
+ </section>
+</main>
+<style>
+#game{box-sizing:border-box;max-width:640px;margin:auto;padding:16px;gap:16px;color:var(--aurai-text)}
+html[data-aurai-display="fullscreen"] #game{padding-top:calc(var(--aurai-host-safe-top-inset,0px) + 12px);padding-bottom:calc(var(--aurai-host-safe-bottom-inset,0px) + 20px)}
+header,.topic-row,.toolbar,.tools{display:flex;align-items:center;justify-content:space-between;gap:12px}header{padding-right:var(--aurai-host-menu-width,0px)}html[data-aurai-display="fullscreen"] header{padding-right:var(--aurai-host-right-inset,0px);min-height:56px}
+h1{font-size:24px;line-height:1.4}h2{font-size:22px;line-height:1.4}.welcome{text-align:center;padding:48px 0;display:flex;flex-direction:column;gap:16px}.welcome p{line-height:1.8}
+.members{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:12px}.member{padding:8px 4px;border:1px solid transparent;border-radius:16px;background:transparent;color:var(--aurai-text);display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;min-width:0}.member img,.avatar{width:44px;height:44px;border-radius:50%;object-fit:cover}.avatar{display:grid;place-items:center;background:var(--aurai-field)}.member strong{font-weight:500;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.member span{color:var(--aurai-muted)}.member[aria-pressed=true],.member.current{background:var(--aurai-field);border-color:var(--aurai-accent)}
+#setup .aurai-field{flex:1}details>div{margin-top:12px}summary{cursor:pointer;color:var(--aurai-muted)}
+.paper{position:relative;border:1px solid var(--aurai-border);background:#fff;border-radius:24px;overflow:hidden;line-height:0;width:100%;aspect-ratio:1;max-width:min(100%,52vh);align-self:center}canvas{display:block;width:100%;height:100%;touch-action:none}#paperHint{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;color:#a0a0a0;font-size:14px;line-height:1.5}
+.toolbar{flex-wrap:wrap;justify-content:center}.palette,.tools{display:flex;gap:7px}.palette button{width:30px;height:30px;border-radius:50%;border:3px solid transparent;background:var(--color);background-clip:padding-box;padding:0}.palette button[aria-pressed=true]{outline:1.5px solid var(--aurai-text);outline-offset:2px}
+.icon-button{width:38px;height:38px;border:0;border-radius:50%;background:var(--aurai-field);color:var(--aurai-text);display:grid;place-items:center;padding:7px}.icon-button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}.icon-button[aria-pressed=true]{background:var(--aurai-accent);color:var(--aurai-on-accent)}.width-dot{width:8px;height:8px;background:currentColor;border-radius:50%}#guessForm input{flex:1;width:0;min-width:80px}.guess{padding:6px 10px;border-radius:12px;background:var(--aurai-field);font-size:13px}.guess span{color:var(--aurai-muted);margin-right:6px}
+</style>
+<script>
+(()=>{
+ const $=id=>document.getElementById(id),ctx=$('canvas').getContext('2d'),colors=['#25252b','#e25d6a','#e5a640','#53a882','#5b91d4','#9475ce'],sizes=[4,8,14];
+ let s=AuraiHTML.messageState,host=s._miniapp,selected=new Set(),roster='',busy=false,generating=false,color=colors[0],size=0,eraser=false,stroke=null,pointer=null,draft=[],localRound=null,localSeq=0,publishedSeq=0,sending=false,flushTimer=null;
+ const canManage=()=>host&&(host.viewerId===host.ownerId||host.viewerId==='user:local');
+ const canDraw=()=>host&&s.phase==='drawing'&&host.viewerId===s.painter;
+ function text(tag,value,className){const el=document.createElement(tag);el.textContent=value;if(className)el.className=className;return el;}
+ function member(m,score){const el=document.createElement('button');el.type='button';el.className='member';if(m.avatar){const img=document.createElement('img');img.src=m.avatar;img.alt='';el.append(img);}else el.append(text('span',m.name.slice(0,1),'avatar'));el.append(text('strong',m.name));if(score!==undefined)el.append(text('span',score+' 分'));return el;}
+ function paint(p){ctx.strokeStyle=p.color;ctx.fillStyle=p.color;ctx.lineWidth=p.width;ctx.lineCap='round';ctx.lineJoin='round';if(p.points.length===1){ctx.beginPath();ctx.arc(p.points[0][0]*768,p.points[0][1]*768,p.width/2,0,Math.PI*2);ctx.fill();return;}ctx.beginPath();p.points.forEach(([x,y],i)=>i?ctx.lineTo(x*768,y*768):ctx.moveTo(x*768,y*768));ctx.stroke();}
+ function redraw(){ctx.fillStyle='#fff';ctx.fillRect(0,0,768,768);(canDraw()?draft:s.canvas?.strokes||[]).forEach(paint);if(stroke)paint(stroke);}
+ function render(){
+  s=AuraiHTML.messageState;host=s._miniapp;
+  if(localRound!==s.round){localRound=s.round;draft=JSON.parse(JSON.stringify(s.canvas?.strokes||[]));localSeq=s.canvasVersion||0;publishedSeq=localSeq;stroke=null;pointer=null;clearTimeout(flushTimer);}
+  if(!canDraw()||!sending&&localSeq===publishedSeq){draft=JSON.parse(JSON.stringify(s.canvas?.strokes||[]));localSeq=s.canvasVersion||0;publishedSeq=localSeq;}
+  const setup=s.phase==='setup',playing=!!host&&!setup;
+  $('template').hidden=!!host;$('setup').hidden=!host||!setup;$('play').hidden=!playing;$('progress').textContent=playing?`${s.round} / ${s.total}`:'';
+  if(host&&setup){const key=JSON.stringify(host.members.map(m=>[m.id,m.name,m.avatar]));if(key!==roster){roster=key;if(!selected.size)host.members.forEach(m=>selected.add(m.id));$('members').replaceChildren(...host.members.map(m=>{const el=member(m);el.setAttribute('aria-pressed',String(selected.has(m.id)));el.onclick=()=>{selected.has(m.id)?selected.delete(m.id):selected.add(m.id);el.setAttribute('aria-pressed',String(selected.has(m.id)));$('start').disabled=busy||generating||selected.size<2;};return el;}));}$('start').disabled=busy||generating||selected.size<2||!canManage();}
+  if(playing){const painter=host.members.find(m=>m.id===s.painter);$('role').textContent=s.phase==='finished'?'对局结束':s.phase==='result'?'本题结束':canDraw()?'你的题目 · 只让自己看见':painter.name+'正在画';$('topic').textContent=s.phase==='finished'?'最终成绩':s.answer||(canDraw()?host.own.word:'猜猜画的是什么');$('toolbar').hidden=!canDraw();$('paperHint').hidden=!!(canDraw()?draft.length:s.canvas.strokes.length)||!!stroke;$('paperHint').textContent=canDraw()?'在这里画，别写出答案':'等画手落笔';$('canvas').style.touchAction=canDraw()?'none':'pan-y';$('guessForm').hidden=s.phase!=='drawing'||canDraw()||!s.players.some(p=>p.id===host.viewerId);$('guessButton').disabled=busy||!s.canvas.strokes.length;$('skip').hidden=s.phase!=='drawing'||!canDraw()&&!canManage();$('next').hidden=s.phase!=='result'||!canManage();$('again').hidden=s.phase!=='finished'||!canManage();$('stop').hidden=s.phase==='finished'||!canManage();$('guesses').replaceChildren(...s.guesses.slice(-8).map(g=>{const el=text('div','','guess');el.append(text('span',host.members.find(m=>m.id===g.actorId).name),text('b',g.text));return el;}));$('players').replaceChildren(...s.players.map(p=>{const m=host.members.find(m=>m.id===p.id),el=member(m,p.score);el.classList.toggle('current',p.id===s.painter&&s.phase==='drawing');el.onclick=()=>AuraiHTML.openProfile(p.id);return el;}));}
+  $('eraser').setAttribute('aria-pressed',String(eraser));$('width').firstElementChild.style.width=$('width').firstElementChild.style.height=sizes[size]+'px';$('undo').disabled=!draft.length;$('clear').disabled=!draft.length;
+  for(const b of $('palette').children)b.setAttribute('aria-pressed',String(b.dataset.color===color&&!eraser));for(const id of ['skip','next','again','stop'])$(id).disabled=busy;
+  redraw();clock();AuraiHTML.requestResize();
+ }
+ function clock(){$('clock').textContent=s.phase==='drawing'?Math.max(0,Math.ceil((s.deadline-Date.now())/1000))+' 秒':'';}
+ async function submit(action,data){if(busy)return;busy=true;render();try{await AuraiHTML.submitEvent({eventId:crypto.randomUUID(),action,data,notifyAi:false});}finally{busy=false;render();}}
+ async function flush(){
+  if(sending||localSeq===publishedSeq||!canDraw())return;const round=s.round,seq=localSeq,strokes=JSON.parse(JSON.stringify(draft));sending=true;let done=false;
+  try{await AuraiHTML.submitEvent({eventId:crypto.randomUUID(),action:'draw',data:{round,seq,strokes},notifyAi:false});if(localRound===round)publishedSeq=seq;done=true;}
+  finally{sending=false;if(done&&localRound===round&&localSeq!==publishedSeq)void flush();render();}
+ }
+ function edited(){localSeq++;clearTimeout(flushTimer);flushTimer=setTimeout(()=>void flush(),350);redraw();$('paperHint').hidden=draft.length>0;$('undo').disabled=!draft.length;$('clear').disabled=!draft.length;}
+ const point=e=>{const r=$('canvas').getBoundingClientRect();return [Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))];};
+ $('canvas').onpointerdown=e=>{if(!canDraw()||pointer!==null)return;e.preventDefault();pointer=e.pointerId;$('canvas').setPointerCapture(pointer);stroke={color:eraser?'#ffffff':color,width:eraser?32:sizes[size],points:[point(e)]};paint(stroke);$('paperHint').hidden=true;};
+ $('canvas').onpointermove=e=>{if(e.pointerId!==pointer)return;e.preventDefault();const p=point(e),last=stroke.points.at(-1);if(Math.hypot(p[0]-last[0],p[1]-last[1])<.001)return;stroke.points.push(p);paint({...stroke,points:[last,p]});};
+ function finish(){if(!stroke)return;draft.push(stroke);stroke=null;pointer=null;edited();}
+ $('canvas').onpointerup=finish;$('canvas').onpointercancel=finish;$('canvas').onlostpointercapture=finish;
+ colors.forEach((value,i)=>{const b=document.createElement('button');b.type='button';b.style.setProperty('--color',value);b.dataset.color=value;b.setAttribute('aria-label',['黑色','红色','黄色','绿色','蓝色','紫色'][i]);b.onclick=()=>{color=value;eraser=false;render();};$('palette').append(b);});
+ $('width').onclick=()=>{size=(size+1)%sizes.length;render();};$('eraser').onclick=()=>{eraser=!eraser;render();};$('undo').onclick=()=>{draft.pop();edited();};$('clear').onclick=()=>{draft=[];edited();};
+ $('setup').onsubmit=e=>{e.preventDefault();const words=$('words').value.trim();void submit('configure',{players:[...selected],seconds:Number($('seconds').value),cycles:Number($('cycles').value),...(words?{words:words.split(/\n/).map(v=>v.trim()).filter(Boolean)}:{})});};
+ $('makeWords').onclick=async()=>{generating=true;$('makeWords').disabled=true;$('makeWords').textContent='正在出词…';render();try{const result=await AuraiHTML.ai.complete({messages:[{role:'user',content:'为你画我猜生成40个适合画图表达的具体物品、动物或食物，2到5个汉字，难度混合，不要抽象概念或重复。返回JSON对象 {"words":["词语"]}。'}],responseFormat:'json'});if(!Array.isArray(result.json.words)||!result.json.words.length||result.json.words.some(w=>typeof w!=='string'||!w.trim()||w.length>20))throw new Error('模型返回的词库无效');$('words').value=result.json.words.join('\n');}finally{generating=false;$('makeWords').disabled=false;$('makeWords').textContent='让默认模型出词';render();}};
+ $('guessForm').onsubmit=async e=>{e.preventDefault();const value=$('guessText').value.trim();await submit('guess',{round:s.round,canvasVersion:s.canvasVersion,text:value});$('guessText').value='';};
+ $('skip').onclick=()=>submit('skip',{});$('next').onclick=()=>submit('next',{});$('stop').onclick=()=>submit('stop',{});$('again').onclick=()=>AuraiHTML.startNextSession();
+ document.addEventListener('aurai:messageupdate',render);document.addEventListener('aurai:pause',()=>{finish();clearTimeout(flushTimer);void flush();});setInterval(clock,1000);render();
+})();
+</script>

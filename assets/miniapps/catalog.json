@@ -16,5 +16,14 @@
     "asset": "assets/miniapps/werewolf.html",
     "iconAsset": "assets/miniapps/icons/werewolf.png",
     "version": "33e3ca9edfe315b7732765e8bcf0ef8b45efc675058bc141f4a3308910e5e255"
+  },
+  {
+    "id": "builtin.draw-guess",
+    "title": "你画我猜",
+    "description": "系统主持的群聊小游戏。群成员轮流画画和猜题，题目仅画手可见，自动计分和轮换。默认模型只用于可选出题。",
+    "publisherId": "user:local",
+    "asset": "assets/miniapps/draw-guess.html",
+    "iconAsset": "assets/miniapps/icons/draw-guess.png",
+    "version": "40903c3b5f2c2c2822dcfff0bf9e99b38117ff73579bbfe21e2970b56231dd51"
   }
 ]

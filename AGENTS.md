@@ -11,6 +11,15 @@
 - 顶部圆形操作按钮的液态玻璃效果复用汉堡菜单使用的 `GlassSurface` 与 `RoundAction`，设置页优先使用 `SettingsGlassAction`。
 - 同一 AppBar 右侧同时出现两个或多个相邻操作时，必须放进同一个 `SettingsGlassActionSurface`，内部使用 `RoundAction` 和 `VerticalDivider` 拼接，禁止显示为多个分离的玻璃圆按钮。
 
+## 插画头像规范
+
+- 新增插画头像使用 imagegen，生成前先查看 `assets/avatars/` 中现有头像作为风格参考，例如 `baby_tiger.webp`、`fox.webp`、`magician_pig.webp`；插画头像沿用现有圆润、亲切的 3D 卡通质感，与界面线稿图标分开处理。
+- 使用方形画布、真正透明的背景，不绘制圆角底板、背景场景、文字或水印。主体为大头半身像，脸部突出，毛发或材质细腻，光线柔和；保留物种特征，避免照搬已有影视角色。
+- 动作、表情和职业服饰须在小尺寸下清晰可辨；脸、耳朵、帽子与关键动作留出边缘余量，兼顾圆形头像裁切，不用繁杂配件抢占主体。
+- 先展示生成预览，用户确认后再保存原图和项目资源，不提前替换或接入头像。原始 PNG 保存到 `C:/Users/luoki/Desktop/Docs/Work/Haiskynology/Aurai/avatars/`，压缩后的 WebP 保存到项目 `assets/avatars/`，使用一致的英文下划线文件名。
+- WebP 沿用现有头像的 512 × 512 尺寸，保持透明通道；压缩后检查毛发边缘、面部和动作细节，无黑白底或明显压缩瑕疵。未经要求不覆盖已有头像。
+- 接入新头像时，同时登记 `lib/src/domain/avatar_portraits.dart` 的图片资源与 `lib/src/features/chat/avatar_symbol.dart` 的 `avatarSymbols` 选择列表；仅添加资源不会让头像出现在头像库中。需要调整圆形裁切时沿用 `avatarPortraitScales`，小程序成员头像复用现有头像渲染入口。
+
 ## 弹框按钮
 
 - 新增或修改弹框前，先检查现有项目弹框组件；业务代码禁止使用 `AlertDialog`、`SimpleDialog`、`CupertinoAlertDialog` 或自行拼装系统默认弹框。

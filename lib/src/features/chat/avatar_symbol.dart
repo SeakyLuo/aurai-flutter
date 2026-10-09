@@ -29,6 +29,7 @@ const avatarSymbols = <String, String>{
   'portrait:polar_bear': '白熊',
   'portrait:lion': '小狮子',
   'portrait:baby_tiger': '小老虎',
+  'portrait:cheetah_police': '猎豹警官',
   'portrait:schnauzer': '雪纳瑞',
   'portrait:capybara': '水豚',
   'portrait:lizard': '树袋熊',

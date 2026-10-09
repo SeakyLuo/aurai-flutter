@@ -16,6 +16,7 @@ const miniappProgramGuide =
     'Effects commit with state in host order: nicknames, reply control, card submission, card closure, messages, then state/timer. Call order does not change this order. '
     'Example: host.call("messages.send",{text:"Ready"}); return {state:ctx.state,view:{phase:"ready"},privateViews:{}}. '
     'state is host-only; view is public; privateViews maps authenticated member IDs to their permitted data. '
+    'Shared drawings may expose view.canvas={width:positiveInteger,height:positiveInteger,background:"#ffffff",strokes:[{color:"#25252b",width:positiveNumber,points:[[x,y],...]}]}. Coordinates are normalized to 0–1; brush widths are logical pixels. readHtmlProgram renders this public projection into a PNG image attachment and replaces stroke coordinates in its text result with canvas metadata. The WebView still receives the original strokes. Keep answers and private drawing prompts in privateViews, never in the public canvas projection. '
     'Never place identities, secret actions or private results in view, HTML or shared values. '
     'The page reads AuraiHTML.messageState and its _miniapp={viewerId,ownerId,members,own,cards}; '
     'the host strips the reducer before rendering and does not save shared image previews for these messages. '

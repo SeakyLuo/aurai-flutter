@@ -2,6 +2,7 @@ import 'html_app_data_tool.dart';
 import '../domain/tool_models.dart';
 import 'html_message_source.dart';
 import '../html_games/html_message_components.dart';
+import '../html_games/miniapp_canvas_image.dart';
 
 class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
   HtmlMessageUpdateTool(this.name, this.invoke);
@@ -131,11 +132,16 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
       final args = name == 'updateHtmlMessage'
           ? await HtmlMessageSource.resolve(call.arguments, creating: false)
           : call.arguments;
+      final output = await invoke(name, args);
+      final attachments = name == 'readHtmlProgram'
+          ? await miniappCanvasAttachments(output)
+          : const <ToolAttachment>[];
       return ToolResult(
         callId: call.id,
         toolName: name,
         status: ToolResultStatus.success,
-        output: await invoke(name, args),
+        output: output,
+        attachments: attachments,
       );
     } on Object catch (error) {
       return ToolResult(
