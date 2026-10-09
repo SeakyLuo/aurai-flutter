@@ -29,7 +29,7 @@ import java.util.concurrent.Executors
 class HtmlViewFactory(private val messenger: BinaryMessenger) : PlatformViewFactory(StandardMessageCodec.INSTANCE) {
     override fun create(context: Context, viewId: Int, args: Any?): PlatformView {
         val values = args as Map<*, *>
-        return HtmlView(context, messenger, viewId, values)
+        return HtmlView(context, messenger, (values["channelId"] as Int?) ?: viewId, values)
     }
 }
 

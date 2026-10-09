@@ -129,7 +129,7 @@ class QuestionBatchForm extends StatelessWidget {
       final selected = (answer['selected'] as List? ?? const []).toSet();
       final text = answer['text'] as String? ?? '';
       final multiple = question['mode'] == 'multiple';
-      final collapsed = compact && readOnly && !hasRichOptions(options);
+      final collapsed = compact && readOnly;
       final firstMissing = questions.indexWhere(
         (q) => !controller.batch.accepts(
           q,
@@ -191,20 +191,17 @@ class QuestionBatchForm extends StatelessWidget {
                 child: QuestionResponse(
                   recipient: recipient,
                   onOpenMember: onOpenMember,
-                  child: text.isNotEmpty && answer['skipped'] != true
-                      ? InteractionTextPreview(
-                          text: text,
-                          onShowDetails: () => _details(context),
-                        )
-                      : Text(
-                          answer['skipped'] == true
-                              ? '已跳过'
-                              : options
-                                    .where((o) => selected.contains(o['id']))
-                                    .map((o) => o['label'])
-                                    .join('、'),
-                          style: const TextStyle(fontSize: 15, height: 1.5),
-                        ),
+                  child: InteractionTextPreview(
+                    text: answer['skipped'] == true
+                        ? '已跳过'
+                        : text.isNotEmpty
+                        ? text
+                        : options
+                              .where((o) => selected.contains(o['id']))
+                              .map((o) => o['label'])
+                              .join('、'),
+                    onShowDetails: () => _details(context),
+                  ),
                 ),
               ),
           ] else ...[
@@ -249,7 +246,7 @@ class QuestionBatchForm extends StatelessWidget {
             ),
             if (readOnly && (text.isNotEmpty || answer['skipped'] == true))
               QuestionResponse(
-                recipient: recipient,
+                recipient: compact && !scrollable ? recipient : null,
                 onOpenMember: onOpenMember,
                 child: Text(
                   answer['skipped'] == true ? '已跳过' : text,

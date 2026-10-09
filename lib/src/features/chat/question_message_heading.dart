@@ -87,7 +87,7 @@ class QuestionMessageHeading extends StatelessWidget {
             ),
           ),
         ],
-        if (status != '已回答')
+        if (sheetHeader || status != '已回答')
           if (recipient case final person?) ...[
             const SizedBox(height: 16),
             Row(

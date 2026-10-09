@@ -175,6 +175,7 @@ class QuestionAnswerContent extends StatelessWidget {
     this.onSelect,
     this.onChooseOptions,
     this.compactOptions = false,
+    this.optionPrefix,
     this.multiple = false,
     this.footer,
     this.showQuestion = true,
@@ -189,6 +190,7 @@ class QuestionAnswerContent extends StatelessWidget {
   final ValueChanged<int>? onSelect;
   final VoidCallback? onChooseOptions;
   final bool compactOptions, multiple;
+  final String? optionPrefix;
   final Widget? footer;
   final bool showQuestion;
   final bool allowCustomAnswer;
@@ -230,6 +232,7 @@ class QuestionAnswerContent extends StatelessWidget {
         if (rich)
           RichOptionCarousel(
             options: choices,
+            optionPrefix: optionPrefix,
             selected: marked,
             multiple: multiple,
             onSelect: onSelect == null
@@ -252,6 +255,7 @@ class QuestionAnswerContent extends StatelessWidget {
               child: UserQuestionOptionTile(
                 option: option,
                 number: index + 1,
+                optionPrefix: optionPrefix,
                 selected: marked.contains(index),
                 multiple: multiple,
                 onTap: index == options.length

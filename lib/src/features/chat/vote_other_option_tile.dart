@@ -13,11 +13,13 @@ class VoteOtherOptionTile extends StatelessWidget {
     required this.onEdit,
     required this.onToggle,
     this.fontSize,
+    this.optionPrefix,
   });
 
   final String text;
   final bool selected, multiple;
   final int number;
+  final String? optionPrefix;
   final double? fontSize;
   final VoidCallback? onEdit, onToggle;
 
@@ -27,6 +29,7 @@ class VoteOtherOptionTile extends StatelessWidget {
         ? const UserQuestionOption(content: '其他')
         : UserQuestionOption(title: '其他', content: text),
     number: number,
+    optionPrefix: optionPrefix,
     multiple: multiple,
     vote: true,
     selected: selected,

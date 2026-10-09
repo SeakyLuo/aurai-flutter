@@ -29,6 +29,7 @@ class InteractionContent extends StatelessWidget {
     this.pendingButtonId,
     required this.onClick,
     this.question = false,
+    this.questionHeading,
     this.statusInHeading = false,
     required this.compactOptions,
     required this.title,
@@ -49,6 +50,7 @@ class InteractionContent extends StatelessWidget {
   final String? busy;
   final String? pendingButtonId;
   final bool question;
+  final Widget? questionHeading;
   final bool statusInHeading;
   final bool compactOptions;
   final bool fullSheet;
@@ -175,6 +177,7 @@ class InteractionContent extends StatelessWidget {
                 ),
           button: button,
           question: question,
+          questionHeading: questionHeading,
           anonymous: view['anonymous'] == true,
           voteStatus: question
               ? null

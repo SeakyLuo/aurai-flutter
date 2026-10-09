@@ -369,7 +369,7 @@ extension AiIdentityController on ChatController {
   Future<void> addAiFriend(
     AiProfile ai, {
     bool create = false,
-    bool notifyFriend = true,
+    bool notifyFriend = false,
   }) async {
     final savedDraft = await _newDraftStore.load(
       _imageStore.directory,

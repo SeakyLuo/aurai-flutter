@@ -37,6 +37,18 @@
         <service android:name=".DocumentService" android:process=":documents" android:exported="false" />
         <service android:name=".AndroidScriptService" android:process=":device_script" android:exported="false" />
         <activity
+            android:name=".MiniappTaskActivity"
+            android:exported="false"
+            android:launchMode="standard"
+            android:documentLaunchMode="intoExisting"
+            android:taskAffinity="com.haiskynology.aurai.miniapp"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme" />
+        </activity>
+        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"

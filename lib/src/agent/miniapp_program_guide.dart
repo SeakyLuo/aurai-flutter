@@ -41,7 +41,7 @@ const miniappProgramGuide =
     'For explicit instance data maintenance, readHtmlData/updateHtmlData read and replace {state,view,privateViews} atomically with version checking. Authors and members whose private view has canEditData:true can edit directly; others request user approval. Keep all projections consistent, preserve secrets and use normal program events for gameplay. '
     'State, card effects and replies commit atomically. Validate actors, phase and legal choices in the reducer; '
     'event IDs deduplicate retries. Human submitEvent runs the program first; it does not automatically wake an AI. '
-    'The program decides which messages/cards wake which AI. AI can read its own projection with readHtmlProgram '
+    'The program decides which messages/cards wake which AI. Use the current runtime-provided projection, or readHtmlProgram when missing/stale, '
     'and return allowed events with submitHtmlProgramEvent (version checked), or use clickInteractiveMessage '
     'on its assigned native card. To end and resume an AI speech, use an explicit completion card/event, '
     'call replies.set and wake the next permitted speaker. Do not introduce a referee or expose private data '

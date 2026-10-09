@@ -16,6 +16,7 @@ import 'vote_message_heading.dart';
 import 'vote_selection_hint.dart';
 import 'question_message_heading.dart';
 import 'question_response.dart';
+import 'interaction_text_preview.dart';
 import 'question_batch_card.dart';
 import 'dart:convert';
 import 'dart:async';
@@ -296,9 +297,10 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
         : null;
     final showRecipient =
         question &&
-        (widget.showQuestionRecipient ||
+        (widget.fullSheet ||
+            widget.showQuestionRecipient ||
             recipientId != MessageSender.localUser.id);
-    final recipient = !showRecipient
+    final recipient = !question
         ? null
         : recipientId == MessageSender.localUser.id
         ? MessageSender.localUser
@@ -397,7 +399,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
       title: card.title,
       description: card.body,
       multiple: multiple,
-      recipient: recipient,
+      recipient: sheet || showRecipient ? recipient : null,
       status: answered
           ? '已回答'
           : card.closed
@@ -424,31 +426,28 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
               padding: const EdgeInsets.only(top: 8, bottom: 16),
               child: questionHeading(sheet: true),
             ),
-            child: QuestionResponse(
-              recipient: recipient,
-              onOpenMember: widget.onOpenMember,
-              child: config == null
-                  ? Text(
-                      answer!['label'] as String,
-                      style: const TextStyle(fontSize: 15, height: 1.5),
-                    )
-                  : QuestionAnswerContent(
-                      question: card.body,
-                      showQuestion: false,
-                      options: [
-                        for (final option in config.options)
-                          UserQuestionOption.fromSelection(option),
-                      ],
-                      selected: {
-                        for (final (index, option) in config.options.indexed)
-                          if ((answer!['selections'] as List).any(
-                            (selected) => selected['optionId'] == option['id'],
-                          ))
-                            index,
-                      },
-                      multiple: config.multiple,
-                    ),
-            ),
+            child: config == null
+                ? Text(
+                    answer!['label'] as String,
+                    style: const TextStyle(fontSize: 15, height: 1.5),
+                  )
+                : QuestionAnswerContent(
+                    question: card.body,
+                    showQuestion: false,
+                    options: [
+                      for (final option in config.options)
+                        UserQuestionOption.fromSelection(option),
+                    ],
+                    selected: {
+                      for (final (index, option) in config.options.indexed)
+                        if ((answer!['selections'] as List).any(
+                          (selected) => selected['optionId'] == option['id'],
+                        ))
+                          index,
+                    },
+                    multiple: config.multiple,
+                    optionPrefix: config.optionPrefix,
+                  ),
           ),
         ),
       );
@@ -478,6 +477,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                 ? openAnsweredQuestion
                 : widget.onStatistics,
             question: question,
+            questionHeading: question ? questionHeading(sheet: true) : null,
             compactOptions: question || vote,
             fullSheet: widget.fullSheet,
             showTextDetails: statisticsVisible,
@@ -640,9 +640,21 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
             const SizedBox(height: 16),
             if (sharedView != null)
               QuestionResponse(
-                recipient: compactAnswered ? recipient : null,
+                recipient: compactAnswered && showRecipient ? recipient : null,
                 onOpenMember: widget.onOpenMember,
-                child: interaction!,
+                child: compactAnswered
+                    ? InteractionTextPreview(
+                        text:
+                            selectionEntries(Map<String, Object?>.from(answer))
+                                .map(
+                                  (entry) => entry['text'] == null
+                                      ? entry['label'] as String
+                                      : '${entry['label']}：${entry['text']}',
+                                )
+                                .join('、'),
+                        onShowDetails: openAnsweredQuestion,
+                      )
+                    : interaction!,
               )
             else
               InteractiveButtonLayout(

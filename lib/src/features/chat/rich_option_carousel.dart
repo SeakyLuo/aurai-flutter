@@ -9,6 +9,7 @@ import 'image_action_scope.dart';
 import 'message_content_preview.dart';
 import 'pinned_message_page.dart';
 import 'question_option_appearance.dart';
+import 'selection_option_prefix.dart';
 import 'question_sheet.dart';
 import 'settings_icon.dart';
 import 'unavailable_image.dart';
@@ -26,6 +27,7 @@ class RichOptionCarousel extends StatefulWidget {
     this.maximum = 25,
     this.captions,
     this.numbers,
+    this.optionPrefix,
   });
   final List<UserQuestionOption> options;
   final Set<int> selected;
@@ -34,6 +36,7 @@ class RichOptionCarousel extends StatefulWidget {
   final int maximum;
   final List<String>? captions;
   final List<int>? numbers;
+  final String? optionPrefix;
 
   @override
   State<RichOptionCarousel> createState() => _RichOptionCarouselState();
@@ -274,14 +277,22 @@ class _RichOptionCarouselState extends State<RichOptionCarousel> {
                                 ),
                                 child: Row(
                                   children: [
-                                    Text(
-                                      '${widget.numbers?[index] ?? index + 1}',
-                                      style: TextStyle(
-                                        color: selected
-                                            ? accent
-                                            : colors.onSurfaceVariant,
+                                    if (widget.optionPrefix != null)
+                                      SelectionOptionPrefix(
+                                        number:
+                                            widget.numbers?[index] ?? index + 1,
+                                        style: widget.optionPrefix!,
+                                        selected: selected,
+                                      )
+                                    else
+                                      Text(
+                                        '${widget.numbers?[index] ?? index + 1}',
+                                        style: TextStyle(
+                                          color: selected
+                                              ? accent
+                                              : colors.onSurfaceVariant,
+                                        ),
                                       ),
-                                    ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(

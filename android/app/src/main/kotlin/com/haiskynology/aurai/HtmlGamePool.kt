@@ -58,6 +58,17 @@ object HtmlGamePool : ComponentCallbacks2 {
         }
     }
 
+    fun removeSurface(surfaceId: String) {
+        val iterator = pages.entries.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            if (entry.key.second == surfaceId) {
+                entry.value.destroy()
+                iterator.remove()
+            }
+        }
+    }
+
     private fun releaseIdle() {
         underPressure = true
         val iterator = pages.entries.iterator()

@@ -223,6 +223,7 @@ part 'app_assistance_actions.dart';
 part 'peer_conversations.dart';
 part 'interactive_message_actions.dart';
 part 'interactive_ai_decision.dart';
+part 'group_program_context.dart';
 part 'message_callback_actions.dart';
 part 'html_actions.dart';
 part 'miniapp_context_compaction.dart';

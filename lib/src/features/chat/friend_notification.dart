@@ -37,7 +37,7 @@ class AddFriendDialog extends StatefulWidget {
 }
 
 class _AddFriendDialogState extends State<AddFriendDialog> {
-  bool _notifyFriend = true;
+  bool _notifyFriend = false;
 
   @override
   Widget build(BuildContext context) => AppDialog(

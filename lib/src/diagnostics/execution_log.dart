@@ -2,10 +2,25 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:developer' as developer;
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
 
 /// Serialized, rotating JSONL diagnostics; logging failure cannot fail a reply.
 class ExecutionLog {
   static Future<void> _tail = Future.value();
+
+  static void captureFlutterErrors() {
+    final report = FlutterError.onError;
+    FlutterError.onError = (details) {
+      report?.call(details);
+      write({
+        'event': 'flutter_error',
+        'exception': details.exceptionAsString(),
+        'stackTrace': details.stack?.toString(),
+        'library': details.library,
+        'context': details.context?.toDescription(),
+      }, apiKey: '');
+    };
+  }
 
   static Future<void> toolException(
     String tool,

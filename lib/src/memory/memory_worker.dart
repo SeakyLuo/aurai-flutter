@@ -268,10 +268,14 @@ class MemoryWorker {
               },
             );
         responseId = response['id'] as String?;
-        if (response['status'] != 'completed')
-          throw StateError(
-            'Memory consolidation incomplete: ${jsonEncode(response)}',
+        if (response['status'] != 'completed') {
+          final incomplete = response['incomplete_details'] as Map?;
+          final reason = incomplete?['reason'] ?? response['status'];
+          throw ModelProviderException(
+            '记忆整理未完成（$reason），原始记录和已有记忆已保留',
+            detail: jsonEncode(response),
           );
+        }
         changes = (memoryConsolidationTool.read(response)['changes'] as List)
             .map((v) => Map<String, Object?>.from(v as Map))
             .toList();

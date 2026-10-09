@@ -26,6 +26,7 @@ Future<Set<int>?> showQuestionOptionsSheet(
   bool showConfirm = false,
   bool readOnly = false,
   bool vote = false,
+  String? optionPrefix,
   bool anonymous = false,
   String? voteStatus,
   int minimum = 1,
@@ -33,6 +34,7 @@ Future<Set<int>?> showQuestionOptionsSheet(
   Widget? actions,
   String? title,
   String? body,
+  Widget? heading,
   QuestionIconType? headerIcon,
   int? otherIndex,
   String otherText = '',
@@ -61,6 +63,7 @@ Future<Set<int>?> showQuestionOptionsSheet(
         showConfirm: showConfirm,
         readOnly: readOnly,
         vote: vote,
+        optionPrefix: optionPrefix,
         anonymous: anonymous,
         voteStatus: voteStatus,
         minimum: minimum,
@@ -68,6 +71,7 @@ Future<Set<int>?> showQuestionOptionsSheet(
         actions: actions,
         title: title,
         body: body,
+        heading: heading,
         headerIcon: headerIcon,
         otherIndex: otherIndex,
         otherText: otherText,
@@ -182,6 +186,7 @@ class QuestionOptionsSheet extends StatefulWidget {
     required this.readOnly,
     required this.vote,
     this.showConfirm = false,
+    this.optionPrefix,
     required this.anonymous,
     this.voteStatus,
     required this.minimum,
@@ -189,6 +194,7 @@ class QuestionOptionsSheet extends StatefulWidget {
     this.actions,
     this.title,
     this.body,
+    this.heading,
     this.headerIcon,
     this.otherIndex,
     this.otherText = '',
@@ -203,12 +209,14 @@ class QuestionOptionsSheet extends StatefulWidget {
   final bool multiple;
   final bool readOnly;
   final bool vote;
+  final String? optionPrefix;
   final bool showConfirm;
   final bool anonymous;
   final String? voteStatus;
   final int minimum, maximum;
   final Widget? actions;
   final String? title, body;
+  final Widget? heading;
   final QuestionIconType? headerIcon;
   final int? otherIndex;
   final String otherText;
@@ -254,6 +262,7 @@ class _QuestionOptionsSheetState extends State<QuestionOptionsSheet> {
     selected: _selected,
     multiple: widget.multiple,
     maximum: widget.maximum,
+    optionPrefix: widget.optionPrefix,
     onSelect: widget.readOnly || widget.busy
         ? null
         : (index) {
@@ -314,7 +323,12 @@ class _QuestionOptionsSheetState extends State<QuestionOptionsSheet> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (widget.headerIcon != null)
+                  if (widget.heading case final heading?)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: heading,
+                    )
+                  else if (widget.headerIcon != null)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                       child: Row(
@@ -439,10 +453,15 @@ class _QuestionOptionsSheetState extends State<QuestionOptionsSheet> {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       itemCount:
                           (_rich ? 1 : widget.options.length) +
-                          (widget.body?.isNotEmpty == true ? 1 : 0),
+                          (widget.heading == null &&
+                                  widget.body?.isNotEmpty == true
+                              ? 1
+                              : 0),
                       separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
-                        final hasBody = widget.body?.isNotEmpty == true;
+                        final hasBody =
+                            widget.heading == null &&
+                            widget.body?.isNotEmpty == true;
                         if (hasBody && index == 0) {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 4),
@@ -464,6 +483,7 @@ class _QuestionOptionsSheetState extends State<QuestionOptionsSheet> {
                         return UserQuestionOptionTile(
                           option: widget.options[optionIndex],
                           number: optionIndex + 1,
+                          optionPrefix: widget.optionPrefix,
                           selected: selected,
                           multiple: widget.multiple,
                           onTap:
@@ -582,6 +602,7 @@ class _QuestionOptionsSheetState extends State<QuestionOptionsSheet> {
                                 selected: _selected.contains(index),
                                 multiple: widget.multiple,
                                 number: index + 1,
+                                optionPrefix: widget.optionPrefix,
                                 onEdit:
                                     widget.readOnly ||
                                         widget.multiple &&
@@ -612,6 +633,7 @@ class _QuestionOptionsSheetState extends State<QuestionOptionsSheet> {
                             : UserQuestionOptionTile(
                                 option: option,
                                 number: index + 1,
+                                optionPrefix: widget.optionPrefix,
                                 selected: _selected.contains(index),
                                 multiple: widget.multiple,
                                 vote: true,

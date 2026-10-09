@@ -535,7 +535,6 @@ class RecentChatsPageState extends State<RecentChatsPage> {
       controller: widget.controller,
       conversation: item,
       project: _projects[item.projectId],
-      showActivity: !_tasks,
       displayName: item.isPersonalChat ? sender!.displayName : null,
       avatar: group
           ? GroupAvatar(groupId: item.id, members: _groups[item.id]!, size: 48)

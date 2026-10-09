@@ -77,6 +77,7 @@ extension _ChatBody on _ChatPageState {
                                   key: _viewportKey,
                                   entries: timeline,
                                   showScrollbar: true,
+                                  alignShortContentToTop: active.isPersonalChat,
                                   onScrollToLatest: _scrollToBottom,
                                   bookmark: _scrollBookmarks[_conversationId],
                                   followOutput: _followOutput && !_quoteFocused,

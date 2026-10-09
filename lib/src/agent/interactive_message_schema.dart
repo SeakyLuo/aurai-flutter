@@ -7,6 +7,12 @@ const interactiveSelectionSchema = {
   'description':
       'Native fixed-option selection for polls and questions. Requires action:submit and a shared interaction. Multiple uses checkboxes and submits all selected options together after confirmation; text-only single choice submits on selection unless showConfirm is true. Rich-content options always require explicit submission, for both questions and polls. The UI renders selection hints and counts automatically. Do not repeat these in the title, body, or accompanying message (e.g. 可多选, 最多选3项). Configure mode and minSelections/maxSelections instead. Cannot combine with input. Works for humans and AI.',
   'properties': {
+    'optionPrefix': {
+      'type': 'string',
+      'enum': ['number', 'letter', 'dot'],
+      'description':
+          'Option leading marker: number (1, 2), letter (A through Z, then AA, AB), or dot (small bullet). Presentation only; submit the original option id.',
+    },
     'showConfirm': {
       'type': 'boolean',
       'default': false,
@@ -20,7 +26,7 @@ const interactiveSelectionSchema = {
     'options': {
       'type': 'array',
       'minItems': 1,
-      'maxItems': 25,
+      'maxItems': 100,
       'items': selectionOptionSchema,
     },
     'minSelections': {

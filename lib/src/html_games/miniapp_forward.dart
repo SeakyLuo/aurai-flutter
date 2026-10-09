@@ -79,7 +79,7 @@ Future<void> openMiniappLink(BuildContext context, Uri uri) async {
         messageId: id,
         conversationId: rows.single['conversation_id'] as String,
         store: controller.htmlStore,
-      ).openFullscreen(context);
+      ).openAdaptive(context);
       return;
     }
     if (uri.pathSegments.length != 2 ||

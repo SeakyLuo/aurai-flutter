@@ -356,10 +356,6 @@ extension ImageForwarding on ChatController {
     _runningConversation = target;
     _conversationChanged();
     try {
-      if (target.kind == ConversationKind.direct &&
-          !(await _directReplyContext(target)).config.isConfigured) {
-        throw StateError('请先为这位联系人配置模型，再重试回复');
-      }
       await _executeConversation(target);
     } on Object catch (error) {
       if (target.executionUserMessageId == null &&

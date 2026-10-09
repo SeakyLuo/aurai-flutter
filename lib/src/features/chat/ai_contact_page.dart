@@ -276,7 +276,7 @@ class _AiContactPageState extends State<AiContactPage> {
                       (SettingsAppBar.toolbarHeight - RoundAction.defaultSize) /
                           2,
                   16,
-                  32,
+                  MediaQuery.paddingOf(context).bottom + 32,
                 ),
                 children: [
                   Center(

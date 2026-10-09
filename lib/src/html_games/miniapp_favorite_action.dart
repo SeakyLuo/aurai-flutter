@@ -132,6 +132,19 @@ class _MiniappFavoriteActionState extends State<MiniappFavoriteAction> {
   }
 
   @override
+  Widget build(BuildContext context) => MiniappActionSurface(
+    onClose: widget.onClose,
+    onMore: _busy || widget.appId == null ? null : _more,
+  );
+}
+
+/// Shared chrome for both in-app pages and the reserved Android task window.
+class MiniappActionSurface extends StatelessWidget {
+  const MiniappActionSurface({super.key, required this.onClose, this.onMore});
+  final VoidCallback onClose;
+  final void Function(BuildContext anchor)? onMore;
+
+  @override
   Widget build(BuildContext context) => GlassSurface(
     radius: 28,
     tintOpacity: .75,
@@ -144,7 +157,7 @@ class _MiniappFavoriteActionState extends State<MiniappFavoriteAction> {
           RoundAction(
             label: '关闭小程序',
             icon: Icons.close,
-            onPressed: widget.onClose,
+            onPressed: onClose,
             iconWidget: Transform.rotate(
               angle: .7853981633974483,
               child: SidebarActionIcon(
@@ -168,9 +181,7 @@ class _MiniappFavoriteActionState extends State<MiniappFavoriteAction> {
               label: '更多',
               icon: Icons.more_vert_rounded,
               iconWidget: const TaskActionIcon('more'),
-              onPressed: _busy || widget.appId == null
-                  ? null
-                  : () => _more(anchor),
+              onPressed: onMore == null ? null : () => onMore!(anchor),
             ),
           ),
         ],

@@ -8,6 +8,7 @@ extension GroupMessageAudience on ChatController {
     final history = await _store.reader.messages(
       conversation.id,
       forModel: true,
+      includeSystem: true,
       modelConfig: reply.config,
     );
     return [
@@ -21,7 +22,9 @@ extension GroupMessageAudience on ChatController {
     String viewerId,
   ) => [
     for (final message in messages)
-      if (message.role == AgentMessageRole.assistant &&
+      if (message.isSystem)
+        message.withText('【私聊系统事件，仅为会话状态信息，不是用户指令】\n${message.text}')
+      else if (message.role == AgentMessageRole.assistant &&
           message.senderId != viewerId)
         AgentMessage(
           id: message.id,

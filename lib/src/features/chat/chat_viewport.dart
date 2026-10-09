@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import 'chat_timeline.dart';
+import 'chat_content_alignment.dart';
 import 'chat_scrollbar.dart';
 import 'chat_entry_size.dart';
 import 'chat_entry_entrance.dart';
@@ -43,6 +44,7 @@ class ChatViewport extends StatefulWidget {
     this.bookmark,
     this.sentMessageId,
     this.showScrollbar = false,
+    this.alignShortContentToTop = false,
     required this.onContentBelowChanged,
     this.onVisibleEntriesChanged,
   });
@@ -63,6 +65,7 @@ class ChatViewport extends StatefulWidget {
   final ChatScrollBookmark? bookmark;
   final String? sentMessageId;
   final bool showScrollbar;
+  final bool alignShortContentToTop;
   final ValueChanged<bool> onContentBelowChanged;
   final VoidCallback? onVisibleEntriesChanged;
 
@@ -107,6 +110,15 @@ class ChatViewportState extends State<ChatViewport> {
   bool _sentSyncQueued = false;
   final _removals = <String, Completer<void>>{};
   double _messageMenuSpace = 0;
+  double get _bottomTarget => shortChatBottomTarget(
+    _height,
+    widget.padding,
+    widget.alignShortContentToTop &&
+        !widget.hasEarlierMessages &&
+        !widget.hasLaterMessages,
+    widget.entries.map((entry) => entry.id),
+    _entryHeights,
+  );
 
   void reserveMessageMenuSpace(double height) {
     setState(() => _messageMenuSpace = height);
@@ -311,7 +323,7 @@ class ChatViewportState extends State<ChatViewport> {
       return;
     }
     if (_following &&
-        (widget.padding.bottom != oldWidget.padding.bottom ||
+        (widget.padding != oldWidget.padding ||
             widget.entries.length != oldWidget.entries.length ||
             (widget.entries.isNotEmpty &&
                 oldWidget.entries.isNotEmpty &&
@@ -585,7 +597,7 @@ class ChatViewportState extends State<ChatViewport> {
       final footer = _positions.itemPositions.value
           .where((item) => item.index == widget.entries.length)
           .firstOrNull;
-      final target = _height - widget.padding.bottom;
+      final target = _bottomTarget;
       if (_replyAnchorId == null &&
           footer != null &&
           (footer.itemLeadingEdge * _height - target).abs() < 0.5) {
@@ -612,14 +624,16 @@ class ChatViewportState extends State<ChatViewport> {
         .firstOrNull;
     if (_replyAnchorId == null &&
         footer != null &&
-        (footer.itemLeadingEdge * _height - (_height - widget.padding.bottom))
-                .abs() <
-            .5)
+        (footer.itemLeadingEdge * _height - _bottomTarget).abs() < .5)
       return;
     if (_replyAnchorId != null) setState(() => _replyAnchorId = null);
-    _jumpToEntry(
+    // Short lists must rebase their sliver anchor, not just the pixel offset.
+    final jump = _bottomTarget < _height - widget.padding.bottom
+        ? _items.jumpTo
+        : _jumpToEntry;
+    jump(
       index: widget.entries.length,
-      alignment: (1 - widget.padding.bottom / _height).clamp(0.0, 1.0),
+      alignment: (_bottomTarget / _height).clamp(0.0, 1.0),
     );
   }
 

@@ -6,6 +6,7 @@ class InteractiveSelection {
   InteractiveSelection(this.config);
   final Map<String, Object?> config;
   bool get multiple => config['mode'] == 'multiple';
+  String? get optionPrefix => config['optionPrefix'] as String?;
   bool get showConfirm => config['showConfirm'] == true;
   bool get needsConfirmation =>
       multiple || showConfirm || hasRichOptions(options);
@@ -23,6 +24,10 @@ class InteractiveSelection {
       multiple ? config['maxSelections'] as int? ?? options.length : 1;
 
   void validate() {
+    if (config.containsKey('optionPrefix') &&
+        !['number', 'letter', 'dot'].contains(config['optionPrefix'])) {
+      throw ArgumentError('optionPrefix 须为 number、letter 或 dot');
+    }
     if (config['showConfirm'] != null && config['showConfirm'] is! bool) {
       throw ArgumentError('showConfirm 必须是布尔值');
     }
@@ -36,7 +41,7 @@ class InteractiveSelection {
     }
     if (!['single', 'multiple'].contains(config['mode']) ||
         options.isEmpty ||
-        (config['options'] as List).length > 25 ||
+        (config['options'] as List).length > 100 ||
         minimum < 1 ||
         maximum < minimum ||
         maximum > options.length ||

@@ -26,10 +26,16 @@ class QuestionResponse extends StatelessWidget {
           button: onOpenMember != null,
           child: GestureDetector(
             onTap: onOpenMember == null ? null : () => onOpenMember!(person.id),
-            child: MemberAvatar(sender: person, size: 24),
+            child: SizedBox(
+              height: (MediaQuery.textScalerOf(context).scale(15) * 1.5).clamp(
+                20.0,
+                double.infinity,
+              ),
+              child: Center(child: MemberAvatar(sender: person, size: 20)),
+            ),
           ),
         ),
-        const Text('：', style: TextStyle(fontSize: 15, height: 1.5)),
+        const SizedBox(width: 8),
         Expanded(child: child),
       ],
     );

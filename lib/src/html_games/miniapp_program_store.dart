@@ -291,9 +291,13 @@ class MiniappProgramStore {
               if (reason != null) 'reason': reason,
             };
     }
-    if (expectedVersion != null && expectedVersion != row['version']) {
-      throw StateError('小程序已更新，请重新读取后提交');
-    }
+    _validateEventVersion(
+      row['version'] as int,
+      expectedVersion,
+      actorView,
+      action,
+      data,
+    );
     // A program may require a published speech before accepting its end card.
     final submittingActor = delegatedPlayer as String? ?? actorId;
     final speechBinding = anonymousCard != null
@@ -326,6 +330,32 @@ class MiniappProgramStore {
         throw StateError('请先成功发送公开发言，再提交结束发言；发送失败或尚未发送的内容不算已发表');
     }
     final now = DateTime.now().millisecondsSinceEpoch;
+    final previousFirstNightWolfVictims = <Object?>[];
+    if (action == 'configure' && row['app_id'] == 'builtin.werewolf') {
+      final previousMessageId = (data as Map)['previousMessageId'] as String?;
+      if (previousMessageId != null) {
+        final previous = await txn.query(
+          'html_games',
+          columns: ['message_id'],
+          where:
+              "message_id = ? AND conversation_id = ? AND app_id = ? AND json_extract(state_json, '\$.winner') IS NOT NULL AND json_extract(state_json, '\$.winner') != '对局已结束' AND message_id IN (SELECT id FROM messages WHERE kind = 'html_game')",
+          whereArgs: [previousMessageId, conversationId, 'builtin.werewolf'],
+        );
+        if (previous.isEmpty) throw StateError('上一局必须是同群已完成的狼人杀对局');
+        final previousRuntime = await txn.query(
+          'app_state',
+          columns: ['value'],
+          where: 'key = ?',
+          whereArgs: [MiniappProgram.key(previousMessageId)],
+        );
+        final previousState =
+            MiniappProgram.decode(previousRuntime.single['value'])['state']
+                as Map;
+        previousFirstNightWolfVictims.addAll(
+          previousState['firstNightWolfVictims'] as List,
+        );
+      }
+    }
     final output = await runner.run(
       MiniappCapabilityProtocol.wrap(script, declared),
       {
@@ -339,6 +369,8 @@ class MiniappProgramStore {
         'ownerId': messages.single['sender_id'],
         'messageId': messageId,
         'now': now,
+        if (action == 'configure' && row['app_id'] == 'builtin.werewolf')
+          'previousFirstNightWolfVictims': previousFirstNightWolfVictims,
       },
     );
     final calls = MiniappCapabilityCalls(output, declared);
@@ -510,6 +542,39 @@ class MiniappProgramStore {
       });
     }
     return change;
+  }
+
+  static void _validateEventVersion(
+    int version,
+    int? expectedVersion,
+    Map? actorView,
+    String action,
+    Object? data,
+  ) {
+    final supplied = data is Map ? data['eventGuard'] : null;
+    final declared = (actorView?['eventGuards'] as Map?)?[action];
+    final matches =
+        declared is Map &&
+        declared.isNotEmpty &&
+        declared.values.every(
+          (value) => value is String || value is num || value is bool,
+        ) &&
+        supplied is Map &&
+        supplied.length == declared.length &&
+        declared.entries.every(
+          (entry) =>
+              supplied.containsKey(entry.key) &&
+              supplied[entry.key] == entry.value,
+        );
+    if (supplied != null && !matches) {
+      throw StateError('当前行动或频道权限已变化，请读取最新状态后重新决定');
+    }
+    // Only explicitly guarded actor events can use an older global version.
+    if (expectedVersion != null &&
+        expectedVersion != version &&
+        (expectedVersion > version || !matches)) {
+      throw StateError('小程序已更新，请重新读取后提交');
+    }
   }
 
   static Future<MiniappProgramChange?> cancel(

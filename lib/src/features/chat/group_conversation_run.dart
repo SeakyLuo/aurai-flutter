@@ -21,7 +21,7 @@ extension GroupConversationRun on ChatController {
       if (conversation.kind == ConversationKind.group) {
         await _executeGroupChat(conversation);
       } else {
-        await _executeMember(
+        await _executePrivateMember(
           conversation,
           scheduled: scheduled,
           callbacksOnly: callbacksOnly,
@@ -370,7 +370,7 @@ String _quotedInput(
       metadata?.participation['presentation'] == 'message';
   final text = [
     if (isProgramText)
-      '【小程序消息；实例 $programMessageId。私密交流用 readHtmlProgram 读取该实例的 channels，再用 submitHtmlProgramEvent 的 sendChannelMessage 回复可发送频道；可见范围由程序设置，不用 sendGroupMessage 代发。】',
+      '【小程序消息；实例 $programMessageId。优先使用运行时提供的当前状态与 channels；缺少或过期时用 readHtmlProgram。私密回复用 submitHtmlProgramEvent 的 sendChannelMessage，可见范围由程序设置，不用 sendGroupMessage 代发。】',
     if (message.excludedAudience != null)
       '【私密消息；不可见成员 ${jsonEncode(message.excludedAudience)}${isProgramText ? '' : '；回复时用 message.excludedAudience 保持此范围'}】',
     if (message.audience != null)

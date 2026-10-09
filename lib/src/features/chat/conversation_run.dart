@@ -284,6 +284,7 @@ extension ConversationRun on ChatController {
       await runtime.run(
         streamOutput: groupParent != null,
         decision: decision,
+        runtimeInput: _groupProgramInput(groupParent, reply.senderId, observed),
         endsRun: (result) => _endsRestRun(result, () => leftSleepDraft = true),
         conversation: [
           ...(groupHistory == null
@@ -662,6 +663,7 @@ extension ConversationRun on ChatController {
       }
       if (runConversation.runState == ChatRunState.stopping ||
           error is AgentCancelled) {
+        _recordRunError(error, (groupParent ?? runConversation).id);
         runConversation.runState = ChatRunState.cancelled;
         outcome = 'cancelled';
         executionWatch.stop();
@@ -713,6 +715,7 @@ extension ConversationRun on ChatController {
           }
         }
         if (groupParent == null) {
+          _appendPrivateRunFailure(runConversation, reply.sender, runId);
           final answerIndex = messages.lastIndexWhere(
             (message) => message.runId == runId,
           );

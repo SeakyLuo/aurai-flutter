@@ -219,8 +219,7 @@ class _MessageItemState extends State<MessageItem> {
                 ),
         );
 
-  Widget _buildMessage(BuildContext context) =>
-      widget.groupBubble && message.isFailure
+  Widget _buildMessage(BuildContext context) => message.isFailure
       ? _withBubbleStatus(_failureCard())
       : message.role == AgentMessageRole.user
       ? Column(

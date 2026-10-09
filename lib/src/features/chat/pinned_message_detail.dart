@@ -3,6 +3,7 @@ import 'attachment_action_icon.dart';
 import 'glass_surface.dart';
 import 'settings_appearance.dart';
 import 'question_sheet.dart';
+import 'question_icon.dart';
 
 class PinnedMessageDetail extends StatelessWidget {
   const PinnedMessageDetail({
@@ -25,44 +26,66 @@ class PinnedMessageDetail extends StatelessWidget {
           title: title,
           heading: Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Expanded(
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: onMore == null
+                        ? RoundAction.defaultSize + 12
+                        : RoundAction.defaultSize * 2 + 13,
+                  ),
                   child: Text(
                     title,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                SettingsGlassActionSurface(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      RoundAction(
-                        label: '定位',
-                        icon: Icons.my_location,
-                        iconWidget: const AttachmentActionIcon(
-                          type: AttachmentActionIconType.locate,
-                        ),
-                        onPressed: onLocate,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    SettingsGlassAction(
+                      label: '关闭',
+                      icon: Icons.close_rounded,
+                      iconWidget: const QuestionIcon(
+                        type: QuestionIconType.close,
                       ),
-                      if (onMore != null) ...[
-                        const SizedBox(
-                          height: 20,
-                          child: VerticalDivider(width: 1),
-                        ),
-                        Builder(
-                          builder: (anchor) => RoundAction(
-                            label: '更多',
-                            icon: Icons.more_vert_rounded,
-                            onPressed: () => onMore!(anchor),
+                      onPressed: onBack,
+                    ),
+                    SettingsGlassActionSurface(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RoundAction(
+                            label: '定位',
+                            icon: Icons.my_location,
+                            iconWidget: const AttachmentActionIcon(
+                              type: AttachmentActionIconType.locate,
+                            ),
+                            onPressed: onLocate,
                           ),
-                        ),
-                      ],
-                    ],
-                  ),
+                          if (onMore != null) ...[
+                            const SizedBox(
+                              height: 20,
+                              child: VerticalDivider(width: 1),
+                            ),
+                            Builder(
+                              builder: (anchor) => RoundAction(
+                                label: '更多',
+                                icon: Icons.more_vert_rounded,
+                                onPressed: () => onMore!(anchor),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

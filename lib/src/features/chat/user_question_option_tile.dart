@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../agent/ask_user_tool.dart';
 import 'settings_icon.dart';
+import 'selection_option_prefix.dart';
 import 'question_option_appearance.dart';
 
 class UserQuestionOptionTile extends StatelessWidget {
@@ -13,6 +14,7 @@ class UserQuestionOptionTile extends StatelessWidget {
     required this.onTap,
     this.multiple = false,
     this.vote = false,
+    this.optionPrefix,
     this.fontSize,
     this.onIndicatorTap,
     this.contentMaxLines,
@@ -24,6 +26,7 @@ class UserQuestionOptionTile extends StatelessWidget {
   final VoidCallback? onTap;
   final bool multiple;
   final bool vote;
+  final String? optionPrefix;
   final double? fontSize;
   final VoidCallback? onIndicatorTap;
   final int? contentMaxLines;
@@ -60,32 +63,14 @@ class UserQuestionOptionTile extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                if (!marked)
-                  Container(
-                    width: MediaQuery.textScalerOf(context).scale(22),
-                    height: MediaQuery.textScalerOf(context).scale(22),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: selected
-                          ? QuestionOptionAppearance.selectedIndicator(context)
-                          : colors.onSurface.withValues(
-                              alpha: dark ? .12 : .08,
-                            ),
-                    ),
-                    child: Text(
-                      '$number',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: selected
-                            ? accent
-                            : colors.onSurface.withValues(alpha: .72),
-                      ),
-                    ),
+                if (!marked || optionPrefix != null) ...[
+                  SelectionOptionPrefix(
+                    number: number,
+                    style: optionPrefix ?? 'number',
+                    selected: selected,
                   ),
-                if (!marked) const SizedBox(width: 10),
+                  const SizedBox(width: 10),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

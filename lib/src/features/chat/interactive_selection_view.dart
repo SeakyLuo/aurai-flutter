@@ -26,6 +26,7 @@ class InteractiveSelectionView extends StatefulWidget {
     required this.onSubmit,
     this.showSubmit = true,
     this.question = false,
+    this.questionHeading,
     this.anonymous = false,
     this.voteStatus,
     required this.compactOptions,
@@ -43,6 +44,7 @@ class InteractiveSelectionView extends StatefulWidget {
   final bool locked, submitted, allowChange, busy;
   final bool showSubmit;
   final bool question;
+  final Widget? questionHeading;
   final bool anonymous;
   final String? voteStatus;
   final bool compactOptions;
@@ -165,6 +167,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
           if (_selected.contains(option['id'])) index,
       },
       multiple: config.multiple,
+      optionPrefix: config.optionPrefix,
       showConfirm: config.needsConfirmation,
       onSelectionChanged: (selected) {
         setState(() {
@@ -185,6 +188,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
       actions: widget.sheetActions,
       title: widget.title,
       body: widget.body,
+      heading: widget.questionHeading,
     );
     if (!mounted || selected == null || _locked || !widget.showSubmit) {
       if (identical(_pickerClosed, closed)) _closePicker();
@@ -222,6 +226,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
             if (_selected.contains(option['id'])) index,
         },
         multiple: config.multiple,
+        optionPrefix: config.optionPrefix,
         showConfirm: config.needsConfirmation,
         readOnly:
             widget.question && widget.submitted ||
@@ -234,6 +239,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
         maximum: config.maximum,
         title: widget.title,
         body: widget.body,
+        heading: widget.questionHeading,
         actions: widget.sheetActions,
         busy: widget.busy,
         otherIndex: config.hasOther ? config.options.length - 1 : null,
@@ -329,6 +335,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
             },
             multiple: config.multiple,
             maximum: config.maximum,
+            optionPrefix: config.optionPrefix,
             onSelect: answeredQuestion || locked || !widget.showSubmit
                 ? null
                 : (i) {
@@ -389,6 +396,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
                           selected: selected,
                           multiple: config.multiple,
                           number: index + 1,
+                          optionPrefix: config.optionPrefix,
                           fontSize: InteractiveMessageButton.defaultFontSize,
                           onEdit: enabled ? _editOther : null,
                           onToggle: enabled
@@ -405,6 +413,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
                             content: option['label'] as String,
                           ),
                           number: index + 1,
+                          optionPrefix: config.optionPrefix,
                           multiple: config.multiple,
                           vote: !widget.question,
                           fontSize: InteractiveMessageButton.defaultFontSize,

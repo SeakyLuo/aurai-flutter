@@ -95,11 +95,24 @@ extension MiniappTemplateSending on ChatController {
         template,
         '',
         initialConfiguration: {
+          'previousMessageId': messageId,
           'hostId': previous.state['hostId'],
           'players': (previous.state['players'] as List)
               .map((p) => (p as Map)['id'])
               .toList(),
-          'roles': previous.state['roles'],
+          'roles': [
+            for (final (index, raw)
+                in (previous.state['roles'] as List).indexed)
+              {
+                ...(raw as Map).cast<String, Object?>(),
+                'id': 'r$index',
+                'skills': [
+                  for (final (skillIndex, skill)
+                      in (raw['skills'] as List).indexed)
+                    {...(skill as Map), 'id': 'r${index}s$skillIndex'},
+                ],
+              },
+          ],
           'rules': previous.state['rules'],
           'assignments': <String, Object?>{},
         },

@@ -71,6 +71,7 @@ class AuraiApplication : Application() {
         FlutterInjector.instance().flutterLoader().startInitialization(this)
         FlutterInjector.instance().flutterLoader().ensureInitializationComplete(this, null)
         flutterEngine = FlutterEngine(this)
+        MiniappTasks.register(this, flutterEngine)
         GeneratedPluginRegistrant.registerWith(flutterEngine)
         DataManagementAccess(this, flutterEngine.dartExecutor.binaryMessenger, ::loadModelConfig)
         flutterEngine.platformViewsController.registry.registerViewFactory(

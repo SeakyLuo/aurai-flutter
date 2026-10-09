@@ -14,7 +14,6 @@ class ConversationListTile extends StatelessWidget {
     required this.avatar,
     required this.onTap,
     this.project,
-    this.showActivity = false,
     this.displayName,
   });
 
@@ -23,7 +22,6 @@ class ConversationListTile extends StatelessWidget {
   final Widget avatar;
   final VoidCallback onTap;
   final DevelopmentProject? project;
-  final bool showActivity;
   final String? displayName;
 
   @override
@@ -60,17 +58,6 @@ class ConversationListTile extends StatelessWidget {
                       style: const TextStyle(fontSize: 16),
                     ),
                   ),
-                  if (showActivity && item.runState == ChatRunState.running)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 6),
-                      child: Text(
-                        '正在回复',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ),
                   ListenableBuilder(
                     listenable: controller.scheduledTasks,
                     builder: (context, _) =>

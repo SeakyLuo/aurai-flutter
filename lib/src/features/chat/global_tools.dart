@@ -155,25 +155,11 @@ extension GlobalTools on ChatController {
                 ).invoke(operation, target.id, senderId, args);
               }
               if (operation == 'readHtmlProgram') {
-                final game = await htmlStore.load(
+                return htmlStore.readProgram(
                   target.id,
                   args['messageId'] as String,
-                  viewer: senderId,
+                  senderId,
                 );
-                if (!game.state.containsKey('_miniapp'))
-                  throw StateError('这条消息不是程序小程序');
-                final compaction = await MiniappProgramStore(_store.database)
-                    .pendingCompaction(
-                      target.id,
-                      args['messageId'] as String,
-                      senderId,
-                    );
-                return {
-                  'messageId': args['messageId'],
-                  'version': game.version,
-                  'state': game.state,
-                  if (compaction != null) 'contextCompaction': compaction,
-                };
               }
               if (operation == 'submitHtmlProgramEvent') {
                 final programs = MiniappProgramStore(_store.database);

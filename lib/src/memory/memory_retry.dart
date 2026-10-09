@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import '../domain/model_provider.dart';
+import '../domain/model_failure.dart';
 import '../providers/provider_error.dart';
 
 String? memoryFailureResponseId(Object error) {
@@ -26,6 +27,17 @@ Duration? memoryRetryDelay(Object error, int retries) {
       error is ModelConnectionInterrupted;
   if (error is ModelProviderException) {
     if (isProviderQuotaError(error.detail ?? error.message)) return null;
+    final failure = classifyModelFailure(
+      error.detail ?? error.message,
+      statusCode: error.statusCode,
+    );
+    if (failure == ModelFailure.contentFilter) return null;
+    transient =
+        transient ||
+        failure == ModelFailure.connection ||
+        failure == ModelFailure.timeout ||
+        failure == ModelFailure.rateLimit ||
+        failure == ModelFailure.unavailable;
     final status = error.statusCode;
     if (status != null) {
       transient = status == 408 || status == 429 || status >= 500;
@@ -43,6 +55,7 @@ Duration? memoryRetryDelay(Object error, int retries) {
         if (decoded['type'] == 'response.failed' && response is Map) {
           final failure = response['error'];
           transient =
+              transient ||
               failure == null ||
               (failure is Map &&
                   [

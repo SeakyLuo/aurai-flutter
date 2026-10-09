@@ -327,7 +327,19 @@ class InteractiveMessageStore {
               .cast<String, Object?>(),
         );
         programChange!.cards[messageId] = current;
-        return (card: current, notice: null, url: null);
+        final notice = card.isQuestion && action == 'submit'
+            ? await writeQuestionAnswerMessage(
+                txn,
+                conversationId: conversationId,
+                messageId: messageId,
+                creatorId: rows.single['sender_id'] as String,
+                actor: actor,
+                card: card,
+                resultCard: current,
+                button: button,
+              )
+            : null;
+        return (card: current, notice: notice, url: null);
       }
       next = await enqueueInteractiveCompletion(
         txn,
@@ -376,7 +388,7 @@ class InteractiveMessageStore {
           },
         );
       }
-      final notice = button['questions'] != null
+      final notice = card.isQuestion && action == 'submit'
           ? await writeQuestionAnswerMessage(
               txn,
               conversationId: conversationId,
@@ -384,7 +396,8 @@ class InteractiveMessageStore {
               creatorId: rows.single['sender_id'] as String,
               actor: actor,
               card: card,
-              answers: button['value'] as List,
+              resultCard: next,
+              button: button,
             )
           : card.hasInteraction
           ? null
@@ -407,7 +420,7 @@ class InteractiveMessageStore {
                       ?.cast<String>(),
             );
       if (notice != null &&
-          button['questions'] == null &&
+          !card.isQuestion &&
           callbackId == null &&
           actor.id == MessageSender.localUser.id) {
         final conversations = await txn.query(

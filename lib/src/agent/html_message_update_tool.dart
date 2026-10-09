@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'html_app_data_tool.dart';
 import '../domain/tool_models.dart';
 import 'html_message_source.dart';
@@ -32,9 +34,9 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
         : name == 'updateHtmlData'
         ? 'Update generic HTML message data without changing source or sending a new launcher. Requires messageId, expectedVersion, eventId and complete data object. For program messages data must include complete state, public view and privateViews; keep projections consistent and secret information only in privateViews. No reducer handler is required. This edits only the sent message instance, never the application template, source or another session. Transport bindings and reply controls are preserved. Gameplay events still use submitHtmlProgramEvent. Do not bypass the data tool by editing database or files. Stale versions fail; reread before reconciling.'
         : name == 'readHtmlProgram'
-        ? 'Read the current version, public state and ONLY your authenticated private view/action cards of a program-backed HTML message. No source or other participants private views are returned. Use this before submitHtmlProgramEvent; never publish private context in group replies. contextCompaction, when present, reports an event already committed but its local window checkpoint is pending. Its initiator, application creator and development team members receive a dedicated context.compact.retry request (expectedVersion:null,data:{}). After resolving the error, submit that request to resume only compaction without repeating the event. Original event data is never returned for recovery.'
+        ? 'Read version, public state, authenticated private view/action cards; no source or other private views. Identical public objects/lists occur only in state._miniapp.own. Keep private content private. Use a current runtime snapshot or read before submitting events. Pending contextCompaction means gameplay committed but checkpoint failed; eligible initiator/creator/team members receive context.compact.retry arguments with expectedVersion:null,data:{}. Resolve the cause, then submit those exact arguments to resume only the checkpoint; never replay gameplay. Reading alone does not recover it.'
         : name == 'submitHtmlProgramEvent'
-        ? 'Submit an authenticated event to the HTML miniapp host program, without opening a WebView. Requires messageId,eventId,expectedVersion,action,data. The program runs synchronously, validates your role and allowed operations, then commits effects and state together. A reducer execution error or timeout commits no changes. A requested context.compact runs AFTER commit: if the local checkpoint fails, the event state is already committed, the previous window remains intact, and readHtmlProgram reports contextCompaction.canRetry and a context.compact.retry request for its initiator, application creator and development team members. Use that returned request with expectedVersion:null and data:{}; do not replay the original gameplay action. Reusing those arguments resumes only compaction, without repeating gameplay or emitted messages. Repeated reads do not complete pending compaction. Report the original blocker and end the turn if it cannot be resolved; do not keep polling, announcing progress, or resubmitting unchanged failing operations. readHtmlProgram supplies the allowed protocol in your private view. Retry only after the cause has changed. Compaction recovery uses the returned dedicated request; other event retries reuse eventId and original arguments; a version conflict requires rereading and reevaluating. Do not overwrite program state via updateHtmlMessage. This works for private role actions, ending your speech, and AI skill callbacks; it grants no authority beyond the program rules. Return skill results to the program rather than revealing identities or private actions in chat.'
+        ? 'Execute a role-checked program event without a WebView, following your private-view protocol. State and effects commit atomically; reducer errors/timeouts commit nothing. Use the current snapshot/read version. If own.eventGuards declares this action, copy it into data.eventGuard; a matching guard tolerates unrelated version changes. On conflict reread and reevaluate. Event retries reuse eventId and original arguments, only after the cause changes. context.compact runs after gameplay commit: checkpoint failure retains the previous window and exposes recovery via readHtmlProgram. Use only its exact context.compact.retry arguments; never replay committed gameplay. If blocked, report the original error and end the turn; no polling or unchanged retries. Use gameplay events, not updateHtmlMessage state overwrite. Return private skill results to the program, not public chat.'
         : name == 'readHtmlMessage'
         ? 'Read an accessible HTML message by messageId. Authors receive source and state; others receive public metadata and their own interaction projection. includePrivate=true requests approval for internal content. No conversation switching needed. Read the version before updateHtmlMessage. This does not run the page or send a message.'
         : htmlAppGuide +
@@ -62,7 +64,7 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
             'minimum': 0,
             if (name == 'submitHtmlProgramEvent')
               'description':
-                  'Use the read version for new events. Null is allowed only when readHtmlProgram supplies null in exact pending compaction retry arguments.',
+                  'Use the current snapshot/read version for new events. Null is allowed only when readHtmlProgram supplies null in exact pending compaction retry arguments.',
           },
           if (name == 'submitHtmlProgramEvent')
             'action': {'type': 'string', 'minLength': 1, 'maxLength': 100},
@@ -136,6 +138,7 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
       final attachments = name == 'readHtmlProgram'
           ? await miniappCanvasAttachments(output)
           : const <ToolAttachment>[];
+      if (name == 'readHtmlProgram') _deduplicateProgramState(output);
       return ToolResult(
         callId: call.id,
         toolName: name,
@@ -155,4 +158,20 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
 
   @override
   Future<void> cancel() async {}
+
+  void _deduplicateProgramState(Map<String, Object?> output) {
+    final state = output['state'] as Map;
+    final miniapp = state['_miniapp'] as Map;
+    if (miniapp['own'] case final Map own) {
+      // Only the AI result is reduced; stored state and WebView data stay intact.
+      state.removeWhere(
+        (key, value) =>
+            key != '_miniapp' &&
+            key != 'canvas' &&
+            (value is Map || value is List) &&
+            own.containsKey(key) &&
+            jsonEncode(value) == jsonEncode(own[key]),
+      );
+    }
+  }
 }

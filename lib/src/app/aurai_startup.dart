@@ -12,6 +12,7 @@ import 'appearance_settings.dart';
 import 'language_settings.dart';
 import 'global_ui.dart';
 import 'startup_brand.dart';
+import '../html_games/miniapp_task_host.dart';
 
 class AuraiStartup extends StatefulWidget {
   const AuraiStartup({super.key});
@@ -51,6 +52,7 @@ class _AuraiStartupState extends State<AuraiStartup> {
         controller.dispose();
         return;
       }
+      MiniappTaskHost.ready(controller);
       setState(() => _controller = controller);
     } on Object catch (error, stack) {
       developer.log(

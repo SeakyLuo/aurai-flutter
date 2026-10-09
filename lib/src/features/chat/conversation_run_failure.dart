@@ -7,6 +7,43 @@ final _recoveryOptions =
     >();
 
 extension ConversationRunFailure on ChatController {
+  Future<void> _executePrivateMember(
+    Conversation conversation, {
+    required ExecutionReplyContext reply,
+    bool scheduled = false,
+    bool callbacksOnly = false,
+  }) async {
+    try {
+      if (!reply.config.isConfigured) {
+        throw StateError('请先为这位联系人配置模型，再重试回复');
+      }
+      await _executeMember(
+        conversation,
+        reply: reply,
+        scheduled: scheduled,
+        callbacksOnly: callbacksOnly,
+      );
+    } on Object catch (error, stack) {
+      if (error is! AgentCancelled &&
+          _recordedRunErrors[error] != conversation.id) {
+        conversation.runState = ChatRunState.failed;
+        conversation.errorDetail = errorMessage(error);
+        _recordRunError(error, conversation.id);
+        await _logRunFailure(
+          error,
+          stack,
+          config: reply.config,
+          conversationId: conversation.id,
+          sender: reply.sender,
+          runId: null,
+        );
+        _appendPrivateRunFailure(conversation, reply.sender, null);
+        await _persistMember(conversation, null);
+      }
+      rethrow;
+    }
+  }
+
   Map<String, bool?>? get resolvedFailedRecoveryOptions =>
       _recoveryOptions[this]?.data;
 
@@ -85,7 +122,7 @@ extension ConversationRunFailure on ChatController {
     required ModelConfig config,
     required String conversationId,
     required MessageSender sender,
-    required String runId,
+    required String? runId,
   }) async {
     var diagnostic = '${error.runtimeType}: $error\n$stack';
     if (config.apiKey.isNotEmpty) {
@@ -109,6 +146,27 @@ extension ConversationRunFailure on ChatController {
     return diagnostic;
   }
 
+  void _appendPrivateRunFailure(
+    Conversation conversation,
+    MessageSender sender,
+    String? runId,
+  ) {
+    if (!conversation.isPersonalChat) return;
+    conversation.messages.add(
+      AgentMessage(
+        id: newMessageId(),
+        role: AgentMessageRole.assistant,
+        senderId: sender.id,
+        sender: sender,
+        text: conversation.errorDetail!,
+        createdAt: DateTime.now(),
+        isFailure: true,
+        runId: runId,
+      ),
+    );
+    conversation.messageCount++;
+  }
+
   void _recordRunError(Object error, String conversationId) {
     if (error is Exception || error is Error) {
       _recordedRunErrors[error] = conversationId;
@@ -127,7 +185,8 @@ extension ConversationRunFailure on ChatController {
             activeConversation.runState != ChatRunState.stopping
       : message.role == AgentMessageRole.assistant &&
             message.runId != null &&
-            activeConversation.runState == ChatRunState.failed &&
+            (activeConversation.runState == ChatRunState.failed ||
+                activeConversation.runState == ChatRunState.interrupted) &&
             activeConversation.activeRunId == message.runId &&
             !hasRunningTask;
 
@@ -259,7 +318,8 @@ extension ConversationRunFailure on ChatController {
   ) async {
     final runId = conversation.activeRunId;
     if (conversation.kind != ConversationKind.direct ||
-        conversation.runState != ChatRunState.failed ||
+        (conversation.runState != ChatRunState.failed &&
+            conversation.runState != ChatRunState.interrupted) ||
         runId == null ||
         (expectedRunId != null && expectedRunId != runId)) {
       throw StateError('这次失败回复已不能重试');
@@ -268,6 +328,7 @@ extension ConversationRunFailure on ChatController {
     _submitting = true;
     _notifyRun(conversation);
     late String goal;
+    var removedFailures = 0;
     try {
       await _store.writer.mutate(() async {
         await _store.database.transaction((txn) async {
@@ -277,7 +338,8 @@ extension ConversationRunFailure on ChatController {
             where: 'id = ? AND conversation_id = ?',
             whereArgs: [runId, conversation.id],
           );
-          if (runs.isEmpty || runs.single['status'] != 'failed') {
+          if (runs.isEmpty ||
+              !{'failed', 'interrupted'}.contains(runs.single['status'])) {
             throw StateError('这次失败回复已不能重试');
           }
           final userMessageId = runs.single['user_message_id'] as String?;
@@ -289,6 +351,19 @@ extension ConversationRunFailure on ChatController {
           );
           if (goals.isEmpty) throw StateError('原消息已不存在，无法重试');
           goal = goals.single['text'] as String;
+          removedFailures = await txn.delete(
+            'messages',
+            where:
+                "conversation_id = ? AND run_id = ? AND kind = 'message_failure'",
+            whereArgs: [conversation.id, runId],
+          );
+          if (removedFailures > 0) {
+            await txn.rawUpdate(
+              'UPDATE conversations SET message_count = message_count - ? WHERE id = ?',
+              [removedFailures, conversation.id],
+            );
+            _store.writer.invalidateHistory(conversation.id);
+          }
           await txn.rawUpdate(
             'UPDATE conversations SET active_run_id = CASE WHEN active_run_id = ? THEN NULL ELSE active_run_id END, run_state = ?, error_detail = NULL, pending_goal = ? WHERE id = ?',
             [runId, ChatRunState.idle.name, goal, conversation.id],
@@ -310,6 +385,13 @@ extension ConversationRunFailure on ChatController {
       ..executionUserMessageId = null
       ..reconnectAttempt = 0;
     conversation.steps.clear();
+    conversation.messages.removeWhere(
+      (message) => message.runId == runId && message.isFailure,
+    );
+    conversation.searchMessages?.removeWhere(
+      (message) => message.runId == runId && message.isFailure,
+    );
+    conversation.messageCount -= removedFailures;
     conversation.unfinishedRunElapsed.remove(runId);
     conversation.cancelledRunMessages.remove(runId);
     _notifyRun(conversation);

@@ -63,7 +63,7 @@ class _AiContactEditorState extends State<AiContactEditor> {
     path: widget.profile?.sender.avatarPath,
   );
   bool _saving = false, _changed = false, _allowPop = false;
-  bool _notifyFriend = true;
+  bool _notifyFriend = false;
   final _draftPaths = <String>{};
   final _editedText = <TextEditingController>{};
   bool _avatarEdited = false;

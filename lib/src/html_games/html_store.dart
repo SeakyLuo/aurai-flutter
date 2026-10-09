@@ -60,6 +60,24 @@ class HtmlStore {
     String viewer = 'user:local',
   }) async => _load(database, conversationId, messageId, viewer: viewer);
 
+  Future<Map<String, Object?>> readProgram(
+    String conversationId,
+    String messageId,
+    String viewer,
+  ) async {
+    final game = await load(conversationId, messageId, viewer: viewer);
+    if (!game.state.containsKey('_miniapp')) throw StateError('这条消息不是程序小程序');
+    final compaction = await MiniappProgramStore(
+      database,
+    ).pendingCompaction(conversationId, messageId, viewer);
+    return {
+      'messageId': messageId,
+      'version': game.version,
+      'state': game.state,
+      if (compaction != null) 'contextCompaction': compaction,
+    };
+  }
+
   Future<HtmlGame> _load(
     DatabaseExecutor db,
     String conversationId,
