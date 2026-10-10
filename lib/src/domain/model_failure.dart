@@ -35,6 +35,11 @@ enum ModelFailure {
 /// Only structured codes and the gateway's exact stream-failure message are
 /// classified; arbitrary prose and model refusals do not imply error codes.
 ModelFailure classifyModelFailure(String detail, {int? statusCode}) {
+  // Persisted message failures may contain only our already-classified title.
+  final heading = detail.split('\n').first;
+  for (final failure in ModelFailure.values) {
+    if (heading == failure.title) return failure;
+  }
   final codes = <String>{};
   final messages = <String>{};
   void read(Map value) {

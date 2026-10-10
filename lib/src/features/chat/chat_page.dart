@@ -55,7 +55,6 @@ import 'chat_widgets.dart';
 import 'quote_focus_view.dart';
 import 'chat_empty_state.dart';
 import 'chat_header.dart';
-import 'thinking_indicator.dart';
 import 'chat_viewport.dart';
 import 'message_item.dart';
 import 'jump_to_bottom_button.dart';
@@ -142,6 +141,22 @@ class _ChatPageState extends State<ChatPage>
   UserQuestion? _shownQuestion;
   bool _questionSheetShowing = false;
   bool _questionSheetScheduled = false;
+  bool _paneVisible = true;
+
+  bool get _conversationPageVisible =>
+      _paneVisible && ModalRoute.of(context)!.isCurrent;
+
+  void _onPaneVisibilityChanged(bool visible) {
+    _paneVisible = visible;
+    _recordPagePosition();
+    if (visible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_conversationPageVisible) return;
+        setState(() {});
+        _scheduleMarkRead();
+      });
+    }
+  }
 
   void _updateEditing(VoidCallback change) => setState(change);
   void _updateChatBody(VoidCallback change) => setState(change);
@@ -185,7 +200,7 @@ class _ChatPageState extends State<ChatPage>
         (page) =>
             page.mounted &&
             identical(page.widget.controller, widget.controller) &&
-            ModalRoute.of(page.context)!.isCurrent,
+            page._conversationPageVisible,
       );
       unawaited(
         widget.controller.setConversationDetailVisible(visible).catchError((
@@ -266,7 +281,7 @@ class _ChatPageState extends State<ChatPage>
 
   @override
   Widget build(BuildContext context) {
-    if (ModalRoute.of(context)!.isCurrent) _scheduleMarkRead();
+    if (_conversationPageVisible) _scheduleMarkRead();
     final controller = widget.controller;
     final active = controller.activeConversation;
     final conversationId = active.id;
@@ -279,13 +294,13 @@ class _ChatPageState extends State<ChatPage>
         !identical(_shownQuestion, pendingQuestion) &&
         !_questionSheetShowing &&
         !_questionSheetScheduled &&
-        ModalRoute.of(context)!.isCurrent) {
+        _conversationPageVisible) {
       _questionSheetScheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         _questionSheetScheduled = false;
         if (!mounted ||
             !identical(controller.pendingQuestion, pendingQuestion) ||
-            !ModalRoute.of(context)!.isCurrent)
+            !_conversationPageVisible)
           return;
         _shownQuestion = pendingQuestion;
         _focusNode.unfocus();
@@ -385,6 +400,7 @@ class _ChatPageState extends State<ChatPage>
               key: _pinSplitKey,
               controller: controller,
               conversationId: conversationId,
+              onConversationVisibilityChanged: _onPaneVisibilityChanged,
               onLocate: _locateSearchMessage,
               messageBuilder: _buildPinnedMessage,
               child: Scaffold(
@@ -437,9 +453,16 @@ class _ChatPageState extends State<ChatPage>
   }
 
   void _onControllerChanged() {
+    // A conversation switch is not committed until loading completes. In
+    // particular, returning from a task must not overwrite the source page's
+    // draft and scroll identity with the task being left.
+    if (widget.controller.changingConversation &&
+        _conversationId != widget.controller.activeConversation.id)
+      return;
     if (mounted &&
         !ModalRoute.of(context)!.isCurrent &&
-        _conversationId != widget.controller.activeConversation.id)
+        (widget.controller.changingConversation ||
+            _conversationId != widget.controller.activeConversation.id))
       return;
     if (!mounted) {
       return;

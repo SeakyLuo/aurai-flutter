@@ -28,12 +28,14 @@ class PinnedMessageSplit extends StatefulWidget {
     required this.onLocate,
     required this.messageBuilder,
     required this.child,
+    this.onConversationVisibilityChanged,
   });
   final ChatController controller;
   final String conversationId;
   final Future<void> Function(String) onLocate;
   final Widget Function(BuildContext, AgentMessage) messageBuilder;
   final Widget child;
+  final ValueChanged<bool>? onConversationVisibilityChanged;
 
   @override
   State<PinnedMessageSplit> createState() => PinnedMessageSplitState();
@@ -334,6 +336,7 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
       child: PaneNavigator(
         key: _paneNavigator,
         handleBack: !_returningFromConversation,
+        onVisibilityChanged: widget.onConversationVisibilityChanged,
         child: widget.child,
       ),
       detailBuilder: _message != null || _details != null

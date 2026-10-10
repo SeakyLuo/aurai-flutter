@@ -145,47 +145,29 @@ extension ConversationRun on ChatController {
         webSources: webSources,
         onProjectGitBaseChanged: gitSnapshots.rebaseAfterGitBaseChange,
         groupId: groupHistory == null ? null : runConversation.id,
-        questionTool: AskUserTool(runConversation.id, (question) {
-          pendingQuestion = question;
-          final target = groupParent ?? runConversation;
-          if (question == null) {
-            target.pendingQuestionPreviews.remove(runId);
-          } else {
-            final title = question.title?.trim();
-            final label = title == null || title.isEmpty
-                ? question.question
-                : title;
-            final preview = '${reply.sender.name}：[问题] $label';
-            target.pendingQuestionPreviews[runId] =
-                target.kind == ConversationKind.group ? preview : '[问题] $label';
-            questionNotifications.value = ConversationCompletion(
-              conversationId: target.id,
-              title: target.title,
-              runId: runId,
-              reply: preview,
-            );
-          }
-          unawaited(
-            _platform.updateAttentionNotification(
-              runConversation.id,
-              'question',
-              title: question == null ? null : '等待你的回答',
-              body: question?.question,
+        questionTool: AskUserTool(
+          runConversation.id,
+          (question) => _showRunQuestion(
+            runConversation,
+            groupParent,
+            reply,
+            runId,
+            question,
+            showProgress:
+                sessionStarted && groupHistory == null && !alongsideGroup,
+          ),
+          sender: reply.sender,
+          executionRunId: runId,
+          onWaiting: (call, sent) => _store.runs.finishTool(
+            runId,
+            ToolResult(
+              callId: call.id,
+              toolName: call.name,
+              status: ToolResultStatus.success,
+              output: {...sent, 'pending': true},
             ),
-          );
-          if (question != null &&
-              sessionStarted &&
-              groupHistory == null &&
-              !alongsideGroup) {
-            unawaited(
-              _platform.updateAgentSessionStep(
-                '等待你的回答',
-                conversationId: runConversation.id,
-              ),
-            );
-          }
-          _notifyMember(runConversation, groupParent);
-        }, sender: reply.sender),
+          ),
+        ),
       )..addAll(_thinkingTools(runConversation, groupParent, reply));
       tools.add(
         runConversation.isPersonalChat
@@ -284,7 +266,12 @@ extension ConversationRun on ChatController {
       await runtime.run(
         streamOutput: groupParent != null,
         decision: decision,
-        runtimeInput: _groupProgramInput(groupParent, reply.senderId, observed),
+        runtimeInput: _programInput(
+          summaryOwner,
+          reply.senderId,
+          observed,
+          userMessage,
+        ),
         endsRun: (result) => _endsRestRun(result, () => leftSleepDraft = true),
         conversation: [
           ...(groupHistory == null
@@ -376,14 +363,14 @@ extension ConversationRun on ChatController {
           reasoningActivityIndex = null;
           outputMessageIndex = null;
           _setMemberStreaming(reply.senderId, null, groupParent);
-          _notifyMember(runConversation, groupParent);
+          _notifyMember(runConversation, groupParent, activityOnly: true);
         },
         takeUserUpdates: groupParent == null
             ? null
             : () => _takeGroupRunUpdates(reply.senderId, observed),
         onTurnCompleted: (turn) async {
           _setMemberStreaming(reply.senderId, null, groupParent);
-          _notifyMember(runConversation, groupParent);
+          _notifyMember(runConversation, groupParent, activityOnly: true);
           await _persistMember(runConversation, groupParent);
           await _store.runs.finishTurn(modelTurnId, turn);
           if (groupParent != null && !runConversation.isTemporary)
@@ -415,7 +402,7 @@ extension ConversationRun on ChatController {
         onReconnect: (attempt) {
           if (runConversation.reconnectAttempt == attempt) return;
           runConversation.reconnectAttempt = attempt;
-          _notifyMember(runConversation, groupParent);
+          _notifyMember(runConversation, groupParent, activityOnly: true);
         },
         onMessageStarted: (index) {
           if (outputMessageIndex == index) return;
@@ -425,7 +412,7 @@ extension ConversationRun on ChatController {
         },
         onMessageCompleted: (_) {
           _setMemberStreaming(reply.senderId, null, groupParent);
-          _notifyMember(runConversation, groupParent);
+          _notifyMember(runConversation, groupParent, activityOnly: true);
         },
         onProcessingStarted: () {
           if (groupParent != null) return;
@@ -487,7 +474,11 @@ extension ConversationRun on ChatController {
             isReasoning: true,
           );
           _setMemberStreaming(reply.senderId, reasoningMessageId, groupParent);
-          _notifyMember(runConversation, groupParent);
+          if (runConversation.isPersonalChat) {
+            privateThoughtChanges.value++;
+          } else {
+            _notifyMember(runConversation, groupParent);
+          }
         },
         onTextChanged: (text) {
           if (groupParent != null && text.trim().isNotEmpty) {
@@ -613,7 +604,7 @@ extension ConversationRun on ChatController {
                 conversationId: runConversation.id,
               ),
             );
-          _notifyMember(runConversation, groupParent);
+          _notifyMember(runConversation, groupParent, activityOnly: true);
         },
       );
       for (final message in messages.where(
@@ -642,7 +633,7 @@ extension ConversationRun on ChatController {
         finalMessageId: runMessageIds.isEmpty
             ? null
             : messages.lastWhere((m) => runMessageIds.contains(m.id)).id,
-        isTask: runConversation.hasExecutionProcess,
+        isTask: runConversation.isTask && runConversation.hasExecutionProcess,
       );
       if (groupHistory == null && _execution.queuedUserMessageId == null)
         runConversation.pendingGoal = null;
@@ -738,6 +729,18 @@ extension ConversationRun on ChatController {
     } finally {
       runConversation.isCompacting = false;
       executionWatch.stop();
+      final notificationMessage = messages
+          .where(
+            (message) =>
+                runMessageIds.contains(message.id) &&
+                !message.isReasoning &&
+                !message.isSystem &&
+                message.canView(MessageSender.localUser.id),
+          )
+          .lastOrNull;
+      final notificationReply = notificationMessage == null
+          ? ''
+          : MessageSummary.fromMessage(notificationMessage);
       try {
         if (outcome != 'completed') {
           await _store.runs.finish(
@@ -747,7 +750,8 @@ extension ConversationRun on ChatController {
             error: runConversation.errorDetail,
             diagnostic: failureDiagnostic,
             finalMessageId: unfinishedFinalMessageId,
-            isTask: runConversation.hasExecutionProcess,
+            isTask:
+                runConversation.isTask && runConversation.hasExecutionProcess,
           );
         }
         if (sessionStarted && groupHistory == null && !alongsideGroup) {
@@ -755,9 +759,7 @@ extension ConversationRun on ChatController {
             outcome,
             conversationId: runConversation.id,
             title: runConversation.title,
-            reply: outcome == 'completed' && runMessageIds.isNotEmpty
-                ? messages.lastWhere((m) => runMessageIds.contains(m.id)).text
-                : '',
+            reply: outcome == 'completed' ? notificationReply : '',
           );
         }
       } finally {
@@ -767,6 +769,7 @@ extension ConversationRun on ChatController {
             sleepDraft.isNotEmpty) {
           await _consumeSleepDraft(sleepDraftKey, sleepDraft);
         }
+        _execution.programRuns.remove(reply.senderId);
         if (groupParent == null) {
           _runtime = null;
           _execution.liveUserMessageIds.clear();
@@ -781,17 +784,13 @@ extension ConversationRun on ChatController {
         ).finish(callbackEvents, outcome == 'completed');
         if (callbackEvents.isEmpty &&
             outcome == 'completed' &&
-            (groupParent == null || runMessageIds.isNotEmpty)) {
+            notificationReply.trim().isNotEmpty) {
           if (groupHistory == null)
             completedReplies.value = ConversationCompletion(
               conversationId: runConversation.id,
               title: runConversation.title,
               runId: runId,
-              reply: runMessageIds.isEmpty
-                  ? ''
-                  : messages
-                        .lastWhere((m) => runMessageIds.contains(m.id))
-                        .text,
+              reply: notificationReply,
             );
         }
       }

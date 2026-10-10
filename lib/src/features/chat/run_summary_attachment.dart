@@ -41,9 +41,9 @@ void _attachRunSummary(
         elapsedMilliseconds:
             runConversation.restoredExecutionElapsed.inMilliseconds +
             executionWatch.elapsedMilliseconds,
-        isTask: runConversation.hasExecutionProcess,
+        isTask: runConversation.isTask && runConversation.hasExecutionProcess,
         intermediateMessageIds: List.unmodifiable(
-          groupParent == null && hasFinalAnswer
+          runConversation.isTask && hasFinalAnswer
               ? runMessageIds.where(
                   (id) =>
                       id != answer.id &&
@@ -62,7 +62,7 @@ void _attachRunSummary(
                   ),
                 ),
         ),
-        gitChanges: gitChanges,
+        gitChanges: runConversation.isTask ? gitChanges : null,
       ),
     );
   }

@@ -81,6 +81,7 @@ extension MemoryRetrieval on MemoryController {
       where: "owner_id = ? AND state = 'failed'",
       whereArgs: [ownerId],
     );
+    MemoryEvents.wakeQueue();
     await _readFailures();
     _notify();
   }

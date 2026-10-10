@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../memory/memory_events.dart';
 
 import 'package:sqflite/sqflite.dart';
 
@@ -294,5 +295,6 @@ class AgentRunStore {
       );
       await batch.commit(noResult: true);
     });
+    MemoryEvents.wakeQueue();
   }
 }

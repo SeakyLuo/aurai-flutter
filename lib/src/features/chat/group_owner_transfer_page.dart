@@ -1,3 +1,4 @@
+import '../../domain/contact_name_order.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/ui_action.dart';
@@ -42,7 +43,7 @@ class _GroupOwnerTransferPageState extends State<GroupOwnerTransferPage> {
     setState(() {
       _members = members
           .where((member) => member.role != GroupMemberRole.owner)
-          .toList();
+          .byContactName((member) => member.sender);
       _loading = false;
     });
   }

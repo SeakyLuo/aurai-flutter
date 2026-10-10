@@ -1,6 +1,14 @@
 part of 'chat_controller.dart';
 
 extension ConversationActions on ChatController {
+  void _configureReadOnArrival() {
+    _store.writer.isReadOnArrival = (id) =>
+        isConversationDetailVisible &&
+        activeConversation.id == id &&
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    _store.writer.onRead = conversationReads.add;
+  }
+
   void setTemporaryChatPersonalization(bool enabled) {
     activeConversation.mode = enabled
         ? ConversationMode.temporaryPersonalized
@@ -209,6 +217,7 @@ extension ConversationActions on ChatController {
       await _store.writer.flush();
       await GroupUnreadMessages(_store.database).markRead(conversation, latest);
       _updateConversationList(conversation);
+      conversationReads.add(conversation);
       _conversationChanged();
       return;
     }
@@ -224,6 +233,7 @@ extension ConversationActions on ChatController {
       rethrow;
     }
     _updateConversationList(conversation);
+    conversationReads.add(conversation);
     _conversationChanged();
   }
 

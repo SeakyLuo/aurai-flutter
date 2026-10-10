@@ -13,6 +13,7 @@ import '../domain/agent_models.dart';
 import '../domain/message_sender.dart';
 import '../storage/conversation_rows.dart';
 import 'html_game.dart';
+import 'werewolf_postgame_context.dart';
 
 class HtmlStore {
   HtmlStore(this.database);
@@ -107,7 +108,12 @@ class HtmlStore {
     return {
       'messageId': messageId,
       'version': game.version,
-      'state': game.state,
+      'state':
+          game.appId == 'builtin.werewolf' &&
+              game.state['winner'] != null &&
+              game.state['winner'] != '对局已结束'
+          ? werewolfPostgameContext(game.state)
+          : game.state,
       if (compaction != null) 'contextCompaction': compaction,
     };
   }

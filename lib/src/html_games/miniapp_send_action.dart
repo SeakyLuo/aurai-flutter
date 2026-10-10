@@ -19,7 +19,12 @@ bool supportsMiniappMessage(String html) => const [
 Map<String, Object?> initializeMiniappMessage(String html) {
   final action = miniappSendAction(html);
   if (action.isEmpty) return {};
-  if (action['type'] == 'program') return {'phase': 'setup'};
+  if (action['type'] == 'program') {
+    return {
+      ...?action['initialView'] as Map<String, dynamic>?,
+      'phase': 'setup',
+    };
+  }
   if (action['type'] == 'message') {
     return (action['state'] as Map).cast<String, Object?>();
   }

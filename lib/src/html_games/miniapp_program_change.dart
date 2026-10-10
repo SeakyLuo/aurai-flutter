@@ -38,14 +38,17 @@ class MiniappProgramChange {
   final cards = <String, InteractiveMessage>{};
   final replyStates = <String, bool>{};
   bool memberNamesChanged = false;
+  bool interruptReplies = false;
   String? pinActorId;
   String? markActorId;
   MiniappContextCompaction? contextCompaction;
 
   /// The application processes this effect after commit, before any AI wakes.
   static Future<bool> Function(MiniappProgramChange)? compactContext;
+  static Future<void> Function(MiniappProgramChange)? interruptProgram;
 
   Future<void> publish() async {
+    if (interruptReplies) await interruptProgram?.call(this);
     if (contextCompaction != null && !await compactContext!(this)) return;
     HtmlGameSignals.changes.add(messageId);
     MiniappProgramStore.changes.add(this);
@@ -64,6 +67,7 @@ class MiniappProgramChange {
         entry.key: entry.value.toJson(includeParticipants: true),
     },
     'replyStates': replyStates,
+    'interruptReplies': interruptReplies,
     'memberNamesChanged': memberNamesChanged,
     if (pinActorId != null) 'pinActorId': pinActorId,
     if (markActorId != null) 'markActorId': markActorId,
@@ -101,6 +105,7 @@ class MiniappProgramChange {
       (json['replyStates'] as Map).cast<String, bool>(),
     );
     change.memberNamesChanged = json['memberNamesChanged'] as bool;
+    change.interruptReplies = json['interruptReplies'] == true;
     change.pinActorId = json['pinActorId'] as String?;
     change.markActorId = json['markActorId'] as String?;
     return change;

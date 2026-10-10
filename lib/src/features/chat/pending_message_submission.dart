@@ -31,8 +31,6 @@ extension PendingMessageSubmission on ChatController {
     bool dispatch = true,
   }) async {
     final conversation = activeConversation;
-    final queue = pendingMessageQueue;
-    if (queue.busy || _submitting) throw StateError('正在保存消息，请稍后再试');
     final message = AgentMessage(
       id: newMessageId(),
       role: AgentMessageRole.user,
@@ -43,6 +41,21 @@ extension PendingMessageSubmission on ChatController {
       files: fromDraft ? List.of(draftFiles) : const [],
       createdAt: DateTime.now(),
     );
+    return _enqueuePendingMessage(
+      message,
+      fromDraft: fromDraft,
+      dispatch: dispatch,
+    );
+  }
+
+  Future<String> _enqueuePendingMessage(
+    AgentMessage message, {
+    required bool fromDraft,
+    bool dispatch = true,
+  }) async {
+    final conversation = activeConversation;
+    final queue = pendingMessageQueue;
+    if (queue.busy || _submitting) throw StateError('正在保存消息，请稍后再试');
     final draft = conversation.draft;
     final mentions = List.of(conversation.draftMentions);
     queue.busy = true;
@@ -255,8 +268,11 @@ extension PendingMessageSubmission on ChatController {
         sent.add(
           AgentMessage(
             id: message.id,
-            role: AgentMessageRole.user,
-            senderId: MessageSender.localUser.id,
+            role: message.role,
+            senderId: message.senderId,
+            sender: message.sender,
+            isSystem: message.isSystem,
+            interactive: message.messageMetadata,
             text: message.text,
             quote: message.quote,
             images: message.images,

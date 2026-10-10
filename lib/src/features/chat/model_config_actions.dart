@@ -31,7 +31,11 @@ class ModelReplacementImpact {
 
 extension ModelConfigActions on ChatController {
   Future<T> _serializeModelSettings<T>(Future<T> Function() operation) {
-    final result = _modelSettingsWrite.then((_) => operation());
+    final result = _modelSettingsWrite.then((_) async {
+      final value = await operation();
+      MemoryEvents.wakeQueue();
+      return value;
+    });
     _modelSettingsWrite = result.then<void>(
       (_) {},
       onError: (Object _, StackTrace __) {},

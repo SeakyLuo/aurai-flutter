@@ -12,6 +12,7 @@ abstract final class MiniappCapabilityProtocol {
     'cards.submit',
     'replies.set',
     'replies.release',
+    'replies.interrupt',
     'members.rename',
     'timer.set',
     'context.compact',
@@ -94,6 +95,10 @@ class MiniappCapabilityCalls {
           replyStates.addAll((args['states'] as Map).cast<String, bool>());
         case 'replies.release':
           releaseReplies = true;
+        case 'replies.interrupt':
+          if (args.isNotEmpty)
+            throw ArgumentError('replies.interrupt 只中断当前小程序的思考，无需参数');
+          interruptReplies = true;
         case 'members.rename':
           nicknames.addAll((args['names'] as Map).cast<String, String>());
         case 'timer.set':
@@ -123,6 +128,7 @@ class MiniappCapabilityCalls {
   final replyStates = <String, bool>{};
   final nicknames = <String, String>{};
   bool releaseReplies = false;
+  bool interruptReplies = false;
   bool pinMessage = false;
   bool markMessage = false;
   bool timerChanged = false;

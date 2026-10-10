@@ -129,47 +129,57 @@ class _PrivateGoalPanelState extends State<PrivateGoalPanel> {
                   (_state['runningSince'] as int));
     final duration = Duration(milliseconds: elapsed);
     final time = taskDuration(duration);
-    return Row(
-      children: [
-        SizedBox.square(
-          dimension: 18,
-          child: SettingsIcon(
-            type: SettingsIconType.goal,
-            color: colors.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: '$label ',
-                  style: TextStyle(color: colors.onSurfaceVariant),
-                ),
-                TextSpan(
-                  text: _state['objective'] as String,
-                  style: TextStyle(color: colors.onSurface),
-                ),
-              ],
+    return Semantics(
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () async {
+          FocusScope.of(context).unfocus();
+          await _showGoal();
+        },
+        child: Row(
+          children: [
+            SizedBox.square(
+              dimension: 18,
+              child: SettingsIcon(
+                type: SettingsIconType.goal,
+                color: colors.onSurfaceVariant,
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13),
-          ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '$label ',
+                      style: TextStyle(color: colors.onSurfaceVariant),
+                    ),
+                    TextSpan(
+                      text: _state['objective'] as String,
+                      style: TextStyle(color: colors.onSurface),
+                    ),
+                  ],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              time,
+              style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+            ),
+            Builder(
+              builder: (anchor) => ComposerMoreAction(
+                label: '目标操作',
+                onPressed: _acting ? null : () => _more(anchor),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 8),
-        Text(
-          time,
-          style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
-        ),
-        Builder(
-          builder: (anchor) => ComposerMoreAction(
-            label: '目标操作',
-            onPressed: _acting ? null : () => _more(anchor),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -264,7 +274,7 @@ class _PrivateGoalPanelState extends State<PrivateGoalPanel> {
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    isDismissible: false,
+    isDismissible: true,
     enableDrag: false,
     showDragHandle: false,
     builder: (_) => PrivateGoalSheet(

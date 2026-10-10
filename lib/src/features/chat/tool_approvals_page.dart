@@ -1,3 +1,4 @@
+import '../../domain/contact_name_order.dart';
 import 'app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import '../../app/ui_action.dart';
@@ -96,7 +97,11 @@ class _ToolApprovalsPageState extends State<ToolApprovalsPage> {
       searchHint: '搜索群成员',
       selected: _selected!,
       choices: [
-        for (final id in _entries.map((e) => e.sender).toSet())
+        for (final id
+            in _entries
+                .map((e) => e.sender)
+                .toSet()
+                .byContactName((id) => _senders[id]!))
           (value: id, label: _names[id]!),
       ],
       itemBuilder: (choice, selected, onTap) => GroupMemberChoice(

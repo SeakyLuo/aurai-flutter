@@ -10,6 +10,9 @@ extension RunToolLogging on ChatController {
     Map<String, Object?> diagnosticCalls,
   ) => (result) async {
     await _store.runs.finishTool(runId, result);
+    if (conversation.isPersonalChat && result.toolName == 'runTask') {
+      await _updateTaskCardMessage(conversation, result);
+    }
     if (result.toolName == 'runSubagent') {
       if (result.output['runId'] case final String childRunId) {
         subagentRuns.changed(childRunId);

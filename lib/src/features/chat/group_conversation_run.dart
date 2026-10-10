@@ -267,12 +267,20 @@ extension GroupConversationRun on ChatController {
     return _persistRun(parent);
   }
 
-  void _notifyMember(Conversation member, Conversation? parent) {
+  void _notifyMember(
+    Conversation member,
+    Conversation? parent, {
+    bool activityOnly = false,
+  }) {
     if (parent == null) {
       _notifyRun(member);
     } else {
-      _mergeMember(member, parent);
-      _notifyRun(parent);
+      if (activityOnly) {
+        groupActivityChanges.value++;
+      } else {
+        _mergeMember(member, parent);
+        _notifyRun(parent);
+      }
       final names = groupActivitiesFor(parent.id, includeThoughts: false)
           .where((activity) => !activity.stopping && !activity.waitingForUser)
           .map((activity) => activity.sender.name)

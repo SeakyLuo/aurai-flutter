@@ -104,8 +104,10 @@ class AskUserTool implements DeferredAgentTool, RuntimeCapabilityAgentTool {
     this.onQuestion, {
     required this.sender,
     this.executionRunId,
+    this.onWaiting,
   });
   final String? executionRunId;
+  final Future<void> Function(ToolCall, Map<String, Object?>)? onWaiting;
   final String conversationId;
   final MessageSender sender;
   final void Function(UserQuestion?) onQuestion;
@@ -191,64 +193,72 @@ class AskUserTool implements DeferredAgentTool, RuntimeCapabilityAgentTool {
           },
         }),
       );
-      final first = batch.questions.first;
-      final question = UserQuestion(
-        batch: batch,
+      return resume(call, sent);
+    }
+  }
+
+  /// Reattach a task to its existing card instead of publishing the question again.
+  Future<ToolResult> resume(ToolCall call, Map<String, Object?> sent) async {
+    final batch = QuestionBatch(call.arguments['questions'] as List);
+    if (!defaultToCard) await onWaiting?.call(call, sent);
+    final first = batch.questions.first;
+    final question = UserQuestion(
+      batch: batch,
+      callId: call.id,
+      executionRunId: executionRunId,
+      conversationId: sent['conversationId'] as String,
+      sender: sender,
+      question: first['question'] as String,
+      options: const [],
+      allowCustomAnswer: true,
+    );
+    final id = sent['messageId'] as String;
+    question.messageId = id;
+    question.persistAnswer = (answers) async {
+      await submitCard(id, answers);
+      if (!question.result.isCompleted) {
+        question.result.complete({'answers': batch.resolve(answers)});
+      }
+    };
+    UserQuestion.activeCards[id] = question;
+    question.result.future.then((_) {
+      UserQuestion.activeCards.remove(id);
+      QuestionReplySignals.release(id);
+    });
+    if (!defaultToCard) _pending = question;
+    final response = QuestionReplySignals.wait(id, blocking: !defaultToCard);
+    response.then((answer) {
+      if (!question.result.isCompleted) question.result.complete(answer);
+    });
+    onQuestion(question);
+    if (defaultToCard) {
+      question.result.future.then((_) => onQuestion(null));
+      return ToolResult(
         callId: call.id,
-        executionRunId: executionRunId,
-        conversationId: sent['conversationId'] as String,
-        sender: sender,
-        question: first['question'] as String,
-        options: const [],
-        allowCustomAnswer: true,
+        toolName: call.name,
+        status: ToolResultStatus.success,
+        output: {
+          ...sent,
+          'awaitingResponse': true,
+          'next':
+              'The question is recorded in chat and opens the answer sheet. Do not repeat it. Submitted answers arrive through the completion callback.',
+        },
       );
-      final id = sent['messageId'] as String;
-      question.messageId = id;
-      question.persistAnswer = (answers) async {
-        await submitCard(id, answers);
-        if (!question.result.isCompleted) {
-          question.result.complete({'answers': batch.resolve(answers)});
-        }
-      };
-      UserQuestion.activeCards[id] = question;
-      question.result.future.then((_) {
-        UserQuestion.activeCards.remove(id);
-        QuestionReplySignals.release(id);
-      });
-      if (!defaultToCard) _pending = question;
-      QuestionReplySignals.wait(id, blocking: !defaultToCard).then((answer) {
-        if (!question.result.isCompleted) question.result.complete(answer);
-      });
-      onQuestion(question);
-      if (defaultToCard) {
-        question.result.future.then((_) => onQuestion(null));
-        return ToolResult(
-          callId: call.id,
-          toolName: call.name,
-          status: ToolResultStatus.success,
-          output: {
-            ...sent,
-            'awaitingResponse': true,
-            'next':
-                'The question is recorded in chat and opens the answer sheet. Do not repeat it. Submitted answers arrive through the completion callback.',
-          },
-        );
-      }
-      try {
-        final answer = await question.result.future;
-        return ToolResult(
-          callId: call.id,
-          toolName: call.name,
-          status: answer['cancelled'] == true
-              ? ToolResultStatus.cancelled
-              : ToolResultStatus.success,
-          output: {...sent, ...answer},
-        );
-      } finally {
-        QuestionReplySignals.release(id);
-        _pending = null;
-        onQuestion(null);
-      }
+    }
+    try {
+      final answer = await question.result.future;
+      return ToolResult(
+        callId: call.id,
+        toolName: call.name,
+        status: answer['cancelled'] == true
+            ? ToolResultStatus.cancelled
+            : ToolResultStatus.success,
+        output: {...sent, ...answer},
+      );
+    } finally {
+      QuestionReplySignals.release(id);
+      _pending = null;
+      onQuestion(null);
     }
   }
 

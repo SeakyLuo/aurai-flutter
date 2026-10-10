@@ -466,6 +466,7 @@ class _ProjectPageState extends State<ProjectPage> {
         id,
         waitForClose: true,
       );
+      if (mounted) await _load();
     } finally {
       if (mounted) setState(() => _opening = false);
     }
@@ -507,16 +508,19 @@ class _ProjectPageState extends State<ProjectPage> {
     }
   }
 
-  Future<void> _searchProject() => Navigator.push<void>(
-    context,
-    MaterialPageRoute(
-      builder: (_) => ConversationSearchPage(
-        controller: widget.controller,
-        preparingGoal: () => false,
-        projectId: _project.id,
+  Future<void> _searchProject() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ConversationSearchPage(
+          controller: widget.controller,
+          preparingGoal: () => false,
+          projectId: _project.id,
+        ),
       ),
-    ),
-  );
+    );
+    if (mounted) await _load();
+  }
 
   @override
   Widget build(BuildContext context) {

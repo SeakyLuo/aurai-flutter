@@ -78,6 +78,7 @@ class AuraiApplication : Application() {
             "aurai/html_game", HtmlViewFactory(flutterEngine.dartExecutor.binaryMessenger),
         )
         ScheduledTasks.initialize(this, flutterEngine.dartExecutor.binaryMessenger)
+        InteractiveReminders.initialize(this, flutterEngine.dartExecutor.binaryMessenger)
         agentBridge = AndroidAgentBridge(this)
         httpProbe = AndroidHttpProbe(
             getSystemService(ConnectivityManager::class.java),

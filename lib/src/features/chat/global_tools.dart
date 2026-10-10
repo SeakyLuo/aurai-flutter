@@ -40,13 +40,11 @@ extension GlobalTools on ChatController {
         'resumeGroupAutoReply',
       ],
     ]);
-    if (parent != null &&
-        observed.any(
-          (message) =>
-              message.canView(reply.senderId) &&
-              message.messageMetadata?.participation['_programMessage']
-                  is String,
-        )) {
+    if (observed.any(
+      (message) =>
+          message.canView(reply.senderId) &&
+          message.messageMetadata?.participation['_programMessage'] is String,
+    )) {
       // A program snapshot already supplies the version and action protocol.
       // Keep its tools available throughout the run instead of rediscovering them.
       registry.retain('readHtmlProgram');
@@ -316,7 +314,11 @@ extension GlobalTools on ChatController {
             );
             _publishInteractiveChange(target.id, message, source: target);
             HtmlGameSignals.changes.add(message.id);
-            final app = await htmlStore.load(target.id, message.id);
+            final app = await htmlStore.load(
+              target.id,
+              message.id,
+              viewer: senderId,
+            );
             final ref = app.appId == null
                 ? null
                 : await HtmlAppStore.load(_store.database, app.appId!);
@@ -325,6 +327,17 @@ extension GlobalTools on ChatController {
               'messageId': message.id,
               'conversationId': target.id,
               if (ref != null) ...await HtmlAppStore.reference(ref),
+              if (app.state.containsKey('_miniapp')) ...{
+                'program': {
+                  'messageId': message.id,
+                  'version': app.version,
+                  'state': app.state,
+                },
+                'nextStep':
+                    '按 program 中的开局协议完成用户已要求的配置；发送棋盘不等于开局完成。'
+                    '用 submitHtmlProgramEvent 提交，不修改源码或覆盖状态。'
+                    '未提供开局协议时用 readHtmlProgram 读取声明的资源，不猜事件参数。',
+              },
             };
           }),
           for (final name in InteractiveMessageTool.names)

@@ -1,0 +1,21 @@
+{
+  "type": "Column",
+  "runtime": {"refreshIntervalMs": 50, "persistState": true},
+  "state": {"running": false, "startedAt": 0, "elapsed": 0, "laps": []},
+  "components": {
+    "ElapsedText": {
+      "params": {"value": {"type": "object"}},
+      "body": {"type": "Text", "style": "displayMedium", "data": {"op": "formatDuration", "args": [{"param": "value"}, "HH:mm:ss.SSS"]}}
+    }
+  },
+  "spacing": 12,
+  "children": [
+    {"type": "Text", "data": "秒表", "style": "titleMedium"},
+    {"type": "Component", "name": "ElapsedText", "args": {"value": {"op": "add", "args": [{"ref": "local.elapsed"}, {"op": "if", "args": [{"ref": "local.running"}, {"op": "subtract", "args": [{"ref": "time.now"}, {"ref": "local.startedAt"}]}, 0]}]}}},
+    {"type": "FilledButton", "enabled": {"op": "not", "args": [{"ref": "local.running"}]}, "child": {"type": "Text", "data": "开始 / 继续"}, "onPressed": {"setState": {"running": true, "startedAt": {"ref": "time.now"}}}},
+    {"type": "TextButton", "enabled": {"ref": "local.running"}, "child": {"type": "Text", "data": "暂停"}, "onPressed": {"setState": {"running": false, "elapsed": {"op": "add", "args": [{"ref": "local.elapsed"}, {"op": "subtract", "args": [{"ref": "time.now"}, {"ref": "local.startedAt"}]}]}}}},
+    {"type": "TextButton", "enabled": {"op": "and", "args": [{"ref": "local.running"}, {"op": "lt", "args": [{"op": "length", "args": [{"ref": "local.laps"}]}, 200]}]}, "child": {"type": "Text", "data": "计次"}, "onPressed": {"setState": {"laps": {"op": "append", "args": [{"ref": "local.laps"}, {"op": "add", "args": [{"ref": "local.elapsed"}, {"op": "subtract", "args": [{"ref": "time.now"}, {"ref": "local.startedAt"}]}]}]}}}},
+    {"type": "TextButton", "child": {"type": "Text", "data": "重置"}, "onPressed": {"setState": {"running": false, "startedAt": 0, "elapsed": 0, "laps": []}}},
+    {"type": "ForEach", "items": {"ref": "local.laps"}, "offset": {"op": "max", "args": [0, {"op": "subtract", "args": [{"op": "length", "args": [{"ref": "local.laps"}]}, 20]}]}, "limit": 20, "template": {"type": "Text", "data": {"op": "concat", "args": ["第 ", {"op": "add", "args": [{"ref": "index"}, 1]}, " 次：", {"op": "formatDuration", "args": [{"ref": "item"}, "HH:mm:ss.SSS"]}]}}}
+  ]
+}

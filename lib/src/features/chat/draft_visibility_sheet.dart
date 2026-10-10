@@ -1,3 +1,4 @@
+import '../../domain/contact_name_order.dart';
 import 'package:flutter/material.dart';
 import 'floating_search_layout.dart';
 import '../../domain/message_sender.dart';
@@ -124,9 +125,13 @@ class _DraftVisibilitySheetState extends State<DraftVisibilitySheet> {
                     slivers: [
                       SliverList.list(
                         children: [
-                          for (final member in widget.members.where(
-                            (m) => m.name.toLowerCase().contains(_search),
-                          ))
+                          for (final member
+                              in widget.members
+                                  .byContactName((m) => m)
+                                  .where(
+                                    (m) =>
+                                        m.name.toLowerCase().contains(_search),
+                                  ))
                             GroupMemberChoice(
                               selected: _selected.contains(member.id),
                               sender: member,

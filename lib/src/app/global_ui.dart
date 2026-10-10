@@ -30,9 +30,10 @@ abstract final class GlobalUI {
 
   /// 可点击人名、@ 提及等文字的强调色，区别于 primary 背景色。
   static Color highlightTextColor(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark
-      ? primaryLight
-      : onPrimary;
+      highlightTextForTheme(Theme.of(context));
+
+  static Color highlightTextForTheme(ThemeData theme) =>
+      theme.brightness == Brightness.dark ? primaryLight : onPrimary;
 
   static TextStyle linkStyle(BuildContext context) {
     final color = Theme.of(context).colorScheme.onSurface;

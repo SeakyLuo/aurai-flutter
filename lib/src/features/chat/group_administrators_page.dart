@@ -1,3 +1,4 @@
+import '../../domain/contact_name_order.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/glass_notice.dart';
@@ -47,7 +48,7 @@ class _GroupAdministratorsPageState extends State<GroupAdministratorsPage> {
     setState(() {
       _members = members
           .where((member) => member.role != GroupMemberRole.owner)
-          .toList();
+          .byContactName((member) => member.sender);
       _selected = selected;
       _initial = {...selected};
       _loading = false;

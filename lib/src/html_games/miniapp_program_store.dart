@@ -45,7 +45,14 @@ class MiniappProgramStore {
     String conversationId, {
     bool avatars = false,
   }) async {
-    final roster = await db.query(
+    final conversations = await db.query(
+      'conversations',
+      columns: ['kind', 'default_sender_id'],
+      where: 'id = ?',
+      whereArgs: [conversationId],
+    );
+    final direct = conversations.single['kind'] == 'direct';
+    final rosterQuery = db.query(
       'message_senders',
       columns: [
         'id',
@@ -53,16 +60,32 @@ class MiniappProgramStore {
         'kind',
         if (avatars) ...['avatar_icon', 'avatar_color', 'avatar_path'],
       ],
-      where:
-          'id IN (SELECT sender_id FROM conversation_members WHERE conversation_id = ? AND left_at IS NULL)',
-      whereArgs: [conversationId],
+      where: direct
+          ? 'id IN (?, ?)'
+          : 'id IN (SELECT sender_id FROM conversation_members WHERE conversation_id = ? AND left_at IS NULL)',
+      whereArgs: direct
+          ? [
+              MessageSender.localUser.id,
+              conversations.single['default_sender_id'],
+            ]
+          : [conversationId],
     );
-    final details = await db.query(
-      'group_member_details',
-      columns: ['sender_id', 'nickname'],
-      where: "conversation_id = ? AND nickname != ''",
-      whereArgs: [conversationId],
-    );
+    if (direct) {
+      final roster = await rosterQuery;
+      return [
+        for (final member in roster)
+          {...member, 'originalName': member['name']},
+      ];
+    }
+    final (roster, details) = await (
+      rosterQuery,
+      db.query(
+        'group_member_details',
+        columns: ['sender_id', 'nickname'],
+        where: "conversation_id = ? AND nickname != ''",
+        whereArgs: [conversationId],
+      ),
+    ).wait;
     final names = {
       for (final row in details) row['sender_id']: row['nickname'],
     };
@@ -393,6 +416,12 @@ class MiniappProgramStore {
       },
     );
     final calls = MiniappCapabilityCalls(output, declared);
+    if (calls.interruptReplies) {
+      if (actorId != MessageSender.localUser.id) {
+        throw StateError('只有用户可以中断小程序思考');
+      }
+      change.interruptReplies = true;
+    }
     if (anonymousCard != null) validateAnonymousVoteEffects(calls);
     if (calls.contextInstructions != null) {
       if (actorId != MessageSender.localUser.id &&

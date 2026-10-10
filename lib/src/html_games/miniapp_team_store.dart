@@ -1,3 +1,5 @@
+import '../domain/contact_display_names.dart';
+import '../domain/contact_name_order.dart';
 import 'dart:async';
 
 import 'package:sqflite/sqflite.dart';
@@ -349,18 +351,41 @@ class MiniappTeamStore {
     int offset = 0,
     String query = '',
   }) async {
-    final rows = await database.query(
+    final index = await database.query(
       'message_senders',
+      columns: ['id', 'name'],
       where:
           '''kind = 'agent' AND archived = 0 AND instr(lower(name), lower(?)) > 0
         AND id != (SELECT creator_id FROM html_apps WHERE id = ?)
         AND id NOT IN (SELECT sender_id FROM miniapp_developers WHERE app_id = ?)''',
       whereArgs: [query, appId, appId],
-      orderBy: 'name, id',
-      limit: pageSize,
-      offset: offset,
     );
-    return rows.map(MessageSender.fromRow).toList();
+    final ordered =
+        index
+            .map(
+              (row) => ContactNameOrder(
+                row['id'] as String,
+                ContactDisplayNames.remark(row['id'] as String) ??
+                    row['name'] as String,
+              ),
+            )
+            .toList()
+          ..sort();
+    final ids = ordered
+        .skip(offset)
+        .take(pageSize)
+        .map((entry) => entry.id)
+        .toList();
+    if (ids.isEmpty) return [];
+    final rows = await database.query(
+      'message_senders',
+      where: 'id IN (${List.filled(ids.length, '?').join(',')})',
+      whereArgs: ids,
+    );
+    final senders = {
+      for (final row in rows) row['id']: MessageSender.fromRow(row),
+    };
+    return [for (final id in ids) senders[id]!];
   }
 
   Future<List<Map<String, Object?>>> pending(

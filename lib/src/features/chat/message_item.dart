@@ -36,6 +36,7 @@ import 'file_attachments.dart';
 import 'reply_image_syntax.dart';
 import 'reply_image_gallery.dart';
 import 'markdown_link_underlines.dart';
+import 'task_card_message.dart';
 import 'markdown_code_block.dart';
 import 'cjk_strong_syntax.dart';
 import 'dart:async';
@@ -78,6 +79,7 @@ class MessageItem extends StatefulWidget {
     required this.onEdit,
     this.replyPart,
     this.trailingActivities,
+    this.showTaskEntries = true,
     this.streaming = false,
     this.readOnly = false,
     this.groupBubble = false,
@@ -101,6 +103,7 @@ class MessageItem extends StatefulWidget {
   final AgentMessage message;
   final PrivateReplyPart? replyPart;
   final Widget? trailingActivities;
+  final bool showTaskEntries;
   final Map<String, String> mentionMembers;
   final Map<String, MessageSender> interactiveMembers;
   final Future<InteractiveClickResult?> Function(
@@ -203,6 +206,8 @@ class _MessageItemState extends State<MessageItem> {
                   anchorKey:
                       !message.isFailure &&
                           message.miniappShare == null &&
+                          message.messageMetadata?.participation['_taskCard'] ==
+                              null &&
                           message.htmlGame == null &&
                           (message.text.isNotEmpty ||
                               message.interactive != null)
@@ -241,13 +246,16 @@ class _MessageItemState extends State<MessageItem> {
       : Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (widget.groupBubble && message.taskSummary != null)
+            if (widget.showTaskEntries &&
+                widget.groupBubble &&
+                message.taskSummary != null)
               OrganizedTaskActivities(summary: message.taskSummary!),
             if (!widget.groupBubble &&
                 (widget.replyPart == null
                     ? message.taskSummary != null
                     : widget.replyPart!.summary != null))
               TaskSummaryView(
+                showTaskEntries: widget.showTaskEntries,
                 excludedMessageId: widget.excludedActivityMessageId,
                 messageId: message.id,
                 summary: widget.replyPart?.summary ?? message.taskSummary!,
@@ -257,11 +265,12 @@ class _MessageItemState extends State<MessageItem> {
               key: const ValueKey('message-content'),
               child: _selectableContent(),
             ),
-            if ((widget.replyPart == null
-                    ? message.taskSummary?.gitChanges
-                    : widget.replyPart!.gitChanges)
-                case final gitChanges?)
-              GitTaskChangesView(changes: gitChanges),
+            if (!widget.groupBubble)
+              if ((widget.replyPart == null
+                      ? message.taskSummary?.gitChanges
+                      : widget.replyPart!.gitChanges)
+                  case final gitChanges?)
+                GitTaskChangesView(changes: gitChanges),
             if (widget.trailingActivities case final activities?) activities,
             if (message.quickReplies.isNotEmpty)
               this._buildQuickReplies(context),
@@ -335,6 +344,14 @@ class _MessageItemState extends State<MessageItem> {
   );
 
   Widget _buildContent(BuildContext context) {
+    if (message.messageMetadata?.participation['_taskCard'] != null) {
+      return TaskCardMessage(
+        message: message,
+        groupBubble: widget.groupBubble,
+        onLongPress: () => _openActions(),
+        wrapContent: _withBubbleStatus,
+      );
+    }
     if (message.miniappShare != null)
       return MiniappShareMessage(
         message: message,

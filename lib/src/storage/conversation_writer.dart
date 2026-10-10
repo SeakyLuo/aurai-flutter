@@ -9,10 +9,14 @@ import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
 import 'new_conversation_draft.dart';
 import 'group_participation.dart';
+import 'group_unread_messages.dart';
+import '../domain/message_sender.dart';
 
 class ConversationWriter {
   ConversationWriter(this.database);
   final Database database;
+  bool Function(String conversationId)? isReadOnArrival;
+  void Function(Conversation conversation)? onRead;
   final _draftStore = NewConversationDraft();
   final Map<String, AgentMessage> _savedMessages = {};
   // These guards outlive queued snapshots, but need not survive a process restart.
@@ -71,6 +75,8 @@ class ConversationWriter {
     final messageRows = [
       for (final message in changed) messageRow(conversation.id, message),
     ];
+    final readOnArrival =
+        !conversation.isTask && isReadOnArrival?.call(conversation.id) == true;
     final imageRows = [
       if (saveDraft)
         for (var i = 0; i < conversation.draftFiles.length; i++)
@@ -107,6 +113,7 @@ class ConversationWriter {
           ),
     ];
     final write = _saving.then((_) async {
+      AgentMessage? readThrough;
       await database.transaction((txn) async {
         // A queued snapshot must never restore a recalled message or its attachments.
         final terminalRows = messageRows.isEmpty
@@ -242,6 +249,23 @@ class ConversationWriter {
           }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
         await batch.commit(noResult: true);
+        if (readOnArrival) {
+          readThrough = changed
+              .where(
+                (message) =>
+                    !terminalIds.contains(message.id) &&
+                    message.role == AgentMessageRole.assistant &&
+                    message.canView(MessageSender.localUser.id),
+              )
+              .lastOrNull;
+          if (readThrough case final message?) {
+            await GroupUnreadMessages.writeCheckpoint(
+              txn,
+              conversation.id,
+              message,
+            );
+          }
+        }
         if (participation != null) {
           await GroupParticipation.setIn(
             txn,
@@ -265,6 +289,17 @@ class ConversationWriter {
       });
       conversation.isStored = true;
       remember(changed);
+      if (readThrough case final message?) {
+        final at = message.createdAt.microsecondsSinceEpoch;
+        if (at > conversation.groupReadAt ||
+            (at == conversation.groupReadAt &&
+                message.id.compareTo(conversation.groupReadId) > 0)) {
+          conversation.groupReadAt = at;
+          conversation.groupReadId = message.id;
+          conversation.unreadMessageCount = 0;
+          onRead?.call(conversation);
+        }
+      }
     });
     // A failed write must not block later attempts; its caller still receives the error.
     _saving = write.catchError((Object error) {});

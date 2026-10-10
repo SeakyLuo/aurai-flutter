@@ -1,4 +1,15 @@
 import 'package:lpinyin/lpinyin.dart';
+import 'message_sender.dart';
+
+extension ContactNameOrdering<T> on Iterable<T> {
+  List<T> byContactName(MessageSender Function(T) senderOf) {
+    final entries = map((item) {
+      final sender = senderOf(item);
+      return (item, ContactNameOrder(sender.id, sender.displayName));
+    }).toList()..sort((a, b) => a.$2.compareTo(b.$2));
+    return [for (final entry in entries) entry.$1];
+  }
+}
 
 class ContactNameOrder implements Comparable<ContactNameOrder> {
   ContactNameOrder(this.id, String name)

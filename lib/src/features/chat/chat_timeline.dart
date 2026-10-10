@@ -1,7 +1,12 @@
 import 'profile_navigation.dart';
+import 'chat_message_spacing.dart';
+import 'chat_timeline_entry.dart';
+import 'task_message_entries.dart';
+export 'chat_timeline_entry.dart';
 import 'private_reply_layout.dart';
 import 'interactive_message_paging.dart';
 import 'recalled_message_notice.dart';
+import 'task_source_notice.dart';
 import '../../html_games/miniapp_forward.dart';
 import '../../html_games/html_view.dart';
 import '../../domain/tool_activity_groups.dart';
@@ -20,14 +25,7 @@ import 'personal_info_page.dart';
 import 'group_mention_text.dart';
 import '../../domain/message_sender.dart';
 import 'message_time.dart';
-import 'tool_activity_view.dart';
-
-class ChatTimelineEntry {
-  const ChatTimelineEntry(this.id, this.builder, {this.preserveState = false});
-  final String id;
-  final WidgetBuilder builder;
-  final bool preserveState;
-}
+import 'timeline_tool_activity.dart';
 
 List<ChatTimelineEntry> buildChatTimeline(
   ChatController controller, {
@@ -128,7 +126,7 @@ List<ChatTimelineEntry> buildChatTimeline(
   };
   final hiddenIds = {
     for (final message in timelineMessages)
-      if (!isGroup && message.taskSummary != null)
+      if (conversation.isTask && message.taskSummary != null)
         for (final id in message.taskSummary!.intermediateMessageIds)
           if (reasoningIds.contains(id) || !richRuns.contains(message.runId))
             id,
@@ -136,6 +134,7 @@ List<ChatTimelineEntry> buildChatTimeline(
   final visibleMessages = timelineMessages
       .where(
         (message) =>
+            !(conversation.isPersonalChat && message.isReasoning) &&
             !(message.isReasoning &&
                 message.runId == conversation.activeRunId &&
                 (conversation.runState == ChatRunState.running ||
@@ -183,7 +182,8 @@ List<ChatTimelineEntry> buildChatTimeline(
   final liveSteps = [
     for (final source in stepSources)
       for (final (ordinal, entry) in source.liveToolSteps.indexed)
-        if (!summarizedRuns.contains(entry.runId) &&
+        if (conversation.isTask &&
+            !summarizedRuns.contains(entry.runId) &&
             source.runState != ChatRunState.running &&
             source.runState != ChatRunState.stopping)
           (
@@ -238,7 +238,7 @@ List<ChatTimelineEntry> buildChatTimeline(
   final liveSources = webSourcesFromSteps(liveSteps.map((entry) => entry.step));
   final groups = toolActivityGroups([
     for (final entry in liveSteps)
-      entry.step.toolName == 'askUser'
+      const {'askUser', 'runTask'}.contains(entry.step.toolName)
           ? null
           : '${entry.runId}:${entry.afterMessageId}:${entry.step.toolName}',
   ]);
@@ -309,58 +309,68 @@ List<ChatTimelineEntry> buildChatTimeline(
         entry.afterMessageId,
       );
     }
-    activitiesAfter(entry.afterMessageId, entry.runId).add(
-      ChatTimelineEntry(
-        storageId,
-        (_) => entry.step.toolName == 'askUser' || group.end - group.start == 1
-            ? _ToolActivity(
-                storageId: storageId,
-                step: entry.step,
-                senderName: entry.senderName,
+    // Task cards occupy a message slot rather than the preceding reply's body.
+    (entry.step.toolName == 'runTask'
+            ? followingToolsByMessage.putIfAbsent(
+                entry.afterMessageId,
+                () => [],
               )
-            : Padding(
-                padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
-                child: ToolActivityGroup(
-                  key: ValueKey(storageId),
-                  storageId: storageId,
-                  toolName: entry.step.toolName,
-                  active:
-                      activeRunIds.contains(entry.runId) &&
-                      latest.step.status == AgentStepStatus.running &&
-                      lastStepByRun[entry.runId] == group.end - 1,
-                  activeLabel: _activeToolActivityTitle(
-                    latest.step,
-                    latest.senderName,
-                  ),
-                  startedAt: latest.step.startedAt,
-                  finishedAt: latest.step.finishedAt,
-                  activeResultJson: latest.step.resultJson,
-                  fileResults:
-                      entry.step.toolName == 'executeAndroidScript' ||
-                          entry.step.toolName == 'runSkill'
-                      ? [
-                          for (var i = group.start; i < group.end; i++)
-                            liveSteps[i].step.resultJson,
-                        ]
-                      : const [],
-                  statuses: [
-                    for (var i = group.start; i < group.end; i++)
-                      liveSteps[i].step.status,
-                  ],
-                  children: [
-                    for (var i = group.start; i < group.end; i++)
-                      _ToolActivity(
-                        storageId:
-                            'tool:${liveSteps[i].runId}:${liveSteps[i].ordinal}',
-                        senderName: liveSteps[i].senderName,
-                        step: liveSteps[i].step,
-                        grouped: true,
+            : activitiesAfter(entry.afterMessageId, entry.runId))
+        .add(
+          ChatTimelineEntry(
+            storageId,
+            (_) =>
+                entry.step.toolName == 'askUser' || group.end - group.start == 1
+                ? TimelineToolActivity(
+                    storageId: storageId,
+                    step: entry.step,
+                    senderName: entry.senderName,
+                    chatBubbles: chatBubbles,
+                    isGroup: isGroup,
+                  )
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
+                    child: ToolActivityGroup(
+                      key: ValueKey(storageId),
+                      storageId: storageId,
+                      toolName: entry.step.toolName,
+                      active:
+                          activeRunIds.contains(entry.runId) &&
+                          latest.step.status == AgentStepStatus.running &&
+                          lastStepByRun[entry.runId] == group.end - 1,
+                      activeLabel: _activeToolActivityTitle(
+                        latest.step,
+                        latest.senderName,
                       ),
-                  ],
-                ),
-              ),
-      ),
-    );
+                      startedAt: latest.step.startedAt,
+                      finishedAt: latest.step.finishedAt,
+                      activeResultJson: latest.step.resultJson,
+                      fileResults:
+                          entry.step.toolName == 'executeAndroidScript' ||
+                              entry.step.toolName == 'runSkill'
+                          ? [
+                              for (var i = group.start; i < group.end; i++)
+                                liveSteps[i].step.resultJson,
+                            ]
+                          : const [],
+                      statuses: [
+                        for (var i = group.start; i < group.end; i++)
+                          liveSteps[i].step.status,
+                      ],
+                      children: [
+                        for (var i = group.start; i < group.end; i++)
+                          TimelineToolActivity(
+                            storageId:
+                                'tool:${liveSteps[i].runId}:${liveSteps[i].ordinal}',
+                            senderName: liveSteps[i].senderName,
+                            step: liveSteps[i].step,
+                            grouped: true,
+                          ),
+                      ],
+                    ),
+                  ),
+          ),
+        );
   }
   if (liveElapsed != null && !liveElapsedPlaced) {
     final firstRunMessage = visibleMessages.indexWhere(
@@ -450,11 +460,31 @@ List<ChatTimelineEntry> buildChatTimeline(
           ),
         ),
       if (message.id != beforeMessageId) ...?headersByMessage[message.id],
+      if (conversation.isTask && message.id != beforeMessageId)
+        ...taskMessageEntries(
+          message.taskSummary,
+          messageId: message.id,
+          chatBubbles: chatBubbles,
+          isGroup: isGroup,
+        ),
       if (message.id != beforeMessageId)
         ChatTimelineEntry(
           message.id,
           (context) {
             if (message.isSystem) {
+              if (message.messageMetadata?.participation['_taskSource'] !=
+                  null) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 12,
+                  ),
+                  child: TaskSourceNotice(
+                    controller: controller,
+                    message: message,
+                  ),
+                );
+              }
               return Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 28,
@@ -467,9 +497,7 @@ List<ChatTimelineEntry> buildChatTimeline(
                   onOpenLink: (href) =>
                       openMiniappLink(context, Uri.parse(href)),
                   memberNames: isGroup ? noticeNameIds : const {},
-                  onOpenMember: isGroup
-                      ? (id) => openNoticeMember(context, id)
-                      : null,
+                  onOpenMember: (id) => openNoticeMember(context, id),
                   style: TextStyle(
                     fontSize: 12,
                     height: 1.6,
@@ -479,6 +507,7 @@ List<ChatTimelineEntry> buildChatTimeline(
               );
             }
             final content = MessageItem(
+              showTaskEntries: false,
               excludedActivityMessageId: conversation.searchMessageId,
               key: ValueKey(message.id),
               message: message,
@@ -654,10 +683,7 @@ List<ChatTimelineEntry> buildChatTimeline(
                     child: systemBody,
                   );
             final item = chatBubbles
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: pagedBody,
-                  )
+                ? ChatMessageSpacing(child: pagedBody)
                 : pagedBody;
             // Keep the HTML subtree mounted when message highlighting ends.
             if (message.id != highlightedMessageId &&
@@ -711,7 +737,8 @@ Map<String, String> chatSummaryOwners(ChatController controller) {
     for (final message in controller.visibleMessages)
       'time:${message.id}': message.id,
     for (final message in controller.visibleMessages)
-      if (message.taskSummary != null) ...{
+      if (controller.activeConversation.isTask &&
+          message.taskSummary != null) ...{
         'elapsed:${message.runId}': message.id,
         for (final id in message.taskSummary!.intermediateMessageIds)
           if (id != controller.activeConversation.searchMessageId &&
@@ -719,55 +746,12 @@ Map<String, String> chatSummaryOwners(ChatController controller) {
             id: message.id,
         for (var i = 0; i < message.taskSummary!.activities.length; i++)
           'tool:${message.runId}:$i': message.id,
+        for (var i = 0; i < message.taskSummary!.activities.length; i++)
+          'task-entry:${message.id}:$i': message.id,
         if (message.runId == controller.activeConversation.activeRunId)
           'progress:${controller.activeConversation.id}': message.id,
       },
   };
-}
-
-class _ToolActivity extends StatelessWidget {
-  const _ToolActivity({
-    required this.step,
-    required this.storageId,
-    this.grouped = false,
-    this.senderName,
-  });
-  final bool grouped;
-  final String? senderName;
-  final String storageId;
-
-  final AgentStep step;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: grouped
-          ? const EdgeInsets.symmetric(vertical: 5)
-          : const EdgeInsets.fromLTRB(18, 4, 18, 8),
-      child: ToolActivityView(
-        callId: step.callId,
-        showFileChanges: !grouped,
-        toolName: step.toolName,
-        storageId: storageId,
-        title: _toolActivityTitle(step, senderName),
-        startedAt: step.startedAt,
-        finishedAt: step.finishedAt,
-        status: step.status,
-        requestJson: step.requestJson,
-        resultJson: step.resultJson,
-      ),
-    );
-  }
-}
-
-String _toolActivityTitle(AgentStep step, String? senderName) {
-  final prefix = switch (step.status) {
-    AgentStepStatus.running => '正在',
-    AgentStepStatus.completed => '已完成：',
-    AgentStepStatus.failed => '未完成：',
-    AgentStepStatus.cancelled => '已停止：',
-  };
-  return '${senderName == null ? '' : '$senderName '}$prefix${step.title}';
 }
 
 String _activeToolActivityTitle(AgentStep step, String? senderName) =>

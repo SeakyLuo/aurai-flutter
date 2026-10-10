@@ -77,7 +77,7 @@ extension _ChatBody on _ChatPageState {
                                   key: _viewportKey,
                                   entries: timeline,
                                   showScrollbar: true,
-                                  alignShortContentToTop: active.isPersonalChat,
+                                  alignShortContentToTop: true,
                                   onScrollToLatest: _scrollToBottom,
                                   bookmark: _scrollBookmarks[_conversationId],
                                   followOutput: _followOutput && !_quoteFocused,
@@ -128,20 +128,6 @@ extension _ChatBody on _ChatPageState {
                                 ),
                               ),
                       ),
-                      if (controller.changingConversation)
-                        Positioned.fill(
-                          child: ColoredBox(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surface.withValues(alpha: 0.81),
-                            child: Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(24),
-                                child: const ThinkingIndicator(label: '正在打开会话'),
-                              ),
-                            ),
-                          ),
-                        ),
                       Positioned(
                         left: 12,
                         right: 16,

@@ -21,6 +21,8 @@ class MemoryWorker {
   final void Function(Object) onError;
   final _active = <String, ResponsesTransport>{};
   Timer? _timer;
+  StreamSubscription<void>? _queueSubscription;
+  bool _wakePending = false;
   bool _stopped = false, _polling = false;
   String? _configKey;
   static final _checkpoints = <String, Future<void>>{};
@@ -96,15 +98,22 @@ class MemoryWorker {
     await database.update('memory_jobs', {
       'state': 'pending',
     }, where: "state = 'working'");
-    _timer = Timer.periodic(
-      const Duration(seconds: 10),
-      (_) => unawaited(_poll()),
-    );
-    unawaited(_poll());
+    _queueSubscription = MemoryEvents.queueChanges.listen((_) => _wake());
+    _wake();
   }
 
-  Future<void> _poll() async {
-    if (_stopped || _polling || _active.length >= 2) return;
+  void _wake() {
+    if (_stopped) return;
+    _timer?.cancel();
+    if (_polling) {
+      _wakePending = true;
+      return;
+    }
+    unawaited(_drain());
+  }
+
+  Future<void> _drain() async {
+    if (_stopped || _active.length >= 2) return;
     _polling = true;
     try {
       final config = modelConfig();
@@ -121,10 +130,18 @@ class MemoryWorker {
         );
         _configKey = key;
       }
+      const eligible =
+          "state = 'pending' "
+          // Build the active run set once, rather than scanning runs per job.
+          "AND NOT EXISTS (SELECT 1 FROM memory_run_jobs mapping "
+          "WHERE mapping.job_id = memory_jobs.run_id AND mapping.run_id IN ("
+          "SELECT id FROM agent_runs WHERE status = 'running' UNION "
+          "SELECT parent_run_id FROM agent_runs WHERE status = 'running' "
+          "AND parent_run_id IS NOT NULL)) "
+          "AND NOT EXISTS (SELECT 1 FROM memory_jobs older WHERE older.owner_id = memory_jobs.owner_id AND older.conversation_id = memory_jobs.conversation_id AND older.state != 'done' AND older.rowid < memory_jobs.rowid)";
       final jobs = await database.query(
         'memory_jobs',
-        where:
-            "state = 'pending' AND due_at <= ? AND NOT EXISTS (SELECT 1 FROM agent_runs child WHERE (child.id IN (SELECT run_id FROM memory_run_jobs WHERE job_id = memory_jobs.run_id) OR child.parent_run_id IN (SELECT run_id FROM memory_run_jobs WHERE job_id = memory_jobs.run_id)) AND child.status = 'running') AND NOT EXISTS (SELECT 1 FROM memory_jobs older WHERE older.owner_id = memory_jobs.owner_id AND older.conversation_id = memory_jobs.conversation_id AND older.state != 'done' AND older.rowid < memory_jobs.rowid)",
+        where: '$eligible AND due_at <= ?',
         whereArgs: [DateTime.now().millisecondsSinceEpoch],
         orderBy: 'due_at, run_id',
         limit: 2 - _active.length,
@@ -145,10 +162,35 @@ class MemoryWorker {
         _active[id] = transport;
         unawaited(_process(job, transport));
       }
+      if (!_stopped && _active.length < 2) {
+        final next = await database.query(
+          'memory_jobs',
+          columns: ['due_at'],
+          where: eligible,
+          orderBy: 'due_at',
+          limit: 1,
+        );
+        if (!_stopped && next.isNotEmpty) {
+          _timer = Timer(
+            Duration(
+              milliseconds: math.max(
+                0,
+                (next.single['due_at'] as int) -
+                    DateTime.now().millisecondsSinceEpoch,
+              ),
+            ),
+            _wake,
+          );
+        }
+      }
     } on Object catch (error) {
       if (!_stopped) onError(error);
     } finally {
       _polling = false;
+      if (_wakePending) {
+        _wakePending = false;
+        _wake();
+      }
     }
   }
 
@@ -344,22 +386,26 @@ class MemoryWorker {
           whereArgs: [id],
         );
         if (foreground) rethrow;
-        onError(error);
+        // Background failures remain in the job and attempt history without interrupting chat.
         MemoryEvents.changed(job['owner_id'] as String);
       }
     } finally {
       _active.remove(id);
+      MemoryEvents.wakeQueue();
     }
   }
 
   Future<void> cancel() async {
     _stopped = true;
+    _timer?.cancel();
+    await _queueSubscription?.cancel();
     await Future.wait(_active.values.map((transport) => transport.cancel()));
   }
 
   void dispose() {
     _stopped = true;
     _timer?.cancel();
+    unawaited(_queueSubscription?.cancel());
     for (final transport in _active.values) {
       unawaited(transport.cancel());
     }

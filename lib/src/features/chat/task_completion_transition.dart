@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 
 import 'settings_icon.dart';
 
@@ -8,10 +9,14 @@ class TaskCompletionTransition extends StatefulWidget {
     super.key,
     required this.completed,
     required this.child,
+    required this.iconLink,
+    required this.iconSize,
   });
 
   final bool completed;
   final Widget child;
+  final LayerLink iconLink;
+  final double iconSize;
 
   @override
   State<TaskCompletionTransition> createState() =>
@@ -20,9 +25,16 @@ class TaskCompletionTransition extends StatefulWidget {
 
 class _TaskCompletionTransitionState extends State<TaskCompletionTransition>
     with SingleTickerProviderStateMixin {
+  // Match the spring used when swipe-to-quote reaches its ready state.
+  static final _checkSpring = SpringSimulation(
+    const SpringDescription(mass: 1, stiffness: 340, damping: 14),
+    0,
+    1,
+    9,
+  );
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 850),
+    duration: const Duration(milliseconds: 2000),
     value: widget.completed ? 1 : 0,
   );
 
@@ -52,13 +64,12 @@ class _TaskCompletionTransitionState extends State<TaskCompletionTransition>
     child: widget.child,
     builder: (context, child) {
       if (_controller.isCompleted) return const SizedBox.shrink();
-      final check = const Interval(
-        0,
-        .35,
-        curve: Curves.easeOutBack,
-      ).transform(_controller.value);
+      final elapsedSeconds = _controller.value * 2;
+      final check = _checkSpring.isDone(elapsedSeconds)
+          ? 1.0
+          : _checkSpring.x(elapsedSeconds);
       final exit = const Interval(
-        .5,
+        .8,
         1,
         curve: Curves.easeInOutCubic,
       ).transform(_controller.value);
@@ -77,21 +88,27 @@ class _TaskCompletionTransitionState extends State<TaskCompletionTransition>
                     child!,
                     if (widget.completed)
                       Positioned(
-                        left: 30,
-                        top: 10,
-                        child: Transform.scale(
-                          scale: check,
-                          child: Container(
-                            width: 34,
-                            height: 34,
-                            decoration: const BoxDecoration(
-                              color: Color(0xff34a66f),
-                              shape: BoxShape.circle,
-                            ),
-                            alignment: Alignment.center,
-                            child: const SettingsIcon(
-                              type: SettingsIconType.check,
-                              color: Colors.white,
+                        left: 0,
+                        top: 0,
+                        child: CompositedTransformFollower(
+                          link: widget.iconLink,
+                          showWhenUnlinked: false,
+                          targetAnchor: Alignment.center,
+                          followerAnchor: Alignment.center,
+                          child: Transform.scale(
+                            scale: check,
+                            child: Container(
+                              width: widget.iconSize,
+                              height: widget.iconSize,
+                              decoration: const BoxDecoration(
+                                color: Color(0xff34a66f),
+                                shape: BoxShape.circle,
+                              ),
+                              alignment: Alignment.center,
+                              child: const SettingsIcon(
+                                type: SettingsIconType.check,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),

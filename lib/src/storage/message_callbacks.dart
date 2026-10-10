@@ -195,19 +195,39 @@ class MessageCallbacks {
     HtmlCallbackState.notify(events);
   }
 
-  Future<void> recoverInterrupted() async {
+  Future<void> recoverInterrupted({
+    List<Map<String, Object?>> runs = const [],
+  }) async {
+    final recovering = {
+      for (final run in runs)
+        (run['conversation_id'], run['sender_id'], run['user_message_id']),
+    };
     final updates = await database.transaction((txn) async {
       final events = await txn.query(
         'message_callbacks',
         where: "status = 'processing' AND processed_at IS NULL",
       );
-      await HtmlCallbackState.transition(txn, events, 'failed');
-      return transitionInteractiveCallbacks(
-        txn,
-        events,
-        'failed',
-        error: '上次处理已中断，可重试',
-      );
+      final resume = events
+          .where(
+            (event) => recovering.contains((
+              event['conversation_id'],
+              event['sender_id'],
+              event['message_id'],
+            )),
+          )
+          .toList();
+      final failed = events.where((event) => !resume.contains(event)).toList();
+      await HtmlCallbackState.transition(txn, resume, 'queued');
+      await HtmlCallbackState.transition(txn, failed, 'failed');
+      return [
+        ...await transitionInteractiveCallbacks(txn, resume, 'queued'),
+        ...await transitionInteractiveCallbacks(
+          txn,
+          failed,
+          'failed',
+          error: '上次处理已中断，可重试',
+        ),
+      ];
     });
     cardChanges.add(updates);
   }

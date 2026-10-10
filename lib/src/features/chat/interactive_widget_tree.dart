@@ -1,5 +1,6 @@
 import 'interactive_extra_widgets.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../domain/interactive_message.dart';
 import '../../storage/interactive_selection_drafts.dart';
@@ -8,6 +9,9 @@ import 'message_composer.dart';
 import 'interactive_dsl_sheet.dart';
 import '../../domain/interactive_bindings.dart';
 import '../../app/glass_notice.dart';
+import '../../domain/interactive_time.dart';
+import '../../scheduling/interactive_reminders.dart';
+import 'interactive_local_state.dart';
 
 /// General Flutter-shaped content. InteractionCard uses the existing compound
 /// card renderer; both consume InteractiveMessage.content and the same actions.
@@ -41,11 +45,39 @@ class InteractiveWidgetTree extends StatefulWidget {
   State<InteractiveWidgetTree> createState() => _InteractiveWidgetTreeState();
 }
 
-class _InteractiveWidgetTreeState extends State<InteractiveWidgetTree> {
+class _InteractiveWidgetTreeState extends State<InteractiveWidgetTree>
+    with WidgetsBindingObserver {
   final _sheet = InteractiveDslSheetController();
   late Map<String, Object?> _values;
   late String _version;
-  late Map<String, Object?> _local;
+  InteractiveLocalState? _localState;
+  Map<String, Object?> get _local => _localState!.values;
+  Timer? _ticker;
+  Map<String, Object?> _notifications = {};
+  StreamSubscription<String>? _notificationChanges;
+  bool get _usesNotifications => widget.card.widgetTree.nodes.any((node) {
+    final event = node['onPressed'] as Map?;
+    return event?.containsKey('scheduleNotification') == true ||
+        event?.containsKey('cancelNotification') == true;
+  });
+
+  Future<void> _readNotifications() async {
+    if (widget.readOnly || widget.messageId == null || !_usesNotifications)
+      return;
+    final messageId = widget.messageId!, actorId = widget.actorId;
+    try {
+      final values = await InteractiveReminders.read(messageId, actorId);
+      if (mounted &&
+          widget.messageId == messageId &&
+          widget.actorId == actorId) {
+        setState(() => _notifications = values);
+        _sheet.refresh();
+      }
+    } on Object catch (error) {
+      if (mounted) _showError(error);
+    }
+  }
+
   late Map<String, Object?> _context;
   var _rendered = 0;
   String? _lastRenderError;
@@ -81,11 +113,68 @@ class _InteractiveWidgetTreeState extends State<InteractiveWidgetTree> {
     super.initState();
     _load();
     _resetLocal();
+    WidgetsBinding.instance.addObserver(this);
+    _notificationChanges = InteractiveReminders.changes.stream.listen((id) {
+      final identity = jsonDecode(id) as List;
+      if (identity[0] == widget.messageId && identity[1] == widget.actorId)
+        _readNotifications();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _readNotifications();
+    });
   }
 
-  void _resetLocal() => _local = Map<String, Object?>.from(
-    widget.card.widgetTree.json['state'] as Map? ?? const {},
-  );
+  void _resetLocal() {
+    _localState?.removeListener(_localChanged);
+    _localState?.release();
+    _localState = InteractiveLocalState.acquire(
+      messageId: widget.messageId,
+      actorId: widget.actorId,
+      initial: Map<String, Object?>.from(
+        widget.card.widgetTree.json['state'] as Map? ?? const {},
+      ),
+      persist:
+          !widget.readOnly &&
+          (widget.card.widgetTree.json['runtime'] as Map?)?['persistState'] ==
+              true,
+    )..addListener(_localChanged);
+  }
+
+  void _localChanged() {
+    setState(() {});
+    _sheet.refresh();
+  }
+
+  void _syncTicker() {
+    _ticker?.cancel();
+    final interval =
+        (widget.card.widgetTree.json['runtime'] as Map?)?['refreshIntervalMs']
+            as int?;
+    if (interval == null ||
+        !TickerMode.valuesOf(context).enabled ||
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed)
+      return;
+    _ticker = Timer.periodic(Duration(milliseconds: interval), (_) {
+      setState(() {});
+      _sheet.refresh();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncTicker();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _syncTicker();
+    if (state == AppLifecycleState.resumed) {
+      _readNotifications();
+      setState(() {});
+      _sheet.refresh();
+    }
+  }
 
   void _load() {
     _version = _formVersion();
@@ -123,25 +212,40 @@ class _InteractiveWidgetTreeState extends State<InteractiveWidgetTree> {
         widget.readOnly != oldWidget.readOnly ||
         widget.participantRevision != oldWidget.participantRevision)
       _load();
-    if (widget.participantRevision != oldWidget.participantRevision ||
+    if (widget.messageId != oldWidget.messageId ||
+        widget.actorId != oldWidget.actorId ||
+        widget.readOnly != oldWidget.readOnly ||
+        jsonEncode(widget.card.widgetTree.json['runtime']) !=
+            jsonEncode(oldWidget.card.widgetTree.json['runtime']) ||
+        widget.participantRevision != oldWidget.participantRevision ||
         jsonEncode(widget.card.widgetTree.json['state']) !=
             jsonEncode(oldWidget.card.widgetTree.json['state'])) {
       _resetLocal();
     }
+    _syncTicker();
     final changed =
         widget.messageId != oldWidget.messageId ||
         widget.actorId != oldWidget.actorId ||
         widget.participantRevision != oldWidget.participantRevision ||
         jsonEncode(widget.card.content) != jsonEncode(oldWidget.card.content);
+    if (changed) _notifications = {};
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (changed) _sheet.close();
+      if (changed) {
+        _sheet.close();
+        _readNotifications();
+      }
       _sheet.refresh();
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _ticker?.cancel();
+    _notificationChanges?.cancel();
+    _localState!.removeListener(_localChanged);
+    _localState!.release();
     _sheet.dispose();
     super.dispose();
   }
@@ -170,17 +274,25 @@ class _InteractiveWidgetTreeState extends State<InteractiveWidgetTree> {
   @override
   Widget build(BuildContext context) => _render(widget.card.widgetTree.json);
 
-  Map<String, Object?> _bindingContext() => {
-    'form': _values,
-    'display': {for (final key in _values.keys) key: _formatted(key)},
-    'local': _local,
-    'host': {
-      ...widget.host,
-      'canSubmit': !widget.readOnly && widget.host['canSubmit'] == true,
-      'canEdit': !widget.readOnly && widget.host['canEdit'] == true,
-      'busy': widget.busy != null,
-    },
-  };
+  Map<String, Object?> _bindingContext() {
+    final now = DateTime.now();
+    return {
+      'form': _values,
+      'display': {for (final key in _values.keys) key: _formatted(key)},
+      'local': _local,
+      'notifications': _notifications,
+      'time': {
+        'now': now.millisecondsSinceEpoch,
+        'utcOffsetMinutes': now.timeZoneOffset.inMinutes,
+      },
+      'host': {
+        ...widget.host,
+        'canSubmit': !widget.readOnly && widget.host['canSubmit'] == true,
+        'canEdit': !widget.readOnly && widget.host['canEdit'] == true,
+        'busy': widget.busy != null,
+      },
+    };
+  }
 
   /// Generated presentation failures are reported once at this UI boundary.
   Widget _render(Map<String, Object?> node) {
@@ -207,6 +319,10 @@ class _InteractiveWidgetTreeState extends State<InteractiveWidgetTree> {
 
   Future<void> _runLocal(Map event) async {
     try {
+      if (widget.readOnly &&
+          !event.containsKey('showBottomSheet') &&
+          !event.containsKey('closeBottomSheet'))
+        throw StateError('只读消息不能执行本地操作');
       if (event['setState'] case final Map changes) {
         final fields = widget.card.widgetTree.nodes.where(
           (node) => interactiveFieldTypes.contains(node['type']),
@@ -218,20 +334,36 @@ class _InteractiveWidgetTreeState extends State<InteractiveWidgetTree> {
             validateInteractiveFieldValue(field, _values[field['key']]);
           }
         }
-        final values = <String, Object?>{};
-        final current = _bindingContext();
-        for (final entry in changes.entries) {
-          final value = resolveInteractiveBinding(entry.value, current);
-          final previous = _local[entry.key];
-          if (!(previous is bool && value is bool ||
-              previous is String && value is String ||
-              previous is num && value is num && value.isFinite)) {
-            throw ArgumentError('setState 不能改变已声明状态的类型');
+        await _localState!.update((previousValues) async {
+          final values = <String, Object?>{};
+          final current = {..._bindingContext(), 'local': previousValues};
+          for (final entry in changes.entries) {
+            final value = resolveInteractiveBinding(entry.value, current);
+            final previous = previousValues[entry.key];
+            if (!(previous is bool && value is bool ||
+                previous is String && value is String ||
+                previous is num && value is num && value.isFinite ||
+                previous is List &&
+                    value is List &&
+                    validInteractiveLocalValue(value))) {
+              throw ArgumentError('setState 不能改变已声明状态的类型');
+            }
+            values[entry.key as String] = value;
           }
-          values[entry.key as String] = value;
-        }
-        setState(() => _local = {..._local, ...values});
-        _sheet.refresh();
+          await _notification(event, current);
+          return {...previousValues, ...values};
+        });
+      } else if (event.containsKey('scheduleNotification') ||
+          event.containsKey('cancelNotification')) {
+        await _localState!.update((values) async {
+          await _notification(event, _bindingContext());
+          return values;
+        });
+      } else if (event['requestNotificationPermission'] == true) {
+        await _localState!.update((values) async {
+          await InteractiveReminders.permissions();
+          return values;
+        });
       } else if (event['showBottomSheet'] case final Map sheet) {
         await _sheet.show(
           context,
@@ -247,6 +379,27 @@ class _InteractiveWidgetTreeState extends State<InteractiveWidgetTree> {
     } on Object catch (error) {
       if (mounted) _showError(error);
     }
+  }
+
+  Future<void> _notification(Map event, Map<String, Object?> current) async {
+    if (!event.containsKey('scheduleNotification') &&
+        !event.containsKey('cancelNotification'))
+      return;
+    if (widget.messageId == null) throw StateError('保存消息后才能设置提醒');
+    final reminder = event['scheduleNotification'] as Map?;
+    await InteractiveReminders.perform(
+      widget.messageId!,
+      widget.actorId,
+      reminder == null
+          ? {'key': event['cancelNotification'], 'cancel': true}
+          : {
+              'key': reminder['key'],
+              for (final key in ['at', 'title', 'body'])
+                if (reminder.containsKey(key))
+                  key: resolveInteractiveBinding(reminder[key], current),
+              'weekdays': reminder['weekdays'] ?? const [],
+            },
+    );
   }
 
   Widget _build(
@@ -283,7 +436,8 @@ class _InteractiveWidgetTreeState extends State<InteractiveWidgetTree> {
         _build(Map<String, Object?>.from(raw as Map), scope),
     ];
     final enabled = flag(node['enabled'] ?? true);
-    final locked = widget.readOnly || widget.busy != null || !enabled;
+    final locked =
+        widget.readOnly || widget.busy != null || _localState!.busy || !enabled;
     final submitted = widget.host['submitted'] == true;
     final canSubmit = widget.host['canSubmit'] == true;
     switch (type) {
@@ -376,6 +530,7 @@ class _InteractiveWidgetTreeState extends State<InteractiveWidgetTree> {
           style: switch (node['style']) {
             'titleMedium' => theme.titleMedium,
             'labelSmall' => theme.labelSmall,
+            'displayMedium' => theme.displayMedium,
             _ => theme.bodyMedium,
           },
         );
@@ -398,10 +553,16 @@ class _InteractiveWidgetTreeState extends State<InteractiveWidgetTree> {
           }
 
           final label = (node['child'] as Map)['data'] as String;
+          final localEnabled =
+              enabled &&
+              !_localState!.busy &&
+              (!widget.readOnly ||
+                  event.containsKey('showBottomSheet') ||
+                  event.containsKey('closeBottomSheet'));
           if (type == 'TextButton') {
             return TextButton(
               key: key,
-              onPressed: enabled ? activate : null,
+              onPressed: localEnabled ? activate : null,
               child: Text(label),
             );
           }
@@ -409,7 +570,7 @@ class _InteractiveWidgetTreeState extends State<InteractiveWidgetTree> {
             key: key,
             button: {'label': label, 'style': 'primary'},
             busy: false,
-            locked: !enabled,
+            locked: !localEnabled,
             onPressed: activate,
           );
         }

@@ -38,9 +38,11 @@ class TaskSummaryView extends StatefulWidget {
     required this.messageId,
     required this.onOpenLink,
     this.excludedMessageId,
+    this.showTaskEntries = true,
   });
 
   final AgentTaskSummary summary;
+  final bool showTaskEntries;
   final String? excludedMessageId;
   final String messageId;
   String get storageId => 'task-expanded:$messageId';
@@ -87,7 +89,8 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
       _activityWidgets = null;
       _fileChanges = null;
     }
-    if (oldWidget.excludedMessageId != widget.excludedMessageId)
+    if (oldWidget.excludedMessageId != widget.excludedMessageId ||
+        oldWidget.showTaskEntries != widget.showTaskEntries)
       _activityWidgets = null;
     if (!oldWidget.summary.stopped && widget.summary.stopped) {
       _expanded = true;
@@ -109,11 +112,17 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
 
   @override
   Widget build(BuildContext context) {
+    final activities = widget.summary.activities
+        .where(
+          (activity) =>
+              widget.showTaskEntries || activity.toolName != 'runTask',
+        )
+        .toList();
     final sources = _expanded && _activityWidgets == null
         ? webSourcesFromActivities(widget.summary.activities)
         : const <String, SourceReference>{};
     Widget activityAt(int index) {
-      final activity = widget.summary.activities[index];
+      final activity = activities[index];
       // Completed output remains available when the task process is expanded.
       if (widget.excludedMessageId != null &&
           activity.messageId == widget.excludedMessageId) {
@@ -190,7 +199,7 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
     }
 
     final groups = toolActivityGroups([
-      for (final activity in widget.summary.activities)
+      for (final activity in activities)
         activity.status == null ? null : activity.toolName,
     ]);
     return Padding(
@@ -256,19 +265,21 @@ class _TaskSummaryViewState extends State<TaskSummaryView> {
                     if (group.end - group.start == 1)
                       activityAt(group.start)
                     else
-                      ToolActivityGroup(
-                        key: ValueKey('${widget.messageId}:${group.start}'),
-                        storageId: '${widget.messageId}:${group.start}',
-                        toolName:
-                            widget.summary.activities[group.start].toolName!,
-                        statuses: [
-                          for (var i = group.start; i < group.end; i++)
-                            widget.summary.activities[i].status!,
-                        ],
-                        children: [
-                          for (var i = group.start; i < group.end; i++)
-                            activityAt(i),
-                        ],
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 5),
+                        child: ToolActivityGroup(
+                          key: ValueKey('${widget.messageId}:${group.start}'),
+                          storageId: '${widget.messageId}:${group.start}',
+                          toolName: activities[group.start].toolName!,
+                          statuses: [
+                            for (var i = group.start; i < group.end; i++)
+                              activities[i].status!,
+                          ],
+                          children: [
+                            for (var i = group.start; i < group.end; i++)
+                              activityAt(i),
+                          ],
+                        ),
                       ),
                 ],
               ),

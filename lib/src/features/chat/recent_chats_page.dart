@@ -31,6 +31,14 @@ import 'profile_avatar.dart';
 import 'settings_appearance.dart';
 import 'sidebar_action_icon.dart';
 
+typedef _ReadCheckpoint = ({
+  int groupReadAt,
+  String groupReadId,
+  int unreadMessageCount,
+  String? activeRunId,
+  String? seenRunId,
+});
+
 class RecentChatsPage extends StatefulWidget {
   const RecentChatsPage({
     super.key,
@@ -78,6 +86,8 @@ class RecentChatsPageState extends State<RecentChatsPage> {
   final _groups = <String, List<MessageSender>>{};
   final _projects = <String, DevelopmentProject>{};
   Timer? _updates;
+  late final StreamSubscription<Conversation> _reads;
+  final _readCheckpoints = <String, _ReadCheckpoint>{};
   int _groupCount = 0;
   bool _loading = false, _more = true, _loaded = false;
   bool _loadingMore = false;
@@ -87,6 +97,33 @@ class RecentChatsPageState extends State<RecentChatsPage> {
     super.initState();
     reload();
     widget.controller.addListener(_changed);
+    _reads = widget.controller.conversationReads.stream.listen(_readChanged);
+  }
+
+  void _readChanged(Conversation conversation) {
+    final item = _items.where((item) => item.id == conversation.id).firstOrNull;
+    if (item == null) return;
+    final read = (
+      groupReadAt: conversation.groupReadAt,
+      groupReadId: conversation.groupReadId,
+      unreadMessageCount: conversation.unreadMessageCount,
+      activeRunId: conversation.activeRunId,
+      seenRunId: conversation.seenRunId,
+    );
+    _readCheckpoints[conversation.id] = read;
+    setState(() => _copyReadState(item, read));
+  }
+
+  void _copyReadState(Conversation item, _ReadCheckpoint read) {
+    if (item.isTask) {
+      if (item.activeRunId == read.activeRunId) {
+        item.seenRunId = read.seenRunId;
+      }
+      return;
+    }
+    item.groupReadAt = read.groupReadAt;
+    item.groupReadId = read.groupReadId;
+    item.unreadMessageCount = read.unreadMessageCount;
   }
 
   void _changed() {
@@ -105,6 +142,7 @@ class RecentChatsPageState extends State<RecentChatsPage> {
   @override
   void dispose() {
     _updates?.cancel();
+    _reads.cancel();
     widget.controller.removeListener(_changed);
     super.dispose();
   }
@@ -168,6 +206,18 @@ class RecentChatsPageState extends State<RecentChatsPage> {
       ]);
       if (!mounted) return;
       setState(() {
+        for (final item in page) {
+          final read = _readCheckpoints[item.id];
+          if (read == null) continue;
+          // A read completed while this database snapshot was loading.
+          // Keep later unread messages from a newer snapshot intact.
+          if (item.isTask ||
+              read.groupReadAt > item.groupReadAt ||
+              (read.groupReadAt == item.groupReadAt &&
+                  read.groupReadId.compareTo(item.groupReadId) > 0)) {
+            _copyReadState(item, read);
+          }
+        }
         if (reset) {
           _items.clear();
           _senders.clear();
@@ -176,6 +226,9 @@ class RecentChatsPageState extends State<RecentChatsPage> {
         }
         final existing = _items.map((item) => item.id).toSet();
         _items.addAll(page.where((item) => !existing.contains(item.id)));
+        _readCheckpoints.removeWhere(
+          (id, _) => !_items.any((item) => item.id == id),
+        );
         _drafts = drafts;
         _senders.addAll(avatars[0] as Map<String, MessageSender>);
         _groups.addAll(avatars[1] as Map<String, List<MessageSender>>);

@@ -47,12 +47,13 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
             'text': {
               'type': 'string',
               'description':
-                  'May be empty when images are attached. Network reference images may use Markdown image syntax only with markdown=true.',
+                  'May be empty when images are attached. Markdown formatting and network reference image syntax are enabled by default.',
             },
             'markdown': {
               'type': 'boolean',
+              'default': true,
               'description':
-                  'Optional, defaults to false. Text is displayed literally; set true only when Markdown formatting or network image syntax is intended.',
+                  'Optional, defaults to true. Set false only when the text should be displayed literally without Markdown formatting.',
             },
             'imagePaths': {
               'type': ['array', 'null'],
@@ -148,6 +149,7 @@ class GroupMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
           );
         }
         final item = Map<String, Object?>.from(raw);
+        item['markdown'] = item['markdown'] as bool? ?? true;
         final paths = item['imagePaths'] ?? const <String>[];
         if (paths is! List ||
             paths.length > 4 ||

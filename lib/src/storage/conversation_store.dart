@@ -23,6 +23,7 @@ class ConversationStore {
   late final ConversationWriter writer;
   late final AgentRunStore runs;
   late final GroupChatStore groups;
+  List<Map<String, Object?>> startupRuns = const [];
 
   Future<String?> earliestGroupContextCheckpoint(
     Conversation conversation,
@@ -83,12 +84,40 @@ class ConversationStore {
         where:
             "key = 'active_conversation' AND value IN (SELECT id FROM conversations WHERE mode != 'normal')",
       );
-      await database.rawUpdate(
-        r"UPDATE private_task_state SET state_json = json_remove(json_set(state_json, '$.status', 'paused', '$.reason', '应用重启，等待继续'), '$.runningSince') WHERE json_extract(state_json, '$.status') = 'active'",
-      );
       final interruptedAt = DateTime.now().microsecondsSinceEpoch;
       await database.transaction((txn) async {
+        final candidates = await txn.query(
+          'agent_runs',
+          where:
+              "parent_run_id IS NULL AND (status = 'running' OR "
+              "(status = 'interrupted' AND id IN (SELECT value FROM json_each("
+              "(SELECT value FROM app_state WHERE key = 'startup_run_recovery'))))) "
+              "AND NOT EXISTS (SELECT 1 FROM agent_runs newer WHERE newer.parent_run_id IS NULL "
+              "AND newer.conversation_id = agent_runs.conversation_id AND newer.sender_id = agent_runs.sender_id "
+              "AND (newer.started_at > agent_runs.started_at OR (newer.started_at = agent_runs.started_at AND newer.id > agent_runs.id))) "
+              "AND conversation_id IN (SELECT id FROM conversations WHERE archived = 0 "
+              "AND mode = 'normal' AND run_state != 'stopping')",
+          orderBy: 'started_at DESC, id DESC',
+        );
+        final owners = <String>{};
+        startupRuns = candidates
+            .where(
+              (run) =>
+                  owners.add('${run['conversation_id']}:${run['sender_id']}'),
+            )
+            .toList();
         final batch = txn.batch();
+        batch.insert('app_state', {
+          'key': 'startup_run_recovery',
+          'value': jsonEncode(startupRuns.map((run) => run['id']).toList()),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+        batch.rawUpdate(
+          r"UPDATE private_task_state SET state_json = json_remove(state_json, '$.runningSince') WHERE json_extract(state_json, '$.status') = 'active'",
+        );
+        batch.rawUpdate(
+          r"UPDATE private_task_state SET state_json = json_set(state_json, '$.status', 'paused', '$.reason', '执行已中断，等待继续') WHERE json_extract(state_json, '$.status') = 'active' AND NOT EXISTS (SELECT 1 FROM agent_runs WHERE id IN (SELECT value FROM json_each(?)) AND conversation_id = private_task_state.conversation_id AND sender_id = private_task_state.sender_id)",
+          [jsonEncode(startupRuns.map((run) => run['id']).toList())],
+        );
         batch.update(
           'conversations',
           {'run_state': 'interrupted'},
@@ -120,6 +149,14 @@ class ConversationStore {
           {'status': 'cancelled'},
           where: 'status = ?',
           whereArgs: ['running'],
+        );
+        // Task cards are persisted messages; interrupted executions must not
+        // leave their last published status permanently running after restart.
+        batch.rawUpdate(
+          r"""UPDATE messages SET interactive_json = json_set(interactive_json,
+            '$.participation._taskCard.status', 'cancelled',
+            '$.revision', json_extract(interactive_json, '$.revision') + 1)
+          WHERE json_extract(interactive_json, '$.participation._taskCard.status') = 'running'""",
         );
         batch.update(
           'tool_approvals',

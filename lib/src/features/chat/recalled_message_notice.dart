@@ -33,6 +33,7 @@ class RecalledMessageNotice extends StatelessWidget {
     final text = message.isSystem
         ? GroupMentionText(
             text: message.text,
+            markdown: message.markdown,
             style: style,
             members: memberNames,
             bareNames: true,

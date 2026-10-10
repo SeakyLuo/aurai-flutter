@@ -1,3 +1,4 @@
+import '../../domain/contact_name_order.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import 'package:flutter/material.dart';
@@ -35,7 +36,7 @@ class _GroupRemoveMembersPageState extends State<GroupRemoveMembersPage> {
             (_localRole == GroupMemberRole.owner ||
                 member.role == GroupMemberRole.member),
       )
-      .toList();
+      .byContactName((member) => member.sender);
   final _selected = <String>{};
   bool _saving = false;
   void _notice(String text, {ToastKind kind = ToastKind.info}) =>

@@ -1,3 +1,4 @@
+import '../../domain/contact_name_order.dart';
 import 'app_bottom_sheet.dart';
 import 'floating_search_layout.dart';
 import '../../app/glass_notice.dart';
@@ -46,7 +47,7 @@ class _MentionSheetState extends State<_MentionSheet> {
         setState(
           () => _members = members
               .where((m) => m.sender.kind == MessageSenderKind.agent)
-              .toList(),
+              .byContactName((member) => member.sender),
         );
     } on Object catch (error) {
       if (!mounted) return;

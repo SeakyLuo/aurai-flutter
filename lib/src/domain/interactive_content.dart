@@ -3,6 +3,7 @@ import 'interactive_fields.dart';
 import 'interactive_widget_catalog.dart';
 import 'interactive_components.dart';
 import 'interactive_bindings.dart';
+import 'interactive_time.dart';
 export 'interactive_fields.dart';
 
 /// The serializable widget tree used by every interactive message presentation.
@@ -204,11 +205,22 @@ class InteractiveContent {
               entry.key is! String ||
               (entry.key as String).isEmpty ||
               (entry.key as String).contains('.') ||
-              !(entry.value is String ||
-                  entry.value is bool ||
-                  entry.value is num && (entry.value as num).isFinite),
+              !validInteractiveLocalValue(entry.value),
         )) {
-      throw ArgumentError('state 使用最多 32 个具名文本、布尔值或有限数值');
+      throw ArgumentError('state 使用最多 32 个具名文本、布尔值、有限数值或最多 200 项的简单列表');
+    }
+    if (json['runtime'] case final Object runtime) {
+      if (runtime is! Map ||
+          runtime.keys.any(
+            (key) => !['persistState', 'refreshIntervalMs'].contains(key),
+          ) ||
+          runtime.containsKey('persistState') &&
+              runtime['persistState'] is! bool)
+        throw ArgumentError('runtime 使用 persistState 和 refreshIntervalMs');
+      final interval = runtime['refreshIntervalMs'];
+      if (interval != null &&
+          (interval is! int || interval < 50 || interval > 60000))
+        throw ArgumentError('refreshIntervalMs 需要 50–60000 毫秒');
     }
     final locals = initialState.keys.cast<String>().toSet();
     void binding(Object? value, {bool inLoop = false}) =>
@@ -261,7 +273,7 @@ class InteractiveContent {
         (key) =>
             key != 'type' &&
             key != 'key' &&
-            !(key == 'state' && depth == 0) &&
+            !(['state', 'runtime'].contains(key) && depth == 0) &&
             !(key == 'enabled' &&
                 (interactiveFieldTypes.contains(type) ||
                     buttonTypes.contains(type))) &&
@@ -321,6 +333,7 @@ class InteractiveContent {
               'titleMedium',
               'bodyMedium',
               'labelSmall',
+              'displayMedium',
             ].contains(node['style']))
           throw ArgumentError('不支持的文字样式');
       }
@@ -406,7 +419,12 @@ class InteractiveContent {
             if (changes.isEmpty ||
                 changes.keys.any((key) => !locals.contains(key)) ||
                 event.keys.any(
-                  (key) => !['setState', 'validateFields'].contains(key),
+                  (key) => ![
+                    'setState',
+                    'validateFields',
+                    'scheduleNotification',
+                    'cancelNotification',
+                  ].contains(key),
                 )) {
               throw ArgumentError('setState 只能更新已声明状态，可附带 validateFields');
             }
@@ -421,6 +439,10 @@ class InteractiveContent {
             }
           } else if (event.length != 1) {
             throw ArgumentError('本地事件只能执行一个操作');
+          } else if (event.containsKey('scheduleNotification') ||
+              event.containsKey('cancelNotification') ||
+              event['requestNotificationPermission'] == true) {
+            // Host notifications are explicitly triggered actions, never build effects.
           } else if (event['showBottomSheet'] case final Map sheet) {
             if (inSheet) throw ArgumentError('暂不支持嵌套 bottomSheet');
             if (sheet.keys.any(
@@ -454,8 +476,43 @@ class InteractiveContent {
               '本地事件使用 showBottomSheet；closeBottomSheet:true 仅用于弹层内部',
             );
           }
+          if (event.containsKey('scheduleNotification') &&
+              event.containsKey('cancelNotification'))
+            throw ArgumentError('一次操作不能同时设置和取消提醒');
+          if (event.containsKey('scheduleNotification')) {
+            final reminder = event['scheduleNotification'];
+            if (reminder is! Map ||
+                reminder.keys.any(
+                  (key) =>
+                      !['key', 'at', 'title', 'body', 'weekdays'].contains(key),
+                ) ||
+                reminder['key'] is! String ||
+                (reminder['key'] as String).isEmpty ||
+                !reminder.containsKey('at') ||
+                !reminder.containsKey('title'))
+              throw ArgumentError(
+                'scheduleNotification 需要稳定 key、at 时间绑定和 title',
+              );
+            binding(reminder['at']);
+            binding(reminder['title']);
+            if (reminder.containsKey('body')) binding(reminder['body']);
+            final days = reminder['weekdays'];
+            if (days != null &&
+                (days is! List ||
+                    days.length > 7 ||
+                    days.toSet().length != days.length ||
+                    days.any((day) => day is! int || day < 1 || day > 7)))
+              throw ArgumentError('weekdays 使用不重复的 1–7（周一到周日），省略为单次');
+          }
+          if (event.containsKey('cancelNotification') &&
+              (event['cancelNotification'] is! String ||
+                  (event['cancelNotification'] as String).isEmpty))
+            throw ArgumentError('cancelNotification 使用提醒 key');
         } else if (event.containsKey('showBottomSheet') ||
             event.containsKey('setState') ||
+            event.containsKey('scheduleNotification') ||
+            event.containsKey('cancelNotification') ||
+            event.containsKey('requestNotificationPermission') ||
             event.containsKey('closeBottomSheet')) {
           throw ArgumentError('消息动作不能混合本地弹层操作');
         }
@@ -490,7 +547,15 @@ class InteractiveContent {
 
     visit(json, 0, null);
     if (initialValues.isNotEmpty &&
-        !buttons.any((button) => button['input'] == 'json'))
+        !buttons.any((button) => button['input'] == 'json') &&
+        !nodes.any(
+          (node) =>
+              (node['onPressed'] as Map?)?.containsKey('setState') == true ||
+              (node['onPressed'] as Map?)?.containsKey(
+                    'scheduleNotification',
+                  ) ==
+                  true,
+        ))
       throw ArgumentError('表单需要 input:json 的提交动作');
     if (json['type'] != 'InteractionCard' &&
         buttons.any(

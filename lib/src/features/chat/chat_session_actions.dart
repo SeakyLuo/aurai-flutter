@@ -59,7 +59,7 @@ extension _ChatSessionActions on _ChatPageState {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         if (!mounted ||
-            !ModalRoute.of(context)!.isCurrent ||
+            !_conversationPageVisible ||
             WidgetsBinding.instance.lifecycleState !=
                 AppLifecycleState.resumed ||
             _scaffoldKey.currentState!.isDrawerOpen ||

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'interactive_time.dart';
 
 /// Pure JSON expressions used by shared interactions and their visible views.
 Object? evaluateInteraction(Object? expression, Map<String, Object?> context) {
@@ -45,6 +46,8 @@ Object? evaluateInteraction(Object? expression, Map<String, Object?> context) {
     ];
   }
   final values = args.map(eval).toList();
+  if (interactiveTimeOperations.contains(op))
+    return evaluateInteractiveTime(op, values);
   return switch (op) {
     'eq' => jsonEncode(values[0]) == jsonEncode(values[1]),
     'ne' => jsonEncode(values[0]) != jsonEncode(values[1]),

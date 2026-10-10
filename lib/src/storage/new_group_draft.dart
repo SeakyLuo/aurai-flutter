@@ -21,7 +21,7 @@ class NewGroupDraft {
   load() async {
     await _pending;
     final saved = await _preferences.getString(_key);
-    final notifyMembers = await _preferences.getBool(_notifyKey) ?? true;
+    final notifyMembers = await _preferences.getBool(_notifyKey) ?? false;
     if (saved == null)
       return (
         title: '',
@@ -53,7 +53,7 @@ class NewGroupDraft {
     List<String> contacts,
     List<AiProfile> members, {
     List<String> excluded = const [],
-    bool notifyMembers = true,
+    bool notifyMembers = false,
   }) {
     final data = jsonEncode({
       'title': title,

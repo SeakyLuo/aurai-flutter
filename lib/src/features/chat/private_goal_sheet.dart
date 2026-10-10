@@ -96,7 +96,7 @@ class _PrivateGoalSheetState extends State<PrivateGoalSheet> {
     return ok;
   }
 
-  Future<void> _back() async {
+  Future<void> _back({bool closeSheet = false}) async {
     if (_busy) return;
     final wasEditing = _editing;
     if (_dirty) {
@@ -113,7 +113,7 @@ class _PrivateGoalSheetState extends State<PrivateGoalSheet> {
       if (action != 'save' && action != 'discard') return;
     }
     if (!mounted) return;
-    if (wasEditing) {
+    if (wasEditing && !closeSheet) {
       setState(() => _editing = false);
       FocusScope.of(context).unfocus();
     } else {
@@ -232,9 +232,9 @@ class _PrivateGoalSheetState extends State<PrivateGoalSheet> {
     final colors = Theme.of(context).colorScheme;
     final inset = MediaQuery.viewInsetsOf(context).bottom;
     return PopScope(
-      canPop: _leaving || (!_editing && !_busy),
+      canPop: _leaving || (!_dirty && !_busy),
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _back();
+        if (!didPop) _back(closeSheet: true);
       },
       child: Padding(
         padding: EdgeInsets.only(bottom: inset),

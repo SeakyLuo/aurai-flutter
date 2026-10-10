@@ -24,6 +24,7 @@ class _GroupThoughtDetailsState extends State<_GroupThoughtDetails> {
   late final _updates = Listenable.merge([
     widget.controller,
     widget.controller.groupActivityChanges,
+    widget.controller.groupThoughtChanges,
     widget.controller.groupSleepChanges,
   ]);
   bool _running = true;

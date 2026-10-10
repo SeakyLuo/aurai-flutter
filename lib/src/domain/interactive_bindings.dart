@@ -11,6 +11,19 @@ void validateInteractiveBinding(
 }) {
   if (depth > 16) throw ArgumentError('绑定表达式最多 16 层');
   if (value == null || value is bool || value is String || value is num) return;
+  if (value is List) {
+    if (value.length > 200) throw ArgumentError('绑定列表最多 200 项');
+    for (final item in value) {
+      validateInteractiveBinding(
+        item,
+        fields: fields,
+        locals: locals,
+        inLoop: inLoop,
+        depth: depth + 1,
+      );
+    }
+    return;
+  }
   if (value is! Map) throw ArgumentError('绑定使用常量、ref 或 op/args');
   if (value.length == 1 && value['ref'] is String) {
     final parts = (value['ref'] as String).split('.');
@@ -22,6 +35,8 @@ void validateInteractiveBinding(
           'local',
           'item',
           'index',
+          'time',
+          'notifications',
         ].contains(parts.first)) {
       throw ArgumentError('绑定只能引用 host、form、display、local、item、index');
     }
@@ -33,6 +48,9 @@ void validateInteractiveBinding(
     if (['item', 'index'].contains(parts.first) && !inLoop) {
       throw ArgumentError('item/index 只能在 ForEach.template 中引用');
     }
+    if (parts.first == 'time' &&
+        (parts.length != 2 || !['now', 'utcOffsetMinutes'].contains(parts[1])))
+      throw ArgumentError('时间绑定使用 time.now 或 time.utcOffsetMinutes');
     return;
   }
   const arities = <String, (int, int)>{
@@ -51,6 +69,19 @@ void validateInteractiveBinding(
     'length': (1, 1),
     'concat': (1, 32),
     'get': (2, 2),
+    'multiply': (2, 2),
+    'divide': (2, 2),
+    'modulo': (2, 2),
+    'min': (2, 2),
+    'max': (2, 2),
+    'floor': (1, 1),
+    'ceil': (1, 1),
+    'round': (1, 1),
+    'formatDuration': (2, 2),
+    'formatDateTime': (2, 3),
+    'nextTimeOfDay': (3, 4),
+    'append': (2, 2),
+    'slice': (3, 3),
   };
   final args = value['args'];
   final arity = arities[value['op']];

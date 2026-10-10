@@ -44,8 +44,9 @@ class AppControlTool implements AgentTool, RuntimeCapabilityAgentTool {
           'text': {'type': 'string', 'maxLength': 20000},
           'markdown': {
             'type': 'boolean',
+            'default': true,
             'description':
-                'Message bubbles default to plain text. Set true to enable Markdown formatting in the bubble. This does not change the private AI reply body.',
+                'Message bubbles default to Markdown. Set false to display the text literally. This does not change the private AI reply body.',
           },
           'imagePaths': {
             'type': 'array',

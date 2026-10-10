@@ -1,6 +1,7 @@
 import '../../app/glass_notice.dart';
+import 'task_entry_card.dart';
 import '../../app/ui_action.dart';
-import 'home_navigation.dart';
+import 'task_conversation_navigation.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../domain/agent_models.dart';
@@ -39,10 +40,43 @@ class SubagentToolActivity extends StatelessWidget {
     final error = result['error'] as String?;
     final label = switch (status) {
       AgentStepStatus.running => '执行中',
-      AgentStepStatus.completed => organizedTask ? '已返回结果' : '已完成',
+      AgentStepStatus.completed => '已完成',
       AgentStepStatus.cancelled => '已停止',
       AgentStepStatus.failed => '未完成',
     };
+    if (organizedTask) {
+      return TaskEntryCard(
+        title: title,
+        description: request['description'] as String? ?? '点击查看任务',
+        status:
+            status == AgentStepStatus.completed &&
+                request['startExecution'] == false
+            ? '已创建'
+            : label,
+        failed: status == AgentStepStatus.failed,
+        onTap: targetId != null
+            ? () async {
+                final controller = ImageActionScope.of(context);
+                await runUiAction(
+                  context,
+                  () => openTaskConversation(
+                    context,
+                    controller,
+                    taskId!,
+                    title: title,
+                  ),
+                );
+              }
+            : error != null
+            ? () async {
+                ScaffoldMessenger.of(context).showToast(
+                  SnackBar(content: Text(error)),
+                  kind: ToastKind.error,
+                );
+              }
+            : null,
+      );
+    }
     return Semantics(
       button: targetId != null || error != null,
       label: '$title，$label',
@@ -57,18 +91,6 @@ class SubagentToolActivity extends StatelessWidget {
                     )
             : () {
                 final controller = ImageActionScope.of(context);
-                if (organizedTask) {
-                  runUiAction(
-                    context,
-                    () => openHomeConversation(
-                      context,
-                      controller,
-                      taskId!,
-                      waitForClose: true,
-                    ),
-                  );
-                  return;
-                }
                 Navigator.push<void>(
                   context,
                   MaterialPageRoute(

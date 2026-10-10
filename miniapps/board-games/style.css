@@ -1,0 +1,42 @@
+#game{max-width:680px;margin:auto;padding:16px;gap:12px}
+#game header{display:flex;align-items:center;gap:12px;justify-content:space-between;padding-right:var(--aurai-host-menu-width,0px);min-height:32px}
+#game h1{font-size:18px;font-weight:600;line-height:1.4}
+#status{font-variant-numeric:tabular-nums;text-align:right}
+.players{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.player{display:flex;align-items:center;gap:10px;min-width:0;padding:5px;font-size:13px;color:var(--aurai-muted)}
+.player:last-child{justify-content:flex-end;text-align:right}
+.player strong{display:block;color:var(--aurai-text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.player .name{min-width:0}
+.player.active strong{color:var(--aurai-highlight-text)}
+.side{position:relative;width:12px;height:12px;border-radius:50%;flex-shrink:0;border:1px solid #9c968e;background:#ede9df;--turn-ring:var(--aurai-muted)}
+.side.r{--turn-ring:#b44e45}
+.player.active .side::after{content:"";position:absolute;inset:-5px;border:1.65px solid var(--turn-ring);border-radius:50%;animation:turn-breathe 2.2s ease-in-out infinite;pointer-events:none}
+@keyframes turn-breathe{0%,100%{transform:scale(.94);opacity:.55}50%{transform:scale(1.12);opacity:1}}
+@media(prefers-reduced-motion:reduce){.player.active .side::after{animation:none;opacity:.8}}
+.side.r{background:#b44e45;border-color:#b44e45}.side.b{background:#383b3e;border-color:#383b3e}
+.board-wrap{width:100%;max-width:340px;margin:0 auto;line-height:0;border-radius:16px;background:#eee5d5;border:1px solid #cec2af;overflow:hidden}
+#board{display:block;width:100%;height:auto;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.turn{font-size:15px;font-weight:500}
+.fullscreen-only{display:none!important}
+html[data-aurai-display="inline"] #setup{display:none!important}
+html[data-aurai-display="fullscreen"] #game{padding-top:calc(var(--aurai-host-safe-top-inset,0px) + 8px);padding-bottom:calc(var(--aurai-host-safe-bottom-inset,0px) + 100px);gap:14px}
+html[data-aurai-display="fullscreen"] #game header{padding-right:var(--aurai-host-right-inset,0px);min-height:56px}
+html[data-aurai-display="fullscreen"] #game h1{font-size:22px}
+html[data-aurai-display="fullscreen"] .fullscreen-only:not([hidden]){display:block!important}
+html[data-aurai-display="fullscreen"] .fullscreen-only.aurai-stack:not([hidden]){display:flex!important}
+html[data-aurai-display="fullscreen"] .board-wrap{max-width:min(100%,max(280px,calc((100dvh - 360px) * var(--board-ratio))))}
+html[data-aurai-display="fullscreen"] #board{touch-action:manipulation}
+summary{color:var(--aurai-muted);font-size:14px;cursor:pointer}details[open]>:not(summary){margin-top:10px}
+#history{padding-left:30px;margin-bottom:0;color:var(--aurai-muted);font-size:13px;line-height:1.9}
+#setupHint,#rules{line-height:1.7}
+#gameToolbar{position:fixed;bottom:calc(var(--aurai-host-safe-bottom-inset,0px) + 16px);left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:420px;box-sizing:border-box;padding:8px;border:1px solid var(--aurai-border);border-radius:32px;background:var(--aurai-field);backdrop-filter:blur(20px);z-index:5;box-shadow:0 4px 20px #00000012}
+#gameToolbar .aurai-button{flex:1;min-width:0}
+#askAi{position:relative}
+#askAi[aria-busy="true"]{color:transparent}
+#askAi[aria-busy="true"]::after{content:"";position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;box-sizing:border-box;border:1.65px solid var(--aurai-border);border-top-color:var(--aurai-highlight-text);border-radius:50%;animation:continue-spin .8s linear infinite}
+@keyframes continue-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#askAi[aria-busy="true"]::after{animation:none}}
+#morePanel{position:fixed;bottom:calc(var(--aurai-host-safe-bottom-inset,0px) + 92px);left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:420px;box-sizing:border-box;max-height:55dvh;overflow:auto;padding:20px;border:1px solid var(--aurai-border);border-radius:24px;background:var(--aurai-field);backdrop-filter:blur(24px);z-index:6;box-shadow:0 8px 28px #00000018}
+.more-heading{justify-content:space-between}#morePanel summary{padding:10px 0;color:var(--aurai-text)}
+#gameToolbar,#morePanel{background:color-mix(in srgb,var(--aurai-field) 88%,transparent)}
+@media(prefers-color-scheme:dark){.board-wrap{background:#d5c9b5;border-color:#8e8474}}

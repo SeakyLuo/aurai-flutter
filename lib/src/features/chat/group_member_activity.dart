@@ -218,7 +218,7 @@ extension GroupMemberActivities on ChatController {
       isReasoning: isReasoning,
     );
     thoughts.latest = key;
-    groupActivityChanges.value++;
+    groupThoughtChanges.value++;
   }
 
   void _recordGroupSteps(String senderId, String runId, List<AgentStep> steps) {
@@ -243,7 +243,7 @@ extension GroupMemberActivities on ChatController {
       );
       thoughts.latest = i;
     }
-    groupActivityChanges.value++;
+    // Notify after the member's steps are updated by onStepsChanged.
   }
 
   String _groupActivityPreview(String text) {

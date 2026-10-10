@@ -1,11 +1,13 @@
 import '../domain/interactive_widget_catalog.dart';
 import '../domain/avatar_portraits.dart';
+import '../domain/interactive_time.dart';
 import 'interactive_message_schema.dart';
 
 const interactiveContentReference = {r'$ref': r'#/$defs/interactiveWidget'};
 const interactiveBindingReference = {r'$ref': r'#/$defs/interactiveBinding'};
 const interactiveBindingSchema = {
   'anyOf': [
+    {'type': 'array', 'maxItems': 200, 'items': interactiveBindingReference},
     {
       'type': ['string', 'number', 'boolean', 'null'],
     },
@@ -38,6 +40,7 @@ const interactiveBindingSchema = {
             'length',
             'concat',
             'get',
+            ...interactiveTimeOperations,
           ],
         },
         'args': {
@@ -70,8 +73,13 @@ final interactiveContentSchema = {
       'Sheets share the message form values and drafts; input:json submits ALL message fields, including sheet fields. Opening/closing a sheet does not submit. Sheets have a built-in close control; nested sheets are not supported. showBottomSheet.resizeToAvoidBottomInset defaults to false: the keyboard overlays the sheet without resizing it. Set true to resize the sheet above the keyboard. The covered chat stays stationary. '
       'ProfileAvatar reuses the app avatar renderer: name is required; icon is initial (default), app_logo_white or a registered portrait; size is 16–160 (default 40), color is a theme color. It supports component parameters and sheet content. '
       'Declare local state on content root as state:{step:0,editing:false}. Text.data, Visibility.visible, control enabled, ForEach.items/offset, LinearProgressIndicator.value and ProfileAvatar.name accept ref/op bindings. '
+      'Time-based interfaces are composed from ordinary widgets, not fixed clock/timer cards. Root runtime:{refreshIntervalMs:1000,persistState:true} enables periodic binding refresh and durable viewer-local state; use 50–100 ms for a stopwatch, 1000 for clocks. Refresh runs only while the app is resumed and this subtree is enabled by TickerMode. time.now is Unix epoch milliseconds sampled once per render/action; time.utcOffsetMinutes is the device offset. Refresh never runs business actions. Calculate durations from timestamps, never increment a counter per frame. Wall-clock corrections also affect timestamp differences. '
+      'formatDuration:[milliseconds,"mm:ss"|"HH:mm:ss"|"HH:mm:ss.SSS"] formats elapsed time; max(0,deadline-time.now) clamps countdowns. formatDateTime:[epochMs,"HH:mm"|"HH:mm:ss"|"yyyy-MM-dd"|"yyyy-MM-dd HH:mm:ss",optionalOffsetMinutes] uses local time unless a fixed UTC offset is supplied. nextTimeOfDay:[time.now,hour,minute,optionalWeekdays] returns the next matching local occurrence; weekdays is a nonempty list of 1–7 (Monday–Sunday). Arithmetic includes multiply/divide/modulo/min/max/floor/ceil/round. append:[list,value] and slice:[list,start,count] support up to 200 simple lap entries, displayed with ForEach. Persist running/start/accumulated/deadline/laps in local state; pause stores elapsed, resume sets a fresh start, reset clears both. Changes to the root initial state declaration reset its persisted state. '
+      'onPressed.scheduleNotification:{key,at:BINDING,title:BINDING,body?:BINDING,weekdays?:[1..7]} schedules a local Android alarm notification independent of the page and AI. Omit weekdays for one-shot; weekdays repeats at the same local time (1=Monday). onPressed.cancelNotification:KEY cancels pending and ringing reminders. requestNotificationPermission:true opens required notification/exact-alarm settings through an explicit user tap. A schedule/cancel may accompany setState; all bindings use the same pre-action state/time. Native permissions must be enabled; failure is reported, never silently downgraded. Only a tap schedules; merely rendering does not. Expose enable/disable and permission controls in the composed UI. Notification actions provide stop/snooze even after the card leaves the screen. '
+      'persistState survives navigation and process restart and is shared across simultaneous views of the same message/actor. It is personal device state, not shared answers. Read-only/history views cannot mutate durable state or schedule alarms. Local-only fields can feed setState or scheduleNotification without a message-submit button. '
+      'notifications.KEY exposes the host reminder status {enabled,at,title,ringUntil}; absent reminders resolve to null, so compare enabled with true. Status updates after scheduling, stopping/snoozing from a notification, and app resume. at is the next scheduled epoch milliseconds or 0 after a one-shot fires; ringUntil bounds current ringing. Use notifications rather than a local boolean as the source of truth for alarm enablement and snoozed deadlines. Notifications sound for up to ten minutes and offer stop/snooze; delivery requires Android permissions and respects system channel settings. '
       'Use refs local.NAME, form.FIELD (raw in expressions), display.FIELD (formatted label), host.PROPERTY, item.PROPERTY and index inside ForEach. Text with a direct form ref retains formatted field display. '
-      'A local onPressed:{setState:{step:{op:add,args:[{ref:local.step},1]}},validateFields:[FIELD]} validates selected fields before changing state. No submission occurs. Reset local state after confirmed participant updates. '
+      'A local onPressed:{setState:{step:{op:add,args:[{ref:local.step},1]}},validateFields:[FIELD]} validates selected fields before changing state. No submission occurs. Nonpersistent local state resets after confirmed participant updates; persisted state retains its saved values. '
       'Visibility:{visible:BINDING,child:WIDGET} controls presentation only; all declared form fields still submit together. ForEach:{items:BINDING,template:WIDGET,offset:BINDING,limit:20} repeats read-only presentation; nested loops are supported. Use offset/limit with local paging controls for long results. Dynamic loop templates cannot contain fields/actions; instantiate form components with stable keys instead. Limit is 1–50; expanded UI budget is 640 nodes. '
       'host contains eligible,submitted,closed,completed,canSubmit,canEdit,summaryVisible,responsesVisible,submittedCount,eligibleCount,answers:[{question,answer}],responses:[{name,answers,label}],metrics:[{label,options:[{label,count,fraction}]}],distribution. Counts are null and lists empty when not permitted. Gate results with visibility flags. host.busy is available in UI. No private host state is exposed. '
       'Host shared interaction rules enforce actors, one submission per actor, allowChange, completion and result visibility independently of UI. Use callbackEvents for completion notifications. Local state and visibility cannot grant permission. Field label renders above the field and is captured with each answer; do not duplicate it as separate Text. '
@@ -107,10 +115,26 @@ final interactiveContentSchema = {
       'type': 'object',
       'maxProperties': 32,
       'additionalProperties': {
-        'type': ['string', 'boolean', 'number'],
+        'type': ['string', 'boolean', 'number', 'array'],
+        'maxItems': 200,
+        'items': {
+          'type': ['string', 'boolean', 'number'],
+        },
       },
       'description':
           'Content root only. Local UI state, not shared interaction state.',
+    },
+    'runtime': {
+      'type': 'object',
+      'properties': {
+        'persistState': {'type': 'boolean'},
+        'refreshIntervalMs': {
+          'type': 'integer',
+          'minimum': 50,
+          'maximum': 60000,
+        },
+      },
+      'additionalProperties': false,
     },
     'visible': interactiveBindingReference,
     'enabled': interactiveBindingReference,
@@ -182,7 +206,7 @@ final interactiveContentSchema = {
     'data': interactiveBindingReference,
     'style': {
       'type': 'string',
-      'enum': ['titleMedium', 'bodyMedium', 'labelSmall'],
+      'enum': ['titleMedium', 'bodyMedium', 'labelSmall', 'displayMedium'],
     },
     for (final name in [
       'padding',
@@ -309,8 +333,32 @@ final interactiveContentSchema = {
               'type': 'array',
               'items': {'type': 'string'},
             },
+            'scheduleNotification': interactiveNotificationSchema,
+            'cancelNotification': {'type': 'string', 'minLength': 1},
           },
           'required': ['setState'],
+          'additionalProperties': false,
+        },
+        {
+          'type': 'object',
+          'properties': {'scheduleNotification': interactiveNotificationSchema},
+          'required': ['scheduleNotification'],
+          'additionalProperties': false,
+        },
+        {
+          'type': 'object',
+          'properties': {
+            'cancelNotification': {'type': 'string', 'minLength': 1},
+          },
+          'required': ['cancelNotification'],
+          'additionalProperties': false,
+        },
+        {
+          'type': 'object',
+          'properties': {
+            'requestNotificationPermission': {'const': true},
+          },
+          'required': ['requestNotificationPermission'],
           'additionalProperties': false,
         },
         {
@@ -361,5 +409,23 @@ final interactiveContentSchema = {
     },
   },
   'required': ['type'],
+  'additionalProperties': false,
+};
+
+const interactiveNotificationSchema = {
+  'type': 'object',
+  'properties': {
+    'key': {'type': 'string', 'minLength': 1, 'maxLength': 100},
+    'at': interactiveBindingReference,
+    'title': interactiveBindingReference,
+    'body': interactiveBindingReference,
+    'weekdays': {
+      'type': 'array',
+      'maxItems': 7,
+      'uniqueItems': true,
+      'items': {'type': 'integer', 'minimum': 1, 'maximum': 7},
+    },
+  },
+  'required': ['key', 'at', 'title'],
   'additionalProperties': false,
 };

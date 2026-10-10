@@ -1,3 +1,4 @@
+import '../../domain/contact_name_order.dart';
 import 'floating_search_layout.dart';
 import 'package:flutter/material.dart';
 import '../../domain/ai_profile.dart';
@@ -44,9 +45,9 @@ class _GroupMuteSelectionState extends State<GroupMuteSelection> {
 
   @override
   Widget build(BuildContext context) {
-    final visible = widget.members.where(
-      (m) => m.sender.name.toLowerCase().contains(_search),
-    );
+    final visible = widget.members
+        .byContactName((m) => m.sender)
+        .where((m) => m.sender.name.toLowerCase().contains(_search));
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: SettingsAppBar(

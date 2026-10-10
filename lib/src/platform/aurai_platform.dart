@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
 import '../domain/capability.dart';
 import '../domain/markdown_plain_text.dart';
@@ -180,12 +181,18 @@ class AuraiPlatform {
     String conversationId,
     String title,
     String body,
-  ) async => _channel.invokeMethod<void>('notifyGroupMessage', {
-    'conversationId': conversationId,
-    'title': title,
-    'body': markdownPlainText(body),
-    'avatar': await notificationAvatar(conversationId),
-  });
+  ) async {
+    // Foreground messages use the in-app notification. Android discards the
+    // system notification here, so do not render and encode its unused avatar.
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed)
+      return;
+    await _channel.invokeMethod<void>('notifyGroupMessage', {
+      'conversationId': conversationId,
+      'title': title,
+      'body': markdownPlainText(body),
+      'avatar': await notificationAvatar(conversationId),
+    });
+  }
 
   Future<void> updateAgentSessionStep(
     String step, {

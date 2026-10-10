@@ -89,20 +89,8 @@ class GroupUnreadMessages {
   }
 
   Future<void> markRead(Conversation conversation, AgentMessage through) async {
+    await writeCheckpoint(database, conversation.id, through);
     final at = through.createdAt.microsecondsSinceEpoch;
-    await database.rawInsert(
-      '''
-      INSERT INTO app_state(key, value) VALUES (?, ?)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value
-      WHERE json_extract(excluded.value, '\$.at') > json_extract(app_state.value, '\$.at')
-        OR (json_extract(excluded.value, '\$.at') = json_extract(app_state.value, '\$.at')
-          AND json_extract(excluded.value, '\$.id') > json_extract(app_state.value, '\$.id'))
-    ''',
-      [
-        'group_read:${conversation.id}',
-        jsonEncode({'at': at, 'id': through.id}),
-      ],
-    );
     if (at > conversation.groupReadAt ||
         (at == conversation.groupReadAt &&
             through.id.compareTo(conversation.groupReadId) > 0)) {
@@ -111,5 +99,26 @@ class GroupUnreadMessages {
     }
     // Reading a visible card does not imply that later messages were seen.
     await load([conversation]);
+  }
+
+  static Future<void> writeCheckpoint(
+    DatabaseExecutor executor,
+    String conversationId,
+    AgentMessage through,
+  ) async {
+    final at = through.createdAt.microsecondsSinceEpoch;
+    await executor.rawInsert(
+      '''
+      INSERT INTO app_state(key, value) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+      WHERE json_extract(excluded.value, '\$.at') > json_extract(app_state.value, '\$.at')
+        OR (json_extract(excluded.value, '\$.at') = json_extract(app_state.value, '\$.at')
+          AND json_extract(excluded.value, '\$.id') > json_extract(app_state.value, '\$.id'))
+    ''',
+      [
+        'group_read:$conversationId',
+        jsonEncode({'at': at, 'id': through.id}),
+      ],
+    );
   }
 }

@@ -24,7 +24,8 @@ Future<AgentMessage?> writeGroupMemberNotice(
     db,
     groupId,
     [
-      if (added.isNotEmpty) '${added.map((id) => names[id]).join('、')} 加入群聊',
+      if (added.isNotEmpty)
+        '${names[actorId]} 邀请 ${added.map((id) => names[id]).join('、')} 进入群聊',
       if (removed.isNotEmpty)
         '${names[actorId]} 把 ${removed.map((id) => names[id]).join('、')} 移出了群聊',
     ].join('；'),

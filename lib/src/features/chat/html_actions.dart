@@ -3,6 +3,46 @@ part of 'chat_controller.dart';
 extension HtmlActions on ChatController {
   HtmlStore get htmlStore => HtmlStore(_store.database);
 
+  Future<void> _interruptProgram(MiniappProgramChange change) async {
+    bool belongs(AgentMessage message) =>
+        message.messageMetadata?.participation['_programMessage'] ==
+        change.messageId;
+    _queuedSystemNotices[change.conversationId]?.removeWhere(belongs);
+    if (_queuedSystemNotices[change.conversationId]?.isEmpty == true) {
+      _queuedSystemNotices.remove(change.conversationId);
+    }
+    final state = _executions.sessions[change.conversationId];
+    if (state == null) return;
+    final target = state.conversation!;
+    if (target.messages.any(
+      (m) => m.id == state.queuedUserMessageId && belongs(m),
+    )) {
+      state.queuedUserMessageId = null;
+      state.forwardedReplyPending = false;
+    }
+    final cancellations = <Future<void>>[];
+    for (final entry in state.programRuns.entries.toList()) {
+      final run = entry.value;
+      if (run.messageId != change.messageId) continue;
+      final current = target.kind == ConversationKind.group
+          ? state.groupRuntimes[entry.key]
+          : state.runtime;
+      if (!identical(current, run.runtime)) continue;
+      if (target.kind == ConversationKind.group) {
+        state.groupRuns[entry.key]!.runState = ChatRunState.stopping;
+        state.groupReplyDrafts.remove(entry.key);
+        if (state.groupDispatcher!.history.lastOrNull case final last?) {
+          if (belongs(last)) state.groupDispatcher!.interrupt(entry.key);
+        }
+      } else {
+        target.runState = ChatRunState.stopping;
+      }
+      cancellations.add(run.runtime.cancel());
+      state.programRuns.remove(entry.key);
+    }
+    await Future.wait(cancellations);
+  }
+
   Future<void> _receiveProgramChange(MiniappProgramChange change) async {
     _scheduleProgramTick();
     if (change.memberNamesChanged) {
@@ -31,12 +71,21 @@ extension HtmlActions on ChatController {
     for (final entry in change.cards.entries) {
       _replaceInteractiveCard(change.conversationId, entry.key, entry.value);
     }
+    final target = await _forwardTarget(change.conversationId);
     for (final effect in change.messages) {
       _publishInteractiveChange(
         change.conversationId,
         effect.message,
-        notifyParticipants: effect.wakeAi,
+        source: target,
+        notifyParticipants:
+            effect.wakeAi && target.kind == ConversationKind.group,
       );
+      if (effect.wakeAi && target.kind == ConversationKind.direct) {
+        await _inConversation(target, () async {
+          _execution.queuedUserMessageId = effect.message.id;
+          await _deliverForwardedMessage(target, effect.message);
+        });
+      }
     }
     if (change.replyStates.isNotEmpty) {
       GroupParticipation.changes.add(change.conversationId);

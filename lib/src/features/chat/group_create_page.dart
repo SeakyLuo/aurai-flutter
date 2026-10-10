@@ -1,3 +1,4 @@
+import '../../domain/contact_name_order.dart';
 import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
@@ -34,7 +35,7 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
       _directoryFailed = false;
   bool _loading = true, _saving = false, _changing = false;
   bool _leaving = false, _allowPop = false;
-  bool _notifyMembers = true;
+  bool _notifyMembers = false;
   Set<String> _excluded = {};
   int get _newCount =>
       _members.where((ai) => !_excluded.contains(ai.sender.id)).length;
@@ -540,8 +541,8 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
                                     ),
                                     onTap: null,
                                   ),
-                                  for (final ai in _members) _member(ai),
                                   for (final ai in [
+                                    ..._members,
                                     ..._contacts.where(
                                       (selected) => !_directory.any(
                                         (p) =>
@@ -549,16 +550,22 @@ class _GroupCreatePageState extends State<GroupCreatePage> {
                                       ),
                                     ),
                                     ..._directory,
-                                  ])
-                                    GroupMemberChoice(
-                                      selected: _contacts.any(
-                                        (p) => p.sender.id == ai.sender.id,
-                                      ),
-                                      sender: ai.sender,
-                                      onTap: _enabled
-                                          ? () => _toggle(ai)
-                                          : null,
-                                    ),
+                                  ].byContactName((ai) => ai.sender))
+                                    _members.any(
+                                          (member) =>
+                                              member.sender.id == ai.sender.id,
+                                        )
+                                        ? _member(ai)
+                                        : GroupMemberChoice(
+                                            selected: _contacts.any(
+                                              (p) =>
+                                                  p.sender.id == ai.sender.id,
+                                            ),
+                                            sender: ai.sender,
+                                            onTap: _enabled
+                                                ? () => _toggle(ai)
+                                                : null,
+                                          ),
                                   if (_directoryLoading)
                                     const Center(
                                       child: CircularProgressIndicator(),

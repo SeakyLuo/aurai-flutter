@@ -9,7 +9,8 @@ extension OrganizedTaskExecution on ChatController {
     required String sourceMessageId,
   }) async {
     final taskId = call.arguments['taskId'] as String?;
-    final instruction = call.arguments['task'] as String;
+    final instruction = call.arguments['task'] as String?;
+    final startExecution = call.arguments['startExecution'] as bool? ?? true;
     late final Conversation task;
     if (taskId == null) {
       task = Conversation.empty()
@@ -42,14 +43,61 @@ extension OrganizedTaskExecution on ChatController {
         task.isArchived = false;
       }
     }
-    final initial = <String, Object?>{'taskId': task.id, 'title': task.title};
+    final notice = AgentMessage(
+      id: newMessageId(),
+      role: AgentMessageRole.user,
+      senderId: reply.senderId,
+      sender: reply.sender,
+      text: call.arguments['description'] as String? ?? task.title,
+      isSystem: true,
+      interactive: InteractiveMessage.card(
+        revision: 0,
+        title: '',
+        body: '',
+        buttons: const [],
+        participation: {
+          'presentation': 'message',
+          '_taskSource': {
+            'conversationId': source.id,
+            'messageId': sourceMessageId,
+          },
+          if (startExecution) '_taskExecution': instruction!,
+        },
+      ),
+      createdAt: DateTime.now(),
+    );
+    if (!startExecution) {
+      await _store.writer.mutate(
+        () => _store.database.transaction((txn) async {
+          await txn.insert('messages', messageRow(task.id, notice));
+          await txn.rawUpdate(
+            'UPDATE conversations SET message_count = message_count + 1, preview = ?, updated_at = ? WHERE id = ?',
+            [notice.text, notice.createdAt.microsecondsSinceEpoch, task.id],
+          );
+        }),
+      );
+      _publishInteractiveChange(task.id, notice, source: task);
+    }
+    final taskMessage = await _sendTaskCardMessage(
+      source,
+      task,
+      reply,
+      call,
+      startExecution: startExecution,
+    );
+    final initial = <String, Object?>{
+      'taskId': task.id,
+      'taskMessageId': taskMessage.id,
+      'conversationId': task.id,
+      'title': task.title,
+    };
     return DeferredToolExecution(
       initialOutput: initial,
       cancel: () => _inConversation(task, _stopConversation),
       finish: () => _inConversation(task, () async {
         if (cancelled()) throw const AgentCancelled();
-        final messageId = await _enqueuePrivateMessage(
-          instruction,
+        final messageId = await _enqueuePendingMessage(
+          notice,
           fromDraft: false,
           dispatch: false,
         );

@@ -12,6 +12,7 @@ extension ConversationRunFailure on ChatController {
     required ExecutionReplyContext reply,
     bool scheduled = false,
     bool callbacksOnly = false,
+    String? continuationRunId,
   }) async {
     try {
       if (!reply.config.isConfigured) {
@@ -22,6 +23,7 @@ extension ConversationRunFailure on ChatController {
         reply: reply,
         scheduled: scheduled,
         callbacksOnly: callbacksOnly,
+        continuationRunId: continuationRunId,
       );
     } on Object catch (error, stack) {
       if (error is! AgentCancelled &&

@@ -212,6 +212,9 @@ extension _MessageItemActions on _MessageItemState {
 
   Widget _selectableContent() {
     if (widget.previewMaxHeight != null) return _content;
+    if (message.messageMetadata?.participation['_taskCard'] != null) {
+      return _content;
+    }
     if (message.interactive != null) return _content;
     if (_hasBubble && message.htmlGame == null) {
       if (_bubbleTextSelection) {
@@ -287,6 +290,7 @@ extension _MessageItemActions on _MessageItemState {
       message.htmlGame == null &&
       message.interactive == null &&
       message.miniappShare == null &&
+      message.messageMetadata?.participation['_taskCard'] == null &&
       message.text.isNotEmpty;
 
   bool get _canReadAloud =>
@@ -298,6 +302,7 @@ extension _MessageItemActions on _MessageItemState {
       message.htmlGame == null &&
       message.interactive == null &&
       message.miniappShare == null &&
+      message.messageMetadata?.participation['_taskCard'] == null &&
       message.images.isEmpty &&
       message.files.isEmpty &&
       message.text.isNotEmpty;

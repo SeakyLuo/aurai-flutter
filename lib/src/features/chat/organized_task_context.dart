@@ -37,6 +37,7 @@ extension OrganizedTaskContext on ChatController {
     return [
       '当前是你正在持续推进的任务“${conversation.title}”。任务与私聊属于同一个 AI，共用长期记忆。'
           '本页组织此任务相关的消息，后续补充继续当前任务。'
+          'AI 的任务执行安排是工作续接，不是用户发言；小程序可能由你在私聊准备后直接发送到本页。'
           '以本任务中用户的最新要求决定当前工作范围，历史记忆不扩大授权。',
       if (origin.isNotEmpty) '任务最初来源（历史资料）：${jsonEncode(origin.single)}',
     ].join('\n');

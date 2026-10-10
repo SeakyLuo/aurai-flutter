@@ -1,3 +1,4 @@
+import '../domain/contact_name_order.dart';
 import '../features/chat/app_sheet_surface.dart';
 import '../features/chat/chat_header_background.dart';
 import '../domain/message_sender.dart';
@@ -61,7 +62,7 @@ class _SkillVisibilityTargetsState extends State<SkillVisibilityTargets> {
               m.id != widget.store.ownerId &&
               m.name.toLowerCase().contains(query),
         )
-        .toList();
+        .byContactName((member) => member);
     final groups = widget.store.groups
         .where((g) => (g['title'] as String).toLowerCase().contains(query))
         .toList();

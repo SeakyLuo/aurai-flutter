@@ -1,0 +1,227 @@
+{
+  "type": "Column",
+  "runtime": {
+    "refreshIntervalMs": 1000,
+    "persistState": true
+  },
+  "state": {
+    "running": false,
+    "deadline": 0,
+    "remaining": 300000
+  },
+  "spacing": 12,
+  "children": [
+    {
+      "type": "Text",
+      "data": "五分钟倒计时",
+      "style": "titleMedium"
+    },
+    {
+      "type": "Text",
+      "style": "displayMedium",
+      "data": {
+        "op": "formatDuration",
+        "args": [
+          {
+            "op": "multiply",
+            "args": [
+              {
+                "op": "ceil",
+                "args": [
+                  {
+                    "op": "divide",
+                    "args": [
+                      {
+                        "op": "max",
+                        "args": [
+                          0,
+                          {
+                            "op": "if",
+                            "args": [
+                              {
+                                "ref": "local.running"
+                              },
+                              {
+                                "op": "subtract",
+                                "args": [
+                                  {
+                                    "op": "if",
+                                    "args": [
+                                      {
+                                        "op": "eq",
+                                        "args": [
+                                          {
+                                            "ref": "notifications.countdown.enabled"
+                                          },
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "ref": "notifications.countdown.at"
+                                      },
+                                      {
+                                        "ref": "local.deadline"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "ref": "time.now"
+                                  }
+                                ]
+                              },
+                              {
+                                "ref": "local.remaining"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      1000
+                    ]
+                  }
+                ]
+              },
+              1000
+            ]
+          },
+          "mm:ss"
+        ]
+      }
+    },
+    {
+      "type": "TextButton",
+      "child": {
+        "type": "Text",
+        "data": "设置提醒权限"
+      },
+      "onPressed": {
+        "requestNotificationPermission": true
+      }
+    },
+    {
+      "type": "FilledButton",
+      "enabled": {
+        "op": "and",
+        "args": [
+          {
+            "op": "not",
+            "args": [
+              {
+                "ref": "local.running"
+              }
+            ]
+          },
+          {
+            "op": "gt",
+            "args": [
+              {
+                "ref": "local.remaining"
+              },
+              0
+            ]
+          }
+        ]
+      },
+      "child": {
+        "type": "Text",
+        "data": "开始 / 继续"
+      },
+      "onPressed": {
+        "setState": {
+          "running": true,
+          "deadline": {
+            "op": "add",
+            "args": [
+              {
+                "ref": "time.now"
+              },
+              {
+                "ref": "local.remaining"
+              }
+            ]
+          }
+        },
+        "scheduleNotification": {
+          "key": "countdown",
+          "at": {
+            "op": "add",
+            "args": [
+              {
+                "ref": "time.now"
+              },
+              {
+                "ref": "local.remaining"
+              }
+            ]
+          },
+          "title": "倒计时结束"
+        }
+      }
+    },
+    {
+      "type": "TextButton",
+      "enabled": {
+        "ref": "local.running"
+      },
+      "child": {
+        "type": "Text",
+        "data": "暂停 / 停止提醒"
+      },
+      "onPressed": {
+        "cancelNotification": "countdown",
+        "setState": {
+          "running": false,
+          "remaining": {
+            "op": "max",
+            "args": [
+              0,
+              {
+                "op": "subtract",
+                "args": [
+                  {
+                    "op": "if",
+                    "args": [
+                      {
+                        "op": "eq",
+                        "args": [
+                          {
+                            "ref": "notifications.countdown.enabled"
+                          },
+                          true
+                        ]
+                      },
+                      {
+                        "ref": "notifications.countdown.at"
+                      },
+                      {
+                        "ref": "local.deadline"
+                      }
+                    ]
+                  },
+                  {
+                    "ref": "time.now"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "TextButton",
+      "child": {
+        "type": "Text",
+        "data": "重置"
+      },
+      "onPressed": {
+        "cancelNotification": "countdown",
+        "setState": {
+          "running": false,
+          "deadline": 0,
+          "remaining": 300000
+        }
+      }
+    }
+  ]
+}

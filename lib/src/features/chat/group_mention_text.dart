@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 import '../../app/global_ui.dart';
+import '../../domain/cjk_strong_syntax.dart';
 
 TextStyle groupMentionStyle(BuildContext context) => TextStyle(
   color: GlobalUI.highlightTextColor(context),
@@ -58,8 +59,10 @@ class GroupMentionText extends StatefulWidget {
     this.textAlign,
     this.maxLines,
     this.overflow,
+    this.markdown = false,
   });
   final String text;
+  final bool markdown;
   final TextStyle style;
   final Map<String, String> members;
   final ValueChanged<String>? onOpen;
@@ -101,43 +104,70 @@ class _GroupMentionTextState extends State<GroupMentionText> {
               ? '|(?:${names.map(RegExp.escape).join('|')})'
               : ''),
     );
-    final spans = <InlineSpan>[];
-    var cursor = 0;
-    for (final match in pattern.allMatches(widget.text)) {
-      spans.add(TextSpan(text: widget.text.substring(cursor, match.start)));
-      final label =
-          match.group(1)?.replaceAllMapped(RegExp(r'\\(.)'), (m) => m[1]!) ??
-          match[0]!;
-      final link = match.group(2);
-      final uri = link == null ? null : Uri.parse(link);
-      final isMiniapp = uri?.host == 'miniapp';
-      final id = link == null
-          ? widget.members[label] ??
-                (label.startsWith('@')
-                    ? widget.members[label.substring(1)]
-                    : null)
-          : isMiniapp
-          ? null
-          : uri!.pathSegments.single;
-      TapGestureRecognizer? recognizer;
-      if (isMiniapp && widget.onOpenLink != null) {
-        recognizer = TapGestureRecognizer()
-          ..onTap = () => widget.onOpenLink!(link!);
-        _recognizers.add(recognizer);
-      } else if (id != null && widget.onOpen != null) {
-        recognizer = TapGestureRecognizer()..onTap = () => widget.onOpen!(id);
-        _recognizers.add(recognizer);
+    List<InlineSpan> mentions(String source) {
+      final spans = <InlineSpan>[];
+      var cursor = 0;
+      for (final match in pattern.allMatches(source)) {
+        spans.add(TextSpan(text: source.substring(cursor, match.start)));
+        final label =
+            match.group(1)?.replaceAllMapped(RegExp(r'\\(.)'), (m) => m[1]!) ??
+            match[0]!;
+        final link = match.group(2);
+        final uri = link == null ? null : Uri.parse(link);
+        final isMiniapp = uri?.host == 'miniapp';
+        final id = link == null
+            ? widget.members[label] ??
+                  (label.startsWith('@')
+                      ? widget.members[label.substring(1)]
+                      : null)
+            : isMiniapp
+            ? null
+            : uri!.pathSegments.single;
+        TapGestureRecognizer? recognizer;
+        if (isMiniapp && widget.onOpenLink != null) {
+          recognizer = TapGestureRecognizer()
+            ..onTap = () => widget.onOpenLink!(link!);
+          _recognizers.add(recognizer);
+        } else if (id != null && widget.onOpen != null) {
+          recognizer = TapGestureRecognizer()..onTap = () => widget.onOpen!(id);
+          _recognizers.add(recognizer);
+        }
+        spans.add(
+          TextSpan(
+            text: label,
+            style: groupMentionStyle(context),
+            recognizer: recognizer,
+          ),
+        );
+        cursor = match.end;
       }
-      spans.add(
-        TextSpan(
-          text: label,
-          style: groupMentionStyle(context),
-          recognizer: recognizer,
-        ),
-      );
-      cursor = match.end;
+      spans.add(TextSpan(text: source.substring(cursor)));
+      return spans;
     }
-    spans.add(TextSpan(text: widget.text.substring(cursor)));
+
+    InlineSpan inline(md.Node node) {
+      if (node is md.Element && node.tag == 'strong') {
+        return TextSpan(
+          style: const TextStyle(fontWeight: FontWeight.w600),
+          children: node.children!.map(inline).toList(),
+        );
+      }
+      if (node is md.Element && node.tag == 'a') {
+        return TextSpan(
+          children: mentions(
+            '[${node.textContent}](${node.attributes['href']})',
+          ),
+        );
+      }
+      return TextSpan(children: mentions(node.textContent));
+    }
+
+    final spans = widget.markdown
+        ? md.InlineParser(
+            widget.text,
+            md.Document(inlineSyntaxes: [CjkStrongSyntax()]),
+          ).parse().map(inline).toList()
+        : mentions(widget.text);
     return Text.rich(
       TextSpan(children: spans),
       style: widget.style,

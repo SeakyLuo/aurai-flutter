@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import 'chat_controller.dart';
 import 'member_avatar.dart';
@@ -31,10 +32,27 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
   static const _avatarSize = 26.0;
   static const _avatarStride = 16.0;
   final _sinceUpdate = Stopwatch()..start();
-  late final _animation = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2800),
-  );
+  final _activityClock = Stopwatch();
+  double _activityTarget = 0;
+  late final AnimationController _animation =
+      AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 2800),
+      )..addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          // A resting pose must stop scheduling frames, not just stop moving pixels.
+          _activityPause = Timer(
+            const Duration(milliseconds: 3800) - _activityClock.elapsed,
+            () {
+              _activityPause = null;
+              if (_animate &&
+                  _visible.take(5).any((a) => !a.sleeping && !a.idle)) {
+                _startActivityCycle();
+              }
+            },
+          );
+        }
+      });
   late final AnimationController _sleepAnimation =
       AnimationController(
         vsync: this,
@@ -43,13 +61,15 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
         if (status == AnimationStatus.completed) {
           _sleepPause = Timer(const Duration(seconds: 4), () {
             _sleepPause = null;
-            if (_animate && _visible.any((a) => a.sleeping)) {
+            if (_animate &&
+                _visible.take(5).any((a) => a.sleeping && !a.autoReplyPaused)) {
               _sleepAnimation.forward(from: 0);
             }
           });
         }
       });
   Timer? _sleepPause;
+  Timer? _activityPause;
   Timer? _revealTimer;
   List<GroupMemberActivity> _visible = const [];
   bool _animate = false;
@@ -101,13 +121,19 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
   }
 
   void _updateAnimation() {
-    if (_animate && _visible.any((a) => !a.sleeping && !a.idle)) {
-      if (!_animation.isAnimating) _animation.repeat();
+    // Overflow members have no animated avatar on screen.
+    final shown = _visible.take(5);
+    if (_animate && shown.any((a) => !a.sleeping && !a.idle)) {
+      _syncActivityCycle();
     } else {
+      _activityPause?.cancel();
+      _activityPause = null;
+      _activityClock.stop();
+      _activityClock.reset();
       _animation.stop();
       _animation.value = 0;
     }
-    if (_animate && _visible.any((a) => a.sleeping)) {
+    if (_animate && shown.any((a) => a.sleeping && !a.autoReplyPaused)) {
       if (!_sleepAnimation.isAnimating && _sleepPause == null) {
         _sleepAnimation.forward(from: 0);
       }
@@ -118,10 +144,54 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
     }
   }
 
+  double get _lastActivityPhase {
+    final last = _visible
+        .take(5)
+        .toList()
+        .lastIndexWhere((activity) => !activity.sleeping && !activity.idle);
+    return .55 + last * .10;
+  }
+
+  void _startActivityCycle() {
+    _activityClock
+      ..reset()
+      ..start();
+    _activityTarget = _lastActivityPhase;
+    _animation.value = 0;
+    _animation.animateTo(_activityTarget);
+  }
+
+  void _syncActivityCycle() {
+    if (!_activityClock.isRunning) {
+      _startActivityCycle();
+      return;
+    }
+    final target = _lastActivityPhase;
+    if (_animation.isAnimating) {
+      if (target != _activityTarget) {
+        _activityTarget = target;
+        // Removed members must not make the remaining avatars run backwards.
+        _animation.animateTo(math.max(_animation.value, target));
+      }
+      return;
+    }
+    final phase = _activityClock.elapsedMicroseconds / 2800000;
+    if (phase < target) {
+      // A newly visible member may still be moving during the old idle tail.
+      _activityPause?.cancel();
+      _activityPause = null;
+      _activityTarget = target;
+      _animation.value = phase;
+      _animation.animateTo(target);
+    }
+  }
+
   @override
   void dispose() {
     _revealTimer?.cancel();
     _sinceUpdate.stop();
+    _activityClock.stop();
+    _activityPause?.cancel();
     _sleepPause?.cancel();
     _sleepAnimation.dispose();
     _animation.dispose();
@@ -203,12 +273,10 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
   }
 
   Widget _sleepLetter(int index) {
-    final progress = ((_sleepAnimation.value * 1848 - index * 224) / 1400)
-        .clamp(0.0, 1.0);
-    final wave = _animate ? (1 - math.cos(progress * math.pi * 2)) / 2 : 0.0;
-    return Transform.scale(
-      alignment: Alignment.bottomCenter,
-      scale: 1 - .35 * wave,
+    return _SleepLetterScale(
+      animation: _sleepAnimation,
+      index: index,
+      animate: _animate,
       child: Text(
         'z',
         style: TextStyle(
@@ -287,18 +355,15 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
                 color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(5),
               ),
-              child: AnimatedBuilder(
-                animation: _sleepAnimation,
-                builder: (context, _) => Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (var i = 0; i < 3; i++)
-                      Padding(
-                        padding: EdgeInsets.only(right: i < 2 ? 1.5 : 0),
-                        child: _sleepLetter(i),
-                      ),
-                  ],
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < 3; i++)
+                    Padding(
+                      padding: EdgeInsets.only(right: i < 2 ? 1.5 : 0),
+                      child: _sleepLetter(i),
+                    ),
+                ],
               ),
             ),
           ),
@@ -323,28 +388,113 @@ class _ActivityAvatarsState extends State<GroupActivityAvatars>
       ],
     );
     if (activity.sleeping || activity.idle) return body;
-    return AnimatedBuilder(
-      animation: _animation,
-      child: body,
-      builder: (context, child) {
-        final phase = (_animation.value - index * .19 - (index % 3) * .035) % 1;
-        final pose = _animate ? _bouncePose(phase, index) : _restingPose;
-        return Transform.translate(
-          offset: Offset(0, pose.y),
-          child: Transform.rotate(
-            angle: pose.angle,
-            alignment: Alignment.bottomCenter,
-            child: Transform.scale(
-              scaleX: pose.scaleX,
-              scaleY: pose.scaleY,
-              alignment: Alignment.bottomCenter,
-              child: child,
-            ),
-          ),
-        );
-      },
+    return SizedBox.square(
+      dimension: _avatarSize,
+      child: Flow(
+        clipBehavior: Clip.none,
+        delegate: _ActivityAvatarMotion(_animation, index, _animate),
+        children: [RepaintBoundary(child: body)],
+      ),
     );
   }
+}
+
+class _SleepLetterScale extends SingleChildRenderObjectWidget {
+  const _SleepLetterScale({
+    required this.animation,
+    required this.index,
+    required this.animate,
+    required super.child,
+  });
+
+  final Animation<double> animation;
+  final int index;
+  final bool animate;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderSleepLetterScale(animation, index, animate);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderSleepLetterScale renderObject,
+  ) => renderObject.update(animation, index, animate);
+}
+
+class _RenderSleepLetterScale extends RenderTransform {
+  _RenderSleepLetterScale(this._animation, this._index, this._animate)
+    : super(transform: Matrix4.identity(), alignment: Alignment.bottomCenter) {
+    _updateTransform();
+  }
+
+  Animation<double> _animation;
+  int _index;
+  bool _animate;
+
+  void update(Animation<double> animation, int index, bool animate) {
+    if (_animation != animation) {
+      if (attached) _animation.removeListener(_updateTransform);
+      _animation = animation;
+      if (attached) _animation.addListener(_updateTransform);
+    }
+    _index = index;
+    _animate = animate;
+    _updateTransform();
+  }
+
+  void _updateTransform() {
+    final progress = ((_animation.value * 1848 - _index * 224) / 1400).clamp(
+      0.0,
+      1.0,
+    );
+    final wave = _animate ? (1 - math.cos(progress * math.pi * 2)) / 2 : 0.0;
+    final scale = 1 - .35 * wave;
+    transform = Matrix4.diagonal3Values(scale, scale, 1);
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _animation.addListener(_updateTransform);
+    _updateTransform();
+  }
+
+  @override
+  void detach() {
+    _animation.removeListener(_updateTransform);
+    super.detach();
+  }
+}
+
+class _ActivityAvatarMotion extends FlowDelegate {
+  _ActivityAvatarMotion(this.animation, this.index, this.animate)
+    : super(repaint: animation);
+
+  final Animation<double> animation;
+  final int index;
+  final bool animate;
+
+  @override
+  void paintChildren(FlowPaintingContext context) {
+    // All five avatars settle before the controller pauses at the end.
+    final phase = (animation.value - index * .10).clamp(0.0, 1.0);
+    final pose = animate ? _bouncePose(phase, index) : _restingPose;
+    final size = context.getChildSize(0)!;
+    // Paint-only motion avoids rebuilding inside the cluster's LayoutBuilder.
+    final transform = Matrix4.identity()
+      ..translateByDouble(size.width / 2, size.height + pose.y, 0, 1)
+      ..rotateZ(pose.angle)
+      ..scaleByDouble(pose.scaleX, pose.scaleY, 1, 1)
+      ..translateByDouble(-size.width / 2, -size.height, 0, 1);
+    context.paintChild(0, transform: transform);
+  }
+
+  @override
+  bool shouldRepaint(_ActivityAvatarMotion oldDelegate) =>
+      animation != oldDelegate.animation ||
+      index != oldDelegate.index ||
+      animate != oldDelegate.animate;
 }
 
 typedef _BouncePose = ({double y, double scaleX, double scaleY, double angle});

@@ -1,0 +1,13 @@
+{
+  "type": "Column",
+  "runtime": {"refreshIntervalMs": 1000},
+  "spacing": 12,
+  "children": [
+    {"type": "Text", "data": "早晨七点", "style": "titleMedium"},
+    {"type": "Text", "data": "每天 07:00", "style": "displayMedium"},
+    {"type": "Text", "data": {"op": "if", "args": [{"op": "eq", "args": [{"ref": "notifications.morning.enabled"}, true]}, {"op": "concat", "args": ["下次提醒：", {"op": "formatDateTime", "args": [{"ref": "notifications.morning.at"}, "yyyy-MM-dd HH:mm:ss"]}]}, "未启用"]}},
+    {"type": "TextButton", "child": {"type": "Text", "data": "设置提醒权限"}, "onPressed": {"requestNotificationPermission": true}},
+    {"type": "FilledButton", "enabled": {"op": "ne", "args": [{"ref": "notifications.morning.enabled"}, true]}, "child": {"type": "Text", "data": "启用"}, "onPressed": {"scheduleNotification": {"key": "morning", "at": {"op": "nextTimeOfDay", "args": [{"ref": "time.now"}, 7, 0]}, "title": "早上好，该起床了", "weekdays": [1, 2, 3, 4, 5, 6, 7]}}},
+    {"type": "TextButton", "enabled": {"op": "eq", "args": [{"ref": "notifications.morning.enabled"}, true]}, "child": {"type": "Text", "data": "关闭"}, "onPressed": {"cancelNotification": "morning"}}
+  ]
+}

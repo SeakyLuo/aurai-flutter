@@ -45,7 +45,6 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
   final _searchFocus = FocusNode();
   bool _searching = false;
   String _searchValue = '';
-  String? _shownFailure;
   Timer? _searchTimer;
   bool _loadingMore = false;
   final _text = TextEditingController();
@@ -63,17 +62,7 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
     _searching = _search.text.isNotEmpty;
     _searchValue = _search.text;
     _search.addListener(_searchChanged);
-    memory.addListener(_showFailure);
-    _shownFailure = memory.latestFailure;
     _searchMemories(_search.text);
-  }
-
-  void _showFailure() {
-    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
-    final failure = memory.latestFailure;
-    if (failure == null || failure == _shownFailure) return;
-    _shownFailure = failure;
-    memoryToast(context, '记忆整理失败：$failure', kind: ToastKind.error);
   }
 
   void _searchChanged() {
@@ -140,7 +129,6 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
     _transport?.cancel();
     _searchTimer?.cancel();
     _search.removeListener(_searchChanged);
-    memory.removeListener(_showFailure);
     _search.dispose();
     _searchFocus.dispose();
     _text.dispose();

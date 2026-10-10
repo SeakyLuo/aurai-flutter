@@ -20,7 +20,7 @@ function visibleTimeline(viewer){var all=viewer===s.hostId||viewer===ctx.ownerId
 function sayMember(text,p){var label=named(p).replace(/([\\\[\]])/g,'\\$1');publicRecord(text);note(text.replace(named(p),'['+label+'](aurai://member/'+encodeURIComponent(p.id)+')'));}
 function role(p){return roleById[p.role];}
 function ownIdentity(p){var r=role(p);if(!s.winner&&(r.type==='seer'||r.type==='shadowSeer')&&s.roles.some(function(v){return v.type==='shadowSeer';}))return {name:'预言家',description:'每夜选择一名玩家查验，由主持私密反馈好人或狼人。本局含灯影预言家，真实身份与查验是否相反需根据局内信息判断。\n玩家策略（以本局规则为准）：按本局私密身份说明和主持反馈行动；不要借源码、角色定义或接口差异判定自己属于哪一种预言家。比较已公开的查验、死亡和票型验证解释，不自动倒置所有结果或把猜测当确证。'};return r;}
-function note(text,audience,wake){out.push({text:text,audience:audience,wakeAi:!!wake});}
+function note(text,audience,wake){out.push({text:text,markdown:true,audience:audience,wakeAi:!!wake});}
 function say(text){publicRecord(text);note(text);}
 function announce(text){publicRecord(text);out.push({text:text,senderId:e.actorId});}
 function pause(){ctx.members.forEach(function(m){if(m.kind==='agent')controls[m.id]=false;});}
@@ -172,17 +172,28 @@ function issueSpeech(){speechProgress('in_progress');var p=player(s.actors[s.spe
  card(p,s.purpose==='lastWords'?'发表遗言':'发言','发言后点击“结束发言”。',null,'speechEnded','speech');}
 
 function postEnabled(key){return s.rules[key]!==false;}
-function finishPostgame(){
- enter('finished');
- say('赛后讨论结束，投票仍可参与。');
+function finishPostgame(){enter('finished');say('赛后复盘结束，每位玩家已完成一次发言。');}
+function issuePostgameSpeech(){
+ var p=player(s.postgame.order[s.postgame.index]);s.actors=[p.id];if(memberById[p.id].kind==='agent')controls[p.id]=true;
+ sayMember('轮到'+named(p)+'发表赛后复盘；请一次发完，发送后自动轮到下一位。',p);var message=out[out.length-1];message.wakeAi=memberById[p.id].kind==='agent';message.wakeMemberIds=message.wakeAi?[p.id]:[];
+}
+function publishPostgameSpeech(p,text){
+ check(s.postgame.order[s.postgame.index]===p.id,'当前没有轮到你复盘或已经发言');s.postgame.speeches.push({actorId:p.id,name:named(p),text:text});matchRecord(text,p.id,'postgameSpeech');out.push({text:text,senderId:p.id,markdown:interceptedMarkdown,wakeAi:false});pause();s.postgame.index++;if(s.postgame.index<s.postgame.order.length)issuePostgameSpeech();else finishPostgame();
 }
 function startDiscussion(){
- var actors=s.players.filter(function(p){return !!memberById[p.id];}).map(function(p){return p.id;});
- if(!postEnabled('postgameDiscussion')||!actors.length){finishPostgame();return;}
- enter('postgameDiscussion');s.actors=actors;s.purpose='postgame';
- actors.forEach(function(id){if(memberById[id].kind==='agent')controls[id]=true;});
- out.push({text:'赛后自由讨论开始。',audience:null,wakeAi:true,wakeMemberIds:actors.filter(function(id){return memberById[id].kind==='agent';})});
- publicRecord('赛后自由讨论开始。');
+ var actors=s.players.filter(function(p){return !!memberById[p.id];}).sort(function(a,b){return a.seat-b.seat;}).map(function(p){return p.id;}),order=[];
+ if(!postEnabled('postgameDiscussion')||!actors.length){enter('finished');say('赛后评奖结束。');return;}
+ function awardWinners(award){var poll=s.postgame.polls.filter(function(p){return p.id===award;})[0];return poll?poll.winners:[];}
+ function append(ids){ids.forEach(function(id){if(actors.indexOf(id)>=0&&order.indexOf(id)<0)order.push(id);});}
+ var loserMvp=awardWinners('loserMvp'),winnerMvp=awardWinners('winnerMvp'),mvps=loserMvp.concat(winnerMvp);
+ append(awardWinners('funniest'));
+ var remaining=actors.filter(function(id){return order.indexOf(id)<0&&mvps.indexOf(id)<0;}).sort(function(a,b){var x=player(a),y=player(b);if(x.alive!==y.alive)return x.alive?1:-1;return (x.alive?0:x.deathRound-y.deathRound)||x.seat-y.seat;});
+ append(remaining.filter(function(id){return s.postgame.winnerIds.indexOf(id)<0;}));append(remaining.filter(function(id){return s.postgame.winnerIds.indexOf(id)>=0;}));append(loserMvp);append(winnerMvp);enter('postgameDiscussion');s.purpose='postgame';s.postgame.order=order;s.postgame.index=0;s.postgame.speeches=[];
+ say('赛后按最下饭奖、其他败者、其他胜者、败方 MVP、胜方 MVP 依次复盘，每人一次。组内先出局的先说，同轮按座位号，存活玩家最后说。');issuePostgameSpeech();
+}
+function finishPostgameVoting(){
+ s.postgame.polls.forEach(function(poll){var totals={};Object.keys(poll.votes).forEach(function(id){var value=poll.votes[id];if(value!=='skip')totals[value]=(totals[value]||0)+1;});var highest=0;Object.keys(totals).forEach(function(id){highest=Math.max(highest,totals[id]);});poll.winners=poll.nominees.filter(function(id){return highest>0&&totals[id]===highest;}).sort(function(a,b){return player(a).seat-player(b).seat;});close.push('postgame:'+poll.id);say(poll.title+'：'+(poll.winners.length?poll.winners.map(function(id){return named(player(id));}).join('、'):'本轮无人获奖')+'。');});
+ startDiscussion();
 }
 function cupidTeam(){var lovers=s.lovers;if(lovers.length!==2)return 'good';var teams=lovers.map(function(id){return role(player(id)).type==='cupid'?'good':identityTeam(player(id));});return teams[0]===teams[1]?teams[0]:'third';}
 function victoryTeam(p){return role(p).type==='cupid'?cupidTeam():cupidTeam()==='third'&&s.lovers.indexOf(p.id)>=0?'third':identityTeam(p);}
@@ -205,23 +216,23 @@ function applyStandardVictory(d){
 function startPostgame(winnerIds){
  var winners=winnerIds||[],losers=s.players.filter(function(p){return winners.indexOf(p.id)<0;}).map(function(p){return p.id;});
  var voters=ctx.members.map(function(m){return m.id;});
- s.postgame={polls:[],voters:voters};
+ enter('postgameVote');s.postgame={winnerIds:winners.slice(),polls:[],voters:voters,requiredVoters:s.players.filter(function(p){return !!memberById[p.id];}).map(function(p){return p.id;})};host.call('context.compact',{instructions:'本局胜负已确定，即将评奖并每人一次复盘。保留用户约定和已经形成的简短经验；比赛聊天、过期状态、工具调用过程不再逐条重放。按小程序提供的全局对局事实表（全部身份、每人行动及理由、裁判反馈、投票、出局、发言）、评奖结果和已发表赛后发言继续；完整记录留在小程序，需要核对具体事实再按来源查询。不要继续比赛流程，不重复搜索或加载本轮已提供的工具。'});
  function poll(id,title,description,nominees){
-  if(postEnabled(id)&&nominees.length)s.postgame.polls.push({id:id,title:title,description:description,nominees:nominees});
+  if(postEnabled(id)&&nominees.length)s.postgame.polls.push({id:id,title:title,description:description,nominees:nominees,votes:{},winners:[]});
  }
  poll('winnerMvp','胜方 MVP','选出获胜方表现最出色的玩家。',winners);
  poll('loserMvp','败方 MVP','选出败方虽败犹荣的玩家。',losers);
  poll('funniest','最下饭奖','评选本局最下饭的玩家。',s.players.map(function(p){return p.id;}));
- var aiVoters=voters.filter(function(id){return memberById[id].kind==='agent'&&!(s.automatic&&s.automatic.active&&id===s.hostId);});
+ var aiVoters=s.postgame.requiredVoters.filter(function(id){return memberById[id].kind==='agent';});
  s.postgame.polls.forEach(function(poll){
   out.push({key:'postgame:'+poll.id,event:'postgameVote',data:{awardId:poll.id},senderId:e.actorId,
-   audience:null,wakeAi:aiVoters.length>0,wakeMemberIds:aiVoters,
+   audience:null,wakeAi:false,
    card:{title:poll.title,body:poll.description,showStatistics:true,
     buttons:[{id:'vote',label:'投票',action:'submit',repeatable:false,selection:{optionPrefix:'dot',mode:'single',options:opts(poll.nominees).concat([{id:'skip',label:'弃权',value:'skip'}])}}],
     interaction:{actors:voters,allowChange:false,reveal:'immediate',views:[{type:'distribution',unit:'票'}]},
     participation:{visibility:'public',summaryVisibility:'public'}}});
  });
- startDiscussion();
+ if(!s.postgame.polls.length){startDiscussion();return;}aiVoters.forEach(function(id){controls[id]=true;});out.push({text:'赛后评奖投票已全部发布，请一次完成全部投票或弃权，投票后等待轮到自己复盘。',audience:null,wakeAi:aiVoters.length>0,wakeMemberIds:aiVoters});
 }
 
 function hostOnly(){check(e.actorId===s.hostId||e.actorId===ctx.ownerId,'只有主持人或创建人可以裁定和安排流程');check(s.phase!=='finished','本局已结束');}
@@ -331,7 +342,7 @@ function advanceAutomatic(){
   if(a.stage==='voteResult'){automaticVoteResult('vote');continue;}
   if(a.stage==='votePk'){automaticBallot('vote',a.pkNominees,true);continue;}
   if(a.stage==='nextNight'){
-   var result={};applyParityVictory(result,true);if(result.winner){s.winner=result.winner;finishDayProgress();say(s.winner+' 获胜。');startPostgame(result.winnerIds);return;}
+   var result={};applyParityVictory(result,true);if(result.winner){s.winner=result.winner;finishDayProgress();publicRecord(s.winner+'获胜。');note('**'+s.winner+'获胜**。');startPostgame(result.winnerIds);return;}
    s.day++;s.wolfVotes={};s.players.forEach(function(p){if(role(p).type==='wolfBeauty')p.charmed=null;});s.nightActions={};s.suggestion=null;a.nightIndex=0;a.feedbackIds=[];a.stage='night';continue;
   }
   throw new Error('未知自动主持阶段：'+a.stage);
@@ -347,8 +358,9 @@ if(announcingNightResult){
 
 var interceptedMarkdown=false;
 if(e.action==='sendPlayerMessage'){
- var speakingPlayer=player(e.actorId);check(speakingPlayer&&!s.winner&&s.phase!=='finished','当前没有接管你的比赛发言');check(typeof e.data.text==='string'&&e.data.text.trim().length>0&&e.data.text.length<=4000,'发言需要 1–4000 字正文');interceptedMarkdown=e.data.markdown===true;
- if(s.phase==='speech'&&s.actors[s.speakerIndex]===e.actorId){var speechStep=s.dayProgress.steps.filter(function(v){return v.id===s.speechProgressIds[s.speakerIndex];})[0];speechStep.speech=(speechStep.speech?speechStep.speech+'\n\n':'')+e.data.text;out.push({text:e.data.text,senderId:e.actorId,markdown:interceptedMarkdown});e.action='playerMessagePublished';}
+ var speakingPlayer=player(e.actorId);check(speakingPlayer&&(!s.winner||s.phase==='postgameDiscussion')&&s.phase!=='finished','当前没有接管你的比赛发言');check(typeof e.data.text==='string'&&e.data.text.trim().length>0&&e.data.text.length<=4000,'发言需要 1–4000 字正文');interceptedMarkdown=e.data.markdown===true;
+ if(s.phase==='postgameDiscussion'){publishPostgameSpeech(speakingPlayer,e.data.text.trim());e.action='playerMessagePublished';}
+ else if(s.phase==='speech'&&s.actors[s.speakerIndex]===e.actorId){var speechStep=s.dayProgress.steps.filter(function(v){return v.id===s.speechProgressIds[s.speakerIndex];})[0];speechStep.speech=(speechStep.speech?speechStep.speech+'\n\n':'')+e.data.text;matchRecord(e.data.text,e.actorId,'speech');out.push({text:e.data.text,senderId:e.actorId,markdown:interceptedMarkdown});e.action='playerMessagePublished';}
  else{var currentPhase=s.phase==='waiting'&&s.kind?s.kind:s.phase;var defaultChannel=currentPhase==='night'&&speakingPlayer.alive&&role(speakingPlayer).team==='wolf'&&!role(speakingPlayer).independentWolf?'team:wolf':'host:'+e.actorId;e.action='sendChannelMessage';e.data={channelId:defaultChannel,text:e.data.text};}
 }
 if(e.action==='playerMessagePublished'){
@@ -377,13 +389,13 @@ if(e.action==='playerMessagePublished'){
  hostOnly();checkChannels(e.data.channels);s.channels=e.data.channels;s.channelRevision++;
 }else if(e.action==='sendChannelMessage'){
  check(Object.keys(e.data).every(function(k){return ['channelId','text','eventGuard'].indexOf(k)>=0;}),'频道消息只接受频道、正文和行动凭据，不能指定接收人');var c=s.channels.filter(function(c){return c.id===e.data.channelId;})[0];check(c&&channelOpen(c)&&c.senders.indexOf(e.actorId)>=0&&channelReaders(c).indexOf(e.actorId)>=0,'当前不能在此频道发言');check(typeof e.data.text==='string'&&e.data.text.trim().length>0&&e.data.text.length<=4000,'频道消息需要 1–4000 字正文');var audience=channelReaders(c);check(audience.some(function(id){return id!==e.actorId;}),'频道没有其他可见成员');var wakeMembers=c.wakeAi?audience.filter(function(id){return id!==e.actorId&&!(s.automatic&&s.automatic.active&&id===s.hostId)&&(c.senders.indexOf(id)>=0||s.wolfDiscussion&&c.id==='team:wolf'&&id===s.hostId)&&ctx.members.some(function(m){return m.id===id&&m.kind==='agent';});}):[];out.push({text:'【'+channelName(c,e.actorId)+'】'+e.data.text,senderId:e.actorId,markdown:interceptedMarkdown,audience:audience,wakeAi:wakeMembers.length>0,wakeMemberIds:wakeMembers});wakeMembers.forEach(function(id){controls[id]=true;});if(s.wolfDiscussion&&c.id==='team:wolf'&&s.wolfDiscussion.actors.indexOf(e.actorId)>=0){if(s.wolfDiscussion.spoken.indexOf(e.actorId)<0)s.wolfDiscussion.spoken.push(e.actorId);}
-}else if(e.action==='stop'){check(e.actorId===ctx.ownerId||e.actorId===s.hostId||e.actorId==='user:local','只有主持人或创建人可以结束');check(s.phase&&s.phase!=='finished','没有进行中的对局');if(s.phase==='postgameDiscussion'){finishPostgame();}else{enter('finished');s.winner='对局已结束';say('本局已提前结束，未判定胜负。');}
+}else if(e.action==='stop'){check(e.actorId===ctx.ownerId||e.actorId===s.hostId||e.actorId==='user:local','只有主持人或创建人可以结束');check(s.phase&&s.phase!=='finished','没有进行中的对局');if(s.phase==='postgameDiscussion'||s.phase==='postgameVote'){enter('finished');say('赛后环节已结束。');}else{enter('finished');s.winner='对局已结束';say('本局已提前结束，未判定胜负。');}
 }else if(e.action==='postgameVote'){
  var id=e.data.submitForPlayerId===undefined?e.actorId:e.data.submitForPlayerId,bound=e.data.context,value=e.data.value;
  check(id===e.actorId||e.actorId===s.hostId||e.actorId===ctx.ownerId,'只有主持人或创建人可以代投');
  var poll=s.postgame.polls.filter(function(p){return p.id===bound.awardId;})[0];
  check(poll&&s.postgame.voters.indexOf(id)>=0&&(value==='skip'||poll.nominees.indexOf(value)>=0),'投票对象或候选人无效');
- if(id!==e.actorId)cardSubmissions.push({key:'postgame:'+poll.id,actorId:id,value:value});
+ check(s.phase==='postgameVote'&&poll.votes[id]===undefined,'本轮评奖投票已提交或结束');poll.votes[id]=value;if(id!==e.actorId)cardSubmissions.push({key:'postgame:'+poll.id,actorId:id,value:value});if(memberById[id].kind==='agent'&&s.postgame.polls.every(function(poll){return poll.votes[id]!==undefined;}))controls[id]=false;if(s.postgame.polls.every(function(poll){return s.postgame.requiredVoters.every(function(voter){return poll.votes[voter]!==undefined;});}))finishPostgameVoting();
 }else if(e.action==='openWolfVote'){hostOnly();check(!!s.wolfDiscussion,'当前没有狼队讨论');openWolfVote();
 }else if(e.action==='finishCollection'){
  hostOnly();check(['night','deathSkill','custom','signup','vote','election','badge','direction'].indexOf(s.phase)>=0,'当前没有可结束的收集');
@@ -397,7 +409,7 @@ if(e.action==='playerMessagePublished'){
  check(d.kind!=='election'||s.rules.sheriff,'本局未启用警长');check(d.kind!=='election'||d.actors.every(function(id){return s.signups.indexOf(id)<0;}),'上警及退水玩家不能参与警长投票');check(d.kind!=='direction'||d.actors.length===1&&d.actors[0]===s.sheriff,'发言方向只能由警长选择');
  check(d.kind!=='signup'||s.rules.sheriff&&!s.signupDone,'不能重新报名警长');check(typeof d.prompt==='string'&&d.prompt.length<=4000,'请填写本轮说明');
  var dayEndResult={};applyParityVictory(dayEndResult,d.kind==='night'&&s.taskPeriod==='day');
- if(dayEndResult.winner){finishDayProgress();s.winner=dayEndResult.winner;publicRecord(s.winner+' 获胜。');note(s.winner+' 获胜，[查看详情](aurai://miniapp/message/'+encodeURIComponent(ctx.messageId)+')');startPostgame(dayEndResult.winnerIds);}else{
+ if(dayEndResult.winner){finishDayProgress();s.winner=dayEndResult.winner;publicRecord(s.winner+'获胜。');note('**'+s.winner+'获胜**，[查看详情](aurai://miniapp/message/'+encodeURIComponent(ctx.messageId)+')');startPostgame(dayEndResult.winnerIds);}else{
  if(['night','custom','deathSkill'].indexOf(d.kind)<0){finishNightProgress();beginDay();}
  if(d.kind==='custom'||(d.kind==='night'||d.kind==='deathSkill')&&d.requests!==undefined)check(Array.isArray(d.requests),'请提供每位玩家的填写卡');
  enter(d.kind);if(['signup','election','vote'].indexOf(d.kind)>=0){startDayProgress();dayStep(d.kind,'in_progress');}if(d.kind==='night'){finishDayProgress();s.taskPeriod='night';}if(d.kind!=='night')s.suggestion=null;s.kind=d.kind;s.purpose=d.purpose||'';s.actors=d.actors;s.prompt=d.prompt;s.voteTotals=null;
@@ -446,7 +458,7 @@ if(e.action==='playerMessagePublished'){
  if(d.applySuggested||d.consumeSkills){check(s.kind==='night'||s.kind==='deathSkill','当前没有技能收集记录');var collected=s.kind==='deathSkill'?[s.collection.actions]:[s.wolfVotes,s.nightActions];collected.forEach(function(batch){Object.keys(batch).forEach(function(id){var value=batch[id];if(value!=='skip'){var p=player(id),a=ability(p,value.skill);p.used[a.id]=(p.used[a.id]||0)+1;p.previous[a.id]=value.targets;}});});s.suggestion=null;if(s.kind==='night'){s.nightActions={};s.wolfVotes={};}else s.collection.actions={};}
  var deferFirstNight=s.day===1&&s.kind==='night'&&s.rules.sheriff&&!s.electionClosed&&(d.applySuggested||d.consumeSkills||d.deaths.length||announcement.trim());
  if(deferFirstNight){check(!s.firstNightResult,'首夜结果已暂存，请先完成警长竞选');check(d.sheriff===undefined&&d.day===undefined,'首夜结果暂存时不能跳过警长竞选');var causes={};d.deaths.forEach(function(id){causes[id]=d.deathCauses&&d.deathCauses[id]||player(id).deathCause||'host';delete player(id).deathCause;});s.firstNightResult={announcement:announcement,deaths:d.deaths.slice(),deathCauses:causes};if(d.winner!==undefined){s.firstNightResult.winner=d.winner;s.firstNightResult.winnerIds=d.winnerIds;delete d.winner;}d.deaths=[];announcement='';hostWake('首夜结果已暂存，请先安排上警报名、竞选发言和警长选举，再公布首夜死讯。');}
- if(!deferFirstNight){var completeDeaths=expandDeaths(d.deaths.map(function(id){return {id:id,cause:d.deathCauses&&d.deathCauses[id]||player(id).deathCause||'host'};}));d.deaths=completeDeaths.map(function(dead){return dead.id;});d.deathCauses={};completeDeaths.forEach(function(dead){d.deathCauses[dead.id]=dead.cause;});}d.deaths.forEach(function(id){check(!(s.day===1&&s.rules.firstNightProtection!==false&&s.protectedIds.indexOf(id)>=0&&d.deathCauses&&d.deathCauses[id]==='attack'&&s.wolfAttack&&s.wolfAttack.target===id),'首夜狼刀不能杀死受保护玩家');player(id).alive=false;player(id).deathPeriod=s.kind==='night'?'night':'day';if(d.deathCauses&&d.deathCauses[id])player(id).deathCause=d.deathCauses[id];else if(!player(id).deathCause)player(id).deathCause=s.pending&&s.pending.actorId===id?'explode':'host';});if(s.day===1&&s.kind==='night')d.deaths.forEach(function(id){if(player(id).deathCause==='attack'&&s.wolfAttack&&s.wolfAttack.target===id&&s.firstNightWolfVictims.indexOf(id)<0)s.firstNightWolfVictims.push(id);});if(d.sheriff!==undefined){s.sheriff=d.sheriff;s.electionClosed=true;if(s.day===1&&s.firstNightResult){startDayProgress();s.dayProgress.steps.forEach(function(v){if(['signup','electionSpeech','election'].indexOf(v.stage||v.id)>=0&&v.status!=='completed')v.status='skipped';});dayStep('nightResult','in_progress');}}if(d.sheriff!==undefined&&d.sheriff!==null)check(d.deaths.indexOf(d.sheriff)<0,'警长不能在本次裁定中出局');if(d.day!==undefined){if(d.day>s.day){s.nightActions={};s.suggestion=null;}s.day=d.day;}
+ if(!deferFirstNight){var completeDeaths=expandDeaths(d.deaths.map(function(id){return {id:id,cause:d.deathCauses&&d.deathCauses[id]||player(id).deathCause||'host'};}));d.deaths=completeDeaths.map(function(dead){return dead.id;});d.deathCauses={};completeDeaths.forEach(function(dead){d.deathCauses[dead.id]=dead.cause;});}d.deaths.forEach(function(id){check(!(s.day===1&&s.rules.firstNightProtection!==false&&s.protectedIds.indexOf(id)>=0&&d.deathCauses&&d.deathCauses[id]==='attack'&&s.wolfAttack&&s.wolfAttack.target===id),'首夜狼刀不能杀死受保护玩家');player(id).alive=false;player(id).deathPeriod=s.kind==='night'?'night':'day';player(id).deathRound=s.day*2+(player(id).deathPeriod==='night'?0:1);if(d.deathCauses&&d.deathCauses[id])player(id).deathCause=d.deathCauses[id];else if(!player(id).deathCause)player(id).deathCause=s.pending&&s.pending.actorId===id?'explode':'host';});if(s.day===1&&s.kind==='night')d.deaths.forEach(function(id){if(player(id).deathCause==='attack'&&s.wolfAttack&&s.wolfAttack.target===id&&s.firstNightWolfVictims.indexOf(id)<0)s.firstNightWolfVictims.push(id);});if(d.sheriff!==undefined){s.sheriff=d.sheriff;s.electionClosed=true;if(s.day===1&&s.firstNightResult){startDayProgress();s.dayProgress.steps.forEach(function(v){if(['signup','electionSpeech','election'].indexOf(v.stage||v.id)>=0&&v.status!=='completed')v.status='skipped';});dayStep('nightResult','in_progress');}}if(d.sheriff!==undefined&&d.sheriff!==null)check(d.deaths.indexOf(d.sheriff)<0,'警长不能在本次裁定中出局');if(d.day!==undefined){if(d.day>s.day){s.nightActions={};s.suggestion=null;}s.day=d.day;}
  if(d.lovers!==undefined){check(Array.isArray(d.lovers)&&d.lovers.length===2&&d.lovers[0]!==d.lovers[1]&&d.lovers.every(function(id){return !!player(id);})&&s.roles.some(function(r){return r.type==='cupid';}),'情侣需为本局两名不同玩家，且本局包含丘比特');s.lovers=d.lovers.slice();}
  if(d.loversSpectatorsVisible!==undefined){check(typeof d.loversSpectatorsVisible==='boolean','情侣观众可见设置无效');s.loversSpectatorsVisible=d.loversSpectatorsVisible;}
  feedback.forEach(function(m){playerRecord(player(m.actorId),m.text,'feedback');if(s.nightProgress&&s.kind==='night'){var node=s.nightProgress.steps.filter(function(v){return v.id===nightStepKey(role(player(m.actorId)));})[0];if(node&&node.results&&node.results[m.actorId])node.results[m.actorId].feedback.push(m.text);}out.push({text:m.text,asHost:true,audience:[m.actorId,s.hostId,ctx.ownerId].concat(spectators()).filter(function(id,i,ids){return memberById[id]&&ids.indexOf(id)===i;}),wakeAi:false});});
@@ -456,7 +468,7 @@ applyParityVictory(d,!deferFirstNight&&nightEnded);if(!deferFirstNight&&!d.winne
 if(d.winner||(s.nightProgress&&(s.day>s.nightProgress.day||s.kind==='night'&&(d.applySuggested||d.consumeSkills)&&s.nightProgress.steps.every(function(v){return v.id==='settlement'||v.status==='completed';}))))finishNightProgress(!d.winner);
  if(announcingNightResult)dayStep('nightResult','completed');if(s.kind==='vote'&&!s.pending){var actualExile=d.deaths.filter(function(id){return d.deathCauses[id]==='vote';});s.lastExiled=actualExile.length?actualExile[0]:null;dayStep('settlement','completed');var exiled=d.deaths.filter(function(id){return !d.deathCauses||!d.deathCauses[id]||['vote','host'].indexOf(d.deathCauses[id])>=0;});s.dayProgress.steps.filter(function(v){return v.id==='settlement';})[0].description=exiled.length?exiled.map(function(id){return named(player(id));}).join('、')+'被放逐':'本轮无人因放逐出局';if(!d.deaths.length||s.rules.lastWords==='none')dayStep('lastWords','skipped');}if(d.winner!==undefined)finishDayProgress();
  s.pending=null;if(announcement.trim()){if(s.nightProgress&&s.kind==='night'){var settlement=s.nightProgress.steps.filter(function(v){return v.id==='settlement';})[0];settlement.description=announcement;}announce(announcement);}
- s.lastResolvedDeaths=d.deaths.slice();if(d.winner!==undefined){s.winner=d.winner;publicRecord(d.winner+' 获胜。');note(d.winner+' 获胜，[查看详情](aurai://miniapp/message/'+encodeURIComponent(ctx.messageId)+')');startPostgame(d.winnerIds);}
+ s.lastResolvedDeaths=d.deaths.slice();if(d.winner!==undefined){s.winner=d.winner;publicRecord(d.winner+'获胜。');note('**'+d.winner+'获胜**，[查看详情](aurai://miniapp/message/'+encodeURIComponent(ctx.messageId)+')');startPostgame(d.winnerIds);}
 }else if(e.action==='withdraw'){
  var p=actionPlayer();check(p&&p.alive&&!s.electionClosed&&s.candidates.indexOf(p.id)>=0&&(s.phase==='speech'&&s.purpose==='election'||s.phase==='waiting'&&s.kind!=='election'),'当前不能退水');recordReason(p,'退水');
  s.candidates=s.candidates.filter(function(id){return id!==p.id;});say(named(p)+'退水（本轮警长投票无投票权）。');if(s.phase==='waiting')hostWake('候选人已退水，请更新竞选安排。');
@@ -477,7 +489,7 @@ if(d.winner||(s.nightProgress&&(s.day>s.nightProgress.day||s.kind==='night'&&(d.
 processEvent();
 advanceAutomatic();
 var channelProtocol='私密通信：读取当前 channels，仅在 canSend=true 时用 submitHtmlProgramEvent action:sendChannelMessage，data:{channelId,text,eventGuard}，eventGuard 原样复制 own.eventGuards.sendChannelMessage；使用已读 expectedVersion；程序决定收件人，禁止自行指定 audience 或用 sendGroupMessage 发送私密内容。正文不重复程序生成的私信前缀，只回应有用的新信息，不发确认、等待提醒或重复观点。频道发言不提交行动、不结束正式发言。';
-var postgameProtocol='胜负已确定，身份公开。按本局 postgame 配置自由复盘，包括已死亡玩家；无轮次、字数限制或 speechEnded，不请示主持或要求人工操作。使用普通群消息，有新观点再回应，避免重复、确认和人身攻击。启用的评奖用 clickInteractiveMessage 投票或弃权，所有群成员可参加，候选仅为实际玩家；评奖不阻塞讨论、不要求全员投票。禁止恢复对局行动或 collect/resolve；stop 只结束讨论，保留胜负与评奖卡。';
+var postgameProtocol='胜负已确定，身份公开。评奖阶段统一完成当前提供的全部投票卡或弃权，不另发确认、不自行复盘。复盘阶段仅当前 speaker 能用 sendGroupMessage 发送一次完整复盘，发送成功即自动轮到下一位；不调用 speechEnded、不另发确认、不重复回应。顺序是最下饭奖、其他败者、其他胜者、败方 MVP、胜方 MVP；败者和胜者组内按出局轮次先后，同轮按座位号，存活者排在各组最后。最下饭奖优先，重复获奖只发言一次，两位 MVP 不在其他组重复发言。使用赛后资料与自身记录，禁止继续比赛行动或让主持推进。';
 var playerProtocol='你是玩家，行动以最新状态和原生卡为准，不裁定死亡、胜负或推进阶段。身份和私密行动在胜负确定前保密。行动、投票、弃权、不用技能用对应卡 clickInteractiveMessage 提交；reason 写简短选择依据，不展开思考或另发公开确认；程序动作使用 data.reason，结束发言无需原因。正式发言须 phase=speech 且 speaker 是自己，用 submitHtmlProgramEvent action:sendPlayerMessage data:{text,markdown?:boolean,eventGuard} 自行公开，eventGuard 原样复制 own.eventGuards.sendPlayerMessage，成功后提交结束发言卡。不把发言私交主持代转、不重复发送；误投后核对本轮公开记录，仍轮到自己且未公开才补发一次，轮次已变只私密说明。普通群消息由程序按阶段分流：夜间普通狼去 team:wolf，非当前发言去主持私信。选举和放逐使用主持发布的同一张共享投票卡；涉及票型时查实际卡或 readInteractiveMessage，区分初选、PK、放逐，不从发言猜票，不要求玩家重复报告已公开的票。';
 var wolfStrategyProtocol='普通狼夜间在允许的 team:wolf 频道讨论，并用同一张共享狼刀卡投票。每只狼给出有用建议或回应；比较刀口收益、守救/反击风险、场上票数，区分事实与猜测，警徽可移交。首夜讨论刀口和白天计划；启用警长时可讨论上警、悍跳、配合、退水和非候选人的选举票，否则讨论身份声明及发言配合。后续依据实际发言、票型和已知身份调整。有分歧可回应或改主意，不重复立场、不机械套模板或强制使用所有战术。自动主持时，轮到狼队即同时开放夜聊和共享袭击投票；先讨论，自己决定何时投票，收齐全部票后程序自动推进。投票不等待主持或一致同意，提交后不能改票。私下计划不代替正式报名、退水或投票，不公开狼队策略，也不为计划开放白天私聊。';
 var hostProtocol='你是裁判，不是玩家。依据 rules、角色/技能配置和实际选择裁定，不虚构玩家意图或为推进而代选，不改源码推进。rules.notes 只放配置无法表达的用户房规，不重复基础规则、技能、顺序、策略或工具说明。使用运行时提供的当前状态与版本；缺少或过期时 readHtmlProgram，按最新 expectedVersion 提交事件；只在 waiting 且 pending=null 时 collect，先 resolve 待裁事件，裁定后自行安排下一步。\n'+
@@ -505,13 +517,13 @@ prepareChannels();var wolfNames=s.players.filter(function(q){return identityTeam
  canWithdraw:p.alive&&!s.electionClosed&&s.candidates.indexOf(p.id)>=0&&(s.phase==='speech'&&s.purpose==='election'||s.phase==='waiting'&&s.kind!=='election'),
  canDuel:!!(p.role&&canDuel(p)),canExplode:!!(p.role&&canExplode(p)),
  protocol:s.winner?postgameProtocol:playerProtocol+channelProtocol+(role(p).type==='whiteWolfKing'?' 白狼王：仅 canExplode=true 时可用 submitHtmlProgramEvent action:explode data:{reason:简短依据} 声明自爆，再操作程序给出的带人目标卡；不要用普通聊天代替发动。':role(p).type==='knight'?' 骑士：仅 canDuel=true 时用 submitHtmlProgramEvent action:duel data:{reason:依据}，再操作目标卡；决斗取消或失败后当前发言继续，已发表内容不重复。':role(p).type==='idiot'?' 白痴：被放逐时操作翻牌选择卡；翻牌后继续发言，但不再参与放逐投票或成为放逐目标。':'')+(identityTeam(p)==='wolf'&&!role(p).independentWolf&&(s.phase==='night'||s.kind==='night')?wolfStrategyProtocol:'')};});
-privateViews[s.hostId]={firstNightWolfVictims:s.firstNightWolfVictims,protectedIds:s.protectedIds,postgame:s.postgame,isHost:true,signupResponses:s.signupResponses,loverIds:loverIds,canEditData:true,canSubmitForPlayers:true,firstNightResult:s.firstNightResult||null,channels:channelViews(s.hostId),channelDefinitions:s.channels,protocol:hostProtocol+(s.winner?'':channelProtocol),seq:s.seq,actors:s.actors,speaker:s.phase==='speech'?s.actors[s.speakerIndex]:null,roles:s.roles,rules:s.rules,players:s.players,signups:s.signups,candidates:s.candidates,actions:s.actions,requests:s.requests,collection:s.collection,pending:s.pending,kind:s.kind,purpose:s.purpose,voteTotals:s.voteTotals,suggestion:s.suggestion,wolfVotes:s.wolfVotes,nightActions:s.nightActions};
+privateViews[s.hostId]={firstNightWolfVictims:s.firstNightWolfVictims,protectedIds:s.protectedIds,postgame:s.postgame,isHost:true,signupResponses:s.signupResponses,loverIds:loverIds,canEditData:true,canSubmitForPlayers:true,firstNightResult:s.firstNightResult||null,channels:channelViews(s.hostId),channelDefinitions:s.channels,protocol:hostProtocol+(s.winner?'':channelProtocol),seq:s.seq,actors:s.actors,speaker:s.phase==='postgameDiscussion'?s.postgame.order[s.postgame.index]:s.phase==='speech'?s.actors[s.speakerIndex]:null,roles:s.roles,rules:s.rules,players:s.players,signups:s.signups,candidates:s.candidates,actions:s.actions,requests:s.requests,collection:s.collection,pending:s.pending,kind:s.kind,purpose:s.purpose,voteTotals:s.voteTotals,suggestion:s.suggestion,wolfVotes:s.wolfVotes,nightActions:s.nightActions};
 spectators().forEach(function(id){privateViews[id]={players:s.players.map(function(p){return {id:p.id,name:p.name,seat:p.seat,knowledge:p.knowledge};}),loverIds:s.loversSpectatorsVisible===false?[]:loverIds,channels:channelViews(id),protocol:'你是旁观者，可读取 players 中的行动/裁判反馈及允许的频道，不参与玩家行动或频道发送。'+(s.winner?postgameProtocol:'')};});
 if(ctx.ownerId!==s.hostId&&memberById[ctx.ownerId]){privateViews[ctx.ownerId]=JSON.parse(JSON.stringify(privateViews[s.hostId]));privateViews[ctx.ownerId].channels=channelViews(ctx.ownerId);}
 out.forEach(function(message){if(message.card&&message.event==='submit'&&message.card.participation.kind!=='questionnaire')message.card.buttons.forEach(function(button){button.reasonRequired=true;});});
 // Program cards and private notices belong to the host; channel speech retains its actual author.
 out.forEach(function(message){if(message.card){delete message.senderId;message.asHost=true;}else if(message.audience&&!message.senderId)message.asHost=true;host.call('messages.send',message);});
-if(s.players.length&&!s.winner&&s.phase!=='setup'&&s.phase!=='finished')host.call('messages.intercept',{actors:s.players.filter(function(p){return p.id!==s.hostId&&memberById[p.id].kind==='agent';}).map(function(p){return p.id;}),action:'sendPlayerMessage'});
+if(s.players.length&&s.phase!=='setup'&&s.phase!=='finished')host.call('messages.intercept',{actors:s.players.filter(function(p){return p.id!==s.hostId&&memberById[p.id].kind==='agent';}).map(function(p){return p.id;}),action:'sendPlayerMessage'});
 cardSubmissions.forEach(function(submission){host.call('cards.submit',submission);});
 if(close.length)host.call('cards.close',{keys:close});
 if(Object.keys(nicknames).length)host.call('members.rename',{names:nicknames});
@@ -522,9 +534,9 @@ if(s.nightProgress&&!s.nightProgress.finished&&(s.phase==='night'||s.phase==='cu
 Object.keys(privateViews).forEach(function(id){
  var view=privateViews[id];view.taskProgress=taskProgressView(id);view.timeline=visibleTimeline(id);view.eventGuards={};
  if(!s.winner&&view.channels.some(function(c){return c.canSend;}))view.eventGuards.sendChannelMessage={seq:s.seq,channelRevision:s.channelRevision};
- if(!s.winner&&s.phase==='speech'&&s.actors[s.speakerIndex]===id)view.eventGuards.sendPlayerMessage={seq:s.seq,speakerIndex:s.speakerIndex};
+ if(!s.winner&&s.phase==='speech'&&s.actors[s.speakerIndex]===id)view.eventGuards.sendPlayerMessage={seq:s.seq,speakerIndex:s.speakerIndex};if(s.phase==='postgameDiscussion'&&s.postgame.order[s.postgame.index]===id)view.eventGuards.sendPlayerMessage={seq:s.seq,postgameIndex:s.postgame.index};
 });
-return {state:s,view:{timeline:visibleTimeline(null),period:s.taskPeriod||'night',taskProgress:taskProgressView(null),postgame:s.postgame||null,loverIds:s.winner&&s.winner!=='对局已结束'?loverIds:[],phase:s.phase,kind:s.kind,purpose:s.purpose,hostId:s.hostId,day:s.day,winner:s.winner||null,sheriff:s.sheriff,speaker:s.phase==='speech'?s.actors[s.speakerIndex]:null,rules:s.rules,roles:s.roles.map(function(r){var copy=Object.assign({},r);copy.skills=r.skills.map(function(skill){var value=Object.assign({},skill);delete value.id;return value;});return copy;}),
+return {state:s,view:{timeline:visibleTimeline(null),period:s.taskPeriod||'night',taskProgress:taskProgressView(null),postgame:s.postgame||null,loverIds:s.winner&&s.winner!=='对局已结束'?loverIds:[],phase:s.phase,kind:s.kind,purpose:s.purpose,hostId:s.hostId,day:s.day,winner:s.winner||null,sheriff:s.sheriff,speaker:s.phase==='postgameDiscussion'?s.postgame.order[s.postgame.index]:s.phase==='speech'?s.actors[s.speakerIndex]:null,rules:s.rules,roles:s.roles.map(function(r){var copy=Object.assign({},r);copy.skills=r.skills.map(function(skill){var value=Object.assign({},skill);delete value.id;return value;});return copy;}),
  players:s.players.map(function(p){return {id:p.id,name:p.name,seat:p.seat,alive:p.alive,submitted:s.actions[p.id]!==undefined,role:p.role&&(p.revealed||s.winner&&s.winner!=='对局已结束')?role(p).name:null,knowledge:s.winner&&s.winner!=='对局已结束'?p.knowledge:[]};}),log:s.log},
  privateViews:privateViews};
 </script>
@@ -581,7 +593,7 @@ html[data-aurai-display="fullscreen"] .ww-tabs{position:fixed;left:50%;transform
    <label class="aurai-row"><input type="checkbox" id="winnerMvp" checked><span>赛后评选 · 胜方 MVP</span></label>
    <label class="aurai-row"><input type="checkbox" id="loserMvp" checked><span>赛后评选 · 败方 MVP</span></label>
    <label class="aurai-row"><input type="checkbox" id="funniest" checked><span>赛后评选 · 最下饭奖</span></label>
-   <label class="aurai-row"><input type="checkbox" id="postgameDiscussion" checked><span>赛后讨论（复盘与互相吐槽）</span></label>
+   <label class="aurai-row"><input type="checkbox" id="postgameDiscussion" checked><span>赛后复盘（每人一次，按顺序发言）</span></label>
       <details><summary>夜间行动顺序</summary><div id="nightOrders" class="aurai-stack"></div></details>
 <label class="aurai-field">补充规则<textarea id="ruleNotes" rows="3" maxlength="4000" placeholder="仅填写本局额外约定，没有可留空"></textarea><span class="ww-small">已配置的规则、角色技能和夜间顺序无需重复填写。</span></label>
   </details><input type="hidden" id="setupDraftRows"><div class="aurai-actions ww-step-actions"><button type="button" id="previousStep" class="aurai-button">上一步</button><button class="aurai-button aurai-button--primary" id="start">开始对局</button></div>
@@ -704,8 +716,8 @@ function periodLabel(day,period){return period==='night'?(day===1?'首夜':'第'
  }
  $('timelinePlayer').onchange=()=>{drawTimeline(AuraiHTML.messageState,AuraiHTML.messageState._miniapp);AuraiHTML.requestResize()};
  $('timelineOrder').onchange=$('timelinePlayer').onchange;
- function render(){const s=AuraiHTML.messageState,host=s._miniapp,setup=s.phase==='setup',names={setup:setupStep===1?'选择参与人':'角色与规则',ready:'等待玩家准备',night:'夜晚行动',speech:'发言',vote:'放逐投票',signup:'警长报名',election:'警长选举',badge:'移交警徽',direction:'发言方向',settling:'结算中',waiting:'等待主持裁定',deathSkill:'出局技能填写',custom:'操作填写',postgameDiscussion:'赛后讨论',finished:'对局结束'};
- $('setupStepOne').hidden=setupStep!==1;$('setupStepTwo').hidden=setupStep!==2;$('template').hidden=!!host;$('setup').hidden=!setup||!host||!host.members.some(m=>m.id===host.viewerId);$('setupHint').hidden=!setup;$('matchTitle').textContent=!host||setup?'狼人杀':s.phase==='ready'?'待开局':s.winner?(s.winner==='对局已结束'?'对局结束':s.winner.replace(/\s*获胜[。！]?$/,'')+'获胜'):s.phase==='finished'?'对局结束':s.phase==='postgameDiscussion'?'赛后讨论':periodLabel(s.day,s.period);$('phase').textContent=!host?'角色与规则':names[s.phase];$('phase').hidden=$('phase').textContent===$('matchTitle').textContent;$('matchPanels').hidden=!host||setup;$('matchTabs').hidden=!host||setup;$('hint').textContent=!host?'在群聊中发送此小程序即可开局。':setup?setupStep===1?'第一步：选择主持人和 3–24 位参赛人。':'第二步：配置角色，按需调整规则。':s.winner?s.phase==='postgameDiscussion'?'胜方：'+s.winner+' · 自由讨论，出局玩家也可参与。':s.winner==='对局已结束'?s.winner:s.winner+'获胜':s.phase==='night'?'查看夜间行动卡。':'';
+ function render(){const s=AuraiHTML.messageState,host=s._miniapp,setup=s.phase==='setup',names={setup:setupStep===1?'选择参与人':'角色与规则',ready:'等待玩家准备',night:'夜晚行动',speech:'发言',vote:'放逐投票',signup:'警长报名',election:'警长选举',badge:'移交警徽',direction:'发言方向',settling:'结算中',waiting:'等待主持裁定',deathSkill:'出局技能填写',custom:'操作填写',postgameVote:'赛后评奖',postgameDiscussion:'赛后复盘',finished:'对局结束'};
+ $('setupStepOne').hidden=setupStep!==1;$('setupStepTwo').hidden=setupStep!==2;$('template').hidden=!!host;$('setup').hidden=!setup||!host||!host.members.some(m=>m.id===host.viewerId);$('setupHint').hidden=!setup;$('matchTitle').textContent=!host||setup?'狼人杀':s.phase==='ready'?'待开局':s.winner?(s.winner==='对局已结束'?'对局结束':s.winner.replace(/\s*获胜[。！]?$/,'')+'获胜'):s.phase==='finished'?'对局结束':s.phase==='postgameDiscussion'?'赛后讨论':periodLabel(s.day,s.period);$('phase').textContent=!host?'角色与规则':names[s.phase];$('phase').hidden=$('phase').textContent===$('matchTitle').textContent;$('matchPanels').hidden=!host||setup;$('matchTabs').hidden=!host||setup;$('hint').textContent=!host?'在群聊中发送此小程序即可开局。':setup?setupStep===1?'第一步：选择主持人和 3–24 位参赛人。':'第二步：配置角色，按需调整规则。':s.winner?s.phase==='postgameDiscussion'?'胜方：'+s.winner+' · 每人按顺序复盘一次。':s.winner==='对局已结束'?s.winner:s.winner+'获胜':s.phase==='night'?'查看夜间行动卡。':'';
  if(host&&roster!==JSON.stringify(host.members)){roster=JSON.stringify(host.members);const selectedHost=$('host').value;$('host').replaceChildren(text('option','请选择主持人'));$('host').firstChild.value='';host.members.filter(m=>m.kind==='agent').forEach(m=>{const option=text('option',m.name);option.value=m.id;$('host').append(option)});$('host').value=selectedHost;$('members').replaceChildren();host.members.filter(m=>m.id!==$('host').value).forEach(m=>{const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=selection.has(m.id);input.id='participant:'+m.id;input.onchange=()=>{input.checked?selection.add(m.id):selection.delete(m.id);defs.forEach(r=>r.assigned=r.assigned.map(id=>selection.has(id)?id:''));roleEditor()};label.append(input);if(m.avatar){const image=document.createElement('img');image.className='ww-avatar';image.src=m.avatar;image.alt='';label.append(image)}label.append(text('span',m.name));$('members').append(label)});count()}
  const visibleLovers=host?.hostView?.loverIds||host?.own?.loverIds||s.loverIds||[];const rosterById=Object.fromEntries((host?.members||[]).map(m=>[m.id,m])),privatePlayers=Object.fromEntries((host?.hostView?.players||host?.own?.players||[]).map(p=>[p.id,p])),roleNames=Object.fromEntries((s.roles||[]).map(r=>[r.id,r.name]));const orderedSeats=[];(s.players||[]).forEach(p=>{
  const member=rosterById[p.id],identity=p.role||roleNames[privatePlayers[p.id]?.role];
@@ -735,7 +747,7 @@ const actionCards=s.winner||['postgameDiscussion','finished'].includes(s.phase)?
    rows.forEach(([label,value])=>rules.append(text('p',label+' · '+value,'aurai-muted ww-rules-note')));
    if(r.notes.trim())rules.append(text('h3','补充规则','aurai-title'),text('p',readableRecord(r.notes),'aurai-muted ww-rules-note'));
   }
- });const isPostgame=s.phase==='postgameDiscussion',canManage=!!host&&(host.viewerId===host.ownerId||host.viewerId===s.hostId);
+ });const isPostgame=s.phase==='postgameDiscussion'||s.phase==='postgameVote'||s.phase==='postgameVote',canManage=!!host&&(host.viewerId===host.ownerId||host.viewerId===s.hostId);
  $('nextGame').hidden=!host||!s.winner||host.viewerId!=='user:local';$('nextGame').disabled=busy;
  $('stop').hidden=!canManage||!s.phase||['setup','finished'].includes(s.phase);$('stop').textContent=isPostgame?'结束赛后环节':'结束本局';
  $('finishCollection').hidden=!canManage||!['night','deathSkill','custom','signup','vote','election','badge','direction'].includes(s.phase);$('finishCollection').disabled=busy;

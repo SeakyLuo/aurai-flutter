@@ -1,0 +1,12 @@
+{
+  "type": "Column",
+  "runtime": {"refreshIntervalMs": 1000},
+  "spacing": 8,
+  "children": [
+    {"type": "Text", "data": "本地时间", "style": "titleMedium"},
+    {"type": "Text", "style": "displayMedium", "data": {"op": "formatDateTime", "args": [{"ref": "time.now"}, "HH:mm:ss"]}},
+    {"type": "Text", "data": {"op": "formatDateTime", "args": [{"ref": "time.now"}, "yyyy-MM-dd"]}},
+    {"type": "Text", "data": "UTC"},
+    {"type": "Text", "data": {"op": "formatDateTime", "args": [{"ref": "time.now"}, "HH:mm:ss", 0]}}
+  ]
+}

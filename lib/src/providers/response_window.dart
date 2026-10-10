@@ -31,7 +31,7 @@ class ResponseWindow {
     refreshedContext = null;
     final revision = sharedContext?.revision ?? 0;
     final checkpointChanged = _initialized && revision != _revision;
-    // Explicit checkpoints use the same save-before-evict boundary.
+    // Original records are persisted independently of durable memory extraction.
     _revision = revision;
     if (!_initialized) {
       final history = await responseMessageInput(
@@ -92,22 +92,14 @@ class ResponseWindow {
     }
     if (removed > 0) {
       final organize = request.organizeTask;
-      if (organize != null) {
-        request.onCompactionChanged?.call(true);
-        try {
-          final background = await _backgroundOrganization;
-          if (background?.error != null) {
-            Error.throwWithStackTrace(background!.error!, background.stack!);
-          }
-          // Include complete rounds finished after the background snapshot.
-          refreshedContext = await organize();
-          _backgroundOrganization = null;
-        } finally {
-          request.onCompactionChanged?.call(false);
-        }
-        size +=
-            await estimateTokens(refreshedContext) -
-            await estimateTokens(request.personalContext);
+      if (organize != null && _backgroundOrganization == null) {
+        // The worker persists failures and retry deadlines. Window movement must
+        // not await extraction or turn its failure into a failed chat reply.
+        _backgroundOrganization = organize().then(
+          (_) => (error: null, stack: null),
+          onError: (Object error, StackTrace stack) =>
+              (error: error, stack: stack),
+        );
       }
       if (size <= limits.inputBudget) _exchanges.removeRange(0, removed);
     }

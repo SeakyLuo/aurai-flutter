@@ -1,3 +1,4 @@
+import '../../domain/contact_name_order.dart';
 import 'floating_search_layout.dart';
 import '../../widgets/empty_data_view.dart';
 import '../../app/glass_notice.dart';
@@ -35,6 +36,7 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
   final _profiles = <AiProfile>[];
   final _created = <AiProfile>[];
   final _selected = <String>{};
+  final _selectedSenders = <String, MessageSender>{};
   late final _joined = widget.members
       .where((m) => m.sender.kind == MessageSenderKind.agent)
       .map((m) => m.sender.id)
@@ -134,6 +136,7 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
       setState(() {
         _created.add(ai);
         _selected.add(ai.sender.id);
+        _selectedSenders[ai.sender.id] = ai.sender;
       });
       await _load(reset: true);
     } catch (caughtError) {
@@ -159,6 +162,9 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
               (member) => member.sender.id == updated.sender.id,
             );
             _created[index] = updated.copyWith(isTemporary: true);
+            if (_selected.contains(updated.sender.id)) {
+              _selectedSenders[updated.sender.id] = updated.sender;
+            }
           });
         },
       ),
@@ -179,7 +185,10 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
             .toList(),
       );
       if (mounted) {
-        _notice('已邀请加入群聊', kind: ToastKind.success);
+        final names = _selected
+            .map((id) => _selectedSenders[id]!.displayName)
+            .join('、');
+        _notice('已邀请 $names 进入群聊', kind: ToastKind.success);
         Navigator.pop(context);
       }
     } on Object catch (error) {
@@ -305,7 +314,7 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
                                           ),
                                     ),
                                     ..._profiles,
-                                  ])
+                                  ].byContactName((ai) => ai.sender))
                                     _joined.contains(ai.sender.id)
                                         ? Row(
                                             children: [
@@ -354,8 +363,17 @@ class _GroupInvitePageState extends State<GroupInvitePage> {
                                               setState(() {
                                                 if (!_selected.remove(
                                                   ai.sender.id,
-                                                ))
+                                                )) {
                                                   _selected.add(ai.sender.id);
+                                                  _selectedSenders[ai
+                                                          .sender
+                                                          .id] =
+                                                      ai.sender;
+                                                } else {
+                                                  _selectedSenders.remove(
+                                                    ai.sender.id,
+                                                  );
+                                                }
                                               });
                                             },
                                           ),

@@ -44,6 +44,12 @@ extension ConversationExecutionState on ChatController {
     if (conversation == null) return;
     _queuedSystemNotices.remove(conversation.id);
     await _persistRun(conversation);
+    if (_runtime == null) {
+      final question = pendingQuestion;
+      if (question != null && !question.result.isCompleted) {
+        question.result.complete({'cancelled': true});
+      }
+    }
     _execution.resolveConfirmation(false);
     _finishAccessibility({'granted': false, 'reason': 'User stopped the task'});
     if (_groupToolQueue.isOwnedBy(_execution)) {

@@ -1,12 +1,12 @@
 part of 'chat_controller.dart';
 
-extension GroupProgramContext on ChatController {
-  Future<List<Map<String, Object?>>> Function()? _groupProgramInput(
-    Conversation? conversation,
+extension ProgramContext on ChatController {
+  Future<List<Map<String, Object?>>> Function() _programInput(
+    Conversation conversation,
     String senderId,
     List<AgentMessage> observed,
+    AgentMessage trigger,
   ) {
-    if (conversation == null) return null;
     var first = true;
     final seen = {for (final message in observed) message.id: message.isSystem};
     final versions = <String, int>{};
@@ -17,12 +17,21 @@ extension GroupProgramContext on ChatController {
       ).readProgram(conversation.id, args['messageId'] as String, senderId),
     );
     return () async {
-      final history = _groupDispatcher!.history;
+      final history = conversation.kind == ConversationKind.group
+          ? _groupDispatcher!.history
+          : conversation.messages;
       final incoming = [
-        if (first) observed.last,
+        // A previous reply can finish after the move that wakes this run.
+        // Read the triggering move's instance, not the last history item.
+        if (first) trigger,
         ...history.where((message) => seen[message.id] != message.isSystem),
       ];
       first = false;
+      if (incoming.isNotEmpty &&
+          incoming.last.messageMetadata?.participation['_programMessage'] ==
+              null) {
+        _execution.programRuns.remove(senderId);
+      }
       for (final message in history) {
         seen[message.id] = message.isSystem;
       }
@@ -44,6 +53,15 @@ extension GroupProgramContext on ChatController {
       }
       final messageId =
           source.messageMetadata!.participation['_programMessage'] as String;
+      final runtime = conversation.kind == ConversationKind.group
+          ? _groupRuntimes[senderId]
+          : _runtime;
+      if (runtime != null) {
+        _execution.programRuns[senderId] = (
+          messageId: messageId,
+          runtime: runtime,
+        );
+      }
       final result = await reader.execute(
         ToolCall(
           id: newMessageId(),

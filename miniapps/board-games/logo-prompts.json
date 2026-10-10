@@ -1,0 +1,11 @@
+{
+  "tool": "imagegen built-in",
+  "xiangqi": {
+    "asset": "assets/miniapps/icons/xiangqi.png",
+    "prompt": "Use case: logo-brand. Create ONE square app logo for a Chinese xiangqi mini game. Premium minimal playful 3D product icon: one ivory Chinese chess disc with clearly engraved single vermilion Chinese character 帥, a second charcoal-edged ivory disc partly behind it, resting on a tiny subtly rounded pale warm wood board with a few thin grid lines. Centered large compact silhouette readable at 48px. Gentle tactile ceramic and wood material, soft diffuse lighting, restrained cream and vermilion, polished friendly modern mobile game identity. A complete square very pale warm gray backdrop, no outer rounded app mask. No extra writing, no Latin letters, no watermark, no scenery. Leave 12 percent clean margin. Avoid glossy plastic, elaborate decoration and purple."
+  },
+  "gomoku": {
+    "asset": "assets/miniapps/icons/gomoku.png",
+    "prompt": "Use case: logo-brand. Create ONE square app logo for a gomoku mini game, designed as a companion to a premium minimal Chinese chess icon. Premium minimal playful 3D product icon: three black and two ivory white round gomoku stones on a tiny subtly rounded pale warm wood board with thin grid lines, balanced compact arrangement suggesting five in a row. Centered large compact silhouette readable at 48px. Gentle tactile ceramic and wood material, soft diffuse lighting, restrained cream and charcoal, polished friendly modern mobile game identity. A complete square very pale warm gray backdrop, no outer rounded app mask. No writing, no letters, no watermark, no scenery. Leave 12 percent clean margin. Avoid glossy plastic, elaborate decoration and purple."
+  }
+}

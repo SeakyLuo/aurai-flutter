@@ -586,7 +586,7 @@ class ConversationReader {
     List<Object?> selectedArgs,
   ) async {
     final runWhere =
-        "status IN ('completed', 'failed', 'interrupted') AND final_message_id IN ($selectedMessages) AND final_message_id IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != '') AND elapsed_ms IS NOT NULL AND (is_task = 1 OR id IN (SELECT run_id FROM messages WHERE kind = 'reasoning')) AND conversation_id IN (SELECT id FROM conversations WHERE kind = 'direct')";
+        "status IN ('completed', 'failed', 'interrupted') AND final_message_id IN ($selectedMessages) AND final_message_id IN (SELECT id FROM messages WHERE kind = 'final' AND interactive_json IS NULL AND text != '') AND elapsed_ms IS NOT NULL AND (is_task = 1 OR id IN (SELECT run_id FROM messages WHERE kind = 'reasoning') OR id IN (SELECT run_id FROM tool_calls WHERE name = 'runTask')) AND conversation_id IN (SELECT id FROM conversations WHERE kind = 'direct')";
     final runs = await database.query(
       'agent_runs',
       where: runWhere,
@@ -608,8 +608,16 @@ class ConversationReader {
         where: 'key IN (${_slots(runs.length)})',
         whereArgs: [for (final run in runs) 'git_task:${run['id']}'],
       ),
+      database.query(
+        'conversations',
+        columns: ['id'],
+        where:
+            "kind = 'direct' AND personal_chat = 0 AND id IN (${_slots(runs.map((r) => r['conversation_id']).toSet().length)})",
+        whereArgs: runs.map((r) => r['conversation_id']).toSet().toList(),
+      ),
     ]);
     final messages = {for (final row in results[1]) row['id']: row};
+    final taskConversations = results[4].map((row) => row['id']).toSet();
     final tools = {for (final row in results[2]) row['id']: row};
     final gitChanges = {
       for (final row in results[3])
@@ -627,10 +635,13 @@ class ConversationReader {
       for (final run in runs)
         run['final_message_id']! as String: AgentTaskSummary(
           elapsedMilliseconds: run['elapsed_ms']! as int,
-          isTask: run['is_task'] == 1,
+          isTask:
+              taskConversations.contains(run['conversation_id']) &&
+              run['is_task'] == 1,
           stopped: run['status'] == 'cancelled',
           intermediateMessageIds:
-              const {
+              taskConversations.contains(run['conversation_id']) &&
+                  const {
                     'completed',
                     'failed',
                     'interrupted',
@@ -683,7 +694,9 @@ class ConversationReader {
                           messages[event['message_id']]!['text'] != '')))
                 _activity(event, messages, tools),
           ],
-          gitChanges: gitChanges[run['id']]?.fileCount == 0
+          gitChanges:
+              !taskConversations.contains(run['conversation_id']) ||
+                  gitChanges[run['id']]?.fileCount == 0
               ? null
               : gitChanges[run['id']],
         ),

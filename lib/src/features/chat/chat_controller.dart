@@ -152,8 +152,10 @@ import '../../scheduling/schedule_tool.dart';
 import 'dart:convert';
 import 'dart:io';
 import '../../memory/memory_controller.dart';
+import '../../memory/memory_events.dart';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import '../../domain/message_summary.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../agent/agent_runtime.dart';
@@ -241,11 +243,14 @@ part 'conversation_search_navigation.dart';
 part 'conversation_run.dart';
 part 'subagent_execution.dart';
 part 'organized_task_execution.dart';
+part 'task_card_messages.dart';
 part 'organized_task_context.dart';
 part 'run_summary_attachment.dart';
 part 'run_tool_logging.dart';
+part 'run_user_question.dart';
 part 'conversation_run_failure.dart';
 part 'conversation_run_continuation.dart';
+part 'startup_run_recovery.dart';
 part 'conversation_run_persistence.dart';
 part 'scheduled_execution.dart';
 part 'message_edit_actions.dart';
@@ -310,6 +315,7 @@ class ChatController extends ChangeNotifier {
       _platform.takeNotificationConversation();
   final questionNotifications = ValueNotifier<ConversationCompletion?>(null);
   final completedReplies = ValueNotifier<ConversationCompletion?>(null);
+  final conversationReads = StreamController<Conversation>.broadcast(sync: true);
   final _store = ConversationStore();
   StreamSubscription<void>? _callbackChanges;
   StreamSubscription<MiniappProgramChange>? _programChanges;
@@ -372,6 +378,9 @@ class ChatController extends ChangeNotifier {
   bool _systemEventDrainScheduled = false;
   final _groupToolQueue = GroupToolQueue();
   final groupActivityChanges = ValueNotifier<int>(0);
+  // Streaming thoughts do not change the member roster or retry availability.
+  final groupThoughtChanges = ValueNotifier<int>(0);
+  final privateThoughtChanges = ValueNotifier<int>(0);
   final contactsChanged = ValueNotifier<AiProfile?>(null);
   final programErrors = ValueNotifier<String?>(null);
   final _peerSessions = <String, Future<_PeerSession>>{};
@@ -415,6 +424,7 @@ class ChatController extends ChangeNotifier {
     _callbackChanges?.cancel();
     _programChanges?.cancel();
     MiniappProgramChange.compactContext = null;
+    MiniappProgramChange.interruptProgram = null;
     HtmlGameSignals.startNextSession = null;
     _programTimer?.cancel();
     _callbackCardChanges?.cancel();
@@ -423,9 +433,12 @@ class ChatController extends ChangeNotifier {
     _memory?.dispose();
     _accessibilityTimer?.cancel();
     completedReplies.dispose();
+    conversationReads.close();
     questionNotifications.dispose();
     notificationOpenRequests.dispose();
     groupActivityChanges.dispose();
+    groupThoughtChanges.dispose();
+    privateThoughtChanges.dispose();
     contactsChanged.dispose();
     programErrors.dispose();
     super.dispose();
@@ -480,6 +493,7 @@ class ChatController extends ChangeNotifier {
       _platform.clearLegacyAppState,
     );
     modelSettings = await _platform.loadModelSettings();
+    _configureReadOnArrival();
     await ToolCustomizations.initialize(_store.database);
     await _updateBundledWerewolf();
     HtmlGameSignals.startNextSession = startNextWerewolf;
@@ -535,13 +549,20 @@ class ChatController extends ChangeNotifier {
         );
       }
     });
-    await MessageCallbacks(_store.database).recoverInterrupted();
+    _callbackConversations.addAll(
+      _store.startupRuns.map((run) => run['conversation_id'] as String),
+    );
+    await MessageCallbacks(
+      _store.database,
+    ).recoverInterrupted(runs: _store.startupRuns);
     await scheduledTasks.initialize(_runScheduled);
     await _groupSleeps.initialize(_store.database, _recoverConversationSleep);
+    _startRunRecovery();
     _programChanges = MiniappProgramStore.changes.stream.listen(
       _receiveProgramChange,
     );
     MiniappProgramChange.compactContext = _compactMiniappContext;
+    MiniappProgramChange.interruptProgram = _interruptProgram;
     _scheduleProgramTick();
     _callbackChanges = MessageCallbacks.changes.stream.listen((_) {
       _callbacksPending = true;

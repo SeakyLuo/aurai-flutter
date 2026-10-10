@@ -95,6 +95,8 @@ class _RunTimelineSheetState extends State<_RunTimelineSheet> {
   void initState() {
     super.initState();
     widget.controller.groupActivityChanges.addListener(_changed);
+    widget.controller.groupThoughtChanges.addListener(_changed);
+    widget.controller.privateThoughtChanges.addListener(_changed);
     widget.controller.addListener(_changed);
     _load();
   }
@@ -151,6 +153,8 @@ class _RunTimelineSheetState extends State<_RunTimelineSheet> {
   void dispose() {
     _updates?.cancel();
     widget.controller.groupActivityChanges.removeListener(_changed);
+    widget.controller.groupThoughtChanges.removeListener(_changed);
+    widget.controller.privateThoughtChanges.removeListener(_changed);
     widget.controller.removeListener(_changed);
     super.dispose();
   }

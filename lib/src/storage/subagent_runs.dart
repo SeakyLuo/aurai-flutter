@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import '../memory/memory_events.dart';
 import 'package:sqflite/sqflite.dart';
 import '../domain/agent_models.dart';
 import '../domain/tool_models.dart';
@@ -90,6 +91,7 @@ class SubagentRuns {
       await batch.commit(noResult: true);
     });
     changed(id);
+    MemoryEvents.wakeQueue();
   }
 
   Future<List<Map<String, Object?>>> tools(String runId) => database.query(

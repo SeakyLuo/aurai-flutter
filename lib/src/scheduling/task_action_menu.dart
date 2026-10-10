@@ -77,7 +77,7 @@ class _ActionPainter extends CustomPainter {
           const Rect.fromLTWH(8.5, 8.5, 7, 7),
           const Radius.circular(1),
         ),
-        pen,
+        Paint()..color = color,
       );
     } else {
       canvas.drawLine(const Offset(9, 8.5), const Offset(9, 15.5), pen);

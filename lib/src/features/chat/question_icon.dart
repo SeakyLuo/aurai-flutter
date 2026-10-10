@@ -103,7 +103,7 @@ class _QuestionPainter extends CustomPainter {
             const Rect.fromLTWH(5, 5, 14, 14),
             const Radius.circular(2),
           ),
-          pen,
+          Paint()..color = color,
         );
       case QuestionIconType.pause:
         final fill = Paint()..color = color;

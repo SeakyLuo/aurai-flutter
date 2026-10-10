@@ -93,6 +93,7 @@ extension PrivateChatRest on ChatController {
   ];
 
   Future<void> _recoverConversationSleep(String id, Set<String> members) async {
+    if (_callbackConversations.contains(id)) return;
     final rows = await _store.database.query(
       'conversations',
       columns: ['kind', 'archived'],

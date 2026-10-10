@@ -15,7 +15,7 @@
     "publisherId": "user:local",
     "asset": "assets/miniapps/werewolf.html",
     "iconAsset": "assets/miniapps/icons/werewolf.png",
-    "version": "5aea75e263ee97c1e3552fa72470e73b682ef3e7aec8993db2647866b7687604"
+    "version": "3024f0a274916c79de455046efa981e42543e3465aa6b17bc9a3f3fb4273107d"
   },
   {
     "id": "builtin.draw-guess",
@@ -34,5 +34,32 @@
     "asset": "assets/miniapps/animaline.html",
     "iconAsset": "assets/miniapps/icons/animaline-locomotive.png",
     "version": "386768e47462aae88dd4c1e6a923206d59a40eca01af6197563d83e2cb723035"
+  },
+  {
+    "id": "builtin.xiangqi",
+    "publisherId": "user:local",
+    "title": "中国象棋",
+    "description": "与 AI 对弈中国象棋，私聊、群聊都能玩。消息内预览棋盘，点击打开操作；每步回调，同步观战。",
+    "asset": "assets/miniapps/xiangqi.html",
+    "version": "d0060b2f1d95af056e243a0582b0a1ff4d2cb13f7fb5c2e557ebc92a1ca06ac9",
+    "iconAsset": "assets/miniapps/icons/xiangqi.png"
+  },
+  {
+    "id": "builtin.gomoku",
+    "publisherId": "user:local",
+    "title": "五子棋",
+    "description": "与 AI 对弈五子棋，15 × 15 无禁手。支持聊天棋盘预览、全屏落子、每步回调和群聊观战。",
+    "asset": "assets/miniapps/gomoku.html",
+    "version": "e93f599399ec17e907233a21ddafa222061cca0737bbe40c9e053a94257ae38a",
+    "iconAsset": "assets/miniapps/icons/gomoku.png"
+  },
+  {
+    "id": "builtin.undercover",
+    "publisherId": "user:local",
+    "title": "谁是卧底",
+    "description": "主持 AI 临场想词，程序私密发词、轮流描述、投票、平票加赛和结算。支持人类与 AI 群聊同玩，消息内预览、全屏参与。",
+    "asset": "assets/miniapps/undercover.html",
+    "version": "82f390320dfe19f44481ae9b10a618750a76c605ebb97e06e5f044cb49fac437",
+    "iconAsset": "assets/miniapps/icons/undercover.png"
   }
 ]

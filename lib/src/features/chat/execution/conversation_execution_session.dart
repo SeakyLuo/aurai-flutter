@@ -49,6 +49,7 @@ class ConversationExecutionSession {
   Completer<void>? _privateRunFinished;
   Future<void>? get privateRunFinished => _privateRunFinished?.future;
   AgentRuntime? runtime;
+  final programRuns = <String, ({String messageId, AgentRuntime runtime})>{};
   final userInputs = <Future<List<Map<String, Object?>>>>[];
   final liveUserMessageIds = <String>{};
   bool systemEventLoading = false;

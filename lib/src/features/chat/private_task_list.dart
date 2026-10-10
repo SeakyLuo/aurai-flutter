@@ -41,6 +41,8 @@ class TaskProgressList extends StatefulWidget {
 }
 
 class _TaskProgressListState extends State<TaskProgressList> {
+  final _iconLink = LayerLink();
+  static const _iconSize = 28.0;
   @override
   Widget build(BuildContext context) {
     final steps = widget.steps;
@@ -63,6 +65,8 @@ class _TaskProgressListState extends State<TaskProgressList> {
     final accent = GlobalUI.highlightTextColor(context);
     final count = '$completed/' + steps.length.toString();
     return TaskCompletionTransition(
+      iconLink: _iconLink,
+      iconSize: _iconSize,
       completed: completed == steps.length,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -81,37 +85,41 @@ class _TaskProgressListState extends State<TaskProgressList> {
                   padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
                   child: Row(
                     children: [
-                      SizedBox.square(
-                        dimension: 28,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            TweenAnimationBuilder<double>(
-                              tween: Tween(end: completed / steps.length),
-                              duration: MediaQuery.disableAnimationsOf(context)
-                                  ? Duration.zero
-                                  : const Duration(milliseconds: 250),
-                              builder: (context, value, _) => SizedBox.expand(
-                                child: CircularProgressIndicator(
-                                  value: value,
-                                  strokeWidth: 1.65,
-                                  strokeCap: StrokeCap.round,
-                                  color: accent,
-                                  backgroundColor: colors.outlineVariant
-                                      .withValues(alpha: .5),
+                      CompositedTransformTarget(
+                        link: _iconLink,
+                        child: SizedBox.square(
+                          dimension: _iconSize,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              TweenAnimationBuilder<double>(
+                                tween: Tween(end: completed / steps.length),
+                                duration:
+                                    MediaQuery.disableAnimationsOf(context)
+                                    ? Duration.zero
+                                    : const Duration(milliseconds: 250),
+                                builder: (context, value, _) => SizedBox.expand(
+                                  child: CircularProgressIndicator(
+                                    value: value,
+                                    strokeWidth: 1.65,
+                                    strokeCap: StrokeCap.round,
+                                    color: accent,
+                                    backgroundColor: colors.outlineVariant
+                                        .withValues(alpha: .5),
+                                  ),
                                 ),
                               ),
-                            ),
-                            SizedBox.square(
-                              dimension: 18,
-                              child: FittedBox(
-                                child: SettingsIcon(
-                                  type: SettingsIconType.taskList,
-                                  color: colors.onSurfaceVariant,
+                              SizedBox.square(
+                                dimension: 18,
+                                child: FittedBox(
+                                  child: SettingsIcon(
+                                    type: SettingsIconType.taskList,
+                                    color: colors.onSurfaceVariant,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),

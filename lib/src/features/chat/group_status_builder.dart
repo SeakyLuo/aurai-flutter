@@ -95,6 +95,7 @@ class _GroupStatusBuilderState extends State<GroupStatusBuilder> {
     listenable: Listenable.merge([
       widget.controller,
       widget.controller.groupActivityChanges,
+      if (widget.includeThoughts) widget.controller.groupThoughtChanges,
       widget.controller.groupSleepChanges,
     ]),
     builder: (context, _) {
