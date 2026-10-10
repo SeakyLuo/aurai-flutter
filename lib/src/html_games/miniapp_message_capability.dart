@@ -14,6 +14,7 @@ class MiniappMessageCapability {
     required String messageId,
     required String actorId,
     String? continuationSenderId,
+    String? hostSenderId,
     bool anonymousEvent = false,
     required Set<String> memberIds,
     required Set<String> agents,
@@ -26,7 +27,11 @@ class MiniappMessageCapability {
     for (final raw in effects) {
       final effect = (raw as Map).cast<String, Object?>();
       final requestedSenderId = effect['senderId'] as String?;
-      if (anonymousEvent && requestedSenderId != null) {
+      final asHost = effect['asHost'] == true;
+      if (asHost && (hostSenderId == null || requestedSenderId != null)) {
+        throw ArgumentError('主持人消息需要已授权的主持人，不能同时指定 senderId');
+      }
+      if (anonymousEvent && (requestedSenderId != null || asHost)) {
         throw ArgumentError('匿名投票回调只能发送程序消息，请省略 senderId');
       }
       if (requestedSenderId != null && requestedSenderId != actorId) {
@@ -41,9 +46,14 @@ class MiniappMessageCapability {
       final definition = effect['card'] as Map?;
       // Follow-up cards retain the verified source card's author, not its respondent.
       // Ordinary messages still use the authenticated event actor.
-      final senderId = definition != null && continuationSenderId != null
+      final senderId = asHost
+          ? hostSenderId
+          : definition != null && continuationSenderId != null
           ? continuationSenderId
           : requestedSenderId;
+      if (asHost && !agents.contains(senderId)) {
+        throw StateError('已授权的主持人已不在当前群聊');
+      }
       if (definition == null && (effect['text'] as String).trim().isEmpty) {
         throw ArgumentError('小程序发送的消息不能为空');
       }
@@ -60,28 +70,35 @@ class MiniappMessageCapability {
       }
       final card = definition == null
           ? null
-          : InteractiveMessage.fromDefinition({
-              ...definition.cast<String, Object?>(),
-              'revision': 0,
-              'showStatistics': definition['showStatistics'] ?? false,
-              'buttons': [
-                for (final button in definition['buttons'] as List)
-                  {
-                    ...(button as Map).cast<String, Object?>(),
-                    'programEvent': effect['event'],
-                  },
-              ],
-              'participation': {
-                'visibility': 'private',
-                'summaryVisibility': 'private',
-                ...?definition['participation'] as Map?,
-                'audience': audience,
-                '_programMessage': messageId,
-                if (wakeAi) '_programWake': true,
-                if (wakeMemberIds != null) '_programWakeMembers': wakeMemberIds,
-                if (senderId != null) '_creatorId': senderId,
-              },
-            });
+          : InteractiveMessage.fromDefinition(
+              InteractiveMessage.cardDefinition({
+                ...definition.cast<String, Object?>(),
+                'revision': 0,
+                'showStatistics': definition['showStatistics'] ?? false,
+                'buttons': [
+                  for (final button in definition['buttons'] as List)
+                    {
+                      ...(button as Map).cast<String, Object?>(),
+                      'programEvent': effect['event'],
+                    },
+                ],
+                'participation': {
+                  'visibility': 'private',
+                  'summaryVisibility': 'private',
+                  ...?definition['participation'] as Map?,
+                  'audience': audience,
+                  '_programMessage': messageId,
+                  if (wakeAi) '_programWake': true,
+                  if (wakeMemberIds != null)
+                    '_programWakeMembers': wakeMemberIds,
+                  if (senderId != null) '_creatorId': senderId,
+                  if (senderId == null &&
+                      (definition['participation'] as Map?)?['kind'] ==
+                          'questionnaire')
+                    '_creatorId': MessageSender.localUser.id,
+                },
+              }),
+            );
       card?.validateTransport(html: false);
       if (card != null) {
         if (card.anonymous && effect['requirePublicMessage'] == true) {
@@ -110,7 +127,7 @@ class MiniappMessageCapability {
       }
       final metadata =
           card ??
-          InteractiveMessage(
+          InteractiveMessage.card(
             revision: 0,
             title: effect['text'] as String,
             body: '',
@@ -148,7 +165,7 @@ class MiniappMessageCapability {
         'UPDATE conversations SET message_count = message_count + ?, preview = ?, updated_at = ? WHERE id = ?',
         [
           effects.length,
-          last.canView(MessageSender.localUser.id) ? last.text : '私密交互消息',
+          last.canView(MessageSender.localUser.id) ? last.text : '私密互动消息',
           last.createdAt.microsecondsSinceEpoch,
           conversationId,
         ],

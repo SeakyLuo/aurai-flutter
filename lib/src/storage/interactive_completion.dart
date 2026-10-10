@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import '../domain/interactive_message.dart';
+import '../domain/interactive_host_projection.dart';
 import '../domain/agent_models.dart';
 import 'message_callbacks.dart';
 import '../domain/question_reply_signals.dart';
@@ -20,12 +21,17 @@ Future<InteractiveMessage> enqueueInteractiveCompletion(
   final round = current.shared ? current.engine.round : 1;
   final events = current.participation['callbackEvents'] as List? ?? const [];
   final notifyVote = actorId != null && events.contains('vote');
+  final notifyPause =
+      events.contains('pause') &&
+      !previous.collectionPaused &&
+      current.collectionPaused &&
+      !current.completed;
   final notifyComplete =
       events.contains('complete') &&
       !previous.completed &&
       current.completed &&
       current.participation['_completionNotifiedRound'] != round;
-  if (!notifyVote && !notifyComplete) return current;
+  if (!notifyVote && !notifyComplete && !notifyPause) return current;
   final choicesVisible = current.visible('visibility', actor: creatorId);
   final result = <String, Object?>{
     'title': current.title,
@@ -42,6 +48,8 @@ Future<InteractiveMessage> enqueueInteractiveCompletion(
     if (current.shared && current.interaction['actors'] != null)
       'eligibleCount': (current.interaction['actors'] as List).length,
     'summary': current.summary,
+    if (current.widgetTree.json['type'] != 'InteractionCard')
+      'host': interactiveHostProjection(current, creatorId),
     if (choicesVisible)
       'choices': {
         for (final entry in current.choices.entries)
@@ -86,6 +94,20 @@ Future<InteractiveMessage> enqueueInteractiveCompletion(
       },
     );
   }
+  if (notifyPause) {
+    await MessageCallbacks.enqueue(
+      db,
+      id: newMessageId(),
+      messageId: messageId,
+      conversationId: conversationId,
+      senderId: creatorId,
+      payload: {
+        ...result,
+        'source': 'interactionPaused',
+        'collectionEvent': 'paused',
+      },
+    );
+  }
   if (!notifyComplete) return current;
   await MessageCallbacks.enqueue(
     db,
@@ -96,6 +118,7 @@ Future<InteractiveMessage> enqueueInteractiveCompletion(
     payload: {
       ...result,
       'source': 'interactionComplete',
+      'collectionEvent': 'completed',
       'completionType': current.shared && current.engine.phase == 'completed'
           ? 'conditionMet'
           : 'manualClose',

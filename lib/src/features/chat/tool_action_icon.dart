@@ -70,8 +70,12 @@ class ToolActionIcon extends StatelessWidget {
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               'sendInteractiveMessage' ||
+              'sendQuestion' ||
+              'sendPoll' ||
+              'sendQuestionnaire' ||
               'clickInteractiveMessage' ||
               'retryInteractiveCallback' ||
+              'setQuestionnairePaused' ||
               'readInteractiveMessage' ||
               'updateInteractiveMessage' ||
               'sendConversationMessage' ||

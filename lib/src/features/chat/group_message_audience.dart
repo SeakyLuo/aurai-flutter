@@ -10,6 +10,7 @@ extension GroupMessageAudience on ChatController {
       forModel: true,
       includeSystem: true,
       modelConfig: reply.config,
+      memoryOwnerId: reply.senderId,
     );
     return [
       for (final message in history)

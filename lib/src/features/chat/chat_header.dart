@@ -42,7 +42,7 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
     systemOverlayStyle: Theme.of(context).brightness == Brightness.dark
         ? SystemUiOverlayStyle.light
         : SystemUiOverlayStyle.dark,
-    flexibleSpace: const ChatHeaderBackground(),
+    flexibleSpace: const IgnorePointer(child: ChatHeaderBackground()),
     toolbarHeight: toolbarHeight,
     titleSpacing: 18,
     title: editing
@@ -108,18 +108,31 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
                                   ),
                                   const SizedBox(height: 2),
                                   Flexible(
-                                    child: Text(
-                                      controller.activeAi!.sender.displayName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        height: 1.2,
-                                        fontWeight: FontWeight.w500,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurface,
+                                    child: GlassSurface(
+                                      radius: 12,
+                                      shadowOpacity: .25,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 2,
+                                        ),
+                                        child: Text(
+                                          controller
+                                              .activeAi!
+                                              .sender
+                                              .displayName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            height: 1.2,
+                                            fontWeight: FontWeight.w500,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),

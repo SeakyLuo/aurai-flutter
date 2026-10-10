@@ -10,6 +10,7 @@ import 'settings_icon.dart';
 import '../../agent/ask_user_tool.dart';
 import '../../domain/selection_option.dart';
 import 'rich_option_carousel.dart';
+import 'questionnaire_response_list.dart';
 
 typedef InteractiveOptionKey = (String, String);
 
@@ -32,8 +33,25 @@ class InteractiveStatisticsOverview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (card.isQuestionnaire) {
+      return ListView(
+        key: const PageStorageKey('questionnaire-overview'),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        children: [
+          QuestionnaireResponseList(
+            card: card,
+            viewerId: MessageSender.localUser.id,
+            members: senders,
+            onParticipant: onParticipant,
+          ),
+        ],
+      );
+    }
     final summaryVisible = card.visible('summaryVisibility');
     final peopleVisible = card.visible('visibility');
+    final actors = (card.interaction['actors'] as List?)?.cast<String>();
+    final eligible =
+        actors == null || actors.contains(MessageSender.localUser.id);
     final summary = card.summary;
     final highestCount = summary.fold<num>(
       0,
@@ -161,41 +179,55 @@ class InteractiveStatisticsOverview extends StatelessWidget {
           const SizedBox(height: 20),
         ],
         if (!summaryVisible || !peopleVisible) ...[
-          Text(
-            peopleVisible ? '参与情况' : '我的记录',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-          ),
           if (!peopleVisible) ...[
+            Text(
+              '参与者选择',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 8),
             Text(
               card.anonymous
-                  ? '匿名投票，发起人也无法查看他人的选择'
-                  : card.shared && !card.engine.revealed
-                  ? '本轮尚未公开参与者选择'
-                  : card.participation['visibility'] == 'afterClose'
-                  ? '结束后公开参与者记录'
-                  : '其他人的记录不公开',
+                  ? '匿名投票，不公开参与者选择'
+                  : card.shared &&
+                            !card.engine.revealed &&
+                            card.participation['visibility'] == 'public' ||
+                        card.participation['visibility'] == 'afterClose'
+                  ? '结束后公开'
+                  : '参与者选择不公开',
               style: TextStyle(
                 fontSize: 13,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
+            const SizedBox(height: 24),
           ],
-          const SizedBox(height: 8),
-          if (people.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Text(peopleVisible ? '还没有人参与' : '你还没有参与'),
+          if (peopleVisible || eligible) ...[
+            Text(
+              peopleVisible ? '参与情况' : '我的记录',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
-          for (final id in people)
-            InteractiveParticipantTile(
-              controller: controller,
-              groupId: groupId,
-              card: card,
-              sender: statisticsSender(card, senders, id),
-              actor: id,
-              onTap: () => onParticipant(id),
-            ),
+            const SizedBox(height: 8),
+            if (people.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Text(
+                  peopleVisible
+                      ? '还没有人参与'
+                      : card.completed || card.closed
+                      ? '你未参与本轮'
+                      : '你还没有参与',
+                ),
+              ),
+            for (final id in people)
+              InteractiveParticipantTile(
+                controller: controller,
+                groupId: groupId,
+                card: card,
+                sender: statisticsSender(card, senders, id),
+                actor: id,
+                onTap: () => onParticipant(id),
+              ),
+          ],
         ],
       ],
     );

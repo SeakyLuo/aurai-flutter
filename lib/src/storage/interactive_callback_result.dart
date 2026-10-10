@@ -55,16 +55,13 @@ completeInteractiveCallback(
     );
   }
   if (['interaction', 'participation', 'states'].any(result.containsKey)) {
-    throw ArgumentError('回调结果使用 title、body、buttons；修改共享规则请另行更新定义');
+    throw ArgumentError('回调结果使用 content 组件树；修改共享规则请另行更新定义');
   }
   final presentation = InteractiveMessage.fromDefinition({
     ...card.toJson(),
-    'title': result['title'],
-    'body': result['body'],
-    'buttons': result['buttons'],
-    'buttonColumns':
-        result['buttonColumns'] ?? card.viewFor(actor).buttonColumns,
+    'content': result['content'],
   });
+  presentation.validateTransport(html: rows.single['kind'] == 'html_game');
   final next = InteractiveMessage.fromJson({
     ...card.toJson(includeParticipants: true),
     'participants': {
@@ -72,10 +69,7 @@ completeInteractiveCallback(
       actor: {
         ...participant!,
         'revision': (participant['revision'] as int) + 1,
-        'title': presentation.title,
-        'body': presentation.body,
-        'buttons': presentation.buttons,
-        'buttonColumns': presentation.buttonColumns,
+        'content': presentation.content,
         'callback': {
           'id': eventId,
           'buttonId': callback?['buttonId'] ?? participant['buttonId'],

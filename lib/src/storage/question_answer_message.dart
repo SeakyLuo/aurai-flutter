@@ -88,7 +88,7 @@ Future<AgentMessage> writeQuestionAnswerMessage(
     quote: quote,
     isGroupMessage: conversation['kind'] == 'group',
     createdAt: DateTime.now(),
-    interactive: InteractiveMessage(
+    interactive: InteractiveMessage.card(
       revision: 0,
       title: text,
       body: '',

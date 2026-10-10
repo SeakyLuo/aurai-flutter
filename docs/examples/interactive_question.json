@@ -1,0 +1,44 @@
+{
+  "interaction": {
+    "actors": ["user:local"], "allowChange": false,
+    "completion": {"op": "eq", "args": [{"ref": "submittedCount"}, 1]}
+  },
+  "participation": {"callbackEvents": ["complete"]},
+  "content": {
+    "type": "Column", "spacing": 12,
+    "children": [
+      {"type": "Text", "data": "你希望活动几点开始？", "style": "titleMedium"},
+      {
+        "type": "Visibility", "visible": {"ref": "host.canSubmit"},
+        "child": {
+          "type": "Column", "spacing": 12,
+          "children": [
+            {"type": "TextField", "key": "time", "label": "期望时间", "required": true, "maxLength": 100},
+            {"type": "FilledButton", "child": {"type": "Text", "data": "提交回答"},
+             "onPressed": {"id": "submit", "action": "submit", "repeatable": false, "input": "json"}}
+          ]
+        }
+      },
+      {
+        "type": "Visibility", "visible": {"ref": "host.submitted"},
+        "child": {"type": "Column", "spacing": 8, "children": [
+          {"type": "Text", "data": "已提交回答"},
+          {"type": "ForEach", "items": {"ref": "host.answers"},
+           "template": {"type": "Text", "data": {"op": "concat", "args": [{"ref": "item.question"}, "：", {"ref": "item.answer"}]}}}
+        ]}
+      },
+      {
+        "type": "Visibility", "visible": {"op": "not", "args": [{"ref": "host.eligible"}]},
+        "child": {"type": "Text", "data": "等待受邀者回答"}
+      },
+      {
+        "type": "Visibility", "visible": {"op": "and", "args": [{"ref": "host.responsesVisible"}, {"op": "not", "args": [{"ref": "host.submitted"}]}]},
+        "child": {"type": "ForEach", "items": {"ref": "host.responses"},
+          "template": {"type": "Column", "spacing": 8, "children": [
+            {"type": "Text", "data": {"ref": "item.name"}},
+            {"type": "ForEach", "items": {"ref": "item.answers"}, "template": {"type": "Text", "data": {"ref": "item.answer"}}}
+          ]}}
+      }
+    ]
+  }
+}

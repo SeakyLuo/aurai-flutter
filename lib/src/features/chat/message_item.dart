@@ -68,6 +68,7 @@ import 'source_citation_syntax.dart';
 import 'source_citation_view.dart';
 
 part 'message_item_actions.dart';
+part 'message_item_interactive.dart';
 
 class MessageItem extends StatefulWidget {
   static const userTopMargin = 16.0;
@@ -225,7 +226,7 @@ class _MessageItemState extends State<MessageItem> {
       ? Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            message.text.isEmpty
+            message.text.isEmpty || _isProgramCard
                 ? _withActions(_content)
                 : _selectableContent(),
             if (message.quickReplies.isNotEmpty)
@@ -323,6 +324,16 @@ class _MessageItemState extends State<MessageItem> {
         )
       : child;
 
+  Widget _quotePreview() => Padding(
+    padding: const EdgeInsets.only(top: 6),
+    child: SelectionContainer.disabled(
+      child: MessageQuoteView(
+        quote: message.quote!,
+        onTap: () => widget.onOpenQuote?.call(message.quote!.messageId),
+      ),
+    ),
+  );
+
   Widget _buildContent(BuildContext context) {
     if (message.miniappShare != null)
       return MiniappShareMessage(
@@ -402,15 +413,6 @@ class _MessageItemState extends State<MessageItem> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  if (message.quote != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: MessageQuoteView(
-                        quote: message.quote!,
-                        onTap: () =>
-                            widget.onOpenQuote?.call(message.quote!.messageId),
-                      ),
-                    ),
                   for (final file in message.files)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -436,10 +438,13 @@ class _MessageItemState extends State<MessageItem> {
                       ],
                     ),
                   if (message.htmlGame == null && message.interactive != null)
-                    ForwardedInteractiveMessage(card: message.interactive!),
+                    if (_isProgramCard)
+                      _ownProgramCard(context)
+                    else
+                      ForwardedInteractiveMessage(card: message.interactive!),
                   if (message.images.isNotEmpty && message.text.isNotEmpty)
                     const SizedBox(height: 8),
-                  if (message.text.isNotEmpty)
+                  if (message.text.isNotEmpty && !_isProgramCard)
                     MenuPressHighlight(
                       keepHighlightWhileOpen: !_bubbleTextSelection,
                       onLongPressStart: (_) => _openBubbleMenu(),
@@ -480,6 +485,7 @@ class _MessageItemState extends State<MessageItem> {
                         ),
                       ),
                     ),
+                  if (message.quote != null) _quotePreview(),
                 ],
               ),
             ),
@@ -520,49 +526,10 @@ class _MessageItemState extends State<MessageItem> {
               ],
             ),
           ),
-        if (message.quote != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: MessageQuoteView(
-              quote: message.quote!,
-              onTap: () => widget.onOpenQuote?.call(message.quote!.messageId),
-            ),
-          ),
         if (message.htmlGame != null)
           widget.htmlView!
         else if (message.interactive != null)
-          IgnorePointer(
-            ignoring: widget.readOnly && widget.onLocate != null,
-            child: InteractiveMessageView(
-              key: ValueKey(page?.sequence),
-              messageId: message.id,
-              card: page?.snapshot ?? message.interactive!,
-              showQuestionRecipient: message.isGroupMessage,
-              members: widget.interactiveMembers,
-              onOpenMember: widget.onOpenMember,
-              historical: page?.snapshot != null,
-              readOnly: widget.readOnly || page?.snapshot != null,
-              onClick: widget.onInteractiveClick!,
-              onRetry: widget.onInteractiveRetry,
-              onCancelVote: (revision, participantRevision) =>
-                  ImageActionScope.of(context).cancelInteractiveVote(
-                    message.id,
-                    revision,
-                    participantRevision,
-                  ),
-              onStatistics: !widget.readOnly || widget.onLocate != null
-                  ? () => showInteractiveStatistics(
-                      context,
-                      controller: ImageActionScope.of(context),
-                      database: ImageActionScope.of(
-                        context,
-                      ).groupStore.database,
-                      messageId: message.id,
-                    )
-                  : null,
-              onOpenLink: (url) => _openLink(context, url),
-            ),
-          )
+          _interactiveContent(context)
         else if (widget.groupBubble && !message.markdown)
           GroupMentionText(
             text: message.text,
@@ -685,6 +652,9 @@ class _MessageItemState extends State<MessageItem> {
               ),
             ),
           ),
+        if (message.quote != null &&
+            (!widget.groupBubble || message.isReasoning))
+          _quotePreview(),
       ],
     );
     if (message.isReasoning) return content;
@@ -732,7 +702,13 @@ class _MessageItemState extends State<MessageItem> {
         ),
       ),
     );
-    if (widget.groupBubble) return bubble;
+    if (widget.groupBubble) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [bubble, if (message.quote != null) _quotePreview()],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -750,6 +726,7 @@ class _MessageItemState extends State<MessageItem> {
     try {
       await Clipboard.setData(ClipboardData(text: text ?? message.text));
       if (!mounted) return;
+      if (context.mounted) _notice(context, '已复制', kind: ToastKind.success);
       _copyResetTimer?.cancel();
       setState(() => _copied = true);
       _copyResetTimer = Timer(const Duration(milliseconds: 1500), () {

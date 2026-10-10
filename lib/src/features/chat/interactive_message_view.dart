@@ -22,6 +22,9 @@ import 'dart:convert';
 import 'dart:async';
 import '../../storage/interactive_message_store.dart';
 import 'user_question_skip_button.dart';
+import 'interactive_widget_tree.dart';
+import '../../domain/interactive_host_projection.dart';
+import 'questionnaire_card_view.dart';
 
 class InteractiveMessageView extends StatefulWidget {
   const InteractiveMessageView({
@@ -138,11 +141,13 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
       );
       if (result != null &&
           widget.messageId != null &&
-          (button['selection'] != null || button['questions'] != null)) {
+          (button['selection'] != null ||
+              button['questions'] != null ||
+              button['input'] != null)) {
         await InteractiveSelectionDrafts.instance.save(
           widget.messageId!,
           widget.actorId,
-          button['id'] as String,
+          button['input'] != null ? '@form' : button['id'] as String,
           '',
           {},
         );
@@ -255,6 +260,69 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
     final pendingButtonId = callbackLocked
         ? (callback?['buttonId'] ?? selected?['buttonId']) as String?
         : null;
+    if (_card.isQuestionnaire &&
+        card.widgetTree.json['type'] == 'InteractionCard') {
+      return QuestionnaireCardView(
+        card: _card,
+        actorId: widget.actorId,
+        messageId: widget.messageId,
+        readOnly:
+            widget.readOnly || widget.historical || _card.snapshotView != null,
+        fullSheet: widget.fullSheet,
+        busy: _busy,
+        pendingButtonId: pendingButtonId,
+        trailing: widget.titleTrailing,
+        members: widget.members,
+        onOpenMember: widget.onOpenMember,
+        onStatistics: widget.onStatistics,
+        onClick: _click,
+        onSave: _saveSelection,
+      );
+    }
+    if (card.widgetTree.json['type'] != 'InteractionCard') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        spacing: 8,
+        children: [
+          if (widget.titleTrailing case final trailing?)
+            Align(alignment: Alignment.centerRight, child: trailing),
+          InteractiveWidgetTree(
+            host: interactiveHostProjection(_card, widget.actorId),
+            key: ValueKey((widget.messageId, widget.actorId)),
+            card: card,
+            messageId: widget.messageId,
+            actorId: widget.actorId,
+            participantRevision: _card.participantRevision(widget.actorId),
+            value: selected?['value'],
+            readOnly:
+                widget.readOnly ||
+                widget.historical ||
+                card.closed ||
+                _card.snapshotView != null ||
+                (_card.interaction['actors'] is List &&
+                    !(_card.interaction['actors'] as List).contains(
+                      widget.actorId,
+                    )),
+            busy: _busy,
+            pendingButtonId: pendingButtonId,
+            onClick: _click,
+            onSave: (version, data) =>
+                _saveSelection('@form', version, {}, data),
+          ),
+          if (callbackStatus == 'failed' &&
+              widget.onRetry != null &&
+              !widget.readOnly &&
+              !widget.historical)
+            InteractiveMessageButton(
+              button: const {'label': '重试'},
+              busy: _busy == callback!['id'],
+              locked: _busy != null,
+              onPressed: () => _retry(callback['id'] as String),
+            ),
+        ],
+      );
+    }
     final canRetry =
         !widget.readOnly &&
         !widget.historical &&
@@ -321,6 +389,10 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
             _card.interaction['actors'] == null ||
             (_card.interaction['actors'] as List).contains(widget.actorId)) &&
         card.buttons.any((button) => button['selection'] != null);
+    final showBody =
+        !question &&
+        card.body.isNotEmpty &&
+        !(repeatedSelectionBody && selecting);
     final statisticsVisible =
         _card.hasInteraction &&
         !selecting &&
@@ -423,7 +495,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
           builder: (context) => QuestionSheetLayout(
             title: card.title,
             heading: Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 16),
+              padding: const EdgeInsets.only(bottom: 8),
               child: questionHeading(sheet: true),
             ),
             child: config == null
@@ -582,9 +654,7 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                   if (widget.titleTrailing case final trailing?) trailing,
                 ],
               ),
-            if (!question &&
-                card.body.isNotEmpty &&
-                !(repeatedSelectionBody && selecting)) ...[
+            if (showBody) ...[
               const SizedBox(height: 8),
               Text(
                 card.body,
@@ -637,7 +707,14 @@ class _InteractiveMessageViewState extends State<InteractiveMessageView> {
                 ],
               ),
             ],
-            const SizedBox(height: 16),
+            SizedBox(
+              height:
+                  !widget.fullSheet &&
+                      callbackStatus != 'failed' &&
+                      (compactAnswered || (vote && !showBody))
+                  ? 8
+                  : 16,
+            ),
             if (sharedView != null)
               QuestionResponse(
                 recipient: compactAnswered && showRecipient ? recipient : null,

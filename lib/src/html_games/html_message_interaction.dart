@@ -344,7 +344,7 @@ extension HtmlMessageInteraction on HtmlStore {
           card != null &&
           ((card['participation'] as Map?)?['audience'] != null ||
               (card['participation'] as Map?)?['excludedAudience'] != null);
-      final text = private ? '私密交互消息' : title;
+      final text = private ? '私密互动消息' : title;
       await txn.update(
         'messages',
         {'text': text, if (card != null) 'interactive_json': jsonEncode(card)},

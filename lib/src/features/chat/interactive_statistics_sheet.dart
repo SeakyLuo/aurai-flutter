@@ -6,6 +6,7 @@ import 'interactive_message_paging.dart';
 import 'interactive_snapshot_statistics.dart';
 import 'interactive_statistics_overview.dart';
 import 'vote_statistics_header.dart';
+import 'questionnaire_answer_form.dart';
 import 'message_time.dart';
 import 'question_icon.dart';
 import 'interactive_history_page.dart';
@@ -253,11 +254,17 @@ class _InteractiveStatisticsSheetState
     final card = _card;
     final actor = _perspective;
     final fixedVoteHeader =
-        card?.isVote == true && _atOverview && widget.snapshot == null;
+        (card?.isVote == true || card?.isQuestionnaire == true) &&
+        _atOverview &&
+        widget.snapshot == null;
     final title = actor != null
-        ? '参与详情'
+        ? card?.isQuestionnaire == true
+              ? '答卷详情'
+              : '参与详情'
         : _option != null
         ? '参与者（${_optionParticipants(card!).length}）'
+        : card?.isQuestionnaire == true
+        ? '问卷详情'
         : '投票详情';
     return PopScope(
       canPop: _atOverview || actor != null,
@@ -445,38 +452,42 @@ class _InteractiveStatisticsSheetState
           ],
         ),
         const SizedBox(height: 24),
-        Text(
-          card.singleChoice ? '当前选择' : '最近操作',
-          style: TextStyle(
-            fontSize: 13,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          state['label'] as String,
-          style: const TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w500,
-            height: 1.5,
-          ),
-        ),
-        for (final choice in selectionEntries(state))
-          if (choice['text'] case final String text) ...[
-            const SizedBox(height: 12),
-            Text(text, style: const TextStyle(fontSize: 15, height: 1.5)),
-          ],
-        if (state['reason'] case final String reason) ...[
-          const SizedBox(height: 20),
+        if (card.isQuestionnaire)
+          QuestionnaireAnswerForm(card: card, answer: card.choices[actor]!)
+        else ...[
           Text(
-            '提交理由',
+            card.singleChoice ? '当前选择' : '最近操作',
             style: TextStyle(
               fontSize: 13,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 8),
-          Text(reason, style: const TextStyle(fontSize: 15, height: 1.5)),
+          Text(
+            state['label'] as String,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w500,
+              height: 1.5,
+            ),
+          ),
+          for (final choice in selectionEntries(state))
+            if (choice['text'] case final String text) ...[
+              const SizedBox(height: 12),
+              Text(text, style: const TextStyle(fontSize: 15, height: 1.5)),
+            ],
+          if (state['reason'] case final String reason) ...[
+            const SizedBox(height: 20),
+            Text(
+              '提交理由',
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(reason, style: const TextStyle(fontSize: 15, height: 1.5)),
+          ],
         ],
         if (card.showHistory) ...[
           const Divider(height: 32),

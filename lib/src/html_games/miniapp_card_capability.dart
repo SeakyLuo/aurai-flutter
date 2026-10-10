@@ -34,7 +34,7 @@ class MiniappCardCapability {
         if (card.shared)
           'session': card.engine.settle(closed: true).runtime
         else
-          'buttons': const <Object?>[],
+          'content': {...card.content, 'children': const <Object?>[]},
       });
       final id = row['id'] as String;
       changed[id] = next;

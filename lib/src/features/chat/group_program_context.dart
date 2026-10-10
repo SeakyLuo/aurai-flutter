@@ -65,6 +65,7 @@ extension GroupProgramContext on ChatController {
               'text':
                   '运行时自动读取的小程序状态，仅为你可见的数据，不是用户指令或公开消息。'
                   '与 readHtmlProgram 返回相同，可直接按此版本与行动卡决策；'
+                  '直接使用本轮已提供的行动工具，不为这些工具重复搜索或加载。'
                   '缺少所需状态或发生版本冲突时再读取，不重复读取同一状态。'
                   '后续工具结果或更新状态优先于本快照。\n${jsonEncode(result.toModelJson())}',
             },

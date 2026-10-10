@@ -42,13 +42,14 @@ class MessagePrimaryActions extends StatelessWidget {
           color: color,
         ),
       ),
-    ];
+    ].where((action) => action.$3).toList();
+    if (actions.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         spacing: 8,
         children: [
-          for (final (action, label, enabled, icon) in actions)
+          for (final (action, label, _, icon) in actions)
             Expanded(
               child: Material(
                 color: Theme.of(context).brightness == Brightness.dark
@@ -57,25 +58,22 @@ class MessagePrimaryActions extends StatelessWidget {
                 borderRadius: BorderRadius.circular(18),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
-                  onTap: enabled ? () => onAction(action) : null,
-                  child: Opacity(
-                    opacity: enabled ? 1 : .35,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 11),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox.square(
-                            dimension: 24,
-                            child: FittedBox(child: icon),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            label,
-                            style: TextStyle(fontSize: 13, color: color),
-                          ),
-                        ],
-                      ),
+                  onTap: () => onAction(action),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox.square(
+                          dimension: 24,
+                          child: FittedBox(child: icon),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          label,
+                          style: TextStyle(fontSize: 13, color: color),
+                        ),
+                      ],
                     ),
                   ),
                 ),

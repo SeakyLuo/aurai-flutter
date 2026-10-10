@@ -1,0 +1,259 @@
+{
+  "avatars": [
+    {
+      "key": "blue_cat",
+      "name": "蓝帽猫咪",
+      "asset": "avatars/blue_cat.webp"
+    },
+    {
+      "key": "shiba_inu",
+      "name": "柴犬",
+      "asset": "avatars/shiba_inu.webp"
+    },
+    {
+      "key": "fox",
+      "name": "小狐狸",
+      "asset": "avatars/fox.webp"
+    },
+    {
+      "key": "lynx",
+      "name": "猞猁",
+      "asset": "avatars/lynx_yawning.webp"
+    },
+    {
+      "key": "raccoon",
+      "name": "浣熊",
+      "asset": "avatars/raccoon.webp"
+    },
+    {
+      "key": "skunk",
+      "name": "臭鼬",
+      "asset": "avatars/skunk_thumbs_down.webp"
+    },
+    {
+      "key": "panda",
+      "name": "大熊猫",
+      "asset": "avatars/panda.webp"
+    },
+    {
+      "key": "polar_bear",
+      "name": "白熊",
+      "asset": "avatars/polar_bear.webp"
+    },
+    {
+      "key": "lion",
+      "name": "小狮子",
+      "asset": "avatars/lion.webp"
+    },
+    {
+      "key": "baby_tiger",
+      "name": "小老虎",
+      "asset": "avatars/baby_tiger.webp"
+    },
+    {
+      "key": "cheetah_police",
+      "name": "猎豹警官",
+      "asset": "avatars/cheetah_police.webp"
+    },
+    {
+      "key": "schnauzer",
+      "name": "雪纳瑞",
+      "asset": "avatars/schnauzer.webp"
+    },
+    {
+      "key": "capybara",
+      "name": "水豚",
+      "asset": "avatars/capybara.webp"
+    },
+    {
+      "key": "lizard",
+      "name": "树袋熊",
+      "asset": "avatars/koala.webp"
+    },
+    {
+      "key": "kangaroo",
+      "name": "袋鼠",
+      "asset": "avatars/kangaroo.webp"
+    },
+    {
+      "key": "monkey",
+      "name": "猴子",
+      "asset": "avatars/monkey.webp"
+    },
+    {
+      "key": "hippo",
+      "name": "河马",
+      "asset": "miniapps/icons/animaline-portrait-hippo.webp"
+    },
+    {
+      "key": "rhino",
+      "name": "犀牛",
+      "asset": "avatars/rhino.webp"
+    },
+    {
+      "key": "buffalo",
+      "name": "美洲野牛",
+      "asset": "avatars/buffalo_italian.webp"
+    },
+    {
+      "key": "camel",
+      "name": "骆驼",
+      "asset": "avatars/camel.webp"
+    },
+    {
+      "key": "moose",
+      "name": "驼鹿",
+      "asset": "avatars/moose_sweat_smile.webp"
+    },
+    {
+      "key": "alpaca",
+      "name": "羊驼",
+      "asset": "avatars/alpaca.webp"
+    },
+    {
+      "key": "baby_elephant",
+      "name": "小象",
+      "asset": "avatars/baby_elephant.webp"
+    },
+    {
+      "key": "goat",
+      "name": "山羊",
+      "asset": "avatars/goat.webp"
+    },
+    {
+      "key": "hedgehog",
+      "name": "刺猬",
+      "asset": "avatars/hedgehog.webp"
+    },
+    {
+      "key": "hamster",
+      "name": "仓鼠",
+      "asset": "avatars/hamster.webp"
+    },
+    {
+      "key": "wild_rabbit",
+      "name": "坏野兔",
+      "asset": "avatars/wild_rabbit.webp"
+    },
+    {
+      "key": "chitu_horse",
+      "name": "赤兔马",
+      "asset": "avatars/chitu_horse.webp"
+    },
+    {
+      "key": "giraffe",
+      "name": "长颈鹿",
+      "asset": "avatars/giraffe.webp"
+    },
+    {
+      "key": "magician_pig",
+      "name": "魔术师小猪",
+      "asset": "avatars/magician_pig.webp"
+    },
+    {
+      "key": "duck",
+      "name": "小鸭子",
+      "asset": "avatars/duck.webp"
+    },
+    {
+      "key": "penguin",
+      "name": "企鹅",
+      "asset": "avatars/penguin.webp"
+    },
+    {
+      "key": "turkey",
+      "name": "火鸡",
+      "asset": "avatars/turkey.webp"
+    },
+    {
+      "key": "toucan",
+      "name": "巨嘴鸟",
+      "asset": "avatars/toucan.webp"
+    },
+    {
+      "key": "owl",
+      "name": "猫头鹰",
+      "asset": "avatars/owl.webp"
+    },
+    {
+      "key": "owl_turned",
+      "name": "转头猫头鹰",
+      "asset": "avatars/owl_turned.webp"
+    },
+    {
+      "key": "parrot",
+      "name": "鹦鹉",
+      "asset": "avatars/parrot.webp"
+    },
+    {
+      "key": "frog",
+      "name": "小青蛙",
+      "asset": "avatars/frog.webp"
+    },
+    {
+      "key": "turtle",
+      "name": "海龟",
+      "asset": "avatars/turtle.webp"
+    },
+    {
+      "key": "yellow_gecko",
+      "name": "鹅黄色守宫",
+      "asset": "avatars/yellow_gecko.webp"
+    },
+    {
+      "key": "frilled_lizard",
+      "name": "伞蜥",
+      "asset": "avatars/frilled_lizard.webp"
+    },
+    {
+      "key": "snail",
+      "name": "蜗牛",
+      "asset": "avatars/snail.webp"
+    },
+    {
+      "key": "baby_trex",
+      "name": "小霸王龙",
+      "asset": "avatars/baby_trex.webp"
+    },
+    {
+      "key": "crocodile",
+      "name": "鳄鱼",
+      "asset": "avatars/crocodile.webp"
+    },
+    {
+      "key": "seal",
+      "name": "小海豹",
+      "asset": "avatars/seal_starfish.webp"
+    },
+    {
+      "key": "pink_dolphin",
+      "name": "粉色海豚",
+      "asset": "avatars/pink_dolphin.webp"
+    },
+    {
+      "key": "shark",
+      "name": "鲨鱼",
+      "asset": "avatars/shark.webp"
+    },
+    {
+      "key": "pufferfish",
+      "name": "河豚",
+      "asset": "avatars/pufferfish.webp"
+    },
+    {
+      "key": "octopus",
+      "name": "比心章鱼",
+      "asset": "avatars/octopus.webp"
+    }
+  ],
+  "playable": {
+    "仓鼠": "hamster",
+    "猴子": "monkey",
+    "浣熊": "raccoon",
+    "鹦鹉": "parrot",
+    "山羊": "goat",
+    "猎豹": "cheetah_police",
+    "猫": "blue_cat",
+    "水豚": "capybara"
+  }
+}

@@ -64,6 +64,7 @@ class QuestionBatchForm extends StatelessWidget {
     this.trailing,
     this.status = '',
     this.closeWhen,
+    this.submitLabel = '提交回答',
   });
   final QuestionBatchController controller;
   final Future<void> Function()? onSubmit;
@@ -76,6 +77,7 @@ class QuestionBatchForm extends StatelessWidget {
   final Widget? trailing;
   final String status;
   final Future<void>? closeWhen;
+  final String submitLabel;
 
   bool get _immediateAnswer =>
       controller.batch.questions.length == 1 &&
@@ -109,6 +111,7 @@ class QuestionBatchForm extends StatelessWidget {
             status: status,
             trailing: trailing,
             closeWhen: closeWhen,
+            submitLabel: submitLabel,
           ),
         ),
       ),
@@ -311,6 +314,7 @@ class QuestionBatchForm extends StatelessWidget {
             if (!_immediateAnswer) ...[
               const SizedBox(height: 12),
               QuestionNavigation(
+                submitLabel: submitLabel,
                 index: controller.index,
                 count: questions.length,
                 busy: busy,

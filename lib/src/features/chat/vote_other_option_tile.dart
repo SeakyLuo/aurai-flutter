@@ -13,11 +13,13 @@ class VoteOtherOptionTile extends StatelessWidget {
     required this.onEdit,
     required this.onToggle,
     this.fontSize,
+    this.showSelectionIndicator = true,
     this.optionPrefix,
   });
 
   final String text;
   final bool selected, multiple;
+  final bool showSelectionIndicator;
   final int number;
   final String? optionPrefix;
   final double? fontSize;
@@ -32,6 +34,7 @@ class VoteOtherOptionTile extends StatelessWidget {
     optionPrefix: optionPrefix,
     multiple: multiple,
     vote: true,
+    showSelectionIndicator: showSelectionIndicator,
     selected: selected,
     fontSize: fontSize,
     contentMaxLines: 1,

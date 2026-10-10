@@ -129,7 +129,7 @@ class AgentMessage {
     interactive: interactive != null && interactive!.title == text
         ? InteractiveMessage.fromJson({
             ...interactive!.toJson(includeParticipants: true),
-            'title': value,
+            'content': interactive!.widgetTree.withTitle(value),
           })
         : messageMetadata,
     htmlGame: htmlGame,
@@ -169,7 +169,7 @@ class AgentMessage {
       _interactive ??
       (_audience == null && _excludedAudience == null
           ? null
-          : InteractiveMessage(
+          : InteractiveMessage.card(
               revision: 1,
               title: '',
               body: '',
@@ -592,18 +592,22 @@ String _defaultToolTitle(String name) => switch (name) {
   'checkoutProjectBranch' => '切换项目分支',
   'updateHtmlApp' => '修改小程序',
   'updateHtmlMessage' => '更新 HTML 消息',
-  'sendInteractiveMessage' => '发送交互消息',
+  'sendInteractiveMessage' => '发送互动消息',
+  'sendQuestion' => '发送问题',
+  'sendPoll' => '发起投票',
+  'sendQuestionnaire' => '发送问卷',
+  'setQuestionnairePaused' => '调整问卷收集',
   'findContacts' => '查找联系人',
   'listFriends' => '查看好友',
   'addFriend' => '添加好友',
   'readExecutionLogs' => '读取执行日志',
-  'clickInteractiveMessage' => '参与交互消息',
+  'clickInteractiveMessage' => '参与互动消息',
   'submitInteractiveChoice' => '提交选择',
   'finishCurrentAction' => '完成当前行动',
   'finishCurrentSpeech' => '结束当前发言',
-  'readInteractiveMessage' => '读取交互消息',
+  'readInteractiveMessage' => '读取互动消息',
   'retryInteractiveCallback' => '重试交互处理',
-  'updateInteractiveMessage' => '更新交互消息',
+  'updateInteractiveMessage' => '更新互动消息',
   'createConversation' => '新建会话',
   'renameConversation' => '重命名会话',
   'setConversationPinned' => '调整会话置顶',

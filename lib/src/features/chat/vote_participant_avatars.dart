@@ -11,11 +11,13 @@ class VoteParticipantAvatars extends StatelessWidget {
     required this.people,
     this.onOpenMember,
     this.onShowAll,
+    this.participantLabel = '投票者',
   });
 
   final List<MessageSender> people;
   final ValueChanged<String>? onOpenMember;
   final VoidCallback? onShowAll;
+  final String participantLabel;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -37,7 +39,7 @@ class VoteParticipantAvatars extends StatelessWidget {
                 final sender = people[index];
                 final more = overflow && index == slots - 1;
                 final label = more
-                    ? '查看其余 ${people.length - slots + 1} 位投票者'
+                    ? '查看其余 ${people.length - slots + 1} 位$participantLabel'
                     : sender.displayName;
                 return Tooltip(
                   message: label,

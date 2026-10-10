@@ -25,6 +25,7 @@ Future<Set<int>?> showQuestionOptionsSheet(
   bool multiple = false,
   bool showConfirm = false,
   bool readOnly = false,
+  bool showSelectionIndicator = true,
   bool vote = false,
   String? optionPrefix,
   bool anonymous = false,
@@ -62,6 +63,7 @@ Future<Set<int>?> showQuestionOptionsSheet(
         multiple: multiple,
         showConfirm: showConfirm,
         readOnly: readOnly,
+        showSelectionIndicator: showSelectionIndicator,
         vote: vote,
         optionPrefix: optionPrefix,
         anonymous: anonymous,
@@ -101,11 +103,13 @@ class QuestionOptionsField extends StatelessWidget {
     this.onTap,
     this.compact = false,
     this.arrow = SettingsIconType.chevron,
+    this.maxLines,
   });
   final String label;
   final VoidCallback? onTap;
   final bool compact;
   final SettingsIconType arrow;
+  final int? maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -126,6 +130,8 @@ class QuestionOptionsField extends StatelessWidget {
                   Flexible(
                     child: Text(
                       label,
+                      maxLines: maxLines,
+                      overflow: maxLines == null ? null : TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 14, height: 1.4, color: color),
                     ),
                   ),
@@ -163,6 +169,8 @@ class QuestionOptionsField extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
+                  maxLines: maxLines,
+                  overflow: maxLines == null ? null : TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 15, height: 1.4),
                 ),
               ),
@@ -186,6 +194,7 @@ class QuestionOptionsSheet extends StatefulWidget {
     required this.readOnly,
     required this.vote,
     this.showConfirm = false,
+    this.showSelectionIndicator = true,
     this.optionPrefix,
     required this.anonymous,
     this.voteStatus,
@@ -208,6 +217,7 @@ class QuestionOptionsSheet extends StatefulWidget {
   final ValueChanged<Set<int>>? onSelectionChanged;
   final bool multiple;
   final bool readOnly;
+  final bool showSelectionIndicator;
   final bool vote;
   final String? optionPrefix;
   final bool showConfirm;
@@ -263,6 +273,7 @@ class _QuestionOptionsSheetState extends State<QuestionOptionsSheet> {
     multiple: widget.multiple,
     maximum: widget.maximum,
     optionPrefix: widget.optionPrefix,
+    showSelectionIndicator: widget.showSelectionIndicator,
     onSelect: widget.readOnly || widget.busy
         ? null
         : (index) {
@@ -325,7 +336,7 @@ class _QuestionOptionsSheetState extends State<QuestionOptionsSheet> {
                 children: [
                   if (widget.heading case final heading?)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                       child: heading,
                     )
                   else if (widget.headerIcon != null)
@@ -484,6 +495,7 @@ class _QuestionOptionsSheetState extends State<QuestionOptionsSheet> {
                           option: widget.options[optionIndex],
                           number: optionIndex + 1,
                           optionPrefix: widget.optionPrefix,
+                          showSelectionIndicator: widget.showSelectionIndicator,
                           selected: selected,
                           multiple: widget.multiple,
                           onTap:
@@ -603,6 +615,8 @@ class _QuestionOptionsSheetState extends State<QuestionOptionsSheet> {
                                 multiple: widget.multiple,
                                 number: index + 1,
                                 optionPrefix: widget.optionPrefix,
+                                showSelectionIndicator:
+                                    widget.showSelectionIndicator,
                                 onEdit:
                                     widget.readOnly ||
                                         widget.multiple &&
@@ -634,6 +648,8 @@ class _QuestionOptionsSheetState extends State<QuestionOptionsSheet> {
                                 option: option,
                                 number: index + 1,
                                 optionPrefix: widget.optionPrefix,
+                                showSelectionIndicator:
+                                    widget.showSelectionIndicator,
                                 selected: _selected.contains(index),
                                 multiple: widget.multiple,
                                 vote: true,

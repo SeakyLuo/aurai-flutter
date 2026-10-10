@@ -64,6 +64,7 @@ class SharedInteraction {
           'weight': (definition['actorWeights'] as Map?)?[actorId] ?? 1,
           'buttonId': button['id'],
           'label': button['label'],
+          if (button['answers'] != null) 'answers': button['answers'],
           if (button['reason'] != null) 'reason': button['reason'],
           'value': button.containsKey('value') ? button['value'] : button['id'],
           if (button['selections'] != null) 'selections': button['selections'],

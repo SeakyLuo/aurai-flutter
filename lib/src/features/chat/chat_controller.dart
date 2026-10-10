@@ -100,6 +100,7 @@ import '../../domain/interactive_message.dart';
 import '../../domain/interactive_tool_view.dart';
 import '../../storage/interactive_completion.dart';
 import '../../storage/interactive_message_store.dart';
+import '../../storage/questionnaire_collection.dart';
 import '../../storage/interactive_vote_withdrawal.dart';
 import '../../agent/interactive_message_tool.dart';
 import '../../agent/history_message_tools.dart';

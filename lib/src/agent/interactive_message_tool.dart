@@ -1,3 +1,5 @@
+import 'interactive_content_schema.dart';
+import 'native_activity_tools.dart';
 import '../diagnostics/execution_log.dart';
 import 'shared_interaction_schema.dart';
 import 'interactive_message_schema.dart';
@@ -8,12 +10,14 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
   InteractiveMessageTool(this.name, this.run);
   final String name;
   final Future<Map<String, Object?>> Function(String, Map<String, Object?>) run;
-  static const names = [
+  static final names = [
+    ...nativeActivityDescriptions.keys,
     'sendInteractiveMessage',
     'readInteractiveMessage',
     'updateInteractiveMessage',
     'clickInteractiveMessage',
     'retryInteractiveCallback',
+    'setQuestionnairePaused',
   ];
   @override
   ToolDefinition get definition => ToolDefinition(
@@ -22,131 +26,140 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
     safety: name == 'readInteractiveMessage'
         ? ToolSafety.readOnly
         : ToolSafety.lowRisk,
-    description: switch (name) {
-      'sendInteractiveMessage' =>
-        'Create a native interactive card in the current conversation or an accessible conversation specified by conversationId, without switching conversations. Omit conversationId to use the current conversation. In the current private chat it is inserted into your current streamed reply at this point; continue ordinary text afterwards only when useful. Do not describe an inline card as a separate message or repeat its contents. In another conversation or group chat it is a separate message sent as you. Use for persistent choices, shared participation and replayable rounds. Use askUser for ordinary human questions; it reuses native question cards in private/group chats and a blocking sheet in tasks. Use this tool for polls, action cards, or questions addressed to another AI. '
-            'To ask one participant a choice question or quiz, set interaction.actors:[the target roster ID, or user:local for the human]. Only that recipient can submit; other viewers cannot answer for it. Only eligible AIs are awakened to answer; participation.audience controls who may view the question independently. For a private question set audience to the intended viewers, set interaction.completion:{op:"eq",args:[{ref:"submittedCount"},1]}, and register participation.callbackEvents:["complete"] to receive the answer automatically. Use one submit button with selection.mode:single or multiple and options for the answers. Multiple-choice questions use minSelections/maxSelections to constrain the count; omit maxSelections to allow all options, or set both limits equal for an exact count. Use label 提交回答 for multiple-choice questions. Do not add distribution views to a question; those represent a poll. Multiple choices are submitted together as one answer, not one submission per option. The answering AI chooses and the program submits its choice to this card; do not ask the human to act for it. Completion is an asynchronous creator callback, not an immediate answer returned by this send call. Ordinary free-text discussion uses sendGroupMessage with mentionIds and the appropriate audience. '
-            'Set buttonColumns=2 for compact short-option polls or quizzes; omit for a single column. For shared interactions define interaction (state, completion rules, reveal timing and views) and submit buttons with JSON value. Each actor contributes one current-round submission. For radio/checkbox choices, put selection:{mode:single|multiple,options:[{id,label,value?}]} on one submit button. Its label is the confirmation action. Set interaction (for example allowChange:true) to store choices; do not create one submit button per option. A single selection records its option value, multiple records an array; selections retains option IDs and labels. Distribution counts each chosen option separately, with participant count as denominator. '
-            'The app settles rules atomically; distribution/text/metric views render visible state. A poll and simultaneous-choice game use this same mechanism. nextRound keeps shared state and resets submissions plus roundInitial fields. '
-            'notifyAi=true locks only the triggering button until its callback result. A later state-changing action supersedes the previous callback. Complete it with updateInteractiveMessage plus callbackEventId; a plain chat reply is not a card result. update/nextState buttons change only the acting participant’s presentation. openUrl opens/returns HTTPS; notifyAi requests a creator callback. Every button requires id,label,action,repeatable. '
-            'Votes update the card without system receipts. The creator always reads live aggregates; individual choices follow visibility. interaction.reveal supplies default timing for other viewers; participation.visibilityTiming and summaryVisibilityTiming override it independently. visibilityImmediateActors/summaryVisibilityImmediateActors allow permitted early viewing. Register listeners through participation.callbackEvents: vote for each submission/change (source=interactionVote, operationType=submit|change); complete for completion/manual closure (source=interactionComplete, completionType=conditionMet|manualClose). Registered listeners receive events automatically; no additional enable switch. Both include current results allowed to creator and require no callbackEventId acknowledgment or participant waiting. Last vote may emit both in order. Keep completion reachable and gate result views on available context. '
-            'This tool performs the operation directly. Keep message/button IDs internal and do not repeat the full card as ordinary text.',
-      'readInteractiveMessage' =>
-        'Read an accessible interactive message without switching conversations. Returns your current card, actionToken, eligibility, buttons/options, visible interactionView and up to 50 of your action-history events. Authors also receive revision and definition for editing. Reading does not submit anything. When you decide to participate and submitted=false, call clickInteractiveMessage; a text choice does not count. '
-            'Use the current card supplied in chat context directly, or read it when missing/stale. interactionView contains phase, round, submitted, self and permitted results. Hidden opponents’ choices and runtime state are not available before reveal. '
-            'For your own card, pass only messageId; omit participantId and beforeEvent or set them to JSON null. Never use an empty participantId or invent a pagination cursor. participantId changes only the read-only perspective; perspective.interactionView belongs to that participant, while actionToken and ownParticipation remain yours. Use the last history sequence as beforeEvent only for earlier events. messageId must identify the actual card, not an ordinary message asking you to read it. A parameter or message-type error does not mean the card needs to be resent.',
-      'retryInteractiveCallback' =>
-        'Retry your failed callback using messageId and callbackEventId from ownParticipation.callback. Reuses the same event; does not click the button again or repeat its local state changes. Only failed events can retry. Read current state after a status conflict.',
-      'clickInteractiveMessage' =>
-        'Perform one existing button action as the current AI, just like a human tap. Copy messageId, actionToken and button id from the current card in chat context or readInteractiveMessage. Do not construct or decode actionToken: the app checks card and participant versions atomically. Never retype, shorten or reconstruct message identifiers. '
-            'submit records or replaces only your current-round choice. nextRound works after completion; it preserves shared state and clears round submissions. No participant impersonation parameter is needed. '
-            'On a stale-state error, read again and decide against the new phase; do not blindly replay an old choice into a new round. Success returns your visible updated state; openUrl also returns its URL.',
-      _ =>
-        'When responding to a callback, attach callbackEventId and supply its participant result title/body/buttons; do not change shared rules in that call. Duplicate completion is ignored. Otherwise update a card you authored, using the current revision and definition from readInteractiveMessage. Supply title,body,buttons; omitted interaction/states/participation fields remain in place, and supplied participation fields merge. '
-            'Preserves participants, shared runtime and action history. initial initializes only creation; roundInitial applies on the next round. Rules may change but a completed round is not settled again. '
-            'participation.closed=true stops collecting and reveals onComplete submissions. Completion rules run only if their expression is true; reference closed explicitly when settlement should occur at closure. Do not replace the card merely to count votes: submit already stores choices and distribution renders them.',
-    },
-    inputSchema: {
-      'type': 'object',
-      'properties': {
-        if (name == 'sendInteractiveMessage')
-          'conversationId': {
-            'type': 'string',
-            'description':
-                'Optional destination from searchConversations/listGroupChats. You must be a current member. Omit for the current conversation; never ask the user to enter IDs.',
-          },
-        if (name == 'retryInteractiveCallback' ||
-            name == 'updateInteractiveMessage')
-          'callbackEventId': {
-            'type': 'string',
-            'description':
-                'For callback completion: eventId received in the callback context. Updates only the triggering participant title/body/buttons and atomically completes that event; do not send interaction/participation/states. Retrying an already committed result does not apply it twice.',
-          },
-        if (name == 'clickInteractiveMessage') ...{
-          'reason': {
-            'type': 'string',
-            'minLength': 1,
-            'maxLength': 1000,
-            'description':
-                '行动的简短依据。按钮 reasonRequired=true 时必填，包括弃权或不使用技能；随行动私密提交，不用另发群消息。',
-          },
-          'value': {
-            'description':
-                'For selection submit buttons: option id for single, array of option ids for multiple. If selection.other is enabled, an extra __other__ choice accepts written content; selecting it requires value:{options:single option ID or multiple option ID array,otherText:written text}, within other.maxLength (default 50, maximum 500). The host resolves configured values and records labels. For HTML input-enabled endpoints: text or JSON. Omit for ordinary fixed buttons.',
-          },
-          'buttonId': {'type': 'string'},
-          'actionToken': {
-            'type': 'string',
-            'description':
-                'Copy exactly from the current card. Bound to this message, your identity and the observed versions; a stale token requires rereading before deciding again.',
-          },
+    description:
+        nativeActivityDescriptions[name] ??
+        switch (name) {
+          'setQuestionnairePaused' =>
+            'Pause or resume a questionnaire you created. Read its latest revision first. paused=true preserves answers and blocks submissions without revealing onComplete results; paused=false resumes an unfinished questionnaire. Pause callbacks carry collectionEvent:paused, completion callbacks carry collectionEvent:completed. A bound program can close the questionnaire and advance its flow on pause; completed questionnaires cannot resume.',
+          'sendInteractiveMessage' =>
+            'Create a custom native interface using a DSL designed around Flutter widgets and composition. Pass its widget tree as content. Top-level title/body/buttons are not accepted. Use layouts, fields, FilledButton/TextButton, local state/setState, bindings, Visibility, ForEach, reusable Component definitions and bottom sheets as described in the content schema. This tool is for custom interfaces; prefer dedicated business tools for standard activities. '
+                'Omit conversationId for the current conversation, or supply an accessible destination without switching conversations. In the current private chat the interface is inserted into this streamed reply; do not announce a separate message or repeat its content. Other destinations receive a separate message. '
+                'input:json submits all declared field keys and typed values, including hidden steps and sheet fields. Host rules enforce participation, editing, completion and result visibility. Bind permitted data through host; local state and conditional rendering do not grant permissions. ForEach repeats read-only content; instantiate fields and actions with stable keys. nextRound preserves shared state and resets submissions plus roundInitial fields. '
+                'notifyAi=true locks only the triggering button until its callback result. A later state-changing action supersedes the previous callback. Complete it with updateInteractiveMessage plus callbackEventId; a plain chat reply is not a card result. update/nextState buttons change only the acting participant’s presentation. openUrl opens/returns HTTPS; notifyAi requests a creator callback. Every InteractiveButton requires child:Text for its label and onPressed:{id,action,repeatable,...}. '
+                'interaction.reveal supplies default result timing; participation.visibilityTiming and summaryVisibilityTiming override it independently. Register participation.callbackEvents: vote for submission/change, complete for completion/manual closure, pause for questionnaire pause. collectionEvent distinguishes paused and completed. These events include permitted results, require no acknowledgment, and do not lock participants. Keep completion reachable and gate displayed results on visibility flags. '
+                'This tool performs the operation directly. Keep message/button IDs internal and do not repeat the full card as ordinary text.',
+          'readInteractiveMessage' =>
+            'Read an accessible interactive message without switching conversations. Returns your current card, actionToken, eligibility, buttons/options, visible interactionView and up to 50 of your action-history events. Authors also receive revision and definition for editing. Reading does not submit anything. When you decide to participate and submitted=false, call clickInteractiveMessage; a text choice does not count. '
+                'Use the current card supplied in chat context directly, or read it when missing/stale. interactionView contains phase, round, submitted, self and permitted results. Custom DSL cards also expose host with eligibility, submission/editing flags, permitted answers/responses and aggregate metrics. Read field definitions in content to construct input:json values. Local setState/sheet controls are presentation events, not callable message actions. Hidden opponents’ choices and runtime state are not available before reveal. '
+                'For your own card, pass only messageId; omit participantId and beforeEvent or set them to JSON null. Never use an empty participantId or invent a pagination cursor. participantId changes only the read-only perspective; perspective.interactionView belongs to that participant, while actionToken and ownParticipation remain yours. Use the last history sequence as beforeEvent only for earlier events. messageId must identify the actual card, not an ordinary message asking you to read it. A parameter or message-type error does not mean the card needs to be resent.',
+          'retryInteractiveCallback' =>
+            'Retry your failed callback using messageId and callbackEventId from ownParticipation.callback. Reuses the same event; does not click the button again or repeat its local state changes. Only failed events can retry. Read current state after a status conflict.',
+          'clickInteractiveMessage' =>
+            'Perform one existing button action as the current AI, just like a human tap. Copy messageId, actionToken and button id from the current card in chat context or readInteractiveMessage. Do not construct or decode actionToken: the app checks card and participant versions atomically. Never retype, shorten or reconstruct message identifiers. '
+                'submit records or replaces only your current-round choice. For a custom DSL form, send value as one object containing ALL declared field keys and typed values, including fields on other steps or in sheets. ChoiceGroup uses configured option values, not labels. Only message actions returned in buttons can be clicked; local setState/showBottomSheet/closeBottomSheet events are UI-only. nextRound works after completion; it preserves shared state and clears round submissions. No participant impersonation parameter is needed. '
+                'On a stale-state error, read again and decide against the new phase; do not blindly replay an old choice into a new round. Success returns your visible updated state; openUrl also returns its URL.',
+          _ =>
+            'When responding to a callback, attach callbackEventId and supply its participant result content widget tree; do not change shared rules in that call. Duplicate completion is ignored. Otherwise update a card you authored, using the current revision and definition from readInteractiveMessage. Supply content; omitted interaction/states/participation fields remain in place, and supplied participation fields merge. '
+                'Content uses the same generic DSL as sendInteractiveMessage: fields, bindings, local state, Visibility, ForEach, sheets and reusable components. Preserve stable field keys and option values for cosmetic edits; include root components and state declarations in the supplied replacement tree. content.state is local UI state; interaction.initial and roundInitial are shared business state. Preserves participants, shared runtime and action history. initial initializes only creation; roundInitial applies on the next round. Rules may change but a completed round is not settled again. '
+                'participation.closed=true stops collecting and reveals onComplete submissions. Completion rules run only if their expression is true; reference closed explicitly when settlement should occur at closure. Do not replace the card merely to count votes: submit already stores choices and distribution renders them.',
         },
-        if (name == 'readInteractiveMessage') ...{
-          'participantId': {
-            'type': ['string', 'null'],
-            'minLength': 1,
-            'description':
-                'Omit or use JSON null to read as yourself. For another perspective use a real participant ID from the roster. Empty string is invalid; this does not grant access to hidden choices.',
-          },
-          'beforeEvent': {
-            'type': ['integer', 'null'],
-            'minimum': 1,
-            'description':
-                'Omit or use JSON null on the first read. For earlier history, use the last sequence returned by the previous read; do not guess 1.',
-          },
-        },
-        if (name != 'sendInteractiveMessage')
-          'messageId': {
-            'type': 'string',
-            'description':
-                'Copy the exact messageId returned by the card read or accessible chat history. Never shorten, reconstruct or guess it.',
-          },
-        if (name == 'updateInteractiveMessage')
-          'revision': {'type': 'integer', 'minimum': 0},
-        if (name == 'sendInteractiveMessage' ||
-            name == 'updateInteractiveMessage') ...{
-          'showStatistics': interactiveStatisticsSchema,
-          'buttonColumns': interactiveButtonColumnsSchema,
-          'participation': interactiveParticipationSchema,
-          'interaction': sharedInteractionSchema,
-          'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
-          'body': interactiveBodySchema,
-          'buttons': interactiveButtonsSchema,
-          'states': {
-            'type': 'array',
-            'maxItems': 16,
-            'description':
-                'Named local card states. nextState buttons switch to a state and replace the entire card. States can link back to earlier states for replay; no nested card definitions or AI call needed.',
-            'items': {
-              'type': 'object',
-              'properties': {
-                'id': {'type': 'string', 'minLength': 1},
-                'title': {'type': 'string', 'minLength': 1, 'maxLength': 100},
-                'body': interactiveBodySchema,
-                'buttons': interactiveButtonsSchema,
-                'showStatistics': interactiveStatisticsSchema,
-                'buttonColumns': interactiveButtonColumnsSchema,
+    inputSchema: nativeActivityDescriptions.containsKey(name)
+        ? nativeActivitySchema(name)
+        : {
+            'type': 'object',
+            if (name == 'sendInteractiveMessage' ||
+                name == 'updateInteractiveMessage')
+              r'$defs': {
+                'interactiveWidget': interactiveContentSchema,
+                'interactiveBinding': interactiveBindingSchema,
               },
-              'required': ['id', 'title', 'body', 'buttons'],
-              'additionalProperties': false,
+            'properties': {
+              if (name == 'sendInteractiveMessage')
+                'conversationId': {
+                  'type': 'string',
+                  'description':
+                      'Optional destination from searchConversations/listGroupChats. You must be a current member. Omit for the current conversation; never ask the user to enter IDs.',
+                },
+              if (name == 'retryInteractiveCallback' ||
+                  name == 'updateInteractiveMessage')
+                'callbackEventId': {
+                  'type': 'string',
+                  'description':
+                      'For callback completion: eventId received in the callback context. Updates only the triggering participant content and atomically completes that event; do not send interaction/participation/states. Retrying an already committed result does not apply it twice.',
+                },
+              if (name == 'clickInteractiveMessage') ...{
+                'reason': {
+                  'type': 'string',
+                  'minLength': 1,
+                  'maxLength': 1000,
+                  'description':
+                      '行动的简短依据。按钮 reasonRequired=true 时必填，包括弃权或不使用技能；随行动私密提交，不用另发群消息。',
+                },
+                'value': {
+                  'description':
+                      'Choose the payload by the button definition, not whether the UI is called a question, poll or questionnaire. For input:json native DSL forms, submit all field keys with their typed values, including hidden steps and sheet fields. For existing InteractionCard buttons with a questions property: submit an object keyed by every question id, each value containing selected:[option IDs], text:written answer, skipped:false; optional questions may use skipped:true with empty selected/text. Submit all questions together and complete required items. '
+                      'For selection submit buttons: option id for single, array of option ids for multiple. If selection.other is enabled, an extra __other__ choice accepts written content; selecting it requires value:{options:single option ID or multiple option ID array,otherText:written text}, within other.maxLength (default 50, maximum 500). The host resolves configured values and records labels. For native forms with input:json: an object of all form keys and their typed values (text, boolean, number, option value/null or option value array). For HTML input-enabled endpoints: text or JSON. Omit for ordinary fixed buttons.',
+                },
+                'buttonId': {'type': 'string'},
+                'actionToken': {
+                  'type': 'string',
+                  'description':
+                      'Copy exactly from the current card. Bound to this message, your identity and the observed versions; a stale token requires rereading before deciding again.',
+                },
+              },
+              if (name == 'readInteractiveMessage') ...{
+                'participantId': {
+                  'type': ['string', 'null'],
+                  'minLength': 1,
+                  'description':
+                      'Omit or use JSON null to read as yourself. For another perspective use a real participant ID from the roster. Empty string is invalid; this does not grant access to hidden choices.',
+                },
+                'beforeEvent': {
+                  'type': ['integer', 'null'],
+                  'minimum': 1,
+                  'description':
+                      'Omit or use JSON null on the first read. For earlier history, use the last sequence returned by the previous read; do not guess 1.',
+                },
+              },
+              if (name != 'sendInteractiveMessage')
+                'messageId': {
+                  'type': 'string',
+                  'description':
+                      'Copy the exact messageId returned by the card read or accessible chat history. Never shorten, reconstruct or guess it.',
+                },
+              if (name == 'setQuestionnairePaused')
+                'paused': {'type': 'boolean'},
+              if (name == 'updateInteractiveMessage' ||
+                  name == 'setQuestionnairePaused')
+                'revision': {'type': 'integer', 'minimum': 0},
+              if (name == 'sendInteractiveMessage' ||
+                  name == 'updateInteractiveMessage') ...{
+                'participation': interactiveParticipationSchema,
+                'interaction': sharedInteractionSchema,
+                'content': interactiveContentReference,
+                'states': {
+                  'type': 'array',
+                  'maxItems': 16,
+                  'description':
+                      'Named local card states. nextState buttons switch to a state and replace the entire card. States can link back to earlier states for replay; no nested card definitions or AI call needed.',
+                  'items': {
+                    'type': 'object',
+                    'properties': {
+                      'id': {'type': 'string', 'minLength': 1},
+                      'content': interactiveContentReference,
+                    },
+                    'required': ['id', 'content'],
+                    'additionalProperties': false,
+                  },
+                },
+              },
             },
+            'required': [
+              if (name != 'sendInteractiveMessage') 'messageId',
+              if (name == 'updateInteractiveMessage') 'revision',
+              if (name == 'setQuestionnairePaused') ...['revision', 'paused'],
+              if (name == 'retryInteractiveCallback') 'callbackEventId',
+              if (name == 'clickInteractiveMessage') ...[
+                'buttonId',
+                'actionToken',
+              ],
+              if (name == 'sendInteractiveMessage' ||
+                  name == 'updateInteractiveMessage') ...[
+                'content',
+              ],
+            ],
+            'additionalProperties': false,
           },
-        },
-      },
-      'required': [
-        if (name != 'sendInteractiveMessage') 'messageId',
-        if (name == 'updateInteractiveMessage') 'revision',
-        if (name == 'retryInteractiveCallback') 'callbackEventId',
-        if (name == 'clickInteractiveMessage') ...['buttonId', 'actionToken'],
-        if (name == 'sendInteractiveMessage' ||
-            name == 'updateInteractiveMessage') ...[
-          'title',
-          'body',
-          'buttons',
-        ],
-      ],
-      'additionalProperties': false,
-    },
   );
   @override
   Future<ToolResult> execute(ToolCall call) async {
@@ -172,26 +185,25 @@ class InteractiveMessageTool implements AgentTool, RuntimeCapabilityAgentTool {
           throw ArgumentError('缺少必填参数 $key，请按工具定义补齐后重试');
         }
       }
-      for (final key in [
-        'messageId',
-        'title',
-        'body',
-        'callbackEventId',
-        'buttonId',
-      ]) {
+      for (final key in ['messageId', 'callbackEventId', 'buttonId']) {
         if (call.arguments.containsKey(key) && call.arguments[key] is! String) {
           throw ArgumentError('$key 必须是字符串');
         }
       }
-      if (call.arguments.containsKey('buttons') &&
-          call.arguments['buttons'] is! List) {
-        throw ArgumentError('buttons 必须是按钮对象数组，不是序列化后的字符串');
+      if (call.arguments.containsKey('content') &&
+          call.arguments['content'] is! Map) {
+        throw ArgumentError('content 必须是组件对象，不是序列化后的字符串');
       }
       return ToolResult(
         callId: call.id,
         toolName: name,
         status: ToolResultStatus.success,
-        output: await run(name, call.arguments),
+        output: nativeActivityDescriptions.containsKey(name)
+            ? await run(
+                'sendInteractiveMessage',
+                nativeActivityArguments(name, call.arguments),
+              )
+            : await run(name, call.arguments),
       );
     } on Object catch (error, stack) {
       await ExecutionLog.toolException(call.name, call.id, error, stack);

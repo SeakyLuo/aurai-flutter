@@ -22,6 +22,7 @@ Future<QuickReplyOption?> showQuickReplyPicker(
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
+    useNativeSurface: true,
     builder: (_) => _QuickReplyPicker(
       selectedKeys: selectedKeys,
       recent: recent,

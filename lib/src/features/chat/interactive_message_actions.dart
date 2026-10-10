@@ -1,6 +1,48 @@
 part of 'chat_controller.dart';
 
 extension InteractiveMessageActions on ChatController {
+  Future<InteractiveMessage> setQuestionnairePaused(
+    String messageId,
+    int revision,
+    bool paused, {
+    Conversation? source,
+    String actorId = 'user:local',
+  }) async {
+    await _store.writer.flush();
+    var conversationId = source?.id;
+    if (conversationId == null) {
+      final rows = await _store.database.query(
+        'messages',
+        columns: ['conversation_id'],
+        where: 'id = ?',
+        whereArgs: [messageId],
+      );
+      if (rows.isEmpty) throw StateError('消息已撤回或删除');
+      conversationId = rows.single['conversation_id'] as String;
+    }
+    try {
+      final card = await setQuestionnaireCollectionPaused(
+        _store.database,
+        conversationId: conversationId,
+        messageId: messageId,
+        actorId: actorId,
+        revision: revision,
+        paused: paused,
+      );
+      _replaceInteractiveCard(conversationId, messageId, card, source: source);
+      MessageCallbacks.changes.add(null);
+      return card;
+    } on InteractiveMessageChanged catch (error) {
+      _replaceInteractiveCard(
+        conversationId,
+        messageId,
+        error.card,
+        source: source,
+      );
+      rethrow;
+    }
+  }
+
   Future<InteractiveMessage> cancelInteractiveVote(
     String messageId,
     int revision,
@@ -46,7 +88,9 @@ extension InteractiveMessageActions on ChatController {
     final callbacks = [
       ...card.buttons,
       for (final state in card.states)
-        ...(state['buttons'] as List).cast<Map>(),
+        ...InteractiveContent(
+          Map<String, Object?>.from(state['content'] as Map),
+        ).buttons,
     ].any((b) => b['notifyAi'] == true);
     if ((callbacks ||
             (card.participation['callbackEvents'] as List? ?? const [])
@@ -61,7 +105,7 @@ extension InteractiveMessageActions on ChatController {
       role: AgentMessageRole.assistant,
       senderId: sender.id,
       sender: sender,
-      text: !card.hasRestrictedAudience ? card.title : '私密交互消息',
+      text: !card.hasRestrictedAudience ? card.title : '私密互动消息',
       interactive: card,
       createdAt: DateTime.now(),
       isGroupMessage: conversation.kind == ConversationKind.group,
@@ -118,7 +162,7 @@ extension InteractiveMessageActions on ChatController {
         sender: profile.sender,
         text: !card.hasRestrictedAudience
             ? '${card.title}\n${card.body}'
-            : '私密交互消息',
+            : '私密互动消息',
         createdAt: DateTime.now(),
         interactive: card,
         runId: sameConversation ? source.activeRunId : null,
@@ -165,6 +209,19 @@ extension InteractiveMessageActions on ChatController {
       jsonDecode(row['interactive_json'] as String) as Map<String, dynamic>,
     );
     old.requireViewer(senderId);
+    if (operation == 'setQuestionnairePaused') {
+      final card = await setQuestionnairePaused(
+        id,
+        args['revision'] as int,
+        args['paused'] as bool,
+        source: source,
+        actorId: senderId,
+      );
+      return {
+        'revision': card.revision,
+        ...interactiveToolView(id, card, senderId),
+      };
+    }
     if (operation == 'readInteractiveMessage') {
       final perspective = args['participantId'] as String? ?? senderId;
       if (perspective != senderId &&
@@ -251,26 +308,17 @@ extension InteractiveMessageActions on ChatController {
         if (result.url != null) 'url': result.url,
       };
     }
-    if (row['sender_id'] != senderId) throw StateError('只能更新自己发送的交互消息');
+    if (row['sender_id'] != senderId) throw StateError('只能更新自己发送的互动消息');
     if (args['revision'] != old.revision) throw StateError('消息已更新，请先重新读取');
     final nextAnonymous = (args['participation'] as Map?)?['anonymous'];
     if (nextAnonymous != null && nextAnonymous != old.anonymous) {
       throw StateError('投票发布后不能更改匿名设置，请新建投票');
     }
-    final definitionChanged =
-        [
-          'title',
-          'body',
-          'buttons',
-          'states',
-          'interaction',
-          'showStatistics',
-          'buttonColumns',
-        ].any(
-          (key) =>
-              jsonEncode(old.toJson()[key]) !=
-              jsonEncode(args[key] ?? old.toJson()[key]),
-        );
+    final definitionChanged = ['content', 'states', 'interaction'].any(
+      (key) =>
+          jsonEncode(old.toJson()[key]) !=
+          jsonEncode(args[key] ?? old.toJson()[key]),
+    );
     var card = InteractiveMessage.fromDefinition({
       ...old.toJson(includeParticipants: true),
       ...args,
@@ -283,11 +331,7 @@ extension InteractiveMessageActions on ChatController {
         for (final entry in old.participants.entries)
           entry.key: definitionChanged
               ? (Map<String, Object?>.of(entry.value)
-                  ..remove('title')
-                  ..remove('body')
-                  ..remove('buttons')
-                  ..remove('showStatistics')
-                  ..remove('buttonColumns')
+                  ..remove('content')
                   ..remove('callback'))
               : entry.value,
       },
@@ -323,7 +367,7 @@ extension InteractiveMessageActions on ChatController {
           ),
           'text': !card.hasRestrictedAudience
               ? '${card.title}\n${card.body}'
-              : '私密交互消息',
+              : '私密互动消息',
         },
         where: 'id = ? AND interactive_json = ?',
         whereArgs: [id, row['interactive_json']],

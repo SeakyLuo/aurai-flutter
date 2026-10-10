@@ -23,8 +23,12 @@ class InteractiveReferenceSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final card = message.interactive!;
     final view = card.interactionView(MessageSender.localUser.id);
-    if (card.isVote &&
+    if ((card.isVote || card.isQuestionnaire) &&
         (view['submitted'] == true ||
+            (card.isQuestionnaire &&
+                !(card.interaction['actors'] as List? ??
+                        [MessageSender.localUser.id])
+                    .contains(MessageSender.localUser.id)) ||
             view['closed'] == true ||
             view['phase'] != 'collecting')) {
       return InteractiveStatisticsSheet(

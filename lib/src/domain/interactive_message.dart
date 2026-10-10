@@ -1,3 +1,6 @@
+import 'interactive_content.dart';
+import 'interactive_form_presentation.dart';
+export 'interactive_content.dart';
 import 'interactive_button_icons.dart';
 import 'anonymous_vote.dart';
 import 'interactive_selection.dart';
@@ -8,20 +11,77 @@ import 'shared_interaction.dart';
 class InteractiveMessage {
   const InteractiveMessage({
     required this.revision,
-    required this.title,
-    required this.body,
-    required this.buttons,
+    required this.content,
     this.states = const [],
     this.participation = const {},
     this.participants = const {},
     this.interaction = const {},
     this.session = const {},
     this.snapshotView,
-    this.showStatistics = true,
-    this.buttonColumns = 1,
   });
-  final bool showStatistics;
-  final int buttonColumns;
+  final Map<String, Object?> content;
+  InteractiveContent get widgetTree => InteractiveContent(content);
+  bool get showStatistics => widgetTree.json['showStatistics'] as bool? ?? true;
+  int get buttonColumns => widgetTree.json['buttonColumns'] as int? ?? 1;
+
+  /// Native producers use this compound widget, just as they would a Dart widget.
+  factory InteractiveMessage.card({
+    required int revision,
+    required String title,
+    required String body,
+    required List<Map<String, Object?>> buttons,
+    List<Map<String, Object?>> states = const [],
+    Map<String, Object?> participation = const {},
+    Map<String, Map<String, Object?>> participants = const {},
+    Map<String, Object?> interaction = const {},
+    Map<String, Object?> session = const {},
+    Map<String, Object?>? snapshotView,
+    bool showStatistics = true,
+    int buttonColumns = 1,
+  }) => InteractiveMessage(
+    revision: revision,
+    content: InteractiveContent.card(
+      title: title,
+      body: body,
+      buttons: buttons,
+      buttonColumns: buttonColumns,
+      showStatistics: showStatistics,
+    ),
+    states: states,
+    participation: participation,
+    participants: participants,
+    interaction: interaction,
+    session: session,
+    snapshotView: snapshotView,
+  );
+
+  /// Build the compound card from a native producer's named constructor arguments.
+  static Map<String, Object?> cardDefinition(Map<String, Object?> arguments) =>
+      {
+        for (final entry in arguments.entries)
+          if (![
+            'title',
+            'body',
+            'buttons',
+            'buttonColumns',
+            'showStatistics',
+          ].contains(entry.key))
+            entry.key: entry.value,
+        'content': InteractiveContent.card(
+          title: arguments['title'] as String,
+          body: arguments['body'] as String,
+          buttons: (arguments['buttons'] as List)
+              .map((b) => Map<String, Object?>.from(b as Map))
+              .toList(),
+          buttonColumns: arguments['buttonColumns'] as int? ?? 1,
+          showStatistics: arguments['showStatistics'] as bool? ?? true,
+        ),
+        if (arguments['states'] case final List states)
+          'states': [
+            for (final state in states)
+              cardDefinition(Map<String, Object?>.from(state as Map)),
+          ],
+      };
   final Map<String, Object?> interaction;
   final Map<String, Object?> session;
   final Map<String, Object?>? snapshotView;
@@ -35,14 +95,30 @@ class InteractiveMessage {
       participation['audience'] != null ||
       participation['excludedAudience'] != null;
   void requireViewer(String actor) {
-    if (!canView(actor)) throw StateError('你无权查看这条交互消息');
+    if (!canView(actor)) throw StateError('你无权查看这条互动消息');
   }
 
   void validateTransport({required bool html}) {
+    if (isQuestionnaire &&
+        widgetTree.json['type'] == 'InteractionCard' &&
+        (html ||
+            !shared ||
+            buttons.length != 1 ||
+            buttons.single['action'] != 'submit' ||
+            (buttons.single['selection'] == null &&
+                buttons.single['questions'] == null &&
+                buttons.single['input'] != 'json') ||
+            states.isNotEmpty ||
+            (interaction['views'] as List? ?? const []).any(
+              (view) => view['type'] == 'distribution',
+            ))) {
+      throw ArgumentError('问卷使用共享参与配置和一个选择、问题组或 DSL 表单提交按钮，不使用票数分布或状态切换');
+    }
     if (buttons.any((button) => button['questions'] != null) &&
         (html ||
             !shared ||
-            (interaction['actors'] as List?)?.length != 1 ||
+            (!isQuestionnaire &&
+                (interaction['actors'] as List?)?.length != 1) ||
             buttons.length != 1 ||
             states.isNotEmpty ||
             isVote)) {
@@ -53,7 +129,10 @@ class InteractiveMessage {
     }
     final allButtons = [
       ...buttons,
-      for (final state in states) ...(state['buttons'] as List).cast<Map>(),
+      for (final state in states)
+        ...InteractiveContent(
+          Map<String, Object?>.from(state['content'] as Map),
+        ).buttons,
     ];
     if (anonymous && allButtons.any((button) => button['notifyAi'] == true)) {
       throw ArgumentError(
@@ -70,8 +149,22 @@ class InteractiveMessage {
       );
     if (!shared && allButtons.any((b) => b['selection'] != null))
       throw ArgumentError('选择列表需要 interaction 配置以保存参与者选择');
-    if (!html && allButtons.any((b) => b['input'] != null))
-      throw ArgumentError('原生交互消息使用固定按钮，输入端点仅用于 HTML');
+    if (!html &&
+        allButtons.any((b) => b['input'] != null && b['input'] != 'json'))
+      throw ArgumentError('原生表单使用 input:json');
+    if (!html) {
+      for (final tree in [
+        widgetTree,
+        for (final state in states)
+          InteractiveContent(
+            Map<String, Object?>.from(state['content'] as Map),
+          ),
+      ]) {
+        if (tree.buttons.any((b) => b['input'] != null) &&
+            tree.initialValues.isEmpty)
+          throw ArgumentError('原生输入动作需要表单组件');
+      }
+    }
   }
 
   bool get systemPresentation => participation['presentation'] == 'system';
@@ -79,15 +172,20 @@ class InteractiveMessage {
   /// Votes show current results by default; history is an opt-in UI feature.
   /// Questions always present the current answer without history navigation.
   bool get showHistory =>
-      !isQuestion && (participation['showHistory'] as bool? ?? !isVote);
+      !isQuestion &&
+      (participation['showHistory'] as bool? ?? (!isVote && !isQuestionnaire));
+  bool get isQuestionnaire => participation['kind'] == 'questionnaire';
+  bool get collectionPaused =>
+      isQuestionnaire && participation['_collectionPaused'] == true;
   bool get isQuestion =>
-      buttons.any((button) => button['questions'] != null) ||
-      !isVote &&
-          (interaction['actors'] as List?)?.length == 1 &&
-          buttons.any(
-            (button) =>
-                button['selection'] != null || button['questions'] != null,
-          );
+      !isQuestionnaire &&
+      (buttons.any((button) => button['questions'] != null) ||
+          !isVote &&
+              (interaction['actors'] as List?)?.length == 1 &&
+              buttons.any(
+                (button) =>
+                    button['selection'] != null || button['questions'] != null,
+              ));
   bool get shared => interaction.isNotEmpty;
   bool get hasInteraction => snapshotView != null || shared || singleChoice;
   Map<String, Object?> get interactionDefinition => shared
@@ -182,7 +280,28 @@ class InteractiveMessage {
         });
       }
     }
-    return {...ctx, if (anonymous) 'anonymous': true, 'components': components};
+    return {
+      for (final entry in ctx.entries)
+        if (!isQuestionnaire || entry.key != 'distribution')
+          entry.key: entry.value,
+      if (isQuestionnaire) ...{
+        'collectionPaused': collectionPaused,
+        if (ctx['self'] case final Map own)
+          'self': {...own, 'updatedAt': participants[actor]!['updatedAt']},
+        if (ctx['submissions'] case final Map submissions)
+          'submissions': {
+            for (final entry in submissions.entries)
+              entry.key: {
+                ...entry.value as Map,
+                'updatedAt': participants[entry.key]!['updatedAt'],
+              },
+          },
+      },
+      if (anonymous) 'anonymous': true,
+      'components': components,
+      if (ctx['summaryVisible'] == true)
+        'formMetrics': interactiveFormMetrics(widgetTree, choices.values),
+    };
   }
 
   final Map<String, Object?> participation;
@@ -193,36 +312,41 @@ class InteractiveMessage {
           engine.phase == 'completed' &&
           !buttons.any((button) => button['action'] == 'nextRound') &&
           !states.any(
-            (state) => (state['buttons'] as List).any(
-              (button) => button['action'] == 'nextRound',
-            ),
+            (state) => InteractiveContent(
+              Map<String, Object?>.from(state['content'] as Map),
+            ).buttons.any((button) => button['action'] == 'nextRound'),
           ));
   bool get singleChoice => participation['selectionMode'] == 'singleChoice';
   bool get anonymous => participation['anonymous'] == true;
   bool get isVote =>
-      singleChoice ||
-      shared &&
-          buttons.any(
-            (button) => (button['selection'] as Map?)?['other'] != null,
+      !isQuestionnaire &&
+      (singleChoice ||
+          shared &&
+              buttons.any(
+                (button) => (button['selection'] as Map?)?['other'] != null,
+              ) ||
+          shared &&
+              buttons
+                      .where(
+                        (button) =>
+                            button['action'] == 'submit' &&
+                            button['input'] == null &&
+                            button['selection'] == null,
+                      )
+                      .length >
+                  1 ||
+          (interaction['views'] as List? ?? const []).any(
+            (view) => view['type'] == 'distribution',
           ) ||
-      shared &&
-          buttons
-                  .where(
-                    (button) =>
-                        button['action'] == 'submit' &&
-                        button['input'] == null &&
-                        button['selection'] == null,
-                  )
-                  .length >
-              1 ||
-      (interaction['views'] as List? ?? const []).any(
-        (view) => view['type'] == 'distribution',
-      ) ||
-      (snapshotView?['components'] as List? ?? const []).any(
-        (component) => component['type'] == 'distribution',
-      );
+          (snapshotView?['components'] as List? ?? const []).any(
+            (component) => component['type'] == 'distribution',
+          ));
   bool visible(String field, {String actor = 'user:local'}) {
     if (anonymous && field == 'visibility') return false;
+    if (isQuestionnaire &&
+        field == 'visibility' &&
+        participation['_creatorId'] == actor)
+      return true;
     if (hasInteraction &&
         field == 'summaryVisibility' &&
         participation['_creatorId'] == actor)
@@ -230,6 +354,10 @@ class InteractiveMessage {
     if (!canView(actor)) return false;
     final allowed = participation['${field}Actors'] as List?;
     if (allowed != null && !allowed.contains(actor)) return false;
+    if (field == 'visibility' &&
+        (participation['visibilityExcludedActors'] as List?)?.contains(actor) ==
+            true)
+      return false;
     final timing = participation['${field}Timing'];
     final early = participation['${field}ImmediateActors'] as List?;
     final immediate = early?.contains(actor) == true;
@@ -237,7 +365,8 @@ class InteractiveMessage {
       if (timing == 'onComplete' && !completed) return false;
       if (timing == null && shared && !engine.revealed) return false;
     }
-    return switch (participation[field] ?? 'public') {
+    return switch (participation[field] ??
+        (isQuestionnaire && field == 'visibility' ? 'private' : 'public')) {
       'public' => true,
       'afterClose' => immediate || completed,
       _ => false,
@@ -252,20 +381,19 @@ class InteractiveMessage {
   InteractiveMessage viewFor(String actor) {
     requireViewer(actor);
     final state = participants[actor];
-    final current = state?.containsKey('buttons') == true ? state : null;
+    final current = state?['content'] as Map?;
+    final presentationSource = current == null
+        ? content
+        : Map<String, Object?>.from(current);
+    final presentation = InteractiveContent(presentationSource).json;
     return InteractiveMessage(
       revision: revision,
-      showStatistics: hasInteraction && participation['_creatorId'] == actor
-          ? true
-          : current?['showStatistics'] as bool? ?? showStatistics,
-      buttonColumns: current?['buttonColumns'] as int? ?? buttonColumns,
-      title: current?['title'] as String? ?? title,
-      body: current?['body'] as String? ?? body,
-      buttons: current == null
-          ? buttons
-          : (current['buttons'] as List)
-                .map((b) => Map<String, Object?>.from(b as Map))
-                .toList(),
+      content:
+          hasInteraction &&
+              participation['_creatorId'] == actor &&
+              presentation['type'] == 'InteractionCard'
+          ? {...presentation, 'showStatistics': true}
+          : presentation,
       states: states,
       participation: participation,
       interaction: interaction,
@@ -276,25 +404,41 @@ class InteractiveMessage {
 
   InteractiveMessage forwardedFor(String actor) {
     final view = viewFor(actor);
+    final saved = participants[actor]?['value'];
     return InteractiveMessage(
       revision: 1,
-      showStatistics: view.showStatistics,
-      buttonColumns: view.buttonColumns,
-      title: view.title,
-      body: view.body,
-      buttons: [
-        for (final button in view.buttons)
-          {
-            'id': button['id'],
-            'label': button['label'],
-            'action': 'acknowledge',
-            'repeatable': false,
-            'disabled': true,
-            if (button['questions'] != null) 'questions': button['questions'],
-            if (button['style'] != null) 'style': button['style'],
-          },
-      ],
-      participation: {'closed': true, if (anonymous) 'anonymous': true},
+      content: InteractiveContent.transform(
+        view.widgetTree.withButtons([
+          for (final button in view.buttons)
+            {
+              'id': button['id'],
+              'label': button['label'],
+              'action': 'acknowledge',
+              'repeatable': false,
+              'disabled': true,
+              if (button['questions'] != null) 'questions': button['questions'],
+              if (button['style'] != null) 'style': button['style'],
+            },
+        ]),
+        (node) =>
+            !anonymous &&
+                interactiveFieldTypes.contains(node['type']) &&
+                saved is Map &&
+                saved.containsKey(node['key']) &&
+                interactiveFieldValueError(
+                      node,
+                      saved[node['key']],
+                      submitting: false,
+                    ) ==
+                    null
+            ? {...node, 'initialValue': saved[node['key']]}
+            : node,
+      ),
+      participation: {
+        'closed': true,
+        if (anonymous) 'anonymous': true,
+        if (isQuestionnaire) 'kind': 'questionnaire',
+      },
       snapshotView: hasInteraction
           ? anonymous
                 ? anonymousForwardView(interactionView(actor))
@@ -335,58 +479,56 @@ class InteractiveMessage {
     if (visible('summaryVisibility', actor: actor)) 'summary': summary,
   };
 
-  List<Map<String, Object?>> get summary => interactionSummary(
-    buttons.where((b) => !shared || b['action'] == 'submit').toList(),
-    choices.values,
-  );
+  List<Map<String, Object?>> get summary => isQuestionnaire
+      ? const []
+      : interactionSummary(
+          buttons.where((b) => !shared || b['action'] == 'submit').toList(),
+          choices.values,
+        );
 
   final int revision;
   final List<Map<String, Object?>> states;
-  final String title;
-  final String body;
-  final List<Map<String, Object?>> buttons;
+  String get title => widgetTree.title;
+  String get body => widgetTree.body;
+  List<Map<String, Object?>> get buttons => widgetTree.buttons;
 
   factory InteractiveMessage.fromSnapshot(
     Map<String, dynamic> json,
     String actorId,
   ) => InteractiveMessage(
-    showStatistics: json['showStatistics'] as bool? ?? true,
-    buttonColumns: json['buttonColumns'] as int? ?? 1,
+    content: Map<String, Object?>.from(json['content'] as Map),
     revision: json['revision'] as int,
     snapshotView: json['interactionView'] == null
         ? null
         : Map<String, Object?>.from(json['interactionView'] as Map),
-    title: json['title'] as String,
-    body: json['body'] as String,
-    buttons: (json['buttons'] as List)
-        .map((b) => Map<String, Object?>.from(b as Map))
-        .toList(),
     participation: Map<String, Object?>.from(json['participation'] as Map),
     participants: {
-      if (json['selectedLabel'] != null)
+      if (json['selectedLabel'] != null || json['value'] != null)
         actorId: {
           'label': json['selectedLabel'],
+          if (json['value'] != null) 'value': json['value'],
           if (json['callback'] != null) 'callback': json['callback'],
         },
     },
   );
 
   factory InteractiveMessage.fromDefinition(Map<String, Object?> json) {
-    _validateButtonColumns(json['buttonColumns']);
-    final title = json['title'] as String;
-    final body = json['body'] as String;
-    final buttons = (json['buttons'] as List)
-        .map((b) => Map<String, Object?>.from(b as Map))
-        .toList();
-    if (title.trim().isEmpty ||
-        title.length > 100 ||
-        body.length > 10000 ||
-        (buttons.isEmpty &&
-            json['snapshotView'] == null &&
-            (json['participation'] as Map?)?['closed'] != true) ||
-        buttons.length > 12) {
-      throw ArgumentError('请提供标题、最多 10000 字正文和 1–12 个按钮');
+    if ([
+      'title',
+      'body',
+      'buttons',
+      'buttonColumns',
+      'showStatistics',
+    ].any(json.containsKey)) {
+      throw ArgumentError('交互消息使用 content 组件树，不再接受 title/body/buttons');
     }
+    final tree = InteractiveContent(
+      Map<String, Object?>.from(json['content'] as Map),
+    );
+    tree.validate();
+    _validateButtonColumns(tree.json['buttonColumns']);
+    final buttons = tree.buttons;
+    if (buttons.length > 12) throw ArgumentError('最多 12 个动作');
     final states = (json['states'] as List? ?? const [])
         .map((state) => Map<String, Object?>.from(state as Map))
         .toList();
@@ -399,23 +541,20 @@ class InteractiveMessage {
     }
     _validateButtons(buttons, stateIds);
     for (final state in states) {
-      _validateButtonColumns(state['buttonColumns']);
-      if (state['showStatistics'] != null && state['showStatistics'] is! bool)
-        throw ArgumentError('showStatistics 必须是布尔值');
-      final stateTitle = state['title'] as String;
-      final stateBody = state['body'] as String;
-      final stateButtons = (state['buttons'] as List)
-          .map((b) => Map<String, Object?>.from(b as Map))
-          .toList();
-      if (stateTitle.trim().isEmpty ||
-          stateTitle.length > 100 ||
-          stateBody.length > 10000 ||
-          stateButtons.isEmpty ||
-          stateButtons.length > 12)
-        throw ArgumentError('每个状态需要标题、最多 10000 字正文和 1–12 个按钮');
+      final tree = InteractiveContent(
+        Map<String, Object?>.from(state['content'] as Map),
+      );
+      tree.validate();
+      _validateButtonColumns(tree.json['buttonColumns']);
+      final stateButtons = tree.buttons;
+      if (stateButtons.length > 12) throw ArgumentError('每个状态最多 12 个动作');
       _validateButtons(stateButtons, stateIds);
     }
     final participation = json['participation'] as Map? ?? const {};
+    if (participation.containsKey('kind') &&
+        participation['kind'] != 'questionnaire') {
+      throw ArgumentError('participation.kind 仅支持 questionnaire；普通交互省略此字段');
+    }
     if (participation['anonymous'] != null &&
         participation['anonymous'] is! bool) {
       throw ArgumentError('anonymous 必须是布尔值');
@@ -436,6 +575,7 @@ class InteractiveMessage {
       'audience',
       'excludedAudience',
       'visibilityActors',
+      'visibilityExcludedActors',
       'summaryVisibilityActors',
       'visibilityImmediateActors',
       'summaryVisibilityImmediateActors',
@@ -445,6 +585,10 @@ class InteractiveMessage {
           throw ArgumentError('$key 必须为参与者标识列表');
       }
     }
+    if (participation['visibilityActors'] != null &&
+        participation['visibilityExcludedActors'] != null) {
+      throw ArgumentError('回答的部分可见和部分不可见不能同时设置');
+    }
     for (final field in ['visibility', 'summaryVisibility']) {
       final timing = participation['${field}Timing'];
       if (timing != null && !['immediate', 'onComplete'].contains(timing))
@@ -452,20 +596,17 @@ class InteractiveMessage {
     }
     if (participation['callbackEvents'] case final events?) {
       if (events is! List ||
-          events.any((event) => !['vote', 'complete'].contains(event)) ||
+          events.any(
+            (event) => !['vote', 'complete', 'pause'].contains(event),
+          ) ||
           events.toSet().length != events.length)
-        throw ArgumentError('callbackEvents 使用不重复的 vote、complete 事件');
+        throw ArgumentError('callbackEvents 使用不重复的 vote、complete、pause 事件');
     }
     return InteractiveMessage.fromJson(json);
   }
 
   // System notices carry audience metadata, not an actionable card.
   factory InteractiveMessage.fromJson(Map<String, Object?> json) {
-    final title = json['title'] as String;
-    final body = json['body'] as String;
-    final buttons = (json['buttons'] as List)
-        .map((b) => Map<String, Object?>.from(b as Map))
-        .toList();
     final states = (json['states'] as List? ?? const [])
         .map((state) => Map<String, Object?>.from(state as Map))
         .toList();
@@ -485,8 +626,7 @@ class InteractiveMessage {
       }
     }
     return InteractiveMessage(
-      showStatistics: json['showStatistics'] as bool? ?? true,
-      buttonColumns: json['buttonColumns'] as int? ?? 1,
+      content: Map<String, Object?>.from(json['content'] as Map),
       snapshotView: json['snapshotView'] == null
           ? null
           : Map<String, Object?>.from(json['snapshotView'] as Map),
@@ -497,9 +637,6 @@ class InteractiveMessage {
               json['session'] as Map? ?? SharedInteraction.initial(interaction),
             ),
       revision: json['revision'] as int,
-      title: title,
-      body: body,
-      buttons: buttons,
       states: states,
       participation: Map<String, Object?>.from(
         json['participation'] as Map? ?? const {},
@@ -542,6 +679,10 @@ class InteractiveMessage {
         if (b['action'] != 'submit' || b['input'] != null)
           throw ArgumentError('选择列表使用 submit，不能同时配置页面输入');
         InteractiveSelection(Map<String, Object?>.from(config)).validate();
+      }
+      if (b['input'] != null &&
+          (b['action'] != 'submit' || !['text', 'json'].contains(b['input']))) {
+        throw ArgumentError('输入端点使用 submit 和 text/json');
       }
       if (b['questions'] != null && b['questions'] is! List) {
         throw ArgumentError('questions 必须是问题列表');
@@ -604,17 +745,13 @@ class InteractiveMessage {
 
   Map<String, Object?> toJson({bool includeParticipants = false}) => {
     'revision': revision,
-    'showStatistics': showStatistics,
-    'buttonColumns': buttonColumns,
+    'content': content,
     if (snapshotView != null) 'snapshotView': snapshotView,
     'participation': {...participation, if (closed) 'closed': true},
     if (interaction.isNotEmpty) 'interaction': interaction,
     if (includeParticipants && session.isNotEmpty) 'session': session,
     if (includeParticipants && participants.isNotEmpty)
       'participants': participants,
-    'title': title,
-    'body': body,
-    'buttons': buttons,
     if (states.isNotEmpty) 'states': states,
   };
 }

@@ -23,6 +23,7 @@ class RichOptionCarousel extends StatefulWidget {
     required this.options,
     required this.selected,
     required this.multiple,
+    this.showSelectionIndicator = true,
     required this.onSelect,
     this.maximum = 25,
     this.captions,
@@ -32,6 +33,7 @@ class RichOptionCarousel extends StatefulWidget {
   final List<UserQuestionOption> options;
   final Set<int> selected;
   final bool multiple;
+  final bool showSelectionIndicator;
   final ValueChanged<int>? onSelect;
   final int maximum;
   final List<String>? captions;
@@ -264,8 +266,12 @@ class _RichOptionCarouselState extends State<RichOptionCarousel> {
                             label:
                                 '选择选项 ${widget.numbers?[index] ?? index + 1}：${option.content}',
                             selected: selected,
-                            checked: selected,
-                            inMutuallyExclusiveGroup: !widget.multiple,
+                            checked: widget.showSelectionIndicator
+                                ? selected
+                                : null,
+                            inMutuallyExclusiveGroup:
+                                widget.showSelectionIndicator &&
+                                !widget.multiple,
                             child: InkWell(
                               onTap: enabled
                                   ? () => widget.onSelect!(index)
@@ -305,37 +311,42 @@ class _RichOptionCarouselState extends State<RichOptionCarousel> {
                                         style: const TextStyle(fontSize: 13),
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      width: 22,
-                                      height: 22,
-                                      decoration: BoxDecoration(
-                                        color: selected
-                                            ? QuestionOptionAppearance.selectedIndicator(
-                                                context,
+                                    if (widget.showSelectionIndicator) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        width: 22,
+                                        height: 22,
+                                        decoration: BoxDecoration(
+                                          color: selected
+                                              ? QuestionOptionAppearance.selectedIndicator(
+                                                  context,
+                                                )
+                                              : null,
+                                          borderRadius: BorderRadius.circular(
+                                            widget.multiple ? 6 : 11,
+                                          ),
+                                          border: Border.all(
+                                            color: selected
+                                                ? accent
+                                                : colors.outlineVariant,
+                                          ),
+                                        ),
+                                        child: selected
+                                            ? Padding(
+                                                padding: const EdgeInsets.all(
+                                                  3,
+                                                ),
+                                                child: FittedBox(
+                                                  child: SettingsIcon(
+                                                    type:
+                                                        SettingsIconType.check,
+                                                    color: accent,
+                                                  ),
+                                                ),
                                               )
                                             : null,
-                                        borderRadius: BorderRadius.circular(
-                                          widget.multiple ? 6 : 11,
-                                        ),
-                                        border: Border.all(
-                                          color: selected
-                                              ? accent
-                                              : colors.outlineVariant,
-                                        ),
                                       ),
-                                      child: selected
-                                          ? Padding(
-                                              padding: const EdgeInsets.all(3),
-                                              child: FittedBox(
-                                                child: SettingsIcon(
-                                                  type: SettingsIconType.check,
-                                                  color: accent,
-                                                ),
-                                              ),
-                                            )
-                                          : null,
-                                    ),
+                                    ],
                                   ],
                                 ),
                               ),

@@ -62,7 +62,11 @@ class MessageQuote {
     if (excerpt) return _text;
     if (_card != null) {
       if (questions.isNotEmpty) return questions.join('\n');
-      return '[${_card!.isVote ? '投票' : '交互消息'}] ${_card!.title}';
+      return '[${_card!.isQuestionnaire
+          ? '问卷'
+          : _card!.isVote
+          ? '投票'
+          : '互动消息'}] ${_card!.title}';
     }
     return _source == null ? _text : MessageSummary.fromMessage(_source!);
   }

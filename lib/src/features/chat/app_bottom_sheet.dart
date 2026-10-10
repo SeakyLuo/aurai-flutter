@@ -17,6 +17,7 @@ Future<T?> showAppBottomSheet<T>({
   bool isDismissible = true,
   bool enableDrag = true,
   bool? showDragHandle,
+  bool useNativeSurface = false,
   bool useSafeArea = false,
   RouteSettings? routeSettings,
   AnimationController? transitionAnimationController,
@@ -26,8 +27,12 @@ Future<T?> showAppBottomSheet<T>({
 }) {
   return showModalBottomSheet<T>(
     context: context,
-    builder: (context) => AppSheetSurface(child: builder(context)),
-    backgroundColor: Colors.transparent,
+    builder: useNativeSurface
+        ? builder
+        : (context) => AppSheetSurface(child: builder(context)),
+    backgroundColor: useNativeSurface
+        ? backgroundColor ?? Theme.of(context).colorScheme.surface
+        : Colors.transparent,
     barrierLabel: barrierLabel,
     elevation: elevation ?? 0,
     shape: shape,

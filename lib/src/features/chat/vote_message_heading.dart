@@ -12,6 +12,7 @@ class VoteMessageHeading extends StatelessWidget {
     required this.anonymous,
     this.status,
     this.trailing,
+    this.questionnaire = false,
   });
 
   final String title;
@@ -19,6 +20,7 @@ class VoteMessageHeading extends StatelessWidget {
   final bool ongoing;
   final bool anonymous;
   final String? status;
+  final bool questionnaire;
   final Widget? trailing;
 
   @override
@@ -34,12 +36,18 @@ class VoteMessageHeading extends StatelessWidget {
         Row(
           children: [
             QuestionIcon(
-              type: QuestionIconType.vote,
+              type: questionnaire
+                  ? QuestionIconType.questionnaire
+                  : QuestionIconType.vote,
               color: colors.onSurfaceVariant,
             ),
             const SizedBox(width: 8),
             Text(
-              anonymous ? '匿名投票' : '投票',
+              questionnaire
+                  ? '问卷'
+                  : anonymous
+                  ? '匿名投票'
+                  : '投票',
               style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
             ),
             const Spacer(),

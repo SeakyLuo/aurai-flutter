@@ -52,7 +52,7 @@ Future<void> loadConversationListPreviews(
   };
   if (groups.isEmpty) return;
   final rows = await database.rawQuery(
-    '''SELECT id, conversation_id, sender_id, kind, substr(text, 1, ${MessageSummary.previewLimit + 1}) AS text, interactive_json, json_extract(miniapp_share_json, '\$.title') AS share_title, CASE WHEN json_extract(interactive_json, '\$.participation.presentation') = 'message' THEN NULL ELSE json_extract(interactive_json, '\$.title') END AS interactive_title, json_extract(interactive_json, '\$.body') AS interactive_body, created_at
+    '''SELECT id, conversation_id, sender_id, kind, substr(text, 1, ${MessageSummary.previewLimit + 1}) AS text, interactive_json, json_extract(miniapp_share_json, '\$.title') AS share_title, created_at
        FROM messages WHERE id IN (
          SELECT (SELECT id FROM messages
            WHERE conversation_id = conversations.id AND $conversationListMessageVisibility
@@ -117,23 +117,27 @@ Future<void> loadConversationListPreviews(
   for (final row in rows) {
     groups[row['conversation_id']]!.lastMessageAt =
         DateTime.fromMicrosecondsSinceEpoch(row['created_at'] as int);
+    final metadata = row['interactive_json'] == null
+        ? null
+        : InteractiveMessage.fromJson(
+            (jsonDecode(row['interactive_json'] as String) as Map)
+                .cast<String, Object?>(),
+          );
+    final card = metadata?.participation['presentation'] == 'message'
+        ? null
+        : metadata;
     final text = row['id'] == 'group-created:${row['conversation_id']}'
         ? groups[row['conversation_id']]!.creationMessage!
-        : row['interactive_title'] != null
-        ? '${row['interactive_title']}\n${row['interactive_body']}'
+        : card != null
+        ? '${card.title}\n${card.body}'
         : row['text'] as String;
     final body = MessageSummary.content(
       text: text,
       htmlTitle: row['kind'] == 'html_game'
           ? text
           : row['share_title'] as String?,
-      interactiveTitle: row['interactive_title'] as String?,
-      interactiveVote:
-          row['interactive_title'] != null &&
-          InteractiveMessage.fromJson(
-            jsonDecode(row['interactive_json'] as String)
-                as Map<String, Object?>,
-          ).isVote,
+      interactiveTitle: card?.title,
+      interactiveVote: card?.isVote ?? false,
       attachments: [
         for (final attachment in attachments[row['id']] ?? const [])
           MessageSummary.attachment(

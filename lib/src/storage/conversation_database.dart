@@ -34,6 +34,7 @@ import '../memory/memory_queue_schema.dart';
 import 'message_quick_reply_schema.dart';
 import 'tool_customization_schema.dart';
 import 'resource_scope_schema.dart';
+import 'interactive_content_migration.dart';
 
 const personalChatSchema = [
   'ALTER TABLE conversations ADD COLUMN personal_chat INTEGER NOT NULL DEFAULT 0 '
@@ -44,7 +45,7 @@ const personalChatSchema = [
 
 Future<Database> openConversationDatabase() async => openDatabase(
   '${await getDatabasesPath()}/aurai.sqlite',
-  version: 100,
+  version: 101,
   onOpen: (db) async {
     await db.update('approval_requests', {
       'status': 'cancelled',
@@ -72,6 +73,7 @@ Future<Database> openConversationDatabase() async => openDatabase(
         r"UPDATE conversations SET draft_quote_json = json_set(json_remove(draft_quote_json, '$.questions'), '$.excerpt', json(CASE WHEN json_extract(draft_quote_json, '$.excerpt') = 1 THEN 'true' ELSE 'false' END)) WHERE draft_quote_json IS NOT NULL",
       );
     }
+    if (oldVersion < 101) await migrateInteractiveContent(db);
   },
   onCreate: (db, version) async {
     final batch = db.batch();

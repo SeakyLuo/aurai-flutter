@@ -73,6 +73,7 @@ class QuestionSheetLayout extends StatelessWidget {
     this.onOpenSender,
     this.heading,
     this.scrollBody = true,
+    this.icon = QuestionIconType.question,
   });
 
   final String title;
@@ -82,6 +83,7 @@ class QuestionSheetLayout extends StatelessWidget {
   final VoidCallback? onOpenSender;
   final Widget? heading;
   final bool scrollBody;
+  final QuestionIconType icon;
 
   @override
   Widget build(BuildContext context) {
@@ -121,10 +123,8 @@ class QuestionSheetLayout extends StatelessWidget {
                                   dimension: MediaQuery.textScalerOf(
                                     context,
                                   ).scale(18),
-                                  child: const FittedBox(
-                                    child: QuestionIcon(
-                                      type: QuestionIconType.question,
-                                    ),
+                                  child: FittedBox(
+                                    child: QuestionIcon(type: icon),
                                   ),
                                 ),
                               ),

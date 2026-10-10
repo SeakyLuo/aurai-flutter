@@ -22,6 +22,7 @@ Map<String, Object?> anonymousProgramVote(
 /// Anonymous callbacks cannot borrow privileges from the hidden respondent.
 void validateAnonymousVoteEffects(MiniappCapabilityCalls calls) {
   if (calls.contextInstructions != null ||
+      calls.hostSenderId != null ||
       calls.pinMessage ||
       calls.markMessage ||
       calls.nicknames.isNotEmpty ||

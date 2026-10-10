@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import '../domain/interactive_message.dart';
 import '../domain/interactive_selection.dart';
 import '../domain/message_sender.dart';
+import '../domain/question_batch.dart';
 
 /// A reducer-authorized proxy uses the same native selection and vote engine.
 Future<InteractiveMessage> submitProgramCard(
@@ -26,6 +27,7 @@ Future<InteractiveMessage> submitProgramCard(
     (jsonDecode(rows.single['interactive_json'] as String) as Map)
         .cast<String, Object?>(),
   );
+  if (card.collectionPaused) throw StateError('问卷已暂停收集，请等待发起人恢复');
   if (card.participation['_programMessage'] != programId || card.closed) {
     throw StateError('这张行动卡已结束或不属于当前小程序');
   }
@@ -50,6 +52,13 @@ Future<InteractiveMessage> submitProgramCard(
         )['id'],
     ];
     button = selection.resolve(button, selection.multiple ? ids : ids.single);
+  } else if (button['questions'] case final List questions) {
+    final answers = QuestionBatch(questions).resolve(value);
+    button = {
+      ...button,
+      'value': answers,
+      'label': '已回答 ${answers.length} 个问题',
+    };
   }
   final participantRevision = card.participantRevision(player.id) + 1;
   final now = DateTime.now().microsecondsSinceEpoch;
@@ -68,11 +77,7 @@ Future<InteractiveMessage> submitProgramCard(
         'revision': participantRevision,
         'definitionRevision': card.revision,
         'snapshotCount': card.participants[player.id]?['snapshotCount'] ?? 0,
-        'title': view.title,
-        'body': view.body,
-        'buttons': view.buttons,
-        'showStatistics': view.showStatistics,
-        'buttonColumns': view.buttonColumns,
+        'content': view.content,
         'buttonId': button['id'],
         'label': button['label'],
         if (reason != null) 'reason': reason,
@@ -80,6 +85,7 @@ Future<InteractiveMessage> submitProgramCard(
           'selections': button['selections'],
           'value': button['value'],
         },
+        if (button['questions'] != null) 'value': button['value'],
         'submittedBy': submitter.id,
         'updatedAt': now,
       },

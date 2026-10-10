@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../domain/interactive_message.dart';
+import '../../domain/message_sender.dart';
 import 'interaction_content.dart';
+import 'questionnaire_response_list.dart';
 
 class InteractiveSnapshotStatistics extends StatelessWidget {
   const InteractiveSnapshotStatistics({super.key, required this.card});
@@ -8,6 +10,18 @@ class InteractiveSnapshotStatistics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (card.isQuestionnaire) {
+      return ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          QuestionnaireResponseList(
+            card: card,
+            viewerId: MessageSender.localUser.id,
+            members: const {},
+          ),
+        ],
+      );
+    }
     final view = card.snapshotView;
     final visible =
         view?['summaryVisible'] == true && view?['revealed'] == true;

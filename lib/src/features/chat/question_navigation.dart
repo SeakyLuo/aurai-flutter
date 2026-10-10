@@ -11,11 +11,13 @@ class QuestionNavigation extends StatelessWidget {
     required this.busy,
     required this.onPrevious,
     required this.onNext,
+    this.submitLabel = '提交回答',
   });
 
   final int index, count;
   final bool busy;
   final VoidCallback onPrevious, onNext;
+  final String submitLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +75,7 @@ class QuestionNavigation extends StatelessWidget {
         ],
         Expanded(
           child: WidgetUtils.primaryButton(
-            text: index < count - 1 ? '下一题' : '提交回答',
+            text: index < count - 1 ? '下一题' : submitLabel,
             loading: busy,
             onPressed: busy ? null : onNext,
           ),

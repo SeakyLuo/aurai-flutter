@@ -32,6 +32,9 @@ Set<String> richReplyRuns(Iterable<AgentMessage> messages) => {
                       activity.status == AgentStepStatus.completed &&
                       const {
                         'sendInteractiveMessage',
+                        'sendQuestion',
+                        'sendPoll',
+                        'sendQuestionnaire',
                         'sendHtmlMessage',
                       }.contains(activity.toolName),
                 ) ??

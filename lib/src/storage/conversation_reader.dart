@@ -350,6 +350,7 @@ class ConversationReader {
     bool forModel = false,
     bool includeSystem = false,
     ModelConfig? modelConfig,
+    String? memoryOwnerId,
     String? afterCheckpoint,
   }) async {
     const richReply =
@@ -527,6 +528,7 @@ class ConversationReader {
             conversationId,
             rows,
             modelConfig,
+            memoryOwnerId: memoryOwnerId,
           );
     return (after == null ? rows.reversed : rows)
         .map(

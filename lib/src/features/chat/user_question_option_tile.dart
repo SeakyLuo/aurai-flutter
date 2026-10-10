@@ -13,6 +13,7 @@ class UserQuestionOptionTile extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.multiple = false,
+    this.showSelectionIndicator = true,
     this.vote = false,
     this.optionPrefix,
     this.fontSize,
@@ -25,6 +26,7 @@ class UserQuestionOptionTile extends StatelessWidget {
   final bool selected;
   final VoidCallback? onTap;
   final bool multiple;
+  final bool showSelectionIndicator;
   final bool vote;
   final String? optionPrefix;
   final double? fontSize;
@@ -39,8 +41,8 @@ class UserQuestionOptionTile extends StatelessWidget {
     final marked = multiple || vote;
     return Semantics(
       selected: selected,
-      checked: marked ? selected : null,
-      inMutuallyExclusiveGroup: !multiple,
+      checked: marked && showSelectionIndicator ? selected : null,
+      inMutuallyExclusiveGroup: showSelectionIndicator && !multiple,
       child: Material(
         color: selected
             ? QuestionOptionAppearance.selectedBackground(context)
@@ -105,7 +107,7 @@ class UserQuestionOptionTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (marked) ...[
+                if (marked && showSelectionIndicator) ...[
                   const SizedBox(width: 16),
                   GestureDetector(
                     onTap: onIndicatorTap,

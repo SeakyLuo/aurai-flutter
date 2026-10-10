@@ -40,6 +40,18 @@ extension GlobalTools on ChatController {
         'resumeGroupAutoReply',
       ],
     ]);
+    if (parent != null &&
+        observed.any(
+          (message) =>
+              message.canView(reply.senderId) &&
+              message.messageMetadata?.participation['_programMessage']
+                  is String,
+        )) {
+      // A program snapshot already supplies the version and action protocol.
+      // Keep its tools available throughout the run instead of rediscovering them.
+      registry.retain('readHtmlProgram');
+      registry.retain('submitHtmlProgramEvent');
+    }
     return registry;
   }
 
@@ -159,6 +171,8 @@ extension GlobalTools on ChatController {
                   target.id,
                   args['messageId'] as String,
                   senderId,
+                  resourceKey: args['resourceKey'] as String?,
+                  resourceOffset: args['resourceOffset'] as int? ?? 0,
                 );
               }
               if (operation == 'submitHtmlProgramEvent') {

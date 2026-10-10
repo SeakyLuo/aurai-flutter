@@ -1,0 +1,89 @@
+{
+  "content": {
+    "components": {
+      "LabeledField": {
+        "params": {
+          "fieldKey": { "type": "string" },
+          "label": { "type": "string" },
+          "hint": { "type": "string", "default": "请输入" }
+        },
+        "body": {
+          "type": "Column",
+          "spacing": 8,
+          "children": [
+            { "type": "Text", "data": { "param": "label" } },
+            {
+              "type": "TextField",
+              "key": { "param": "fieldKey" },
+              "hintText": { "param": "hint" }
+            }
+          ]
+        }
+      },
+      "DetailsSheet": {
+        "params": {
+          "title": { "type": "string" },
+          "child": { "type": "widget" }
+        },
+        "body": {
+          "type": "TextButton",
+          "child": { "type": "Text", "data": { "param": "title" } },
+          "onPressed": {
+            "showBottomSheet": {
+              "title": { "param": "title" },
+              "child": { "param": "child" }
+            }
+          }
+        }
+      }
+    },
+    "type": "Column",
+    "spacing": 12,
+    "children": [
+      { "type": "Text", "data": "活动报名", "style": "titleMedium" },
+      {
+        "type": "Component",
+        "name": "LabeledField",
+        "args": { "fieldKey": "name", "label": "称呼" }
+      },
+      {
+        "type": "Component",
+        "name": "DetailsSheet",
+        "args": {
+          "title": "填写备注",
+          "child": {
+            "type": "Column",
+            "spacing": 12,
+            "children": [
+              {
+                "type": "Component",
+                "name": "LabeledField",
+                "args": {
+                  "fieldKey": "notes",
+                  "label": "备注",
+                  "hint": "例如饮食偏好"
+                }
+              },
+              {
+                "type": "TextButton",
+                "child": { "type": "Text", "data": "返回报名卡片" },
+                "onPressed": { "closeBottomSheet": true }
+              }
+            ]
+          }
+        }
+      },
+      { "type": "Text", "data": { "ref": "form.notes" } },
+      {
+        "type": "FilledButton",
+        "child": { "type": "Text", "data": "提交报名信息" },
+        "onPressed": {
+          "id": "submit_registration",
+          "action": "submit",
+          "repeatable": true,
+          "input": "json"
+        }
+      }
+    ]
+  }
+}

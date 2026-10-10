@@ -39,7 +39,10 @@ const _summaries = <String, String>{
   'sendHtmlMessage':
       '发送可交互的 HTML 小程序消息，用于自定义页面、图表、小游戏和复杂表单。支持直接提供 HTML 或从本地文件发布，可在聊天内展示或全屏运行。可指定有权访问的目标会话；创建前加载完整说明，了解页面桥接、数据、身份和权限约束。普通文字或原生投票不需要此工具。',
   'sendInteractiveMessage':
-      '发送原生交互卡片，用于投票、选择题、表单和多步骤行动。支持按钮、本地状态切换、统计、参与者与结果可见范围。适合无需自定义 HTML 的结构化互动；发送前加载完整参数，按真实成员配置参与权限。',
+      '使用基于 Flutter 设计的 DSL 创建自定义原生界面，支持组件组合、字段、状态、绑定、条件显示、列表和底部弹层。标准业务优先使用专用工具。',
+  'sendQuestion': '向指定成员发送原生问题，填写题目和选项即可，提交后回调答案。向当前用户澄清信息使用 askUser。',
+  'sendPoll': '发起原生投票，配置选项、参与者、匿名和结果可见范围，自动提供投票与统计界面，无需编写 DSL。',
+  'sendQuestionnaire': '发送原生问卷，配置题目、参与者和结果可见范围，自动提供分页填写与答案查看界面，无需编写 DSL。',
   'updateInteractiveMessage':
       '修改已有交互卡片的标题、正文、按钮、状态、统计和参与设置。用于更新或关闭已有活动，不另发重复卡片。先读取当前卡片，使用返回的消息标识和版本，遵守权限及已有参与数据的约束。',
   'searchTools':
@@ -90,6 +93,8 @@ const _summaries = <String, String>{
   'finishCurrentSpeech': '结束当前发言阶段，遵守当前活动的发言规则。',
   'readInteractiveMessage': '读取交互卡片的当前状态、可选按钮、统计和行动令牌。先读取再操作，只返回当前身份可见的信息。',
   'retryInteractiveCallback': '重新处理明确指定的交互回调，不重复提交参与者选择。',
+  'setQuestionnairePaused':
+      '暂停或恢复自己发起的问卷收集，保留已有回答；回调通过 collectionEvent 区分暂停与完成。',
   'createConversation': '创建或打开与指定联系人的私聊，确认双方身份后使用。',
   'renameConversation': '修改指定会话或任务的名称。',
   'setConversationPinned': '设置或取消会话置顶。',

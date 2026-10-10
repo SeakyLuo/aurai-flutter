@@ -1,3 +1,4 @@
+import '../domain/interactive_message.dart';
 import '../domain/question_reply_signals.dart';
 import '../domain/question_batch.dart';
 import 'question_batch_schema.dart';
@@ -154,40 +155,42 @@ class AskUserTool implements DeferredAgentTool, RuntimeCapabilityAgentTool {
     if (_pending != null) throw StateError('上一组问题仍在等待回答');
     {
       final publish = publishCard!;
-      final sent = await publish({
-        'title': batch.questions.length == 1
-            ? '问题'
-            : '${batch.questions.length} 个问题',
-        'body': '',
-        'buttons': [
-          {
-            'id': 'answer',
-            'label': '提交回答',
-            'action': 'submit',
-            'style': 'primary',
-            'repeatable': false,
-            'questions': batch.questions,
+      final sent = await publish(
+        InteractiveMessage.cardDefinition({
+          'title': batch.questions.length == 1
+              ? '问题'
+              : '${batch.questions.length} 个问题',
+          'body': '',
+          'buttons': [
+            {
+              'id': 'answer',
+              'label': '提交回答',
+              'action': 'submit',
+              'style': 'primary',
+              'repeatable': false,
+              'questions': batch.questions,
+            },
+          ],
+          'interaction': {
+            'actors': ['user:local'],
+            'allowChange': false,
+            'completion': {
+              'op': 'eq',
+              'args': [
+                {'ref': 'submittedCount'},
+                1,
+              ],
+            },
+            'views': <Object?>[],
           },
-        ],
-        'interaction': {
-          'actors': ['user:local'],
-          'allowChange': false,
-          'completion': {
-            'op': 'eq',
-            'args': [
-              {'ref': 'submittedCount'},
-              1,
-            ],
+          'participation': {
+            'visibility': 'public',
+            'summaryVisibility': 'public',
+            'showHistory': false,
+            'callbackEvents': ['complete'],
           },
-          'views': <Object?>[],
-        },
-        'participation': {
-          'visibility': 'public',
-          'summaryVisibility': 'public',
-          'showHistory': false,
-          'callbackEvents': ['complete'],
-        },
-      });
+        }),
+      );
       final first = batch.questions.first;
       final question = UserQuestion(
         batch: batch,

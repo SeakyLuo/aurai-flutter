@@ -121,6 +121,30 @@ extension _ChatQuoting on _ChatPageState {
         }
       }
       _quoteVisual = message == null ? null : visual;
+      if (message != null && conversation.kind == ConversationKind.group) {
+        final members = await widget.controller.groupStore.noticeMembers(
+          conversation.id,
+        );
+        if (!mounted ||
+            !identical(conversation, widget.controller.activeConversation))
+          return;
+        final byId = {for (final member in members) member.id: member};
+        final audience = message.audience;
+        final excluded = message.excludedAudience;
+        _updateDraftVisibility(() {
+          _draftVisibility[conversation.id] = DraftVisibility(
+            audience != null
+                ? DraftVisibilityMode.included
+                : excluded != null && excluded.isNotEmpty
+                ? DraftVisibilityMode.excluded
+                : DraftVisibilityMode.everyone,
+            [
+              for (final id in audience ?? excluded ?? <String>[])
+                if (id != MessageSender.localUser.id) byId[id]!,
+            ],
+          );
+        });
+      }
       await widget.controller.setDraftQuote(
         message,
         selectedText: selectedText,

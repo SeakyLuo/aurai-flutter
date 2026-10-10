@@ -44,7 +44,7 @@ class RecalledMessageNotice extends StatelessWidget {
     if (message.quote != null && onOpenSource != null) {
       return Semantics(
         button: true,
-        label: '定位交互消息',
+        label: '定位互动消息',
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () => onOpenSource!(message.quote!.messageId),

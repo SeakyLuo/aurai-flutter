@@ -6,6 +6,7 @@ import '../../domain/message_sender.dart';
 import '../../domain/question_batch.dart';
 import '../../storage/interactive_selection_drafts.dart';
 import 'question_batch_form.dart';
+import 'questionnaire_form.dart';
 import '../../agent/ask_user_tool.dart';
 import 'question_card_anchor.dart';
 import 'question_sheet.dart';
@@ -28,6 +29,9 @@ class QuestionBatchCard extends StatefulWidget {
     this.onOpenMember,
     this.trailing,
     this.compact = true,
+    this.embedded = false,
+    this.sheetTitle = '问题',
+    this.questionnaire = false,
   });
   final List questions;
   final String buttonId, actorId, version, status;
@@ -38,6 +42,9 @@ class QuestionBatchCard extends StatefulWidget {
   final ValueChanged<String>? onOpenMember;
   final Widget? trailing;
   final bool compact;
+  final bool embedded;
+  final String sheetTitle;
+  final bool questionnaire;
   final Future<void> Function(Map<String, Object?>) onSubmit;
   final Future<void> Function(String version, String data) onSave;
   @override
@@ -141,9 +148,21 @@ class _QuestionBatchCardState extends State<QuestionBatchCard> {
   }
 
   @override
-  Widget build(BuildContext context) => !widget.compact
+  Widget build(BuildContext context) => widget.questionnaire
+      ? widget.embedded
+            ? _form(compact: false)
+            : !widget.compact
+            ? QuestionSheetLayout(
+                title: widget.sheetTitle,
+                heading: const SizedBox.shrink(),
+                child: _form(compact: false),
+              )
+            : _form()
+      : widget.embedded
+      ? _form(compact: false)
+      : !widget.compact
       ? QuestionSheetLayout(
-          title: '问题',
+          title: widget.sheetTitle,
           heading: const SizedBox.shrink(),
           child: _form(compact: false),
         )
@@ -181,32 +200,42 @@ class _QuestionBatchCardState extends State<QuestionBatchCard> {
       messageId: widget.messageId,
       closeWhen: widget.readOnly ? null : _answered.future,
       child: QuestionSheetLayout(
-        title: '问题',
+        title: widget.sheetTitle,
         heading: const SizedBox.shrink(),
         child: _form(compact: false),
       ),
     );
   }
 
-  Widget _form({bool compact = true}) => QuestionBatchForm(
-    controller: _controller,
-    compact: compact,
-    readOnly: widget.readOnly,
-    status: widget.status,
-    recipient: widget.recipient,
-    onOpenMember: widget.onOpenMember,
-    trailing: widget.trailing,
-    closeWhen: widget.readOnly ? null : _answered.future,
-    onSubmit: () async {
-      final controller = _controller;
-      if (controller.sending) return;
-      controller.setSending(true);
-      try {
-        await widget.onSubmit(Map.of(controller.answers));
-      } finally {
-        if (mounted && identical(controller, _controller))
-          controller.setSending(false);
-      }
-    },
-  );
+  Future<void> _submit() async {
+    final controller = _controller;
+    if (controller.sending) return;
+    controller.setSending(true);
+    try {
+      await widget.onSubmit(Map.of(controller.answers));
+    } finally {
+      if (mounted && identical(controller, _controller))
+        controller.setSending(false);
+    }
+  }
+
+  Widget _form({bool compact = true}) => widget.questionnaire
+      ? QuestionnaireForm(
+          controller: _controller,
+          compact: compact,
+          readOnly: widget.readOnly,
+          closeWhen: _answered.future,
+          onSubmit: _submit,
+        )
+      : QuestionBatchForm(
+          controller: _controller,
+          compact: compact,
+          readOnly: widget.readOnly,
+          status: widget.status,
+          recipient: widget.recipient,
+          onOpenMember: widget.onOpenMember,
+          trailing: widget.trailing,
+          closeWhen: widget.readOnly ? null : _answered.future,
+          onSubmit: _submit,
+        );
 }

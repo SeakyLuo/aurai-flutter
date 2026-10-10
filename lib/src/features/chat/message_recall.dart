@@ -425,7 +425,7 @@ extension MessageRecall on ChatController {
       // Preserve visibility without retaining the recalled card's content or controls.
       interactive: !message.hasRestrictedAudience
           ? null
-          : InteractiveMessage(
+          : InteractiveMessage.card(
               revision: message.messageMetadata!.revision,
               title: text,
               body: '',

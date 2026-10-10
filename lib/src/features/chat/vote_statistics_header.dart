@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/interactive_message.dart';
+import '../../domain/message_sender.dart';
 import 'vote_message_heading.dart';
+import 'participation_summary.dart';
 
 /// Kept outside the result scroll view so the vote context stays visible.
 class VoteStatisticsHeader extends StatelessWidget {
@@ -11,15 +13,21 @@ class VoteStatisticsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actors = (card.interaction['actors'] as List?)?.cast<String>();
+    final eligible =
+        actors == null || actors.contains(MessageSender.localUser.id);
     final multiple = card.buttons.any(
       (button) => (button['selection'] as Map?)?['mode'] == 'multiple',
     );
     final rules = [
-      if (card.interaction.containsKey('actorWeights'))
-        '按参与者票值计票'
-      else if (multiple)
-        '每个所选项各计一票',
-      if (card.engine.allowChange) '改票会替换原票',
+      if (!card.isQuestionnaire) ...[
+        if (card.interaction.containsKey('actorWeights'))
+          '按参与者票值计票'
+        else if (multiple)
+          '每个所选项各计一票',
+        if (card.engine.allowChange) '改票会替换原票',
+      ] else if (card.engine.allowChange)
+        '提交后可修改回答',
     ];
     final secondary = Theme.of(context).colorScheme.onSurfaceVariant;
     return Padding(
@@ -28,6 +36,7 @@ class VoteStatisticsHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           VoteMessageHeading(
+            questionnaire: card.isQuestionnaire,
             title: card.title,
             multiple: multiple,
             ongoing: !card.closed && !card.completed,
@@ -42,10 +51,18 @@ class VoteStatisticsHeader extends StatelessWidget {
             const SizedBox(height: 16),
             Text(card.body, style: const TextStyle(fontSize: 15, height: 1.5)),
           ],
-          if (card.visible('summaryVisibility')) ...[
+          if (card.visible('summaryVisibility') || !eligible) ...[
             const SizedBox(height: 10),
             Text(
-              '${card.choices.length} 人参与',
+              [
+                if (card.visible('summaryVisibility'))
+                  participationSummaryText(
+                    card.choices.length,
+                    actors?.length,
+                    questionnaire: card.isQuestionnaire,
+                  ),
+                if (!eligible) '不需要你参与',
+              ].join(' · '),
               style: TextStyle(fontSize: 13, color: secondary),
             ),
           ],

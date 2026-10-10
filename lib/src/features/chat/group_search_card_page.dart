@@ -88,7 +88,7 @@ class _GroupSearchCardPageState extends State<GroupSearchCardPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
-    appBar: SettingsAppBar(title: '交互消息', onBack: () => Navigator.pop(context)),
+    appBar: SettingsAppBar(title: '互动消息', onBack: () => Navigator.pop(context)),
     body: SettingsPageBody(
       child: _loading || _card == null
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2))

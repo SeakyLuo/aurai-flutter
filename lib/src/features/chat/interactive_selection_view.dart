@@ -25,11 +25,13 @@ class InteractiveSelectionView extends StatefulWidget {
     required this.busy,
     required this.onSubmit,
     this.showSubmit = true,
+    this.showSelectionIndicator = true,
     this.question = false,
     this.questionHeading,
     this.anonymous = false,
     this.voteStatus,
     required this.compactOptions,
+    this.collapseOptions = false,
     required this.title,
     required this.body,
     this.sheetActions,
@@ -43,11 +45,13 @@ class InteractiveSelectionView extends StatefulWidget {
   final Map? self;
   final bool locked, submitted, allowChange, busy;
   final bool showSubmit;
+  final bool showSelectionIndicator;
   final bool question;
   final Widget? questionHeading;
   final bool anonymous;
   final String? voteStatus;
   final bool compactOptions;
+  final bool collapseOptions;
   final bool fullSheet;
   final String title, body;
   final Widget? sheetActions;
@@ -168,6 +172,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
       },
       multiple: config.multiple,
       optionPrefix: config.optionPrefix,
+      showSelectionIndicator: widget.showSelectionIndicator,
       showConfirm: config.needsConfirmation,
       onSelectionChanged: (selected) {
         setState(() {
@@ -227,6 +232,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
         },
         multiple: config.multiple,
         optionPrefix: config.optionPrefix,
+        showSelectionIndicator: widget.showSelectionIndicator,
         showConfirm: config.needsConfirmation,
         readOnly:
             widget.question && widget.submitted ||
@@ -265,6 +271,14 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
       );
     }
     final locked = _locked;
+    if (widget.compactOptions &&
+        widget.collapseOptions &&
+        config.options.length > 4) {
+      return QuestionOptionsField(
+        label: '去填写',
+        onTap: locked || !widget.showSubmit ? null : _chooseOptions,
+      );
+    }
     final answeredQuestion = widget.question && widget.submitted;
     final rich = hasRichOptions(config.options);
     final truncated =
@@ -336,6 +350,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
             multiple: config.multiple,
             maximum: config.maximum,
             optionPrefix: config.optionPrefix,
+            showSelectionIndicator: widget.showSelectionIndicator,
             onSelect: answeredQuestion || locked || !widget.showSubmit
                 ? null
                 : (i) {
@@ -386,7 +401,12 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
 
                 return Padding(
                   padding: EdgeInsets.only(
-                    bottom: answeredQuestion && index == visibleOptions.last.$1
+                    bottom:
+                        index == visibleOptions.last.$1 &&
+                            (answeredQuestion ||
+                                (!truncated &&
+                                    !(widget.showSubmit &&
+                                        config.needsConfirmation)))
                         ? 0
                         : 8,
                   ),
@@ -397,6 +417,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
                           multiple: config.multiple,
                           number: index + 1,
                           optionPrefix: config.optionPrefix,
+                          showSelectionIndicator: widget.showSelectionIndicator,
                           fontSize: InteractiveMessageButton.defaultFontSize,
                           onEdit: enabled ? _editOther : null,
                           onToggle: enabled
@@ -414,6 +435,7 @@ class _InteractiveSelectionViewState extends State<InteractiveSelectionView>
                           ),
                           number: index + 1,
                           optionPrefix: config.optionPrefix,
+                          showSelectionIndicator: widget.showSelectionIndicator,
                           multiple: config.multiple,
                           vote: !widget.question,
                           fontSize: InteractiveMessageButton.defaultFontSize,

@@ -42,7 +42,7 @@ class QuestionMessageHeading extends StatelessWidget {
       children: [
         ConstrainedBox(
           constraints: BoxConstraints(
-            minHeight: sheetHeader ? kMinInteractiveDimension : 0,
+            minHeight: sheetHeader ? 32 : 0,
           ),
           child: Row(
             children: [
@@ -57,7 +57,7 @@ class QuestionMessageHeading extends StatelessWidget {
                 Transform.translate(offset: const Offset(4, 0), child: pager!),
               if (trailing != null) ...[
                 const SizedBox(width: 8),
-                QuestionSkipStyle(compact: !sheetHeader, child: trailing!),
+                QuestionSkipStyle(compact: true, child: trailing!),
               ],
             ],
           ),

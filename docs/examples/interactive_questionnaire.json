@@ -1,0 +1,65 @@
+{
+  "interaction": {"allowChange": true},
+  "participation": {"visibilityTiming": "onComplete", "summaryVisibilityTiming": "immediate", "callbackEvents": ["complete"]},
+  "content": {
+    "components": {
+      "Question": {
+        "params": {"fieldKey": {"type": "string"}, "title": {"type": "string"}, "required": {"type": "boolean", "default": false}},
+        "body": {"type": "TextField", "key": {"param": "fieldKey"}, "label": {"param": "title"}, "required": {"param": "required"}, "maxLength": 500}
+      },
+      "AnswerList": {
+        "params": {"source": {"type": "object"}},
+        "body": {"type": "ForEach", "items": {"param": "source"}, "template": {"type": "Text", "data": {"op": "concat", "args": [{"ref": "item.question"}, "：", {"ref": "item.answer"}]}}}
+      }
+    },
+    "state": {"step": 0, "editing": false, "offset": 0},
+    "type": "Column", "spacing": 16,
+    "children": [
+      {"type": "Row", "spacing": 12, "children": [
+        {"type": "ProfileAvatar", "name": "活动小助手", "icon": "portrait:fox", "size": 40},
+        {"type": "Expanded", "child": {"type": "Text", "data": "周末活动问卷", "style": "titleMedium"}}
+      ]},
+      {"type": "Text", "data": "发起人结束收集后公开回答，结束前可修改。"},
+      {"type": "Visibility", "visible": {"ref": "host.summaryVisible"}, "child": {"type": "Text", "data": {"op": "concat", "args": ["已填写：", {"ref": "host.submittedCount"}, " 人"]}}},
+      {
+        "type": "Visibility",
+        "visible": {"op": "and", "args": [{"ref": "host.canSubmit"}, {"op": "or", "args": [{"op": "not", "args": [{"ref": "host.submitted"}]}, {"ref": "local.editing"}]}]},
+        "child": {"type": "Column", "spacing": 12, "children": [
+          {"type": "Text", "data": {"op": "if", "args": [{"op": "eq", "args": [{"ref": "local.step"}, 0]}, "第一步：填写称呼", "第二步：活动偏好"]}},
+          {"type": "Visibility", "visible": {"op": "eq", "args": [{"ref": "local.step"}, 0]}, "child": {"type": "Column", "spacing": 12, "children": [
+            {"type": "Component", "name": "Question", "args": {"fieldKey": "name", "title": "怎么称呼你？", "required": true}},
+            {"type": "TextButton", "child": {"type": "Text", "data": "下一步"}, "onPressed": {"setState": {"step": 1}, "validateFields": ["name"]}}
+          ]}},
+          {"type": "Visibility", "visible": {"op": "eq", "args": [{"ref": "local.step"}, 1]}, "child": {"type": "Column", "spacing": 12, "children": [
+            {"type": "ChoiceGroup", "key": "activities", "label": "想参加哪些活动？", "multiple": true, "required": true, "maxSelections": 2,
+              "items": [{"value": "hiking", "child": {"type": "Text", "data": "徒步"}}, {"value": "games", "child": {"type": "Text", "data": "桌游"}}, {"value": "picnic", "child": {"type": "Text", "data": "野餐"}}]},
+            {"type": "TextButton", "child": {"type": "Text", "data": "补充备注（选填）"}, "onPressed": {"showBottomSheet": {"title": "补充备注", "child": {"type": "Column", "spacing": 12, "children": [
+              {"type": "Component", "name": "Question", "args": {"fieldKey": "notes", "title": "还有什么需要提前知道的？"}},
+              {"type": "TextButton", "child": {"type": "Text", "data": "返回问卷"}, "onPressed": {"closeBottomSheet": true}}
+            ]}}}},
+            {"type": "Text", "data": {"ref": "display.notes"}},
+            {"type": "TextButton", "child": {"type": "Text", "data": "上一步"}, "onPressed": {"setState": {"step": 0}}},
+            {"type": "FilledButton", "child": {"type": "Text", "data": "提交全部回答"}, "onPressed": {"id": "submit", "action": "submit", "repeatable": true, "input": "json"}}
+          ]}}
+        ]}
+      },
+      {"type": "Visibility", "visible": {"op": "and", "args": [{"ref": "host.submitted"}, {"op": "not", "args": [{"ref": "host.responsesVisible"}]}, {"op": "not", "args": [{"ref": "local.editing"}]}]}, "child": {"type": "Column", "spacing": 8, "children": [
+        {"type": "Text", "data": "我的回答"},
+        {"type": "Component", "name": "AnswerList", "args": {"source": {"ref": "host.answers"}}}
+      ]}},
+      {"type": "Visibility", "visible": {"op": "and", "args": [{"ref": "host.canEdit"}, {"op": "not", "args": [{"ref": "local.editing"}]}]}, "child": {"type": "TextButton", "child": {"type": "Text", "data": "修改回答"}, "onPressed": {"setState": {"editing": true, "step": 0}}}},
+      {"type": "Visibility", "visible": {"ref": "local.editing"}, "child": {"type": "TextButton", "child": {"type": "Text", "data": "取消修改"}, "onPressed": {"setState": {"editing": false}}}},
+      {"type": "Visibility", "visible": {"ref": "host.responsesVisible"}, "child": {"type": "Column", "spacing": 12, "children": [
+        {"type": "Text", "data": "填写结果", "style": "titleMedium"},
+        {"type": "ForEach", "items": {"ref": "host.responses"}, "offset": {"ref": "local.offset"}, "limit": 10, "template": {"type": "Column", "spacing": 8, "children": [
+          {"type": "Text", "data": {"ref": "item.name"}},
+          {"type": "Component", "name": "AnswerList", "args": {"source": {"ref": "item.answers"}}},
+          {"type": "Divider"}
+        ]}},
+        {"type": "TextButton", "enabled": {"op": "gt", "args": [{"ref": "local.offset"}, 0]}, "child": {"type": "Text", "data": "上一页"}, "onPressed": {"setState": {"offset": {"op": "subtract", "args": [{"ref": "local.offset"}, 10]}}}},
+        {"type": "TextButton", "enabled": {"op": "lt", "args": [{"op": "add", "args": [{"ref": "local.offset"}, 10]}, {"op": "length", "args": [{"ref": "host.responses"}]}]}, "child": {"type": "Text", "data": "下一页"}, "onPressed": {"setState": {"offset": {"op": "add", "args": [{"ref": "local.offset"}, 10]}}}}
+      ]}},
+      {"type": "Visibility", "visible": {"ref": "host.closed"}, "child": {"type": "Text", "data": "收集已结束"}}
+    ]
+  }
+}

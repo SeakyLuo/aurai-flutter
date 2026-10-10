@@ -15,7 +15,7 @@
     "publisherId": "user:local",
     "asset": "assets/miniapps/werewolf.html",
     "iconAsset": "assets/miniapps/icons/werewolf.png",
-    "version": "9c03bf193c24e34160d3050b11559f976cfcceafdc7a47f2dd541c9d288e6890"
+    "version": "5aea75e263ee97c1e3552fa72470e73b682ef3e7aec8993db2647866b7687604"
   },
   {
     "id": "builtin.draw-guess",
@@ -33,6 +33,6 @@
     "publisherId": "user:local",
     "asset": "assets/miniapps/animaline.html",
     "iconAsset": "assets/miniapps/icons/animaline-locomotive.png",
-    "version": "d02b0edc0f492b641a666a93fb8d454258cb5f234a1334a833bd5274a6e54025"
+    "version": "386768e47462aae88dd4c1e6a923206d59a40eca01af6197563d83e2cb723035"
   }
 ]

@@ -9,7 +9,10 @@ class KeyboardInset extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: EdgeInsets.only(
-      bottom: enabled ? MediaQuery.viewInsetsOf(context).bottom : 0,
+      // Resolve the pane's route here, below its nested Navigator.
+      bottom: enabled && ModalRoute.isCurrentOf(context) != false
+          ? MediaQuery.viewInsetsOf(context).bottom
+          : 0,
     ),
     child: child,
   );

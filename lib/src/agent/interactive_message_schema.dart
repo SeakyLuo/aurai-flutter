@@ -121,7 +121,7 @@ const interactiveButtonsSchema = {
         'type': 'boolean',
         'default': false,
         'description':
-            'Queue an AI callback for non-voting actions or HTML text/json input. Fixed-option votes use participation.callbackEvents instead. Only this button waits until the creator commits title/body/buttons with updateInteractiveMessage + callbackEventId. A later state-changing action expires the previous callback. Failures can retry the same event without repeating this action. Omit/false for local-only changes.',
+            'Queue an AI callback for non-voting actions or HTML text/json input. Fixed-option votes use participation.callbackEvents instead. Only this button waits until the creator commits content with updateInteractiveMessage + callbackEventId. A later state-changing action expires the previous callback. Failures can retry the same event without repeating this action. Omit/false for local-only changes.',
       },
       'repeatable': {'type': 'boolean'},
       'selection': interactiveSelectionSchema,
@@ -130,7 +130,7 @@ const interactiveButtonsSchema = {
         'type': 'string',
         'enum': ['text', 'json'],
         'description':
-            'HTML messages only: this submit endpoint accepts page-provided text or JSON. Native cards use fixed button values instead. The host binds the authenticated participant.',
+            'This submit endpoint accepts text or JSON from HTML, or a JSON object of form field values from native widget trees. The host binds the authenticated participant.',
       },
       'value': {
         'description':
@@ -154,6 +154,12 @@ const interactiveButtonsSchema = {
 const interactiveParticipationSchema = {
   'type': 'object',
   'properties': {
+    'kind': {
+      'type': 'string',
+      'enum': ['questionnaire'],
+      'description':
+          'Questionnaire metadata for the existing InteractionCard selection/questions presentation. Custom DSL trees render entirely from their own generic bindings, Visibility and ForEach, regardless of this metadata; they do not need kind. Shared actors/completion/reveal/allowChange remain host business rules.',
+    },
     'anonymous': {
       'type': 'boolean',
       'description':
@@ -162,7 +168,7 @@ const interactiveParticipationSchema = {
     'showHistory': {
       'type': 'boolean',
       'description':
-          'Enable card history paging and participant operation history in the UI. Questions addressed to one actor never show history. Defaults to false for votes and true for other interactive messages. Does not delete recorded actions or change current results.',
+          'Enable card history paging and participant operation history in the UI. Questions addressed to one actor never show history. Defaults to false for votes and questionnaires, and true for other interactive messages. Does not delete recorded actions or change current results.',
     },
     'excludedAudience': {
       'type': 'array',
@@ -181,7 +187,15 @@ const interactiveParticipationSchema = {
       'type': 'array',
       'items': {'type': 'string'},
       'description':
-          'Additional allowlist for other participants choices; still follows visibility and reveal timing.',
+          'Only these viewers can read others answers/choices, subject to visibility and timing. Mutually exclusive with visibilityExcludedActors. Questionnaire creators always see all answers; every respondent can still read their own answer.',
+    },
+    'visibilityExcludedActors': {
+      'type': 'array',
+      'minItems': 1,
+      'uniqueItems': true,
+      'items': {'type': 'string'},
+      'description':
+          'These viewers cannot read others answers/choices; everyone else follows visibility and timing. Mutually exclusive with visibilityActors. Does not hide the card or own answer. Questionnaire creators always see all answers. For hidden signup choices, exclude players and publish a separate public system announcement after collection.',
     },
     'summaryVisibilityActors': {
       'type': 'array',
@@ -211,7 +225,7 @@ const interactiveParticipationSchema = {
       'type': 'array',
       'items': {'type': 'string'},
       'description':
-          'These viewers may see individual choices before publication. Still requires card audience and visibilityActors; private remains hidden. No automatic privileges for creator, human or administrator.',
+          'These viewers may see individual choices before publication. Still requires card audience and result visibility scope; private remains hidden. Questionnaire creators separately retain full answer access. Poll creators, humans and administrators receive no extra individual-choice privileges.',
     },
     'summaryVisibilityImmediateActors': {
       'type': 'array',
@@ -224,14 +238,16 @@ const interactiveParticipationSchema = {
       'uniqueItems': true,
       'items': {
         'type': 'string',
-        'enum': ['vote', 'complete'],
+        'enum': ['vote', 'complete', 'pause'],
       },
       'description':
-          'Register creator AI listeners: vote receives each submission/change (source=interactionVote, operationType=submit|change); complete receives completion/manual closure once (source=interactionComplete, completionType=conditionMet|manualClose, completionConditionMet). Registration takes effect immediately without an enable switch. Omit/empty means no listener. Both include revision, round, sessionVersion, phase, submittedCount, eligibleCount when actors are specified, summary, and individual choices/state only if permitted. Non-anonymous vote events include actorId/actorName and permitted submission. Anonymous events contain aggregates only, never participant identity, individual submission, choices, or runtime state. No result acknowledgment, participant waiting or system receipt. If both subscribed, the last vote emits vote then complete.',
+          'Register creator AI listeners: vote receives each submission/change (source=interactionVote, operationType=submit|change); complete receives completion/manual closure once (source=interactionComplete, collectionEvent=completed, completionType=conditionMet|manualClose, completionConditionMet); pause receives questionnaire collecting-to-paused transitions (source=interactionPaused, collectionEvent=paused). Pausing preserves answers without revealing onComplete results. Registration takes effect immediately without an enable switch. Omit/empty means no listener. Events include revision, round, sessionVersion, phase, submittedCount, eligibleCount when actors are specified, summary, and individual choices/state only if permitted. Non-anonymous vote events include actorId/actorName and permitted submission. Anonymous events contain aggregates only, never participant identity, individual submission, choices, or runtime state. No result acknowledgment, participant waiting or system receipt. If both subscribed, the last vote emits vote then complete.',
     },
     'visibility': {
       'type': 'string',
       'enum': ['public', 'private', 'afterClose'],
+      'description':
+          'Questionnaires default to private: only the creator and each respondent for their own answer. Set public and an optional visibilityActors/visibilityExcludedActors scope to share answers. Other activities retain their existing default.',
     },
     'summaryVisibility': {
       'type': 'string',

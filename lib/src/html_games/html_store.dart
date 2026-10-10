@@ -6,6 +6,7 @@ import 'miniapp_member_avatars.dart';
 import 'miniapp_send_action.dart';
 import '../domain/interactive_message.dart';
 import 'dart:convert';
+import 'miniapp_resources.dart';
 import 'dart:typed_data';
 import 'package:sqflite/sqflite.dart';
 import '../domain/agent_models.dart';
@@ -63,10 +64,43 @@ class HtmlStore {
   Future<Map<String, Object?>> readProgram(
     String conversationId,
     String messageId,
-    String viewer,
-  ) async {
+    String viewer, {
+    String? resourceKey,
+    int resourceOffset = 0,
+  }) async {
     final game = await load(conversationId, messageId, viewer: viewer);
     if (!game.state.containsKey('_miniapp')) throw StateError('这条消息不是程序小程序');
+    if (resourceKey != null) {
+      final own = (game.state['_miniapp'] as Map)['own'] as Map?;
+      var resource = MiniappResources.read(
+        game.html,
+        resourceKey,
+        isHost: own?['isHost'] == true,
+        offset: resourceOffset,
+      );
+      if (resource.containsKey('stateField')) {
+        final rows = await database.query(
+          'app_state',
+          columns: ['value'],
+          where: 'key = ?',
+          whereArgs: [MiniappProgram.key(messageId)],
+          limit: 1,
+        );
+        resource = MiniappResources.read(
+          game.html,
+          resourceKey,
+          isHost: own?['isHost'] == true,
+          state: (MiniappProgram.decode(rows.single['value'])['state'] as Map)
+              .cast<String, Object?>(),
+          offset: resourceOffset,
+        );
+      }
+      return {
+        'messageId': messageId,
+        'version': game.version,
+        'resource': resource,
+      };
+    }
     final compaction = await MiniappProgramStore(
       database,
     ).pendingCompaction(conversationId, messageId, viewer);
@@ -271,17 +305,19 @@ class HtmlStore {
       throw ArgumentError('请选择包含你和用户的 2–8 位当前群成员，并指定有效的下一位玩家');
     final interactive = args['interaction'] == null
         ? null
-        : InteractiveMessage.fromDefinition({
-            'title': title,
-            'body': '',
-            'revision': 0,
-            'buttons': args['buttons'],
-            'interaction': args['interaction'],
-            'participation': {
-              ...?args['participation'] as Map?,
-              '_creatorId': creator.id,
-            },
-          });
+        : InteractiveMessage.fromDefinition(
+            InteractiveMessage.cardDefinition({
+              'title': title,
+              'body': '',
+              'revision': 0,
+              'buttons': args['buttons'],
+              'interaction': args['interaction'],
+              'participation': {
+                ...?args['participation'] as Map?,
+                '_creatorId': creator.id,
+              },
+            }),
+          );
     interactive?.validateTransport(html: true);
     final appId = messageOnly ? null : existingId ?? newMessageId();
     final message = AgentMessage(
@@ -292,7 +328,7 @@ class HtmlStore {
       sender: creator,
       text:
           messageText ??
-          (interactive?.hasRestrictedAudience != true ? title : '私密交互消息'),
+          (interactive?.hasRestrictedAudience != true ? title : '私密互动消息'),
       createdAt: DateTime.now(),
       isGroupMessage: groupMessage,
       runId: runId,

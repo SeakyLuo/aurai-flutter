@@ -10,6 +10,7 @@ import 'message_callbacks.dart';
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import '../domain/interactive_message.dart';
+import '../domain/interactive_form_presentation.dart';
 import '../domain/agent_models.dart';
 import '../domain/message_sender.dart';
 import 'conversation_rows.dart';
@@ -71,7 +72,8 @@ class InteractiveMessageStore {
           (pending?['buttonId'] ?? card.participants[actor.id]?['buttonId']) ==
               buttonId)
         throw StateError('正在处理这次操作，请等待结果');
-      if (card.closed) throw StateError('这条交互消息已结束');
+      if (card.closed) throw StateError('这条互动消息已结束');
+      if (card.collectionPaused) throw StateError('问卷已暂停收集，请等待发起人恢复');
       final view = card.viewFor(actor.id);
       var button = view.buttons.firstWhere((b) => b['id'] == buttonId);
       if (button['disabled'] == true) throw StateError('这个选项已处理');
@@ -90,6 +92,12 @@ class InteractiveMessageStore {
           Map<String, Object?>.from(config),
         ).resolve(button, inputValue);
       } else if (button['questions'] case final List questions) {
+        if (card.isQuestionnaire &&
+            inputValue is Map &&
+            (inputValue as Map)['skipQuestions'] == true &&
+            questions.any((question) => question['required'] != false)) {
+          throw ArgumentError('请完成问卷中的必填问题');
+        }
         final answers = QuestionBatch(questions).resolve(inputValue);
         button = {
           ...button,
@@ -97,13 +105,24 @@ class InteractiveMessageStore {
           'label': '已回答 ${answers.length} 个问题',
         };
       } else if (inputValue != null) {
-        if (rows.single['kind'] != 'html_game' ||
-            action != 'submit' ||
-            !['text', 'json'].contains(button['input']))
+        final submittedInput = inputValue;
+        if (action != 'submit' || !['text', 'json'].contains(button['input']))
           throw ArgumentError('这个按钮不接受页面输入');
         if (button['input'] == 'text' &&
-            (inputValue is! String || inputValue.trim().isEmpty))
+            (submittedInput is! String || submittedInput.trim().isEmpty))
           throw ArgumentError('请填写文本内容');
+        if (rows.single['kind'] != 'html_game') {
+          inputValue = view.widgetTree.resolveInput(inputValue);
+        }
+        button = {
+          ...button,
+          'value': inputValue,
+          if (rows.single['kind'] != 'html_game')
+            'answers': interactiveFormAnswers(
+              view.widgetTree,
+              inputValue as Map<String, Object?>,
+            ),
+        };
       } else if (button['input'] != null) {
         throw ArgumentError('请提供页面输入数据');
       }
@@ -129,9 +148,9 @@ class InteractiveMessageStore {
             )
           : null;
       final nextButtons = target != null
-          ? (target['buttons'] as List)
-                .map((b) => Map<String, Object?>.from(b as Map))
-                .toList()
+          ? InteractiveContent(
+              Map<String, Object?>.from(target['content'] as Map),
+            ).buttons
           : [
               for (final b in view.buttons)
                 if (b['id'] == buttonId &&
@@ -175,24 +194,27 @@ class InteractiveMessageStore {
         'revision': participantRevision + 1,
         'snapshotCount': snapshotCount,
         'definitionRevision': revision,
-        'showStatistics': target?['showStatistics'] ?? view.showStatistics,
-        'buttonColumns': newRound
-            ? card.buttonColumns
-            : target?['buttonColumns'] ?? view.buttonColumns,
-        'title': newRound ? card.title : target?['title'] ?? view.title,
-        'body': newRound
-            ? card.body
-            : target?['body'] ??
-                  (action == 'update' ? button['nextBody'] : view.body),
-        'buttons': newRound ? card.buttons : nextButtons,
+        'content': newRound
+            ? card.content
+            : target != null
+            ? target['content']
+            : InteractiveContent(
+                action == 'update' && button['nextBody'] != null
+                    ? view.widgetTree.withBody(button['nextBody'] as String)
+                    : view.content,
+              ).withButtons(nextButtons),
         'buttonId': buttonId,
         'label': button['label'],
+        if (!newRound && previous?['value'] != null)
+          'value': previous!['value'],
         if (reason != null) 'reason': reason.trim(),
         if (button['selections'] != null) ...{
           'selections': button['selections'],
           'value': button['value'],
         },
-        if (button['questions'] != null) 'value': button['value'],
+        if (button['questions'] != null || button['input'] != null)
+          'value': button['value'],
+        if (button['answers'] != null) 'answers': button['answers'],
         'updatedAt': now,
       };
       var next = InteractiveMessage(
@@ -202,23 +224,17 @@ class InteractiveMessageStore {
                     nextSession.phase != card.engine.phase)
             ? card.revision + 1
             : card.revision,
-        showStatistics: card.showStatistics,
-        buttonColumns: card.buttonColumns,
+        content: card.content,
         interaction: card.interaction,
         session: nextSession?.runtime ?? card.session,
-        title: card.title,
-        body: card.body,
-        buttons: card.buttons,
         states: card.states,
         participation: card.participation,
         participants: {
           for (final entry in card.participants.entries)
             entry.key: newRound
                 ? (Map<String, Object?>.from(entry.value)
-                    ..remove('title')
-                    ..remove('body')
-                    ..remove('buttons')
-                    ..remove('buttonColumns')
+                    ..remove('content')
+                    ..remove('value')
                     ..remove('callback'))
                 : entry.value,
           actor.id: state,
@@ -228,6 +244,10 @@ class InteractiveMessageStore {
       final pageChanged =
           newRound ||
           (nextSession != null && nextSession.phase != card.engine.phase) ||
+          !const DeepCollectionEquality().equals(
+            view.widgetTree.structure,
+            nextView.widgetTree.structure,
+          ) ||
           view.title != nextView.title ||
           view.body != nextView.body ||
           view.buttonColumns != nextView.buttonColumns ||
@@ -260,11 +280,8 @@ class InteractiveMessageStore {
         'before_json': pageChanged
             ? jsonEncode({
                 'revision': view.revision,
-                'showStatistics': view.showStatistics,
-                'buttonColumns': view.buttonColumns,
-                'title': view.title,
-                'body': view.body,
-                'buttons': view.buttons,
+                'content': view.content,
+                if (previous?['value'] != null) 'value': previous!['value'],
                 'participation': view.participation,
                 if (card.participants[actor.id]?['callback'] != null)
                   'callback': card.participants[actor.id]!['callback'],
@@ -327,19 +344,9 @@ class InteractiveMessageStore {
               .cast<String, Object?>(),
         );
         programChange!.cards[messageId] = current;
-        final notice = card.isQuestion && action == 'submit'
-            ? await writeQuestionAnswerMessage(
-                txn,
-                conversationId: conversationId,
-                messageId: messageId,
-                creatorId: rows.single['sender_id'] as String,
-                actor: actor,
-                card: card,
-                resultCard: current,
-                button: button,
-              )
-            : null;
-        return (card: current, notice: notice, url: null);
+        // Program action cards display their recorded answer in place. The reducer
+        // may already have entered the next stage, so do not append a late duplicate.
+        return (card: current, notice: null, url: null);
       }
       next = await enqueueInteractiveCompletion(
         txn,
@@ -378,6 +385,7 @@ class InteractiveMessageStore {
               'actorName': actor.name,
               'buttonId': buttonId,
               'label': button['label'],
+              if (button['input'] != null) 'value': button['value'],
               if (button['selections'] != null) ...{
                 'selections': button['selections'],
                 'value': button['value'],
@@ -405,7 +413,8 @@ class InteractiveMessageStore {
               txn,
               conversationId,
               !card.visible('visibility', actor: actor.id) ||
-                      card.participation['visibilityActors'] != null
+                      card.participation['visibilityActors'] != null ||
+                      card.participation['visibilityExcludedActors'] != null
                   ? '${actor.name}提交了“${card.title}”'
                   : '${actor.name}在“${card.title}”中选择了“${button['label']}”',
               source: MessageQuote(
@@ -460,7 +469,8 @@ class InteractiveMessageStore {
       );
     });
     await programChange?.publish();
-    if (result.card.buttons.any((b) => b['questions'] != null) &&
+    if (result.card.isQuestion &&
+        result.card.buttons.any((b) => b['questions'] != null) &&
         result.card.completed) {
       QuestionReplySignals.complete(
         messageId,
@@ -487,7 +497,7 @@ class InteractiveMessageStore {
       quote: source,
       interactive: audience == null && excludedAudience == null
           ? null
-          : InteractiveMessage(
+          : InteractiveMessage.card(
               revision: 0,
               title: text,
               body: '',
@@ -504,7 +514,7 @@ class InteractiveMessageStore {
     await db.rawUpdate(
       'UPDATE conversations SET message_count = message_count + 1, preview = ?, updated_at = ? WHERE id = ?',
       [
-        !notice.canView(MessageSender.localUser.id) ? '私密交互消息' : text,
+        !notice.canView(MessageSender.localUser.id) ? '私密互动消息' : text,
         notice.createdAt.microsecondsSinceEpoch,
         conversationId,
       ],

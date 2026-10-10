@@ -59,6 +59,12 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   final options = quickReplyOptionsByKey;
   final split = context.findAncestorStateOfType<PinnedMessageSplitState>();
   final allowSplit = split != null && split.supportsSplit;
+  final canCopy =
+      allowCopy &&
+      message.interactive == null &&
+      message.htmlGame == null &&
+      message.miniappShare == null &&
+      message.text.isNotEmpty;
   final visibleKeys = recentQuickReplyKeys(recent, 5);
   return showMessageMenuSheet(
     context,
@@ -120,7 +126,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
             ),
             message.htmlGame != null ? '分享' : '转发',
           ),
-        if (allowCopy && message.htmlGame == null && message.text.isNotEmpty)
+        if (canCopy)
           (
             const MessageActionResult(MessageAction.copy),
             CopyIcon(color: iconColor),
@@ -278,10 +284,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
                 MessagePrimaryActions(
                   allowQuote: allowQuote,
                   allowForward: allowForward,
-                  allowCopy:
-                      allowCopy &&
-                      message.htmlGame == null &&
-                      message.text.isNotEmpty,
+                  allowCopy: canCopy,
                   allowStar: allowStar,
                   starred: starred,
                   onAction: (action) => close(MessageActionResult(action)),

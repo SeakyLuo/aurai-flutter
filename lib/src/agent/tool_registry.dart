@@ -144,6 +144,12 @@ class ToolRegistry {
     if (name == _additionalTool?.definition.name) return;
     _loaded.remove(name);
     _retained.add(name);
+    // Reading a program exposes the corresponding action entry point too.
+    // Catalog/scope checks still decide whether that tool is available.
+    if (name == 'readHtmlProgram') {
+      _loaded.remove('submitHtmlProgramEvent');
+      _retained.add('submitHtmlProgramEvent');
+    }
   }
 
   AgentTool? find(String name) => !_inScope(name)

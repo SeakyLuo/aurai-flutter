@@ -34,7 +34,7 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
         : name == 'updateHtmlData'
         ? 'Update generic HTML message data without changing source or sending a new launcher. Requires messageId, expectedVersion, eventId and complete data object. For program messages data must include complete state, public view and privateViews; keep projections consistent and secret information only in privateViews. No reducer handler is required. This edits only the sent message instance, never the application template, source or another session. Transport bindings and reply controls are preserved. Gameplay events still use submitHtmlProgramEvent. Do not bypass the data tool by editing database or files. Stale versions fail; reread before reconciling.'
         : name == 'readHtmlProgram'
-        ? 'Read version, public state, authenticated private view/action cards; no source or other private views. Identical public objects/lists occur only in state._miniapp.own. Keep private content private. Use a current runtime snapshot or read before submitting events. Pending contextCompaction means gameplay committed but checkpoint failed; eligible initiator/creator/team members receive context.compact.retry arguments with expectedVersion:null,data:{}. Resolve the cause, then submit those exact arguments to resume only the checkpoint; never replay gameplay. Reading alone does not recover it.'
+        ? 'Read version, public state, authenticated private view/action cards; no source or other private views. Optional resourceKey reads only one declared reference section instead of gameplay state; use reference keys from own.references and returned section indexes. Page image resources are unavailable to AI; host references require the authenticated host view. Identical public objects/lists occur only in state._miniapp.own. Keep private content private. Use a current runtime snapshot or read before submitting events. Pending contextCompaction means gameplay committed but checkpoint failed; eligible initiator/creator/team members receive context.compact.retry arguments with expectedVersion:null,data:{}. Resolve the cause, then submit those exact arguments to resume only the checkpoint; never replay gameplay. Reading alone does not recover it.'
         : name == 'submitHtmlProgramEvent'
         ? 'Execute a role-checked program event without a WebView, following your private-view protocol. State and effects commit atomically; reducer errors/timeouts commit nothing. Use the current snapshot/read version. If own.eventGuards declares this action, copy it into data.eventGuard; a matching guard tolerates unrelated version changes. On conflict reread and reevaluate. Event retries reuse eventId and original arguments, only after the cause changes. context.compact runs after gameplay commit: checkpoint failure retains the previous window and exposes recovery via readHtmlProgram. Use only its exact context.compact.retry arguments; never replay committed gameplay. If blocked, report the original error and end the turn; no polling or unchanged retries. Use gameplay events, not updateHtmlMessage state overwrite. Return private skill results to the program, not public chat.'
         : name == 'readHtmlMessage'
@@ -55,6 +55,15 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
                 'Default false. Authors receive their own source and state automatically. For another author, true requests human approval to read source and internal state.',
           },
         'messageId': {'type': 'string'},
+        if (name == 'readHtmlProgram')
+          'resourceKey': {'type': 'string', 'minLength': 1},
+        if (name == 'readHtmlProgram')
+          'resourceOffset': {
+            'type': 'integer',
+            'minimum': 0,
+            'description':
+                'Archive pagination only; use the returned nextOffset. Each page has at most 20 records.',
+          },
         if (name == 'submitHtmlProgramEvent' || name == 'updateHtmlData') ...{
           'eventId': {'type': 'string', 'minLength': 1, 'maxLength': 100},
           'expectedVersion': {
@@ -135,10 +144,14 @@ class HtmlMessageUpdateTool implements AgentTool, RuntimeCapabilityAgentTool {
           ? await HtmlMessageSource.resolve(call.arguments, creating: false)
           : call.arguments;
       final output = await invoke(name, args);
-      final attachments = name == 'readHtmlProgram'
+      final attachments =
+          name == 'readHtmlProgram' &&
+              !call.arguments.containsKey('resourceKey')
           ? await miniappCanvasAttachments(output)
           : const <ToolAttachment>[];
-      if (name == 'readHtmlProgram') _deduplicateProgramState(output);
+      if (name == 'readHtmlProgram' &&
+          !call.arguments.containsKey('resourceKey'))
+        _deduplicateProgramState(output);
       return ToolResult(
         callId: call.id,
         toolName: name,

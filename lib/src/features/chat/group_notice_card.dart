@@ -36,16 +36,26 @@ class GroupNoticeCard extends StatelessWidget {
                 onTap: onOpen,
                 borderRadius: BorderRadius.circular(22),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 0, 10),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 0, 8),
                   child: Row(
                     children: [
                       Tooltip(
                         message: announcement ? '群公告' : '置顶消息',
-                        child: ConversationMenuIcon(
-                          type: announcement
-                              ? ConversationMenuIconType.announcement
-                              : ConversationMenuIconType.toTop,
-                          color: colors.onSurfaceVariant,
+                        child: SizedBox.square(
+                          dimension: 28,
+                          child: Center(
+                            child: SizedBox.square(
+                              dimension: 20,
+                              child: FittedBox(
+                                child: ConversationMenuIcon(
+                                  type: announcement
+                                      ? ConversationMenuIconType.announcement
+                                      : ConversationMenuIconType.toTop,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -100,7 +110,7 @@ class GroupNoticeCard extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 15,
+                                fontSize: 14,
                                 height: 1.4,
                                 color: colors.onSurface,
                               ),
@@ -114,9 +124,16 @@ class GroupNoticeCard extends StatelessWidget {
               ),
             ),
             IconButton(
+              constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+              padding: const EdgeInsets.all(10),
               tooltip: dismissLabel ?? (announcement ? '隐藏公告提示' : '关闭置顶提示'),
               onPressed: onDismiss,
-              icon: const QuestionIcon(type: QuestionIconType.close),
+              icon: const SizedBox.square(
+                dimension: 20,
+                child: FittedBox(
+                  child: QuestionIcon(type: QuestionIconType.close),
+                ),
+              ),
             ),
             const SizedBox(width: 4),
           ],

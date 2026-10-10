@@ -56,7 +56,11 @@ String? toolInlineDetail(
     'createScheduledTask' || 'updateScheduledTask' => request['title'],
     'sendConversationMessage' => _messagePreview(request),
     'sendGroupMessage' => _messagePreview(request['message'] as Map?),
-    'sendHtmlMessage' || 'sendInteractiveMessage' => request['title'],
+    'sendHtmlMessage' ||
+    'sendInteractiveMessage' ||
+    'sendQuestion' ||
+    'sendPoll' ||
+    'sendQuestionnaire' => request['title'],
     'inputUiText' => request['text'],
     'clickUiElement' => result['targetLabel'],
     'launchApp' => result['appName'],

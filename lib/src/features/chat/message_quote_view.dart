@@ -75,7 +75,7 @@ class MessageQuoteView extends StatelessWidget {
                                       ? '[问题] $question'
                                       : '[问题${index + 1}] $question${index == 1 && questions.length > 2 ? '…' : ''}',
                                   markdown: false,
-                                  maxLines: 1,
+                                  maxLines: questions.length == 1 ? 2 : 1,
                                   style: style,
                                 ),
                               )

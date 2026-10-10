@@ -3,7 +3,7 @@ import '../../domain/tool_models.dart';
 enum ToolLibraryGroup {
   conversations('会话与朋友'),
   groups('群聊管理'),
-  interactions('交互消息'),
+  interactions('互动消息'),
   miniapps('小程序'),
   tasks('任务与执行'),
   schedules('定时任务'),
@@ -31,7 +31,11 @@ enum ToolLibraryGroup {
       'compactContext' || 'hideThinking' => tasks,
       'sendQuickReply' ||
       'sendInteractiveMessage' ||
+      'sendQuestion' ||
+      'sendPoll' ||
+      'sendQuestionnaire' ||
       'readInteractiveMessage' ||
+      'setQuestionnairePaused' ||
       'updateInteractiveMessage' ||
       'clickInteractiveMessage' ||
       'retryInteractiveCallback' => interactions,

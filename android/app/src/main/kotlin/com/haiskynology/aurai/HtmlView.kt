@@ -14,6 +14,7 @@ import android.webkit.PermissionRequest
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -92,6 +93,8 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
             override fun onPermissionRequest(request: PermissionRequest) = request.deny()
         }
         web.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
+                MiniappAssetResources.response(webContext.assets, request)
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = true
             override fun onPageFinished(view: WebView, url: String) {
                 if (!disposed) { loaded = true; channel?.invokeMethod("ready", null); if (!attached) pause() }

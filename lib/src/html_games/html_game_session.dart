@@ -243,6 +243,20 @@ class HtmlGameSession extends ChangeNotifier {
         try {
           final args = (jsonDecode(call.arguments as String) as Map)
               .cast<String, Object?>();
+          if (args['operation'] == 'programResource') {
+            if (independent) throw StateError('请从原会话查看旅程记录');
+            final offset = args['resourceOffset'] as int;
+            if (offset < 0) throw ArgumentError('记录位置不能为负数');
+            return jsonEncode(
+              await store.readProgram(
+                game.conversationId,
+                game.messageId,
+                MessageSender.localUser.id,
+                resourceKey: args['resourceKey'] as String,
+                resourceOffset: offset,
+              ),
+            );
+          }
           if (args['operation'] == 'nextSession') {
             if (onNextSession == null) throw StateError('请从会话小程序开始下一局');
             await onNextSession!();

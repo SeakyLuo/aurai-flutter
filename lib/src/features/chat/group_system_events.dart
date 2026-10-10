@@ -5,6 +5,11 @@ extension GroupSystemEvents on ChatController {
       (message.messageMetadata?.participation['_programWakeMembers'] as List?)
           ?.cast<String>();
 
+  bool _noticeCanWake(AgentMessage message, String memberId) =>
+      message.canView(memberId) &&
+      (memberId != message.senderId ||
+          _programWakeMembers(message)?.contains(memberId) == true);
+
   List<String>? _noticeWakeMembers(AgentMessage message) {
     if (message.messageMetadata?.participation['_programWake'] == true) {
       return _programWakeMembers(message) ?? message.audience;
@@ -23,8 +28,7 @@ extension GroupSystemEvents on ChatController {
         [notice],
         {
           for (final id in _groupReplies.keys)
-            if (id != notice.senderId &&
-                notice.canView(id) &&
+            if (_noticeCanWake(notice, id) &&
                 recipients?.contains(id) != false &&
                 (!dispatcher.paused.contains(id) ||
                     notice.messageMetadata?.participation['_programWake'] ==
@@ -192,7 +196,7 @@ extension GroupSystemEvents on ChatController {
                 ? {
                     for (final notice in notices)
                       for (final id in _noticeWakeMembers(notice)!)
-                        if (id != notice.senderId && notice.canView(id)) id,
+                        if (_noticeCanWake(notice, id)) id,
                   }
                 : null,
           );

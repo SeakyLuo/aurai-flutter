@@ -47,8 +47,24 @@ extension _FailureRetry on _MessageItemState {
 
 extension _MessageItemActions on _MessageItemState {
   void _quote({String? selectedText}) {
-    final source =
-        _quoteSourceKey.currentContext!.findRenderObject()! as RenderBox;
+    final heading = context
+        .findAncestorWidgetOfExactType<GroupMessageHeading>();
+    RenderBox sourceBox() {
+      RenderBox? row;
+      if (heading != null) {
+        context.visitAncestorElements((element) {
+          if (element.widget is GroupMessageHeading) {
+            row = element.findRenderObject()! as RenderBox;
+            return false;
+          }
+          return true;
+        });
+      }
+      return row ??
+          _quoteSourceKey.currentContext!.findRenderObject()! as RenderBox;
+    }
+
+    final source = sourceBox();
     widget.onQuote!(
       message,
       selectedText: selectedText,
@@ -56,23 +72,40 @@ extension _MessageItemActions on _MessageItemState {
         createdAt: message.createdAt,
         rect: source.localToGlobal(Offset.zero) & source.size,
         sourceRect: () {
-          final current =
-              _quoteSourceKey.currentContext!.findRenderObject()! as RenderBox;
+          final current = sourceBox();
           return current.localToGlobal(Offset.zero) & current.size;
         },
-        builder: (maxHeight) => MessageItem(
-          message: message,
-          onEdit: null,
-          readOnly: true,
-          previewMaxHeight: maxHeight,
-          groupBubble: widget.groupBubble,
-          replyPart: widget.replyPart,
-          htmlView: widget.htmlView,
-          onInteractiveClick: widget.onInteractiveClick,
-          mentionMembers: widget.mentionMembers,
-          interactiveMembers: widget.interactiveMembers,
-          availableSources: widget.availableSources,
-        ),
+        builder: (maxHeight) {
+          final preview = MessageItem(
+            message: message,
+            onEdit: null,
+            readOnly: true,
+            previewMaxHeight: heading == null
+                ? maxHeight
+                : (maxHeight - 24).clamp(24.0, double.infinity),
+            showSenderAvatar: widget.showSenderAvatar,
+            groupBubble: widget.groupBubble,
+            replyPart: widget.replyPart,
+            htmlView: widget.htmlView,
+            onInteractiveClick: widget.onInteractiveClick,
+            mentionMembers: widget.mentionMembers,
+            interactiveMembers: widget.interactiveMembers,
+            availableSources: widget.availableSources,
+          );
+          return heading == null
+              ? preview
+              : IgnorePointer(
+                  child: GroupMessageHeading(
+                    sender: heading.sender,
+                    showName: heading.showName,
+                    showAvatar: heading.showAvatar,
+                    groupId: heading.groupId,
+                    trailingInset: heading.trailingInset,
+                    onOpenProfile: heading.onOpenProfile,
+                    child: preview,
+                  ),
+                );
+        },
       ),
     );
   }

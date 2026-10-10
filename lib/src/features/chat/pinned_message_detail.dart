@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'attachment_action_icon.dart';
 import 'glass_surface.dart';
 import 'settings_appearance.dart';
-import 'question_sheet.dart';
+import 'app_sheet_body.dart';
 import 'question_icon.dart';
 
 class PinnedMessageDetail extends StatelessWidget {
@@ -22,75 +22,92 @@ class PinnedMessageDetail extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) => sheet
-      ? QuestionSheetLayout(
-          title: title,
-          heading: Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: onMore == null
-                        ? RoundAction.defaultSize + 12
-                        : RoundAction.defaultSize * 2 + 13,
-                  ),
-                  child: Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      ? ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight:
+                MediaQuery.sizeOf(context).height -
+                MediaQuery.paddingOf(context).top -
+                MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: BackdropGroup(
+            child: AppSheetBody(
+              shrinkWrap: true,
+              header: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    SettingsGlassAction(
-                      label: '关闭',
-                      icon: Icons.close_rounded,
-                      iconWidget: const QuestionIcon(
-                        type: QuestionIconType.close,
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: onMore == null
+                            ? RoundAction.defaultSize + 12
+                            : RoundAction.defaultSize * 2 + 13,
                       ),
-                      onPressed: onBack,
+                      child: Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                    SettingsGlassActionSurface(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          RoundAction(
-                            label: '定位',
-                            icon: Icons.my_location,
-                            iconWidget: const AttachmentActionIcon(
-                              type: AttachmentActionIconType.locate,
-                            ),
-                            onPressed: onLocate,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        SettingsGlassAction(
+                          label: '关闭',
+                          icon: Icons.close_rounded,
+                          iconWidget: const QuestionIcon(
+                            type: QuestionIconType.close,
                           ),
-                          if (onMore != null) ...[
-                            const SizedBox(
-                              height: 20,
-                              child: VerticalDivider(width: 1),
-                            ),
-                            Builder(
-                              builder: (anchor) => RoundAction(
-                                label: '更多',
-                                icon: Icons.more_vert_rounded,
-                                onPressed: () => onMore!(anchor),
+                          onPressed: onBack,
+                        ),
+                        SettingsGlassActionSurface(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              RoundAction(
+                                label: '定位',
+                                icon: Icons.my_location,
+                                iconWidget: const AttachmentActionIcon(
+                                  type: AttachmentActionIconType.locate,
+                                ),
+                                onPressed: onLocate,
                               ),
-                            ),
-                          ],
-                        ],
-                      ),
+                              if (onMore != null) ...[
+                                const SizedBox(
+                                  height: 20,
+                                  child: VerticalDivider(width: 1),
+                                ),
+                                Builder(
+                                  builder: (anchor) => RoundAction(
+                                    label: '更多',
+                                    icon: Icons.more_vert_rounded,
+                                    onPressed: () => onMore!(anchor),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
+              child: ListView(
+                shrinkWrap: true,
+                padding: EdgeInsets.only(
+                  top: 68,
+                  bottom: MediaQuery.paddingOf(context).bottom + 12,
+                ),
+                children: [child],
+              ),
             ),
           ),
-          child: child,
         )
       : Scaffold(
           extendBodyBehindAppBar: true,

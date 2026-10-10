@@ -1,8 +1,10 @@
-import 'app_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'message_action.dart';
-import 'app_sheet_surface.dart';
+import 'glass_surface.dart';
+import '../../app/global_ui.dart';
 import 'chat_viewport.dart';
+import 'chat_header.dart';
+import 'group_message_heading.dart';
 
 Future<MessageMenuResult?> showMessageMenuSheet(
   BuildContext context, {
@@ -13,15 +15,18 @@ Future<MessageMenuResult?> showMessageMenuSheet(
   const color = Colors.transparent;
   final shape = Theme.of(context).bottomSheetTheme.shape;
   if (!preserveSelection) {
-    return showAppBottomSheet<MessageMenuResult>(
+    // The menu supplies its glass surface; do not add an opaque sheet beneath it.
+    return showModalBottomSheet<MessageMenuResult>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: false,
       elevation: 0,
       backgroundColor: color,
-      barrierColor: Colors.black.withValues(alpha: .24),
+      barrierColor: Colors.transparent,
       shape: shape,
+      // GlassSurface owns clipping; a parent saveLayer hides the backdrop.
+      clipBehavior: Clip.none,
       builder: (sheetContext) => _MessageMenuSurface(
         messageContext: context,
         child: builder(
@@ -60,6 +65,7 @@ class _SelectionMessageMenuRoute
          elevation: 0,
          requestFocus: false,
          isDismissible: true,
+         clipBehavior: Clip.none,
        );
 
   // Dismiss the full menu before adjusting the retained text selection.
@@ -100,17 +106,32 @@ class _MessageMenuSurfaceState extends State<_MessageMenuSurface> {
     _viewport?.reserveMessageMenuSpace(height);
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted || !widget.messageContext.mounted) return;
-    final box = widget.messageContext.findRenderObject()! as RenderBox;
+    var box = widget.messageContext.findRenderObject()! as RenderBox;
+    widget.messageContext.visitAncestorElements((element) {
+      if (element.widget is GroupMessageHeading) {
+        box = element.findRenderObject()! as RenderBox;
+        return false;
+      }
+      return true;
+    });
     final top = box.localToGlobal(Offset.zero).dy;
     final visibleBottom = MediaQuery.sizeOf(context).height - height - 12;
-    final safeTop =
-        MediaQuery.paddingOf(widget.messageContext).top + kToolbarHeight + 12;
-    final delta = (top + box.size.height - visibleBottom).clamp(
-      0.0,
-      (top - safeTop).clamp(0.0, double.infinity),
+    final viewport = _viewport;
+    final safeTop = viewport == null
+        ? MediaQuery.paddingOf(widget.messageContext).top +
+              ChatHeader.toolbarHeight +
+              12
+        : (viewport.context.findRenderObject()! as RenderBox)
+                  .localToGlobal(Offset.zero)
+                  .dy +
+              viewport.widget.padding.top;
+    final lowestTop = (visibleBottom - box.size.height).clamp(
+      safeTop,
+      double.infinity,
     );
+    final delta = top - top.clamp(safeTop, lowestTop);
     final scroll = Scrollable.maybeOf(widget.messageContext);
-    if (scroll != null && delta > 0) {
+    if (scroll != null && delta != 0) {
       await scroll.position.animateTo(
         (scroll.position.pixels + delta).clamp(
           scroll.position.minScrollExtent,
@@ -134,7 +155,12 @@ class _MessageMenuSurfaceState extends State<_MessageMenuSurface> {
 
   @override
   Widget build(BuildContext context) => BackdropGroup(
-    child: AppSheetSurface(
+    child: GlassSurface(
+      borderRadius: GlobalUI.bottomSheetBorderRadius,
+      shadowOpacity: 2.5,
+      gradientColors: Theme.of(context).brightness == Brightness.light
+          ? const [Color(0xcceeeeee), Color(0xb3e4e4e4), Color(0xccececec)]
+          : const [Color(0xcc383838), Color(0xb3282828), Color(0xcc303030)],
       child: SafeArea(
         top: false,
         child: Column(

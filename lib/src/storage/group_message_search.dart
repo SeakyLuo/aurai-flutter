@@ -80,12 +80,11 @@ class GroupMessageSearch {
         ${query.isEmpty ? '' : '''AND (instr(lower(text), ?) > 0
           OR EXISTS (SELECT 1 FROM attachments a WHERE a.message_id = messages.id
             AND instr(lower(coalesce(a.display_name, '')), ?) > 0)
-          OR (interactive_json IS NOT NULL AND (
-            instr(lower(json_extract(interactive_json, '\$.title')), ?) > 0 OR
-            instr(lower(json_extract(interactive_json, '\$.body')), ?) > 0)))'''}''',
+          OR EXISTS (SELECT 1 FROM json_tree(interactive_json, '\$.content')
+            WHERE key = 'data' AND type = 'text' AND instr(lower(atom), ?) > 0))'''}''',
       whereArgs: [
         conversationId,
-        if (query.isNotEmpty) ...List.filled(4, query.toLowerCase()),
+        if (query.isNotEmpty) ...List.filled(3, query.toLowerCase()),
       ],
       orderBy: 'created_at DESC, id DESC',
       limit: pageSize,

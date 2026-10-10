@@ -78,14 +78,11 @@ class _TaskProgressListState extends State<TaskProgressList> {
                 borderRadius: BorderRadius.circular(22),
                 onTap: _showSteps,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
                   child: Row(
                     children: [
                       SizedBox.square(
-                        dimension: 34,
+                        dimension: 28,
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
@@ -106,7 +103,7 @@ class _TaskProgressListState extends State<TaskProgressList> {
                               ),
                             ),
                             SizedBox.square(
-                              dimension: 20,
+                              dimension: 18,
                               child: FittedBox(
                                 child: SettingsIcon(
                                   type: SettingsIconType.taskList,
@@ -123,31 +120,16 @@ class _TaskProgressListState extends State<TaskProgressList> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    widget.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      height: 1.3,
-                                      fontWeight: FontWeight.w500,
-                                      color: accent,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  count,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    height: 1.3,
-                                    color: colors.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              widget.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.3,
+                                fontWeight: FontWeight.w500,
+                                color: accent,
+                              ),
                             ),
                             const SizedBox(height: 3),
                             Text(
@@ -155,12 +137,24 @@ class _TaskProgressListState extends State<TaskProgressList> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 15,
+                                fontSize: 14,
                                 height: 1.4,
                                 color: colors.onSurface,
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                      SizedBox(
+                        width: 40,
+                        child: Text(
+                          count,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.3,
+                            color: colors.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     ],

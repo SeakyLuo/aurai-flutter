@@ -41,6 +41,7 @@ class MessageComposer extends StatelessWidget {
   Widget build(BuildContext context) => SafeArea(
     top: false,
     bottom: !embedded,
+    maintainBottomViewPadding: ModalRoute.isCurrentOf(context) == false,
     child: Center(
       heightFactor: 1,
       child: ConstrainedBox(

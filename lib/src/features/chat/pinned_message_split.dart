@@ -208,7 +208,8 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
       final interactiveReference =
           !pinned &&
           (message.interactive?.isQuestion == true ||
-              message.interactive?.isVote == true);
+              message.interactive?.isVote == true ||
+              message.interactive?.isQuestionnaire == true);
       if (opening && (!supportsSplit || interactiveReference)) {
         await showAppBottomSheet<void>(
           context: context,

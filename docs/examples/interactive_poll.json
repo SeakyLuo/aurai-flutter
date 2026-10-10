@@ -1,0 +1,41 @@
+{
+  "interaction": {"allowChange": true},
+  "participation": {"visibility": "private", "summaryVisibilityTiming": "immediate"},
+  "content": {
+    "type": "Column", "spacing": 12, "state": {"editing": false},
+    "children": [
+      {"type": "Text", "data": "周末去哪里？", "style": "titleMedium"},
+      {"type": "Text", "data": "结束前可以改选，由发起人结束投票。"},
+      {
+        "type": "Visibility",
+        "visible": {"op": "and", "args": [{"ref": "host.canSubmit"}, {"op": "or", "args": [{"op": "not", "args": [{"ref": "host.submitted"}]}, {"ref": "local.editing"}]}]},
+        "child": {"type": "Column", "spacing": 12, "children": [
+          {"type": "ChoiceGroup", "key": "destination", "label": "选择目的地", "required": true,
+           "items": [{"value": "park", "child": {"type": "Text", "data": "公园"}}, {"value": "museum", "child": {"type": "Text", "data": "博物馆"}}]},
+          {"type": "FilledButton", "child": {"type": "Text", "data": "确认投票"},
+           "onPressed": {"id": "submit", "action": "submit", "repeatable": true, "input": "json"}}
+        ]}
+      },
+      {"type": "Visibility", "visible": {"ref": "host.submitted"},
+       "child": {"type": "ForEach", "items": {"ref": "host.answers"},
+         "template": {"type": "Text", "data": {"op": "concat", "args": ["我的选择：", {"ref": "item.answer"}]}}}},
+      {"type": "Visibility", "visible": {"op": "and", "args": [{"ref": "host.canEdit"}, {"op": "not", "args": [{"ref": "local.editing"}]}]},
+       "child": {"type": "TextButton", "child": {"type": "Text", "data": "改选"}, "onPressed": {"setState": {"editing": true}}}},
+      {"type": "Visibility", "visible": {"ref": "local.editing"},
+       "child": {"type": "TextButton", "child": {"type": "Text", "data": "取消改选"}, "onPressed": {"setState": {"editing": false}}}},
+      {
+        "type": "Visibility", "visible": {"ref": "host.summaryVisible"},
+        "child": {"type": "Column", "spacing": 12, "children": [
+          {"type": "Text", "data": {"op": "concat", "args": ["已参与：", {"ref": "host.submittedCount"}, " 人"]}},
+          {"type": "ForEach", "items": {"ref": "host.metrics"},
+           "template": {"type": "ForEach", "items": {"ref": "item.options"},
+             "template": {"type": "Padding", "padding": 8, "child": {"type": "Column", "spacing": 8, "children": [
+               {"type": "Text", "data": {"op": "concat", "args": [{"ref": "item.label"}, "：", {"ref": "item.count"}, " 票"]}},
+               {"type": "LinearProgressIndicator", "value": {"ref": "item.fraction"}}
+             ]}}}}
+        ]}
+      },
+      {"type": "Visibility", "visible": {"ref": "host.closed"}, "child": {"type": "Text", "data": "投票已结束"}}
+    ]
+  }
+}

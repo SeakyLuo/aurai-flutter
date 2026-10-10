@@ -4,6 +4,7 @@ import 'dart:convert';
 abstract final class MiniappCapabilityProtocol {
   static const operations = {
     'messages.send',
+    'messages.setHost',
     'messages.pin',
     'messages.mark',
     'messages.intercept',
@@ -70,6 +71,8 @@ class MiniappCapabilityCalls {
       switch (name) {
         case 'messages.send':
           messages.add(args);
+        case 'messages.setHost':
+          hostSenderId = args['senderId'] as String;
         case 'messages.pin':
           if (args.isNotEmpty) throw ArgumentError('messages.pin 只置顶当前实例，无需参数');
           pinMessage = true;
@@ -125,4 +128,5 @@ class MiniappCapabilityCalls {
   bool timerChanged = false;
   int? wakeAt;
   String? contextInstructions;
+  String? hostSenderId;
 }

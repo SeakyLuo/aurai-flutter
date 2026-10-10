@@ -134,8 +134,12 @@ class MiniappProgramStore {
     Object? data,
     String? cardId,
     String? reason,
+    bool collectionPaused = false,
     int? expectedVersion,
   }) async {
+    if (cardId == null && data is Map && data.containsKey('collectionEvent')) {
+      throw ArgumentError('collectionEvent 由原生问卷生成，不能通过小程序事件伪造');
+    }
     final rows = await txn.query(
       'html_games',
       where:
@@ -176,6 +180,7 @@ class MiniappProgramStore {
     final bindings = (runtime['bindings'] as Map).cast<String, Object?>();
     Map<String, Object?>? sourceCard;
     InteractiveMessage? anonymousCard;
+    InteractiveMessage? questionnaire;
     if (cardId != null) {
       final sources = await txn.query(
         'messages',
@@ -188,6 +193,14 @@ class MiniappProgramStore {
         MiniappProgram.decode(sourceCard['interactive_json']),
       );
       if (card.anonymous) anonymousCard = card;
+      if (card.isQuestionnaire) questionnaire = card;
+    }
+    if (collectionPaused &&
+        (questionnaire == null ||
+            !questionnaire.collectionPaused ||
+            questionnaire.completed ||
+            sourceCard!['sender_id'] != actorId)) {
+      throw StateError('只有问卷发起人可以通知暂停收集');
     }
     final delegatedPlayer = anonymousCard == null && data is Map
         ? data['submitForPlayerId']
@@ -198,6 +211,7 @@ class MiniappProgramStore {
       'actorId': actorId,
       'action': action,
       'data': data,
+      if (collectionPaused) 'collectionEvent': 'paused',
       if (expectedVersion != null) 'expectedVersion': expectedVersion,
     });
     final duplicates = await txn.query(
@@ -272,14 +286,15 @@ class MiniappProgramStore {
           return binding['action'] == action &&
               (binding['actors'] as List).contains(actorId);
         })) {
-      throw StateError('请操作对应的交互消息，提交会同时更新消息和小程序');
+      throw StateError('请操作对应的互动消息，提交会同时更新消息和小程序');
     }
     String? continuationSenderId;
     if (cardId != null) {
       final binding = bindings[cardId] as Map?;
       if (binding == null ||
           binding['action'] != action ||
-          !(binding['actors'] as List).contains(actorId)) {
+          (!collectionPaused &&
+              !(binding['actors'] as List).contains(actorId))) {
         throw StateError('这张行动卡已结束或不属于你');
       }
       continuationSenderId = sourceCard!['sender_id'] as String;
@@ -288,6 +303,10 @@ class MiniappProgramStore {
           : {
               'context': binding['data'],
               'value': data,
+              if (collectionPaused)
+                'collectionEvent': 'paused'
+              else if (questionnaire?.completed == true)
+                'collectionEvent': 'completed',
               if (reason != null) 'reason': reason,
             };
     }
@@ -300,7 +319,7 @@ class MiniappProgramStore {
     );
     // A program may require a published speech before accepting its end card.
     final submittingActor = delegatedPlayer as String? ?? actorId;
-    final speechBinding = anonymousCard != null
+    final speechBinding = anonymousCard != null || collectionPaused
         ? null
         : bindings.values
               .cast<Map>()
@@ -428,6 +447,17 @@ class MiniappProgramStore {
         .toSet();
     if (calls.messageRoutes.keys.any((id) => !agents.contains(id)))
       throw ArgumentError('消息拦截只能指定当前群内的 AI');
+    final hostSenderId =
+        calls.hostSenderId ?? runtime['hostSenderId'] as String?;
+    if (calls.hostSenderId != null) {
+      if (actorId != messages.single['sender_id'] &&
+          actorId != MessageSender.localUser.id) {
+        throw StateError('只有小程序创建人或用户可以指定主持人');
+      }
+      if (!agents.contains(calls.hostSenderId)) {
+        throw ArgumentError('主持人必须是当前群内的 AI');
+      }
+    }
     final replyChange = await capabilities.replies.apply(
       txn,
       conversationId: conversationId,
@@ -472,6 +502,7 @@ class MiniappProgramStore {
         actorId: actorId,
         memberIds: memberIds,
         continuationSenderId: continuationSenderId,
+        hostSenderId: hostSenderId,
         anonymousEvent: anonymousCard != null,
         agents: agents,
         senders: senders,
@@ -493,6 +524,7 @@ class MiniappProgramStore {
       'privateViews': views,
       'bindings': bindings,
       'messageRoutes': calls.messageRoutes,
+      if (hostSenderId != null) 'hostSenderId': hostSenderId,
       'wakeAt': wakeAt,
       'replyBefore': replyBefore,
       'conversationId': conversationId,

@@ -105,6 +105,13 @@ class InteractionContent extends StatelessWidget {
               .firstOrNull
         : null;
     final showSubmitted = selectedButton != null;
+    final showCancelVote =
+        !question &&
+        submitted &&
+        choosing &&
+        eligible &&
+        !readOnly &&
+        onCancelVote != null;
     final status = view['closed'] == true || view['phase'] == 'closed'
         ? (question && answer != null ? '已回答' : '已结束')
         : view['completed'] == true
@@ -123,6 +130,14 @@ class InteractionContent extends StatelessWidget {
           view['submittedCount'] as int,
           view['eligibleCount'] as int?,
         ),
+      if (!question && shared)
+        !eligible
+            ? '不需要你参与'
+            : submitted
+            ? '你已参与'
+            : collecting
+            ? '你还没有参与'
+            : '你未参与本轮',
     ].join(' · ');
     final actions = participantButtons
         .where((button) => !question || answer == null)
@@ -150,6 +165,7 @@ class InteractionContent extends StatelessWidget {
     Widget selectionView(Map<String, Object?> button) =>
         InteractiveSelectionView(
           fullSheet: fullSheet,
+          showSelectionIndicator: eligible,
           key: ValueKey((button['id'], view['round'])),
           draftSelection: draftOwner == null || !editingSelection
               ? null
@@ -271,15 +287,22 @@ class InteractionContent extends StatelessWidget {
               button['selection'] != null,
         ))
           Padding(
-            padding: EdgeInsets.only(bottom: question ? 0 : 8),
+            padding: EdgeInsets.only(
+              top:
+                  !question &&
+                      !editingSelection &&
+                      participationSummary.isNotEmpty
+                  ? 12
+                  : 0,
+              bottom:
+                  !question &&
+                      (actions.isNotEmpty || showSubmitted || showCancelVote)
+                  ? 8
+                  : 0,
+            ),
             child: selectionView(button),
           ),
-        if (!question &&
-            submitted &&
-            choosing &&
-            eligible &&
-            !readOnly &&
-            onCancelVote != null) ...[
+        if (showCancelVote) ...[
           const SizedBox(height: 12),
           InteractiveMessageButton(
             button: const {'label': '取消投票'},

@@ -34,6 +34,10 @@ const htmlGameLifecycleScript = r'''
       const result=await appData({operation:'retryEvent',eventId});return result.events[0];
     },
     readData(name){return appData({operation:'read',name})},
+    async readProgramResource(resourceKey,resourceOffset=0){
+      const result=await appData({operation:'programResource',resourceKey,resourceOffset});
+      return result.resource;
+    },
     startNextSession(){
       if(!navigator.userActivation.isActive)return Promise.reject(new Error('Start a session from a user action'));
       return appData({operation:'nextSession'});

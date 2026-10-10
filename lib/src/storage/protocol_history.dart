@@ -4,6 +4,8 @@ import 'package:sqflite/sqflite.dart';
 
 import '../domain/model_provider.dart';
 import '../domain/model_failure.dart';
+import 'miniapp_protocol_history.dart';
+import 'task_experience_history.dart';
 
 List<Map<String, Object?>>? _safeProtocolItems(
   Iterable<Map<String, Object?>> turns,
@@ -203,8 +205,17 @@ Future<Map<String, List<Map<String, Object?>>>> loadProtocolHistory(
   Database database,
   String conversationId,
   List<Map<String, Object?>> messages,
-  ModelConfig config,
-) async {
+  ModelConfig config, {
+  String? memoryOwnerId,
+}) async {
+  final experiences = memoryOwnerId == null
+      ? <String, List<Map<String, Object?>>>{}
+      : await loadTaskExperienceHistory(
+          database,
+          conversationId,
+          memoryOwnerId,
+          messages,
+        );
   final selection =
       'SELECT id FROM agent_runs WHERE parent_run_id IS NULL AND conversation_id = ? '
       "AND provider = ? AND model = ? AND status IN ('completed', 'failed', 'interrupted') "
@@ -218,18 +229,21 @@ Future<Map<String, List<Map<String, Object?>>>> loadProtocolHistory(
   ];
   final rows = await database.query(
     'model_turns',
-    where: 'run_id IN ($selection)',
-    whereArgs: args,
+    where:
+        'run_id IN ($selection) AND run_id NOT IN (SELECT value FROM json_each(?))',
+    whereArgs: [...args, jsonEncode(experiences.keys.toList())],
     orderBy: 'ordinal',
   );
   final turns = <String, List<Map<String, Object?>>>{};
   for (final row in rows) {
     turns.putIfAbsent(row['run_id']! as String, () => []).add(row);
   }
-  final inputs = <String, List<Map<String, Object?>>>{};
+  final inputs = <String, List<Map<String, Object?>>>{...experiences};
   for (final entry in turns.entries) {
     final safeItems = _safeProtocolItems(entry.value);
-    if (safeItems != null) inputs[entry.key] = safeItems;
+    if (safeItems != null) {
+      inputs[entry.key] = miniappProtocolHistory(safeItems);
+    }
   }
   final replay = <String, List<Map<String, Object?>>>{};
   final attached = <String>{};
