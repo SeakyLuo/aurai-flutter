@@ -1,4 +1,4 @@
-"""Bundle local card tables and their authoritative, private-hand reducers."""
+"""Bundle local tabletop games and their authoritative private-state reducers."""
 from pathlib import Path
 import hashlib
 import json
@@ -6,6 +6,12 @@ import json
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'miniapps/card-games'
 GAMES = [
+    ('battleship', '海战棋', '藏好舰队，锁定目标',
+     '经典双人海战，随机布舰与雷达射击。本地 AI 只根据命中记录寻找舰船。', ['≈', '⌖', '≈']),
+    ('junqi', '军棋', '翻开战局，步步为营',
+     '双人军棋翻棋，支持铁路、行营、工兵排雷与本地 AI。', ['兵', '军旗', '营']),
+    ('azul', '花砖物语', '将每一块颜色，拼成好风景',
+     '双人经典彩墙玩法，与本地 AI 取砖、铺墙，争取连线与花色奖励。', ['✦', '◆', '✿']),
     ('doudizhu', '斗地主', '一副好牌，一场默契',
      '三人经典叫分，与两位本地 AI 较量。支持提示、农民配合与本局积分。', ['♣', 'A', '♦']),
     ('uno', 'UNO', '下一张，改变牌局',

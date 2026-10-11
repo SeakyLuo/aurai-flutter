@@ -1,0 +1,15 @@
+.battleship-root{display:flex;flex-direction:column;gap:16px}
+.sea-panel{padding:18px 14px 14px;border-radius:24px;background:#102e40;color:#e6f4f3;border:1px solid #365d6b;overflow:hidden}
+.sea-panel h2{font-size:21px;line-height:1.4;margin:8px 0 12px}.sea-panel h3{font-size:15px;font-weight:500;margin:0 0 12px}
+.sea-eyebrow{font-size:12px;letter-spacing:2px;color:#89c4c8}.sea-caption{font-size:13px;color:#bbd3d8;margin:8px 0 16px;line-height:1.5}
+.sea-grid{display:grid;grid-template-columns:18px repeat(10,minmax(0,1fr));gap:3px;max-width:480px;margin:auto}
+.sea-axis{display:grid;place-items:center;color:#89adb6;font-size:10px;min-height:18px}
+.sea-cell{appearance:none;display:grid;place-items:center;aspect-ratio:1;min-width:0;padding:0;border:1px solid #345364;border-radius:4px;background:#193b4c;color:#b5d4df;font:20px/1 sans-serif;touch-action:manipulation}
+button.sea-cell{cursor:crosshair}button.sea-cell:disabled{cursor:default;opacity:1}button.sea-cell:enabled:hover{background:#326273;border-color:#91d4d0}button.sea-cell:focus-visible{outline:2px solid #f1d29b;outline-offset:1px}
+.sea-cell.sea-ship{background:#74abae;border-color:#a6d2d0;color:#102e40}.sea-cell.sea-shot-1{background:#153344;color:#b6d4da}.sea-cell.sea-shot-2{color:#ffd2a9;background:#79493e;border-color:#c98662}.sea-cell.sea-shot-3{color:#fff2d6;background:#b36748;border-color:#e8ac74}
+.sea-legend{display:flex;justify-content:center;gap:20px;margin-top:12px;font-size:11px;color:#b8ced4}.sea-legend span:nth-child(2){color:#ffd2a9}.sea-legend span:nth-child(3){color:#e8ac74}
+.sea-fleet-status{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--aurai-muted);flex-wrap:wrap}.sea-actions{display:flex;gap:10px}.sea-actions>button{flex:1}.sea-home{background:#142f3b}
+#cardGame.battleship .card-cover{background:radial-gradient(circle at 50% 80%,#447b81,#102e40);position:relative}
+#cardGame.battleship .card-cover span{width:44px;height:22px;border-radius:6px 18px 18px 6px;background:#bdd7d5;color:transparent;border:0;transform:rotate(-30deg);box-shadow:0 9px 0 -7px #ffffff50}
+#cardGame.battleship .card-cover span:nth-child(2){width:75px;height:30px;transform:translateY(-15px) rotate(-30deg)}
+@media(max-width:360px){.sea-panel{padding:14px 8px}.sea-grid{gap:2px;grid-template-columns:14px repeat(10,minmax(0,1fr))}.sea-cell{font-size:16px}.sea-legend{gap:12px}}

@@ -30,7 +30,7 @@ function render(){
   $('cardStatus').textContent=setup?'本地 AI':s.phase==='finished'?'本局结束':`第 ${s.game} 局`;
   $('cardRules').textContent=s.rules||'{{RULES_TEXT}}';
   $('cardStart').disabled=busy||!owner;
-  $('cardSetupHint').textContent=host()?owner?'无需联网，也不用配置模型':'等待玩家开始牌局':'从小程序库打开即可开始';
+  $('cardSetupHint').textContent=host()?owner?'无需联网，也不用配置模型':'等待玩家开始对局':'从小程序库打开即可开始';
   if(!setup){
     $('cardPlayers').replaceChildren(...s.players.map((p,i)=>{
       const node=el('div','',`card-player${s.phase==='playing'&&s.turn===i?' active':''}`);

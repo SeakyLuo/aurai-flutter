@@ -15,7 +15,7 @@ if(e.action==='configure'){
   notify(person(s.players[0])+'开始了'+TITLE+'，与本地 AI 对局');
 }else{
   require(s.phase==='playing'||s.phase==='finished','请先开始对局');
-  require(d.game===s.game&&d.ply===s.ply,'牌桌已变化，请基于当前牌桌操作');
+  require(d.game===s.game&&d.ply===s.ply,'对局已变化，请基于当前状态操作');
   var was=s.phase;
   if(e.action==='rematch'){
     require(s.phase==='finished','本局尚未结束');start(s.game+1);
@@ -35,8 +35,8 @@ if(e.action==='configure'){
     }else require(e.action!=='cardAi','请通过对局引擎继续');
     Cards.apply(s,seat,action,data);s.ply++;
     if(s.phase==='finished'&&was!=='finished'){
-      var winners=GAME==='scout'?s.winners:[s.winner];
-      notify(winners.map(function(i){return person(s.players[i]);}).join('、')+'**获胜** · '+TITLE+(GAME==='doudizhu'?' · '+s.result:''));
+      var winners=s.winners|| (s.winner===null?[]:[s.winner]);
+      notify((winners.length?winners.map(function(i){return person(s.players[i]);}).join('、')+'**获胜**':'**和局**')+' · '+TITLE+(GAME==='doudizhu'?' · '+s.result:''));
     }
   }
 }

@@ -37,6 +37,9 @@ class BoardGameService {
       'builtin.doudizhu',
       'builtin.uno',
       'builtin.scout',
+      'builtin.battleship',
+      'builtin.junqi',
+      'builtin.azul',
     ].contains(rows.isEmpty ? id : rows.single['source_id']);
   }
 
@@ -125,6 +128,9 @@ class BoardGameService {
           'doudizhu',
           'uno',
           'scout',
+          'battleship',
+          'junqi',
+          'azul',
         ].contains(current.state['gameType']);
         if (cardGame
             ? action != 'cardAi'

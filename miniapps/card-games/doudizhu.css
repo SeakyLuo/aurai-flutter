@@ -14,3 +14,24 @@
 .ddz-controls{display:flex;gap:8px;margin-top:6px}.ddz-action{flex:1;border:0;border-radius:24px;background:#e9e1d3;color:#655342;min-height:40px;font:inherit;font-size:14px;cursor:pointer}.ddz-action.primary{background:linear-gradient(110deg,#bf7951,#a85c42);color:white}.ddz-action:disabled{opacity:.38;cursor:default}
 @media(prefers-color-scheme:dark){.ddz-root{--ddz-ink:#eee2cf}.ddz-desk{background:#302b23;border-color:#4b4031;box-shadow:inset 0 0 30px #1a151533}.ddz-meta,.ddz-last-label,.ddz-bids,.ddz-scores{color:#b9a88e}.ddz-role{color:#d4ab83}.ddz-action{background:#3d352b;color:#dcc8af}.ddz-action.primary{color:white}}
 @media(prefers-reduced-motion:reduce){.ddz-pick{transition:none}}
+/* Keep the table spatial: opponents on either side, own hand along the bottom. */
+#cardGame.doudizhu{max-width:1200px}.doudizhu #cardPlayers{display:none}
+.ddz-root{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;isolation:isolate;background:radial-gradient(ellipse at 50% 30%,#f7f1e5,#e9dfca);border:1px solid #d8c9ad;border-radius:24px;padding:14px}
+.ddz-desk{grid-column:1/-1;display:grid;grid-template-columns:70px minmax(0,1fr) 70px;grid-template-rows:auto minmax(170px,1fr);gap:12px 4px;background:none;border:0;border-radius:0;padding:0;box-shadow:none}
+.ddz-meta{grid-column:1/-1;grid-row:1;justify-content:center;gap:16px}.ddz-bottom{order:-1}
+.ddz-current{grid-column:2;grid-row:2;min-width:0;min-height:190px;gap:10px}
+.ddz-player{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;align-self:start;font-size:12px;text-align:center;color:#786954}
+.ddz-left{grid-column:1;grid-row:2}.ddz-right{grid-column:3;grid-row:2}
+.ddz-avatar{display:grid;place-items:center;width:44px;height:52px;border-radius:12px;background:linear-gradient(145deg,#ad7653,#72513b);border:2px solid #fff9;color:#fff3d5;font:600 22px Georgia,serif;position:relative}
+.ddz-player.active .ddz-avatar:after{content:'';position:absolute;inset:-5px;border:1.5px solid var(--aurai-highlight-text);border-radius:16px;animation:card-pulse 1.7s ease-in-out infinite}
+.ddz-player-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}.ddz-player.active .ddz-player-name{color:var(--aurai-highlight-text)}
+.ddz-count{font-variant-numeric:tabular-nums}.ddz-self{grid-column:1;grid-row:3;align-self:center}
+.ddz-controls{grid-column:1/-1;grid-row:2;justify-content:center;margin:0;min-height:40px}.ddz-action{flex:0 1 120px}
+.ddz-hand{grid-column:2;grid-row:3;margin:0;min-width:0;padding-top:18px;padding-bottom:10px;min-height:126px}
+.ddz-pick{flex-basis:62px;margin-left:-32px}.ddz-card{width:62px;height:98px;align-items:flex-start;justify-content:flex-start;padding:5px 7px;gap:0}.ddz-rank{font-size:24px}.ddz-suit{font-size:23px}
+.ddz-mini{width:28px;height:42px;padding:3px;align-items:center;justify-content:center}.ddz-mini .ddz-rank{font-size:12px}.ddz-mini .ddz-suit{font-size:12px}
+.ddz-played{gap:0;row-gap:4px}.ddz-played .ddz-card+.ddz-card{margin-left:-9px}.ddz-result{font-size:16px}.ddz-bids,.ddz-scores{flex-direction:column;gap:6px}
+@media(min-width:700px){.ddz-root{grid-template-columns:82px minmax(0,1fr);padding:20px}.ddz-desk{grid-template-columns:100px minmax(0,1fr) 100px}.ddz-current{min-height:220px}.ddz-avatar{width:62px;height:76px;font-size:28px}.ddz-pick{flex-basis:76px;margin-left:calc(-76px + (100% - 76px)/19);max-width:76px}.ddz-pick:first-child{margin-left:0}.ddz-hand .ddz-card{width:76px;height:116px}.ddz-hand{min-height:145px}.ddz-hand .ddz-rank{font-size:28px}}
+@media(max-width:360px){.ddz-root{padding:10px;grid-template-columns:44px minmax(0,1fr)}.ddz-desk{grid-template-columns:50px minmax(0,1fr) 50px}.ddz-avatar{width:36px;height:44px}.ddz-current{min-height:180px}.ddz-result{font-size:14px}.ddz-meta{gap:10px;font-size:11px}}
+@media(prefers-color-scheme:dark){.ddz-root{background:radial-gradient(ellipse at 50% 30%,#393228,#25221e);border-color:#4b4031}.ddz-desk{background:none;box-shadow:none}.ddz-player{color:#b9a88e}}
+@media(prefers-reduced-motion:reduce){.ddz-player.active .ddz-avatar:after{animation:none}}

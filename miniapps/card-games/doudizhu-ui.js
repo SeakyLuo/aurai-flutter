@@ -8,6 +8,9 @@ var CardUI=(function(){
     function el(tag,text,cls){return api.el(tag,text,cls);}
     function card(id,small){var r=Cards.rank(id),suit=id>=52?'★':['♣','♦','♥','♠'][id%4],node=el('span','',small?'ddz-card ddz-mini':'ddz-card');if(id%4===1||id%4===2||id===53)node.classList.add('ddz-red');node.append(el('b',Cards.labels[r],'ddz-rank'),el('span',suit,'ddz-suit'));return node;}
     var desk=el('section','','ddz-desk');
+    function player(seat,side){var p=v.players[seat],box=el('div','', 'ddz-player '+side+(v.phase==='playing'&&v.turn===seat?' active':''));var badge=el('span',seat===v.landlord?'地':v.landlord===null?'候':'农','ddz-avatar');box.append(badge,el('strong',p.name,'ddz-player-name'),el('span',v.counts[seat]+' 张','ddz-count'));box.setAttribute('aria-label',p.name+'，'+v.counts[seat]+' 张'+(v.turn===seat?'，正在行动':''));return box;}
+    var local=own?own.seat:0;
+    desk.append(player((local+2)%3,'ddz-left'),player((local+1)%3,'ddz-right'));
     var top=el('div','','ddz-meta');top.append(el('span',v.stage==='bid'?'叫地主':'底分 '+v.bid+' · '+v.multiplier+' 倍',''));
     var bottom=el('div','','ddz-bottom');if(v.bottom.length)v.bottom.forEach(function(c){bottom.append(card(c,true));});else for(var i=0;i<3;i++)bottom.append(el('span','✦','ddz-back'));top.append(bottom);desk.append(top);
     var current=el('div','','ddz-current');
@@ -17,7 +20,7 @@ var CardUI=(function(){
     else current.append(el('strong',own&&v.turn===own.seat?'由你领出':'等待领出','ddz-result'));
     desk.append(current);root.append(desk);
     if(!own)return;
-    var caption=el('div','','ddz-caption');caption.append(el('span','你的手牌 · '+hand.length+' 张',''));if(v.landlord!==null)caption.append(el('span',own.seat===v.landlord?'地主':'农民','ddz-role'));root.append(caption);
+    var caption=player(own.seat,'ddz-self');root.append(caption);
     var strip=el('div','','ddz-hand');hand.forEach(function(c){var button=el('button','','ddz-pick');button.type='button';button.append(card(c,false));button.classList.toggle('selected',selected.indexOf(c)>=0);button.disabled=!api.canPlay||v.stage!=='play';button.setAttribute('aria-label',Cards.labels[Cards.rank(c)]+(c<52?['梅花','方块','红桃','黑桃'][c%4]:''));button.setAttribute('aria-pressed',String(selected.indexOf(c)>=0));button.onclick=function(){var i=selected.indexOf(c);if(i>=0)selected.splice(i,1);else selected.push(c);render(root,v,own,api);};strip.append(button);});root.append(strip);strip.scrollLeft=scroll;
     if(v.phase==='finished')return;
     var controls=el('div','','ddz-controls');

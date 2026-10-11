@@ -104,7 +104,7 @@
     "title": "斗地主",
     "description": "三人经典叫分，与两位本地 AI 较量。支持提示、农民配合与本局积分。",
     "asset": "assets/miniapps/doudizhu.html",
-    "version": "530adae7bc217f02e9c3d0b024d3192d5b56005ed6f9ed86bcb9b76a4c6cb2ee",
+    "version": "a246e1045d3f2e2ddad4a8552bcc8135cbba0d43b1056e5aaf3bd717a37f8ce6",
     "iconAsset": "assets/miniapps/icons/doudizhu.png"
   },
   {
@@ -113,7 +113,7 @@
     "title": "UNO",
     "description": "四人经典配色牌局，与三位本地 AI 游玩。支持反转、UNO 与 +4 质疑。",
     "asset": "assets/miniapps/uno.html",
-    "version": "067ea32c7a7639ec7e8c9339ee420568e57cf9f8e88dd6bd1d489a6b020d0a94",
+    "version": "8114f5090c3e337a5631deacde2bd335bdbeb1808e71206193e2a179c62031be",
     "iconAsset": "assets/miniapps/icons/uno.png"
   },
   {
@@ -122,7 +122,43 @@
     "title": "Scout 马戏星探",
     "description": "三人马戏牌局，与两位本地 AI 游玩。招募、演出，三轮决出最佳团长。",
     "asset": "assets/miniapps/scout.html",
-    "version": "2389610527cd6e250d4d9fb9b913fa8065958e3fe963d590af29e34bf61d10cd",
+    "version": "85fd8f74939f5ebfeca94d7aa37c6a6e33d66ed6ba964953be79e663c73c2df6",
     "iconAsset": "assets/miniapps/icons/scout.png"
+  },
+  {
+    "id": "builtin.sheep",
+    "publisherId": "user:local",
+    "title": "羊了个羊",
+    "description": "每局都有通关解法的叠牌三消。七格收集槽、三档难度，支持撤回、提示、同关重来和离线保存。",
+    "asset": "assets/miniapps/sheep.html",
+    "iconAsset": "assets/miniapps/icons/sheep.png",
+    "version": "6cbfa2c87b07e7227e4517a0a287381c3d4a279391d6b114e31bdfbf67b323c3"
+  },
+  {
+    "id": "builtin.battleship",
+    "publisherId": "user:local",
+    "title": "海战棋",
+    "description": "经典双人海战，随机布舰与雷达射击。本地 AI 只根据命中记录寻找舰船。",
+    "asset": "assets/miniapps/battleship.html",
+    "version": "ceaef66fad93031edb17d22c38e2932086e5624669c0ed840df5adba5c9d2882",
+    "iconAsset": "assets/miniapps/icons/battleship.png"
+  },
+  {
+    "id": "builtin.junqi",
+    "publisherId": "user:local",
+    "title": "军棋",
+    "description": "双人军棋翻棋，支持铁路、行营、工兵排雷与本地 AI。",
+    "asset": "assets/miniapps/junqi.html",
+    "version": "0d1a48060d4654806438ce88dbca9b2abde830bb35b2946749389690e4fe415c",
+    "iconAsset": "assets/miniapps/icons/junqi.png"
+  },
+  {
+    "id": "builtin.azul",
+    "publisherId": "user:local",
+    "title": "花砖物语",
+    "description": "双人经典彩墙玩法，与本地 AI 取砖、铺墙，争取连线与花色奖励。",
+    "asset": "assets/miniapps/azul.html",
+    "version": "02959e69891f55de05f1f8bfcc8ef362e6e420fab32560d341e717cac0907d21",
+    "iconAsset": "assets/miniapps/icons/azul.png"
   }
 ]
