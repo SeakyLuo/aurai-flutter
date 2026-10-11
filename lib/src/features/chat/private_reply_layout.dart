@@ -57,20 +57,32 @@ Map<String, PrivateReplyPart> privateReplyLayout(
       start++;
       continue;
     }
+    final replyIndices = [start];
+    final programIds = {if (first.htmlGame != null) first.id};
     var end = start + 1;
-    while (end < messages.length) {
-      final next = messages[end];
+    for (var index = end; index < messages.length; index++) {
+      final next = messages[index];
+      // Program notices retain their chronological slots, but do not split
+      // their originating reply into separate headers and action footers.
+      if (next.isSystem &&
+          programIds.contains(
+            next.messageMetadata?.participation['_programMessage'],
+          )) {
+        continue;
+      }
       if (next.runId != first.runId ||
           next.senderId != first.senderId ||
           next.role != AgentMessageRole.assistant ||
           next.isSystem ||
           next.isFailure)
         break;
-      end++;
+      replyIndices.add(index);
+      if (next.htmlGame != null) programIds.add(next.id);
+      end = index + 1;
     }
     AgentTaskSummary? summary;
     final text = <String>[];
-    for (var i = start; i < end; i++) {
+    for (final i in replyIndices) {
       final message = messages[i];
       summary = message.taskSummary ?? summary;
       final card = message.interactive;
@@ -99,14 +111,16 @@ Map<String, PrivateReplyPart> privateReplyLayout(
                 .toList(),
           );
     final copyText = text.where((part) => part.isNotEmpty).join('\n\n');
-    for (var i = start; i < end; i++) {
+    for (final i in replyIndices) {
       result[messages[i].id] = PrivateReplyPart(
         first: i == start,
-        last: i == end - 1,
+        last: i == replyIndices.last,
         copyText: copyText,
         summary: i == start ? process : null,
-        gitChanges: i == end - 1 ? gitChanges : null,
-        goalElapsed: i == end - 1 ? goalCompletionElapsed(summary) : null,
+        gitChanges: i == replyIndices.last ? gitChanges : null,
+        goalElapsed: i == replyIndices.last
+            ? goalCompletionElapsed(summary)
+            : null,
       );
     }
     start = end;

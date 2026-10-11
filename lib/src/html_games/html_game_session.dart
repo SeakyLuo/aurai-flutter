@@ -1,3 +1,5 @@
+import 'board_game_service.dart';
+import '../providers/decision_client.dart';
 import 'miniapp_library_store.dart';
 import 'html_ai_service.dart';
 import '../storage/html_callback_state.dart';
@@ -97,6 +99,11 @@ class HtmlGameSession extends ChangeNotifier {
   late final StreamSubscription<String> _appUpdates;
   late final StreamSubscription<String> _interactiveUpdates;
   final _ai = HtmlAiService();
+  late final _board = BoardGameService(
+    store.database,
+    game,
+    independent: independent,
+  );
   MethodChannel? _channel;
   bool _closed = false;
   bool _closing = false;
@@ -243,6 +250,23 @@ class HtmlGameSession extends ChangeNotifier {
         try {
           final args = (jsonDecode(call.arguments as String) as Map)
               .cast<String, Object?>();
+          if (args['operation'] == 'board') {
+            final request = (args['request'] as Map).cast<String, Object?>();
+            if (request['operation'] != 'status' && !_visible)
+              throw StateError('请在可见的棋盘中操作');
+            if (!fullscreen &&
+                request['operation'] == 'event' &&
+                (request['event'] as Map)['action'] != 'move') {
+              throw StateError('请打开完整棋盘后操作');
+            }
+            try {
+              final result = await _board.handle(request);
+              await _reload();
+              return jsonEncode(result);
+            } on DecisionCancelled {
+              return jsonEncode({'cancelled': true});
+            }
+          }
           if (args['operation'] == 'programResource') {
             if (independent) throw StateError('请从原会话查看旅程记录');
             final offset = args['resourceOffset'] as int;
@@ -439,6 +463,7 @@ class HtmlGameSession extends ChangeNotifier {
     _visible = value;
     if (!value) {
       _captureTimer?.cancel();
+      _board.pause();
       await _ai.cancelAll();
     }
     if (ready) await _channel?.invokeMethod<void>('visibility', value);
@@ -515,6 +540,7 @@ class HtmlGameSession extends ChangeNotifier {
     _readyTimeout.cancel();
     _captureTimer?.cancel();
     try {
+      _board.pause();
       await _ai.cancelAll();
       try {
         await _channel

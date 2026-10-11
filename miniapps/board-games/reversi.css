@@ -1,0 +1,7 @@
+#game{--game-bg:#142d28;--board-bg:#214c40;--board-edge:#819c74;--board-ink:#b3c6a2;--move-color:#d7bd7b;--aurai-text:#f2f1df;--aurai-muted:#b0c4b6;--aurai-field:#24483d;--aurai-border:#496654;--aurai-highlight-text:#e2c88c;--game-primary:linear-gradient(120deg,#b5a272,#d8c897);--game-on-primary:#24392d;color-scheme:dark}
+#game header h1{font-family:serif;letter-spacing:.12em}
+#game .side.b{background:#162321;border-color:#82958c;--turn-ring:#d6c58d}
+#game .side.w{background:#f1e8ce;border-color:#f1e8ce;--turn-ring:#d6c58d}
+.felt-cell{fill:#285546;stroke:#75937840;stroke-width:.7}.felt-cell.alternate{fill:#2d5b4b}
+.stone.b .stone-face{fill:#162321}.stone.w .stone-face{fill:#f1e8ce}
+#game .board-wrap{box-shadow:0 16px 32px #00000030,inset 0 0 0 4px #82946b22}

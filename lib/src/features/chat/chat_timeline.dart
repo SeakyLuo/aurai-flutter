@@ -2,6 +2,7 @@ import 'profile_navigation.dart';
 import 'chat_message_spacing.dart';
 import 'chat_timeline_entry.dart';
 import 'task_message_entries.dart';
+import 'task_summary_placement.dart';
 export 'chat_timeline_entry.dart';
 import 'private_reply_layout.dart';
 import 'interactive_message_paging.dart';
@@ -23,6 +24,7 @@ import 'group_message_heading.dart';
 import 'ai_contact_page.dart';
 import 'personal_info_page.dart';
 import 'group_mention_text.dart';
+import '../../domain/system_notice_text.dart';
 import '../../domain/message_sender.dart';
 import 'message_time.dart';
 import 'timeline_tool_activity.dart';
@@ -72,23 +74,6 @@ List<ChatTimelineEntry> buildChatTimeline(
   mentionMembers.removeWhere((name, _) => ambiguousNames.contains(name));
   final isGroup = conversation.kind == ConversationKind.group;
   final chatBubbles = isGroup || conversation.isPersonalChat;
-  final noticeNameIds = <String, String>{};
-  final ambiguousNoticeNames = <String>{};
-  for (final sender in [
-    ...mentionSenders.values,
-    ...conversation.noticeMembers.values,
-  ]) {
-    for (final name in {
-      sender.displayName,
-      if (sender.originalName != null) sender.originalName!,
-    }) {
-      if (noticeNameIds.containsKey(name) && noticeNameIds[name] != sender.id) {
-        ambiguousNoticeNames.add(name);
-      }
-      noticeNameIds[name] = sender.id;
-    }
-  }
-  noticeNameIds.removeWhere((name, _) => ambiguousNoticeNames.contains(name));
   void openNoticeMember(BuildContext context, String id) {
     openProfileRoute(
       context,
@@ -392,6 +377,24 @@ List<ChatTimelineEntry> buildChatTimeline(
           visibleMessages.take(end < 0 ? visibleMessages.length : end).toList(),
           richRuns,
         );
+  final summaries = <String, AgentTaskSummary>{
+    if (conversation.isTask && !chatBubbles)
+      for (final message in visibleMessages.take(end))
+        if ((replyParts.containsKey(message.id)
+                ? replyParts[message.id]!.summary
+                : message.taskSummary)
+            case final summary?)
+          message.id: summary,
+  };
+  final summaryAnchors = taskSummaryAnchors(
+    timelineMessages,
+    visibleMessages,
+    summaries,
+  );
+  final summariesBeforeMessage = <String, List<String>>{};
+  for (final entry in summaryAnchors.entries) {
+    summariesBeforeMessage.putIfAbsent(entry.value, () => []).add(entry.key);
+  }
   return [
     if (conversation.kind == ConversationKind.group &&
         !(conversation.searchMessages != null
@@ -418,9 +421,9 @@ List<ChatTimelineEntry> buildChatTimeline(
                   )) ...[
                 const SizedBox(height: 24),
                 GroupMentionText(
-                  text: conversation.creationMessage!,
-                  members: noticeNameIds,
-                  bareNames: true,
+                  text:
+                      '${systemNoticeMember(MessageSender.localUser.id, conversation.creationUserName)}邀请了 ${conversation.creationMembers.map((sender) => systemNoticeMember(sender.id, sender.name)).join('、')} 加入群聊',
+                  members: const {},
                   textAlign: TextAlign.center,
                   onOpen: (id) => openNoticeMember(context, id),
                   style: TextStyle(
@@ -460,6 +463,20 @@ List<ChatTimelineEntry> buildChatTimeline(
           ),
         ),
       if (message.id != beforeMessageId) ...?headersByMessage[message.id],
+      if (message.id != beforeMessageId)
+        for (final ownerId in summariesBeforeMessage[message.id] ?? <String>[])
+          ChatTimelineEntry(
+            'summary:$ownerId',
+            (context) => MessageItem(
+              message: messagesById[ownerId]!,
+              replyPart: replyParts[ownerId],
+              onEdit: null,
+              taskSummaryOnly: true,
+              showTaskEntries: false,
+              excludedActivityMessageId: conversation.searchMessageId,
+              onOpenMember: (id) => openNoticeMember(context, id),
+            ),
+          ),
       if (conversation.isTask && message.id != beforeMessageId)
         ...taskMessageEntries(
           message.taskSummary,
@@ -496,7 +513,6 @@ List<ChatTimelineEntry> buildChatTimeline(
                   onOpenSource: onOpenQuote,
                   onOpenLink: (href) =>
                       openMiniappLink(context, Uri.parse(href)),
-                  memberNames: isGroup ? noticeNameIds : const {},
                   onOpenMember: (id) => openNoticeMember(context, id),
                   style: TextStyle(
                     fontSize: 12,
@@ -508,6 +524,7 @@ List<ChatTimelineEntry> buildChatTimeline(
             }
             final content = MessageItem(
               showTaskEntries: false,
+              showTaskSummary: !summaryAnchors.containsKey(message.id),
               excludedActivityMessageId: conversation.searchMessageId,
               key: ValueKey(message.id),
               message: message,

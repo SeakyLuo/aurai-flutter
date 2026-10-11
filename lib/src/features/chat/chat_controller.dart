@@ -156,6 +156,7 @@ import '../../memory/memory_events.dart';
 
 import 'package:flutter/widgets.dart';
 import '../../domain/message_summary.dart';
+import '../../domain/system_notice_text.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../agent/agent_runtime.dart';
@@ -315,7 +316,9 @@ class ChatController extends ChangeNotifier {
       _platform.takeNotificationConversation();
   final questionNotifications = ValueNotifier<ConversationCompletion?>(null);
   final completedReplies = ValueNotifier<ConversationCompletion?>(null);
-  final conversationReads = StreamController<Conversation>.broadcast(sync: true);
+  final conversationReads = StreamController<Conversation>.broadcast(
+    sync: true,
+  );
   final _store = ConversationStore();
   StreamSubscription<void>? _callbackChanges;
   StreamSubscription<MiniappProgramChange>? _programChanges;

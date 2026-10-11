@@ -332,16 +332,18 @@ extension ModelConfigActions on ChatController {
     }
     if (!protocol.supportsChatModels &&
         purpose != ModelPurpose.speechSynthesis &&
+        purpose != ModelPurpose.decision &&
         (!account.modelCatalog.any((model) => model.id == selection.model) ||
             (!account.autoSyncModels &&
                 !account.savedModels.contains(selection.model)))) {
       throw ArgumentError('请选择该供应商的可用模型');
     }
-    if (purpose == ModelPurpose.speechSynthesis &&
+    if ((purpose == ModelPurpose.speechSynthesis ||
+            purpose == ModelPurpose.decision) &&
         (!modelPurposesFor(account, selection.model).contains(purpose) ||
             (!account.autoSyncModels &&
                 !account.savedModels.contains(selection.model)))) {
-      throw ArgumentError('请选择该供应商的可用语音模型');
+      throw ArgumentError('请选择该供应商对应用途的可用模型');
     }
     final next = ModelSettings(
       activeService: purpose == ModelPurpose.text

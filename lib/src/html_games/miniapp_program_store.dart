@@ -103,8 +103,9 @@ class MiniappProgramStore {
     String conversationId,
     String messageId,
     String actorId,
-    Map<String, Object?> args,
-  ) async {
+    Map<String, Object?> args, {
+    bool decision = false,
+  }) async {
     late MiniappProgramChange change;
     final result = await database.transaction((txn) async {
       change = args['action'] == MiniappContextRecovery.action
@@ -123,6 +124,7 @@ class MiniappProgramStore {
               eventId: args['eventId'] as String,
               action: args['action'] as String,
               data: args['data'],
+              decision: decision,
               expectedVersion: args['expectedVersion'] as int?,
             );
       final rows = await txn.query(
@@ -158,6 +160,7 @@ class MiniappProgramStore {
     String? cardId,
     String? reason,
     bool collectionPaused = false,
+    bool decision = false,
     int? expectedVersion,
   }) async {
     if (cardId == null && data is Map && data.containsKey('collectionEvent')) {
@@ -232,6 +235,7 @@ class MiniappProgramStore {
     final canSubmitForPlayers = actorView?['canSubmitForPlayers'] == true;
     final request = jsonEncode({
       'actorId': actorId,
+      'decision': decision,
       'action': action,
       'data': data,
       if (collectionPaused) 'collectionEvent': 'paused',
@@ -402,6 +406,7 @@ class MiniappProgramStore {
       MiniappCapabilityProtocol.wrap(script, declared),
       {
         'state': runtime['state'],
+        'decision': decision,
         'event': {
           'actorId': anonymousCard != null ? null : actorId,
           'action': action,

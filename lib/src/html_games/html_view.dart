@@ -1,5 +1,6 @@
 import 'miniapp_recent_store.dart';
 import '../features/chat/pinned_message_split.dart';
+import '../features/chat/detail_pane_mode.dart';
 import '../features/chat/settings_appearance.dart';
 import 'miniapp_favorite_action.dart';
 import '../app/glass_notice.dart';
@@ -104,6 +105,11 @@ class _HtmlViewState extends State<HtmlView>
   bool get wantKeepAlive => _session != null || _opening || _closing != null;
   final _anchor = GlobalKey();
   HtmlGameSession? _session;
+  bool get _inlineBoard => const [
+    'xiangqi',
+    'gomoku',
+    'tictactoe',
+  ].contains(_session?.game.state['gameType']);
   static final _views = <_HtmlViewState>{};
   ScrollPosition? _scroll;
   bool _checkScheduled = false;
@@ -377,7 +383,9 @@ class _HtmlViewState extends State<HtmlView>
         hostSafeTopInset: widget.fullscreen
             ? MediaQuery.paddingOf(context).top
             : 0,
-        hostRightInset: widget.fullscreen ? 124 : 0,
+        hostRightInset: widget.fullscreen
+            ? (DetailPaneMode.maybeOf(context)?.onToggle != null ? 180 : 124)
+            : 0,
         hostSafeBottomInset: widget.fullscreen
             ? MediaQuery.paddingOf(context).bottom
             : 0,
@@ -567,6 +575,9 @@ class _HtmlViewState extends State<HtmlView>
                 appId: _session?.game.appId,
                 store: widget.store,
                 onClose: _leaveFullscreen,
+                onToggleDisplay: DetailPaneMode.maybeOf(context)?.onToggle,
+                displayFullscreen:
+                    DetailPaneMode.maybeOf(context)?.fullscreen ?? false,
               ),
             ),
           ),
@@ -589,7 +600,7 @@ class _HtmlViewState extends State<HtmlView>
             borderRadius: BorderRadius.circular(22),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: _card.displayMode == 'hybrid'
+              onTap: _card.displayMode == 'hybrid' && !_inlineBoard
                   ? () => widget.openAdaptive(context)
                   : null,
               child: _buildView(context),
@@ -706,7 +717,8 @@ class _HtmlViewState extends State<HtmlView>
                     SizedBox(
                       height: height,
                       child: IgnorePointer(
-                        ignoring: _card.displayMode == 'hybrid',
+                        ignoring:
+                            _card.displayMode == 'hybrid' && !_inlineBoard,
                         child: HtmlGameSurface(
                           session: _session!,
                           preview: _themedPreview,

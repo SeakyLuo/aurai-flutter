@@ -18,6 +18,7 @@ import '../features/chat/conversation.dart';
 import 'conversation_rows.dart';
 import 'personal_chats.dart';
 import 'system_notice.dart';
+import '../domain/system_notice_text.dart';
 
 part 'group_ai_profile_storage.dart';
 part 'group_management_store.dart';
@@ -554,7 +555,7 @@ class GroupChatStore {
       final notice = await writeGroupNotice(
         txn,
         conversation.id,
-        conversation.creationMessage!,
+        '${systemNoticeMember(MessageSender.localUser.id, conversation.creationUserName)}邀请了 ${conversation.creationMembers.map((sender) => systemNoticeMember(sender.id, sender.name)).join('、')} 加入群聊',
         id: 'group-created:${conversation.id}',
       );
       conversation.messages.add(notice);

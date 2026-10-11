@@ -12,8 +12,9 @@ var GAME='{{GAME}}',TITLE='{{TITLE}}';
   <form id="setup" class="aurai-stack" hidden>
     <p class="aurai-muted" id="setupHint"></p>
     <label class="aurai-field">玩家<select id="human"></select></label>
-    <label class="aurai-field">AI 对手<select id="ai"></select></label>
-    <label class="aurai-field">先手<select id="first"><option value="human">玩家先手</option><option value="ai">AI 先手</option></select></label>
+    <label class="aurai-field">对手<select id="ai"></select></label>
+    <label class="aurai-field" id="difficultyField">难度<select id="difficulty"><option value="1">入门</option><option value="2">简单</option><option value="3" selected>普通</option><option value="4">困难</option><option value="5">专家</option></select></label>
+    <label class="aurai-field">先手<select id="first"><option value="human">玩家先手</option><option value="ai">对手先手</option></select></label>
     <button class="aurai-button aurai-button--primary" id="start" type="submit">开始对局</button>
   </form>
   <section id="match" class="aurai-stack" hidden>
@@ -28,9 +29,9 @@ var GAME='{{GAME}}',TITLE='{{TITLE}}';
       </div>
       <div id="morePanel" class="aurai-stack" hidden>
         <div class="aurai-row more-heading"><strong>更多</strong><button id="closeMore" type="button" class="aurai-button">收起</button></div>
+        <label class="aurai-field" id="matchDifficultyField">难度<select id="matchDifficulty"><option value="1">入门</option><option value="2">简单</option><option value="3" selected>普通</option><option value="4">困难</option><option value="5">专家</option></select></label>
         <details><summary>最近棋谱</summary><ol id="history"></ol><p id="emptyHistory" class="aurai-muted">尚未落子</p></details>
         <details><summary>规则</summary><p id="rules" class="aurai-muted"></p></details>
-        <button id="rematch" type="button" class="aurai-button aurai-button--primary" hidden>再来一局 · 交换先手</button>
         <div id="gameActions" class="aurai-row">
           <button id="offerDraw" type="button" class="aurai-button">提议和棋</button>
           <button id="resign" type="button" class="aurai-button">认输</button>
@@ -44,6 +45,7 @@ var GAME='{{GAME}}',TITLE='{{TITLE}}';
       <nav id="gameToolbar" class="aurai-row" aria-label="对局操作">
         <button id="undo" type="button" class="aurai-button">悔棋</button>
         <button id="askAi" type="button" class="aurai-button">继续</button>
+        <button id="rematch" type="button" class="aurai-button aurai-button--primary" title="交换先手开始下一局" hidden>再来一局</button>
         <button id="more" type="button" class="aurai-button" aria-expanded="false" aria-controls="morePanel">更多</button>
       </nav>
     </div>
@@ -52,11 +54,15 @@ var GAME='{{GAME}}',TITLE='{{TITLE}}';
 <style>
 {{STYLE}}
 </style>
+<script type="application/json" id="localEngineSource">{{WORKER}}</script>
+<script type="application/json" id="localEngineLicense">{{LICENSE}}</script>
 <script>
 (()=>{
 const GAME='{{GAME}}',TITLE='{{TITLE}}';
 {{ENGINE}}
 {{BOARD}}
+{{DIFFICULTY}}
+{{LOCAL_ENGINE}}
 {{UI}}
 })();
 </script>

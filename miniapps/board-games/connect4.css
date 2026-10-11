@@ -1,0 +1,9 @@
+#game{--game-bg:#fff2db;--board-bg:#376c94;--board-edge:#285577;--board-ink:#d3e6ef;--move-color:#fff7c8;--aurai-text:#3a4651;--aurai-muted:#807969;--aurai-field:#fff9eb;--aurai-border:#dcccad;--aurai-highlight-text:#a5523d;--game-primary:linear-gradient(120deg,#c9614e,#df8060);--game-on-primary:#fff;color-scheme:light}
+#game header h1{letter-spacing:.02em;font-weight:750}
+#game .side.r{background:#dd735f;border-color:#ba5649;--turn-ring:#dd735f}
+#game .side.y{background:#f1c451;border-color:#bd952e;--turn-ring:#c39b2c}
+.slot{fill:#163d5b;stroke:#5784a2;stroke-width:2}
+.stone.r .stone-face{fill:#ee8970;stroke:#b85646}.stone.y .stone-face{fill:#f8d36c;stroke:#be9639}
+.column-arrow{fill:none;stroke:#d4e9f0;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#game .board-wrap{box-shadow:0 8px 0 #285577,0 18px 28px #41647b25;margin-bottom:8px}
+@media(prefers-color-scheme:dark){#game{--game-bg:#242c35;--aurai-text:#f3e7d5;--aurai-muted:#c6b89f;--aurai-field:#343d46;--aurai-border:#646967;--aurai-highlight-text:#ffb091}}

@@ -12,7 +12,6 @@ class RecalledMessageNotice extends StatelessWidget {
     this.onOpenSource,
     this.onOpenMember,
     this.onOpenLink,
-    this.memberNames = const {},
     required this.style,
   });
   final AgentMessage message;
@@ -21,7 +20,6 @@ class RecalledMessageNotice extends StatelessWidget {
   final ValueChanged<String>? onOpenSource;
   final ValueChanged<String>? onOpenMember;
   final ValueChanged<String>? onOpenLink;
-  final Map<String, String> memberNames;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -32,11 +30,13 @@ class RecalledMessageNotice extends StatelessWidget {
   Widget _notice(BuildContext context) {
     final text = message.isSystem
         ? GroupMentionText(
-            text: message.text,
+            text:
+                message.messageMetadata?.participation['_systemNoticeText']
+                    as String? ??
+                message.text,
             markdown: message.markdown,
             style: style,
-            members: memberNames,
-            bareNames: true,
+            members: const {},
             textAlign: TextAlign.center,
             onOpen: onOpenMember,
             onOpenLink: onOpenLink,

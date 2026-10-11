@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import '../domain/avatar_style.dart';
 import 'group_chat_store.dart';
 import 'group_system_notice.dart';
+import '../domain/system_notice_text.dart';
 
 class GroupAvatarStore {
   GroupAvatarStore(this.groups);
@@ -62,7 +63,11 @@ class GroupAvatarStore {
         where: 'id = ?',
         whereArgs: [id],
       );
-      return writeGroupNotice(txn, id, '${actor['name']}更新了群头像');
+      return writeGroupNotice(
+        txn,
+        id,
+        '${systemNoticeMember(actorId, actor['name'] as String)}更新了群头像',
+      );
     });
     final next = {...styles.value};
     if (style == null) {

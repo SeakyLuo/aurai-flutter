@@ -352,6 +352,7 @@ class _ModelDetailPageState extends State<ModelDetailPage> {
 
   String _purposeLabel(ModelPurpose purpose) => switch (purpose) {
     ModelPurpose.text => '文本',
+    ModelPurpose.decision => '决策',
     ModelPurpose.imageGeneration => '图片',
     ModelPurpose.videoGeneration => '视频',
     ModelPurpose.musicGeneration => '音乐',

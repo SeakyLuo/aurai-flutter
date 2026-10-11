@@ -2,6 +2,7 @@ import 'model_provider.dart';
 
 enum ModelPurpose {
   text('默认文本模型'),
+  decision('默认决策模型'),
   imageGeneration('图片生成模型'),
   videoGeneration('视频生成模型'),
   musicGeneration('音乐生成模型'),

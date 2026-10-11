@@ -243,6 +243,7 @@ class _ModelTypeRecognitionPageState extends State<ModelTypeRecognitionPage> {
 
   String _typeName(ModelPurpose type) => switch (type) {
     ModelPurpose.text => '文本',
+    ModelPurpose.decision => '决策',
     ModelPurpose.imageGeneration => '图片',
     ModelPurpose.videoGeneration => '视频',
     ModelPurpose.musicGeneration => '音乐',

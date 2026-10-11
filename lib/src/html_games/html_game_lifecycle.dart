@@ -33,6 +33,7 @@ const htmlGameLifecycleScript = r'''
       if(!navigator.userActivation.isActive)throw new Error('Retry from a user action');
       const result=await appData({operation:'retryEvent',eventId});return result.events[0];
     },
+    boardGame(operation,event){return appData({operation:'board',request:{operation,event}})},
     readData(name){return appData({operation:'read',name})},
     async readProgramResource(resourceKey,resourceOffset=0){
       const result=await appData({operation:'programResource',resourceKey,resourceOffset});

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import '../domain/agent_models.dart';
 import 'system_notice.dart';
+import '../domain/system_notice_text.dart';
 
 Future<AgentMessage?> writeGroupMemberNotice(
   DatabaseExecutor db,
@@ -19,7 +20,10 @@ Future<AgentMessage?> writeGroupMemberNotice(
     where: 'id IN (${List.filled(ids.length, '?').join(',')})',
     whereArgs: ids.toList(),
   );
-  final names = {for (final row in rows) row['id']: row['name']};
+  final names = {
+    for (final row in rows)
+      row['id']: systemNoticeMember(row['id'] as String, row['name'] as String),
+  };
   return writeGroupNotice(
     db,
     groupId,

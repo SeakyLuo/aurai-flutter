@@ -1,4 +1,5 @@
 import 'detail_split_layout.dart';
+import 'detail_pane_mode.dart';
 import 'pane_navigator.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -59,6 +60,7 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
   Completer<bool?>? _detailsResult;
   int _request = 0;
   bool _open = false;
+  bool _detailFullscreen = false;
   bool _pinned = true;
   final _paneNavigator = GlobalKey<PaneNavigatorState>();
   bool _returningFromConversation = false;
@@ -124,6 +126,7 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
     ++_request;
     setState(() {
       _open = true;
+      _detailFullscreen = false;
       _details = Navigator(
         key: navigator,
         onGenerateInitialRoutes: (_, _) => [
@@ -161,7 +164,10 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
     FocusManager.instance.primaryFocus?.unfocus();
     _detailsResult?.complete(null);
     _detailsResult = null;
-    setState(() => _details = null);
+    setState(() {
+      _details = null;
+      _detailFullscreen = false;
+    });
     await _load(id, opening: true, pinned: pinned);
   }
 
@@ -270,6 +276,7 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
     if (oldWidget.conversationId != widget.conversationId) {
       ++_request;
       _open = false;
+      _detailFullscreen = false;
       _message = null;
       _details = null;
       _detailsResult?.complete(null);
@@ -333,6 +340,7 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
     child: DetailSplitLayout(
       animation: _curve,
       opened: _open,
+      detailFullscreen: _detailFullscreen,
       child: PaneNavigator(
         key: _paneNavigator,
         handleBack: !_returningFromConversation,
@@ -352,7 +360,16 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
                       child: _detail(context, wide: wide),
                     ),
                   ),
-                if (_details != null) _details!,
+                if (_details != null)
+                  DetailPaneMode(
+                    fullscreen: _detailFullscreen,
+                    onToggle: supportsSplit
+                        ? () => setState(
+                            () => _detailFullscreen = !_detailFullscreen,
+                          )
+                        : null,
+                    child: _details!,
+                  ),
               ],
             )
           : null,

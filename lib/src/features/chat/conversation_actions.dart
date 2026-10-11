@@ -335,6 +335,9 @@ extension ConversationActions on ChatController {
           senderId: actorId,
           isSystem: true,
           text: '$actor将群名改为“$name”',
+          interactive: systemNoticeMetadata(
+            '${systemNoticeMember(actorId, actor)}将群名改为“$name”',
+          ),
           createdAt: DateTime.now(),
         );
         await txn.update(

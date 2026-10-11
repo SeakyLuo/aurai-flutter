@@ -39,18 +39,18 @@
     "id": "builtin.xiangqi",
     "publisherId": "user:local",
     "title": "中国象棋",
-    "description": "与 AI 对弈中国象棋，私聊、群聊都能玩。消息内预览棋盘，点击打开操作；每步回调，同步观战。",
+    "description": "直接与本地 AI开局，也可在私聊、群聊中选择 AI 对手。支持五档难度、悔棋、棋谱和同步观战。",
     "asset": "assets/miniapps/xiangqi.html",
-    "version": "d0060b2f1d95af056e243a0582b0a1ff4d2cb13f7fb5c2e557ebc92a1ca06ac9",
+    "version": "ad371660f05a98bbca963d76518259a8fce3bb22b66176bee13fc8711f990665",
     "iconAsset": "assets/miniapps/icons/xiangqi.png"
   },
   {
     "id": "builtin.gomoku",
     "publisherId": "user:local",
     "title": "五子棋",
-    "description": "与 AI 对弈五子棋，15 × 15 无禁手。支持聊天棋盘预览、全屏落子、每步回调和群聊观战。",
+    "description": "15 × 15 无禁手。直接与本地 AI开局，也可在聊天中选择 AI 对手，支持五档难度、悔棋和同步观战。",
     "asset": "assets/miniapps/gomoku.html",
-    "version": "e93f599399ec17e907233a21ddafa222061cca0737bbe40c9e053a94257ae38a",
+    "version": "4f3662d22a682b6f92c6416541548485a502fbd982bfce8009bb964a7c59be73",
     "iconAsset": "assets/miniapps/icons/gomoku.png"
   },
   {
@@ -61,5 +61,68 @@
     "asset": "assets/miniapps/undercover.html",
     "version": "82f390320dfe19f44481ae9b10a618750a76c605ebb97e06e5f044cb49fac437",
     "iconAsset": "assets/miniapps/icons/undercover.png"
+  },
+  {
+    "id": "builtin.tictactoe",
+    "publisherId": "user:local",
+    "title": "井字棋",
+    "description": "霓虹九宫格，本地 AI 即开即玩，无需联网或配置模型。支持悔棋、交换先手，也可在聊天中对弈和观战。",
+    "asset": "assets/miniapps/tictactoe.html",
+    "version": "523085b90dadb00c21053a1ee734d45b8b18f615ab449b9b4d51aab9ae94b16f",
+    "iconAsset": "assets/miniapps/icons/tictactoe.png"
+  },
+  {
+    "id": "builtin.reversi",
+    "publisherId": "user:local",
+    "title": "黑白棋",
+    "description": "森林棋室里的翻转对决，支持五档本地 AI、自动让行、悔棋和聊天观战。",
+    "asset": "assets/miniapps/reversi.html",
+    "version": "5a963b40ccb4e68151f69fc710c4f77bbf806a15a0207f48e53270ee5aed6173",
+    "iconAsset": "assets/miniapps/icons/reversi.png"
+  },
+  {
+    "id": "builtin.halma",
+    "publisherId": "user:local",
+    "title": "跳棋",
+    "description": "薄荷与蜜桃的双人星盘，支持连续跳跃、五档本地 AI、悔棋和聊天观战。",
+    "asset": "assets/miniapps/halma.html",
+    "version": "26580e1e313822541d18b6468c001a3ae486b09ddc7d8b9145cc1612af512974",
+    "iconAsset": "assets/miniapps/icons/halma.png"
+  },
+  {
+    "id": "builtin.connect4",
+    "publisherId": "user:local",
+    "title": "四子棋",
+    "description": "复古落子棋架，点击一列投下棋子。支持五档本地 AI、悔棋和聊天观战。",
+    "asset": "assets/miniapps/connect4.html",
+    "version": "496abb2f13a51f15d2341dedf661a712eccfd20edae8ba567c644ff3b981bab6",
+    "iconAsset": "assets/miniapps/icons/connect4.png"
+  },
+  {
+    "id": "builtin.doudizhu",
+    "publisherId": "user:local",
+    "title": "斗地主",
+    "description": "三人经典叫分，与两位本地 AI 较量。支持提示、农民配合与本局积分。",
+    "asset": "assets/miniapps/doudizhu.html",
+    "version": "530adae7bc217f02e9c3d0b024d3192d5b56005ed6f9ed86bcb9b76a4c6cb2ee",
+    "iconAsset": "assets/miniapps/icons/doudizhu.png"
+  },
+  {
+    "id": "builtin.uno",
+    "publisherId": "user:local",
+    "title": "UNO",
+    "description": "四人经典配色牌局，与三位本地 AI 游玩。支持反转、UNO 与 +4 质疑。",
+    "asset": "assets/miniapps/uno.html",
+    "version": "067ea32c7a7639ec7e8c9339ee420568e57cf9f8e88dd6bd1d489a6b020d0a94",
+    "iconAsset": "assets/miniapps/icons/uno.png"
+  },
+  {
+    "id": "builtin.scout",
+    "publisherId": "user:local",
+    "title": "Scout 马戏星探",
+    "description": "三人马戏牌局，与两位本地 AI 游玩。招募、演出，三轮决出最佳团长。",
+    "asset": "assets/miniapps/scout.html",
+    "version": "2389610527cd6e250d4d9fb9b913fa8065958e3fe963d590af29e34bf61d10cd",
+    "iconAsset": "assets/miniapps/icons/scout.png"
   }
 ]

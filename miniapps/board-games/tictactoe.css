@@ -1,0 +1,29 @@
+html{background:#090d1c;color-scheme:dark}
+#game{--aurai-text:#edf1ff;--aurai-muted:#9da9cb;--aurai-highlight-text:#70e9ff;--aurai-border:#303b60;--aurai-field:#141b31;--aurai-button-radius:24px;color:var(--aurai-text);min-height:100dvh;box-sizing:border-box;background:radial-gradient(ellipse at 10% 20%,#13234570,transparent 55%),radial-gradient(ellipse at 95% 65%,#37154c60,transparent 55%),#090d1c}
+#game header h1{letter-spacing:.05em;color:#f4f7ff}
+#game #status{font-size:12px;letter-spacing:.04em;color:#a5b2d7}
+#game .players{gap:20px;padding:12px 4px}
+#game .player{gap:12px;padding:10px 6px}
+#game .player.active strong{color:#e9faff}
+#game .side{width:18px;height:18px;border:0;border-radius:0;background:none;display:grid;place-items:center;font-size:22px;line-height:1;font-weight:700}
+#game .side.x{color:#54e5ff;--turn-ring:#54e5ff;text-shadow:0 0 10px #35d7ff80}
+#game .side.o{color:#ff76d9;--turn-ring:#ff76d9;text-shadow:0 0 10px #ff48c580}
+#game .player.active .side::after{inset:-8px;border-radius:12px}
+#game .board-wrap{padding:16px;box-sizing:border-box;border-radius:28px;background:linear-gradient(150deg,#111b31,#141024);border:1px solid #3a4067;box-shadow:0 0 32px #6c4dff12,inset 0 1px 0 #ffffff0c;max-width:340px}
+html[data-aurai-display="fullscreen"] #game .board-wrap{max-width:min(100%,420px,max(280px,calc(100dvh - 340px)))}
+.neon-grid{stroke:#675b9d;stroke-width:2.5;stroke-linecap:round;filter:drop-shadow(0 0 5px #9c61ff60)}
+.neon-mark.x{stroke:#54e5ff;filter:drop-shadow(0 0 6px #35d7ff80)}
+.neon-mark.o{stroke:#ff76d9;filter:drop-shadow(0 0 6px #ff48c580)}
+.last-mark{fill:#aab5d9}
+.winning-line{stroke:#eafaff;stroke-width:3;stroke-linecap:round;opacity:.9;filter:drop-shadow(0 0 7px #9b8cff)}
+.pending-cell{fill:#54e5ff10;stroke:#54e5ff;stroke-width:1.5}
+#game .turn{text-align:center;color:#c7f6ff;font-size:16px;padding:8px 0}
+#game #instruction{text-align:center;line-height:1.6}
+#game .aurai-button{background:#1b2540;border:1px solid #3b486e;color:#e6ecff}
+#game .aurai-button--primary{background:linear-gradient(120deg,#295a86,#60458d);border-color:#658ac0;color:#fff}
+#game .aurai-button--danger{color:#ffa9d5;border-color:#824965}
+#game .aurai-button:disabled{opacity:.4}
+#game .aurai-button:focus-visible,#game select:focus-visible{outline:2px solid #70e9ff;outline-offset:3px}
+#game #gameToolbar,#game #morePanel{background:#111a30ef;border-color:#344366;box-shadow:0 6px 24px #00000045,0 0 22px #7658ff12}
+#game select{background:#141c33;color:#edf1ff;border:1px solid #344366}
+html[data-aurai-display="inline"] #game{min-height:0;border-radius:24px;padding:16px}

@@ -40,9 +40,15 @@ abstract final class DetectedModelPurposes {
       for (final value in values) ModelPurpose.values.byName(value as String),
     };
   }
+
+  static Iterable<String> modelIds(String baseUrl) =>
+      ((_catalogs[_endpoint(baseUrl)] as Map?) ?? const {}).keys.cast<String>();
 }
 
 Set<ModelPurpose> modelPurposesFor(ModelConfig config, String model) {
+  if (config.apiModelFor(model).split('/').last.startsWith('jev-')) {
+    return {ModelPurpose.decision};
+  }
   final configured = config.details?.modelPurposes[model];
   if (configured != null) return configured;
   final preset = config.service.presetModelPurposes[model];

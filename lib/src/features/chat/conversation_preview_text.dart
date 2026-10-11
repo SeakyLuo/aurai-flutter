@@ -49,9 +49,7 @@ class ConversationPreviewText extends StatelessWidget {
           ),
       ],
       maxLines: maxLines,
-      textWidthBasis: running
-          ? TextWidthBasis.longestLine
-          : TextWidthBasis.parent,
+      textWidthBasis: TextWidthBasis.parent,
       style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
     );
     final failure =
@@ -62,7 +60,7 @@ class ConversationPreviewText extends StatelessWidget {
     return Row(
       children: [
         if (running) ...[
-          Flexible(child: text),
+          Expanded(child: text),
           Padding(
             padding: const EdgeInsets.only(left: 8),
             child: Semantics(

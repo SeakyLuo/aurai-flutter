@@ -311,6 +311,7 @@ class ModelConfig {
       details?.speechApiKey.isNotEmpty == true ? details!.speechApiKey : apiKey;
   Set<ModelPurpose> get supportedModelPurposes => {
     ...protocol.supportedModelPurposes,
+    if (service == ModelService.dmxapi) ModelPurpose.decision,
     if (speechApi != null) ModelPurpose.speechSynthesis,
   };
   List<({String id, String name})> get modelCatalog => [

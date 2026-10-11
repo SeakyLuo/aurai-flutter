@@ -213,6 +213,7 @@ extension MiniappPublicationOperations on MiniappLibraryStore {
           'stateful': 1,
         });
       } else if (changed) {
+        await upgradeBoardGame(txn, entry.id);
         await txn.update(
           'html_apps',
           {...values, 'version': (rows.single['version'] as int) + 1},

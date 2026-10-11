@@ -55,6 +55,8 @@ enum SettingsIconType {
   grid,
   list,
   selectCircle,
+  fullscreen,
+  split,
 }
 
 class SettingsIcon extends StatelessWidget {
@@ -143,6 +145,32 @@ class _SettingsIconPainter extends CustomPainter {
           canvas.drawCircle(Offset(4.5, y), 1.1, Paint()..color = color);
           canvas.drawLine(Offset(9, y), Offset(20, y), pen);
         }
+      case SettingsIconType.fullscreen:
+        canvas.drawPath(
+          Path()
+            ..moveTo(9, 4)
+            ..lineTo(4, 4)
+            ..lineTo(4, 9)
+            ..moveTo(15, 4)
+            ..lineTo(20, 4)
+            ..lineTo(20, 9)
+            ..moveTo(20, 15)
+            ..lineTo(20, 20)
+            ..lineTo(15, 20)
+            ..moveTo(9, 20)
+            ..lineTo(4, 20)
+            ..lineTo(4, 15),
+          pen,
+        );
+      case SettingsIconType.split:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(3, 4, 18, 16),
+            const Radius.circular(3),
+          ),
+          pen,
+        );
+        canvas.drawLine(const Offset(12, 4), const Offset(12, 20), pen);
       case SettingsIconType.selectCircle:
         canvas.drawCircle(const Offset(12, 12), 9, pen);
         canvas.drawPath(

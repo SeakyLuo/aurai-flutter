@@ -1,0 +1,16 @@
+XQWLight (XiangQi Wizard Light), copyright 2004-2012 www.xqbase.com.
+Source: https://github.com/xqbase/xqwlight
+Revision: 6221733f1f79b3acb44cce6f83dc6100443cb2c9
+License: GPL-2.0-or-later; see XQWLight-LICENSE.txt.
+JavaScript/position.js and JavaScript/search.js are bundled without an opening
+book. Whitespace is compacted with Terser 5.44.0 (no compression or mangling,
+all original comments retained). Aurai's worker adapter is GPL-2.0-or-later.
+
+Gomoku, copyright as stated in Gomoku-LICENSE.txt.
+Source: https://github.com/justa-cai/gomoku
+Revision: e8994c03eceda77190c1e88d33a5b4666eeafa5f
+License: MIT; see Gomoku-LICENSE.txt.
+js/difficulty.js and js/engines/engine.worker.js are bundled with the same
+Terser settings. The worker's difficulty import is inlined by the build;
+its transposition table is reduced from 2^20 to 2^17 entries (2 MiB).
+Aurai exposes upstream difficulty levels 1-5 using its own concise labels.

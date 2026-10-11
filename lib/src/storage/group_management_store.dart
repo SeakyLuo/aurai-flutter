@@ -231,7 +231,7 @@ extension GroupManagementStore on GroupChatStore {
         return writeGroupNotice(
           txn,
           conversationId,
-          '${target.single['name']} 已成为新群主',
+          '${systemNoticeMember(nextOwnerId, target.single['name'] as String)} 已成为新群主',
         );
       })
       .then((notice) async {
@@ -278,7 +278,11 @@ extension GroupManagementStore on GroupChatStore {
           where: 'id = ?',
           whereArgs: [conversationId],
         );
-        return writeGroupNotice(txn, conversationId, '${sender['name']}退出了群聊');
+        return writeGroupNotice(
+          txn,
+          conversationId,
+          '${systemNoticeMember(actorId, sender['name'] as String)}退出了群聊',
+        );
       })
       .then((notice) => _notifySystem(conversationId, notice));
 

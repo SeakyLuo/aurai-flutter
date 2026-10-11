@@ -161,7 +161,7 @@ extension GroupSleepRecovery on ChatController {
       (txn) => writeGroupNotice(
         txn,
         conversationId,
-        '${actorName}唤醒了${senders[senderId]!.name}',
+        '${systemNoticeMember(actorId, actorName)}唤醒了${systemNoticeMember(senderId, senders[senderId]!.name)}',
       ),
     );
     _publishInteractiveChange(conversationId, notice);
@@ -207,7 +207,7 @@ extension GroupSleepRecovery on ChatController {
       (txn) => writeGroupNotice(
         txn,
         conversationId,
-        '${actor.name}唤醒了${targets.map((sender) => sender.name).join('、')}',
+        '${systemNoticeMember(actor.id, actor.name)}唤醒了${targets.map((sender) => systemNoticeMember(sender.id, sender.name)).join('、')}',
       ),
     );
     _publishInteractiveChange(conversationId, notice);

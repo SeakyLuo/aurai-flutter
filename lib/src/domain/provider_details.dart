@@ -27,6 +27,12 @@ class ModelContextOverride {
 enum ProviderProtocol {
   openaiChatCompletions('Chat Completions'),
   responses('Responses'),
+  typeSafe(
+    'TypeSafe System One',
+    supportsChatModels: false,
+    defaultModelPurposes: {ModelPurpose.decision},
+    supportedModelPurposes: {ModelPurpose.decision},
+  ),
   speechSynthesis(
     '语音合成',
     supportsChatModels: false,

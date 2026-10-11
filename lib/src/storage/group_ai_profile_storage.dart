@@ -30,7 +30,7 @@ extension GroupAiProfileStorage on GroupChatStore {
     final notice = await writeSystemNotice(
       txn,
       id,
-      '你已添加了${profile.sender.displayName}，现在可以开始聊天了。',
+      '你已添加了${systemNoticeMember(profile.sender.id, profile.sender.displayName)}，现在可以开始聊天了。',
     );
     return (conversationId: id, notice: notice, previousName: previousName);
   });

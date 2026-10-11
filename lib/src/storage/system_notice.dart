@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../domain/agent_models.dart';
 import '../domain/message_sender.dart';
+import '../domain/system_notice_text.dart';
 import 'conversation_rows.dart';
 
 Future<AgentMessage> writeSystemNotice(
@@ -15,13 +16,14 @@ Future<AgentMessage> writeSystemNotice(
     role: AgentMessageRole.user,
     senderId: MessageSender.localUser.id,
     isSystem: true,
-    text: text,
+    text: systemNoticePlainText(text),
+    interactive: systemNoticeMetadata(text),
     createdAt: DateTime.now(),
   );
   await db.insert('messages', messageRow(conversationId, notice));
   await db.rawUpdate(
     'UPDATE conversations SET message_count = message_count + 1, preview = ?, updated_at = ? WHERE id = ?',
-    [text, notice.createdAt.microsecondsSinceEpoch, conversationId],
+    [notice.text, notice.createdAt.microsecondsSinceEpoch, conversationId],
   );
   return notice;
 }

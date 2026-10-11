@@ -82,8 +82,8 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
                           button: true,
                           label:
                               '查看${controller.activeAi!.sender.displayName}的资料',
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(20),
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
                             onTap: () => openProfileRoute(
                               context,
                               MaterialPageRoute(

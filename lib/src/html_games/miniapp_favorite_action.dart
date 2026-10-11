@@ -20,9 +20,13 @@ class MiniappFavoriteAction extends StatefulWidget {
     required this.appId,
     required this.store,
     required this.onClose,
+    this.onToggleDisplay,
+    this.displayFullscreen = false,
   });
   final String? appId;
   final VoidCallback onClose;
+  final VoidCallback? onToggleDisplay;
+  final bool displayFullscreen;
   final HtmlStore store;
 
   @override
@@ -134,14 +138,24 @@ class _MiniappFavoriteActionState extends State<MiniappFavoriteAction> {
   @override
   Widget build(BuildContext context) => MiniappActionSurface(
     onClose: widget.onClose,
+    onToggleDisplay: widget.onToggleDisplay,
+    displayFullscreen: widget.displayFullscreen,
     onMore: _busy || widget.appId == null ? null : _more,
   );
 }
 
 /// Shared chrome for both in-app pages and the reserved Android task window.
 class MiniappActionSurface extends StatelessWidget {
-  const MiniappActionSurface({super.key, required this.onClose, this.onMore});
+  const MiniappActionSurface({
+    super.key,
+    required this.onClose,
+    this.onMore,
+    this.onToggleDisplay,
+    this.displayFullscreen = false,
+  });
   final VoidCallback onClose;
+  final VoidCallback? onToggleDisplay;
+  final bool displayFullscreen;
   final void Function(BuildContext anchor)? onMore;
 
   @override
@@ -154,6 +168,29 @@ class MiniappActionSurface extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (onToggleDisplay != null) ...[
+            RoundAction(
+              label: displayFullscreen ? '返回分屏' : '全屏运行',
+              icon: Icons.fullscreen,
+              iconWidget: SettingsIcon(
+                type: displayFullscreen
+                    ? SettingsIconType.split
+                    : SettingsIconType.fullscreen,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              onPressed: onToggleDisplay,
+            ),
+            SizedBox(
+              height: 18,
+              child: VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: Theme.of(
+                  context,
+                ).colorScheme.outlineVariant.withValues(alpha: .5),
+              ),
+            ),
+          ],
           RoundAction(
             label: '关闭小程序',
             icon: Icons.close,

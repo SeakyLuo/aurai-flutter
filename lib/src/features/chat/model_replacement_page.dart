@@ -85,6 +85,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
 
   String _purposeLabel(ModelPurpose purpose) => switch (purpose) {
     ModelPurpose.text => '文本',
+    ModelPurpose.decision => '决策',
     ModelPurpose.imageGeneration => '图片生成',
     ModelPurpose.videoGeneration => '视频生成',
     ModelPurpose.musicGeneration => '音乐生成',
@@ -101,6 +102,7 @@ class _ModelReplacementPageState extends State<ModelReplacementPage> {
       if (impact.purposes.contains(purpose))
         switch (purpose) {
           ModelPurpose.text => '默认文本模型',
+          ModelPurpose.decision => '默认决策模型',
           ModelPurpose.imageGeneration => '默认图片生成模型',
           ModelPurpose.videoGeneration => '默认视频生成模型',
           ModelPurpose.musicGeneration => '默认音乐生成模型',

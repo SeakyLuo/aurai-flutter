@@ -8,9 +8,11 @@ class DetailSplitLayout extends StatelessWidget {
     required this.opened,
     required this.child,
     this.detailBuilder,
+    this.detailFullscreen = false,
   });
   final Animation<double> animation;
   final bool opened;
+  final bool detailFullscreen;
   final Widget child;
   final Widget Function(BuildContext, bool)? detailBuilder;
 
@@ -18,7 +20,7 @@ class DetailSplitLayout extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final width = constraints.maxWidth;
-      final wide = width >= 600;
+      final wide = width >= 600 && !detailFullscreen;
       final detailWidth = wide ? width / 2 : width;
       final dividerColor = Theme.of(context).dividerColor;
       final softDividerColor = dividerColor.withValues(

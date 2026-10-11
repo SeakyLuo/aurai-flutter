@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:sqflite/sqflite.dart';
 import 'group_chat_store.dart';
 import 'group_system_notice.dart';
+import '../domain/system_notice_text.dart';
 
 const groupAnnouncementSchema = '''CREATE TABLE group_announcements (
   conversation_id TEXT PRIMARY KEY REFERENCES conversations(id) ON DELETE CASCADE,
@@ -90,7 +91,11 @@ class GroupAnnouncementStore {
           'updated_at': DateTime.now().microsecondsSinceEpoch,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
-      return writeGroupNotice(txn, groupId, '$name 更新了群公告');
+      return writeGroupNotice(
+        txn,
+        groupId,
+        '${systemNoticeMember(actorId, name)} 更新了群公告',
+      );
     });
     changes.add(groupId);
     if (notice != null) await groups.onSystemNotice?.call(groupId, notice);

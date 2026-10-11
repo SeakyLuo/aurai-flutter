@@ -76,6 +76,7 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
         ? null
         : widget.controller.modelSettings.profile(service);
     if (service == null ||
+        !_accounts(purpose).any((account) => account.service == service) ||
         (purpose == ModelPurpose.speechSynthesis
             ? !account!.isSpeechConfigured
             : !account!.isConfigured)) {
@@ -94,7 +95,9 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
     ModelPurpose.text =>
       widget.controller.modelSettings.modelDefaults[purpose]?.service ??
           widget.controller.modelSettings.activeService,
-    ModelPurpose.speechSynthesis || ModelPurpose.videoGeneration =>
+    ModelPurpose.decision ||
+    ModelPurpose.speechSynthesis ||
+    ModelPurpose.videoGeneration =>
       widget.controller.modelSettings.modelDefaults[purpose]?.service,
     ModelPurpose.musicGeneration =>
       widget.controller.modelSettings.modelDefaults[purpose]?.service ??
@@ -122,11 +125,28 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
               ModelPurpose.videoGeneration =>
                 profile.protocol.supportsChatModels,
               ModelPurpose.text => profile.protocol.supportsChatModels,
-              ModelPurpose.musicGeneration || ModelPurpose.speechSynthesis =>
+              ModelPurpose.decision ||
+              ModelPurpose.musicGeneration ||
+              ModelPurpose.speechSynthesis =>
                 profile.supportedModelPurposes.contains(purpose),
-            },
+            } &&
+            _hasModels(profile, purpose),
       )
       .toList();
+
+  bool _hasModels(ModelConfig account, ModelPurpose purpose) {
+    final models = {
+      ...account.savedModels,
+      if (account.autoSyncModels) ...[
+        ...account.modelCatalog.map((model) => model.id),
+        ...DetectedModelPurposes.modelIds(account.baseUrl),
+        ...account.service.staticImageModelIds,
+      ],
+    };
+    return models.any(
+      (model) => modelPurposesFor(account, model).contains(purpose),
+    );
+  }
 
   Future<void> _selectProvider(ModelPurpose purpose) async {
     var accounts = _accounts(purpose);
@@ -163,18 +183,21 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
     try {
       final catalog = ModelCatalog();
       _catalog = catalog;
-      final models = purpose == ModelPurpose.speechSynthesis
+      final models =
+          purpose == ModelPurpose.speechSynthesis ||
+              purpose == ModelPurpose.decision
           ? {
                   ...account.modelCatalog.map((model) => model.id),
                   ...account.savedModels,
+                  if (purpose == ModelPurpose.decision &&
+                      account.autoSyncModels &&
+                      account.protocol.supportsChatModels)
+                    ...await catalog.loadFor(account),
                   ...?account.details?.modelPurposes.keys,
                 }
                 .where(
                   (id) =>
-                      modelPurposesFor(
-                        account,
-                        id,
-                      ).contains(ModelPurpose.speechSynthesis) &&
+                      modelPurposesFor(account, id).contains(purpose) &&
                       (account.autoSyncModels ||
                           account.savedModels.contains(id)),
                 )
@@ -197,7 +220,9 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
           ModelPurpose.videoGeneration =>
             info?.outputModalities.contains('video') ?? true,
           ModelPurpose.imageGeneration => false,
-          ModelPurpose.musicGeneration || ModelPurpose.speechSynthesis =>
+          ModelPurpose.decision ||
+          ModelPurpose.musicGeneration ||
+          ModelPurpose.speechSynthesis =>
             account.supportedModelPurposes.contains(purpose),
         };
         if (eligible) {
@@ -348,6 +373,7 @@ class _DefaultModelsPageState extends State<DefaultModelsPage> {
 
   String _sectionTitle(ModelPurpose purpose) => switch (purpose) {
     ModelPurpose.text => '默认文本模型',
+    ModelPurpose.decision => '默认决策模型',
     ModelPurpose.imageGeneration => '默认图片生成模型',
     ModelPurpose.videoGeneration => '默认视频生成模型',
     ModelPurpose.musicGeneration => '默认音乐生成模型',

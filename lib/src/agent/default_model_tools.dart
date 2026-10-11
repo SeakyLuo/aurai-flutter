@@ -23,8 +23,8 @@ class DefaultModelTool implements AgentTool, RuntimeCapabilityAgentTool {
     capabilityId: 'model.settings',
     safety: update ? ToolSafety.lowRisk : ToolSafety.readOnly,
     description: update
-        ? 'Change one app-wide default model when requested by the user: text, imageGeneration, videoGeneration or musicGeneration. Read readDefaultModels first to discover saved providers and models. Use an exact model ID suitable for the requested purpose; savedModels are suggestions, not an allowlist. Other defaults and per-AI model selections are preserved. Provider credentials and URL come from saved settings. Applies to subsequent calls, not the already running request.'
-        : 'Read app-wide default models for text, image generation, video generation and music generation, plus saved providers and model IDs. Does not expose credentials. A null default means that purpose has no configured model. Use updateDefaultModel for app defaults, updateAiContact for an individual AI model.',
+        ? 'Change one app-wide default model when requested by the user: text, decision, imageGeneration, videoGeneration, musicGeneration or speechSynthesis. Read readDefaultModels first to discover saved providers and models. Decision models use typed choice, score and yes/no questions, including board-game moves. Use an exact model ID suitable for the requested purpose; savedModels are suggestions, not an allowlist. Other defaults and per-AI model selections are preserved. Provider credentials and URL come from saved settings. Applies to subsequent calls, not the already running request.'
+        : 'Read app-wide default models for text, decisions, image generation, video generation, music generation and speech synthesis, plus saved providers and model IDs. Does not expose credentials. A null default means that purpose has no configured model. Use updateDefaultModel for app defaults, updateAiContact for an individual AI model.',
     inputSchema: {
       'type': 'object',
       'properties': {
@@ -58,7 +58,9 @@ class DefaultModelTool implements AgentTool, RuntimeCapabilityAgentTool {
         );
         final config = settings().profiles[provider];
         if (config == null ||
-            (purpose == ModelPurpose.musicGeneration
+            (purpose == ModelPurpose.decision
+                ? !config.supportedModelPurposes.contains(purpose)
+                : purpose == ModelPurpose.musicGeneration
                 ? !config.protocol.defaultModelPurposes.contains(purpose)
                 : !config.protocol.supportsChatModels)) {
           throw ArgumentError('供应商不存在');

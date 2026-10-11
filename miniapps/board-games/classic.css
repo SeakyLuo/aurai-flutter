@@ -1,0 +1,22 @@
+#game{min-height:100dvh;background:var(--game-bg);color:var(--aurai-text)}
+#game .board-wrap{max-width:420px;border:1px solid var(--board-edge);background:var(--board-bg);padding:8px;border-radius:26px;box-shadow:0 12px 30px #00000014}
+html[data-aurai-display="fullscreen"] #game .board-wrap{max-width:min(100%,460px)}
+#game .aurai-button{border:1px solid var(--aurai-border)}
+#game .aurai-button--primary{background:var(--game-primary);color:var(--game-on-primary)}
+#game .aurai-button:focus-visible,#game select:focus-visible{outline:2px solid var(--aurai-highlight-text);outline-offset:3px}
+#game #instruction{text-align:center;font-size:13px;line-height:1.6}
+#game .turn{text-align:center}
+#game .player small{display:block;font-size:11px;color:var(--aurai-muted);margin-top:4px}
+.board-label{fill:var(--board-ink);font:10px system-ui,sans-serif;letter-spacing:.08em}
+.stone-face{stroke:#ffffff30;stroke-width:1}
+.legal-dot{fill:var(--move-color);opacity:.85}
+.selection,.winner-ring{fill:none;stroke:var(--move-color);stroke-width:2}
+.last-dot{fill:var(--move-color);stroke:#fff;stroke-width:.6}
+.stone.flip{transform-box:fill-box;transform-origin:center;animation:stone-flip .34s ease-out}
+.stone.arrive{transform-box:fill-box;transform-origin:center;animation:stone-arrive .24s ease-out}
+.stone.fall{animation:stone-fall .32s cubic-bezier(.35,.1,.75,1)}
+@keyframes stone-flip{0%{transform:scaleX(.1)}100%{transform:scaleX(1)}}
+@keyframes stone-arrive{0%{transform:scale(.7);opacity:.4}100%{transform:scale(1);opacity:1}}
+@keyframes stone-fall{0%{transform:translateY(var(--fall))}85%{transform:translateY(3px)}100%{transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.stone.flip,.stone.arrive,.stone.fall{animation:none}}
+html[data-aurai-display="inline"] #game{min-height:0;border-radius:24px}

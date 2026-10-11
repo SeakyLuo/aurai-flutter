@@ -80,6 +80,8 @@ class MessageItem extends StatefulWidget {
     this.replyPart,
     this.trailingActivities,
     this.showTaskEntries = true,
+    this.showTaskSummary = true,
+    this.taskSummaryOnly = false,
     this.streaming = false,
     this.readOnly = false,
     this.groupBubble = false,
@@ -104,6 +106,8 @@ class MessageItem extends StatefulWidget {
   final PrivateReplyPart? replyPart;
   final Widget? trailingActivities;
   final bool showTaskEntries;
+  final bool showTaskSummary;
+  final bool taskSummaryOnly;
   final Map<String, String> mentionMembers;
   final Map<String, MessageSender> interactiveMembers;
   final Future<InteractiveClickResult?> Function(
@@ -194,6 +198,8 @@ class _MessageItemState extends State<MessageItem> {
   @override
   Widget build(BuildContext context) => !message.canView('user:local')
       ? const SizedBox.shrink()
+      : widget.taskSummaryOnly
+      ? _taskSummary(context)
       : ImageMessageScope(
           messageId: message.id,
           child:
@@ -251,16 +257,11 @@ class _MessageItemState extends State<MessageItem> {
                 message.taskSummary != null)
               OrganizedTaskActivities(summary: message.taskSummary!),
             if (!widget.groupBubble &&
+                widget.showTaskSummary &&
                 (widget.replyPart == null
                     ? message.taskSummary != null
                     : widget.replyPart!.summary != null))
-              TaskSummaryView(
-                showTaskEntries: widget.showTaskEntries,
-                excludedMessageId: widget.excludedActivityMessageId,
-                messageId: message.id,
-                summary: widget.replyPart?.summary ?? message.taskSummary!,
-                onOpenLink: (href) => _openLink(context, href),
-              ),
+              _taskSummary(context),
             KeyedSubtree(
               key: const ValueKey('message-content'),
               child: _selectableContent(),
@@ -332,6 +333,14 @@ class _MessageItemState extends State<MessageItem> {
           child: child,
         )
       : child;
+
+  Widget _taskSummary(BuildContext context) => TaskSummaryView(
+    showTaskEntries: widget.showTaskEntries,
+    excludedMessageId: widget.excludedActivityMessageId,
+    messageId: message.id,
+    summary: widget.replyPart?.summary ?? message.taskSummary!,
+    onOpenLink: (href) => _openLink(context, href),
+  );
 
   Widget _quotePreview() => Padding(
     padding: const EdgeInsets.only(top: 6),

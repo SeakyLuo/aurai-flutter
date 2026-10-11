@@ -1,3 +1,6 @@
+import 'board_game_service.dart';
+import 'board_game_upgrade.dart';
+import 'miniapp_program.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -311,9 +314,11 @@ class MiniappLibraryStore {
       title:
           (metadata.isEmpty ? app['title'] : metadata.single['title'])
               as String,
-      html: await HtmlAppStore.code(app),
-      state: (jsonDecode(app['state_json'] as String) as Map)
-          .cast<String, Object?>(),
+      html: MiniappProgram.document(await HtmlAppStore.code(app)),
+      state: await BoardGameService.supports(database, id)
+          ? await BoardGameService.independentView(database, app)
+          : (jsonDecode(app['state_json'] as String) as Map)
+                .cast<String, Object?>(),
       version: app['version'] as int,
       stateful: app['stateful'] == 1,
       participants: const [],

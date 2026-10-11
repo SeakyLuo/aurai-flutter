@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:sqflite/sqflite.dart';
 import 'group_chat_store.dart';
 import 'system_notice.dart';
+import '../domain/system_notice_text.dart';
 
 const groupMessageMarksSchema = [
   '''CREATE TABLE group_pinned_messages (
@@ -186,7 +187,7 @@ class GroupMessageMarks {
           return writeSystemNotice(
             txn,
             groupId,
-            '${senders.single['name']} 置顶了一条消息',
+            '${systemNoticeMember(actorId, senders.single['name'] as String)} 置顶了一条消息',
           );
         }
       } else {
