@@ -4,3 +4,4 @@ html[data-aurai-display=fullscreen] #sheepGame{padding-top:calc(var(--aurai-host
 html[data-aurai-display=fullscreen] #sheepGame .sheep-header{padding-right:var(--aurai-host-right-inset,0px);min-height:56px}
 html[data-aurai-display=fullscreen] #sheepGame .sheep-brand p{display:none}
 @media(max-width:360px){.sheep-brand h1{font-size:18px}.sheep-brand img{width:36px;height:36px}.level-badge{padding:5px 8px;font-size:11px}}
+#sheepGame .levels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));max-width:360px;border-radius:20px;padding:6px;gap:6px}#sheepGame .levels button{border-radius:14px;padding:10px 6px;font-size:13px}

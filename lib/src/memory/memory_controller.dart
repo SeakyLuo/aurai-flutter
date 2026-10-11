@@ -77,7 +77,8 @@ class MemoryController extends ChangeNotifier {
     ]);
     final settings = results.first.single;
     nickname = settings['nickname'] as String;
-    MessageSender.setLocalUserName(nickname);
+    avatar = AvatarStyle.fromRow(results[2].single);
+    MessageSender.setLocalUserProfile(nickname, avatar);
     occupation = settings['occupation'] as String;
     gender = ProfileGender.values.byName(settings['gender'] as String);
     about = settings['about'] as String;
@@ -92,7 +93,6 @@ class MemoryController extends ChangeNotifier {
         }),
       );
     });
-    avatar = AvatarStyle.fromRow(results[2].single);
   }
 
   void _notify() {
@@ -137,7 +137,7 @@ class MemoryController extends ChangeNotifier {
     });
     if (avatar != null) this.avatar = avatar;
     nickname = name;
-    MessageSender.setLocalUserName(name);
+    MessageSender.setLocalUserProfile(name, this.avatar);
     occupation = job;
     this.gender = gender;
     about = info;

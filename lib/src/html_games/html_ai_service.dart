@@ -1,4 +1,5 @@
 import '../providers/structured_result_tool.dart';
+import 'html_decision_service.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -12,6 +13,7 @@ import '../providers/responses_transport.dart';
 /// JSON results use a result-only function, without access to application tools.
 class HtmlAiService {
   final _jobs = <int, _AiJob>{};
+  final _decisions = HtmlDecisionService();
 
   Future<Map<String, Object?>> invoke(
     int id,
@@ -20,6 +22,10 @@ class HtmlAiService {
   }) async {
     try {
       final args = (jsonDecode(encoded) as Map).cast<String, Object?>();
+      if (args['operation'] == 'decide' ||
+          args['operation'] == 'decisionStatus') {
+        return await _decisions.invoke(id, args);
+      }
       if (args['operation'] == 'status') {
         final config =
             (await AuraiPlatform.instance.loadModelSettings()).activeConfig;
@@ -177,9 +183,13 @@ class HtmlAiService {
     return {'text': text, 'model': config.model};
   }
 
-  Future<void> cancel(int id) async => _jobs[id]?.cancel();
+  Future<void> cancel(int id) async {
+    _decisions.cancel(id);
+    await _jobs[id]?.cancel();
+  }
 
   Future<void> cancelAll() async {
+    _decisions.cancelAll();
     await Future.wait(_jobs.values.toList().map((job) => job.cancel()));
   }
 

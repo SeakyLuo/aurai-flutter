@@ -25,15 +25,25 @@ function controls(){
     states[m.id]=s.phase==='words'?m.id===s.hostId:s.phase==='speech'?m.id===s.order[s.index]:s.phase==='vote'&&!!player(m.id)&&player(m.id).alive&&s.votes[m.id]===undefined;
   });host.call('replies.set',{states:states});
 }
-function wake(id,text){if(member(id).kind==='agent')host.call('messages.send',{text:text,audience:[id],wakeAi:true,wakeMemberIds:[id]});}
+function wake(id,text){if(member(id).kind==='agent')host.call('messages.send',{text:text,asHost:true,audience:[id],wakeAi:true,wakeMemberIds:[id]});}
 function nextSpeaker(){
   s.seq++;var p=player(s.order[s.index]);s.cardKey='speech:'+s.seq;
-  host.call('messages.send',{key:s.cardKey,event:'speechEnded',data:{seq:s.seq},audience:null,
-    requirePublicMessage:true,wakeAi:member(p.id).kind==='agent',wakeMemberIds:member(p.id).kind==='agent'?[p.id]:[],
-    card:{title:'轮到'+name(p)+'描述',body:'请直接在群里描述自己的词语，不要说出词语本身；说完后结束发言。',
-      buttons:[{id:'done',label:'结束发言',action:'submit',repeatable:false}],
+  announce('轮到'+name(p)+'描述');
+  host.call('messages.send',{key:s.cardKey,event:'describe',data:{seq:s.seq},asHost:true,audience:[p.id],
+    wakeAi:member(p.id).kind==='agent',wakeMemberIds:member(p.id).kind==='agent'?[p.id]:[],
+    card:{title:'描述你的词语',body:'',
+      buttons:[{id:'describe',label:'提交描述',action:'submit',repeatable:false,questions:[{id:'description',question:'用一句话描述你的词语',mode:'text',required:true,options:[]}]}],
       interaction:{actors:[p.id],allowChange:false,reveal:'immediate',views:[]},
       participation:{visibility:'public',summaryVisibility:'public'}}});
+}
+function describe(text){
+  check(s.phase==='speech'&&s.order[s.index]===e.actorId,'当前没有轮到你描述');
+  check(typeof text==='string'&&text.trim().length>0&&text.length<=2000,'请填写不超过 2000 字的描述');
+  text=text.trim();var p=player(e.actorId);
+  check(text.indexOf(p.word)<0,'描述不能直接包含自己的词语');
+  record(name(p)+'描述',text);host.call('messages.send',{text:text,senderId:e.actorId,markdown:false});
+  s.spoken[p.id]=text;closeCards();s.index++;
+  if(s.index<s.order.length)nextSpeaker();else vote();
 }
 function speech(order,pk){
   closeCards();s.phase='speech';s.order=order;s.index=0;s.pk=pk;s.spoken={};
@@ -45,9 +55,9 @@ function vote(){
   var actors=alive().map(function(p){return p.id;}),options=s.candidates.map(function(id){return {id:id,label:name(player(id)),value:id};});
   options.push({id:'skip',label:'弃权',value:'skip'});
   record('投票',s.pk?'平票候选人再次投票':'投出你认为的卧底');
-  host.call('messages.send',{key:s.cardKey,event:'vote',data:{seq:s.seq},audience:null,
+  host.call('messages.send',{key:s.cardKey,event:'vote',data:{seq:s.seq},asHost:true,audience:null,
     wakeAi:actors.some(function(id){return member(id).kind==='agent';}),wakeMemberIds:actors.filter(function(id){return member(id).kind==='agent';}),
-    card:{title:'第'+s.round+'轮'+(s.pk?' · 平票重投':' · 找出卧底'),body:'票数收齐后公开；可以弃权。',showStatistics:true,
+    card:{title:'第'+s.round+'轮'+(s.pk?' · 平票重投':' · 找出卧底'),body:'',showStatistics:true,
       buttons:[{id:'vote',label:'提交投票',action:'submit',repeatable:false,selection:{optionPrefix:'dot',mode:'single',options:options}}],
       interaction:{actors:actors,allowChange:false,reveal:'onComplete',completion:{op:'eq',args:[{ref:'submittedCount'},actors.length]},views:[{type:'distribution',unit:'票'}]},
       participation:{visibility:'public',summaryVisibility:'public'}}});
@@ -88,23 +98,14 @@ if(e.action==='configure'){
     s.words={civilian:civilian,undercover:undercover};var shuffled=s.players.slice();
     for(var i=shuffled.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),temp=shuffled[i];shuffled[i]=shuffled[j];shuffled[j]=temp;}
     shuffled.forEach(function(p,i){p.role=i<s.undercoverCount?'undercover':'civilian';p.word=s.words[p.role];});
-    s.players.forEach(function(p){host.call('messages.send',{text:'你的词语：'+p.word+'。不知道自己的阵营，请根据大家的描述推理；不要直接说出词语。',audience:[p.id],wakeAi:false});});
-    announce('词语已私密发放，按座位顺序各描述一句；全部描述后投票。');
+    s.players.forEach(function(p){host.call('messages.send',{text:'你的词语：'+p.word,asHost:true,audience:[p.id],wakeAi:false});});
     s.candidates=alive().map(function(p){return p.id;});speech(s.candidates.slice(),false);
   }else if(e.action==='playerMessage'){
-    check(s.phase==='speech'&&s.order[s.index]===e.actorId,'当前没有轮到你描述');
-    check(s.spoken[e.actorId]===undefined,'本轮已经描述，请提交结束发言卡');
-    check(typeof d.text==='string'&&d.text.trim().length>0&&d.text.length<=300,'请用 1–300 字描述自己的词语');
-    var text=d.text.trim(),p=player(e.actorId);
-    check(text.indexOf(p.word)<0,'描述不能直接包含自己的词语');
-    record(name(p)+'描述',text);host.call('messages.send',{text:text,senderId:e.actorId,markdown:false});
-    s.spoken[p.id]=text;
-  }else if(e.action==='speechEnded'){
+    describe(d.text);
+  }else if(e.action==='describe'){
     check(s.phase==='speech'&&s.order[s.index]===e.actorId&&d.context.seq===s.seq,'发言卡已过期或还没有轮到你');
-    if(member(e.actorId).kind==='agent')check(s.spoken[e.actorId]!==undefined,'请先在群里描述，再结束发言');
-    else record(name(player(e.actorId))+'描述','已在群内发言');
-    closeCards();s.index++;
-    if(s.index<s.order.length)nextSpeaker();else vote();
+    check(Array.isArray(d.value)&&d.value.length===1&&d.value[0].id==='description'&&d.value[0].skipped===false,'请提交描述');
+    describe(d.value[0].text);
   }else if(e.action==='vote'){
     check(s.phase==='vote'&&d.context.seq===s.seq,'投票已过期');
     var voter=player(e.actorId),value=d.value;
@@ -118,7 +119,7 @@ if(s.phase!=='finished'){
   controls();host.call('messages.intercept',{actors:s.players.filter(function(p){return member(p.id)&&member(p.id).kind==='agent';}).map(function(p){return p.id;}),action:'playerMessage'});
 }
 var hostProtocol='你是主持人，不参赛。仅在 phase=words 时想一对相近但不同、有共同特征的词，用 setWords data:{seq,civilian,undercover} 提交。词语只能提交给程序，不得在公开正文中透露。程序随机分配、按顺序收集描述、投票、平票加赛、淘汰并判胜，之后无需主持推进，不轮询或代玩家操作。';
-var playerProtocol='你是谁是卧底玩家，只知道自己的 word，不知道阵营。读取最新状态和群聊公开描述，不能读主持人视角或其他玩家词语。轮到你时用 sendGroupMessage 直接在群里描述一句，不含自己的词语，不要通过小程序事件提交描述；发送成功后用 clickInteractiveMessage 提交对应结束发言卡，才会轮到下一位。vote 阶段用对应原生投票卡 clickInteractiveMessage 投票；不要另发确认、私密词语或长篇思考。不轮询、不重复发言；出局后只观战，结束后才公开词语。';
+var playerProtocol='你是谁是卧底玩家，使用自己的 word 和群聊公开描述推理，不能读主持人视角或其他玩家词语。轮到你时用 clickInteractiveMessage 提交当前描述卡，value:{description:{text:一句描述}}，不得包含自己的词语；程序会以你的身份公开描述并自动进入下一位，不另发同一段文字，不需要结束发言。vote 阶段用对应原生投票卡 clickInteractiveMessage 投票；不要另发确认、私密词语或长篇思考。不轮询、不重复发言；出局后只观战，结束后才公开词语。';
 var privateViews={};privateViews[s.hostId]={isHost:true,canEditData:true,words:s.words,players:s.players,protocol:hostProtocol};
 s.players.forEach(function(p){privateViews[p.id]={word:p.word||null,alive:p.alive,canSpeak:s.phase==='speech'&&s.order[s.index]===p.id,seq:s.seq,protocol:playerProtocol};});
 return {state:s,view:{title:'谁是卧底',phase:s.phase,hostId:s.hostId,round:s.round,seq:s.seq,undercoverCount:s.undercoverCount,

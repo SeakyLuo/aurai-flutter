@@ -1,4 +1,5 @@
 import 'contact_display_names.dart';
+import 'avatar_style.dart';
 
 class MessageSender {
   const MessageSender({
@@ -29,14 +30,14 @@ class MessageSender {
   );
   static MessageSender get localUser => _localUser;
 
-  static void setLocalUserName(String name) {
+  static void setLocalUserProfile(String name, AvatarStyle avatar) {
     _localUser = MessageSender(
       id: _localUser.id,
       name: name.isEmpty ? '你' : name,
       kind: _localUser.kind,
-      avatarIcon: _localUser.avatarIcon,
-      avatarColor: _localUser.avatarColor,
-      avatarPath: _localUser.avatarPath,
+      avatarIcon: avatar.icon,
+      avatarColor: avatar.color,
+      avatarPath: avatar.path,
       archived: _localUser.archived,
     );
   }

@@ -1,4 +1,14 @@
 .scout-root{display:flex;flex-direction:column;gap:16px;min-width:0}
+.scout-pick.recruited{touch-action:none;cursor:grab!important}.scout-pick.dragging{opacity:.3!important}.scout-drag-ghost{position:fixed;z-index:1001;pointer-events:none;transform:rotate(5deg);box-shadow:0 8px 24px #0004}.scout-drop-marker{position:fixed;width:3px;border-radius:3px;background:var(--aurai-highlight-text);z-index:1000;pointer-events:none}
+.scout #cardPlayers{display:none}.scout#cardGame{max-width:1100px}
+.scout-table{position:relative;padding:80px 75px 12px;background:#29364c;border-radius:24px;min-height:280px;color:#fff6e4}
+.scout-opponents{position:absolute;inset:14px 10px auto;display:flex;justify-content:center;gap:24px}
+.scout-player{display:grid;justify-items:center;gap:5px;width:76px;font-size:12px;text-align:center}
+.scout-player[data-position="left"]{position:absolute;left:0;top:80px}.scout-player[data-position="right"]{position:absolute;right:0;top:80px}
+.scout-avatar{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:#f2d5a1;color:#29364c;font-size:18px;font-weight:600}
+.scout-player.active .scout-avatar{outline:2px solid #f2c57c;outline-offset:4px}.scout-player strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}.scout-player-detail{font-size:10px;color:#d9d5cb;white-space:nowrap}
+.scout-table .scout-desk{padding:8px;min-height:170px;background:none;border-radius:0}.scout-table[data-seats="3"]{padding-top:18px}.scout-table[data-seats="3"] .scout-player{top:40px}
+.scout-tally strong{color:var(--aurai-highlight-text);font-weight:500}.scout-tally{align-items:center;flex-wrap:wrap}.scout-hand-label{margin-bottom:-10px}
 .scout-desk{background:#29364c;color:#fff6e4;border-radius:24px;padding:20px;text-align:center;min-height:190px;background-image:radial-gradient(ellipse at 50% 0,#ffffff0b,transparent 65%)}
 .scout-desk-label{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#d8cfbb}.scout-wordmark{font-weight:700;letter-spacing:3px;color:#f2c57c}
 .scout-desk h2{font-size:22px;line-height:1.5;margin:26px 0 12px}.scout-subtle{font-size:13px;color:#d9d5cb;line-height:1.7;margin:14px 0 0}
@@ -14,3 +24,7 @@
 .scout-scoreboard{display:flex;flex-direction:column;gap:14px;margin-top:20px}.scout-score{display:flex;align-items:center;gap:12px;font-size:13px}.scout-score strong{font-weight:500;flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.scout-score span{color:#d9d5cb}.scout-score b{font-size:17px;min-width:50px;text-align:right}
 .scout .card-cover{background:#29364c}.scout .card-cover span{color:#29364c;background:#f2d5a1}.scout .card-cover span:nth-child(2){background:#a9d2c8;color:#29364c}.scout .card-cover span:nth-child(3){background:#e5aba0}
 @media(max-width:340px){.scout-desk{padding:16px}.scout-desk h2{font-size:20px}.scout-actions>.aurai-button{padding:10px 8px;font-size:13px!important}}
+@media(min-width:650px){.scout-table{min-height:310px;padding-left:110px;padding-right:110px}.scout-player{width:96px;font-size:14px}.scout-avatar{width:44px;height:44px}.scout-player-detail{font-size:12px}.scout-hand{justify-content:center}.scout-actions{justify-content:center}.scout-actions>.aurai-button{flex:0 1 180px}.scout-table .scout-desk h2{margin-top:40px}}
+@media(max-width:420px){.scout-table{padding-left:62px;padding-right:62px}.scout-player{width:58px}.scout-table .scout-desk h2{font-size:17px}.scout-desk-label{font-size:10px;gap:4px}.scout-wordmark{letter-spacing:1px}.scout-card{width:47px;height:78px}.scout-active{justify-content:flex-start}.scout-score{flex-wrap:wrap;gap:4px}.scout-score strong{flex-basis:100%}}
+.scout-hand{--scout-card-width:54px;gap:0}.scout-hand .scout-pick{width:clamp(22px,calc((100% - var(--scout-card-width))/max(1,var(--cards) - 1)),61px)}.scout-hand .scout-pick:last-child{width:var(--scout-card-width)}.scout-hand .scout-back-number{align-self:flex-start}.scout-hand .scout-card{border:1px solid #29364c25;padding-left:6px}.scout-hand .scout-card.selected{border-color:var(--aurai-highlight-text)}
+@media(max-width:420px){.scout-hand{--scout-card-width:47px}.scout-hand .scout-number{font-size:23px}}

@@ -11,12 +11,14 @@ var GAME='{{GAME}}',TITLE='{{TITLE}}';
   <section id="cardSetup" class="aurai-stack">
     <div class="card-cover" aria-hidden="true">{{COVER}}</div>
     <h2>{{SUBTITLE}}</h2><p class="aurai-muted">{{DESCRIPTION}}</p>
+    <div id="cardSeatOptions" class="card-seat-options" hidden></div>
     <button id="cardStart" type="button" class="aurai-button aurai-button--primary">与电脑开局</button>
     <p id="cardSetupHint" class="aurai-muted"></p>
   </section>
   <section id="cardMatch" class="aurai-stack" hidden>
     <div id="cardPlayers" class="card-players"></div>
     <div id="cardTable"></div>
+    <div id="cardRematchSeats" class="card-seat-options" hidden></div>
     <nav id="cardToolbar" class="aurai-row" aria-label="对局操作">
       <button id="cardContinue" type="button" class="aurai-button">继续</button>
       <button id="cardRematch" type="button" class="aurai-button aurai-button--primary" hidden>再来一局</button>

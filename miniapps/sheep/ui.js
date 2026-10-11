@@ -1,5 +1,5 @@
 const $=id=>document.getElementById(id),el=(tag,text,cls)=>{const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n;};
-let game=AuraiHTML.state?.game??null,level=game?game.level:1,busy=false,hinting=false,hinted=null,worker=null,cancelHint=null,confirmation=null;
+let game=AuraiHTML.state?.game??null,level=game?game.level:0,busy=false,hinting=false,hinted=null,worker=null,cancelHint=null,confirmation=null;
 const seed=()=>crypto.getRandomValues(new Uint32Array(1))[0];
 function stopHint(){if(worker){worker.terminate();worker=null;}if(cancelHint){cancelHint({status:'cancelled'});cancelHint=null;}hinting=false;hinted=null;}
 function render(){
@@ -20,7 +20,8 @@ function render(){
     $('instruction').textContent=game.phase==='playing'?(hinting?'寻找通关走法…':hinted!==null?'发光的这张，可以通向过关':game.tray.length>=5?'收集槽快满了，优先凑齐已有图案':'三张相同就消除，灰暗的牌还被遮挡'):'';
     $('result').hidden=game.phase==='playing';$('resultSymbol').textContent=game.phase==='won'?'🐑':'🌿';
     $('resultTitle').textContent=game.phase==='won'?'恭喜，羊羊回家了':'先歇一小会儿';
-    $('resultText').textContent=game.phase==='won'?`用 ${game.history.length} 步清空牧场，再挑战一关？`:'收集槽满了。可以撤回几步，或者用同一副牌再试一次。';
+    $('resultText').textContent=game.phase==='won'?(level===Sheep.levels.length-1?'山顶挑战完成，可以换一副牌继续挑战。':`已清空 ${game.tiles.length} 张牌，下一关见。`):'收集槽满了。可以撤回几步，或者用同一副牌再试一次。';
+    $('next').textContent=level===Sheep.levels.length-1?'再次挑战':'下一关';
     $('next').hidden=game.phase!=='won';$('next').disabled=busy;
     $('undo').disabled=busy||hinting||!game.history.length;$('hint').disabled=busy||hinting||game.phase!=='playing';$('retry').disabled=busy||hinting||!game.history.length;$('new').disabled=busy||hinting;
   }
@@ -41,12 +42,12 @@ async function play(id){
     }
   }finally{busy=false;render();}
 }
-async function newGame(nextLevel=level,same=false){stopHint();$('confirm').hidden=true;confirmation=null;level=nextLevel;busy=true;try{await commit(Sheep.deal(level,same?game.seed:seed()));}finally{busy=false;render();}}
+async function newGame(nextLevel=level,same=false){stopHint();$('confirm').hidden=true;confirmation=null;level=nextLevel;busy=true;try{await commit(same?{...structuredClone(game),removed:[],tray:[],history:[],phase:'playing'}:Sheep.deal(level,seed()));}finally{busy=false;render();}}
 function confirm(action,text){confirmation=action;$('confirmText').textContent=text;$('confirm').hidden=false;AuraiHTML.requestResize();}
-$('start').onclick=()=>newGame();$('next').onclick=()=>newGame();
+$('start').onclick=()=>newGame();$('next').onclick=()=>newGame(Math.min(level+1,Sheep.levels.length-1));
 $('undo').onclick=async()=>{stopHint();busy=true;try{await commit(Sheep.undo(structuredClone(game)));}finally{busy=false;render();}};
 $('retry').onclick=()=>confirm(()=>newGame(level,true),'用这副牌重新开始？当前走牌进度会清空。');
-$('new').onclick=()=>confirm(async()=>{stopHint();$('confirm').hidden=true;busy=true;try{await commit(null);}finally{busy=false;render();}},'返回难度选择，开始新关？当前进度会被替换。');
+$('new').onclick=()=>confirm(async()=>{stopHint();$('confirm').hidden=true;busy=true;try{await commit(null);}finally{busy=false;render();}},'返回关卡选择？当前进度会被替换。');
 $('confirmNo').onclick=()=>{$('confirm').hidden=true;confirmation=null;AuraiHTML.requestResize();};$('confirmYes').onclick=()=>{const action=confirmation;confirmation=null;$('confirm').hidden=true;void action();};
 $('hint').onclick=async()=>{
   stopHint();hinting=true;render();

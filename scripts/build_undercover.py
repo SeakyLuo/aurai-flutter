@@ -23,8 +23,8 @@ def build():
                  description='主持 AI 临场想词，程序私密发词、轮流描述、投票、平票加赛和结算。支持人类与 AI 群聊同玩，消息内预览、全屏参与。',
                  asset='assets/miniapps/undercover.html',
                  version=hashlib.sha256(target.read_bytes()).hexdigest())
-    if (ROOT / 'assets/miniapps/icons/undercover.png').is_file():
-        entry['iconAsset'] = 'assets/miniapps/icons/undercover.png'
+    if (ROOT / 'assets/miniapps/icons/undercover.webp').is_file():
+        entry['iconAsset'] = 'assets/miniapps/icons/undercover.webp'
     path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print('谁是卧底: ' + str(len(html.encode('utf-8'))) + ' bytes')
 

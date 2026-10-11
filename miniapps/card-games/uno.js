@@ -8,10 +8,14 @@ var Cards=(function(){
   function next(s,n){return (s.turn+s.direction*(n||1)+8)%4;}
   function draw(s,seat,n){var drawn=[];for(var i=0;i<n;i++){if(!s.deck.length){var top=s.discard.pop();s.deck=shuffle(s,s.discard);s.discard=[top];}if(!s.deck.length)break;var c=s.deck.pop();s.hands[seat].push(c);drawn.push(c);}return drawn;}
   function matches(s,c){var top=s.discard[s.discard.length-1];return c.color==='k'||c.color===s.color||c.value===top.value;}
+  // Jump-in applies to identical number cards, only until the next action.
+  // Action cards retain their existing penalties and +4 challenge flow.
+  function jumpCards(s,seat){var top=s.discard[s.discard.length-1];return s.phase==='playing'&&s.stage==='play'&&s.jumpOpen&&seat!==s.turn?s.hands[seat].filter(function(c){return c.color===top.color&&c.value===top.value;}):[];}
+  function aiSeat(s){for(var n=1;n<=4;n++){var seat=(s.turn+s.direction*n+8)%4;if(s.players[seat].kind==='engine'&&jumpCards(s,seat).length)return seat;}return s.players[s.turn].kind==='engine'?s.turn:-1;}
   function points(c){return c.color==='k'?50:(isNaN(Number(c.value))?20:Number(c.value));}
   function finish(s){var winner=s.hands.findIndex(function(h){return h.length===0;});if(winner<0)return;s.phase='finished';s.winner=winner;s.score=s.hands.reduce(function(n,h){return n+h.reduce(function(a,c){return a+points(c);},0);},0);log(s,winner,'获胜，获得 '+s.score+' 分');}
   function create(players,seed){
-    var s={phase:'playing',stage:'play',turn:0,players:players,seed:seed>>>0,direction:1,hands:[[],[],[],[]],deck:[],discard:[],color:'r',logs:[],unoSeat:null,drawn:null,challenge:null,evidence:null,winner:null,score:0};
+    var s={phase:'playing',stage:'play',turn:0,players:players,seed:seed>>>0,direction:1,hands:[[],[],[],[]],deck:[],discard:[],color:'r',logs:[],unoSeat:null,drawn:null,challenge:null,evidence:null,winner:null,score:0,jumpOpen:false};
     var id=0;colors.forEach(function(color){for(var n=0;n<=9;n++)for(var k=0;k<(n===0?1:2);k++)s.deck.push({id:id++,color:color,value:String(n)});['skip','reverse','draw2'].forEach(function(value){for(var k=0;k<2;k++)s.deck.push({id:id++,color:color,value:value});});});
     ['wild','draw4'].forEach(function(value){for(var k=0;k<4;k++)s.deck.push({id:id++,color:'k',value:value});});shuffle(s,s.deck);
     for(var p=0;p<4;p++)draw(s,p,7);
@@ -23,7 +27,11 @@ var Cards=(function(){
     return s;
   }
   function apply(s,seat,action,data){
-    if(s.phase!=='playing'||seat!==s.turn)throw Error('尚未轮到你');
+    var jumping=action==='jump';
+    if(s.phase!=='playing')throw Error('本局已经结束');
+    if(jumping){if(!jumpCards(s,seat).some(function(c){return c.id===data.card;}))throw Error('只能抢出同色同数字的牌');s.turn=seat;action='play';}
+    else if(seat!==s.turn)throw Error('尚未轮到你');
+    s.jumpOpen=false;
     if(action==='catch'){
       if(s.unoSeat===null)throw Error('无人漏喊 UNO');draw(s,s.unoSeat,2);log(s,s.unoSeat,'漏喊 UNO，被抓到并摸两张');s.unoSeat=null;return;
     }
@@ -56,7 +64,8 @@ var Cards=(function(){
     if(card.color==='k'&&colors.indexOf(data.color)<0)throw Error('请选择下一轮颜色');
     var prior=s.hands[seat].slice(),illegal=prior.some(function(c){return c.color===s.color;});
     s.unoSeat=null;s.hands[seat].splice(index,1);s.discard.push(card);s.color=card.color==='k'?data.color:card.color;s.stage='play';s.drawn=null;
-    log(s,seat,'打出 '+label(card)+(card.color==='k'?'，选择'+names[s.color]+'色':'')+(s.hands[seat].length===1&&data.uno?' · UNO！':''));
+    s.jumpOpen=card.color!=='k'&&/^\d$/.test(card.value);
+    log(s,seat,(jumping?'抢出 ':'打出 ')+label(card)+(card.color==='k'?'，选择'+names[s.color]+'色':'')+(s.hands[seat].length===1&&data.uno?' · UNO！':''));
     if(s.hands[seat].length===1&&!data.uno)s.unoSeat=seat;
     if(card.value==='reverse')s.direction*=-1;
     var victim=next(s);
@@ -65,9 +74,10 @@ var Cards=(function(){
     else s.turn=next(s,card.value==='skip'?2:1);
     finish(s);
   }
-  function publicView(s){return {phase:s.phase,stage:s.stage,turn:s.turn,players:s.players,direction:s.direction,color:s.color,top:s.discard[s.discard.length-1],counts:s.hands.map(function(h){return h.length;}),logs:s.logs,unoSeat:s.unoSeat,winner:s.winner,score:s.score,challenged:s.challenge?s.challenge.seat:null};}
-  function privateView(s,seat){return {seat:seat,hand:s.hands[seat],playable:s.phase==='playing'&&s.turn===seat&&(s.stage==='play'||s.stage==='drawn')?s.hands[seat].filter(function(c){return matches(s,c)&&(s.stage!=='drawn'||c.id===s.drawn);}).map(function(c){return c.id;}):[],evidence:s.evidence&&s.evidence.seat===seat?s.evidence:null};}
+  function publicView(s){var view={phase:s.phase,stage:s.stage,turn:s.turn,players:s.players,direction:s.direction,color:s.color,top:s.discard[s.discard.length-1],counts:s.hands.map(function(h){return h.length;}),logs:s.logs,unoSeat:s.unoSeat,winner:s.winner,score:s.score,challenged:s.challenge?s.challenge.seat:null,jumpOpen:s.jumpOpen===true,engineCanJump:s.phase==='playing'&&aiSeat(s)>=0&&aiSeat(s)!==s.turn};if(s.phase==='finished')view.hands=s.hands;return view;}
+  function privateView(s,seat){return {seat:seat,hand:s.hands[seat],jumpable:jumpCards(s,seat).map(function(c){return c.id;}),playable:s.phase==='playing'&&s.turn===seat&&(s.stage==='play'||s.stage==='drawn')?s.hands[seat].filter(function(c){return matches(s,c)&&(s.stage!=='drawn'||c.id===s.drawn);}).map(function(c){return c.id;}):[],evidence:s.evidence&&s.evidence.seat===seat?s.evidence:null};}
   function ai(own,v){
+    if(own.seat!==v.turn)return {action:'jump',data:{card:own.jumpable[0],uno:true}};
     if(v.unoSeat!==null)return {action:'catch',data:{}};
     var count={r:0,y:0,g:0,b:0};own.hand.forEach(function(c){if(c.color!=='k')count[c.color]++;});var color=colors.slice().sort(function(a,b){return count[b]-count[a];})[0];
     if(v.stage==='color')return {action:'color',data:{color:color}};
@@ -79,5 +89,5 @@ var Cards=(function(){
     if(choice)return {action:'play',data:{card:choice.id,color:color,uno:true}};
     return {action:v.stage==='drawn'?'pass':'draw',data:{}};
   }
-  return {title:'UNO',seats:4,create:create,apply:apply,publicView:publicView,privateView:privateView,ai:ai,label:label,rules:'四人经典 108 张牌，每人 7 张。按颜色、数字或符号接牌，也可主动摸一张；摸后只能打出刚摸到的牌，或保留结束回合。+2 和 +4 不叠加。+4 仅在手中没有当前颜色时合法，下家可质疑：成功则出牌者摸 4 张，失败则质疑者摸 6 张并跳过。打到剩一张时勾选喊 UNO，漏喊可被下家抓到罚 2 张。反转改变顺序，跳过使下家停一回合。末张罚牌结算后结束。本模式为单局计分，数字按牌面、功能牌 20 分、万能牌 50 分，不进行累计 500 分赛。'};
+  return {title:'UNO',seats:4,aiSeat:aiSeat,create:create,apply:apply,publicView:publicView,privateView:privateView,ai:ai,label:label,rules:'四人 108 张牌，每人 7 张。同色同数字可以抢出：上一张数字牌打出后、下一位行动前，直接抢出相同牌，随后从抢出者的下家继续。功能牌和万能牌不参与抢出。按颜色、数字或符号接牌，也可主动摸一张；摸后只能打出刚摸到的牌，或保留结束回合。+2 和 +4 不叠加。+4 仅在手中没有当前颜色时合法，下家可质疑：成功则出牌者摸 4 张，失败则质疑者摸 6 张并跳过。打到剩一张时勾选喊 UNO，漏喊可被下家抓到罚 2 张。反转改变顺序，跳过使下家停一回合。末张罚牌结算后结束。本模式为单局计分，数字按牌面、功能牌 20 分、万能牌 50 分，不进行累计 500 分赛。'};
 })();

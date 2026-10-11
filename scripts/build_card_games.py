@@ -6,6 +6,10 @@ import json
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'miniapps/card-games'
 GAMES = [
+    ('quoridor', '步步为营', '走一步，也留一条路',
+     '双人迷宫竞速，用围墙改变路线，与本地 AI 比拼寻路和拦截。', ['●', '╬', '●']),
+    ('sixnimmt', '牛头王', '小心，第六张归你',
+     '与三位本地 AI 暗选同揭，避开牛头罚分。完整四人经典玩法。', ['6', '55', '104']),
     ('battleship', '海战棋', '藏好舰队，锁定目标',
      '经典双人海战，随机布舰与雷达射击。本地 AI 只根据命中记录寻找舰船。', ['≈', '⌖', '≈']),
     ('junqi', '军棋', '翻开战局，步步为营',
@@ -15,9 +19,9 @@ GAMES = [
     ('doudizhu', '斗地主', '一副好牌，一场默契',
      '三人经典叫分，与两位本地 AI 较量。支持提示、农民配合与本局积分。', ['♣', 'A', '♦']),
     ('uno', 'UNO', '下一张，改变牌局',
-     '四人经典配色牌局，与三位本地 AI 游玩。支持反转、UNO 与 +4 质疑。', ['↻', '4', '+2']),
+     '四人配色牌局，与三位本地 AI 游玩。支持同色同数字抢出、反转、UNO 与 +4 质疑。', ['↻', '4', '+2']),
     ('scout', 'Scout 马戏星探', '把你的手牌，变成好戏',
-     '三人马戏牌局，与两位本地 AI 游玩。招募、演出，三轮决出最佳团长。', ['3', '4', '5']),
+     '支持 3—5 人，与本地 AI 招募、演出，争夺最佳团长。', ['3', '4', '5']),
 ]
 
 
@@ -44,9 +48,9 @@ def build():
             catalog.append(entry)
         entry.update(title=title, description=description, asset='assets/miniapps/'+game+'.html',
                      version=hashlib.sha256(target.read_bytes()).hexdigest())
-        icon = ROOT / ('assets/miniapps/icons/'+game+'.png')
+        icon = ROOT / ('assets/miniapps/icons/'+game+'.webp')
         if icon.is_file():
-            entry['iconAsset'] = 'assets/miniapps/icons/'+game+'.png'
+            entry['iconAsset'] = 'assets/miniapps/icons/'+game+'.webp'
         print(title+': '+str(target.stat().st_size)+' bytes')
     catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
 

@@ -1,0 +1,13 @@
+{
+  "mode": "built-in image_gen",
+  "assets": [
+    {
+      "path": "assets/miniapps/icons/quoridor.webp",
+      "prompt": "A premium mobile mini game icon, square canvas, tactile soft 3D clay and carved wood style matching a friendly board game app. A small cream wooden 3x3 maze board viewed in three-quarter perspective, two chunky rounded pawns one plum purple and one warm teal separated by a low walnut wooden fence. Strong instantly recognizable silhouette, clean beige studio background, soft lighting, centered with padding, no letters no numbers no watermark, no frame."
+    },
+    {
+      "path": "assets/miniapps/icons/sixnimmt.webp",
+      "prompt": "A premium mobile mini game icon, square canvas, tactile friendly 3D clay boardgame style. A charming small cinnamon brown bull head with two ivory curved horns emerging above a fan of three cream rounded number cards. The front card has a large embossed red number 6, the rear cards subtle warm yellow and teal faces without text. Soft warm pale mint studio background. Simple iconic playful composition, centered with padding, rounded soft materials, no other text, no watermark, no frame."
+    }
+  ]
+}

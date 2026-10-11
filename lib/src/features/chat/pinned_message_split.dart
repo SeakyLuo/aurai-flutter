@@ -348,7 +348,7 @@ class PinnedMessageSplitState extends State<PinnedMessageSplit>
         child: widget.child,
       ),
       detailBuilder: _message != null || _details != null
-          ? (context, wide) => Stack(
+          ? (context, wide, supportsSplit) => Stack(
               fit: StackFit.expand,
               children: [
                 if (_message != null)

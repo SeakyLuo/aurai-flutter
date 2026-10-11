@@ -19,10 +19,10 @@
     <div id="players" class="roster"></div>
     <section id="privateWord" class="private-word" hidden><span class="aurai-muted">仅你可见的词语</span><strong id="word"></strong></section>
     <p id="hostHint" class="aurai-muted" hidden>你是主持人，词语由你准备。后续流程由程序自动推进。</p>
-    <p class="aurai-muted" id="chatHint">请在群聊里发言，通过群里的行动卡结束发言、投票。</p>
+    <p class="aurai-muted" id="chatHint">通过群里的描述卡和投票卡参与。</p>
     <div class="fullscreen-only aurai-stack">
       <details open><summary>对局时间线</summary><div id="timeline" class="aurai-stack"></div></details>
-      <details><summary>规则</summary><p class="aurai-muted">主持人不参赛，随机发放两组相近的词。玩家不知道自己的阵营，按座位顺序各描述一句，再共同投票，可弃权。最高票唯一者出局并公布阵营；平票者补充描述后重投，再次平票或全员弃权则无人出局，进入下一轮。卧底全出局，平民胜；存活卧底人数不少于平民，卧底胜。结束后公开全部词语与身份。</p></details>
+      <details><summary>规则</summary><p class="aurai-muted">主持人不参赛，随机发放两组相近的词。按座位顺序各描述一句，再共同投票，可弃权。最高票唯一者出局并公布阵营；平票者补充描述后重投，再次平票或全员弃权则无人出局，进入下一轮。卧底全出局，平民胜；存活卧底人数不少于平民，卧底胜。结束后公开全部词语与身份。</p></details>
       <button type="button" class="aurai-button" id="stop" hidden>结束本局</button>
       <div id="stopConfirm" class="aurai-row" hidden><span>结束后公开词语与身份？</span><button type="button" class="aurai-button aurai-button--danger" id="confirmStop">确认结束</button><button type="button" class="aurai-button" id="cancelStop">继续对局</button></div>
       <button type="button" class="aurai-button aurai-button--primary" id="nextGame" hidden>再来一局</button>

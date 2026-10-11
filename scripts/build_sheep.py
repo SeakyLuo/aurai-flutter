@@ -10,11 +10,11 @@ SOURCE = ROOT / 'miniapps/sheep'
 def build():
     engine = (SOURCE / 'engine.js').read_text(encoding='utf-8')
     worker = engine + '\nself.onmessage=({data})=>self.postMessage(Sheep.hint(data));'
-    icon = ROOT / 'assets/miniapps/icons/sheep.png'
+    icon = ROOT / 'assets/miniapps/icons/sheep.webp'
     values = {'ENGINE': engine, 'UI': (SOURCE / 'ui.js').read_text(encoding='utf-8'),
               'STYLE': (SOURCE / 'style.css').read_text(encoding='utf-8'),
               'WORKER': json.dumps(worker, ensure_ascii=False).replace('</', '<\\/'),
-              'LOGO': 'data:image/png;base64,' + base64.b64encode(icon.read_bytes()).decode()}
+              'LOGO': 'data:image/webp;base64,' + base64.b64encode(icon.read_bytes()).decode()}
     paths = {'UNDO': '<path d="M9 5 4 10l5 5M4 10h9a6 6 0 0 1 0 12" transform="translate(0 -2)"/>',
              'HINT': '<path d="M9 18h6m-5 3h4M8 13a6 6 0 1 1 8 0c-1.5 1-1.5 2-1.5 3h-5c0-1 0-2-1.5-3Z"/>',
              'RETRY': '<path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/>',
@@ -32,8 +32,8 @@ def build():
     if entry is None:
         entry = {'id': 'builtin.sheep', 'publisherId': 'user:local'}
         catalog.append(entry)
-    entry.update(title='羊了个羊', description='每局都有通关解法的叠牌三消。七格收集槽、三档难度，支持撤回、提示、同关重来和离线保存。',
-                 asset='assets/miniapps/sheep.html', iconAsset='assets/miniapps/icons/sheep.png',
+    entry.update(title='羊了个羊', description='12 个递进关卡，从教学草地到多层挑战。七格收集槽，每局都有通关解法，支持撤回、提示、同关重来和离线保存。',
+                 asset='assets/miniapps/sheep.html', iconAsset='assets/miniapps/icons/sheep.webp',
                  version=hashlib.sha256(target.read_bytes()).hexdigest())
     catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
     print('sheep: ' + str(target.stat().st_size) + ' bytes')

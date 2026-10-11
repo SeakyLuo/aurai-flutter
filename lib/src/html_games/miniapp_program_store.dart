@@ -160,6 +160,7 @@ class MiniappProgramStore {
     String? cardId,
     String? reason,
     bool collectionPaused = false,
+    bool collectionWithdrawn = false,
     bool decision = false,
     int? expectedVersion,
   }) async {
@@ -218,6 +219,14 @@ class MiniappProgramStore {
       final card = InteractiveMessage.fromJson(
         MiniappProgram.decode(sourceCard['interactive_json']),
       );
+      if (collectionWithdrawn &&
+          (!card.isVote ||
+              card.closed ||
+              card.engine.phase != 'collecting' ||
+              card.participation['_programNotifyWithdrawal'] != true ||
+              card.choices.containsKey(actorId))) {
+        throw StateError('投票取消状态无效');
+      }
       if (card.anonymous) anonymousCard = card;
       if (card.isQuestionnaire) questionnaire = card;
     }
@@ -332,6 +341,8 @@ class MiniappProgramStore {
               'value': data,
               if (collectionPaused)
                 'collectionEvent': 'paused'
+              else if (collectionWithdrawn)
+                'collectionEvent': 'withdrawn'
               else if (questionnaire?.completed == true)
                 'collectionEvent': 'completed',
               if (reason != null) 'reason': reason,

@@ -45,9 +45,16 @@ class _MentionSheetState extends State<_MentionSheet> {
       final members = await widget.store.members(widget.conversationId);
       if (mounted)
         setState(
-          () => _members = members
-              .where((m) => m.sender.kind == MessageSenderKind.agent)
-              .byContactName((member) => member.sender),
+          () => _members =
+              members
+                  .where((m) => m.sender.kind == MessageSenderKind.agent)
+                  .toList()
+                ..sort(
+                  (a, b) => ContactNameOrder(
+                    a.sender.id,
+                    a.sender.name,
+                  ).compareTo(ContactNameOrder(b.sender.id, b.sender.name)),
+                ),
         );
     } on Object catch (error) {
       if (!mounted) return;
@@ -150,7 +157,11 @@ class _MentionSheetState extends State<_MentionSheet> {
                               m.sender.displayName.toLowerCase().contains(
                                 query,
                               ) ||
-                              m.sender.name.toLowerCase().contains(query),
+                              m.sender.name.toLowerCase().contains(query) ||
+                              (m.sender.originalName?.toLowerCase().contains(
+                                    query,
+                                  ) ??
+                                  false),
                         ))
                           ListTile(
                             contentPadding: EdgeInsets.zero,
@@ -164,7 +175,7 @@ class _MentionSheetState extends State<_MentionSheet> {
                               size: 44,
                             ),
                             title: Text(
-                              member.sender.displayName,
+                              member.sender.name,
                               style: const TextStyle(fontSize: 15),
                             ),
                             onTap: () =>
@@ -176,7 +187,11 @@ class _MentionSheetState extends State<_MentionSheet> {
                                   m.sender.displayName.toLowerCase().contains(
                                     query,
                                   ) ||
-                                  m.sender.name.toLowerCase().contains(query),
+                                  m.sender.name.toLowerCase().contains(query) ||
+                                  (m.sender.originalName
+                                          ?.toLowerCase()
+                                          .contains(query) ??
+                                      false),
                             ))
                           const Padding(
                             padding: EdgeInsets.all(24),

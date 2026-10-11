@@ -21,5 +21,5 @@ var Chess = (function () {
     return [];
   }
   return {width:15,height:15,first:'b',second:'w',sides:{b:'黑棋',w:'白棋'},initial:function(){return Array(225).fill(null);},legal:legal,play:play,winningLine:winningLine,coordinate:coordinate,
-    rules:'15 × 15 棋盘，黑棋先行，双方轮流落子。横、竖或斜线连续五子及以上获胜；无禁手，满盘未分胜负判和。'};
+    rules:'15 × 15 棋盘，首局随机分配黑白棋，之后棋色固定、双方轮换先手。双方轮流落子。横、竖或斜线连续五子及以上获胜；无禁手，满盘未分胜负判和。'};
 })();

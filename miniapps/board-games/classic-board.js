@@ -9,9 +9,9 @@ function marble(el,x,y,side,r,extra=''){
   node('ellipse',{cx:x-r*.23,cy:y-r*.35,rx:r*.38,ry:r*.2,fill:'#fff',opacity:.28},group);
   return group;
 }
-function starPoint(p){return [250+24*((p[0]-8)+(p[1]-8)/2),224+21*(p[1]-8)];}
-function drawBoard(board,selected,pending,moves,last,winningLine){
-  const scene=JSON.stringify([board,selected,pending,moves,last,winningLine]);
+function starPoint(p,flip=false){const direction=flip?-1:1;return [250+direction*24*((p[0]-8)+(p[1]-8)/2),224+direction*21*(p[1]-8)];}
+function drawBoard(board,selected,pending,moves,last,winningLine,flip=false){
+  const scene=JSON.stringify([board,selected,pending,moves,last,winningLine,flip]);
   if(scene===paintedScene&&$('board').childElementCount)return;
   paintedScene=scene;
   const el=$('board'),key=board.join(','),animate=paintedPosition!==''&&key!==paintedPosition;paintedPosition=key;
@@ -20,14 +20,15 @@ function drawBoard(board,selected,pending,moves,last,winningLine){
     el.setAttribute('viewBox','80 30 340 390');$('game').style.setProperty('--board-ratio',340/390);
     node('path',{d:'M250 45 L302 131 L407 131 L355 224 L407 317 L302 317 L250 403 L198 317 L93 317 L145 224 L93 131 L198 131 Z',class:'star-paper'},el);
     for(const i of Chess.holes){
-      const p=[i%17,Math.floor(i/17)],[x,y]=starPoint(p),camp=p[1]<4?'home-b':p[1]>12?'home-w':'';
+      const p=[i%17,Math.floor(i/17)],[x,y]=starPoint(p,flip),camp=Chess.campAt(i)?'home-'+Chess.campAt(i):'';
       node('circle',{cx:x,cy:y,r:8,class:'hole '+camp},el);
       if(board[i])marble(el,x,y,board[i],8.6,animate&&last?.to[0]===p[0]&&last?.to[1]===p[1]?'arrive':'');
       if(selected&&selected[0]===p[0]&&selected[1]===p[1])node('circle',{cx:x,cy:y,r:12,class:'selection'},el);
     }
-    if(selected)for(const m of moves.filter(m=>m.from[0]===selected[0]&&m.from[1]===selected[1])){const [cx,cy]=starPoint(m.to);node('circle',{cx,cy,r:7,class:'legal-dot'},el);}
-    if(last){const route=[last.from,...last.path].map(starPoint);node('polyline',{points:route.map(p=>p.join(',')).join(' '),class:'jump-trail'},el);}
-    boardLabel(el,320,64,'薄 荷');boardLabel(el,180,392,'蜜 桃');
+    if(selected)for(const m of moves.filter(m=>m.from[0]===selected[0]&&m.from[1]===selected[1])){const [cx,cy]=starPoint(m.to,flip);node('circle',{cx,cy,r:7,class:'legal-dot'},el);}
+    if(last){const route=[last.from,...last.path].map(p=>starPoint(p,flip));node('polyline',{points:route.map(p=>p.join(',')).join(' '),class:'jump-trail'},el);}
+    if(pending){const [cx,cy]=starPoint(pending.to,flip);node('circle',{cx,cy,r:12,fill:'none',stroke:'var(--aurai-highlight-text)','stroke-width':3,'stroke-dasharray':'4 3'},el);}
+    boardLabel(el,320,64,flip?'蜜 桃':'薄 荷');boardLabel(el,180,392,flip?'薄 荷':'蜜 桃');
     return;
   }
   const w=Chess.width,h=Chess.height,cell=44,pad=24,sw=w*cell+pad*2,sh=h*cell+pad*2;
@@ -44,16 +45,17 @@ function drawBoard(board,selected,pending,moves,last,winningLine){
     }else if(GAME==='reversi'&&moves.some(m=>m.to[0]===x&&m.to[1]===y))node('circle',{cx,cy,r:4,class:'legal-dot'},el);
     if(winningLine.some(p=>p[0]===x&&p[1]===y))node('circle',{cx,cy,r:20,class:'winner-ring'},el);
   }
+  if(pending)node('circle',{cx:pad+(pending.to[0]+.5)*cell,cy:pad+(pending.to[1]+.5)*cell,r:19,fill:'none',stroke:'var(--aurai-highlight-text)','stroke-width':3,'stroke-dasharray':'4 3'},el);
   for(let x=0;x<w;x++)boardLabel(el,pad+(x+.5)*cell,sh-10,String.fromCharCode(65+x));
   if(GAME==='reversi')for(let y=0;y<h;y++)boardLabel(el,11,pad+(y+.5)*cell,y+1);
   if(GAME==='connect4')for(const m of moves){const cx=pad+(m.to[0]+.5)*cell;node('path',{d:`M${cx-4} 9 L${cx} 14 L${cx+4} 9`,class:'column-arrow'},el);}
 }
-function boardPoint(event){
+function boardPoint(event,flip=false){
   const box=$('board').getBoundingClientRect();
   if(GAME==='halma'){
     const x=80+(event.clientX-box.left)/box.width*340,y=30+(event.clientY-box.top)/box.height*390;
     let closest=null,distance=14;
-    for(const i of Chess.holes){const p=[i%17,Math.floor(i/17)],v=starPoint(p),d=Math.hypot(x-v[0],y-v[1]);if(d<distance){closest=p;distance=d;}}
+    for(const i of Chess.holes){const p=[i%17,Math.floor(i/17)],v=starPoint(p,flip),d=Math.hypot(x-v[0],y-v[1]);if(d<distance){closest=p;distance=d;}}
     return closest;
   }
   const w=Chess.width,h=Chess.height,x=Math.floor(((event.clientX-box.left)/box.width*(w*44+48)-24)/44),y=Math.floor(((event.clientY-box.top)/box.height*(h*44+48)-24)/44);

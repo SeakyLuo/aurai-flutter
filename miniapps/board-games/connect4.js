@@ -20,5 +20,5 @@ var Chess=(function(){
     }return value;
   }
   return {width:7,height:6,first:'r',second:'y',sides:{r:'珊瑚棋',y:'金色棋'},legend:{r:'珊',y:'金'},initial:function(){return Array(42).fill(null);},legal:legal,moved:moved,play:function(s,m){s.board=moved(s.board,m,s.turn);return {to:m.to,text:coordinate(m.to)};},outcome:outcome,evaluate:evaluate,coordinate:coordinate,searchDepth:[1,2,4,6,9],searchWidth:7,
-    rules:'珊瑚棋先行。点击任意未满的列，棋子落到该列最低的空位。横、竖、斜线先连成四子获胜；棋盘填满仍未分胜负则和棋。',hint:'点击一列投下棋子，先连成四子获胜'};
+    rules:'首局随机分配珊瑚棋和金色棋，之后棋色固定、双方轮换先手。点击任意未满的列，棋子落到该列最低的空位。横、竖、斜线先连成四子获胜；棋盘填满仍未分胜负则和棋。',hint:'点击一列投下棋子，先连成四子获胜'};
 })();

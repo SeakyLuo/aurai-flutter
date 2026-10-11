@@ -70,7 +70,7 @@ class LibraryDetailSplitState extends State<LibraryDetailSplit>
     child: DetailSplitLayout(
       animation: _curve,
       opened: _open,
-      detailBuilder: _detail == null ? null : (_, _) => _detail!,
+      detailBuilder: _detail == null ? null : (_, _, _) => _detail!,
       child: widget.child,
     ),
   );

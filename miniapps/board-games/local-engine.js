@@ -4,7 +4,8 @@ const LocalEngine=(()=>{
   function cancel(){if(active){active.finish(null);active=null;}}
   function search(view){
     cancel();
-    const source=document.getElementById('localEngineSource').textContent;
+    const hiddenXiangqi=GAME==='xiangqi'&&view.mode!=='normal'&&view.mode!==undefined;
+    const source=document.getElementById(hiddenXiangqi?'hiddenXiangqiEngineSource':'localEngineSource').textContent;
     const url=URL.createObjectURL(new Blob([JSON.parse(source)],{type:'text/javascript'}));
     const worker=new Worker(url);URL.revokeObjectURL(url);
     return new Promise((resolve,reject)=>{
@@ -29,14 +30,17 @@ const LocalEngine=(()=>{
       };
       if(['tictactoe','reversi','connect4','halma'].includes(GAME)){
         const codes=Object.fromEntries(Object.entries(view.pieceLegend).map(([code,symbol])=>[symbol,code]));
-        worker.postMessage({board:view.board.flat().map(p=>p==='·'?null:codes[p]),turn:view.turn,level:view.difficulty});
+        worker.postMessage({board:view.board.flat().map(p=>p==='·'?null:codes[p]),turn:view.turn,level:view.difficulty,...(GAME==='halma'?{sides:view.players.filter(p=>p.active).map(p=>p.side)}:{})});
       }else if(GAME==='xiangqi'){
         const codes=Object.fromEntries(Object.entries(view.pieceLegend).map(([code,symbol])=>[symbol,code]));
-        worker.postMessage({board:view.board.map(row=>row.map(p=>p==='·'?null:codes[p])),turn:view.turn,level:view.difficulty,legalMoves:view.legalMoves});
+        const board=view.board.map(row=>row.map(p=>p==='·'?null:codes[p]));
+        worker.postMessage(hiddenXiangqi?{mode:view.mode,board:board.flat(),players:view.players,unseenPieces:view.unseenPieces,colorsAssigned:view.colorsAssigned,quiet:view.quiet,turn:view.turn,level:view.difficulty,legalMoves:view.legalMoves}:{board,turn:view.turn,level:view.difficulty,legalMoves:view.legalMoves});
       }else{
-        const black=[],white=[];
-        view.board.flat().forEach((p,i)=>{if(p==='●')black.push(i);else if(p==='○')white.push(i);});
-        const moves=[];black.forEach((p,i)=>{moves.push(p);if(i<white.length)moves.push(white[i]);});
+        // The worker uses alternating first/second roles internally. Map from
+        // the actual opening color so white-first games retain the live board.
+        const first=[],second=[],firstSymbol=view.pieceLegend[view.firstSide];
+        view.board.flat().forEach((p,i)=>{if(p===firstSymbol)first.push(i);else if(p!=='·')second.push(i);});
+        const moves=[];first.forEach((p,i)=>{moves.push(p);if(i<second.length)moves.push(second[i]);});
         worker.postMessage({type:'search',seq:1,moves,level:view.difficulty});
       }
     });

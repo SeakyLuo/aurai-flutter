@@ -5,7 +5,7 @@
     "description": "选择一位球员，重新打完整个职业生涯。创建球员、参加比赛，体验成长与交易。",
     "publisherId": "user:local",
     "asset": "assets/miniapps/tipoff.html",
-    "iconAsset": "assets/miniapps/icons/tipoff-logo.jpg",
+    "iconAsset": "assets/miniapps/icons/tipoff-logo.webp",
     "version": "0bec1717f814c781852c383f7b862a052dc64586c7ccf1c78c7ab0f5d11a1f7b"
   },
   {
@@ -14,8 +14,8 @@
     "description": "自由配置角色和技能，小程序负责身份保密、行动收集、发言和计票，主持 AI 裁定结果并推进对局。支持主持 AI 自行配置开局。",
     "publisherId": "user:local",
     "asset": "assets/miniapps/werewolf.html",
-    "iconAsset": "assets/miniapps/icons/werewolf.png",
-    "version": "3024f0a274916c79de455046efa981e42543e3465aa6b17bc9a3f3fb4273107d"
+    "iconAsset": "assets/miniapps/icons/werewolf.webp",
+    "version": "4a08eb69d2b9391b8f1231551afca2c8ba89c15dc90785bf2c6e5e1db9c9b7b2"
   },
   {
     "id": "builtin.draw-guess",
@@ -23,7 +23,7 @@
     "description": "系统主持的群聊小游戏。群成员轮流画画和猜题，题目仅画手可见，自动计分和轮换。默认模型只用于可选出题。",
     "publisherId": "user:local",
     "asset": "assets/miniapps/draw-guess.html",
-    "iconAsset": "assets/miniapps/icons/draw-guess.png",
+    "iconAsset": "assets/miniapps/icons/draw-guess.webp",
     "version": "40903c3b5f2c2c2822dcfff0bf9e99b38117ff73579bbfe21e2970b56231dd51"
   },
   {
@@ -32,26 +32,26 @@
     "description": "在群聊中经营动物列车。主持 AI 推进旅程，小程序保存角色、订单、资金与库存，执行经营结算。",
     "publisherId": "user:local",
     "asset": "assets/miniapps/animaline.html",
-    "iconAsset": "assets/miniapps/icons/animaline-locomotive.png",
+    "iconAsset": "assets/miniapps/icons/animaline-locomotive.webp",
     "version": "386768e47462aae88dd4c1e6a923206d59a40eca01af6197563d83e2cb723035"
   },
   {
     "id": "builtin.xiangqi",
     "publisherId": "user:local",
     "title": "中国象棋",
-    "description": "直接与本地 AI开局，也可在私聊、群聊中选择 AI 对手。支持五档难度、悔棋、棋谱和同步观战。",
+    "description": "普通象棋、揭棋与半盘暗棋。支持五档本地对手、双方 AI 自动对弈、推荐下法、悔棋和聊天观战。",
     "asset": "assets/miniapps/xiangqi.html",
-    "version": "ad371660f05a98bbca963d76518259a8fce3bb22b66176bee13fc8711f990665",
-    "iconAsset": "assets/miniapps/icons/xiangqi.png"
+    "version": "aabe7cc1c07be91b37040127ddc66c0c0dec4dfb9a24d7d0f41afc6627ea87c7",
+    "iconAsset": "assets/miniapps/icons/xiangqi.webp"
   },
   {
     "id": "builtin.gomoku",
     "publisherId": "user:local",
     "title": "五子棋",
-    "description": "15 × 15 无禁手。直接与本地 AI开局，也可在聊天中选择 AI 对手，支持五档难度、悔棋和同步观战。",
+    "description": "15 × 15 无禁手。支持五档本地对手、双方 AI 自动对弈、推荐下法、悔棋和聊天观战。",
     "asset": "assets/miniapps/gomoku.html",
-    "version": "4f3662d22a682b6f92c6416541548485a502fbd982bfce8009bb964a7c59be73",
-    "iconAsset": "assets/miniapps/icons/gomoku.png"
+    "version": "fe45eef26c6a477ae8979c5bf17da27a415dee0ce88a786454e677dd257a3425",
+    "iconAsset": "assets/miniapps/icons/gomoku.webp"
   },
   {
     "id": "builtin.undercover",
@@ -59,8 +59,8 @@
     "title": "谁是卧底",
     "description": "主持 AI 临场想词，程序私密发词、轮流描述、投票、平票加赛和结算。支持人类与 AI 群聊同玩，消息内预览、全屏参与。",
     "asset": "assets/miniapps/undercover.html",
-    "version": "82f390320dfe19f44481ae9b10a618750a76c605ebb97e06e5f044cb49fac437",
-    "iconAsset": "assets/miniapps/icons/undercover.png"
+    "version": "5698819578bb05194b5badc46ec887abb08b208301be773cc48e97bb8632dff1",
+    "iconAsset": "assets/miniapps/icons/undercover.webp"
   },
   {
     "id": "builtin.tictactoe",
@@ -68,8 +68,8 @@
     "title": "井字棋",
     "description": "霓虹九宫格，本地 AI 即开即玩，无需联网或配置模型。支持悔棋、交换先手，也可在聊天中对弈和观战。",
     "asset": "assets/miniapps/tictactoe.html",
-    "version": "523085b90dadb00c21053a1ee734d45b8b18f615ab449b9b4d51aab9ae94b16f",
-    "iconAsset": "assets/miniapps/icons/tictactoe.png"
+    "version": "14c439eff03e9335f042218ff21f8d5fbae8797d90e429502dd56b921e614696",
+    "iconAsset": "assets/miniapps/icons/tictactoe.webp"
   },
   {
     "id": "builtin.reversi",
@@ -77,17 +77,17 @@
     "title": "黑白棋",
     "description": "森林棋室里的翻转对决，支持五档本地 AI、自动让行、悔棋和聊天观战。",
     "asset": "assets/miniapps/reversi.html",
-    "version": "5a963b40ccb4e68151f69fc710c4f77bbf806a15a0207f48e53270ee5aed6173",
-    "iconAsset": "assets/miniapps/icons/reversi.png"
+    "version": "653fbf71eb640b3201f8bf84471edcac0cab2da05a977ef9ba1eb30b21648e87",
+    "iconAsset": "assets/miniapps/icons/reversi.webp"
   },
   {
     "id": "builtin.halma",
     "publisherId": "user:local",
     "title": "跳棋",
-    "description": "薄荷与蜜桃的双人星盘，支持连续跳跃、五档本地 AI、悔棋和聊天观战。",
+    "description": "六色星盘，支持 2、3、4、6 人，聊天成员与本地电脑混合对局、连续跳跃、悔棋和观战。",
     "asset": "assets/miniapps/halma.html",
-    "version": "26580e1e313822541d18b6468c001a3ae486b09ddc7d8b9145cc1612af512974",
-    "iconAsset": "assets/miniapps/icons/halma.png"
+    "version": "cfb3dd41bf7b0cfee460cc91bfcfeaec188b0fdfeacb5eeb1f5d51dcd72f5327",
+    "iconAsset": "assets/miniapps/icons/halma.webp"
   },
   {
     "id": "builtin.connect4",
@@ -95,8 +95,8 @@
     "title": "四子棋",
     "description": "复古落子棋架，点击一列投下棋子。支持五档本地 AI、悔棋和聊天观战。",
     "asset": "assets/miniapps/connect4.html",
-    "version": "496abb2f13a51f15d2341dedf661a712eccfd20edae8ba567c644ff3b981bab6",
-    "iconAsset": "assets/miniapps/icons/connect4.png"
+    "version": "5c02cd844ddf0bdf5a65b940e8a0067fb054a36d3230b4f8cd11d7b852036a67",
+    "iconAsset": "assets/miniapps/icons/connect4.webp"
   },
   {
     "id": "builtin.doudizhu",
@@ -104,35 +104,35 @@
     "title": "斗地主",
     "description": "三人经典叫分，与两位本地 AI 较量。支持提示、农民配合与本局积分。",
     "asset": "assets/miniapps/doudizhu.html",
-    "version": "a246e1045d3f2e2ddad4a8552bcc8135cbba0d43b1056e5aaf3bd717a37f8ce6",
-    "iconAsset": "assets/miniapps/icons/doudizhu.png"
+    "version": "e26107ffe8be3ee09d5a8ba2fe87ae05d363919a18b6768818de0afe34aaec7d",
+    "iconAsset": "assets/miniapps/icons/doudizhu.webp"
   },
   {
     "id": "builtin.uno",
     "publisherId": "user:local",
     "title": "UNO",
-    "description": "四人经典配色牌局，与三位本地 AI 游玩。支持反转、UNO 与 +4 质疑。",
+    "description": "四人配色牌局，与三位本地 AI 游玩。支持同色同数字抢出、反转、UNO 与 +4 质疑。",
     "asset": "assets/miniapps/uno.html",
-    "version": "8114f5090c3e337a5631deacde2bd335bdbeb1808e71206193e2a179c62031be",
-    "iconAsset": "assets/miniapps/icons/uno.png"
+    "version": "ef5c4a6071cba6224bdc193ab702bc0bd7e20028b0072bb8da002444f5d044c6",
+    "iconAsset": "assets/miniapps/icons/uno.webp"
   },
   {
     "id": "builtin.scout",
     "publisherId": "user:local",
     "title": "Scout 马戏星探",
-    "description": "三人马戏牌局，与两位本地 AI 游玩。招募、演出，三轮决出最佳团长。",
+    "description": "支持 3—5 人，与本地 AI 招募、演出，争夺最佳团长。",
     "asset": "assets/miniapps/scout.html",
-    "version": "85fd8f74939f5ebfeca94d7aa37c6a6e33d66ed6ba964953be79e663c73c2df6",
-    "iconAsset": "assets/miniapps/icons/scout.png"
+    "version": "b9890535e15357bed01cc2cfe6a17861aed5d6952b1cbf8730caa85826adff2a",
+    "iconAsset": "assets/miniapps/icons/scout.webp"
   },
   {
     "id": "builtin.sheep",
     "publisherId": "user:local",
     "title": "羊了个羊",
-    "description": "每局都有通关解法的叠牌三消。七格收集槽、三档难度，支持撤回、提示、同关重来和离线保存。",
+    "description": "12 个递进关卡，从教学草地到多层挑战。七格收集槽，每局都有通关解法，支持撤回、提示、同关重来和离线保存。",
     "asset": "assets/miniapps/sheep.html",
-    "iconAsset": "assets/miniapps/icons/sheep.png",
-    "version": "6cbfa2c87b07e7227e4517a0a287381c3d4a279391d6b114e31bdfbf67b323c3"
+    "iconAsset": "assets/miniapps/icons/sheep.webp",
+    "version": "2e08499b67d45bda0f01cc4b5e79defc4bdf6c2a018815a44ca572dddecd3ab4"
   },
   {
     "id": "builtin.battleship",
@@ -140,8 +140,8 @@
     "title": "海战棋",
     "description": "经典双人海战，随机布舰与雷达射击。本地 AI 只根据命中记录寻找舰船。",
     "asset": "assets/miniapps/battleship.html",
-    "version": "ceaef66fad93031edb17d22c38e2932086e5624669c0ed840df5adba5c9d2882",
-    "iconAsset": "assets/miniapps/icons/battleship.png"
+    "version": "f5ba45663a68118afa21698d0e462d56befb3f24228b64269f950157368259c1",
+    "iconAsset": "assets/miniapps/icons/battleship.webp"
   },
   {
     "id": "builtin.junqi",
@@ -149,8 +149,8 @@
     "title": "军棋",
     "description": "双人军棋翻棋，支持铁路、行营、工兵排雷与本地 AI。",
     "asset": "assets/miniapps/junqi.html",
-    "version": "0d1a48060d4654806438ce88dbca9b2abde830bb35b2946749389690e4fe415c",
-    "iconAsset": "assets/miniapps/icons/junqi.png"
+    "version": "37ad5571a140efd5e2f8799ca0c63664273ee506949753ee4f001e4dc22e27b4",
+    "iconAsset": "assets/miniapps/icons/junqi.webp"
   },
   {
     "id": "builtin.azul",
@@ -158,7 +158,43 @@
     "title": "花砖物语",
     "description": "双人经典彩墙玩法，与本地 AI 取砖、铺墙，争取连线与花色奖励。",
     "asset": "assets/miniapps/azul.html",
-    "version": "02959e69891f55de05f1f8bfcc8ef362e6e420fab32560d341e717cac0907d21",
-    "iconAsset": "assets/miniapps/icons/azul.png"
+    "version": "7f9883d6081c170a742e978845d71cc81e468c25d62426844b4faf717936901c",
+    "iconAsset": "assets/miniapps/icons/azul.webp"
+  },
+  {
+    "id": "builtin.quoridor",
+    "publisherId": "user:local",
+    "title": "步步为营",
+    "description": "双人迷宫竞速，用围墙改变路线，与本地 AI 比拼寻路和拦截。",
+    "asset": "assets/miniapps/quoridor.html",
+    "version": "01eca2511f5b945851f34fee47c4ab38f41b937dfabc9a491f2a25a0b2703375",
+    "iconAsset": "assets/miniapps/icons/quoridor.webp"
+  },
+  {
+    "id": "builtin.sixnimmt",
+    "publisherId": "user:local",
+    "title": "牛头王",
+    "description": "与三位本地 AI 暗选同揭，避开牛头罚分。完整四人经典玩法。",
+    "asset": "assets/miniapps/sixnimmt.html",
+    "version": "d9d6add28903ed99acdde58d8512cb1d9306ceba6f9022ecab6f55ef18e8eb1d",
+    "iconAsset": "assets/miniapps/icons/sixnimmt.webp"
+  },
+  {
+    "id": "builtin.bomber",
+    "publisherId": "user:local",
+    "title": "炸弹人",
+    "description": "支持 2～4 人混战、四种玩法、七种道具。经典对战、限时缩圈、道具争夺、火力全开，与本地电脑或默认决策模型对战。",
+    "asset": "assets/miniapps/bomber.html",
+    "iconAsset": "assets/miniapps/icons/bomber.webp",
+    "version": "d9c3e5f57f210c66b57157a46a106952c5ce0948968706dd4ef0c381201f5ce8"
+  },
+  {
+    "id": "builtin.no-big-deal",
+    "publisherId": "user:local",
+    "title": "问题不大",
+    "description": "扮演秘书汉娜，连线整理文件，撑过两天工作。处理需求、桌面意外和夜间疲劳，使用道具与后勤部，进度离线保存。",
+    "asset": "assets/miniapps/no-big-deal.html",
+    "iconAsset": "assets/miniapps/icons/no-big-deal.webp",
+    "version": "194c81eb7e1ff35353e7f3232ea363cc2049594dd7bf2231d22f3039a056d43e"
   }
 ]

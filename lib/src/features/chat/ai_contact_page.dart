@@ -25,7 +25,7 @@ import 'chat_controller.dart';
 import 'ai_contact_editor.dart';
 import 'ai_model_page.dart';
 import 'ai_speech_page.dart';
-import 'profile_avatar.dart';
+import 'profile_avatar_preview.dart';
 import 'glass_surface.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
@@ -282,7 +282,7 @@ class _AiContactPageState extends State<AiContactPage> {
                   Center(
                     child: Stack(
                       children: [
-                        ProfileAvatar(
+                        ViewableProfileAvatar(
                           style: AvatarStyle(
                             icon: ai.sender.avatarIcon,
                             color: ai.sender.avatarColor,

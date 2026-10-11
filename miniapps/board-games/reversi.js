@@ -34,5 +34,5 @@ var Chess=(function(){
     return value+10*(legal(b,side).length-legal(b,other(side)).length);
   }
   return {width:width,height:height,first:first,second:second,sides:{b:'黑棋',w:'白棋'},legend:{b:'●',w:'○'},initial:initial,legal:legal,moved:moved,play:play,outcome:outcome,nextTurn:nextTurn,evaluate:evaluate,coordinate:coordinate,searchDepth:[1,2,3,5,7],searchWidth:64,
-    rules:'黑棋先行。落子必须在横、竖或斜线夹住对方棋子，夹住的棋子全部翻色。没有合法落点时自动让行；双方都不能落子时结束，棋子多的一方获胜。',hint:'点击小圆点落子，夹住的棋子会翻色'};
+    rules:'首局随机分配黑白，后续保持颜色、轮换先手，本局先手见玩家栏。落子必须在横、竖或斜线夹住对方棋子，夹住的棋子全部翻色。没有合法落点时自动让行；双方都不能落子时结束，棋子多的一方获胜。',hint:'点击小圆点落子，夹住的棋子会翻色'};
 })();

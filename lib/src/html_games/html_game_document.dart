@@ -29,6 +29,8 @@ html[data-aurai-paused="true"] *{animation-play-state:paused!important}
 #aurai-content{display:flow-root;width:100%;overflow-wrap:anywhere}
 :where(input,textarea,select){font:inherit;color:var(--aurai-text);background:var(--aurai-field);border:1px solid var(--aurai-border);border-radius:var(--aurai-field-radius);padding:10px;max-width:100%}
 :where(button){font:inherit;border:0;border-radius:var(--aurai-button-radius);padding:10px 14px;background:var(--aurai-accent);color:var(--aurai-on-accent)}
+/* Controls should respond to touch without selecting their labels; body text and editors remain selectable. */
+:where(button,[role=button],[role=tab],.aurai-button,summary,input[type=button],input[type=submit],input[type=reset]){-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 $htmlMessageComponentStyles
 </style>
 <script>

@@ -14,13 +14,15 @@ class DetailSplitLayout extends StatelessWidget {
   final bool opened;
   final bool detailFullscreen;
   final Widget child;
-  final Widget Function(BuildContext, bool)? detailBuilder;
+  final Widget Function(BuildContext, bool wide, bool supportsSplit)?
+  detailBuilder;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final width = constraints.maxWidth;
-      final wide = width >= 600 && !detailFullscreen;
+      final supportsSplit = width >= 600;
+      final wide = supportsSplit && !detailFullscreen;
       final detailWidth = wide ? width / 2 : width;
       final dividerColor = Theme.of(context).dividerColor;
       final softDividerColor = dividerColor.withValues(
@@ -64,8 +66,11 @@ class DetailSplitLayout extends StatelessWidget {
                           builder: (paneContext) => TickerMode(
                             enabled: !(animation.value == 0),
                             child: Builder(
-                              builder: (detailContext) =>
-                                  detailBuilder!(detailContext, wide),
+                              builder: (detailContext) => detailBuilder!(
+                                detailContext,
+                                wide,
+                                supportsSplit,
+                              ),
                             ),
                           ),
                         ),

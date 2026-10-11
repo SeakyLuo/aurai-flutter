@@ -43,5 +43,5 @@ var Chess = (function () {
   return {width:3,height:3,first:'x',second:'o',sides:{x:'X',o:'O'},
     initial:function(){return Array(9).fill(null);},legal:legal,play:play,
     winningLine:winningLine,coordinate:coordinate,bestMove:bestMove,
-    rules:'3 × 3 九宫格，X 先行，双方轮流在空格落子。横、竖或斜线连成三个即获胜；满盘未分胜负判和。支持与本地 AI 离线对弈。'};
+    rules:'3 × 3 九宫格，首局随机分配 X/O，之后符号固定、双方轮换先手。双方轮流在空格落子。横、竖或斜线连成三个即获胜；满盘未分胜负判和。支持与本地 AI 离线对弈。'};
 })();

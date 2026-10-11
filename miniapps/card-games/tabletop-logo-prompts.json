@@ -3,15 +3,15 @@
   "games": {
     "battleship": {
       "prompt": "Create one square mobile game app icon for Battleship naval guessing game. Stylized miniature navy-blue battleship with two simplified turrets seen in three-quarter view, riding a single sculpted turquoise wave, a subtle mint radar arc behind it. Premium softly rounded tactile 3D toy sculpture, restrained soft studio lighting, clean silhouette and large clear features visible at 48px. Full bleed deep ocean navy background, no outer rounded-square border, no lettering, no numbers, no explosions, no flags, no watermark, no mockup. Centered 75% occupancy with safe margins. Original design, polished and friendly, cohesive with pastel 3D card-game icons.",
-      "asset": "assets/miniapps/icons/battleship.png"
+      "asset": "assets/miniapps/icons/battleship.webp"
     },
     "junqi": {
       "prompt": "Create one square mobile app icon for Chinese military dark chess / Junqi. Two squat rectangular upright Chinese board-game pieces with rounded corners, warm ivory ceramic front piece embossed with the exact two Chinese characters 军旗 arranged vertically, dark forest-green piece behind bearing only a small five-point star. A small folded crimson game flag emerging behind the pieces. Tactile premium softly rounded 3D toy sculpture, restrained studio lighting, crisp readable silhouette at 48px. Full bleed muted pale sage background. Centered 75% occupancy with safe margins. No poker suits, no chess knight, no realistic soldiers or weapons, no text other than 军旗, no watermark, no outer rounded-square border, no mockup. Original elegant playful design.",
-      "asset": "assets/miniapps/icons/junqi.png"
+      "asset": "assets/miniapps/icons/junqi.webp"
     },
     "azul": {
       "prompt": "Create one square mobile game app icon for Azul tile-drafting board game, Chinese title 花砖物语. A compact offset cluster of five thick square glazed ceramic tiles in cobalt blue, golden yellow, terracotta red, ivory and deep teal. Front central cobalt tile has a bold ivory symmetrical Portuguese azulejo floral geometric motif, surrounding tiles each one simple complementary large motif. Rich ceramic depth with softly rounded bevels, restrained gloss and soft studio light, premium tactile 3D toy-like style, clean silhouette readable at 48px. Full bleed warm ivory background, centered 75% occupancy with safe margins. No playing cards, no letters or numbers, no wordmark, no watermark, no outer rounded-square border, no mockup. Original design rather than copied game artwork.",
-      "asset": "assets/miniapps/icons/azul.png"
+      "asset": "assets/miniapps/icons/azul.webp"
     }
   }
 }

@@ -30,10 +30,11 @@ function drawBoard(board,selected,pending,moves,last,winningLine,flip) {
     const group=node('g',{'aria-label':(Chess.names?Chess.names[piece]:Chess.sides[piece])+' '+Chess.coordinate(p)},el);
     const red=piece[0]==='r',black=piece[0]==='b';
     node('circle',{cx,cy:cy+1.5,r:GAME==='xiangqi'?17:16.5,fill:'#5b4d38',opacity:.14},group);
-    node('circle',{cx,cy,r:GAME==='xiangqi'?17:16.5,fill:GAME==='xiangqi'?'#f6f0e4':black?'#303438':'#faf8f2',stroke:GAME==='xiangqi'?(red?'#b96658':'#615b52'):black?'#222629':'#b7b0a5','stroke-width':1.2},group);
+    node('circle',{cx,cy,r:GAME==='xiangqi'?17:16.5,fill:GAME==='xiangqi'?(piece[1]==='D'?'#c9b58f':'#f6f0e4'):black?'#303438':'#faf8f2',stroke:GAME==='xiangqi'?(red?'#b96658':'#615b52'):black?'#222629':'#b7b0a5','stroke-width':1.2},group);
     if(GAME==='xiangqi'){
       node('circle',{cx,cy,r:14.2,fill:'none',stroke:red?'#b96658':'#777068','stroke-width':.7},group);
-      const t=node('text',{x:cx,y:cy,'text-anchor':'middle','dominant-baseline':'central','font-size':23,'font-family':'serif','font-weight':600,fill:red?'#a84035':'#3d3b37'},group);t.textContent=Chess.names[piece];
+      if(piece[1]==='D')node('path',{d:`M ${cx} ${cy-7} l 7 7 -7 7 -7 -7 Z`,fill:'none',stroke:'#827253','stroke-width':1.2,'stroke-linejoin':'round'},group);
+      else {const t=node('text',{x:cx,y:cy,'text-anchor':'middle','dominant-baseline':'central','font-size':23,'font-family':'serif','font-weight':600,fill:red?'#a84035':'#3d3b37'},group);t.textContent=Chess.names[piece];}
     }
     if(winningLine.some(q=>q[0]===p[0]&&q[1]===p[1]))node('circle',{cx,cy,r:18,fill:'none',stroke:'#56816a','stroke-width':2.2},el);
   });

@@ -40,6 +40,8 @@ class BoardGameService {
       'builtin.battleship',
       'builtin.junqi',
       'builtin.azul',
+      'builtin.quoridor',
+      'builtin.sixnimmt',
     ].contains(rows.isEmpty ? id : rows.single['source_id']);
   }
 
@@ -101,15 +103,23 @@ class BoardGameService {
         final current = await _load();
         final view = current.state;
         final players = (view['players'] as List).cast<Map>();
-        final human = players.firstWhere((p) => p['kind'] != 'engine');
-        if (human['id'] != MessageSender.localUser.id) {
+        final localPlayer = players.any(
+          (p) => p['id'] == MessageSender.localUser.id,
+        );
+        final watching = view['watching'] == true;
+        if (!localPlayer && !watching) {
           throw StateError('只有对局玩家可以请求落子');
         }
         if (view['phase'] != 'playing' ||
+            view['paused'] == true ||
             (!players.any(
-                  (p) => p['kind'] == 'engine' && p['side'] == view['turn'],
+                  (p) =>
+                      p['kind'] == 'engine' &&
+                      (view['drawOffer'] != null
+                          ? p['id'] != view['drawOffer']
+                          : p['side'] == view['turn']),
                 ) &&
-                view['drawOffer'] != human['id'])) {
+                view['engineCanJump'] != true)) {
           return {'skipped': true};
         }
         final token = newMessageId();
@@ -131,6 +141,8 @@ class BoardGameService {
           'battleship',
           'junqi',
           'azul',
+          'quoridor',
+          'sixnimmt',
         ].contains(current.state['gameType']);
         if (cardGame
             ? action != 'cardAi'

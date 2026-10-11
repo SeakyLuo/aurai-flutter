@@ -86,8 +86,11 @@ Future<InteractiveMessage> withdrawInteractiveVote(
       where: 'id = ?',
       whereArgs: [messageId],
     );
+    // Opted-in programs must remove their recorded action in this same transaction.
+    // Updating only the card leaves the old vote available to game settlement.
     if (card.participation['_programMessage'] case final String programId
-        when card.anonymous) {
+        when card.anonymous ||
+            card.participation['_programNotifyWithdrawal'] == true) {
       final button = card.buttons.firstWhere(
         (button) => button['id'] == previous['buttonId'],
       );
@@ -99,6 +102,7 @@ Future<InteractiveMessage> withdrawInteractiveVote(
         eventId: '$messageId:$actorId:withdraw:$participantRevision',
         action: button['programEvent'] as String,
         cardId: messageId,
+        collectionWithdrawn: !card.anonymous,
       );
       final updated = await txn.query(
         'messages',

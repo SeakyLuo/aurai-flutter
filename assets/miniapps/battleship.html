@@ -71,10 +71,12 @@ function require(ok,message){if(!ok)throw new Error(message);}
 function person(p){return p.kind==='engine'?p.name:'['+p.name.replace(/[\\\[\]]/g,'\\$&')+'](aurai://member/'+encodeURIComponent(p.id)+')';}
 function notify(text){host.call('messages.send',{text:text,markdown:true});}
 function start(game){
+  var seats=Cards.seatOptions?d.seats:Cards.seats;
+  if(Cards.seatOptions)require(Cards.seatOptions.indexOf(seats)>=0,'请选择支持的对局人数');
   var human=ctx.members.find(function(p){return p.id==='user:local';});
   require(human,'请由本机玩家打开对局');
   var players=[{id:human.id,name:human.name,kind:human.kind,side:0}];
-  for(var i=1;i<Cards.seats;i++)players.push({id:'engine:card:'+i,name:'电脑 '+i,kind:'engine',side:i});
+  for(var i=1;i<seats;i++)players.push({id:'engine:card:'+i,name:'电脑 '+i,kind:'engine',side:i});
   s=Cards.create(players,Math.floor(Math.random()*4294967296));s.game=game;s.ply=0;
 }
 require(e.actorId==='user:local','请由本局玩家操作，其他成员可以观战');
@@ -96,8 +98,8 @@ if(e.action==='configure'){
     require(s.phase==='playing','本局已经结束');
     var seat=0,action=e.action,data=d;
     if(ctx.decision===true){
-      require(e.action==='cardAi'&&s.players[s.turn].kind==='engine','当前没有需要行动的电脑');
-      seat=s.turn;
+      seat=Cards.aiSeat?Cards.aiSeat(s):s.turn;
+      require(e.action==='cardAi'&&seat>=0&&s.players[seat].kind==='engine','当前没有需要行动的电脑');
       // Only the same public table and this seat's own hand enter the strategy.
       var move=Cards.ai(Cards.privateView(s,seat),Cards.publicView(s));action=move.action;data=move.data;
     }else require(e.action!=='cardAi','请通过对局引擎继续');
@@ -122,12 +124,14 @@ return {state:s,view:view,privateViews:privateViews};
   <section id="cardSetup" class="aurai-stack">
     <div class="card-cover" aria-hidden="true"><span>≈</span><span>⌖</span><span>≈</span></div>
     <h2>藏好舰队，锁定目标</h2><p class="aurai-muted">经典双人海战，随机布舰与雷达射击。本地 AI 只根据命中记录寻找舰船。</p>
+    <div id="cardSeatOptions" class="card-seat-options" hidden></div>
     <button id="cardStart" type="button" class="aurai-button aurai-button--primary">与电脑开局</button>
     <p id="cardSetupHint" class="aurai-muted"></p>
   </section>
   <section id="cardMatch" class="aurai-stack" hidden>
     <div id="cardPlayers" class="card-players"></div>
     <div id="cardTable"></div>
+    <div id="cardRematchSeats" class="card-seat-options" hidden></div>
     <nav id="cardToolbar" class="aurai-row" aria-label="对局操作">
       <button id="cardContinue" type="button" class="aurai-button">继续</button>
       <button id="cardRematch" type="button" class="aurai-button aurai-button--primary" hidden>再来一局</button>
@@ -168,6 +172,14 @@ html[data-aurai-display=fullscreen] .card-heading{min-height:48px;padding-right:
 html[data-aurai-display=fullscreen] #cardToolbar{position:fixed;bottom:calc(var(--aurai-host-safe-bottom-inset,0px) + 16px);left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:400px;padding:8px;border:1px solid var(--aurai-border);border-radius:32px;background:color-mix(in srgb,var(--aurai-field) 88%,transparent);backdrop-filter:blur(20px);z-index:8;box-shadow:0 4px 20px #00000012}
 html[data-aurai-display=fullscreen] #cardMorePanel{position:fixed;bottom:calc(var(--aurai-host-safe-bottom-inset,0px) + 90px);left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:420px;max-height:60dvh;overflow:auto;z-index:9;backdrop-filter:blur(24px);background:color-mix(in srgb,var(--aurai-field) 94%,transparent)}
 @media(prefers-reduced-motion:reduce){.card-player.active .card-seat:after,#cardContinue[aria-busy=true]:after{animation:none}}
+.card-seat-options{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:13px}.card-seat-options>.aurai-button{flex:1}.card-seat-options>span,.card-seat-options>small{flex-basis:100%}
+
+.card-remaining{grid-column:1/-1;display:flex;flex-direction:column;gap:16px;margin-top:14px;padding-top:16px;border-top:1px solid color-mix(in srgb,var(--aurai-muted) 20%,transparent);min-width:0}
+.card-revealed-hand{display:flex;flex-direction:column;gap:8px;min-width:0}
+.card-revealed-cards{display:flex;flex-wrap:wrap;gap:6px}
+.card-revealed-cards .uno-card{width:54px;flex-basis:54px;height:82px;padding:5px;border-width:2px;border-radius:9px}
+.card-revealed-cards .uno-face{font-size:24px}
+.card-revealed-cards .uno-color-name{font-size:10px}
 
 .battleship-root{display:flex;flex-direction:column;gap:16px}
 .sea-panel{padding:18px 14px 14px;border-radius:24px;background:#102e40;color:#e6f4f3;border:1px solid #365d6b;overflow:hidden}
@@ -295,9 +307,10 @@ var CardUI=(function(){
 const $=id=>document.getElementById(id);
 const el=(tag,value,cls)=>{const node=document.createElement(tag);node.textContent=value;if(cls)node.className=cls;return node;};
 let s=AuraiHTML.messageState,busy=false,thinking=false,paused=false,generation=0,attempt='',timer=null;
+let seatCount=s.players?s.players.length:Cards.seats;
 const host=()=>s._miniapp;
 const mine=()=>s.players?.find(p=>p.id===host()?.viewerId);
-const aiTurn=()=>s.phase==='playing'&&s.players[s.turn].kind==='engine';
+const aiTurn=()=>s.phase==='playing'&&(s.players[s.turn].kind==='engine'||s.engineCanJump===true);
 const key=()=>`${s.game}:${s.ply}`;
 function cancel(){generation++;clearTimeout(timer);timer=null;thinking=false;}
 async function continueAi(){
@@ -316,6 +329,16 @@ async function act(action,data={}){
     attempt='';
   }finally{busy=false;render();}
 }
+function showRemainingHands(root,v,card){
+  const section=el('section','','card-remaining');section.append(el('strong','剩余手牌'));
+  v.players.forEach((p,i)=>{
+    const row=el('div','','card-revealed-hand'),cards=el('div','','card-revealed-cards');
+    row.append(el('span',p.name+' · '+v.hands[i].length+' 张','aurai-muted'));
+    v.hands[i].forEach(c=>cards.append(card(c,false)));
+    if(!v.hands[i].length)cards.append(el('span','已出完','aurai-muted'));
+    row.append(cards);section.append(row);
+  });root.append(section);
+}
 function more(open){$('cardMorePanel').hidden=!open;$('cardMore').setAttribute('aria-expanded',String(open));$('cardLeaveConfirm').hidden=true;AuraiHTML.requestResize();}
 function render(){
   s=AuraiHTML.messageState;
@@ -325,6 +348,12 @@ function render(){
   $('cardRules').textContent=s.rules||Cards.rules;
   $('cardStart').disabled=busy||!owner;
   $('cardSetupHint').textContent=host()?owner?'无需联网，也不用配置模型':'等待玩家开始对局':'从小程序库打开即可开始';
+  for(const [id,visible] of [['cardSeatOptions',setup],['cardRematchSeats',s.phase==='finished']]){
+    const container=$(id);container.hidden=!Cards.seatOptions||!visible||!owner;
+    if(!container.hidden){container.replaceChildren(el('span','对局人数','aurai-muted'),...Cards.seatOptions.map(count=>{
+      const b=el('button',count+' 人','aurai-button'+(seatCount===count?' aurai-button--primary':''));b.type='button';b.disabled=busy;b.setAttribute('aria-pressed',String(seatCount===count));b.onclick=()=>{seatCount=count;render();};return b;
+    }),el('small','你与 '+(seatCount-1)+' 位电脑游玩','aurai-muted'));}
+  }
   if(!setup){
     $('cardPlayers').replaceChildren(...s.players.map((p,i)=>{
       const node=el('div','',`card-player${s.phase==='playing'&&s.turn===i?' active':''}`);
@@ -333,20 +362,22 @@ function render(){
       node.setAttribute('aria-label',p.name+(s.phase==='playing'&&s.turn===i?'，正在行动':''));return node;
     }));
     if(s.abandoned){$('cardTable').replaceChildren(el('p','本局已结束，可重新开局。','aurai-muted'));}
-    else CardUI.render($('cardTable'),s,host()?.own,{act,busy:busy||thinking,canPlay:!busy&&!thinking&&!!mine()&&s.turn===mine().side,el});
-    $('cardContinue').hidden=s.phase==='finished';$('cardContinue').disabled=busy||thinking||!mine()||!aiTurn();
+    else CardUI.render($('cardTable'),s,host()?.own,{act,busy:busy||thinking,canJump:!busy&&!thinking&&!!mine(),canPlay:!busy&&!thinking&&!!mine()&&s.turn===mine().side,el});
+    $('cardContinue').hidden=GAME==='doudizhu'||s.phase==='finished';$('cardContinue').disabled=busy||thinking||!mine()||!aiTurn();
     $('cardContinue').setAttribute('aria-busy',String(thinking));
+    $('cardMore').hidden=GAME==='doudizhu';
+    $('cardToolbar').hidden=GAME==='doudizhu'&&(s.phase!=='finished'||!mine());
     $('cardRematch').hidden=s.phase!=='finished'||!mine();$('cardRematch').disabled=busy;
     $('cardLeave').hidden=s.phase==='finished'||!mine();
     $('cardLog').replaceChildren(...(s.logs||[]).map(item=>el('li',(item.seat>=0?s.players[item.seat].name+' · ':'')+item.text)));
   }
   AuraiHTML.requestResize();
   if(!setup&&!busy&&!thinking&&!paused&&mine()&&aiTurn()&&attempt!==key()&&!timer){
-    timer=setTimeout(()=>{timer=null;void continueAi();},650);
+    timer=setTimeout(()=>{timer=null;void continueAi();},s.engineCanJump===true||host()?.own?.jumpable?.length?3000:650);
   }
 }
-$('cardStart').onclick=()=>act('configure');
-$('cardRematch').onclick=()=>{CardUI.reset();more(false);void act('rematch');};
+$('cardStart').onclick=()=>act('configure',Cards.seatOptions?{seats:seatCount}:{});
+$('cardRematch').onclick=()=>{CardUI.reset();more(false);void act('rematch',Cards.seatOptions?{seats:seatCount}:{});};
 $('cardContinue').onclick=()=>{clearTimeout(timer);timer=null;void continueAi();};
 $('cardMore').onclick=()=>more($('cardMorePanel').hidden);$('cardCloseMore').onclick=()=>more(false);
 $('cardLeave').onclick=()=>{$('cardLeaveConfirm').hidden=false;};

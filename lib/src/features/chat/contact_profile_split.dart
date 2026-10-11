@@ -131,7 +131,7 @@ class ContactProfileSplitState extends State<ContactProfileSplit>
       opened: _open && _fullscreenRoute == null,
       detailBuilder: _detail == null || _fullscreenRoute != null
           ? null
-          : (_, _) => _detail!,
+          : (_, _, _) => _detail!,
       child: widget.child,
     ),
   );

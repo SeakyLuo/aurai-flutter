@@ -3,7 +3,7 @@
 <script type="application/json" id="aurai-capabilities">["messages.send"]</script>
 <script type="application/aurai-program">
 var GAME='scout',TITLE='Scout 马戏星探';
-// SCOUT rules by Kei Kajino / Oink Games, three-player rules.
+// SCOUT rules by Kei Kajino / Oink Games, three-to-five-player rules.
 // https://oinkgames.com/en/games/analog/scout/ — artwork below is original CSS.
 var Cards=(function(){
   function require(ok,message){if(!ok)throw Error(message);}
@@ -38,14 +38,16 @@ var Cards=(function(){
   function deal(s){
     var deck=[],id=0;
     // Three players remove all nine cards containing 10: 36 cards, 12 each.
-    for(var a=1;a<=9;a++)for(var b=a+1;b<=9;b++)deck.push({id:id++,top:a,bottom:b});
+    // Four players remove only 9/10: 44 cards, 11 each. Five use all 45, 9 each.
+    var seats=s.players.length,limit=seats===3?9:10;
+    for(var a=1;a<=limit;a++)for(var b=a+1;b<=limit;b++){if(seats===4&&a===9&&b===10)continue;deck.push({id:id++,top:a,bottom:b});}
     for(var i=deck.length-1;i>0;i--){var j=Math.floor(random(s)*(i+1)),card=deck[i];deck[i]=deck[j];deck[j]=card;}
     deck=deck.map(function(c){return random(s)<.5?{id:c.id,top:c.bottom,bottom:c.top}:c;});
-    s.hands=[deck.slice(0,12),deck.slice(12,24),deck.slice(24)];
-    s.stage='orient';s.turn=0;s.oriented=[false,false,false];s.active=[];s.owner=null;s.scouted=0;
-    s.captured=[0,0,0];s.tokens=[0,0,0];s.comboUsed=[false,false,false];s.roundScores=null;
+    var size=deck.length/seats;s.hands=Array.from({length:seats},function(_,i){return deck.slice(i*size,(i+1)*size);});
+    s.stage='orient';s.turn=0;s.oriented=Array(seats).fill(false);s.active=[];s.owner=null;s.scouted=0;
+    s.captured=Array(seats).fill(0);s.tokens=Array(seats).fill(0);s.comboUsed=Array(seats).fill(false);s.roundScores=null;
   }
-  function create(players,seed){var s={phase:'playing',players:players,seed:seed>>>0,round:1,scores:[0,0,0],logs:[],winner:null,winners:[],result:''};deal(s);return s;}
+  function create(players,seed){require([3,4,5].indexOf(players.length)>=0,'请选择 3、4 或 5 人');var s={phase:'playing',players:players,seed:seed>>>0,round:1,scores:Array(players.length).fill(0),logs:[],winner:null,winners:[],result:''};deal(s);return s;}
   function quality(hand){
     // Minimum number of adjacent valid sets needed to empty this hand.
     var costs=Array(hand.length+1).fill(Infinity);costs[hand.length]=0;
@@ -56,7 +58,7 @@ var Cards=(function(){
     s.roundScores=s.scores.map(function(_,i){return s.captured[i]+s.tokens[i]-(i===immune?0:s.hands[i].length);});
     s.scores=s.scores.map(function(n,i){return n+s.roundScores[i];});
     log(s,-1,'第 '+s.round+' 轮结束');
-    if(s.round===3){s.phase='finished';s.stage='finished';var best=Math.max.apply(null,s.scores);s.winners=s.scores.map(function(n,i){return n===best?i:-1;}).filter(function(i){return i>=0;});s.winner=s.winners[0];s.result=s.winners.map(function(i){return s.players[i].name;}).join('、')+'获胜';}
+    if(s.round===s.players.length){s.phase='finished';s.stage='finished';var best=Math.max.apply(null,s.scores);s.winners=s.scores.map(function(n,i){return n===best?i:-1;}).filter(function(i){return i>=0;});s.winner=s.winners[0];s.result=s.winners.map(function(i){return s.players[i].name;}).join('、')+'获胜';}
     else{s.stage='roundEnd';s.turn=0;}
   }
   function show(s,seat,start,count){
@@ -64,14 +66,14 @@ var Cards=(function(){
     require(move,'请选择手中相邻且比当前演出更强的组合');
     s.captured[seat]+=s.active.length;s.active=s.hands[seat].splice(start,count);s.owner=seat;s.scouted=0;
     log(s,seat,'演出 '+s.active.map(function(c){return c.top;}).join(' · '));
-    if(!s.hands[seat].length)endRound(s,null);else s.turn=(seat+1)%3;
+    if(!s.hands[seat].length)endRound(s,null);else s.turn=(seat+1)%s.players.length;
   }
   function apply(s,seat,action,data){
     require(s.phase==='playing'&&seat===s.turn,'尚未轮到你');
     if(s.stage==='orient'){
       require(action==='orient'&&typeof data.flip==='boolean','请确认整手牌的朝向');
       if(data.flip)s.hands[seat]=flipped(s.hands[seat]);s.oriented[seat]=true;
-      if(s.oriented.every(Boolean)){s.stage='play';s.turn=(s.round-1)%3;}else s.turn=(seat+1)%3;
+      if(s.oriented.every(Boolean)){s.stage='play';s.turn=(s.round-1)%s.players.length;}else s.turn=(seat+1)%s.players.length;
       return;
     }
     if(s.stage==='roundEnd'){
@@ -86,9 +88,9 @@ var Cards=(function(){
     s.hands[seat]=change.hand;s.active=change.active;s.tokens[s.owner]++;s.scouted++;
     log(s,seat,'招募 '+change.card.top);
     if(action==='scoutShow'){s.comboUsed[seat]=true;show(s,seat,data.start,data.count);}
-    else if(s.scouted===2)endRound(s,s.owner);else s.turn=(seat+1)%3;
+    else if(s.scouted===s.players.length-1)endRound(s,s.owner);else s.turn=(seat+1)%s.players.length;
   }
-  function publicView(s){return {phase:s.phase,stage:s.stage,turn:s.turn,players:s.players,round:s.round,scores:s.scores,counts:s.hands.map(function(h){return h.length;}),active:s.active,owner:s.owner,scouted:s.scouted,captured:s.captured,tokens:s.tokens,comboUsed:s.comboUsed,roundScores:s.roundScores,logs:s.logs,winner:s.winner,winners:s.winners,result:s.result};}
+  function publicView(s){var view={phase:s.phase,stage:s.stage,turn:s.turn,players:s.players,round:s.round,scores:s.scores,counts:s.hands.map(function(h){return h.length;}),active:s.active,owner:s.owner,scouted:s.scouted,captured:s.captured,tokens:s.tokens,comboUsed:s.comboUsed,roundScores:s.roundScores,logs:s.logs,winner:s.winner,winners:s.winners,result:s.result};if(s.phase==='finished')view.hands=s.hands;return view;}
   function privateView(s,seat){return {seat:seat,hand:s.hands[seat],legalShows:s.phase==='playing'&&s.stage==='play'&&s.turn===seat?shows(s.hands[seat],s.active):[]};}
   function ai(own,v){
     if(v.stage==='orient')return {action:'orient',data:{flip:quality(flipped(own.hand))>quality(own.hand)}};
@@ -105,8 +107,8 @@ var Cards=(function(){
     }});});
     choices.sort(function(a,b){return b.value-a.value;});return {action:choices[0].action,data:choices[0].data};
   }
-  return {title:'Scout 马戏星探',seats:3,create:create,apply:apply,publicView:publicView,privateView:privateView,ai:ai,flipped:flipped,combination:combination,shows:shows,recruit:recruit,
-    rules:'三人局，共三轮；使用不含 10 的 36 张双数字牌，每人 12 张。每轮开始可把整手牌翻转一次，之后不能重排或翻转手牌。\n演出：打出手中相邻的同数牌或连续升序／降序牌。先比张数，再比牌型（同数大于连续），最后比最小数字；必须严格压过桌面演出。被压过的桌牌每张得 1 分。\n招募：只能取桌牌两端的一张，可翻面并插入手牌任意位置；原演出者得 1 分。本轮每人可使用一次“招募并演出”，招募后立即出牌。\n有人出完手牌，或一次演出后其他两人都仅招募，立即结束本轮。每人得分为赢得的桌牌数＋被招募次数－剩余手牌数；连续被两人招募的演出者不扣手牌分。桌上仍在演出的牌不计分。每轮起始玩家轮换，三轮总分最高者获胜，可并列。'};
+  return {title:'Scout 马戏星探',seats:3,seatOptions:[3,4,5],create:create,apply:apply,publicView:publicView,privateView:privateView,ai:ai,flipped:flipped,combination:combination,shows:shows,recruit:recruit,
+    rules:'支持 3—5 人，轮数等于人数。3 人移除所有含 10 的牌，共 36 张，每人 12 张；4 人只移除 9/10 牌，共 44 张，每人 11 张；5 人使用全部 45 张，每人 9 张。每轮开始可选择整手牌朝向，之后不能重排或翻转手牌。\n演出：打出手中相邻的同数牌或连续升序／降序牌。先比张数，再比牌型（同数大于连续），最后比最小数字；必须严格压过桌面演出。被压过的桌牌每张得 1 分。\n招募：只能取桌牌两端的一张，可翻面并插入手牌任意位置；原演出者得 1 分。本轮每人可使用一次“招募并演出”，招募后立即出牌。\n有人出完手牌，或一次演出后其余所有玩家都仅招募，立即结束本轮。每人得分为赢得的桌牌数＋被招募次数－剩余手牌数；演出未被任何对手压过而结束本轮的演出者不扣手牌分。桌上仍在演出的牌不计分。每轮起始玩家轮换，总分最高者获胜，可并列。'};
 })();
 
 var s=ctx.state,e=ctx.event,d=e.data;
@@ -114,10 +116,12 @@ function require(ok,message){if(!ok)throw new Error(message);}
 function person(p){return p.kind==='engine'?p.name:'['+p.name.replace(/[\\\[\]]/g,'\\$&')+'](aurai://member/'+encodeURIComponent(p.id)+')';}
 function notify(text){host.call('messages.send',{text:text,markdown:true});}
 function start(game){
+  var seats=Cards.seatOptions?d.seats:Cards.seats;
+  if(Cards.seatOptions)require(Cards.seatOptions.indexOf(seats)>=0,'请选择支持的对局人数');
   var human=ctx.members.find(function(p){return p.id==='user:local';});
   require(human,'请由本机玩家打开对局');
   var players=[{id:human.id,name:human.name,kind:human.kind,side:0}];
-  for(var i=1;i<Cards.seats;i++)players.push({id:'engine:card:'+i,name:'电脑 '+i,kind:'engine',side:i});
+  for(var i=1;i<seats;i++)players.push({id:'engine:card:'+i,name:'电脑 '+i,kind:'engine',side:i});
   s=Cards.create(players,Math.floor(Math.random()*4294967296));s.game=game;s.ply=0;
 }
 require(e.actorId==='user:local','请由本局玩家操作，其他成员可以观战');
@@ -139,8 +143,8 @@ if(e.action==='configure'){
     require(s.phase==='playing','本局已经结束');
     var seat=0,action=e.action,data=d;
     if(ctx.decision===true){
-      require(e.action==='cardAi'&&s.players[s.turn].kind==='engine','当前没有需要行动的电脑');
-      seat=s.turn;
+      seat=Cards.aiSeat?Cards.aiSeat(s):s.turn;
+      require(e.action==='cardAi'&&seat>=0&&s.players[seat].kind==='engine','当前没有需要行动的电脑');
       // Only the same public table and this seat's own hand enter the strategy.
       var move=Cards.ai(Cards.privateView(s,seat),Cards.publicView(s));action=move.action;data=move.data;
     }else require(e.action!=='cardAi','请通过对局引擎继续');
@@ -164,13 +168,15 @@ return {state:s,view:view,privateViews:privateViews};
   <header class="card-heading"><h1>Scout 马戏星探</h1><span id="cardStatus" class="aurai-muted"></span></header>
   <section id="cardSetup" class="aurai-stack">
     <div class="card-cover" aria-hidden="true"><span>3</span><span>4</span><span>5</span></div>
-    <h2>把你的手牌，变成好戏</h2><p class="aurai-muted">三人马戏牌局，与两位本地 AI 游玩。招募、演出，三轮决出最佳团长。</p>
+    <h2>把你的手牌，变成好戏</h2><p class="aurai-muted">支持 3—5 人，与本地 AI 招募、演出，争夺最佳团长。</p>
+    <div id="cardSeatOptions" class="card-seat-options" hidden></div>
     <button id="cardStart" type="button" class="aurai-button aurai-button--primary">与电脑开局</button>
     <p id="cardSetupHint" class="aurai-muted"></p>
   </section>
   <section id="cardMatch" class="aurai-stack" hidden>
     <div id="cardPlayers" class="card-players"></div>
     <div id="cardTable"></div>
+    <div id="cardRematchSeats" class="card-seat-options" hidden></div>
     <nav id="cardToolbar" class="aurai-row" aria-label="对局操作">
       <button id="cardContinue" type="button" class="aurai-button">继续</button>
       <button id="cardRematch" type="button" class="aurai-button aurai-button--primary" hidden>再来一局</button>
@@ -211,8 +217,26 @@ html[data-aurai-display=fullscreen] .card-heading{min-height:48px;padding-right:
 html[data-aurai-display=fullscreen] #cardToolbar{position:fixed;bottom:calc(var(--aurai-host-safe-bottom-inset,0px) + 16px);left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:400px;padding:8px;border:1px solid var(--aurai-border);border-radius:32px;background:color-mix(in srgb,var(--aurai-field) 88%,transparent);backdrop-filter:blur(20px);z-index:8;box-shadow:0 4px 20px #00000012}
 html[data-aurai-display=fullscreen] #cardMorePanel{position:fixed;bottom:calc(var(--aurai-host-safe-bottom-inset,0px) + 90px);left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:420px;max-height:60dvh;overflow:auto;z-index:9;backdrop-filter:blur(24px);background:color-mix(in srgb,var(--aurai-field) 94%,transparent)}
 @media(prefers-reduced-motion:reduce){.card-player.active .card-seat:after,#cardContinue[aria-busy=true]:after{animation:none}}
+.card-seat-options{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:13px}.card-seat-options>.aurai-button{flex:1}.card-seat-options>span,.card-seat-options>small{flex-basis:100%}
+
+.card-remaining{grid-column:1/-1;display:flex;flex-direction:column;gap:16px;margin-top:14px;padding-top:16px;border-top:1px solid color-mix(in srgb,var(--aurai-muted) 20%,transparent);min-width:0}
+.card-revealed-hand{display:flex;flex-direction:column;gap:8px;min-width:0}
+.card-revealed-cards{display:flex;flex-wrap:wrap;gap:6px}
+.card-revealed-cards .uno-card{width:54px;flex-basis:54px;height:82px;padding:5px;border-width:2px;border-radius:9px}
+.card-revealed-cards .uno-face{font-size:24px}
+.card-revealed-cards .uno-color-name{font-size:10px}
 
 .scout-root{display:flex;flex-direction:column;gap:16px;min-width:0}
+.scout-pick.recruited{touch-action:none;cursor:grab!important}.scout-pick.dragging{opacity:.3!important}.scout-drag-ghost{position:fixed;z-index:1001;pointer-events:none;transform:rotate(5deg);box-shadow:0 8px 24px #0004}.scout-drop-marker{position:fixed;width:3px;border-radius:3px;background:var(--aurai-highlight-text);z-index:1000;pointer-events:none}
+.scout #cardPlayers{display:none}.scout#cardGame{max-width:1100px}
+.scout-table{position:relative;padding:80px 75px 12px;background:#29364c;border-radius:24px;min-height:280px;color:#fff6e4}
+.scout-opponents{position:absolute;inset:14px 10px auto;display:flex;justify-content:center;gap:24px}
+.scout-player{display:grid;justify-items:center;gap:5px;width:76px;font-size:12px;text-align:center}
+.scout-player[data-position="left"]{position:absolute;left:0;top:80px}.scout-player[data-position="right"]{position:absolute;right:0;top:80px}
+.scout-avatar{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:#f2d5a1;color:#29364c;font-size:18px;font-weight:600}
+.scout-player.active .scout-avatar{outline:2px solid #f2c57c;outline-offset:4px}.scout-player strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}.scout-player-detail{font-size:10px;color:#d9d5cb;white-space:nowrap}
+.scout-table .scout-desk{padding:8px;min-height:170px;background:none;border-radius:0}.scout-table[data-seats="3"]{padding-top:18px}.scout-table[data-seats="3"] .scout-player{top:40px}
+.scout-tally strong{color:var(--aurai-highlight-text);font-weight:500}.scout-tally{align-items:center;flex-wrap:wrap}.scout-hand-label{margin-bottom:-10px}
 .scout-desk{background:#29364c;color:#fff6e4;border-radius:24px;padding:20px;text-align:center;min-height:190px;background-image:radial-gradient(ellipse at 50% 0,#ffffff0b,transparent 65%)}
 .scout-desk-label{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#d8cfbb}.scout-wordmark{font-weight:700;letter-spacing:3px;color:#f2c57c}
 .scout-desk h2{font-size:22px;line-height:1.5;margin:26px 0 12px}.scout-subtle{font-size:13px;color:#d9d5cb;line-height:1.7;margin:14px 0 0}
@@ -228,10 +252,14 @@ html[data-aurai-display=fullscreen] #cardMorePanel{position:fixed;bottom:calc(va
 .scout-scoreboard{display:flex;flex-direction:column;gap:14px;margin-top:20px}.scout-score{display:flex;align-items:center;gap:12px;font-size:13px}.scout-score strong{font-weight:500;flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.scout-score span{color:#d9d5cb}.scout-score b{font-size:17px;min-width:50px;text-align:right}
 .scout .card-cover{background:#29364c}.scout .card-cover span{color:#29364c;background:#f2d5a1}.scout .card-cover span:nth-child(2){background:#a9d2c8;color:#29364c}.scout .card-cover span:nth-child(3){background:#e5aba0}
 @media(max-width:340px){.scout-desk{padding:16px}.scout-desk h2{font-size:20px}.scout-actions>.aurai-button{padding:10px 8px;font-size:13px!important}}
+@media(min-width:650px){.scout-table{min-height:310px;padding-left:110px;padding-right:110px}.scout-player{width:96px;font-size:14px}.scout-avatar{width:44px;height:44px}.scout-player-detail{font-size:12px}.scout-hand{justify-content:center}.scout-actions{justify-content:center}.scout-actions>.aurai-button{flex:0 1 180px}.scout-table .scout-desk h2{margin-top:40px}}
+@media(max-width:420px){.scout-table{padding-left:62px;padding-right:62px}.scout-player{width:58px}.scout-table .scout-desk h2{font-size:17px}.scout-desk-label{font-size:10px;gap:4px}.scout-wordmark{letter-spacing:1px}.scout-card{width:47px;height:78px}.scout-active{justify-content:flex-start}.scout-score{flex-wrap:wrap;gap:4px}.scout-score strong{flex-basis:100%}}
+.scout-hand{--scout-card-width:54px;gap:0}.scout-hand .scout-pick{width:clamp(22px,calc((100% - var(--scout-card-width))/max(1,var(--cards) - 1)),61px)}.scout-hand .scout-pick:last-child{width:var(--scout-card-width)}.scout-hand .scout-back-number{align-self:flex-start}.scout-hand .scout-card{border:1px solid #29364c25;padding-left:6px}.scout-hand .scout-card.selected{border-color:var(--aurai-highlight-text)}
+@media(max-width:420px){.scout-hand{--scout-card-width:47px}.scout-hand .scout-number{font-size:23px}}
 </style>
 <script>(()=>{
 const GAME='scout',TITLE='Scout 马戏星探';
-// SCOUT rules by Kei Kajino / Oink Games, three-player rules.
+// SCOUT rules by Kei Kajino / Oink Games, three-to-five-player rules.
 // https://oinkgames.com/en/games/analog/scout/ — artwork below is original CSS.
 var Cards=(function(){
   function require(ok,message){if(!ok)throw Error(message);}
@@ -266,14 +294,16 @@ var Cards=(function(){
   function deal(s){
     var deck=[],id=0;
     // Three players remove all nine cards containing 10: 36 cards, 12 each.
-    for(var a=1;a<=9;a++)for(var b=a+1;b<=9;b++)deck.push({id:id++,top:a,bottom:b});
+    // Four players remove only 9/10: 44 cards, 11 each. Five use all 45, 9 each.
+    var seats=s.players.length,limit=seats===3?9:10;
+    for(var a=1;a<=limit;a++)for(var b=a+1;b<=limit;b++){if(seats===4&&a===9&&b===10)continue;deck.push({id:id++,top:a,bottom:b});}
     for(var i=deck.length-1;i>0;i--){var j=Math.floor(random(s)*(i+1)),card=deck[i];deck[i]=deck[j];deck[j]=card;}
     deck=deck.map(function(c){return random(s)<.5?{id:c.id,top:c.bottom,bottom:c.top}:c;});
-    s.hands=[deck.slice(0,12),deck.slice(12,24),deck.slice(24)];
-    s.stage='orient';s.turn=0;s.oriented=[false,false,false];s.active=[];s.owner=null;s.scouted=0;
-    s.captured=[0,0,0];s.tokens=[0,0,0];s.comboUsed=[false,false,false];s.roundScores=null;
+    var size=deck.length/seats;s.hands=Array.from({length:seats},function(_,i){return deck.slice(i*size,(i+1)*size);});
+    s.stage='orient';s.turn=0;s.oriented=Array(seats).fill(false);s.active=[];s.owner=null;s.scouted=0;
+    s.captured=Array(seats).fill(0);s.tokens=Array(seats).fill(0);s.comboUsed=Array(seats).fill(false);s.roundScores=null;
   }
-  function create(players,seed){var s={phase:'playing',players:players,seed:seed>>>0,round:1,scores:[0,0,0],logs:[],winner:null,winners:[],result:''};deal(s);return s;}
+  function create(players,seed){require([3,4,5].indexOf(players.length)>=0,'请选择 3、4 或 5 人');var s={phase:'playing',players:players,seed:seed>>>0,round:1,scores:Array(players.length).fill(0),logs:[],winner:null,winners:[],result:''};deal(s);return s;}
   function quality(hand){
     // Minimum number of adjacent valid sets needed to empty this hand.
     var costs=Array(hand.length+1).fill(Infinity);costs[hand.length]=0;
@@ -284,7 +314,7 @@ var Cards=(function(){
     s.roundScores=s.scores.map(function(_,i){return s.captured[i]+s.tokens[i]-(i===immune?0:s.hands[i].length);});
     s.scores=s.scores.map(function(n,i){return n+s.roundScores[i];});
     log(s,-1,'第 '+s.round+' 轮结束');
-    if(s.round===3){s.phase='finished';s.stage='finished';var best=Math.max.apply(null,s.scores);s.winners=s.scores.map(function(n,i){return n===best?i:-1;}).filter(function(i){return i>=0;});s.winner=s.winners[0];s.result=s.winners.map(function(i){return s.players[i].name;}).join('、')+'获胜';}
+    if(s.round===s.players.length){s.phase='finished';s.stage='finished';var best=Math.max.apply(null,s.scores);s.winners=s.scores.map(function(n,i){return n===best?i:-1;}).filter(function(i){return i>=0;});s.winner=s.winners[0];s.result=s.winners.map(function(i){return s.players[i].name;}).join('、')+'获胜';}
     else{s.stage='roundEnd';s.turn=0;}
   }
   function show(s,seat,start,count){
@@ -292,14 +322,14 @@ var Cards=(function(){
     require(move,'请选择手中相邻且比当前演出更强的组合');
     s.captured[seat]+=s.active.length;s.active=s.hands[seat].splice(start,count);s.owner=seat;s.scouted=0;
     log(s,seat,'演出 '+s.active.map(function(c){return c.top;}).join(' · '));
-    if(!s.hands[seat].length)endRound(s,null);else s.turn=(seat+1)%3;
+    if(!s.hands[seat].length)endRound(s,null);else s.turn=(seat+1)%s.players.length;
   }
   function apply(s,seat,action,data){
     require(s.phase==='playing'&&seat===s.turn,'尚未轮到你');
     if(s.stage==='orient'){
       require(action==='orient'&&typeof data.flip==='boolean','请确认整手牌的朝向');
       if(data.flip)s.hands[seat]=flipped(s.hands[seat]);s.oriented[seat]=true;
-      if(s.oriented.every(Boolean)){s.stage='play';s.turn=(s.round-1)%3;}else s.turn=(seat+1)%3;
+      if(s.oriented.every(Boolean)){s.stage='play';s.turn=(s.round-1)%s.players.length;}else s.turn=(seat+1)%s.players.length;
       return;
     }
     if(s.stage==='roundEnd'){
@@ -314,9 +344,9 @@ var Cards=(function(){
     s.hands[seat]=change.hand;s.active=change.active;s.tokens[s.owner]++;s.scouted++;
     log(s,seat,'招募 '+change.card.top);
     if(action==='scoutShow'){s.comboUsed[seat]=true;show(s,seat,data.start,data.count);}
-    else if(s.scouted===2)endRound(s,s.owner);else s.turn=(seat+1)%3;
+    else if(s.scouted===s.players.length-1)endRound(s,s.owner);else s.turn=(seat+1)%s.players.length;
   }
-  function publicView(s){return {phase:s.phase,stage:s.stage,turn:s.turn,players:s.players,round:s.round,scores:s.scores,counts:s.hands.map(function(h){return h.length;}),active:s.active,owner:s.owner,scouted:s.scouted,captured:s.captured,tokens:s.tokens,comboUsed:s.comboUsed,roundScores:s.roundScores,logs:s.logs,winner:s.winner,winners:s.winners,result:s.result};}
+  function publicView(s){var view={phase:s.phase,stage:s.stage,turn:s.turn,players:s.players,round:s.round,scores:s.scores,counts:s.hands.map(function(h){return h.length;}),active:s.active,owner:s.owner,scouted:s.scouted,captured:s.captured,tokens:s.tokens,comboUsed:s.comboUsed,roundScores:s.roundScores,logs:s.logs,winner:s.winner,winners:s.winners,result:s.result};if(s.phase==='finished')view.hands=s.hands;return view;}
   function privateView(s,seat){return {seat:seat,hand:s.hands[seat],legalShows:s.phase==='playing'&&s.stage==='play'&&s.turn===seat?shows(s.hands[seat],s.active):[]};}
   function ai(own,v){
     if(v.stage==='orient')return {action:'orient',data:{flip:quality(flipped(own.hand))>quality(own.hand)}};
@@ -333,26 +363,39 @@ var Cards=(function(){
     }});});
     choices.sort(function(a,b){return b.value-a.value;});return {action:choices[0].action,data:choices[0].data};
   }
-  return {title:'Scout 马戏星探',seats:3,create:create,apply:apply,publicView:publicView,privateView:privateView,ai:ai,flipped:flipped,combination:combination,shows:shows,recruit:recruit,
-    rules:'三人局，共三轮；使用不含 10 的 36 张双数字牌，每人 12 张。每轮开始可把整手牌翻转一次，之后不能重排或翻转手牌。\n演出：打出手中相邻的同数牌或连续升序／降序牌。先比张数，再比牌型（同数大于连续），最后比最小数字；必须严格压过桌面演出。被压过的桌牌每张得 1 分。\n招募：只能取桌牌两端的一张，可翻面并插入手牌任意位置；原演出者得 1 分。本轮每人可使用一次“招募并演出”，招募后立即出牌。\n有人出完手牌，或一次演出后其他两人都仅招募，立即结束本轮。每人得分为赢得的桌牌数＋被招募次数－剩余手牌数；连续被两人招募的演出者不扣手牌分。桌上仍在演出的牌不计分。每轮起始玩家轮换，三轮总分最高者获胜，可并列。'};
+  return {title:'Scout 马戏星探',seats:3,seatOptions:[3,4,5],create:create,apply:apply,publicView:publicView,privateView:privateView,ai:ai,flipped:flipped,combination:combination,shows:shows,recruit:recruit,
+    rules:'支持 3—5 人，轮数等于人数。3 人移除所有含 10 的牌，共 36 张，每人 12 张；4 人只移除 9/10 牌，共 44 张，每人 11 张；5 人使用全部 45 张，每人 9 张。每轮开始可选择整手牌朝向，之后不能重排或翻转手牌。\n演出：打出手中相邻的同数牌或连续升序／降序牌。先比张数，再比牌型（同数大于连续），最后比最小数字；必须严格压过桌面演出。被压过的桌牌每张得 1 分。\n招募：只能取桌牌两端的一张，可翻面并插入手牌任意位置；原演出者得 1 分。本轮每人可使用一次“招募并演出”，招募后立即出牌。\n有人出完手牌，或一次演出后其余所有玩家都仅招募，立即结束本轮。每人得分为赢得的桌牌数＋被招募次数－剩余手牌数；演出未被任何对手压过而结束本轮的演出者不扣手牌分。桌上仍在演出的牌不计分。每轮起始玩家轮换，总分最高者获胜，可并列。'};
 })();
 
 var CardUI=(function(){
   var stateKey='',anchor=null,end=null,orientation=false,recruiting=false,edge='left',flip=false,position=0,combo=false,scroll=0;
+  var cancelDrag=null;
   function reset(){stateKey='';anchor=null;end=null;orientation=false;recruiting=false;edge='left';flip=false;position=0;combo=false;scroll=0;}
   function render(root,v,own,api){
+    if(cancelDrag)cancelDrag();
     var old=root.querySelector('.scout-hand');if(old)scroll=old.scrollLeft;
     var key=v.game+':'+v.ply;
     if(key!==stateKey){reset();stateKey=key;}
     var el=api.el;root.replaceChildren();root.className='scout-root';
     function button(label,fn,disabled,primary){var b=el('button',label,'aurai-button'+(primary?' aurai-button--primary':''));b.type='button';b.disabled=disabled;b.onclick=fn;return b;}
     function card(c,selected){var node=el('span','','scout-card'+(selected?' selected':''));node.dataset.tone=String(c.top%3);node.append(el('b',String(c.top),'scout-number'),el('span','✦','scout-star'),el('small',String(c.bottom),'scout-back-number'));return node;}
+    var table=el('div','','scout-table'),seats=el('div','','scout-opponents');
+    var viewer=own?own.seat:0;
+    for(var offset=1;offset<v.players.length;offset++){
+      var index=(viewer+offset)%v.players.length,p=v.players[index];
+      var seat=el('div','','scout-player'+(v.phase==='playing'&&v.turn===index?' active':''));
+      seat.dataset.position=offset===1?'right':offset===v.players.length-1?'left':'top';
+      seat.append(el('span',p.name.slice(0,1),'scout-avatar'),el('strong',p.name),el('span',v.counts[index]+' 张 · '+v.scores[index]+' 分','scout-player-detail'));
+      seat.setAttribute('aria-label',p.name+'，'+v.counts[index]+' 张，'+v.scores[index]+' 分'+(v.phase==='playing'&&v.turn===index?'，正在行动':''));seats.append(seat);
+    }
+    table.dataset.seats=String(v.players.length);table.append(seats);
     var desk=el('section','','scout-desk'),label=el('div','','scout-desk-label');
-    label.append(el('span','SCOUT','scout-wordmark'),el('span','第 '+v.round+' / 3 轮'));desk.append(label);
+    label.append(el('span','SCOUT','scout-wordmark'),el('span','第 '+v.round+' / '+v.players.length+' 轮'));desk.append(label);
     if(v.stage==='roundEnd'||v.phase==='finished'){
       desk.append(el('h2',v.phase==='finished'?v.result:'这一轮，谢幕！'));
       var board=el('div','','scout-scoreboard');
       v.players.forEach(function(p,i){var row=el('div','','scout-score');row.append(el('strong',p.name),el('span','本轮 '+(v.roundScores[i]>=0?'+':'')+v.roundScores[i]),el('b',String(v.scores[i])+' 分'));board.append(row);});desk.append(board);
+      if(v.active.length){desk.append(el('p',v.players[v.owner].name+'的最后演出','scout-subtle'));var finalShow=el('div','','scout-active');v.active.forEach(function(c){finalShow.append(card(c,false));});desk.append(finalShow);}
     }else if(v.stage==='orient'){
       desk.append(el('h2','好戏，从选好方向开始'),el('p','每张牌有两个数字。整手翻转后，牌序也会反过来。','scout-subtle'));
     }else{
@@ -362,9 +405,10 @@ var CardUI=(function(){
       var group=Cards.combination(v.active);
       if(group)desk.append(el('div',group.count+' 张 · '+(group.count===1?'单张':group.type?'同数':'连续'),'scout-subtle'));
     }
-    root.append(desk);
+    table.append(desk);root.append(table);
+    if(v.phase==='finished'){showRemainingHands(root,v,card);return;}
     if(!own){root.append(el('p','正在观战 · 手牌仅玩家本人可见','aurai-muted'));return;}
-    var tally=el('div','','scout-tally');tally.append(el('span','总分 '+v.scores[own.seat]),el('span','赢牌 '+v.captured[own.seat]),el('span','招募奖励 '+v.tokens[own.seat]));root.append(tally);
+    var tally=el('div','','scout-tally');tally.append(el('strong',v.players[own.seat].name),el('span','总分 '+v.scores[own.seat]),el('span','赢牌 '+v.captured[own.seat]),el('span','招募奖励 '+v.tokens[own.seat]));root.append(tally);
     if(v.stage==='roundEnd'){
       root.append(button('开始下一轮',function(){api.act('nextRound',{});},!api.canPlay,true));return;
     }
@@ -376,31 +420,53 @@ var CardUI=(function(){
     var start=anchor===null?0:Math.min(anchor,end===null?anchor:end),count=anchor===null?0:Math.abs((end===null?anchor:end)-anchor)+1;
     var valid=legal.some(function(m){return m.start===start&&m.count===count;});
     root.append(el('div',v.stage==='orient'?'选择手牌朝向':recruiting?'招募后的手牌预览':'你的手牌 · 顺序固定','scout-hand-label'));
-    var strip=el('div','','scout-hand');
+    var strip=el('div','','scout-hand');strip.style.setProperty('--cards',String(hand.length));
     hand.forEach(function(c,i){
-      var b=button('',function(){if(anchor===null||end!==null){anchor=i;end=null;}else end=i;render(root,v,own,api);},!api.canPlay||v.stage!=='play'||recruiting&&!combo,false);
+      var recruited=change&&c.id===change.card.id;
+      var b=button('',function(){if(recruiting&&!combo)return;if(anchor===null||end!==null){anchor=i;end=null;}else end=i;render(root,v,own,api);},!api.canPlay||v.stage!=='play'||recruiting&&!combo&&!recruited,false);
       b.className='scout-pick';b.append(card(c,!!count&&i>=start&&i<start+count));b.setAttribute('aria-label','第 '+(i+1)+' 张，'+c.top+'，背面 '+c.bottom);b.setAttribute('aria-pressed',String(!!count&&i>=start&&i<start+count));
-      if(change&&c.id===change.card.id)b.classList.add('recruited');strip.append(b);
+      if(recruited){b.classList.add('recruited');b.setAttribute('aria-label','招募牌 '+c.top+'，拖动调整位置，左右方向键也可移动');
+        b.onkeydown=function(event){if(!api.canPlay||!['ArrowLeft','ArrowRight'].includes(event.key))return;event.preventDefault();position=Math.max(0,Math.min(own.hand.length,position+(event.key==='ArrowLeft'?-1:1)));anchor=end=null;render(root,v,own,api);root.querySelector('.recruited').focus();};
+        b.onpointerdown=function(event){
+          if(!api.canPlay||event.button!==0)return;
+          var source=event.currentTarget,id=event.pointerId,x=event.clientX,y=event.clientY,initialX=x,initialY=y,dragging=false,target=position,frame,ghost,marker,inside=false;
+          source.setPointerCapture(id);
+          function clean(){cancelAnimationFrame(frame);if(ghost)ghost.remove();if(marker)marker.remove();source.classList.remove('dragging');source.onpointermove=source.onpointerup=source.onpointercancel=source.onlostpointercapture=null;if(source.hasPointerCapture(id))source.releasePointerCapture(id);cancelDrag=null;}
+          cancelDrag=clean;
+          function move(){
+            var bounds=strip.getBoundingClientRect();inside=x>=bounds.left-24&&x<=bounds.right+24&&y>=bounds.top-50&&y<=bounds.bottom+50;
+            if(inside){strip.scrollLeft+=x<bounds.left+28?-6:x>bounds.right-28?6:0;
+              var others=Array.from(strip.children).filter(function(node){return node!==source;});
+              target=others.filter(function(node){var r=node.getBoundingClientRect();return x>r.left+r.width/2;}).length;
+              var r=(target<others.length?others[target]:others[others.length-1]).getBoundingClientRect();
+              marker.style.left=(target<others.length?r.left:r.right)+'px';marker.style.top=bounds.top+'px';marker.style.height=bounds.height+'px';
+            }
+            marker.hidden=!inside;ghost.style.left=(x-24)+'px';ghost.style.top=(y-40)+'px';frame=requestAnimationFrame(move);
+          }
+          source.onpointermove=function(e){if(e.pointerId!==id)return;x=e.clientX;y=e.clientY;if(!dragging&&Math.hypot(x-initialX,y-initialY)>5){dragging=true;source.classList.add('dragging');ghost=card(c,false);ghost.classList.add('scout-drag-ghost');marker=el('span','','scout-drop-marker');root.append(ghost,marker);move();}};
+          source.onpointerup=function(e){if(e.pointerId!==id)return;var dropped=dragging&&inside;if(dragging)source.onclick=function(e){e.preventDefault();};clean();if(dropped){position=target;anchor=end=null;render(root,v,own,api);}else if(dragging)render(root,v,own,api);};
+          source.onpointercancel=source.onlostpointercapture=clean;
+        };
+      }strip.append(b);
     });root.append(strip);strip.scrollLeft=scroll;
     if(v.stage==='orient'){
-      var orient=el('div','','scout-actions');orient.append(button('翻转整手牌',function(){orientation=!orientation;render(root,v,own,api);},!api.canPlay,false),button('就用这面',function(){api.act('orient',{flip:orientation});},!api.canPlay,true));root.append(orient);return;
+      var orient=el('div','','scout-actions');orient.append(button('翻转整手牌',function(){orientation=!orientation;render(root,v,own,api);},!api.canPlay,false),button('就用这面',function(){api.act('orient',{flip:orientation});},!api.canPlay,true));root.insertBefore(orient,tally);return;
     }
     if(recruiting){
       var panel=el('div','','scout-recruit'),settings=el('div','','scout-actions');
       settings.append(button(edge==='left'?'取左端 ✓':'取左端',function(){edge='left';anchor=end=null;render(root,v,own,api);},!api.canPlay,false),button(edge==='right'?'取右端 ✓':'取右端',function(){edge='right';anchor=end=null;render(root,v,own,api);},!api.canPlay||v.active.length===1,false),button(flip?'已翻面 ✓':'翻面',function(){flip=!flip;anchor=end=null;render(root,v,own,api);},!api.canPlay,false));panel.append(settings);
-      var insert=el('label','','aurai-field');insert.append(el('span','插入位置'));var select=el('select','');
-      for(var i=0;i<=own.hand.length;i++){var option=el('option',i===0?'最左侧':i===own.hand.length?'最右侧':'第 '+i+' 张之后');option.value=String(i);select.append(option);}select.value=String(position);select.disabled=!api.canPlay;select.onchange=function(){position=Number(select.value);anchor=end=null;render(root,v,own,api);};insert.append(select);panel.append(insert);
-      var choice=el('label','','scout-combo');var check=el('input','');check.type='checkbox';check.checked=combo;check.disabled=!api.canPlay||v.comboUsed[own.seat]||!legal.length;check.onchange=function(){combo=check.checked;anchor=end=null;render(root,v,own,api);};choice.append(check,el('span',v.comboUsed[own.seat]?'招募并演出 · 本轮已用':'招募并演出 · 每轮一次'));panel.append(choice);
+      panel.append(el('p','拖动手牌中虚线框的招募牌，放到想插入的间隙。','aurai-muted'));
+      var choice=el('label','','scout-combo');var check=el('input','');check.type='checkbox';check.checked=combo;check.disabled=!api.canPlay||v.comboUsed[own.seat]||!legal.length&&!combo;check.onchange=function(){combo=check.checked;anchor=end=null;render(root,v,own,api);};choice.append(check,el('span',v.comboUsed[own.seat]?'招募并演出 · 本轮已用':'招募并演出 · 每轮一次'));panel.append(choice);
       if(combo)panel.append(el('p','在预览手牌中选择相邻组合，再一起提交。','aurai-muted'));
       var actions=el('div','','scout-actions');actions.append(button('取消',function(){recruiting=false;anchor=end=null;render(root,v,own,api);},api.busy,false));
       if(combo)actions.append(button('提示',function(){var m=legal.slice().sort(function(a,b){return b.count-a.count;})[0];anchor=m.start;end=m.start+m.count-1;render(root,v,own,api);},!api.canPlay||!legal.length,false));
-      actions.append(button(combo?'招募并演出':'确认招募',function(){api.act(combo?'scoutShow':'scout',{edge:edge,flip:flip,position:position,start:start,count:count});},!api.canPlay||combo&&!valid,true));panel.append(actions);root.append(panel);
+      actions.append(button(combo?'招募并演出':'确认招募',function(){api.act(combo?'scoutShow':'scout',{edge:edge,flip:flip,position:position,start:start,count:count});},!api.canPlay||combo&&!valid,true));panel.append(actions);root.insertBefore(panel,tally);
     }else{
-      root.append(el('p',count?'已选 '+count+' 张'+(valid?' · 可以演出':' · 请选择能压过桌面的组合'):'点击首尾两张，选择相邻组合；也可只选一张。','aurai-muted scout-hint'));
+      root.insertBefore(el('p',count?'已选 '+count+' 张'+(valid?' · 可以演出':' · 请选择能压过桌面的组合'):'点击首尾两张，选择相邻组合；也可只选一张。','aurai-muted scout-hint'),tally);
       var actions=el('div','','scout-actions');
       actions.append(button('招募',function(){recruiting=true;position=0;edge='left';flip=false;combo=false;anchor=end=null;render(root,v,own,api);},!api.canPlay||!v.active.length||v.owner===own.seat,false));
       actions.append(button('提示',function(){var m=legal.slice().sort(function(a,b){return b.count-a.count;})[0];anchor=m.start;end=m.start+m.count-1;render(root,v,own,api);},!api.canPlay||!legal.length,false));
-      actions.append(button('演出',function(){api.act('show',{start:start,count:count});},!api.canPlay||!valid,true));root.append(actions);
+      actions.append(button('演出',function(){api.act('show',{start:start,count:count});},!api.canPlay||!valid,true));root.insertBefore(actions,tally);
     }
   }
   return {render:render,reset:reset};
@@ -409,9 +475,10 @@ var CardUI=(function(){
 const $=id=>document.getElementById(id);
 const el=(tag,value,cls)=>{const node=document.createElement(tag);node.textContent=value;if(cls)node.className=cls;return node;};
 let s=AuraiHTML.messageState,busy=false,thinking=false,paused=false,generation=0,attempt='',timer=null;
+let seatCount=s.players?s.players.length:Cards.seats;
 const host=()=>s._miniapp;
 const mine=()=>s.players?.find(p=>p.id===host()?.viewerId);
-const aiTurn=()=>s.phase==='playing'&&s.players[s.turn].kind==='engine';
+const aiTurn=()=>s.phase==='playing'&&(s.players[s.turn].kind==='engine'||s.engineCanJump===true);
 const key=()=>`${s.game}:${s.ply}`;
 function cancel(){generation++;clearTimeout(timer);timer=null;thinking=false;}
 async function continueAi(){
@@ -430,6 +497,16 @@ async function act(action,data={}){
     attempt='';
   }finally{busy=false;render();}
 }
+function showRemainingHands(root,v,card){
+  const section=el('section','','card-remaining');section.append(el('strong','剩余手牌'));
+  v.players.forEach((p,i)=>{
+    const row=el('div','','card-revealed-hand'),cards=el('div','','card-revealed-cards');
+    row.append(el('span',p.name+' · '+v.hands[i].length+' 张','aurai-muted'));
+    v.hands[i].forEach(c=>cards.append(card(c,false)));
+    if(!v.hands[i].length)cards.append(el('span','已出完','aurai-muted'));
+    row.append(cards);section.append(row);
+  });root.append(section);
+}
 function more(open){$('cardMorePanel').hidden=!open;$('cardMore').setAttribute('aria-expanded',String(open));$('cardLeaveConfirm').hidden=true;AuraiHTML.requestResize();}
 function render(){
   s=AuraiHTML.messageState;
@@ -439,6 +516,12 @@ function render(){
   $('cardRules').textContent=s.rules||Cards.rules;
   $('cardStart').disabled=busy||!owner;
   $('cardSetupHint').textContent=host()?owner?'无需联网，也不用配置模型':'等待玩家开始对局':'从小程序库打开即可开始';
+  for(const [id,visible] of [['cardSeatOptions',setup],['cardRematchSeats',s.phase==='finished']]){
+    const container=$(id);container.hidden=!Cards.seatOptions||!visible||!owner;
+    if(!container.hidden){container.replaceChildren(el('span','对局人数','aurai-muted'),...Cards.seatOptions.map(count=>{
+      const b=el('button',count+' 人','aurai-button'+(seatCount===count?' aurai-button--primary':''));b.type='button';b.disabled=busy;b.setAttribute('aria-pressed',String(seatCount===count));b.onclick=()=>{seatCount=count;render();};return b;
+    }),el('small','你与 '+(seatCount-1)+' 位电脑游玩','aurai-muted'));}
+  }
   if(!setup){
     $('cardPlayers').replaceChildren(...s.players.map((p,i)=>{
       const node=el('div','',`card-player${s.phase==='playing'&&s.turn===i?' active':''}`);
@@ -447,20 +530,22 @@ function render(){
       node.setAttribute('aria-label',p.name+(s.phase==='playing'&&s.turn===i?'，正在行动':''));return node;
     }));
     if(s.abandoned){$('cardTable').replaceChildren(el('p','本局已结束，可重新开局。','aurai-muted'));}
-    else CardUI.render($('cardTable'),s,host()?.own,{act,busy:busy||thinking,canPlay:!busy&&!thinking&&!!mine()&&s.turn===mine().side,el});
-    $('cardContinue').hidden=s.phase==='finished';$('cardContinue').disabled=busy||thinking||!mine()||!aiTurn();
+    else CardUI.render($('cardTable'),s,host()?.own,{act,busy:busy||thinking,canJump:!busy&&!thinking&&!!mine(),canPlay:!busy&&!thinking&&!!mine()&&s.turn===mine().side,el});
+    $('cardContinue').hidden=GAME==='doudizhu'||s.phase==='finished';$('cardContinue').disabled=busy||thinking||!mine()||!aiTurn();
     $('cardContinue').setAttribute('aria-busy',String(thinking));
+    $('cardMore').hidden=GAME==='doudizhu';
+    $('cardToolbar').hidden=GAME==='doudizhu'&&(s.phase!=='finished'||!mine());
     $('cardRematch').hidden=s.phase!=='finished'||!mine();$('cardRematch').disabled=busy;
     $('cardLeave').hidden=s.phase==='finished'||!mine();
     $('cardLog').replaceChildren(...(s.logs||[]).map(item=>el('li',(item.seat>=0?s.players[item.seat].name+' · ':'')+item.text)));
   }
   AuraiHTML.requestResize();
   if(!setup&&!busy&&!thinking&&!paused&&mine()&&aiTurn()&&attempt!==key()&&!timer){
-    timer=setTimeout(()=>{timer=null;void continueAi();},650);
+    timer=setTimeout(()=>{timer=null;void continueAi();},s.engineCanJump===true||host()?.own?.jumpable?.length?3000:650);
   }
 }
-$('cardStart').onclick=()=>act('configure');
-$('cardRematch').onclick=()=>{CardUI.reset();more(false);void act('rematch');};
+$('cardStart').onclick=()=>act('configure',Cards.seatOptions?{seats:seatCount}:{});
+$('cardRematch').onclick=()=>{CardUI.reset();more(false);void act('rematch',Cards.seatOptions?{seats:seatCount}:{});};
 $('cardContinue').onclick=()=>{clearTimeout(timer);timer=null;void continueAi();};
 $('cardMore').onclick=()=>more($('cardMorePanel').hidden);$('cardCloseMore').onclick=()=>more(false);
 $('cardLeave').onclick=()=>{$('cardLeaveConfirm').hidden=false;};

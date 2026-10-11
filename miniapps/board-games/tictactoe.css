@@ -24,6 +24,7 @@ html[data-aurai-display="fullscreen"] #game .board-wrap{max-width:min(100%,420px
 #game .aurai-button--danger{color:#ffa9d5;border-color:#824965}
 #game .aurai-button:disabled{opacity:.4}
 #game .aurai-button:focus-visible,#game select:focus-visible{outline:2px solid #70e9ff;outline-offset:3px}
-#game #gameToolbar,#game #morePanel{background:#111a30ef;border-color:#344366;box-shadow:0 6px 24px #00000045,0 0 22px #7658ff12}
+#game #gameToolbar,#game #gameDialog{background:#111a30ef;border-color:#344366;box-shadow:0 6px 24px #00000045,0 0 22px #7658ff12}
 #game select{background:#141c33;color:#edf1ff;border:1px solid #344366}
 html[data-aurai-display="inline"] #game{min-height:0;border-radius:24px;padding:16px}
+#game .side svg{display:block;width:100%;height:100%;overflow:visible}

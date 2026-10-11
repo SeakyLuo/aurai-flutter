@@ -2,5 +2,5 @@
   "tool": "built-in image_gen",
   "prompt": "Use case: logo-brand. Create an original polished mobile app icon for the Chinese card game Dou Dizhu, using a humorous landlord and farmer character theme. Center a friendly round-faced Chinese landlord wearing a traditional dark round cap with a small jade ornament, a neatly groomed short curled mustache, and a rich warm red traditional jacket, smiling mischievously while holding a small fan of playing cards. Beside him, a cheerful farmer wearing a woven straw hat and simple blue work clothes, smiling confidently with one playing card. Two large expressive faces, compact balanced composition, unmistakable landlord-versus-farmer card-game concept. Premium soft 3D cartoon toy-like rendering, tactile rounded forms, warm gentle light, crisp silhouettes readable as a tiny icon. Warm ivory and muted terracotta backdrop with subtle amber glow, restrained harmonious palette. Full-bleed square artwork, composition safely inside edges, no rounded-square frame, no text, no letters, no numbers, no watermark. Do not copy any existing branded game mascot or logo.",
   "original": "C:\\Users\\luoki\\.codex\\generated_images\\01a0f80b-69e4-7301-a4a7-e7bae5a306bd\\exec-a4517372-2338-4b1d-b08a-9588904ddf0e.png",
-  "asset": "assets/miniapps/icons/doudizhu.png"
+  "asset": "assets/miniapps/icons/doudizhu.webp"
 }

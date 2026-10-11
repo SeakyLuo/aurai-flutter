@@ -1,6 +1,6 @@
 // Coordinates are [file, rank], zero-based from the black side at the top.
 var Chess = (function () {
-  var width = 9, height = 10;
+  var width = 9, height = 10,jieqi=false;
   var names = {rK:'帅',rA:'仕',rE:'相',rH:'马',rR:'车',rC:'炮',rP:'兵',bK:'将',bA:'士',bE:'象',bH:'馬',bR:'車',bC:'砲',bP:'卒'};
   function initial() {
     var board = Array(90).fill(null), back = ['R','H','E','A','K','A','E','H','R'];
@@ -18,10 +18,10 @@ var Chess = (function () {
     if (!inside(x,y)||!inside(tx,ty)||(x===tx&&y===ty)) return false;
     var piece=board[y*9+x],target=board[ty*9+tx];
     if (!piece||side(piece)===side(target)) return false;
-    var dx=tx-x,dy=ty-y,ax=Math.abs(dx),ay=Math.abs(dy),color=side(piece),type=piece[1];
+    var dx=tx-x,dy=ty-y,ax=Math.abs(dx),ay=Math.abs(dy),color=side(piece),covered=piece[1]==='D',type=covered?piece[2]:piece[1];
     if (type==='H') return ax===2&&ay===1?!board[y*9+x+dx/2]:ax===1&&ay===2?!board[(y+dy/2)*9+x]:false;
-    if (type==='E') return ax===2&&ay===2&&(color==='r'?ty>=5:ty<=4)&&!board[(y+dy/2)*9+x+dx/2];
-    if (type==='A') return ax===1&&ay===1&&palace(tx,ty,color);
+    if (type==='E') return ax===2&&ay===2&&(jieqi&&!covered||(color==='r'?ty>=5:ty<=4))&&!board[(y+dy/2)*9+x+dx/2];
+    if (type==='A') return ax===1&&ay===1&&(jieqi&&!covered||palace(tx,ty,color));
     if (type==='P') return dx===0&&dy===(color==='r'?-1:1) || (color==='r'?y<=4:y>=5)&&ay===0&&ax===1;
     if (type==='K' && ax+ay===1 && palace(tx,ty,color)) return true;
     if (dx!==0&&dy!==0) return false;
@@ -91,7 +91,8 @@ var Chess = (function () {
     var frames=[{board:board,ids:ids,turn:turn}];
     if(move)records.push({from:move.from,to:move.to,piece:s.board[move.from[1]*9+move.from[0]],side:s.turn});
     records.forEach(function(m){
-      board=moved(board,m.from,m.to);ids=ids.slice();ids[m.to[1]*9+m.to[0]]=ids[m.from[1]*9+m.from[0]];ids[m.from[1]*9+m.from[0]]=null;
+      board=moved(board,m.from,m.to);if(m.revealed)board[m.to[1]*9+m.to[0]]=m.revealed;
+      ids=ids.slice();ids[m.to[1]*9+m.to[0]]=ids[m.from[1]*9+m.from[0]];ids[m.from[1]*9+m.from[0]]=null;
       turn=other(m.side);frames.push({board:board,ids:ids,turn:turn});
     });
     return frames;
@@ -141,6 +142,6 @@ var Chess = (function () {
   function allowed(s) {
     return legal(s.board,s.turn).filter(function(move){var repeat=repetition(s,move);return !repeat||repeat.offender!==s.turn;});
   }
-  return {width:width,height:height,first:'r',second:'b',sides:{r:'红方',b:'黑方'},names:names,initial:initial,legal:legal,allowed:allowed,repetition:repetition,play:play,check:check,coordinate:coordinate,
+  return {width:width,height:height,first:'r',second:'b',sides:{r:'红方',b:'黑方'},names:names,initial:initial,legal:legal,allowed:allowed,repetition:repetition,play:play,check:check,coordinate:coordinate,setJieqi:function(value){jieqi=value;},
     rules:'红方先行。遵循蹩马腿、塞象眼、九宫、过河、炮隔子及将帅照面规则；将死或无合法走法均判负。同局面同走方第三次出现时，单方长将、长捉同一棋子的走法禁止，必须变招；长将对长捉由长将方变招。双方同等重复或均未犯例判和。将帅、兵卒追捉、合法兑子和追捉真有根子不算长捉，马炮追有根车除外。连续 120 步未吃子或达到 400 步判和。'};
 })();
