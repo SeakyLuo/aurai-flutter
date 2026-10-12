@@ -109,21 +109,21 @@ const Office = (() => {
   function selection(s,path,dest) {
     if(s.status!=='playing'||!path.length||dest<0||dest>15)return '请选择桌面上的文件';
     if(new Set(path).size!==path.length)return '连线不能重复经过同一个文件';
-    const anchor=path.map(i=>s.board[i]).find(o=>o&&!['copy','cancel'].some(kind=>R.effect(o,kind)));
     for(let k=0;k<path.length;k++){
       const o=s.board[path[k]];
       if(!o)return '连线只能经过已有物品';
       if(!usable(o,s))return o.frozen?'物品还在冰冻中':o.charge?'先准备绝缘手套再移动带电物品':'先拆除固定物或加装滚轮';
       if(k>0&&!connection(s,path[k-1],path[k]))return '文件之间的路径须为空，且不能穿过挡板';
-      if(k>0&&(!compatible(s.board[path[0]],o)||(anchor&&!compatible(anchor,o))))return '请连接同值、同湿润状态的文件';
     }
+    if(path.length>1&&!OfficeMerge.compatible(path.map(i=>s.board[i])))return '这些文件的类型或状态不能一起合并';
+    if(path.length>1&&!OfficeMerge.complete(path.map(i=>s.board[i])))return '文件尚未配齐，请继续连接或退回已选文件';
     if(path.length>1&&R.fatigue(s,'noMerge'))return '疲劳期间暂时无法合并，可以移动单个文件';
     if(path.length===1&&B.linked(s,path[0]).length>1&&dest!==path[0])linkedMove(s,path[0],dest);
     const occupied=s.board[dest];
     const sameGroup=path.length===1&&B.linked(s,path[0]).length>1;
     if(occupied&&!sameGroup&&!path.includes(dest)&&!R.collectible(occupied)&&!(occupied.kind==='stone'&&occupied.brittle>0))return '终点须是空格、选中的文件或可收集道具';
     if(path.length===1&&B.crossesBarrier(s,path[0],dest))return '物品不能穿过挡板';
-    if(path.length===1&&path[0]===dest)return '拖到空格移动，或连选相邻同值文件合并';
+    if(path.length===1&&path[0]===dest)return '拖到空格移动，或连选可归并为一份的文件';
     if(path.length===1&&R.fatigue(s,'heavy')&&!R.adjacent(path[0],dest))return '疲劳期间每次只能移动一格';
     if(path.length===1&&!R.isFile(s.board[path[0]])&&!s.board[path[0]].attach.some(a=>['wheels','booster'].includes(a))){
       if(R.tier(s.board[path[0]])===3)return '超重物需要滚轮或助推器才能移动';
@@ -134,8 +134,9 @@ const Office = (() => {
   function cleanup(s) {
     // A full desk is still playable if an adjacent compatible pair can merge.
     // Collectible objects can also free a cell without consuming a move.
+    // Mixed-value submissions can remain playable without an adjacent equal pair.
     if(s.items.length<R.itemLimit(s)&&s.board.some(o=>R.collectible(o)&&(o.kind!=='parcel'||o.opened)&&(!o.charge||s.items.some(a=>a.key==='glove'&&!a.polluted))))return;
-    if(B.empty(s).length||s.board.some((o,i)=>o&&usable(o,s)&&B.neighbors(i).some(j=>!blocked(s,i,j)&&compatible(o,s.board[j])&&usable(s.board[j],s))))return;
+    if(B.empty(s).length||OfficeMerge.hasMerge(s))return;
     s.patience=Math.max(0,s.patience-50);s.cleanings++;
     if(!s.patience){s.status='lost';return;}
     // The confirmed cleaner rule preserves seals, clears other objects and deals two files.
@@ -164,22 +165,15 @@ const Office = (() => {
     OfficeWelfare.endAction(s);
   }
   function merge(s,objects,dest) {
-      const base=objects.find(a=>!['copy','cancel'].some(kind=>R.effect(a,kind)))||objects[0];
-      const copies=objects.filter(a=>R.effect(a,'copy')).length;
-      const originals=objects.filter(a=>!R.effect(a,'copy'));
-      const sum=(originals.length?originals.reduce((total,a)=>total+a.value,0):base.value)*2**(originals.length?copies:copies-1);
-      const cancellations=objects.filter(a=>R.effect(a,'cancel')).length;
-      const cancelled=objects.some(a=>a.cancelled&&!a.polluted)||cancellations>0;
-      const score=cancelled?0:sum+objects.reduce((total,a)=>total+(a.polluted?0:a.messy),0);
-      const o=B.object(s,R.fatigue(s,'noGrowth')?base.value:sum,base.kind==='waste'?'waste':base.kind==='metal'?'metal':'file');
-      if(cancellations===objects.length)o.value=1;
-      o.cancelled=(cancellations>0||objects.every(a=>a.cancelled))&&(cancellations+objects.filter(a=>a.cancelled&&!a.polluted).length)%2===1;
+      const plan=OfficeMerge.result(s,objects);
+      const o=B.object(s,plan.value,plan.kind);
+      o.cancelled=plan.cancelled;
       o.attach=[...new Set(objects.flatMap(a=>a.attach))];
       o.wet=Math.max(...objects.map(a=>a.wet));o.sticky=Math.max(...objects.map(a=>a.sticky));
       o.polluted=objects.some(a=>a.polluted);o.charge=Math.max(...objects.map(a=>a.charge));
       const dry=objects.filter(a=>!a.wet).length,sticky=objects.filter(a=>a.sticky).length;
       s.stats.merges++;s.stats.dry+=dry;s.stats.sticky+=sticky;s.phaseStats.dry+=dry;s.phaseStats.sticky+=sticky;
-      const gain=OfficeWelfare.merged(s,o,base.kind==='waste'?0:score,objects);
+      const gain=OfficeWelfare.merged(s,o,plan.score,objects);
       if(s.coffeeRebound){s.coffeeRebound=false;W.fatigue(s);}
       s.score+=gain;s.stats.organized+=gain;
       if(s.zones[dest].types.includes('overtime'))s.patience=Math.min(100,s.patience+1);

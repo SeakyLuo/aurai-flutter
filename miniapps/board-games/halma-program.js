@@ -13,6 +13,10 @@ function start(players,firstSide,game,difficulty){
   s={phase:'playing',game:game,difficulty:difficulty,players:players.map(function(p){return {id:p.id,name:p.name,kind:p.kind,side:p.side,active:true};}),firstSide:firstSide,turn:firstSide,board:Chess.initial(),ply:0,history:[],positions:{},winner:null,result:'',winningLine:[],drawOffer:null,paused:false};
   s.positions[position()]=1;
 }
+function nextGame(){
+  var first=s.players[(s.players.findIndex(function(p){return p.side===s.firstSide;})+1)%s.players.length].side;
+  start(s.players,first,s.game+1,s.difficulty);notify('第'+s.game+'局开始，轮到'+person(player(s.turn)),player(s.turn).kind==='agent');
+}
 function advance(side){
   var order=s.players.map(function(p){return p.side;}),at=order.indexOf(side),next=null;
   for(var n=1;n<=order.length;n++){var candidate=player(order[(at+n)%order.length]);if(!candidate.active)continue;if(Chess.legal(s.board,candidate.side).length){next=candidate.side;break;}notify(person(candidate)+'无合法走法，自动让行',false);}
@@ -58,9 +62,9 @@ if(e.action==='configure'){
   }else if(e.action==='resign'){
     require(s.phase==='playing'&&actor.active,'本局已经结束或你已认输');actor.active=false;s.drawOffer=null;s.ply++;Chess.setSides(activeSides());
     notify(person(actor)+'认输',false);
-    if(activeSides().length===1)finish(activeSides()[0],'其余玩家认输');
+    if(activeSides().length===1){finish(activeSides()[0],'其余玩家认输');host.call('replies.interrupt',{});nextGame();}
     else if(s.turn===actor.side)advance(actor.side);
-    if(s.phase==='playing'&&player(s.turn).kind==='agent')notify('轮到'+person(player(s.turn))+'落子',true);
+    if(s.game===d.game&&s.phase==='playing'&&player(s.turn).kind==='agent')notify('轮到'+person(player(s.turn))+'落子',true);
   }else if(e.action==='offerDraw'||e.action==='answerDraw'){
     require(s.players.length===2&&s.phase==='playing','和棋协商仅用于双人对局');
     if(e.action==='offerDraw'){require(!s.drawOffer,'已提出和棋');s.drawOffer=actor.id;var other=s.players.find(function(p){return p.id!==actor.id;});var args={text:actor.name+'提议和棋'};if(other.kind==='agent'){args.audience=members.map(function(m){return m.id;});args.wakeAi=true;args.wakeMemberIds=[other.id];}host.call('messages.send',args);}
@@ -71,8 +75,7 @@ if(e.action==='configure'){
     require(s.phase==='playing'&&player(s.turn).kind==='agent','当前不需要请 AI 落子');notify('请'+person(player(s.turn))+'继续落子',true);
   }else if(e.action==='rematch'||e.action==='restart'){
     require(s.phase==='finished'||e.action==='restart'&&(manager()||actor.kind!=='agent'&&actor.kind!=='engine'),'本局尚未结束');host.call('replies.interrupt',{});
-    var first=s.players[(s.players.findIndex(function(p){return p.side===s.firstSide;})+1)%s.players.length].side;
-    start(s.players,first,s.game+1,s.difficulty);notify('第'+s.game+'局开始，轮到'+person(player(s.turn)),player(s.turn).kind==='agent');
+    nextGame();
   }else throw new Error('不支持的棋局操作');
 }
 var protocol='这是多人中国跳棋。每次先 readHtmlProgram 读取最新 view；players 给出各玩家颜色和 active 状态，turn 是当前颜色，board 是二维棋盘，pieceLegend 解释棋子标记。只在轮到自己且 active 时，从 legalMoves 选择一步，submitHtmlProgramEvent action:move data:{game:view.game,ply:view.ply,from:[x,y],to:[x,y]}，起终点按棋盘索引提交，连跳由程序完成。不要凭聊天旧棋盘落子，不读其他玩家视角，不代其他玩家操作。一次只走一步，不轮询，不重复发送确认。'+Chess.rules;

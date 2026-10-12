@@ -68,7 +68,7 @@ const OfficeCampaign = (() => {
     if(s.status!=='playing')return null;
     const c=s.campaign;
     if(s.day===1&&s.phase===0){
-      if(!c.mergedFour)return '拖到同值文件松手合并，先合出一份 4 份文件。';
+      if(!c.mergedFour)return '连起能归并为一份的文件，先合出一份 4 份文件。';
       if(!c.spilled&&s.props.includes('tea'))return '把文件移到茶杯格，再挪开文件，看看洒出的清水。';
       if(!c.sleeveGiven)return '把文件移入清水区，体验湿润和重量变化。';
       if(!c.sleeveUsed)return '打开文件柜，选牛皮文件套，再点一份文件保护它。';

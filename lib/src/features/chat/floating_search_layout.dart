@@ -73,7 +73,7 @@ class _FloatingSearchLayoutState extends State<FloatingSearchLayout> {
       if (!_hidden) setState(() => _hidden = true);
     } else if (notification is ScrollEndNotification) {
       _reveal?.cancel();
-      _reveal = Timer(const Duration(seconds: 5), () {
+      _reveal = Timer(const Duration(seconds: 3), () {
         if (mounted) setState(() => _hidden = false);
       });
     }

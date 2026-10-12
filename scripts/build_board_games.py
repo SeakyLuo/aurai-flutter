@@ -61,7 +61,7 @@ def build():
             begin = html.index(marker) + len(marker)
             end = html.index('</script>', begin)
             launch = json.loads(html[begin:end])
-            launch['initialView']['setupProtocol'] = '用户要求下跳棋时，由发起消息的 AI 调用 submitHtmlProgramEvent 开局。action:configure，data:{players:[成员ID列表],firstId:先手成员ID,difficulty:1至5}。players 支持 2、3、4、6 位不重复的当前聊天成员；仅本地用户可加入 engine:halma:1 至 engine:halma:5 作为电脑。firstId 必须在 players 中，默认用户先手。人数和玩家按用户要求选择，不代其他成员同意。仅 ownerId 或本地用户可配置。每席十子，按列表顺序轮流行动；颜色固定，再来一局轮换先手。提交成功后 readHtmlProgram 读取最新棋盘及 own.protocol；只在轮到自己时走一步，随后结束执行，不轮询、不重复开局或发送棋盘。'
+            launch['initialView']['setupProtocol'] = '用户要求下跳棋时，由发起消息的 AI 调用 submitHtmlProgramEvent 开局。action:configure，data:{players:[成员ID列表],firstId:先手成员ID,difficulty:1至5}。players 支持 2、3、4、6 位不重复的当前聊天成员；仅本地用户可加入 engine:halma:1 至 engine:halma:5 作为电脑。firstId 必须在 players 中，默认用户先手。人数和玩家按用户要求选择，不代其他成员同意。仅 ownerId 或本地用户可配置。每席十子，按列表顺序轮流行动；颜色固定，下一局轮换先手。提交成功后 readHtmlProgram 读取最新棋盘及 own.protocol；只在轮到自己时走一步，随后结束执行，不轮询、不重复开局或发送棋盘。'
             html = html[:begin] + json.dumps(launch, ensure_ascii=False) + html[end:]
         if game == 'xiangqi':
             html = html.replace('humanFirst:boolean}', 'humanFirst:boolean,mode:string}，mode 可取 normal、jieqi、banqi，分别为普通象棋、揭棋、暗棋，未指定时默认 normal')

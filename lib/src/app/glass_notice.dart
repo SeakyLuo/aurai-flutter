@@ -180,7 +180,7 @@ class _TopToastState extends State<_TopToast>
       ToastKind.success =>
         dark ? const Color(0xff6ed4aa) : const Color(0xff24845d),
       ToastKind.error ||
-      ToastKind.warning => dark ? GlobalUI.darkWarningRed : GlobalUI.warningRed,
+      ToastKind.warning => Theme.of(context).colorScheme.error,
       ToastKind.info =>
         dark ? const Color(0xff64b5f6) : const Color(0xff2196f3),
     };

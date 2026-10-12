@@ -8,6 +8,14 @@ import 'miniapp_program.dart';
 /// Upgrade saved opponents when the bundled board-game code changes.
 /// Board positions, move history and chat messages remain intact.
 Future<void> upgradeBoardGame(DatabaseExecutor db, String appId) async {
+  if (const [
+    'builtin.doudizhu',
+    'builtin.uno',
+    'builtin.scout',
+  ].contains(appId)) {
+    await _upgradeFinishedHands(db, appId);
+    return;
+  }
   if (appId != 'builtin.xiangqi' && appId != 'builtin.gomoku') return;
   final (apps, games, runtimes) = await (
     db.query(
@@ -67,6 +75,57 @@ Future<void> upgradeBoardGame(DatabaseExecutor db, String appId) async {
       {'value': jsonEncode(runtime)},
       where: 'key = ?',
       whereArgs: [row['key']],
+    );
+  }
+  await batch.commit(noResult: true);
+}
+
+/// A renderer update also needs the ended round's public snapshot updated.
+/// Reuse the authoritative hands; never reset a round to repair its display.
+Future<void> _upgradeFinishedHands(DatabaseExecutor db, String appId) async {
+  final (apps, games, runtimes) = await (
+    db.query(
+      'html_apps',
+      columns: ['state_json', 'version'],
+      where: 'id = ?',
+      whereArgs: [appId],
+    ),
+    db.query(
+      'html_games',
+      columns: ['message_id', 'state_json', 'version'],
+      where: 'app_id = ?',
+      whereArgs: [appId],
+    ),
+    db.query(
+      'app_state',
+      columns: ['key', 'value'],
+      where:
+          "key = ? OR key IN (SELECT 'miniapp-program:' || message_id FROM html_games WHERE app_id = ?)",
+      whereArgs: [BoardGameService.runtimeKey(appId), appId],
+    ),
+  ).wait;
+  final states = {
+    for (final row in runtimes)
+      row['key']: MiniappProgram.decode(row['value'])['state'] as Map,
+  };
+  final batch = db.batch();
+  for (final row in [...apps, ...games]) {
+    final view = MiniappProgram.decode(row['state_json']);
+    if (view['phase'] != 'finished' || view['abandoned'] == true) continue;
+    final messageId = row['message_id'] as String?;
+    final key = messageId == null
+        ? BoardGameService.runtimeKey(appId)
+        : MiniappProgram.key(messageId);
+    view['hands'] = states[key]!['hands'];
+    batch.update(
+      messageId == null ? 'html_apps' : 'html_games',
+      {
+        'state_json': jsonEncode(view),
+        'version': (row['version'] as int) + 1,
+        if (messageId != null) 'preview': null,
+      },
+      where: messageId == null ? 'id = ?' : 'message_id = ?',
+      whereArgs: [messageId ?? appId],
     );
   }
   await batch.commit(noResult: true);

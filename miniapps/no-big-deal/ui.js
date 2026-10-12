@@ -8,6 +8,12 @@ function requestPageResize(){const page=$('officeGame').getBoundingClientRect(),
 let soundEnabled=AuraiHTML.state?.soundEnabled===true;F.setEnabled(soundEnabled);
 const art={paper:'{{PAPER}}',folder:'{{FOLDER}}',box:'{{BOX}}',coffee:'{{ART_COFFEE}}',sleeve:'{{ART_SLEEVE}}',cage:'{{ART_CAGE}}',lock:'{{ART_LOCK}}'};
 let game=AuraiHTML.state?.version===7?AuraiHTML.state.game:null,busy=false,path=[],drop=null,drag=false,item=null,panel='demands',screen='desk',toastTimer=0,pointer=null,groupDrag=false,keyboardSelection=false,inspectOpen=false;
+let selectionGame=null,selectionOptions=null;
+function connectable(){
+  if(!path.length||groupDrag||item!==null||busy)return [];
+  if(selectionGame!==game){selectionGame=game;selectionOptions=OfficeMerge.selector(game);}
+  return selectionOptions.options(path);
+}
 function toast(text){$('officeToast').textContent=text;$('officeToast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{$('officeToast').hidden=true;},5000);}
 function button(text,action,cls='aurai-button',disabled=false){const b=el('button',text,cls);b.type='button';b.disabled=disabled;b.onclick=()=>{if(!busy)action();};return b;}
 function fileArt(o){return o.value<=16?art.paper:o.value<=512?art.folder:art.box;}
@@ -56,7 +62,10 @@ function renderBoard(){
     cell.classList.toggle('pending',(game.pending!==null&&!game.pending.startsWith('attach@')&&!game.pending.startsWith('collect@')&&game.pending.endsWith('@'+i))||game.pending==='collect@'+o?.id || (game.pending!==null&&game.pending.startsWith('attach@')&&Number(game.pending.split('@')[2])===i));
     cell.disabled=game.status!=='playing';
     cell.ondblclick=()=>{if(busy||!game.board[i])return;path=[i];drop=null;inspectOpen=true;paintSelection();inspect();requestPageResize();};
-    cell.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();keyboardSelection=true;tapCell(i);if(path.length>1||drop!==null)void commitSelection();}};
+    cell.onkeydown=e=>{
+      if(e.key==='Escape'){e.preventDefault();cancelDrag();}
+      if(e.key==='Enter'||e.key===' '){e.preventDefault();keyboardSelection=true;if(e.ctrlKey)void commitSelection();else tapCell(i);}
+    };
     boardViews[i]={view,cell};return cell;
   });
   for(let i=0;i<cells.length;i++){const old=$('board').children[i];if(!old)$('board').append(cells[i]);else if(old!==cells[i])$('board').replaceChild(cells[i],old);}
@@ -64,7 +73,21 @@ function renderBoard(){
 }
 function paintSelection(){
   const selectedCells=groupDrag&&path.length===1?B.linked(game,path[0]):path;
-  for(const n of $('board').children){const i=Number(n.dataset.cell);n.classList.toggle('selected',selectedCells.includes(i));n.classList.toggle('drop-target',drop===i);n.setAttribute('aria-pressed',String(selectedCells.includes(i)));}
+  const choosing=path.length>0&&!groupDrag&&item===null&&!busy&&R.isFile(game.board[path[0]]),choices=connectable();
+  for(const n of $('board').children){
+    const i=Number(n.dataset.cell),selected=selectedCells.includes(i),candidate=choosing&&!selected&&R.isFile(game.board[i]);
+    n.classList.toggle('selected',selected);n.classList.toggle('drop-target',drop===i);
+    n.classList.toggle('connectable',candidate&&choices.includes(i));n.classList.toggle('unconnectable',candidate&&!choices.includes(i));
+    n.setAttribute('aria-pressed',String(selected));
+    if(candidate)n.setAttribute('aria-description',choices.includes(i)?'可继续连接':'当前无法连接');else n.removeAttribute('aria-description');
+  }
+  const merging=choosing&&path.length>1;
+  $('mergePreview').hidden=!merging;
+  if(merging){
+    const plan=OfficeMerge.preview(game,path),concealed=path.some(i=>fogged(i)||hiddenValue(game.board[i],i));
+    $('mergePreview').classList.toggle('ready',plan.ready);
+    writeText('mergePreview',plan.ready?(concealed?`${path.length} 张 · 松手合并`:`${path.length} 张 → ${plan.value} 份 · +${plan.gain}`):`${path.length} 张 · 待配齐`);
+  }
   const points=[...path,...(drop!==null&&!path.includes(drop)?[drop]:[])];
   $('connectLine').replaceChildren();
   if(points.length>1){const line=document.createElementNS('http://www.w3.org/2000/svg','polyline');line.setAttribute('points',points.map(i=>`${(i%4+.5)*100},${(Math.floor(i/4)+.5)*100}`).join(' '));$('connectLine').append(line);}
@@ -75,9 +98,9 @@ function paintSelection(){
   const states=game.fatigues.map(f=>R.fatigues[f.type]);$('statusContent').textContent=states.join(' · ');$('statusIcon').hidden=!states.length;$('statusIcon').textContent=states.length?'疲':'';
   $('instruction').textContent=pendingAttach?'审批中，再次点击金色框里的物品确认附着':item!==null?(game.items[item].polluted?'已选受污染的道具，点击空格放回桌面，用清水洗净':game.items[item].key==='magnet'?'点击桌面空格放置磁铁，或在文件柜选择桌外位置':`已选${R.items[game.items[item].key].name}，点击桌面目标使用`):
     pendingMerge?'审批区：再拖动相同文件到这里，完成第二次合并。':groupDrag?'整组移动：选择落点，分别合并同值文件、收集道具或附着。':
-    path.length>1?`已连接 ${path.length} 份文件，松手合并`:
+    path.length>1?(OfficeMerge.complete(path.map(i=>game.board[i]))?`已连接 ${path.length} 张，松手合并`:'尚未配齐，继续连接亮起的文件，或沿线退回'):
     drop!==null&&R.collectible(game.board[drop])?'松手收集或附着目标道具':
-    selected?'拖到空格移动；拖到同值文件上松手合并':OfficeCampaign.hint(game);
+    selected?'连接亮起的文件，配齐后松手合并；拖到空格可移动':OfficeCampaign.hint(game);
 }
 function inspect(){
   const i=path.length===1?path[0]:null,o=i!==null?game.board[i]:null;
@@ -240,27 +263,32 @@ function render(){
 }
 async function transact(action){
   if(busy)return;
-  const previousGame=game,previousPath=path.slice(),previousDrop=drop;
+  const previousGame=game,previousPath=path.slice(),previousDrop=drop,previousItem=item;
   let committed=false;
   busy=true;path=[];drop=null;
   try{
-    const next=structuredClone(game),result=action(next);
+    const next=structuredClone(game),selectedItem=item===null?null:next.items[item];
+    const result=action(next);
     if(next.status==='playing'&&!result?.approval)Office.checkEnd(next);
     const messages=Office.publish(next);
+    const selectedIndex=selectedItem===null?-1:next.items.indexOf(selectedItem);
+    item=selectedIndex===-1?null:selectedIndex;
     game=next;render();
     if(!result?.approval)F.animate(previousGame,next);
     await AuraiHTML.saveState({version:7,game:next,soundEnabled});committed=true;
     if(result?.approval){path=previousPath;drop=previousDrop;}
-    if(item!==null&&item>=game.items.length)item=null;
     if(game.status!=='playing')clearSelection();
     if(messages.length)toast(messages.join(' '));
     await F.play(result?.approval?'select':F.changed(previousGame,next));
     return result;
-  }finally{busy=false;if(!committed){game=previousGame;path=previousPath;drop=previousDrop;render();}}
+  }finally{busy=false;if(!committed){game=previousGame;path=previousPath;drop=previousDrop;item=previousItem;render();}}
 }
 function clearSelection(){if(selectionFrame){cancelAnimationFrame(selectionFrame);selectionFrame=0;}touchId=null;inspectOpen=false;path=[];drop=null;item=null;drag=false;groupDrag=false;keyboardSelection=false;}
 async function commitSelection(){
   if(!path.length||busy)return;
+  if(path.length>1&&!OfficeMerge.complete(path.map(i=>game.board[i]))){
+    clearSelection();paintSelection();inspect();toast('文件尚未配齐，本次未合并，也不消耗整理次数');return;
+  }
   const chosen=path.slice(),target=drop===null?chosen[chosen.length-1]:drop;
   const result=await transact(s=>Office.connect(s,chosen,target));
   clearSelection();
@@ -286,11 +314,10 @@ function tapCell(i){
   if(!path.length){if(game.board[i])path=[i];}
   else if(path.includes(i)){path=path.slice(0,path.indexOf(i)+1);drop=null;}
   else if(!game.board[i]||R.collectible(game.board[i])||(game.board[i].kind==='stone'&&game.board[i].brittle>0))drop=i;
-  else if(Office.compatible(game.board[path[0]],game.board[i])&&Office.connection(game,path[path.length-1],i))path.push(i);
-  else{path=[i];drop=null;}
+  else if(connectable().includes(i)){path.push(i);drop=null;}
   paintSelection();inspect();requestPageResize();
 }
-let dragBounds=null,dragCells=[],selectionFrame=0,touchId=null;
+let dragBounds=null,dragCells=[],dragPoint=null,selectionFrame=0,touchId=null;
 function cellAt(e){
   const r=dragBounds;
   if(e.clientX<r.left||e.clientX>=r.right||e.clientY<r.top||e.clientY>=r.bottom)return null;
@@ -308,16 +335,32 @@ function beginDrag(e){
   if(groupDrag&&path.length===1&&i!==path[0]){drop=i;paintSelection();return false;}
   if(!game.board[i]){clearSelection();paintSelection();inspect();return false;}
   if(path[0]!==i)groupDrag=false;
-  path=[i];drop=null;drag=true;keyboardSelection=false;inspectOpen=false;paintSelection();return true;
+  path=[i];drop=null;drag=true;dragPoint={clientX:e.clientX,clientY:e.clientY};keyboardSelection=false;inspectOpen=false;paintSelection();return true;
 }
 function dragSelection(i){
   if(i===null||i<0){drop=null;return;}
   if(groupDrag){drop=i===path[0]?null:i;return;}
   const existing=path.indexOf(i);
   if(existing>=0){path=path.slice(0,existing+1);drop=i;}
-  else if(R.isFile(game.board[i])&&Office.connection(game,path[path.length-1],i)&&Office.compatible(game.board[path[0]],game.board[i])){path.push(i);drop=null;}
+  else if(R.isFile(game.board[i])&&connectable().includes(i)){path.push(i);drop=null;}
   else if(!game.board[i]||R.collectible(game.board[i])||(game.board[i].kind==='stone'&&game.board[i].brittle>0)){drop=i;}
   // Crossing an incompatible file keeps the last valid destination, as in the original.
+}
+// Touch events may skip cells during a fast stroke; visit the crossed cell interiors in order.
+function traceDrag(e){
+  const from=dragPoint,dx=e.clientX-from.clientX,dy=e.clientY-from.clientY,hits=[];
+  if(dx!==0||dy!==0){
+    dragCells.forEach((cell,i)=>{
+      let enter=0,leave=1;
+      for(const [start,delta,min,max] of [[from.clientX,dx,cell.left,cell.right],[from.clientY,dy,cell.top,cell.bottom]]){
+        if(delta===0){if(start<=min||start>=max)return;}
+        else{const a=(min-start)/delta,b=(max-start)/delta;enter=Math.max(enter,Math.min(a,b));leave=Math.min(leave,Math.max(a,b));}
+      }
+      if(enter<leave)hits.push({i,enter});
+    });
+    hits.sort((a,b)=>a.enter-b.enter).forEach(({i})=>dragSelection(i));
+  }
+  dragSelection(cellAt(e));dragPoint={clientX:e.clientX,clientY:e.clientY};
 }
 function releaseDestination(i){
   if(drop!==null)return drop;
@@ -326,7 +369,7 @@ function releaseDestination(i){
 }
 function finishDrag(e){
   if(selectionFrame){cancelAnimationFrame(selectionFrame);selectionFrame=0;}
-  const i=cellAt(e);dragSelection(i);const target=releaseDestination(i);drag=false;
+  traceDrag(e);const i=cellAt(e),target=releaseDestination(i);drag=false;
   if(path.length>1||target!==path[0]){drop=target;void commitSelection();}
   else{drop=null;paintSelection();inspect();requestPageResize();}
 }
@@ -340,7 +383,7 @@ $('board').onpointerdown=e=>{
 };
 $('board').onpointermove=e=>{
   if(e.pointerType==='touch'||!drag||e.pointerId!==pointer)return;
-  dragSelection(cellAt(e));paintDrag();
+  traceDrag(e);paintDrag();
 };
 $('board').onpointerup=e=>{
   if(e.pointerType==='touch'||!drag||e.pointerId!==pointer)return;
@@ -356,7 +399,7 @@ $('board').addEventListener('touchstart',e=>{
 $('board').addEventListener('touchmove',e=>{
   if(touchId===null)return;
   e.preventDefault();const touch=Array.from(e.changedTouches).find(t=>t.identifier===touchId);
-  if(touch){dragSelection(cellAt(touch));paintDrag();}
+  if(touch){traceDrag(touch);paintDrag();}
 },{passive:false});
 $('board').addEventListener('touchend',e=>{
   if(touchId===null)return;

@@ -29,6 +29,12 @@ function start(human,ai,humanFirst,game,difficulty,color) {
   if(Chess.initialize)Chess.initialize(s);
   s.positions[position()]=1;
 }
+function nextGame(mode) {
+  var oldHuman=s.players[0],oldAi=s.players[1],humanFirst=oldHuman.side!==openingSide();
+  if(GAME==='xiangqi'&&mode!==undefined)Chess=XiangqiModes.get(mode);
+  start(member(oldHuman.id),member(oldAi.id),humanFirst,s.game+1,s.difficulty,oldHuman.side);
+  notify('第'+s.game+'局开始，交换先后手，轮到'+player(s.turn).name,player(s.turn).kind==='agent');
+}
 function notify(text,wake) {
   var args={text:text,markdown:true};
   if (wake) {
@@ -99,7 +105,7 @@ if (e.action==='configure') {
     host.call('replies.interrupt',{});
     notify(person(actor)+' 悔棋，撤回'+count+'步',false);
   } else if (e.action==='resign') {
-    require(s.phase==='playing','本局已经结束');finished(actor.side===Chess.first?Chess.second:Chess.first,'对手认输');notify(person(actor)+'认输，'+person(player(s.winner))+'**获胜**',false);
+    require(s.phase==='playing','本局已经结束');finished(actor.side===Chess.first?Chess.second:Chess.first,'对手认输');notify(person(actor)+'认输，'+person(player(s.winner))+'**获胜**',false);host.call('replies.interrupt',{});nextGame();
   } else if (e.action==='offerDraw') {
     require(s.phase==='playing'&&!s.drawOffer,'当前不能提和');s.drawOffer=actor.id;
     notify(actor.name+'提议和棋',s.players.some(function(p){return p.id!==actor.id&&p.kind==='agent';}));
@@ -120,14 +126,10 @@ if (e.action==='configure') {
   } else if (e.action==='rematch'||e.action==='restart') {
     require(s.phase==='finished'||e.action==='restart'&&s.phase==='playing'&&(spectatorControl||actor.kind!=='agent'&&actor.kind!=='engine'),'本局尚未结束');
     if(s.phase==='playing')host.call('replies.interrupt',{});
-    var oldHuman=s.players[0],oldAi=s.players[1];
-    var humanFirst=oldHuman.side!==openingSide();
-    if(GAME==='xiangqi'&&d.mode!==undefined)Chess=XiangqiModes.get(d.mode);
-    start(member(oldHuman.id),member(oldAi.id),humanFirst,s.game+1,s.difficulty,oldHuman.side);
-    notify('第'+s.game+'局开始，交换先后手，轮到'+player(s.turn).name,player(s.turn).kind==='agent');
+    nextGame(d.mode);
   } else throw new Error('不支持的棋局操作');
 }
-var protocol='这是'+(GAME==='xiangqi'?XiangqiModes.labels[s.mode]:TITLE)+'人机对局。先 readHtmlProgram 读取当前 view；board 是从上到下逐行排列的二维棋盘，board[y][x] 对应坐标 [x,y]，左上角为 [0,0]，空位为“·”。'+(GAME==='xiangqi'?'棋子含义见 pieceLegend。暗子身份对双方保密，不得猜作确定棋子；揭棋暗子的标记只代表原位置走法。暗棋首次翻子后按最新 players 确认自己的颜色。':GAME==='tictactoe'?'X/O 为双方固定符号，本局先手见 firstSide。':Chess.legend?'棋子标记和阵营含义见 pieceLegend、players 与 rules。':'●为黑棋，○为白棋。')+'具体棋规：'+Chess.rules+' 行列索引见 boardCoordinates；界面字母列 A、B…对应 x=0、1…，数字行 1、2…对应 y=0、1…。只在轮到你时从 legalMoves 中选择一步，submitHtmlProgramEvent action:move data:{game:view.game,ply:view.ply,from:[x,y],to:[x,y]}；没有 from 的合法走法省略 from；跳棋按 legalMoves 的起终点提交，程序自动完成整条连跳。不要凭旧聊天记忆下棋，不要修改源代码或直接写数据。对方提和时可 action:answerDraw data:{game,ply,accept:boolean}；主动提和 action:offerDraw、认输 action:resign；结束后等用户决定是否再来一局。view.paused 为 true 时不要落子，等待继续对局回调。一次只走一步，等待下一次回调，不要轮询；错误按实际原因处理，不要自动原样重试。';
+var protocol='这是'+(GAME==='xiangqi'?XiangqiModes.labels[s.mode]:TITLE)+'人机对局。先 readHtmlProgram 读取当前 view；board 是从上到下逐行排列的二维棋盘，board[y][x] 对应坐标 [x,y]，左上角为 [0,0]，空位为“·”。'+(GAME==='xiangqi'?'棋子含义见 pieceLegend。暗子身份对双方保密，不得猜作确定棋子；揭棋暗子的标记只代表原位置走法。暗棋首次翻子后按最新 players 确认自己的颜色。':GAME==='tictactoe'?'X/O 为双方固定符号，本局先手见 firstSide。':Chess.legend?'棋子标记和阵营含义见 pieceLegend、players 与 rules。':'●为黑棋，○为白棋。')+'具体棋规：'+Chess.rules+' 行列索引见 boardCoordinates；界面字母列 A、B…对应 x=0、1…，数字行 1、2…对应 y=0、1…。只在轮到你时从 legalMoves 中选择一步，submitHtmlProgramEvent action:move data:{game:view.game,ply:view.ply,from:[x,y],to:[x,y]}；没有 from 的合法走法省略 from；跳棋按 legalMoves 的起终点提交，程序自动完成整条连跳。不要凭旧聊天记忆下棋，不要修改源代码或直接写数据。对方提和时可 action:answerDraw data:{game,ply,accept:boolean}；主动提和 action:offerDraw、认输 action:resign；结束后等用户决定是否下一局。view.paused 为 true 时不要落子，等待继续对局回调。一次只走一步，等待下一次回调，不要轮询；错误按实际原因处理，不要自动原样重试。';
 var privateViews={};s.players.filter(function(p){return p.kind!=='engine';}).forEach(function(p){privateViews[p.id]={protocol:protocol};});
 s.players.filter(function(p){return p.kind!=='engine';}).forEach(function(p){privateViews[p.id].protocol+=' 下棋时没有必要的话就不要说话，不必每走一步都回复一句；程序会自动发布棋谱、将军与胜负。用户悔棋后以最新棋盘为准，等用户重新落子。';});
 // The UI history is for human viewers; model views use the live board only.

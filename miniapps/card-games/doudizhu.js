@@ -51,7 +51,12 @@ var Cards=(function(){
     log(s,seat,names[m.type]+' '+m.cards.map(function(c){return labels[rank(c)];}).join(' '));
     if(!s.hands[seat].length){s.phase='finished';s.winner=seat;var landlordWon=seat===s.landlord;var spring=landlordWon?s.playCounts.every(function(n,i){return i===s.landlord||n===0;}):s.playCounts[s.landlord]===1;if(spring)s.multiplier*=2;var value=s.bid*s.multiplier;s.scores=s.players.map(function(_,i){return(i===s.landlord?2:-1)*value*(landlordWon?1:-1);});s.result=(landlordWon?'地主获胜':'农民获胜')+(spring?' · '+(landlordWon?'春天':'反春天'):'');log(s,seat,s.result);}else s.turn=(seat+1)%3;
   }
-  function publicView(s){var view={phase:s.phase,stage:s.stage,turn:s.turn,players:s.players,counts:s.hands.map(function(h){return h.length;}),bids:s.bids,bid:s.bid,landlord:s.landlord,bottom:s.stage==='bid'?[]:s.bottom,last:s.last,table:s.table,multiplier:s.multiplier,playCounts:s.playCounts,logs:s.logs,winner:s.winner,result:s.result,scores:s.scores};if(s.phase==='finished')view.hands=s.hands;return view;}
+  function publicView(s){
+    var view={phase:s.phase,stage:s.stage,turn:s.turn,players:s.players,counts:s.hands.map(function(h){return h.length;}),bids:s.bids,bid:s.bid,landlord:s.landlord,bottom:s.stage==='bid'?[]:s.bottom,last:s.last,table:s.table,multiplier:s.multiplier,playCounts:s.playCounts,logs:s.logs,winner:s.winner,result:s.result,scores:s.scores};
+    // Settlement reveals all hands; saved public snapshots upgrade with the bundled code.
+    if(s.phase==='finished')view.hands=s.hands;
+    return view;
+  }
   function privateView(s,seat){return {seat:seat,hand:s.hands[seat],legalMoves:s.phase==='playing'&&s.stage==='play'&&s.turn===seat?moves(s.hands[seat],s.last):[]};}
   function ai(own,v){
     if(v.stage==='bid'){var g=groups(own.hand),power=g[12].length*1.4+g[13].length*2+g[14].length*3+g.filter(function(c){return c.length===4;}).length*3;var score=power>=8?3:power>=5?2:power>=3?1:0;return {action:'bid',data:{score:score>v.bid?score:0}};}

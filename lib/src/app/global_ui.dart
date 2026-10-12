@@ -23,8 +23,7 @@ abstract final class GlobalUI {
   static const Color femaleColor = Color(0xfff37cb6);
   static const Color primaryLight = Color(0xffddc5f7);
   static const Color primaryBackground = Color(0xfff4effb);
-  static const Color warningRed = Color(0xffe53935);
-  static const Color darkWarningRed = Color(0xffff6b6b);
+  static const Color errorColor = Color(0xffd54841);
   static const Color onPrimaryBackground = Color(0xff493365);
   static const Color onPrimary = Color(0xff493365);
 
@@ -82,6 +81,8 @@ abstract final class GlobalUI {
       brightness: brightness,
       primary: primary,
       onPrimary: onPrimary,
+      error: errorColor,
+      onError: Colors.white,
       primaryContainer: dark ? const Color(0xff343047) : primaryBackground,
       onPrimaryContainer: dark ? const Color(0xffe6dcfa) : onPrimaryBackground,
       surface: dark ? const Color(0xff18181b) : pageBackground,

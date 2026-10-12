@@ -4,7 +4,7 @@
   <header class="office-header"><div class="office-brand"><img src="{{PAPER}}" alt=""><div><h1>问题不大</h1><p>今天，也把工作整理好</p></div></div></header>
   <section id="welcome" class="office-welcome">
     <div class="welcome-desk" aria-hidden="true"><img src="{{FOLDER}}" alt=""><img src="{{PAPER}}" alt=""><span class="coffee-art">☕</span></div>
-    <h2>文件很多，问题不大。</h2><p>你是秘书汉娜。连起相同的文件，<br>在老板失去耐心前，撑过两天工作。</p>
+    <h2>文件很多，问题不大。</h2><p>你是秘书汉娜。连起能归并为一份的文件，<br>在老板失去耐心前，撑过两天工作。</p>
     <div class="welcome-facts"><span>4 × 4 办公桌</span><span>六个工作阶段</span><span>自动保存进度</span></div>
     <button id="start" type="button" class="aurai-button aurai-button--primary">开始上班</button>
   </section>
@@ -15,9 +15,9 @@
     </div>
     <section id="demands" class="office-panel demand-board" aria-label="工作需求"></section>
     <div id="fatigue" class="office-fatigue" hidden></div>
-    <div class="office-desk"><div id="board" class="office-board" role="group" aria-label="文件桌面" data-aurai-gestures="exclusive"></div><svg id="connectLine" viewBox="0 0 400 400" aria-hidden="true"></svg></div>
+    <div class="office-desk"><div id="mergePreview" class="merge-preview" hidden></div><div id="board" class="office-board" role="group" aria-label="文件桌面" data-aurai-gestures="exclusive"></div><svg id="connectLine" viewBox="0 0 400 400" aria-hidden="true"></svg></div>
     <div class="desk-caption"><span id="nextLabel"></span><span id="zoneLabel"></span></div>
-    <div class="selection-row"><p id="instruction">拖到空格松手移动；拖到同值文件上松手合并。</p><button id="cancelSelection" type="button" class="office-link" hidden>取消</button></div>
+    <div class="selection-row"><p id="instruction">连起能归并为一份的文件，配齐后松手合并。</p><button id="cancelSelection" type="button" class="office-link" hidden>取消</button></div>
     <section id="inspect" class="office-inspect" hidden><div><strong id="inspectTitle"></strong><p id="inspectText"></p></div><div id="inspectActions" class="aurai-actions"></div></section>
     <section class="item-tray" aria-label="随身道具"><span id="itemCount" hidden></span><div id="itemTray" class="office-items"></div></section>
     <section id="cabinet" class="office-panel cabinet-details" aria-label="道具与福利详情" hidden></section>
@@ -28,9 +28,9 @@
   <section id="workMenu" class="office-menu" hidden><h2>歇一小会儿</h2><p>工作进度已自动保存，关闭小程序后可继续。</p><button id="returnToWork" type="button" class="aurai-button aurai-button--primary">返回办公桌</button><button id="soundToggle" type="button" class="aurai-button" aria-pressed="false">音效：关闭</button><button id="newWork" type="button" class="aurai-button">重新开始两天工作</button></section>
   <section id="restartConfirm" class="office-menu" hidden><h2>重新开始工作？</h2><p>当前这两天的工作进度将被清空；已选择的通关福利或失败后保留的道具会带到下一次上班。</p><button id="keepWork" type="button" class="aurai-button aurai-button--primary">继续当前工作</button><button id="confirmRestart" type="button" class="aurai-button aurai-button--danger">重新开始</button></section>
   <details id="rules" class="office-rules"><summary>工作手册</summary>
-    <h3>拖动整理</h3><p>拖到空格松手即可移动；拖到同值文件松手即可合并，中间可跨过空格，但不能穿过物品或挡板。允许斜向拖动，合并获得同等份数的整理进度。审批区需重复同一次合并操作，第二次才真正合并。湿润文件只能和同样湿润的文件合并；连线模式沿用原作，不限制普通文件的移动距离。</p>
+    <h3>连线整理</h3><p>普通文件可以混合数字一起提交，只要这组文件能通过同数两两合并，最终归成一份。例如 2、2、4 可合成 8，2、2、4、8 可合成 16；2、4 还需补齐，三张 2 还需再接一张 2。开始连线后，可继续连接的文件亮起，不可连接的文件置灰；未配齐但还能继续凑成一组的文件也可连接。沿线退回可以撤选，配齐后松手提交，未配齐松手不会消耗次数。普通组合基础得分为合成份数 ×（提交张数－1），再结算福利；整组只计一次合并、消耗一次整理并执行一次补牌。键盘按回车或空格选取，Ctrl＋回车提交，Esc 取消。</p><p>拖到空格松手可移动或指定合并落点；连线可跨空格，不能穿过物品或挡板，允许斜向。审批区仍需重复同一次合并操作。湿润文件只能和同样湿润的文件合并；复印、撤销、废弃等特殊文件沿用各自合并规则。</p>
     <h3>两天工作</h3><p>每天上午、下午、晚上各最多整理 100 次。第一天目标 100 / 200 / 300，第二天目标 1000 / 1500 / 2000。达标立即结束阶段；未达标扣 50 忍耐度，归零则失败。初始忍耐度 100。桌面无法移动或合并时，扣 50，保洁清空所有未贴封条的物品，再从牌库发两份文件；封条保留，地面区域不变。封条和废弃区导致不足两格可发牌时，工作结束。</p>
-    <h3>文件与预告</h3><p>初始牌库为六张 1、三张 2、一张 4，抽完洗牌重用。预告格被占时本次不生成，只更换预告；仅剩一个空格时沿用原代码直接生成。普通文件重量等于份数，金属套增加 3，湿润增加 3。512 以上为重物，超过 10000 为超重物；连线可合并任意同值文件。</p>
+    <h3>文件与预告</h3><p>初始牌库为六张 1、三张 2、一张 4，抽完洗牌重用。预告格被占时本次不生成，只更换预告；仅剩一个空格时沿用原代码直接生成。普通文件重量等于份数，金属套增加 3，湿润增加 3。512 以上为重物，超过 10000 为超重物；普通文件连线不限制移动距离，可混合数字归并。</p>
     <p>污染只保留轮廓和重量，暂停复印、撤销、便签、紧急倒计时、炸弹、磁铁与机械的特殊效果。清水可洗去污染；受污染的道具收进柜子后无法使用或提供被动效果，先点击它放回桌面，用清水洗净，再重新收集。清水会覆盖原污水区并灭火。</p><div id="fileGuide"></div><h3>桌面区域</h3><div id="zoneGuide"></div>
     <h3>湿润、胶水与茶杯</h3><p>湿润按原代码为 5 回合；水量 60，每回合自然减少 1，补湿也消耗水量。普通胶黏着 5 步，强力胶 10 步，可触发 3 次。挪动茶杯格上的文件会打翻茶杯，在十字范围铺水。相邻黏着物形成黏连体，单个拖动时整体平移；可在物品详情选择“整组移动”，再点击或拖到落点。同组文件保持相对位置，每件与落点同值文件分别合并；遇到道具、打开的外卖袋或磁铁时分别收集，适配的附着物直接附着。整组会先检查文件柜总容量，装不下则全部不移动；整次只消耗一步；任一合并处于审批区时整体二次确认。落点有无法合并的物品、穿过挡板或桌边时不能移动。连选同值文件仍按连线合并。黏着物的废弃判定由区外更重的物品支撑。</p>
     <h3>两天的工作安排</h3><p>第一天学习茶杯洒水、文件套和胶水，下午保留桌面并出现桌洞与挡板；夜间送来胶水中的咖啡外卖袋，合并教学便签可获得加班记录本，夜间合并得分增加 15%。第二天上午桌洞修成危险区并送来紧急需求；下午先送紧急和普通需求，完成紧急需求后出现人情需求和脏道具；晚上送来需求链和紧急需求，老板的脏道具洗净后恢复 1 忍耐度。需求位被旧工作占据时，新工作等待空位后送达。</p><h3>需求、摸鱼与夜晚</h3><p>通常最多两个需求，业务压力事件每次增加一个本阶段需求位，可与夜班补贴叠加；接受后开始计时。普通需求 30 步、紧急 12 步、人情 40 步；普通、紧急或连续需求逾期按卡片预告扣 10 忍耐度、触发桌面意外，或产生持续疲劳；人情需求无惩罚，奖励完成后揭晓。需求链由三段不同任务组成，每段完成后领取金币，再接受下一段并重新计时；卡片会预告后续任务。便签催急将当前任务缩至最多 8 步并提高金币奖励；连续需求只催急当前段，后续任务保留。废弃需求会送来两份 4 份废弃文件，没有废弃区时另占一格开辟；黏着需求送来两份黏着的 2 份文件和普通胶。物资在接受后送达，桌面空间不足时需先整理空格；文件柜装不下的补给留在桌上。夜间奖励增加 30%；已有短期疲劳时长加倍，没有疲劳则产生夜间疲劳。湿润和冰冻延长 2 步，燃烧缩短 2 步。摸鱼消耗 5 次整理，每阶段最多 5 次；80% 在最新文件、10% 在随机文件夹入便签，10% 无事发生，首次必有事件，每阶段最多一次无事发生。</p>
@@ -46,6 +46,7 @@
 {{BOARD}}
 {{WORK}}
 {{CAMPAIGN}}
+{{MERGE}}
 {{ENGINE}}
 {{INHERITANCE}}
 {{FEEDBACK}}

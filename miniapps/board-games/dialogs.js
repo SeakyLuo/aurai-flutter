@@ -4,17 +4,17 @@ function closeGameDialog(){
 }
 function openGameDialog(page){
   dialogPage=page;
-  const titles={Menu:'对局菜单',Rules:'规则',Difficulty:'难度',Restart:s.phase==='finished'?'再来一局':'重新开始',Resign:'确认认输？',Draw:'提议和棋？',AnswerDraw:'对手提议和棋'};
+  const titles={Menu:'对局菜单',Rules:'规则',Difficulty:'难度',Restart:s.phase==='finished'?'下一局':'重新开始',Resign:'确认认输？',Draw:'提议和棋？',AnswerDraw:'对手提议和棋'};
   $('dialogTitle').textContent=titles[page];
   for(const name of ['Menu','Rules','Difficulty','Restart'])$('dialog'+name).hidden=name!==page;
-  const questions={Resign:GAME==='halma'&&s.players.length>2?'退出本局，其余玩家继续对局。':'认输后本局结束，对手获胜。',Draw:'向对手提出和棋，双方同意后结束本局。',AnswerDraw:'接受后本局以和棋结束，也可以继续对局。'};
+  const questions={Resign:GAME==='halma'&&s.players.length>2?'退出本局，其余玩家继续对局。':'认输后对手获胜，直接开始下一局。',Draw:'向对手提出和棋，双方同意后结束本局。',AnswerDraw:'接受后本局以和棋结束，也可以继续对局。'};
   $('dialogQuestion').hidden=!questions[page];$('dialogQuestion').textContent=questions[page]||'';
   $('restartText').textContent=GAME==='halma'?'保持颜色，轮换先手，开始下一局。':s.phase==='finished'?'交换先后手，开始下一局。':'结束当前对局，交换先后手重新开始。';
   $('matchDifficulty').value=String(s.difficulty);
   $('nextMode').value=s.mode||'normal';
   $('dialogCancel').textContent=page==='Menu'||page==='Rules'?'关闭':page==='AnswerDraw'?'继续对局':'取消';
   $('dialogConfirm').hidden=page==='Menu'||page==='Rules';
-  $('dialogConfirm').textContent={Difficulty:'保存',Restart:s.phase==='finished'?'再来一局':'重新开始',Resign:'认输',Draw:'提出和棋',AnswerDraw:'接受和棋'}[page]||'确定';
+  $('dialogConfirm').textContent={Difficulty:'保存',Restart:s.phase==='finished'?'下一局':'重新开始',Resign:'认输',Draw:'提出和棋',AnswerDraw:'接受和棋'}[page]||'确定';
   $('dialogConfirm').classList.toggle('aurai-button--danger',page==='Resign');
   $('dialogConfirm').classList.toggle('aurai-button--primary',page!=='Resign');
   if(!$('gameDialog').open)$('gameDialog').showModal();
@@ -24,6 +24,7 @@ function syncGameDialogs(){
   const own=me(),playing=s.phase==='playing',manage=!!own||s.watching&&canManage();
   $('menuDifficulty').hidden=!s.players?.some(p=>p.kind==='engine')||GAME==='tictactoe';
   $('menuDifficulty').disabled=busy||!manage;
+  $('menuRestart').textContent=s.phase==='finished'?'下一局':'重来';
   $('menuRestart').hidden=!s.phase||s.phase==='setup';$('menuRestart').disabled=busy||!manage;
   $('offerDraw').hidden=!own||!playing||GAME==='halma'&&s.players.length>2;
   $('offerDraw').disabled=busy||s.drawOffer===own?.id;
@@ -39,7 +40,11 @@ function initGameDialogs(){
   $('menu').onclick=()=>openGameDialog('Menu');
   $('menuRules').onclick=()=>openGameDialog('Rules');
   $('menuDifficulty').onclick=()=>openGameDialog('Difficulty');
-  $('menuRestart').onclick=$('rematch').onclick=()=>openGameDialog('Restart');
+  $('menuRestart').onclick=$('rematch').onclick=()=>{
+    if(busy)return;
+    if(s.phase==='finished'){closeGameDialog();void submit('rematch',GAME==='xiangqi'?{mode:s.mode}:{});}
+    else openGameDialog('Restart');
+  };
   $('resign').onclick=()=>openGameDialog('Resign');
   $('offerDraw').onclick=()=>openGameDialog(s.drawOffer&&s.drawOffer!==me().id?'AnswerDraw':'Draw');
   $('dialogCancel').onclick=()=>{const answer=dialogPage==='AnswerDraw';closeGameDialog();if(answer)void submit('answerDraw',{accept:false});};

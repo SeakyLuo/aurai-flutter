@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../app/global_ui.dart';
 
 class TaskFailureIcon extends StatelessWidget {
   const TaskFailureIcon({super.key, this.size = 16});
@@ -8,19 +7,19 @@ class TaskFailureIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: Size.square(size),
-    painter: _FailurePainter(Theme.of(context).brightness == Brightness.dark),
+    painter: _FailurePainter(Theme.of(context).colorScheme.error),
   );
 }
 
 class _FailurePainter extends CustomPainter {
-  const _FailurePainter(this.dark);
-  final bool dark;
+  const _FailurePainter(this.color);
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.scale(size.width / 24, size.height / 24);
     final pen = Paint()
-      ..color = dark ? GlobalUI.darkWarningRed : GlobalUI.warningRed
+      ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.65
       ..strokeCap = StrokeCap.round
@@ -35,5 +34,5 @@ class _FailurePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_FailurePainter oldDelegate) => oldDelegate.dark != dark;
+  bool shouldRepaint(_FailurePainter oldDelegate) => oldDelegate.color != color;
 }

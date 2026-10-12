@@ -48,11 +48,14 @@ const OfficeWelfare = (() => {
     if(active(s,'parallel')&&inputs.length>=3)s.welfare.find(w=>w.key==='parallel').pending++;
     if(active(s,'archive'))s.coins++;
     if(active(s,'cycle'))addCard(s,result);
+    return mergeScore(s,result,baseScore);
+  }
+  function mergeScore(s,result,baseScore,deckSize=s.deck.length){
     if(!baseScore)return 0;
     let multiplier=1+(active(s,'speed')?.1:0)+(active(s,'stress')?s.fatigues.length*.5:0)+
       (active(s,'night')&&s.phase===2?.5:0)+(active(s,'notebook')&&s.phase===2?.15:0)+(active(s,'business')?s.acceptedDemands*.05:0)+(active(s,'closed')?.5:0);
     if(active(s,'light')&&result.value<=16)multiplier*=2;
-    return Math.round(baseScore*multiplier)+(active(s,'thickness')?Math.floor(s.deck.length/5)*10:0);
+    return Math.round(baseScore*multiplier)+(active(s,'thickness')?Math.floor(deckSize/5)*10:0);
   }
   function reward(s){
     if(s.phase===0)return;
@@ -100,5 +103,5 @@ const OfficeWelfare = (() => {
   function expire(s,phase,day){
     s.welfare=s.welfare.filter(w=>!(w.rental==='phase'&&w.expires<=phase)&&!(w.rental==='day'&&s.phase===2&&w.expires<=day));
   }
-  return {definitions,active,add,addCard,merged,reward,choose,expire,fatigueBlocked,flush,endAction,demandComplete,gift,eventType,randomWelfare,progress,deckPrice};
+  return {definitions,active,add,addCard,merged,mergeScore,reward,choose,expire,fatigueBlocked,flush,endAction,demandComplete,gift,eventType,randomWelfare,progress,deckPrice};
 })();

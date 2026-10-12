@@ -33,11 +33,11 @@ summary{color:var(--aurai-muted);font-size:14px;cursor:pointer}details[open]>:no
 #gameToolbar .aurai-button{flex:1;min-width:0}
 #game .aurai-button{border-radius:var(--aurai-button-radius,24px)}
 #gameToolbar #rematch{flex:2}
-#askAi,#recommend{position:relative}
-:is(#askAi,#recommend)[aria-busy="true"]{color:transparent}
-:is(#askAi,#recommend)[aria-busy="true"]::after{content:"";position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;box-sizing:border-box;border:1.65px solid var(--aurai-border);border-top-color:var(--aurai-highlight-text);border-radius:50%;animation:continue-spin .8s linear infinite}
+#recommend{position:relative}
+#recommend[aria-busy="true"]{color:transparent}
+#recommend[aria-busy="true"]::after{content:"";position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;box-sizing:border-box;border:1.65px solid var(--aurai-border);border-top-color:var(--aurai-highlight-text);border-radius:50%;animation:continue-spin .8s linear infinite}
 @keyframes continue-spin{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){:is(#askAi,#recommend)[aria-busy="true"]::after{animation:none}}
+@media(prefers-reduced-motion:reduce){#recommend[aria-busy="true"]::after{animation:none}}
 #game header h1{flex:1}
 #game #menu{width:40px;min-height:40px;padding:8px;flex-shrink:0}
 #menu svg{display:block;width:22px;height:22px}
