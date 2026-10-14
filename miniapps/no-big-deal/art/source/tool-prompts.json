@@ -1,0 +1,26 @@
+{
+  "generator": "built-in imageGen",
+  "transparent_background": true,
+  "assets": [
+    {
+      "file": "tool-duplicator.png",
+      "prompt": "Use case: stylized-concept. Asset: single isolated inventory icon for a cozy steam-era office merge game. Two overlapping warm ivory sheets of carbon copying paper, top sheet slightly curled, an exposed deep blue carbon-paper corner, a few simple brown horizontal writing strokes. No letters. Hand-painted 2D casual mobile game item, chunky rounded shapes, strong dark warm-brown outer outline, golden ochre and cream palette, soft cel shading and restrained highlights. Three-quarter view, readable at 48px. Centered single object occupying 78% of square canvas with generous transparent padding. Truly transparent background, no tile, no UI, no ground, no surrounding props, no text, no labels, no watermark. Consistent antique wood/brass/parchment materials, not monochrome line art, not photorealistic."
+    },
+    {
+      "file": "tool-paper-knife.png",
+      "prompt": "Use case: stylized-concept. Asset: single isolated inventory icon for a cozy steam-era office merge game. A single Victorian brass paper knife with a short rounded ivory handle, broad tapered polished brass blade, pointing diagonally upper right. Not a modern utility knife, no plastic. Hand-painted 2D casual mobile game item, chunky rounded shapes, strong dark warm-brown outer outline, golden ochre and cream palette, soft cel shading and restrained highlights. Three-quarter view, readable at 48px. Centered single object occupying 78% of square canvas with generous transparent padding. Truly transparent background, no tile, no UI, no ground, no surrounding props, no text, no labels, no watermark. Consistent antique wood/brass/parchment materials, not monochrome line art, not photorealistic."
+    },
+    {
+      "file": "tool-binding-press.png",
+      "prompt": "Use case: stylized-concept. Asset: single isolated inventory icon for a cozy steam-era office merge game. A small Victorian bookbinding screw press: two warm dark wooden horizontal jaws, a chunky central brass screw and a small brass turning crossbar on top, a slim cream paper stack between jaws. Recognizable simple silhouette. No modern stapler. Hand-painted 2D casual mobile game item, chunky rounded shapes, strong dark warm-brown outer outline, golden ochre and cream palette, soft cel shading and restrained highlights. Three-quarter view, readable at 48px. Centered single object occupying 78% of square canvas with generous transparent padding. Truly transparent background, no tile, no UI, no ground, no surrounding props, no text, no labels, no watermark. Consistent antique wood/brass/parchment materials, not monochrome line art, not photorealistic."
+    },
+    {
+      "file": "tool-requisition.png",
+      "prompt": "Use case: stylized-concept. Asset: single isolated inventory icon for a cozy steam-era office merge game. A cream archival request slip partly laid over a small closed brown leather ledger, a single large brass magnifying glass across the slip, simple brown writing strokes, no letters. Hand-painted 2D casual mobile game item, chunky rounded shapes, strong dark warm-brown outer outline, golden ochre and cream palette, soft cel shading and restrained highlights. Three-quarter view, readable at 48px. Centered single object occupying 78% of square canvas with generous transparent padding. Truly transparent background, no tile, no UI, no ground, no surrounding props, no text, no labels, no watermark. Consistent antique wood/brass/parchment materials, not monochrome line art, not photorealistic."
+    },
+    {
+      "file": "tool-dispatch.png",
+      "prompt": "Use case: stylized-concept. Asset: single isolated inventory icon for a cozy steam-era office merge game. A single plump ivory envelope with a red wax seal and a small tied brass directional arrow pointing right. Victorian postal dispatch stationery. No lettering. Hand-painted 2D casual mobile game item, chunky rounded shapes, strong dark warm-brown outer outline, golden ochre and cream palette, soft cel shading and restrained highlights. Three-quarter view, readable at 48px. Centered single object occupying 78% of square canvas with generous transparent padding. Truly transparent background, no tile, no UI, no ground, no surrounding props, no text, no labels, no watermark. Consistent antique wood/brass/parchment materials, not monochrome line art, not photorealistic."
+    }
+  ]
+}

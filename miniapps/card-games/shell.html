@@ -20,13 +20,13 @@ var GAME='{{GAME}}',TITLE='{{TITLE}}';
     <div id="cardTable"></div>
     <div id="cardRematchSeats" class="card-seat-options" hidden></div>
     <nav id="cardToolbar" class="aurai-row" aria-label="对局操作">
-      <button id="cardContinue" type="button" class="aurai-button">继续</button>
       <button id="cardRematch" type="button" class="aurai-button aurai-button--primary" hidden>下一局</button>
       <button id="cardMore" type="button" class="aurai-button" aria-expanded="false">更多</button>
     </nav>
   </section>
   <section id="cardMorePanel" class="aurai-stack" hidden>
     <div class="aurai-row"><strong>对局</strong><button id="cardCloseMore" type="button" class="aurai-button">收起</button></div>
+    <button id="cardContinue" type="button" class="aurai-button">继续</button>
     <details><summary>玩法规则</summary><p id="cardRules"></p></details>
     <details><summary>最近记录</summary><ol id="cardLog"></ol></details>
     <button id="cardLeave" type="button" class="aurai-button">结束本局</button>

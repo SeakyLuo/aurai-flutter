@@ -136,7 +136,7 @@ async function recommend(){
   const generation=++searchGeneration,key=positionKey();
   recommending=true;recommendation=null;render();
   try{
-    const move=await LocalEngine.search({...s,difficulty:5});
+    const move=await LocalEngine.search(s);
     if(generation!==searchGeneration||key!==positionKey()||move===null)return;
     recommendation=move;
     selected=move.from||null;pending=null;
@@ -162,7 +162,7 @@ $('board').onclick=event=>{
   render();
 };
 $('undo').onclick=()=>submit('undo');
-$('askAi').onclick=()=>decisionTurn()?decide():submit('requestAi');
+$('askAi').onclick=()=>{closeGameDialog();return decisionTurn()?decide():submit('requestAi');};
 initGameDialogs();
 $('ai').onchange=render;$('human').onchange=render;
 $('mode').onchange=render;$('matchType').onchange=render;

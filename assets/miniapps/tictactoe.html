@@ -129,7 +129,7 @@ if (e.action==='configure') {
       var outcome=Chess.judge?Chess.judge(s,match,movedSide):Chess.outcome(s.board,match,movedSide);
       if(outcome){s.winningLine=outcome.line;finished(outcome.winner,outcome.reason);}
       if(GAME==='halma'&&s.phase==='playing'&&!Chess.legal(s.board,s.turn).length)finished(null,'双方均无法移动');
-      if(Chess.repetition){var key=position(),maxPly=Chess.maxPly===undefined?400:Chess.maxPly;s.positions[key]=(s.positions[key]||0)+1;if(s.phase==='playing'&&(s.positions[key]>=3||maxPly>0&&s.ply>=maxPly))finished(null,s.positions[key]>=3?'三次重复局面':'达到 '+maxPly+' 步');}
+      if(Chess.repetition){var key=position(),maxPly=Chess.maxPly===undefined?400:Chess.maxPly;s.positions[key]=(s.positions[key]||0)+1;if(s.phase==='playing'&&maxPly>0&&s.ply>=maxPly)finished(null,'达到 '+maxPly+' 步');}
     } else if (GAME!=='xiangqi') {
       s.winningLine=Chess.winningLine(s.board,match.to);
       if (s.winningLine.length) finished(movedSide,GAME==='tictactoe'?'三子连线':'连成五子');
@@ -137,8 +137,6 @@ if (e.action==='configure') {
     } else {
       var key=position();s.positions[key]=(s.positions[key]||0)+1;
       if (!legalMoves().length) finished(movedSide,Chess.legal(s.board,s.turn).length?'长将长捉无可变着':Chess.check(s.board,s.turn)?'将死':'无棋可走');
-      var repeat=Chess.repetition(s);
-      if (s.phase==='playing'&&repeat&&!repeat.offender) finished(null,'三次重复局面');
       if (s.phase==='playing'&&s.quiet>=120) finished(null,'连续 120 步未吃子');
       if (s.phase==='playing'&&s.ply>=400) finished(null,'达到 400 步');
     }
@@ -221,7 +219,6 @@ return {state:s,view:{gameType:GAME,title:TITLE,mode:s.mode,colorsAssigned:s.col
         <button id="undo" type="button" class="aurai-button">悔棋</button>
         <button id="watchPause" type="button" class="aurai-button" hidden>暂停</button>
         <button id="recommend" type="button" class="aurai-button" hidden>推荐下法</button>
-        <button id="askAi" type="button" class="aurai-button">继续</button>
         <button id="rematch" type="button" class="aurai-button aurai-button--primary" title="交换先手开始下一局" hidden>下一局</button>
         <button id="resign" type="button" class="aurai-button">认输</button>
       </nav>
@@ -232,6 +229,7 @@ return {state:s,view:{gameType:GAME,title:TITLE,mode:s.mode,colorsAssigned:s.col
       <h2 id="dialogTitle" class="aurai-title"></h2>
       <section id="dialogMenu" class="aurai-stack" hidden>
         <p id="status" class="aurai-muted"></p>
+        <button id="askAi" type="button" class="aurai-button">继续</button>
         <button id="menuRules" type="button" class="aurai-button">规则</button>
         <button id="menuDifficulty" type="button" class="aurai-button">难度</button>
         <button id="offerDraw" type="button" class="aurai-button">和棋</button>
@@ -675,7 +673,7 @@ async function recommend(){
   const generation=++searchGeneration,key=positionKey();
   recommending=true;recommendation=null;render();
   try{
-    const move=await LocalEngine.search({...s,difficulty:5});
+    const move=await LocalEngine.search(s);
     if(generation!==searchGeneration||key!==positionKey()||move===null)return;
     recommendation=move;
     selected=move.from||null;pending=null;
@@ -701,7 +699,7 @@ $('board').onclick=event=>{
   render();
 };
 $('undo').onclick=()=>submit('undo');
-$('askAi').onclick=()=>decisionTurn()?decide():submit('requestAi');
+$('askAi').onclick=()=>{closeGameDialog();return decisionTurn()?decide():submit('requestAi');};
 initGameDialogs();
 $('ai').onchange=render;$('human').onchange=render;
 $('mode').onchange=render;$('matchType').onchange=render;

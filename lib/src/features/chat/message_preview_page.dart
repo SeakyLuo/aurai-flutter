@@ -47,18 +47,7 @@ class MessagePreviewPage extends StatelessWidget {
             ],
             if (message.images.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final image in message.images)
-                    ImageAttachment(
-                      image: image,
-                      gallery: message.images,
-                      size: 160,
-                    ),
-                ],
-              ),
+              MessageImageGrid(images: message.images),
             ],
             for (final file in message.files)
               Padding(

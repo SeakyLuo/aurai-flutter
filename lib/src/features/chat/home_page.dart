@@ -6,6 +6,7 @@ import 'me_page.dart';
 import 'discover_page.dart';
 import 'home_tab_bar.dart';
 import 'contacts_search_bar.dart';
+import 'home_miniapp_drawer.dart';
 
 final homeRouteObserver = RouteObserver<PageRoute<dynamic>>();
 
@@ -15,6 +16,7 @@ class HomePage extends StatefulWidget {
 
   static void showConversations() {
     final state = navigationKey.currentState!;
+    state._miniapps.currentState?.close();
     state._pages.jumpToPage(0);
     state._pageChanged(0);
   }
@@ -26,6 +28,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with RouteAware {
   final _recentKey = GlobalKey<RecentChatsPageState>();
+  final _miniapps = GlobalKey<HomeMiniappDrawerState>();
+  bool _miniappsOpen = false;
   int _tab = 0;
   final _pages = PageController();
   final _contactSearch = TextEditingController();
@@ -100,9 +104,13 @@ class _HomePageState extends State<HomePage> with RouteAware {
 
   @override
   Widget build(BuildContext context) => PopScope(
-    canPop: _tab == 0 && !_searchingContacts,
+    canPop: _tab == 0 && !_searchingContacts && !_miniappsOpen,
     onPopInvokedWithResult: (didPop, result) {
       if (!didPop) {
+        if (_miniappsOpen) {
+          _miniapps.currentState!.close();
+          return;
+        }
         if (_tab == 1 && _contactDetailOpen) return;
         if (_searchingContacts) {
           _toggleContactSearch();
@@ -111,64 +119,72 @@ class _HomePageState extends State<HomePage> with RouteAware {
         }
       }
     },
-    child: Scaffold(
-      extendBody: true,
-      body: PageView(
-        controller: _pages,
-        onPageChanged: _pageChanged,
-        children: _tabPages,
-      ),
-      bottomNavigationBar: AnimatedPadding(
-        duration: const Duration(milliseconds: 180),
-        padding: EdgeInsets.only(
-          bottom: _searchingContacts
-              ? MediaQuery.viewInsetsOf(context).bottom
-              : 0,
+    child: HomeMiniappDrawer(
+      key: _miniapps,
+      controller: widget.controller,
+      enabled: _tab == 0,
+      onChanged: (open) => setState(() => _miniappsOpen = open),
+      child: Scaffold(
+        extendBody: true,
+        body: PageView(
+          controller: _pages,
+          onPageChanged: _pageChanged,
+          children: _tabPages,
         ),
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            IgnorePointer(
-              ignoring: _searchingContacts,
-              child: AnimatedSlide(
-                offset: _searchingContacts ? const Offset(0, 1.5) : Offset.zero,
-                duration: const Duration(milliseconds: 260),
-                curve: Curves.easeInOutCubic,
-                child: ExcludeSemantics(
-                  excluding: _searchingContacts,
-                  child: HomeTabBar(
-                    selected: _tab,
-                    pages: _pages,
-                    onSelected: _select,
-                  ),
-                ),
-              ),
-            ),
-            Positioned.fill(
-              child: IgnorePointer(
-                ignoring: !_searchingContacts,
-                child: ExcludeSemantics(
-                  excluding: !_searchingContacts,
-                  child: AnimatedSlide(
-                    offset: _searchingContacts
-                        ? Offset.zero
-                        : const Offset(0, 1.5),
-                    duration: const Duration(milliseconds: 260),
-                    curve: Curves.easeInOutCubic,
-                    onEnd: () {
-                      if (_searchingContacts)
-                        _contactSearchFocus.requestFocus();
-                    },
-                    child: ContactsSearchBar(
-                      controller: _contactSearch,
-                      focusNode: _contactSearchFocus,
-                      onClose: _toggleContactSearch,
+        bottomNavigationBar: AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          padding: EdgeInsets.only(
+            bottom: _searchingContacts
+                ? MediaQuery.viewInsetsOf(context).bottom
+                : 0,
+          ),
+          child: Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              IgnorePointer(
+                ignoring: _searchingContacts,
+                child: AnimatedSlide(
+                  offset: _searchingContacts
+                      ? const Offset(0, 1.5)
+                      : Offset.zero,
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeInOutCubic,
+                  child: ExcludeSemantics(
+                    excluding: _searchingContacts,
+                    child: HomeTabBar(
+                      selected: _tab,
+                      pages: _pages,
+                      onSelected: _select,
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+              Positioned.fill(
+                child: IgnorePointer(
+                  ignoring: !_searchingContacts,
+                  child: ExcludeSemantics(
+                    excluding: !_searchingContacts,
+                    child: AnimatedSlide(
+                      offset: _searchingContacts
+                          ? Offset.zero
+                          : const Offset(0, 1.5),
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeInOutCubic,
+                      onEnd: () {
+                        if (_searchingContacts)
+                          _contactSearchFocus.requestFocus();
+                      },
+                      child: ContactsSearchBar(
+                        controller: _contactSearch,
+                        focusNode: _contactSearchFocus,
+                        onClose: _toggleContactSearch,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     ),

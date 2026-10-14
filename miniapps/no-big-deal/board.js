@@ -38,13 +38,15 @@ const OfficeBoard = (() => {
     const cells=empty(s);
     s.preview=cells.length?{cell:cells[random(s,cells.length)],value:s.forcedOnes?1:s.nextCard.value}:null;
   }
-  function spawn(s) {
-    const cells=empty(s);
-    if(!cells.length){s.preview=null;return;}
-    if(s.preview && s.board[s.preview.cell] && cells.length!==1){preview(s);return;}
-    if(!s.preview)preview(s);
-    const i=cells.length===1?cells[0]:s.preview.cell;
-    s.board[i]=fromCard(s,s.forcedOnes?card(1):s.nextCard);if(s.forcedOnes)s.forcedOnes--;enter(s,i,s.board[i]);discard(s);s.nextCard=draw(s);preview(s);
+  function spawn(s, count=1) {
+    for(let dealt=0;dealt<count;dealt++){
+      const cells=empty(s);
+      if(!cells.length){s.preview=null;return;}
+      if(s.preview && s.board[s.preview.cell])preview(s);
+      if(!s.preview)preview(s);
+      const i=cells.length===1?cells[0]:s.preview.cell;
+      s.board[i]=fromCard(s,s.forcedOnes?card(1):s.nextCard);if(s.forcedOnes)s.forcedOnes--;enter(s,i,s.board[i]);discard(s);s.nextCard=draw(s);preview(s);
+    }
   }
   function protect(o,type) {
     if(o.attach.includes('sleeve') && ['water','pollution','fire','ice'].includes(type))return true;

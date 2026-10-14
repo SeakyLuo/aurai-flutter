@@ -109,7 +109,7 @@ extension _ChatMessageEditing on _ChatPageState {
       }
       final remaining = MessageImageStore.maxImages - session.images.length;
       if (remaining == 0) {
-        _imageNotice('每条消息最多添加 4 张图片');
+        _imageNotice('每条消息最多添加 ${MessageImageStore.maxImages} 张图片');
         return;
       }
       final images = await widget.controller.pickEditImages(

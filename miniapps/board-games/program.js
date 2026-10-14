@@ -76,7 +76,7 @@ if (e.action==='configure') {
       var outcome=Chess.judge?Chess.judge(s,match,movedSide):Chess.outcome(s.board,match,movedSide);
       if(outcome){s.winningLine=outcome.line;finished(outcome.winner,outcome.reason);}
       if(GAME==='halma'&&s.phase==='playing'&&!Chess.legal(s.board,s.turn).length)finished(null,'双方均无法移动');
-      if(Chess.repetition){var key=position(),maxPly=Chess.maxPly===undefined?400:Chess.maxPly;s.positions[key]=(s.positions[key]||0)+1;if(s.phase==='playing'&&(s.positions[key]>=3||maxPly>0&&s.ply>=maxPly))finished(null,s.positions[key]>=3?'三次重复局面':'达到 '+maxPly+' 步');}
+      if(Chess.repetition){var key=position(),maxPly=Chess.maxPly===undefined?400:Chess.maxPly;s.positions[key]=(s.positions[key]||0)+1;if(s.phase==='playing'&&maxPly>0&&s.ply>=maxPly)finished(null,'达到 '+maxPly+' 步');}
     } else if (GAME!=='xiangqi') {
       s.winningLine=Chess.winningLine(s.board,match.to);
       if (s.winningLine.length) finished(movedSide,GAME==='tictactoe'?'三子连线':'连成五子');
@@ -84,8 +84,6 @@ if (e.action==='configure') {
     } else {
       var key=position();s.positions[key]=(s.positions[key]||0)+1;
       if (!legalMoves().length) finished(movedSide,Chess.legal(s.board,s.turn).length?'长将长捉无可变着':Chess.check(s.board,s.turn)?'将死':'无棋可走');
-      var repeat=Chess.repetition(s);
-      if (s.phase==='playing'&&repeat&&!repeat.offender) finished(null,'三次重复局面');
       if (s.phase==='playing'&&s.quiet>=120) finished(null,'连续 120 步未吃子');
       if (s.phase==='playing'&&s.ply>=400) finished(null,'达到 400 步');
     }

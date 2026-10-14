@@ -143,5 +143,5 @@ var Chess = (function () {
     return legal(s.board,s.turn).filter(function(move){var repeat=repetition(s,move);return !repeat||repeat.offender!==s.turn;});
   }
   return {width:width,height:height,first:'r',second:'b',sides:{r:'红方',b:'黑方'},names:names,initial:initial,legal:legal,allowed:allowed,repetition:repetition,play:play,check:check,coordinate:coordinate,setJieqi:function(value){jieqi=value;},
-    rules:'红方先行。遵循蹩马腿、塞象眼、九宫、过河、炮隔子及将帅照面规则；将死或无合法走法均判负。同局面同走方第三次出现时，单方长将、长捉同一棋子的走法禁止，必须变招；长将对长捉由长将方变招。双方同等重复或均未犯例判和。将帅、兵卒追捉、合法兑子和追捉真有根子不算长捉，马炮追有根车除外。连续 120 步未吃子或达到 400 步判和。'};
+    rules:'红方先行。遵循蹩马腿、塞象眼、九宫、过河、炮隔子及将帅照面规则；将死或无合法走法均判负。同局面同走方第三次出现时，单方长将、长捉同一棋子的走法禁止，必须变招；长将对长捉由长将方变招。重复局面不自动判和。将帅、兵卒追捉、合法兑子和追捉真有根子不算长捉，马炮追有根车除外。连续 120 步未吃子或达到 400 步判和。'};
 })();

@@ -22,7 +22,7 @@ extension AssetLibraryActions on ChatController {
         .map((asset) => asset.file)
         .toList();
     if (draftImages.length + images.length > MessageImageStore.maxImages)
-      throw StateError('每条消息最多添加 4 张图片');
+      throw StateError('每条消息最多添加 ${MessageImageStore.maxImages} 张图片');
     if (draftFiles.length + files.length > MessageFileStore.maxFiles)
       throw StateError('每条消息最多添加 10 个文件');
     final conversation = activeConversation;

@@ -72,7 +72,7 @@ function render(){
 }
 $('cardStart').onclick=()=>act('configure',Cards.seatOptions?{seats:seatCount}:{});
 $('cardRematch').onclick=()=>{CardUI.reset();more(false);void act('rematch',Cards.seatOptions?{seats:seatCount}:{});};
-$('cardContinue').onclick=()=>{clearTimeout(timer);timer=null;void continueAi();};
+$('cardContinue').onclick=()=>{more(false);clearTimeout(timer);timer=null;void continueAi();};
 $('cardMore').onclick=()=>more($('cardMorePanel').hidden);$('cardCloseMore').onclick=()=>more(false);
 $('cardLeave').onclick=()=>{$('cardLeaveConfirm').hidden=false;};
 $('cardCancelLeave').onclick=()=>{$('cardLeaveConfirm').hidden=true;};

@@ -107,14 +107,20 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
         case AttachmentSource.gallery:
           if (widget.controller.draftImages.length ==
               MessageImageStore.maxImages) {
-            _notice('每条消息最多添加 4 张图片，请先移除一张', kind: ToastKind.warning);
+            _notice(
+              '每条消息最多添加 ${MessageImageStore.maxImages} 张图片，请先移除一张',
+              kind: ToastKind.warning,
+            );
             return;
           }
           await widget.controller.addImages(ImageSource.gallery);
         case AttachmentSource.camera:
           if (widget.controller.draftImages.length ==
               MessageImageStore.maxImages) {
-            _notice('每条消息最多添加 4 张图片，请先移除一张', kind: ToastKind.warning);
+            _notice(
+              '每条消息最多添加 ${MessageImageStore.maxImages} 张图片，请先移除一张',
+              kind: ToastKind.warning,
+            );
             return;
           }
           await widget.controller.addImages(ImageSource.camera);

@@ -71,7 +71,10 @@ extension _ChatAttachments on _ChatPageState {
       }
     } else {
       if (controller.draftImages.length == MessageImageStore.maxImages) {
-        _imageNotice('每条消息最多添加 4 张图片，请先移除一张', kind: ToastKind.warning);
+        _imageNotice(
+          '每条消息最多添加 ${MessageImageStore.maxImages} 张图片，请先移除一张',
+          kind: ToastKind.warning,
+        );
         return;
       }
       await _loadImages(

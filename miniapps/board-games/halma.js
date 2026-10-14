@@ -41,5 +41,5 @@ var Chess=(function(){
     return score;
   }
   return {width:width,height:height,first:'b',second:'w',sides:{b:'薄荷棋',p:'薰衣草棋',o:'杏橙棋',w:'蜜桃棋',g:'湖蓝棋',y:'奶黄棋'},legend:{b:'薄',p:'紫',o:'橙',w:'桃',g:'蓝',y:'黄'},seatSides:seatSides,target:target,campAt:campAt,setSides:setSides,progress:progress,holes:holes,camps:camps,valid:valid,initial:initial,legal:legal,moved:moved,play:play,outcome:outcome,nextTurn:nextTurn,evaluate:function(b,side){return progress(b,side)-Math.max.apply(null,active.filter(function(s){return s!==side;}).map(function(s){return progress(b,s);}));},coordinate:coordinate,searchDepth:[1,1,2,3,4],searchWidth:12,moving:true,repetition:true,
-    rules:'支持 2、3、4、6 人，每方十子，按席位依次行动。可移动到相邻空穴，或跳过一枚相邻棋子到其后的空穴，并可连续跳跃；不吃子。选中棋子后点击高亮终点，一次完成整条连跳。休闲规则：进入对面目标营后只可在营内移动，最先十子全部入营者获胜；无合法走法时自动让行，所有人均无法移动、三次重复局面或 1200 步判和。认输者退出回合，棋子保留作为跳跃支点，最后一位未退出者获胜。下一局保持颜色并轮换先手。',hint:'先选棋子，再点亮起的空穴；可直接选择连跳终点'};
+    rules:'支持 2、3、4、6 人，每方十子，按席位依次行动。可移动到相邻空穴，或跳过一枚相邻棋子到其后的空穴，并可连续跳跃；不吃子。选中棋子后点击高亮终点，一次完成整条连跳。休闲规则：进入对面目标营后只可在营内移动，最先十子全部入营者获胜；无合法走法时自动让行，所有人均无法移动或 1200 步判和，重复局面不自动判和。认输者退出回合，棋子保留作为跳跃支点，最后一位未退出者获胜。下一局保持颜色并轮换先手。',hint:'先选棋子，再点亮起的空穴；可直接选择连跳终点'};
 })();

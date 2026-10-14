@@ -102,18 +102,45 @@ class ConversationUnreadAvatar extends StatelessWidget {
             top: -2,
             right: -2,
             child: Semantics(
-              label: '有新消息',
+              label: conversation.isPersonalChat
+                  ? '${conversation.unreadMessageCount}条未读消息'
+                  : '有新消息',
               child: Container(
-                width: 12,
-                height: 12,
+                constraints: conversation.isPersonalChat
+                    ? const BoxConstraints(minWidth: 20, minHeight: 20)
+                    : null,
+                width: conversation.isPersonalChat ? null : 12,
+                height: conversation.isPersonalChat ? null : 12,
+                padding: conversation.isPersonalChat
+                    ? const EdgeInsets.symmetric(horizontal: 5, vertical: 1)
+                    : null,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+                  borderRadius: conversation.isPersonalChat
+                      ? BorderRadius.circular(12)
+                      : null,
+                  shape: conversation.isPersonalChat
+                      ? BoxShape.rectangle
+                      : BoxShape.circle,
                   color: unreadDotColor,
                   border: Border.all(
                     color: Theme.of(context).scaffoldBackgroundColor,
                     width: 2,
                   ),
                 ),
+                child: conversation.isPersonalChat
+                    ? Text(
+                        conversation.unreadMessageCount > 99
+                            ? '99+'
+                            : '${conversation.unreadMessageCount}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          height: 1.4,
+                        ),
+                      )
+                    : null,
               ),
             ),
           ),

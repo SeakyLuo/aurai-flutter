@@ -11,6 +11,75 @@ import '../../domain/message_image.dart';
 import 'image_preview.dart';
 export 'attachment_source_menu.dart';
 
+/// Keep message thumbnails compact while retaining every image in the viewer.
+class MessageImageGrid extends StatelessWidget {
+  const MessageImageGrid({super.key, required this.images});
+
+  final List<MessageImage> images;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final count = images.length > 4 ? 4 : images.length;
+      final columns = count == 3
+          ? 3
+          : count == 1
+          ? 1
+          : 2;
+      final width = constraints.maxWidth.clamp(0.0, count == 1 ? 260.0 : 320.0);
+      const gap = 8.0;
+      final size = (width - gap * (columns - 1)) / columns;
+      return SizedBox(
+        width: width,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var start = 0; start < count; start += columns) ...[
+              if (start > 0) const SizedBox(height: gap),
+              Row(
+                children: [
+                  for (var i = start; i < start + columns; i++) ...[
+                    if (i > start) const SizedBox(width: gap),
+                    Stack(
+                      children: [
+                        ImageAttachment(
+                          image: images[i],
+                          gallery: images,
+                          size: size,
+                        ),
+                        if (i == 3 && images.length > 4)
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: Container(
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.45),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Text(
+                                  '+${images.length - 4}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ],
+        ),
+      );
+    },
+  );
+}
+
 class DraftImageAttachments extends StatelessWidget {
   const DraftImageAttachments({
     super.key,

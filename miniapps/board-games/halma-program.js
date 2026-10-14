@@ -49,7 +49,7 @@ if(e.action==='configure'){
     notify(person(actor)+' '+record.text,false);
     var outcome=Chess.outcome(s.board,move,side);
     if(outcome)finish(side,outcome.reason);else advance(side);
-    if(s.phase==='playing'){var key=position();s.positions[key]=(s.positions[key]||0)+1;if(s.positions[key]>=3||s.ply>=1200)finish(null,s.positions[key]>=3?'三次重复局面':'达到 1200 步');}
+    if(s.phase==='playing'){var key=position();s.positions[key]=(s.positions[key]||0)+1;if(s.ply>=1200)finish(null,'达到 1200 步');}
     if(s.phase==='playing'&&player(s.turn).kind==='agent')notify('轮到'+person(player(s.turn))+'落子',true);
   }else if(e.action==='undo'){
     require(actor.active&&actor.kind!=='agent'&&actor.kind!=='engine','只有未退出的玩家可以悔棋');

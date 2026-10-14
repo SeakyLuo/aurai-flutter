@@ -133,13 +133,13 @@ return {state:s,view:view,privateViews:privateViews};
     <div id="cardTable"></div>
     <div id="cardRematchSeats" class="card-seat-options" hidden></div>
     <nav id="cardToolbar" class="aurai-row" aria-label="对局操作">
-      <button id="cardContinue" type="button" class="aurai-button">继续</button>
       <button id="cardRematch" type="button" class="aurai-button aurai-button--primary" hidden>下一局</button>
       <button id="cardMore" type="button" class="aurai-button" aria-expanded="false">更多</button>
     </nav>
   </section>
   <section id="cardMorePanel" class="aurai-stack" hidden>
     <div class="aurai-row"><strong>对局</strong><button id="cardCloseMore" type="button" class="aurai-button">收起</button></div>
+    <button id="cardContinue" type="button" class="aurai-button">继续</button>
     <details><summary>玩法规则</summary><p id="cardRules"></p></details>
     <details><summary>最近记录</summary><ol id="cardLog"></ol></details>
     <button id="cardLeave" type="button" class="aurai-button">结束本局</button>
@@ -161,9 +161,6 @@ return {state:s,view:view,privateViews:privateViews};
 @keyframes card-pulse{50%{transform:scale(1.18);opacity:.4}}
 #cardGame .aurai-button{border-radius:var(--aurai-button-radius,24px);min-height:42px;font-size:14px}
 #cardToolbar{justify-content:center;margin-top:8px}#cardToolbar>button{flex:1;max-width:180px}
-#cardContinue[aria-busy=true]{color:transparent;position:relative}
-#cardContinue[aria-busy=true]:after{content:"";position:absolute;left:calc(50% - 9px);top:calc(50% - 9px);width:18px;height:18px;border-radius:50%;border:1.6px solid var(--aurai-border);border-top-color:var(--aurai-highlight-text);animation:card-spin .8s linear infinite}
-@keyframes card-spin{to{transform:rotate(360deg)}}
 #cardMorePanel{padding:20px;border:1px solid var(--aurai-border);border-radius:24px;background:var(--aurai-field)}
 #cardMorePanel>.aurai-row{justify-content:space-between}#cardMorePanel summary{padding:8px 0;cursor:pointer}#cardRules{white-space:pre-line;font-size:13px;line-height:1.8}
 #cardLog{padding-left:20px;font-size:13px;color:var(--aurai-muted);line-height:1.9}
@@ -171,7 +168,7 @@ html[data-aurai-display=fullscreen] #cardGame{padding-top:calc(var(--aurai-host-
 html[data-aurai-display=fullscreen] .card-heading{min-height:48px;padding-right:var(--aurai-host-right-inset,0px)}
 html[data-aurai-display=fullscreen] #cardToolbar{position:fixed;bottom:calc(var(--aurai-host-safe-bottom-inset,0px) + 16px);left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:400px;padding:8px;border:1px solid var(--aurai-border);border-radius:32px;background:color-mix(in srgb,var(--aurai-field) 88%,transparent);backdrop-filter:blur(20px);z-index:8;box-shadow:0 4px 20px #00000012}
 html[data-aurai-display=fullscreen] #cardMorePanel{position:fixed;bottom:calc(var(--aurai-host-safe-bottom-inset,0px) + 90px);left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:420px;max-height:60dvh;overflow:auto;z-index:9;backdrop-filter:blur(24px);background:color-mix(in srgb,var(--aurai-field) 94%,transparent)}
-@media(prefers-reduced-motion:reduce){.card-player.active .card-seat:after,#cardContinue[aria-busy=true]:after{animation:none}}
+@media(prefers-reduced-motion:reduce){.card-player.active .card-seat:after{animation:none}}
 .card-seat-options{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:13px}.card-seat-options>.aurai-button{flex:1}.card-seat-options>span,.card-seat-options>small{flex-basis:100%}
 
 .card-remaining{grid-column:1/-1;display:flex;flex-direction:column;gap:16px;margin-top:14px;padding-top:16px;border-top:1px solid color-mix(in srgb,var(--aurai-muted) 20%,transparent);min-width:0}
@@ -378,7 +375,7 @@ function render(){
 }
 $('cardStart').onclick=()=>act('configure',Cards.seatOptions?{seats:seatCount}:{});
 $('cardRematch').onclick=()=>{CardUI.reset();more(false);void act('rematch',Cards.seatOptions?{seats:seatCount}:{});};
-$('cardContinue').onclick=()=>{clearTimeout(timer);timer=null;void continueAi();};
+$('cardContinue').onclick=()=>{more(false);clearTimeout(timer);timer=null;void continueAi();};
 $('cardMore').onclick=()=>more($('cardMorePanel').hidden);$('cardCloseMore').onclick=()=>more(false);
 $('cardLeave').onclick=()=>{$('cardLeaveConfirm').hidden=false;};
 $('cardCancelLeave').onclick=()=>{$('cardLeaveConfirm').hidden=true;};

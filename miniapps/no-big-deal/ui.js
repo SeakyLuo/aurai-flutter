@@ -101,6 +101,7 @@ function paintSelection(){
     path.length>1?(OfficeMerge.complete(path.map(i=>game.board[i]))?`已连接 ${path.length} 张，松手合并`:'尚未配齐，继续连接亮起的文件，或沿线退回'):
     drop!==null&&R.collectible(game.board[drop])?'松手收集或附着目标道具':
     selected?'连接亮起的文件，配齐后松手合并；拖到空格可移动':OfficeCampaign.hint(game);
+  OfficeToolUI.paint();
 }
 function inspect(){
   const i=path.length===1?path[0]:null,o=i!==null?game.board[i]:null;
@@ -153,16 +154,12 @@ function renderCabinet(){
   $('itemCount').textContent=game.items.length+'/'+R.itemLimit(game);$('cabinet').replaceChildren();
   $('itemTray').replaceChildren();
   const grid=el('div',null,'office-items');
+  OfficeItemUI.hide();
   game.items.forEach((entry,index)=>{
-    const info=R.items[entry.key],b=button(entry.polluted?'受污染的道具':(entry.spoiled?'变质 · ':'')+info.name,()=>{
-      if(entry.polluted){item=index;path=[];drop=null;panel='cabinet';render();$('board').scrollIntoView({block:'nearest',behavior:'smooth'});return;}
-      if(info.target==='passive'){toast(info.description);return;}
-      if(info.target==='instant'){void transact(s=>W.use(s,index,0));return;}
-      item=index;path=[];drop=null;panel='cabinet';render();if(entry.key!=='magnet')$('board').scrollIntoView({block:'nearest',behavior:'smooth'});
-    },item===index?'active':'',game.status!=='playing');
-    const label=el('span',b.textContent);b.textContent='';const imageKey={coffee:'coffee',sleeve:'sleeve',cage:'cage'}[entry.key];if(imageKey){const image=el('img',null);image.src=art[imageKey];image.alt='';b.append(image);}b.append(label);
-    b.title=info.name+'：'+info.description;
-    b.append(el('small',entry.polluted?'放回桌面清洗':entry.spoiled?{water:'使用后产生污水',strongGlue:'仅普通胶效果',coffee:'消除一种疲劳，下次合并产生疲劳',snack:'恢复 5 忍耐度',hamburger:'下两份为 1，额外留下临时文件',energy:'保护一次行动，结束后获得疲劳'}[entry.key]:entry.rental==='phase'?'本阶段租用':entry.rental==='day'?'今日租用':R.rarities[R.itemRarity[entry.key]]+(info.target==='passive'?' · 持有生效':' · 点击使用')));grid.append(b);
+    const b=button(null,()=>{},item===index?'active':'',game.status!=='playing');
+    b.dataset.item=entry.key;b.append(OfficeItemUI.icon(entry.key));
+    b.classList.toggle('item-polluted',!!entry.polluted);b.classList.toggle('item-spoiled',!!entry.spoiled);
+    OfficeItemUI.bind(b,entry,()=>OfficeToolUI.select(index));grid.append(b);
   });
   const limit=R.itemLimit(game);for(let index=game.items.length;index<Math.max(12,limit);index++){const slot=el('div',null,'tray-empty');if(index>=limit){const lock=el('img',null);lock.src=art.lock;lock.alt='未解锁';slot.append(lock);}else slot.setAttribute('aria-label','空道具位');grid.append(slot);}
   $('itemTray').replaceChildren(...grid.childNodes);
@@ -283,7 +280,7 @@ async function transact(action){
     return result;
   }finally{busy=false;if(!committed){game=previousGame;path=previousPath;drop=previousDrop;item=previousItem;render();}}
 }
-function clearSelection(){if(selectionFrame){cancelAnimationFrame(selectionFrame);selectionFrame=0;}touchId=null;inspectOpen=false;path=[];drop=null;item=null;drag=false;groupDrag=false;keyboardSelection=false;}
+function clearSelection(){OfficeItemUI.hide();OfficeToolUI.reset();if(selectionFrame){cancelAnimationFrame(selectionFrame);selectionFrame=0;}touchId=null;inspectOpen=false;path=[];drop=null;item=null;drag=false;groupDrag=false;keyboardSelection=false;}
 async function commitSelection(){
   if(!path.length||busy)return;
   if(path.length>1&&!OfficeMerge.complete(path.map(i=>game.board[i]))){
@@ -296,6 +293,7 @@ async function commitSelection(){
   paintSelection();inspect();
 }
 async function applyItem(i){
+  if(OfficeToolUI.active()){OfficeToolUI.pick(i);return;}
   const index=item;
   const result=await transact(s=>{
     const entry=s.items[index],info=R.items[entry.key];
@@ -347,12 +345,16 @@ function dragSelection(i){
   // Crossing an incompatible file keeps the last valid destination, as in the original.
 }
 // Touch events may skip cells during a fast stroke; visit the crossed cell interiors in order.
-function traceDrag(e){
+function traceDrag(e,releasing=false){
   const from=dragPoint,dx=e.clientX-from.clientX,dy=e.clientY-from.clientY,hits=[];
   if(dx!==0||dy!==0){
     dragCells.forEach((cell,i)=>{
+      // Crossing a file edge is not a selection; aim through its central area.
+      // Empty destinations and the release target retain their full hit area.
+      const inset=!groupDrag&&R.isFile(game.board[i]) ? R.config.fileHitInset : 0;
+      const xInset=cell.width*inset,yInset=cell.height*inset;
       let enter=0,leave=1;
-      for(const [start,delta,min,max] of [[from.clientX,dx,cell.left,cell.right],[from.clientY,dy,cell.top,cell.bottom]]){
+      for(const [start,delta,min,max] of [[from.clientX,dx,cell.left+xInset,cell.right-xInset],[from.clientY,dy,cell.top+yInset,cell.bottom-yInset]]){
         if(delta===0){if(start<=min||start>=max)return;}
         else{const a=(min-start)/delta,b=(max-start)/delta;enter=Math.max(enter,Math.min(a,b));leave=Math.min(leave,Math.max(a,b));}
       }
@@ -360,7 +362,9 @@ function traceDrag(e){
     });
     hits.sort((a,b)=>a.enter-b.enter).forEach(({i})=>dragSelection(i));
   }
-  dragSelection(cellAt(e));dragPoint={clientX:e.clientX,clientY:e.clientY};
+  const i=cellAt(e);
+  if(releasing||groupDrag||i===null||i<0||!R.isFile(game.board[i]))dragSelection(i);
+  dragPoint={clientX:e.clientX,clientY:e.clientY};
 }
 function releaseDestination(i){
   if(drop!==null)return drop;
@@ -369,7 +373,7 @@ function releaseDestination(i){
 }
 function finishDrag(e){
   if(selectionFrame){cancelAnimationFrame(selectionFrame);selectionFrame=0;}
-  traceDrag(e);const i=cellAt(e),target=releaseDestination(i);drag=false;
+  traceDrag(e,true);const i=cellAt(e),target=releaseDestination(i);drag=false;
   if(path.length>1||target!==path[0]){drop=target;void commitSelection();}
   else{drop=null;paintSelection();inspect();requestPageResize();}
 }
@@ -443,8 +447,9 @@ guide('fileGuide',[
   ['撤销','可与普通文件合并，本次不得分并添加撤销；与普通文件合并后解除撤销；再次撤销可抵消，两个撤销文件合成普通 1 份。'],
   ['金属','导电、受磁吸；手动移动带电物品需要绝缘手套。']]);
 document.addEventListener('aurai:restore',()=>{if(!busy){game=AuraiHTML.state?.version===7?AuraiHTML.state.game:null;soundEnabled=AuraiHTML.state?.soundEnabled===true;F.setEnabled(soundEnabled);clearSelection();render();}});
-document.addEventListener('aurai:pause',()=>{F.pause();clearSelection();if(game)render();});
+document.addEventListener('aurai:pause',()=>{OfficeItemUI.hide();F.pause();clearSelection();if(game)render();});
 document.addEventListener('aurai:resume',()=>{F.resume();render();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)F.pause();else F.resume();});
 document.addEventListener('aurai:displaychange',()=>{if(game){clearSelection();render();}else requestPageResize();});
+OfficeItemUI.init();OfficeToolUI.init();
 render();

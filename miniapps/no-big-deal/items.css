@@ -1,0 +1,19 @@
+/* Inventory details use the same paper, ink and rounded outline language as the desk. */
+#itemTray>button{display:flex;align-items:center;justify-content:center;touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#itemTray>button>svg{width:72%;height:72%;color:#805127;pointer-events:none;filter:drop-shadow(0 1px 0 #fff9e7)}
+#itemTray>button>img{width:77%;height:77%;pointer-events:none}
+#itemTray>button.item-polluted{filter:grayscale(1)}
+#itemTray>button.item-spoiled::after{content:'!';position:absolute;right:7px;top:4px;color:#a34d26;font-weight:900;font-size:12px}
+.item-info{position:fixed;z-index:30;padding:12px 14px;border:2px solid #a57543;border-radius:7px;background:#fff0ce;box-shadow:0 5px 12px #5d341d44;pointer-events:none;text-align:left;color:#613e22}
+.item-info strong{font-size:14px}.item-info p{font-size:12px;line-height:1.6;margin:6px 0}.item-info small{display:block;font-size:10px;line-height:1.5;color:#92643c}
+.item-action{display:flex;flex-wrap:wrap;align-items:center;gap:7px;padding:8px 10px;margin:0 5px 6px;border:1px solid #b98b58;border-radius:7px;background:#fff0cf}
+.item-action>div:first-child{flex:1;min-width:0}.item-action strong{font-size:12px}.item-action p{font-size:11px;line-height:1.5;margin:2px 0}
+.tool-actions{display:flex;gap:4px;align-items:center}.tool-actions .aurai-button,.tool-actions .office-link{min-height:36px!important;padding:5px 12px!important;font-size:12px!important}.tool-actions .aurai-button{background:#9b6337!important;color:#fff5dc!important}
+.tool-pool{flex-basis:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;max-height:175px;overflow-y:auto;padding:3px}
+.tool-pool-card{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:55px;border:1px solid #bd8c57!important;border-radius:6px!important;background:#f9e0b2!important;padding:5px!important;color:#613e22!important}
+.tool-pool-card strong{font-size:14px}.tool-pool-card span,.tool-pool-card small{font-size:9px}.tool-pool-card.active{outline:2px solid #8c672f;outline-offset:0}
+.office-cell.tool-valid{outline:2px solid #d8ea8c;outline-offset:-6px;border-radius:8px!important}
+.office-cell.tool-invalid>.file-art,.office-cell.tool-invalid>.file-number,.office-cell.tool-invalid>.cell-tags{filter:grayscale(1);opacity:.28}
+.office-cell.tool-source{outline:3px solid #ffe79a;outline-offset:-5px;border-radius:8px!important}
+.office-cell.tool-target{outline:3px dashed #ffe79a;outline-offset:-5px;border-radius:8px!important}
+.tool-number-preview{position:absolute;left:9%;right:9%;bottom:8%;padding:2px;background:#fff0cfef;border:1px solid #b88750;border-radius:8px;color:#613e22;font-size:12px;line-height:16px;pointer-events:none;z-index:3}

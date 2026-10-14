@@ -22,7 +22,7 @@ var XiangqiModes=(function(base){
     s.hidden[from]=null;s.hidden[to]=null;return record;
   }
   var jieqi=Object.assign({},base,{mode:'jieqi',names:names,legend:legend,initialize:initialize,restore:restore,unseen:unseen,play:jieqiPlay,
-    rules:'将帅明置，其余棋子按各自颜色洗乱盖住。暗子第一步按原位置的棋种走，走后揭开；明子按真实棋种走，士、象可过河，士不受九宫限制。暗子被吃不公开身份。红方先行，将死或困毙判负；长将长捉、重复局面及步数判和沿用普通象棋规则，揭子清空未吃子计数。',hint:'先选棋子，再选择落点，暗子走后自动揭开'});
+    rules:'将帅明置，其余棋子按各自颜色洗乱盖住。暗子第一步按原位置的棋种走，走后揭开；明子按真实棋种走，士、象可过河，士不受九宫限制。暗子被吃不公开身份。红方先行，将死或困毙判负；长将长捉限制与步数判和沿用普通象棋规则，重复局面不自动判和，揭子清空未吃子计数。',hint:'先选棋子，再选择落点，暗子走后自动揭开'});
   var ranks={K:7,A:6,E:5,R:4,H:3,C:2,P:1};
   function coordinate(p){return String.fromCharCode(65+p[0])+(p[1]+1);}
   function capture(a,b){return a[1]==='P'?b[1]==='P'||b[1]==='K':a[1]==='K'?b[1]!=='P':ranks[a[1]]>=ranks[b[1]];}
@@ -57,6 +57,6 @@ var XiangqiModes=(function(base){
     return s.quiet>=60?{winner:null,reason:'连续 60 步未吃子或翻子',line:[]}:null;
   }
   var banqi={mode:'banqi',width:4,height:8,first:'r',second:'b',sides:base.sides,names:names,legend:legend,initial:function(){return Array(32).fill('uD');},initialize:initialize,restore:restore,unseen:unseen,legal:legal,play:banqiPlay,check:function(){return false;},outcome:outcome,judge:judge,repetition:true,maxPly:0,coordinate:coordinate,
-    rules:'4 × 8 半盘暗棋，32 子洗乱盖住。首次翻出的颜色归先手。每回合翻一子，或移动己方明子：上下左右一格，大吃小、同级互吃；将帅不能吃兵卒，兵卒可以吃将帅。炮只隔一个棋子吃任意敌方明子，不能直接吃子；暗子不能被吃。棋子全失或无合法走法判负；同局面同走方三次重复、连续 60 步未吃子或翻子判和。',hint:'点击暗子翻开，或选己方明子走棋'};
+    rules:'4 × 8 半盘暗棋，32 子洗乱盖住。首次翻出的颜色归先手。每回合翻一子，或移动己方明子：上下左右一格，大吃小、同级互吃；将帅不能吃兵卒，兵卒可以吃将帅。炮只隔一个棋子吃任意敌方明子，不能直接吃子；暗子不能被吃。棋子全失或无合法走法判负；重复局面不自动判和；连续 60 步未吃子或翻子判和。',hint:'点击暗子翻开，或选己方明子走棋'};
   return {labels:labels,get:function(mode){if(['normal','jieqi','banqi'].indexOf(mode)<0)throw Error('请选择有效的象棋模式');base.setJieqi(mode==='jieqi');return mode==='normal'?base:mode==='jieqi'?jieqi:banqi;}};
 })(Chess);

@@ -17,7 +17,7 @@ class ImageInputException implements Exception {
 }
 
 class MessageImageStore {
-  static const maxImages = 4;
+  static const maxImages = 18;
   final _picker = ImagePicker();
   late final String directory;
 
@@ -56,7 +56,7 @@ class MessageImageStore {
 
   Future<List<MessageImage>> _store(List<XFile> files, int remaining) async {
     if (files.length > remaining) {
-      throw const ImageInputException('每条消息最多添加 4 张图片，请重新选择');
+      throw const ImageInputException('每条消息最多添加 ${maxImages} 张图片，请重新选择');
     }
     final images = <MessageImage>[];
     try {

@@ -24,9 +24,11 @@ class MiniappLibraryPage extends StatefulWidget {
     super.key,
     required this.controller,
     this.pickingMessage = false,
+    this.initiallySearching = false,
   });
   final ChatController controller;
   final bool pickingMessage;
+  final bool initiallySearching;
 
   @override
   State<MiniappLibraryPage> createState() => _MiniappLibraryPageState();
@@ -368,18 +370,21 @@ class _MiniappLibraryPageState extends State<MiniappLibraryPage> {
                   children: [
                     Expanded(
                       child: FloatingSearchLayout(
-                        itemCount: {
-                          for (final entry in [
-                            ..._bundled,
-                            ..._apps,
-                            ..._locals,
-                          ])
-                            if (!widget.pickingMessage ||
-                                _messageCapable.contains(
-                                  '${entry.kind.name}:${entry.id}',
-                                ))
-                              entry.publicationId,
-                        }.length,
+                        autofocus: widget.initiallySearching,
+                        itemCount: widget.initiallySearching
+                            ? null
+                            : {
+                                for (final entry in [
+                                  ..._bundled,
+                                  ..._apps,
+                                  ..._locals,
+                                ])
+                                  if (!widget.pickingMessage ||
+                                      _messageCapable.contains(
+                                        '${entry.kind.name}:${entry.id}',
+                                      ))
+                                    entry.publicationId,
+                              }.length,
                         controller: _search,
                         onChanged: _queryChanged,
                         hintText: '搜索小程序',

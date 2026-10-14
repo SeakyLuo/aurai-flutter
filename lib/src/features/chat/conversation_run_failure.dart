@@ -300,13 +300,30 @@ extension ConversationRunFailure on ChatController {
         );
       });
     });
-    conversation.messages.removeWhere((entry) => entry.id == message.id);
-    conversation.searchMessages?.removeWhere((entry) => entry.id == message.id);
+    _removeRetriedMessageCopies(conversation, {message.id});
     conversation.messageCount = count;
-    for (final member in _groupRuns.values) {
-      member.messages.removeWhere((entry) => entry.id == message.id);
-    }
     _notifyRun(conversation);
+  }
+
+  void _removeRetriedMessageCopies(Conversation conversation, Set<String> ids) {
+    final copies = <Conversation>{
+      conversation,
+      if (_viewConversation.id == conversation.id) _viewConversation,
+      if (activeConversation.id == conversation.id) activeConversation,
+      if (_runningConversation?.id == conversation.id) _runningConversation!,
+      if (_privateConversation?.id == conversation.id) _privateConversation!,
+      ..._conversations.where((c) => c.id == conversation.id),
+      ..._searchWindows.values.where((c) => c.id == conversation.id),
+      if (conversation.kind == ConversationKind.group &&
+          _runningConversation?.id == conversation.id)
+        ..._groupRuns.values,
+    };
+    for (final copy in copies) {
+      copy.messages.removeWhere((message) => ids.contains(message.id));
+      copy.searchMessages?.removeWhere((message) => ids.contains(message.id));
+      copy.storedPreview = null;
+      copy.storedPreviewIsSystem = false;
+    }
   }
 
   Future<void> retryFailedRun([String? expectedRunId]) => _inConversation(
@@ -331,6 +348,7 @@ extension ConversationRunFailure on ChatController {
     _notifyRun(conversation);
     late String goal;
     var removedFailures = 0;
+    final removedIds = <String>{};
     try {
       await _store.writer.mutate(() async {
         await _store.database.transaction((txn) async {
@@ -353,6 +371,14 @@ extension ConversationRunFailure on ChatController {
           );
           if (goals.isEmpty) throw StateError('原消息已不存在，无法重试');
           goal = goals.single['text'] as String;
+          final failures = await txn.query(
+            'messages',
+            columns: ['id'],
+            where:
+                "conversation_id = ? AND run_id = ? AND kind = 'message_failure'",
+            whereArgs: [conversation.id, runId],
+          );
+          removedIds.addAll(failures.map((row) => row['id'] as String));
           removedFailures = await txn.delete(
             'messages',
             where:
@@ -361,16 +387,22 @@ extension ConversationRunFailure on ChatController {
           );
           if (removedFailures > 0) {
             await txn.rawUpdate(
-              'UPDATE conversations SET message_count = message_count - ? WHERE id = ?',
-              [removedFailures, conversation.id],
+              "UPDATE conversations SET message_count = message_count - ?, preview = (SELECT text FROM messages WHERE conversation_id = ? AND kind NOT IN ('commentary', 'reasoning', 'quick_reply') ORDER BY created_at DESC, id DESC LIMIT 1) WHERE id = ?",
+              [removedFailures, conversation.id, conversation.id],
             );
-            _store.writer.invalidateHistory(conversation.id);
           }
           await txn.rawUpdate(
             'UPDATE conversations SET active_run_id = CASE WHEN active_run_id = ? THEN NULL ELSE active_run_id END, run_state = ?, error_detail = NULL, pending_goal = ? WHERE id = ?',
             [runId, ChatRunState.idle.name, goal, conversation.id],
           );
         });
+        for (final id in removedIds) {
+          _store.writer.invalidateHistory(
+            conversation.id,
+            deletedMessageId: id,
+          );
+        }
+        _removeRetriedMessageCopies(conversation, removedIds);
       });
     } finally {
       _submitting = false;

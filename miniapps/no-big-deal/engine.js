@@ -9,7 +9,12 @@ const Office = (() => {
       turn:0,slacks:0,totalSlacks:0,slackEmpty:false,items:[],pendingItems:[],demands:[],fatigues:[],welfare:[],reward:null,completionReward:null,acceptedDemands:0,freeRemovals:0,forcedOnes:0,fatigueShield:0,coffeeRebound:false,energyRebound:false,
       stock:[],shopUnlocked:false,shopBlocked:false,deckPurchases:0,pending:null,
       campaign:OfficeCampaign.create(),notices:[],summary:null,log:[],cleanings:0,reason:null,outsideMagnets:[],delayed:[],demandSlots:2};
-    s.board[0]=B.fromCard(s,B.draw(s));s.board[12]=B.fromCard(s,B.draw(s));s.props[5]='tea';
+    const opening=Array.from({length:R.config.deskFiles},()=>B.draw(s));
+    // Six cards from the initial 1/2/4 deck always contain a pair; place it side by side.
+    const a=opening.findIndex((o,i)=>opening.some((p,j)=>j>i&&p.value===o.value));
+    const pair=opening.splice(a,1)[0],b=opening.findIndex(o=>o.value===pair.value);
+    const ordered=[pair,opening.splice(b,1)[0],...opening];
+    [0,1,2,8,9,10].forEach((cell,i)=>{s.board[cell]=B.fromCard(s,ordered[i]);});s.props[5]='tea';
     if(carry)OfficeWelfare.add(s,carry);
     if(carriedItem)s.items.push({...carriedItem});
     s.nextCard=B.draw(s);B.preview(s);startPhase(s);return s;
@@ -60,16 +65,23 @@ const Office = (() => {
       (o.attach.includes('wheels')||o.attach.includes('booster')||!o.attach.some(a=>['woodStand','metalStand','tape'].includes(a)));
   }
   function compatible(a,b) {
-    if(!R.isFile(a)||!R.isFile(b)||!!a.wet!==!!b.wet)return false;
+    if(!R.isFile(a)||!R.isFile(b))return false;
+    if(!(a.kind==='file'&&b.kind==='file')&&!!a.wet!==!!b.wet)return false;
     if(a.kind==='waste'||b.kind==='waste')return a.kind===b.kind&&a.value===b.value;
     return a.value===b.value||['copy','cancel'].some(kind=>R.effect(a,kind)||R.effect(b,kind));
   }
   function connection(s,from,to){
     if(from===to||B.crossesBarrier(s,from,to))return false;
-    const dx=to%4-from%4,dy=Math.floor(to/4)-Math.floor(from/4),steps=Math.max(Math.abs(dx),Math.abs(dy));
-    for(let n=1;n<steps;n++){
-      const i=Math.round(Math.floor(from/4)+dy*n/steps)*4+Math.round(from%4+dx*n/steps);
-      if(s.board[i])return false;
+    const x=from%4+.5,y=Math.floor(from/4)+.5,dx=to%4-from%4,dy=Math.floor(to/4)-Math.floor(from/4);
+    for(let i=0;i<s.board.length;i++){
+      if(i===from||i===to||!s.board[i])continue;
+      const inset=R.isFile(s.board[i])?R.config.fileHitInset:0;
+      let enter=0,leave=1;
+      for(const [start,delta,min,max] of [[x,dx,i%4+inset,i%4+1-inset],[y,dy,Math.floor(i/4)+inset,Math.floor(i/4)+1-inset]]){
+        if(delta===0){if(start<=min||start>=max){leave=0;break;}}
+        else{const a=(min-start)/delta,b=(max-start)/delta;enter=Math.max(enter,Math.min(a,b));leave=Math.min(leave,Math.max(a,b));}
+      }
+      if(enter<leave)return false;
     }
     return true;
   }
@@ -150,7 +162,7 @@ const Office = (() => {
     B.discard(s);B.preview(s);
     s.notices.push('桌面无法整理，忍耐度扣除 50；保洁保留封条，清空其他物品并发了两份文件。');
   }
-  function finishTurn(s,elapsed=1) {
+  function finishTurn(s,elapsed=1,merged=false) {
     for(let n=0;n<elapsed&&s.status==='playing';n++){
       s.moves--;s.turn++;B.tick(s);
       if(s.score>=target(s)||s.patience<=0){checkEnd(s);break;}
@@ -161,7 +173,9 @@ const Office = (() => {
       if(s.fatigueShield&&--s.fatigueShield===0&&s.energyRebound){s.energyRebound=false;W.fatigue(s);}
       checkEnd(s);
     }
-    if(s.status==='playing'){B.spawn(s);OfficeCampaign.afterAction(s);checkEnd(s);if(s.status==='playing'){cleanup(s);checkEnd(s);}}
+    if(s.status==='playing'){
+      const count=merged?Math.max(1,R.config.deskFiles-s.board.filter(R.isFile).length):1;
+      B.spawn(s,Math.min(count,B.empty(s).length));OfficeCampaign.afterAction(s);checkEnd(s);if(s.status==='playing'){cleanup(s);checkEnd(s);}}
     OfficeWelfare.endAction(s);
   }
   function merge(s,objects,dest) {
@@ -226,7 +240,7 @@ const Office = (() => {
       group.forEach((i,k)=>{if(merging[k])leaveFatigue(s,[i],targets);});
       s.pending=null;B.discard(s);OfficeWelfare.flush(s);W.demands(s,0);checkEnd(s);
       for(let k=0;k<objects.length&&s.status==='playing';k++)if(merging[k]&&((objects[k].note&&!objects[k].polluted)||(recipients[k].note&&!recipients[k].polluted))){W.event(s,[objects[k],recipients[k]].some(o=>o.note==='notebook'&&!o.polluted)?'notebook':null);W.demands(s,0);checkEnd(s);}
-      if(s.status==='playing')finishTurn(s);else{s.moves=Math.max(0,s.moves-1);s.turn++;OfficeWelfare.endAction(s);}
+      if(s.status==='playing')finishTurn(s,1,merging.some(Boolean));else{s.moves=Math.max(0,s.moves-1);s.turn++;OfficeWelfare.endAction(s);}
       return {approval:false};
     }
     if(s.board[dest]?.kind==='stone'&&s.board[dest].brittle>0&&!path.includes(dest)){
@@ -258,7 +272,7 @@ const Office = (() => {
     B.discard(s);OfficeWelfare.flush(s);W.demands(s,0);checkEnd(s);
     if(note&&s.status==='playing'){W.event(s,objects.some(o=>o.note==='notebook'&&!o.polluted)?'notebook':null);W.demands(s,0);checkEnd(s);}
     // The successful action counts toward the outgoing phase, never the next one.
-    if(s.status==='playing')finishTurn(s);else{s.moves=Math.max(0,s.moves-1);s.turn++;OfficeWelfare.endAction(s);}
+    if(s.status==='playing')finishTurn(s,1,objects.length>1);else{s.moves=Math.max(0,s.moves-1);s.turn++;OfficeWelfare.endAction(s);}
     return {approval:false};
   }
   function collect(s,cell) {

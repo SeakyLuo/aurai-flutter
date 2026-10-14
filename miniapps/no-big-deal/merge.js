@@ -7,8 +7,8 @@ const OfficeMerge = (() => {
   function compatible(objects){
     if(!objects.every(R.isFile))return false;
     const first=objects[0];
-    if(objects.some(o=>!!o.wet!==!!first.wet))return false;
     if(ordinary(objects))return objects.every(o=>unit(o.value)===unit(first.value));
+    if(objects.some(o=>!!o.wet!==!!first.wet))return false;
     const anchor=objects.find(o=>!['copy','cancel'].some(kind=>R.effect(o,kind)));
     return objects.every(o=>Office.compatible(first,o)&&(!anchor||Office.compatible(anchor,o)));
   }
@@ -41,9 +41,9 @@ const OfficeMerge = (() => {
     const links=Array.from({length:16},(_,i)=>files.reduce((mask,j)=>Office.connection(s,i,j)?mask|1<<j:mask,0));
     const families=new Map(),optionsCache=new Map();
     function family(first){
-      const factor=unit(first.value),key=factor+':'+!!first.wet;
+      const factor=unit(first.value),key=factor;
       if(families.has(key))return families.get(key);
-      const cells=files.filter(i=>s.board[i].kind==='file'&&!!s.board[i].wet===!!first.wet&&unit(s.board[i].value)===factor);
+      const cells=files.filter(i=>s.board[i].kind==='file'&&unit(s.board[i].value)===factor);
       const mask=cells.reduce((m,i)=>m|1<<i,0),descending=cells.slice().sort((a,b)=>s.board[b].value-s.board[a].value);
       const memo=new Map();
       // With at most 16 cells, each subset/endpoint is searched once per board state.

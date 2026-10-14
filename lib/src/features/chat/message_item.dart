@@ -445,24 +445,7 @@ class _MessageItemState extends State<MessageItem> {
                       child: FileAttachmentCard(file: file),
                     ),
                   if (message.images.isNotEmpty)
-                    Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final image in message.images)
-                          ImageAttachment(
-                            image: image,
-                            gallery: message.images,
-                            size: message.images.length == 1
-                                ? ((constraints.maxWidth - 32) * 0.72).clamp(
-                                    80.0,
-                                    260.0,
-                                  )
-                                : ((constraints.maxWidth - 32) * 0.82 - 8) / 2,
-                          ),
-                      ],
-                    ),
+                    MessageImageGrid(images: message.images),
                   if (message.htmlGame == null && message.interactive != null)
                     if (_isProgramCard)
                       _ownProgramCard(context)
@@ -539,18 +522,7 @@ class _MessageItemState extends State<MessageItem> {
         if (message.images.isNotEmpty)
           Padding(
             padding: EdgeInsets.only(bottom: message.text.isEmpty ? 0 : 8),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final image in message.images)
-                  ImageAttachment(
-                    image: image,
-                    gallery: message.images,
-                    size: message.images.length == 1 ? 220 : 120,
-                  ),
-              ],
-            ),
+            child: MessageImageGrid(images: message.images),
           ),
         if (message.htmlGame != null)
           widget.htmlView!

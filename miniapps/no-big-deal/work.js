@@ -204,7 +204,8 @@ const OfficeWork = (() => {
   }
   function stock(s) {
     const one=s.phase===2?['ice','lighter','strongGlue','coffee','snack','bomb']:['water','glue','film','coffee','snack','scissors'];
-    const selected=[];
+    const tools=OfficeTools.keys.slice(),selected=[];
+    for(let n=0;n<2;n++)selected.push(tools.splice(B.random(s,tools.length),1)[0]);
     while(selected.length<4){const key=one[B.random(s,one.length)];if(!selected.includes(key))selected.push(key);}
     s.stock=selected.map(key=>({key,sold:false,kind:'item'}));
     const welfareKeys=Object.keys(OfficeWelfare.definitions).filter(key=>!OfficeWelfare.active(s,key));
@@ -246,6 +247,7 @@ const OfficeWork = (() => {
       const prop=B.object(s,['magnet','machine'].includes(key)?32:1,'prop');prop.item=key;prop.polluted=true;prop.spoiled=entry.spoiled;s.board[cell]=prop;
       B.enter(s,cell,prop);s.items.splice(index,1);B.discard(s);s.notices.push('道具已放回桌面，用清水洗净后再收集。');return;
     }
+    if(OfficeTools.has(key))throw Error('请选择整理道具的目标并确认使用');
     if(item.target==='passive')throw Error('这件道具放在文件柜中自动生效');
     if(item.target==='file'&&!R.isFile(o))throw Error('请选择一份文件');
     if(item.target==='object'&&!o)throw Error('请选择桌上的物品');

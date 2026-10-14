@@ -10,7 +10,7 @@ SOURCE = ROOT / 'miniapps/no-big-deal'
 
 def build():
     values = {key.upper(): (SOURCE / (key + '.js')).read_text(encoding='utf-8')
-              for key in ['rules', 'welfare', 'board', 'work', 'campaign', 'merge', 'engine', 'inheritance', 'feedback', 'ui']}
+              for key in ['rules', 'welfare', 'board', 'tools', 'work', 'campaign', 'merge', 'engine', 'inheritance', 'feedback', 'item-ui', 'tool-ui', 'ui']}
     # Compact explicit statement boundaries in the generated bundle only.
     # Source modules and their comments remain readable and unchanged.
     for key, code in values.items():
@@ -18,7 +18,7 @@ def build():
             line.rstrip() + (' ' if line.rstrip().endswith((';', '{', ','))
                              and not line.lstrip().startswith('//') else '\n')
             for line in code.splitlines()).rstrip()
-    values['STYLE'] = (SOURCE / 'style.css').read_text(encoding='utf-8') + (SOURCE / 'layout.css').read_text(encoding='utf-8')
+    values['STYLE'] = (SOURCE / 'style.css').read_text(encoding='utf-8') + (SOURCE / 'layout.css').read_text(encoding='utf-8') + (SOURCE / 'items.css').read_text(encoding='utf-8')
     for asset in sorted((SOURCE / 'art').glob('*.webp')):
         values['ART_' + asset.stem.upper().replace('-', '_')] = 'data:image/webp;base64,' + base64.b64encode(asset.read_bytes()).decode()
     for key in ['paper', 'folder', 'box']:

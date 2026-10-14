@@ -51,74 +51,76 @@ class TaskFailureCard extends StatefulWidget {
   @override
   State<TaskFailureCard> createState() => _TaskFailureCardState();
 
-  Widget _build(BuildContext context, String title) => Padding(
-    padding: padding,
-    child: Container(
-      padding: paused == null
-          ? const EdgeInsets.fromLTRB(16, 6, 8, 16)
-          : const EdgeInsets.fromLTRB(16, 6, 8, 6),
-      decoration: BoxDecoration(
-        color: GlobalUI.controlBackground(Theme.of(context)),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? const Color(0xff3a3a3a)
-              : const Color(0xffe6e6e6),
+  Widget _build(BuildContext context, String title) {
+    final body = paused == null ? _errorBody : '';
+    return Padding(
+      padding: padding,
+      child: Container(
+        padding: body.isNotEmpty
+            ? const EdgeInsets.fromLTRB(16, 6, 8, 16)
+            : const EdgeInsets.fromLTRB(16, 6, 8, 6),
+        decoration: BoxDecoration(
+          color: GlobalUI.controlBackground(Theme.of(context)),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xff3a3a3a)
+                : const Color(0xffe6e6e6),
+          ),
         ),
-      ),
-      child: paused == null
-          ? _errorContent(context, title)
-          : Row(
-              children: [
-                const TaskFailureIcon(size: 22),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    error,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w400,
+        child: paused == null
+            ? _errorContent(context, title, body)
+            : Row(
+                children: [
+                  const TaskFailureIcon(size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      error,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w400,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Transform.scale(
-                  scale: 0.85,
-                  alignment: Alignment.centerRight,
-                  transformHitTests: false,
-                  child: RoundAction(
-                    label: actionLabel,
-                    icon: Icons.refresh_rounded,
-                    iconWidget: paused == null
-                        ? ConversationMenuIcon(
-                            type: ConversationMenuIconType.retry,
-                            color: enabled
-                                ? GlobalUI.onPrimary
-                                : Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                          )
-                        : TaskPlaybackIcon(
-                            paused: paused!,
-                            color: enabled
-                                ? GlobalUI.onPrimary
-                                : Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                          ),
-                    primary: true,
-                    compact: true,
-                    inkResponse: false,
-                    onPressed: enabled ? onRetry : null,
+                  const SizedBox(width: 12),
+                  Transform.scale(
+                    scale: 0.85,
+                    alignment: Alignment.centerRight,
+                    transformHitTests: false,
+                    child: RoundAction(
+                      label: actionLabel,
+                      icon: Icons.refresh_rounded,
+                      iconWidget: paused == null
+                          ? ConversationMenuIcon(
+                              type: ConversationMenuIconType.retry,
+                              color: enabled
+                                  ? GlobalUI.onPrimary
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                            )
+                          : TaskPlaybackIcon(
+                              paused: paused!,
+                              color: enabled
+                                  ? GlobalUI.onPrimary
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                            ),
+                      primary: true,
+                      compact: true,
+                      inkResponse: false,
+                      onPressed: enabled ? onRetry : null,
+                    ),
                   ),
-                ),
-              ],
-            ),
-    ),
-  );
+                ],
+              ),
+      ),
+    );
+  }
 
-  Widget _errorContent(BuildContext context, String title) {
-    final colors = Theme.of(context).colorScheme;
+  String get _errorBody {
     final preview = MessageSummary.preview(error, limit: 1024);
     final lines = preview.split('\n');
     final heading = lines.first;
@@ -139,6 +141,11 @@ class TaskFailureCard extends StatefulWidget {
             heading.substring(headingTitle.length).trim(),
             ...lines.skip(1),
           ].join('\n');
+    return body.trim();
+  }
+
+  Widget _errorContent(BuildContext context, String title, String body) {
+    final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

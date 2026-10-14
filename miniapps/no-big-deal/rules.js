@@ -1,7 +1,7 @@
 const OfficeRules = (() => {
   // Existing NoBigDeal values take precedence; campaign rules complete its placeholders.
   const config = {
-    days: 2, moves: 100, patience: 100, penalty: 50,
+    fileHitInset: .22, deskFiles: 6, days: 2, moves: 100, patience: 100, penalty: 50,
     targets: [[100, 200, 300], [1000, 1500, 2000]],
     wetTurns: 5, water: 60, wetWeight: 3, glueUses: 3,
     weakGlue: 5, strongGlue: 10, collapse: 6,
@@ -32,6 +32,11 @@ const OfficeRules = (() => {
     parcel: ['外卖袋', '袋'], prop: ['道具', '具'],
   };
   const items = {
+    duplicator:{name:'复写纸',price:16,target:'ordinary',description:'选一份普通文件，再选空格，复印出相同份数的新文件；不复制状态和附着物。'},
+    paperKnife:{name:'裁纸刀',price:10,target:'ordinary',description:'将一份偶数份普通文件拆成两半；原件保留状态，另一半放进选定空格。'},
+    stapler:{name:'装订压机',price:14,target:'ordinary',description:'让一份普通文件的份数翻倍，保留原有状态。'},
+    requisition:{name:'调阅单',price:10,target:'pool',description:'从本轮剩余文件里选下一份；原预告退到它后面，其他文件顺序不变。不重新洗牌。'},
+    dispatch:{name:'派送单',price:6,target:'empty',description:'把下一份文件的预告位置改到选定空格，不立即发牌。'},
     machine: {name:'损坏的整理机',price:18,target:'cell',description:'放置整理机；传入电量后启动，每次整理 8 份文件。'},
     water: {name:'清水瓶', price:8, target:'cell', description:'在一格铺清水，洗净污染并灭火。'},
     glue: {name:'普通胶', price:8, target:'cell', description:'在一格铺胶水，黏着 5 步。'},
@@ -64,7 +69,7 @@ const OfficeRules = (() => {
     noMerge:'暂时无法合并', noGrowth:'合并得分但份数不增加', trouble:'便签事件更频繁',
   };
   const rarities={normal:'普通',rare:'稀有',favor:'人情专属',night:'夜间专属',logistics:'后勤专属',event:'事件专属'};
-  const itemRarity={machine:'logistics',water:'normal',glue:'normal',film:'normal',woodStand:'normal',tape:'normal',coffee:'normal',snack:'normal',
+  const itemRarity={duplicator:'rare',paperKnife:'normal',stapler:'rare',requisition:'normal',dispatch:'normal',machine:'logistics',water:'normal',glue:'normal',film:'normal',woodStand:'normal',tape:'normal',coffee:'normal',snack:'normal',
     sleeve:'rare',metalStand:'rare',woodCage:'rare',metalCage:'rare',wheels:'rare',seal:'normal',
     glove:'favor',ice:'night',strongGlue:'night',lighter:'night',bomb:'night',hamburger:'normal',energy:'normal',scissors:'logistics',booster:'event',magnet:'event'};
   const itemLimit = s => 6+(s.welfare.some(w=>w.key==='cabinet')?2:0);
