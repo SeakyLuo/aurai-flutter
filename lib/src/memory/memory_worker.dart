@@ -5,11 +5,10 @@ import 'package:crypto/crypto.dart';
 import 'package:sqflite/sqflite.dart';
 import '../domain/model_provider.dart';
 import '../providers/responses_transport.dart';
-import '../providers/model_context_limits.dart';
 import 'memory_evidence.dart';
 import 'memory_retry.dart';
 import 'memory_events.dart';
-import 'memory_search.dart';
+import 'memory_consolidation_session.dart';
 import 'memory_consolidation_prompt.dart';
 import 'memory_consolidation_store.dart';
 import 'memory_fragment_validation.dart';
@@ -237,72 +236,20 @@ class MemoryWorker {
         'start_offset': job['text_offset'],
         'end_offset': evidence.offset,
       });
-      final search = MemorySearch(
-        database,
-        job['owner_id'] as String,
-        scope: job['scope'] as String,
-      );
-      final query = evidence.records
-          .map(
-            (e) =>
-                e['text'] ??
-                '${e['name'] ?? ''} ${e['arguments'] ?? ''} ${e['result'] ?? ''}',
-          )
-          .join(' ');
-      final candidates = await search.find(
-        query.length > 12000 ? query.substring(0, 12000) : query,
-        limit: 8,
-      );
+      final candidates = <Map<String, Object?>>[];
       List<Map<String, Object?>> changes = [];
       final hasNewContent = evidence.records.any(
         (record) => !(record['source'] as String).startsWith('run:'),
       );
       if (hasNewContent) {
-        final response = await transport
-            .send({
-              'model': transport.config.apiModel,
-              ...memoryConsolidationToolFor(
-                evidence.records,
-                candidates,
-              ).request,
-              'stream': true,
-              // Match the summary budget while respecting the selected model's limit.
-              // Reasoning and the structured fragments share this output allowance.
-              'max_output_tokens': math.min(
-                8192,
-                ModelContextLimits.forConfig(transport.config).outputTokens,
-              ),
-              if (transport.config.service.disableReasoningForSummary)
-                'reasoning': {'effort': 'none'},
-              'instructions': memoryConsolidationInstructions,
-              'input': [
-                {
-                  'role': 'user',
-                  'content': jsonEncode({
-                    'owner': job['owner_id'],
-                    'scene': job['scope'],
-                    'purpose':
-                        'Retain substance worth remembering beyond this exchange, about any relevant subject. Avoid retelling the process or duplicating existing memories; return no changes when nothing qualifies.',
-                    'evidence': evidence.records,
-                    'context_only': evidence.context,
-                    'existing': [
-                      for (final e in candidates)
-                        {
-                          'id': e['id'],
-                          'version': e['version'],
-                          'text': e['text'],
-                          'manual': e['manual'] == 1,
-                          'kind': e['kind'],
-                          'assertion': e['assertion'],
-                          'scope': e['memory_scope'],
-                          'entities': jsonDecode(e['entities_json'] as String),
-                        },
-                    ],
-                  }),
-                },
-              ],
-            })
-            .timeout(
+        final response =
+            await runMemoryConsolidation(
+              database,
+              transport,
+              job,
+              evidence,
+              candidates,
+            ).timeout(
               const Duration(seconds: 90),
               onTimeout: () async {
                 await transport.cancel();
