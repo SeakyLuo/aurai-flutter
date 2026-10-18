@@ -13,18 +13,28 @@ extension ConversationRunFailure on ChatController {
     bool scheduled = false,
     bool callbacksOnly = false,
     String? continuationRunId,
-  }) async {
+    bool preserveAutoReplyPause = false,
+  }) => _guardPrivateReply(conversation, reply, () async {
+    if (!reply.config.isConfigured) {
+      throw StateError('请先为这位联系人配置模型，再重试回复');
+    }
+    await _executeMember(
+      conversation,
+      reply: reply,
+      scheduled: scheduled,
+      callbacksOnly: callbacksOnly,
+      continuationRunId: continuationRunId,
+      preserveAutoReplyPause: preserveAutoReplyPause,
+    );
+  });
+
+  Future<void> _guardPrivateReply(
+    Conversation conversation,
+    ExecutionReplyContext reply,
+    Future<void> Function() run,
+  ) async {
     try {
-      if (!reply.config.isConfigured) {
-        throw StateError('请先为这位联系人配置模型，再重试回复');
-      }
-      await _executeMember(
-        conversation,
-        reply: reply,
-        scheduled: scheduled,
-        callbacksOnly: callbacksOnly,
-        continuationRunId: continuationRunId,
-      );
+      await run();
     } on Object catch (error, stack) {
       if (error is! AgentCancelled &&
           _recordedRunErrors[error] != conversation.id) {
@@ -180,7 +190,9 @@ extension ConversationRunFailure on ChatController {
       _recordedRunErrors[error] == activeConversation.id;
 
   bool canOfferFailedRetry(AgentMessage message) =>
-      activeConversation.kind == ConversationKind.group
+      activeConversation.isPersonalChat
+      ? message.isFailure && !hasRunningTask && !_submitting
+      : activeConversation.kind == ConversationKind.group
       ? message.isFailure &&
             _groupRuns[message.senderId]?.runState != ChatRunState.running &&
             _groupDispatcher?.hasPending(message.senderId) != true &&
@@ -197,7 +209,15 @@ extension ConversationRunFailure on ChatController {
     bool resumeAutoReply = false,
     Future<void> Function()? beforeRemoval,
   }) async {
-    if (activeConversation.kind == ConversationKind.direct) {
+    if (activeConversation.isPersonalChat) {
+      await _retryPersonalChatMessage(
+        message,
+        resumeAutoReply: resumeAutoReply,
+        beforeRemoval: beforeRemoval,
+      );
+      return;
+    }
+    if (activeConversation.isTask) {
       await retryFailedRun(message.runId);
       return;
     }
@@ -335,6 +355,18 @@ extension ConversationRunFailure on ChatController {
     Conversation conversation,
     String? expectedRunId,
   ) async {
+    if (conversation.isPersonalChat) {
+      final message = conversation.messages
+          .where(
+            (message) =>
+                message.isFailure &&
+                (expectedRunId == null || message.runId == expectedRunId),
+          )
+          .lastOrNull;
+      if (message == null) throw StateError('这次失败回复已不能重试');
+      await _retryPersonalChatMessage(message, resumeAutoReply: false);
+      return;
+    }
     final runId = conversation.activeRunId;
     if (conversation.kind != ConversationKind.direct ||
         (conversation.runState != ChatRunState.failed &&

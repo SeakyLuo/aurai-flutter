@@ -64,12 +64,16 @@ import 'message_visibility_sheet.dart';
 import 'message_visibility_marker.dart';
 import 'menu_press_highlight.dart';
 import 'group_message_selection.dart';
+import 'message_selection_menu.dart';
+import 'conversation_menu_icon.dart';
+import 'settings_icon.dart';
 import 'html_message_more_button.dart';
 import 'source_citation_syntax.dart';
 import 'source_citation_view.dart';
 
 part 'message_item_actions.dart';
 part 'message_item_interactive.dart';
+part 'message_selection_actions.dart';
 
 class MessageItem extends StatefulWidget {
   static const userTopMargin = 16.0;

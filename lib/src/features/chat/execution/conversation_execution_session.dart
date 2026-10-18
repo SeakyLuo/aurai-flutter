@@ -8,7 +8,7 @@ import '../../../domain/model_provider.dart';
 import '../../../domain/message_sender.dart';
 import '../../../domain/live_project_changes.dart';
 import '../conversation.dart';
-import '../group_dispatcher.dart';
+import '../chat_dispatcher.dart';
 import 'pending_confirmation.dart';
 
 typedef ExecutionReplyContext = ({
@@ -49,12 +49,15 @@ class ConversationExecutionSession {
   Completer<void>? _privateRunFinished;
   Future<void>? get privateRunFinished => _privateRunFinished?.future;
   AgentRuntime? runtime;
+  ChatDispatcher? personalDispatcher;
+  final personalDeliveredMessages = <String, AgentMessage>{};
+  ChatDispatcher? get chatDispatcher => personalDispatcher ?? groupDispatcher;
   final programRuns = <String, ({String messageId, AgentRuntime runtime})>{};
   final userInputs = <Future<List<Map<String, Object?>>>>[];
   final liveUserMessageIds = <String>{};
   bool systemEventLoading = false;
-  GroupDispatcher? _groupDispatcher;
-  GroupDispatcher? get groupDispatcher => _groupDispatcher;
+  ChatDispatcher? _groupDispatcher;
+  ChatDispatcher? get groupDispatcher => _groupDispatcher;
   String? groupNotificationStep;
   Map<String, ExecutionReplyContext> groupReplies = {};
   Map<String, MessageSender> groupSenders = {};
@@ -153,7 +156,7 @@ class ConversationExecutionSession {
     _notify();
   }
 
-  GroupDispatcher startGroup({
+  ChatDispatcher startGroup({
     required List<AgentMessage> history,
     required Iterable<String> members,
     required Set<String> paused,
@@ -165,7 +168,7 @@ class ConversationExecutionSession {
     groupThoughts.clear();
     hiddenThinkingMembers.clear();
     groupReplyDrafts.clear();
-    return _groupDispatcher = GroupDispatcher(
+    return _groupDispatcher = ChatDispatcher(
       history: history,
       members: members,
       paused: paused,
@@ -192,6 +195,7 @@ class ConversationExecutionSession {
 
   /// Mark stopping before any persistence or platform operation can yield.
   Conversation? beginStop() {
+    personalDispatcher?.stop();
     queuedUserMessageId = null;
     userInputs.clear();
     final target = runningConversation;
@@ -220,6 +224,7 @@ class ConversationExecutionSession {
     _disposed = true;
     groupDispatcher?.stop();
     resolveConfirmation(false);
+    personalDispatcher?.stop();
     final question = pendingQuestion;
     if (question != null && !question.result.isCompleted) {
       question.result.complete({'cancelled': true});

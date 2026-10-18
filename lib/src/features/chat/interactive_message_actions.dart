@@ -433,6 +433,7 @@ extension InteractiveMessageActions on ChatController {
   }) {
     InteractiveMessageStore.changes.add(id);
     InteractiveMessageStore.cardUpdates.add((messageId: id, card: card));
+    AgentMessage? updated;
     for (final conversation in _interactiveConversations(
       conversationId,
       source,
@@ -453,20 +454,26 @@ extension InteractiveMessageActions on ChatController {
             interactive: card,
           );
           _store.writer.remember([history[index]]);
+          updated = history[index];
         }
       }
       if (conversation.draftQuote?.messageId == id) {
         conversation.draftQuote!.resolveCard(card);
       }
     }
-    final dispatcher = _executions.sessions[conversationId]?.groupDispatcher;
+    final dispatcher = _executions.sessions[conversationId]?.chatDispatcher;
     if (dispatcher != null) {
       final index = dispatcher.history.indexWhere((m) => m.id == id);
-      if (index >= 0)
+      if (index >= 0) {
         dispatcher.history[index] = dispatcher.history[index].withSender(
           dispatcher.history[index].sender,
           interactive: card,
         );
+      } else if (updated != null &&
+          _executions.sessions[conversationId]?.personalDispatcher ==
+              dispatcher) {
+        dispatcher.history.add(updated);
+      }
     }
     _conversationChanged();
   }
@@ -487,7 +494,21 @@ extension InteractiveMessageActions on ChatController {
       }
     }
     _store.writer.remember([message]);
-    final dispatcher = _executions.sessions[conversationId]?.groupDispatcher;
+    final session = _executions.sessions[conversationId];
+    final personal = session?.personalDispatcher;
+    if (personal != null && !personal.closed && !personal.stopped) {
+      personal.history.removeWhere((item) => item.id == message.id);
+      if (notifyParticipants) {
+        personal.receive([message]);
+      } else {
+        personal.history.add(message);
+      }
+    } else if (source?.isPersonalChat == true &&
+        notifyParticipants &&
+        message.senderId != source!.defaultSenderId) {
+      unawaited(_deliverForwardedMessage(source, message));
+    }
+    final dispatcher = session?.groupDispatcher;
     if (notifyParticipants &&
         (source?.kind == ConversationKind.group || dispatcher != null)) {
       unawaited(

@@ -1,61 +1,115 @@
 import 'package:flutter/material.dart';
+import '../../app/ui_action.dart';
+import '../../storage/quick_reply_recents.dart';
+import 'attachment_action_icon.dart';
+import 'copy_icon.dart';
+import 'message_quote_view.dart';
+import 'message_selection_menu.dart';
+import 'quick_reply_picker.dart';
+import 'settings_icon.dart';
+import 'text_selection_icon.dart';
 
 class GroupMessageSelection extends StatefulWidget {
   const GroupMessageSelection({
     super.key,
     required this.child,
     required this.onChanged,
-    required this.onOpenMenu,
+    required this.loadOptions,
+    required this.createdAt,
     this.onQuote,
     this.onStar,
     this.onForward,
     this.onReadAloud,
+    this.onReaction,
+    this.sentQuickReplyKeys = const {},
   });
   final Widget child;
   final ValueChanged<String?> onChanged;
-  final Future<bool> Function() onOpenMenu;
+  final Future<SelectionMenuOptions> Function() loadOptions;
+  final DateTime createdAt;
   final ValueChanged<String>? onQuote;
   final VoidCallback? onStar;
   final VoidCallback? onForward;
   final ValueChanged<String>? onReadAloud;
+  final ValueChanged<String>? onReaction;
+  final Set<String> sentQuickReplyKeys;
 
   @override
   State<GroupMessageSelection> createState() => GroupMessageSelectionState();
 }
 
 class GroupMessageSelectionState extends State<GroupMessageSelection> {
+  // Keep the menu in the selection overlay. Clearing selection removes that
+  // overlay; never restore it independently of a live selection.
+
   final _selectionKey = GlobalKey<SelectionAreaState>();
   final _focus = FocusNode();
-  bool _menuOpen = false;
   bool _selectionActive = false;
+  bool _selectingAll = false;
+  int _menuSession = 0;
   String? _text;
+  List<String> _recent = const [];
+  bool _prepared = false;
+  SelectionMenuOptions _options = (starred: false, actions: const []);
+  ScrollPosition? _scrollPosition;
 
-  Future<void> openMenu() async {
-    if (_menuOpen) return;
-    _selectionActive = true;
-    _menuOpen = true;
-    await _showMenu();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final position = Scrollable.maybeOf(context)?.position;
+    if (identical(position, _scrollPosition)) return;
+    _scrollPosition?.isScrollingNotifier.removeListener(_onScroll);
+    _scrollPosition = position;
+    position?.isScrollingNotifier.addListener(_onScroll);
   }
 
-  Future<void> _showMenu() async {
-    final selection = _selectionKey.currentState!.selectableRegion;
-    _focus.requestFocus();
-    selection.selectAll(SelectionChangedCause.toolbar);
-    var acted = false;
-    try {
-      acted = await widget.onOpenMenu();
-    } finally {
-      if (selection.mounted) {
-        selection.hideToolbar(acted);
-        if (acted) selection.clearSelection();
-      }
-      _menuOpen = false;
-      if (acted) _selectionActive = false;
+  void _onScroll() {
+    if (_scrollPosition!.isScrollingNotifier.value) {
+      _selectionKey.currentState!.selectableRegion.hideToolbar(false);
     }
+  }
+
+  Future<bool> _prepareMenu() => runUiAction(context, () async {
+    final (recent, options) = await (
+      widget.onReaction == null
+          ? Future.value(<String>[])
+          : QuickReplyRecents.load(),
+      widget.loadOptions(),
+    ).wait;
+    _recent = recent;
+    _options = options;
+    _prepared = true;
+  });
+
+  Future<void> openMenu() async {
+    final session = ++_menuSession;
+    _selectionActive = true;
+    if (!await _prepareMenu() || !mounted || session != _menuSession) return;
+    final selection = _selectionKey.currentState!.selectableRegion;
+    _selectionActive = true;
+    _focus.requestFocus();
+    _selectAll(selection);
+  }
+
+  Future<void> _openReactions() async {
+    // The toolbar's overlay context is disposed by hideToolbar. Open the picker
+    // from this message's persistent context instead.
+    final origin = context;
+    final selection = _selectionKey.currentState!.selectableRegion;
+    selection.hideToolbar();
+    selection.clearSelection();
+    await runUiAction(origin, () async {
+      final option = await showQuickReplyPicker(
+        origin,
+        selectedKeys: widget.sentQuickReplyKeys,
+      );
+      if (mounted && option != null) widget.onReaction!(option.key);
+    });
   }
 
   @override
   void dispose() {
+    _scrollPosition?.isScrollingNotifier.removeListener(_onScroll);
     _focus.dispose();
     super.dispose();
   }
@@ -67,50 +121,118 @@ class GroupMessageSelectionState extends State<GroupMessageSelection> {
     onSelectionChanged: (selection) {
       _text = selection?.plainText;
       widget.onChanged(_text);
-      if (!_menuOpen && (_text == null || _text!.isEmpty)) {
+      if (!_selectingAll && (_text == null || _text!.isEmpty)) {
+        _menuSession++;
         _selectionActive = false;
+        _prepared = false;
+        _selectionKey.currentState!.selectableRegion.hideToolbar();
       }
     },
     contextMenuBuilder: (context, selection) {
-      if (!_selectionActive && !_menuOpen) {
+      if (!_selectionActive) {
         _selectionActive = true;
-        _menuOpen = true;
+        final session = ++_menuSession;
         WidgetsBinding.instance.addPostFrameCallback((_) async {
-          if (!mounted || !selection.mounted) return;
-          await _showMenu();
+          if (!mounted || !selection.mounted || session != _menuSession) return;
+          if (!await _prepareMenu() ||
+              !mounted ||
+              !selection.mounted ||
+              session != _menuSession)
+            return;
+          _selectAll(selection);
         });
       }
-      if (_menuOpen) return const SizedBox.shrink();
-      void act(ValueChanged<String> callback) {
-        final text = _text!;
-        selection.hideToolbar();
-        selection.clearSelection();
-        callback(text);
+      if (!_prepared || (_text == null && !_selectingAll)) {
+        return const SizedBox.shrink();
       }
-
-      return AdaptiveTextSelectionToolbar.buttonItems(
-        anchors: selection.contextMenuAnchors,
-        buttonItems: [
-          ...selection.contextMenuButtonItems.where(
-            (item) => item.type == ContextMenuButtonType.copy,
-          ),
-          if (widget.onQuote case final quote?)
-            ContextMenuButtonItem(label: '引用', onPressed: () => act(quote)),
-          if (widget.onStar case final star?)
-            ContextMenuButtonItem(
-              label: '收藏',
-              onPressed: () => act((_) => star()),
-            ),
-          if (widget.onForward case final forward?)
-            ContextMenuButtonItem(
-              label: '转发',
-              onPressed: () => act((_) => forward()),
-            ),
-          if (widget.onReadAloud case final read?)
-            ContextMenuButtonItem(label: '朗读', onPressed: () => act(read)),
-        ],
-      );
+      return _toolbar(context, selection);
     },
     child: widget.child,
   );
+
+  void _selectAll(SelectableRegionState selection) {
+    _selectingAll = true;
+    selection.selectAll(SelectionChangedCause.toolbar);
+    _selectingAll = false;
+    _selectionActive = true;
+  }
+
+  Widget _toolbar(BuildContext context, SelectableRegionState selection) {
+    void act(ValueChanged<String> callback) {
+      final text = _text!;
+      selection.hideToolbar();
+      selection.clearSelection();
+      callback(text);
+    }
+
+    final color = Theme.of(context).colorScheme.onSurface;
+    final actions = <SelectionMenuAction>[
+      for (final item in selection.contextMenuButtonItems)
+        if (item.type == ContextMenuButtonType.copy)
+          (
+            label: '复制',
+            icon: CopyIcon(color: color),
+            onTap: () {
+              item.onPressed!();
+            },
+          ),
+      if (widget.onQuote case final quote?)
+        (label: '引用', icon: QuoteIcon(color: color), onTap: () => act(quote)),
+      if (widget.onForward case final forward?)
+        (
+          label: '转发',
+          icon: AttachmentActionIcon(
+            type: AttachmentActionIconType.forward,
+            color: color,
+          ),
+          onTap: () => act((_) => forward()),
+        ),
+      if (widget.onStar case final star?)
+        (
+          label: _options.starred ? '取消收藏' : '收藏',
+          icon: SettingsIcon(
+            type: _options.starred
+                ? SettingsIconType.starFilled
+                : SettingsIconType.star,
+            color: color,
+          ),
+          onTap: () => act((_) => star()),
+        ),
+      (
+        label: '全选',
+        icon: TextSelectionIcon(color: color),
+        onTap: () {
+          _selectAll(selection);
+        },
+      ),
+      if (widget.onReadAloud case final read?)
+        (
+          label: '朗读',
+          icon: SettingsIcon(type: SettingsIconType.sound, color: color),
+          onTap: () => act(read),
+        ),
+      for (final action in _options.actions)
+        (
+          label: action.label,
+          icon: action.icon,
+          onTap: () => act((_) => action.onTap()),
+        ),
+    ];
+    final box = _selectionKey.currentContext!.findRenderObject()! as RenderBox;
+    return MessageSelectionMenu(
+      messageRect: box.localToGlobal(Offset.zero) & box.size,
+      selectionHandles: [
+        for (final endpoint in selection.selectionEndpoints)
+          box.localToGlobal(endpoint.point),
+      ],
+      actions: actions,
+      recent: _recent,
+      createdAt: widget.createdAt,
+      sentQuickReplyKeys: widget.sentQuickReplyKeys,
+      onReaction: widget.onReaction == null
+          ? null
+          : (key) => act((_) => widget.onReaction!(key)),
+      onMoreReactions: _openReactions,
+    );
+  }
 }

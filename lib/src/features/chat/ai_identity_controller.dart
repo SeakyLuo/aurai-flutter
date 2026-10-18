@@ -54,7 +54,7 @@ extension AiIdentityController on ChatController {
           conversation.messages,
           if (conversation.searchMessages != null) conversation.searchMessages!,
         ],
-      if (_groupDispatcher != null) _groupDispatcher!.history,
+      if (_execution.chatDispatcher != null) _execution.chatDispatcher!.history,
     ];
     for (final messages in histories) {
       for (var i = 0; i < messages.length; i++) {
@@ -408,7 +408,7 @@ extension AiIdentityController on ChatController {
       unawaited(
         _inConversation(target, () async {
           _execution.queuedUserMessageId = result.notice.id;
-          _resumeForwardedReply();
+          await _deliverForwardedMessage(target, result.notice);
         }),
       );
     }
@@ -459,7 +459,7 @@ extension AiIdentityController on ChatController {
         ..._groupRuns.values,
       })
         if (conversation != null) conversation.messages,
-      if (_groupDispatcher != null) _groupDispatcher!.history,
+      if (_execution.chatDispatcher != null) _execution.chatDispatcher!.history,
     ];
     for (final messages in histories) {
       for (var i = 0; i < messages.length; i++) {
@@ -545,7 +545,7 @@ extension AiIdentityController on ChatController {
         conversation.creationUserName = nextName;
       }
     }
-    final history = _groupDispatcher?.history;
+    final history = _execution.chatDispatcher?.history;
     if (history != null) {
       for (var i = 0; i < history.length; i++) {
         final message = history[i];

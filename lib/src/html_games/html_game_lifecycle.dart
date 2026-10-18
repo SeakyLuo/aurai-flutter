@@ -10,6 +10,14 @@ const htmlGameLifecycleScript = r'''
   let saveSerial=0,dataSerial=0;
   const pendingData=new Map();
   let events=[];
+  let presentation=window.__auraiInitialPresentation;
+  document.documentElement.dataset.auraiInteractive=String(presentation.interactive);
+  window.__auraiPresentation=value=>{
+    if(JSON.stringify(presentation)===JSON.stringify(value))return;
+    presentation=value;
+    document.documentElement.dataset.auraiInteractive=String(value.interactive);
+    document.dispatchEvent(new CustomEvent('aurai:presentationchange',{detail:structuredClone(value)}));
+  };
   window.__auraiCallbacks=value=>{events=value;document.dispatchEvent(new CustomEvent('aurai:eventupdate',{detail:structuredClone(events)}))};
   window.__auraiDataReply=(id,value)=>{
     const pending=pendingData.get(id);if(!pending)return;pendingData.delete(id);
@@ -26,6 +34,7 @@ const htmlGameLifecycleScript = r'''
     value.error?pending.reject(new Error(value.error)):pending.resolve(value);
   };
   window.AuraiHTML=Object.freeze({
+    get presentation(){return structuredClone(presentation)},
     ai:window.__auraiAi,
     get events(){return structuredClone(events)},
     async readEvent(eventId){const result=await appData({operation:'events',eventId});return result.events[0]??null},
@@ -76,6 +85,7 @@ const htmlGameLifecycleScript = r'''
     },
     get state(){return structuredClone(saved)},
     async saveState(value){
+      if(!presentation.interactive)throw new Error('请在右侧详情中操作');
       const json=JSON.stringify(value);
       if(json===undefined) throw new Error('State must be JSON-compatible');
       if(json===JSON.stringify(saved)&&pendingSaves.size===0)return;

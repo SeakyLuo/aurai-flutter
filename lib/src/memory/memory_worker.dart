@@ -282,7 +282,7 @@ class MemoryWorker {
                     'owner': job['owner_id'],
                     'scene': job['scope'],
                     'purpose':
-                        'Select worthwhile memories from recent evidence, not a task checkpoint or log summary.',
+                        'Retain substance worth remembering beyond this exchange, about any relevant subject. Avoid retelling the process or duplicating existing memories; return no changes when nothing qualifies.',
                     'evidence': evidence.records,
                     'context_only': evidence.context,
                     'existing': [

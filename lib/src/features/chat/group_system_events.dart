@@ -19,7 +19,7 @@ extension GroupSystemEvents on ChatController {
     return (card.interaction['actors'] as List?)?.cast<String>();
   }
 
-  void _dispatchGroupNotice(GroupDispatcher dispatcher, AgentMessage notice) {
+  void _dispatchGroupNotice(ChatDispatcher dispatcher, AgentMessage notice) {
     final recipients = _noticeWakeMembers(notice);
     if (notice.audience == null && recipients == null) {
       dispatcher.receive([notice], mentions: _groupNoticeMentions([notice]));

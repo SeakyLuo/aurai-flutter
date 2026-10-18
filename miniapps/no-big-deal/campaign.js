@@ -73,7 +73,7 @@ const OfficeCampaign = (() => {
       if(!c.sleeveGiven)return '把文件移入清水区，体验湿润和重量变化。';
       if(!c.sleeveUsed)return '打开文件柜，选牛皮文件套，再点一份文件保护它。';
       if(c.glueLesson&&s.board.some(o=>o?.attach.includes('sleeve')))return '把套好文件套的文件移入胶水区：文件套和胶水会相互抵消。';
-      return '文件套能防水；湿润文件需与湿润文件合并。继续完成整理目标。';
+      return '文件套能防水；普通文件干湿可以混合合并。继续完成整理目标。';
     }
     if(s.day===1&&s.phase===1)return '上午的桌面继续保留。黏着物会一起移动，只有区外更重的物品能拉住废弃区上的同伴；挡板会阻止通行。';
     if(s.day===1&&s.phase===2){

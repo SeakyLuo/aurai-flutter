@@ -232,7 +232,7 @@ extension GroupSleepRecovery on ChatController {
     Duration duration,
     String draft,
     String reason,
-    GroupDispatcher dispatcher,
+    ChatDispatcher dispatcher,
   ) async {
     if (dispatcher.stopped ||
         dispatcher.closed ||

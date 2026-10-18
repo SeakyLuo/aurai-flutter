@@ -28,7 +28,7 @@ extension GroupMessageDelivery on ChatController {
     required ExecutionReplyContext reply,
     required List<AgentMessage> observed,
     required List<String> publishedIds,
-    required GroupDispatcher dispatcher,
+    required ChatDispatcher dispatcher,
   }) async {
     if (dispatcher.stopped || dispatcher.closed) throw const AgentCancelled();
     final groupId = arguments['groupId'] as String?;

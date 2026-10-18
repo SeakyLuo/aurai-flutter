@@ -70,6 +70,7 @@ class AgentRuntime {
     Future<void> Function(ToolCall)? onToolStarted,
     Future<void> Function(ToolResult)? onToolCompleted,
     List<String> Function()? takeUserUpdates,
+    Future<List<Map<String, Object?>>> Function()? takeMessageInput,
     Future<List<Map<String, Object?>>> Function()? runtimeInput,
     bool Function(ToolResult)? endsRun,
     ResponseDecision? decision,
@@ -126,6 +127,7 @@ class AgentRuntime {
         }
         final userMessageInput = [
           ...await runtimeInput?.call() ?? const <Map<String, Object?>>[],
+          ...await takeMessageInput?.call() ?? const <Map<String, Object?>>[],
           ...await _takeUserInput(),
         ];
         _throwIfCancelled();

@@ -31,6 +31,7 @@ extension ConversationExecutionState on ChatController {
   Future<void> stop() => _inConversation(activeConversation, _stopConversation);
 
   Future<void> _stopConversation() async {
+    _execution.personalDispatcher?.stop();
     pendingMessageQueue.paused = true;
     _execution.queuedUserMessageId = null;
     _execution.userInputs.clear();
@@ -64,7 +65,7 @@ extension ConversationExecutionState on ChatController {
   set _runtime(AgentRuntime? value) => _execution.runtime = value;
   bool get _systemEventLoading => _execution.systemEventLoading;
   set _systemEventLoading(bool value) => _execution.systemEventLoading = value;
-  GroupDispatcher? get _groupDispatcher => _execution.groupDispatcher;
+  ChatDispatcher? get _groupDispatcher => _execution.groupDispatcher;
   Map<String, ExecutionReplyContext> get _groupReplies =>
       _execution.groupReplies;
   Map<String, MessageSender> get _groupSenders => _execution.groupSenders;

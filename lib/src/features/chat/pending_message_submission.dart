@@ -4,15 +4,16 @@ extension PendingMessageSubmission on ChatController {
   PendingMessageQueue get pendingMessageQueue =>
       _executions.pendingMessages(activeConversation.id);
 
-  bool get shouldQueuePrivateMessage =>
-      activeConversation.kind == ConversationKind.direct &&
+  bool get shouldQueueTaskMessage =>
+      activeConversation.isTask &&
       (isBusy || pendingMessageQueue.messages.isNotEmpty);
 
   Future<void> _loadPendingMessageQueues() async {
+    await _movePersonalQueuesToHistory();
     final rows = await _store.database.query(
       'app_state',
       where:
-          "key GLOB 'pending_message_queue:*' AND substr(key, 23) IN (SELECT id FROM conversations)",
+          "key GLOB 'pending_message_queue:*' AND substr(key, 23) IN (SELECT id FROM conversations WHERE kind = 'direct' AND personal_chat = 0)",
     );
     for (final row in rows) {
       _executions.restorePendingMessages(
@@ -183,7 +184,7 @@ extension PendingMessageSubmission on ChatController {
 
   bool _resumePendingMessages() {
     final conversation = _execution.conversation;
-    if (conversation == null || conversation.kind != ConversationKind.direct)
+    if (conversation == null || !conversation.isTask)
       return false;
     final queue = pendingMessageQueue;
     if (queue.messages.isEmpty) return false;

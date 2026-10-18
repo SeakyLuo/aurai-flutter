@@ -25,6 +25,7 @@ extension MessageSubmission on ChatController {
     List<String>? excludedAudience,
     VoidCallback? onSubmitted,
   ) async {
+    if (_submitting) return false;
     if (activeConversation.kind == ConversationKind.group) {
       final members = await groupStore.members(activeConversation.id);
       final scope = <String, Object?>{
@@ -47,7 +48,7 @@ extension MessageSubmission on ChatController {
         MessageSender.localUser.id,
       );
     }
-    if (shouldQueuePrivateMessage) {
+    if (shouldQueueTaskMessage) {
       await _enqueuePrivateMessage(goal, fromDraft: true);
       return false;
     }
@@ -192,6 +193,8 @@ extension MessageSubmission on ChatController {
     Conversation conversation,
     AgentMessage message,
   ) async {
+    if (conversation.isPersonalChat && await _receivePersonalMessage(message))
+      return;
     if (conversation.kind == ConversationKind.group) {
       if (_groupDispatcher?.stopped == true) {
         _queuedSystemNotices

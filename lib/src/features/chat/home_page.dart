@@ -5,6 +5,7 @@ import 'ai_contacts_page.dart';
 import 'me_page.dart';
 import 'discover_page.dart';
 import 'home_tab_bar.dart';
+import 'home_tab_scope.dart';
 import 'contacts_search_bar.dart';
 import 'home_miniapp_drawer.dart';
 
@@ -129,7 +130,16 @@ class _HomePageState extends State<HomePage> with RouteAware {
         body: PageView(
           controller: _pages,
           onPageChanged: _pageChanged,
-          children: _tabPages,
+          children: [
+            for (var index = 0; index < _tabPages.length; index++)
+              HomeTabScope(
+                active: _tab == index,
+                child: TickerMode(
+                  enabled: _tab == index,
+                  child: _tabPages[index],
+                ),
+              ),
+          ],
         ),
         bottomNavigationBar: AnimatedPadding(
           duration: const Duration(milliseconds: 180),

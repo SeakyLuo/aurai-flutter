@@ -291,7 +291,7 @@ const aiTurn=()=>s.phase==='playing'&&(s.players[s.turn].kind==='engine'||s.engi
 const key=()=>`${s.game}:${s.ply}`;
 function cancel(){generation++;clearTimeout(timer);timer=null;thinking=false;}
 async function continueAi(){
-  if(busy||thinking||paused||!mine()||!aiTurn())return;
+  if(busy||thinking||paused||!AuraiHTML.presentation.interactive||!mine()||!aiTurn())return;
   const run=++generation;attempt=key();thinking=true;render();
   try{
     const job=await AuraiHTML.boardGame('begin');
@@ -349,7 +349,7 @@ function render(){
     $('cardLog').replaceChildren(...(s.logs||[]).map(item=>el('li',(item.seat>=0?s.players[item.seat].name+' · ':'')+item.text)));
   }
   AuraiHTML.requestResize();
-  if(!setup&&!busy&&!thinking&&!paused&&mine()&&aiTurn()&&attempt!==key()&&!timer){
+  if(!setup&&!busy&&!thinking&&!paused&&AuraiHTML.presentation.interactive&&mine()&&aiTurn()&&attempt!==key()&&!timer){
     timer=setTimeout(()=>{timer=null;void continueAi();},s.engineCanJump===true||host()?.own?.jumpable?.length?3000:650);
   }
 }
@@ -363,6 +363,7 @@ $('cardConfirmLeave').onclick=()=>{more(false);void act('leave');};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')more(false);});
 document.addEventListener('aurai:pause',()=>{paused=true;cancel();});
 document.addEventListener('aurai:resume',()=>{paused=false;attempt='';render();});
+document.addEventListener('aurai:presentationchange',()=>{cancel();attempt='';render();});
 document.addEventListener('aurai:restore',render);
 document.addEventListener('aurai:messageupdate',()=>{const next=AuraiHTML.messageState;if(next.game!==s.game||next.ply!==s.ply)cancel();render();});
 document.addEventListener('aurai:displaychange',render);

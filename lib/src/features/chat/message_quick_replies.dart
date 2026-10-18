@@ -37,7 +37,7 @@ extension MessageQuickReplies on ChatController {
     final sendAsMessage =
         conversation.kind == ConversationKind.direct &&
         source.role == AgentMessageRole.assistant;
-    if (sendAsMessage && shouldQueuePrivateMessage) {
+    if (sendAsMessage && shouldQueueTaskMessage) {
       await _enqueuePrivateMessage(text, fromDraft: false);
       QuickReplyRecents.record(key);
       return false;
@@ -305,7 +305,7 @@ extension MessageQuickReplies on ChatController {
         value.messageCount--;
       }
       final execution = _executions.sessions[conversation.id];
-      execution?.groupDispatcher?.history.removeWhere(
+      execution?.chatDispatcher?.history.removeWhere(
         (message) => message.id == replyId,
       );
       if (execution?.queuedUserMessageId == replyId) {

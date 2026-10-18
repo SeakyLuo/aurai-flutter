@@ -73,7 +73,7 @@ extension _ChatProgress on _ChatPageState {
   }
 
   Future<void> _retryFailedMessage(AgentMessage message) async {
-    if (widget.controller.activeConversation.kind == ConversationKind.direct) {
+    if (widget.controller.activeConversation.isTask) {
       await _retryFailed(message.runId);
       return;
     }
@@ -91,8 +91,8 @@ extension _ChatProgress on _ChatPageState {
         final choice = await showDialog<bool>(
           context: context,
           builder: (context) => AppPromptDialog(
-            title: '该成员已暂停接话',
-            description: '仅继续这次任务，还是同时恢复后续自动接话？',
+            title: '已暂停自动接话',
+            description: '仅继续这次回复，还是同时恢复后续自动接话？',
             actions: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,

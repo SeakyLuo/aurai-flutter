@@ -556,6 +556,7 @@ async function decide(){
   }finally{if(generation===searchGeneration){deciding=false;render();}}
 }
 function autoDecide(){
+  if(!AuraiHTML.presentation.interactive)return;
   if(GAME==='tictactoe'&&host?.independent&&fullscreen()&&!s.phase&&!autoStartAttempted&&!busy&&!paused){
     autoStartAttempted=true;
     void submit('configure',{humanId:host.viewerId,aiId:'engine:local',humanFirst:true,difficulty:3});
@@ -706,6 +707,7 @@ $('mode').onchange=render;$('matchType').onchange=render;
 $('watchPause').onclick=()=>submit(s.paused?'resume':'pause');
 document.addEventListener('aurai:pause',()=>{paused=true;cancelSearch();});
 document.addEventListener('aurai:resume',()=>{paused=false;decisionAttempt='';render();});
+document.addEventListener('aurai:presentationchange',()=>{cancelSearch();decisionAttempt='';if(!AuraiHTML.presentation.interactive)closeGameDialog();render();});
 document.addEventListener('aurai:restore',render);
 document.addEventListener('aurai:messageupdate',()=>{const next=AuraiHTML.messageState;if(next.game!==s.game||next.ply!==s.ply||next.phase!==s.phase||next.difficulty!==s.difficulty||next.drawOffer!==s.drawOffer||next.paused!==s.paused)cancelSearch();render();});
 document.addEventListener('aurai:displaychange',()=>{if(!fullscreen()){cancelSearch();closeGameDialog();}decisionAttempt='';render();});render();

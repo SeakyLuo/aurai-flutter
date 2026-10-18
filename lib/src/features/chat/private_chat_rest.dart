@@ -63,6 +63,8 @@ extension PrivateChatRest on ChatController {
             await _groupSleeps.remove(conversation.id, senderId);
             throw const AgentCancelled();
           }
+          _execution.personalDispatcher?.paused.remove(senderId);
+          _execution.personalDispatcher?.sleepUntil(senderId, until);
           _conversationChanged();
           return {
             'sleeping': until != null,
@@ -79,12 +81,15 @@ extension PrivateChatRest on ChatController {
           reason: arguments['reason'] as String?,
         );
         if (paused) {
+          _execution.personalDispatcher?.pause(senderId);
           await _groupSleeps.reload();
           await PrivateTaskState(
             _store.database,
             conversation.id,
             senderId,
           ).pause(arguments['reason'] as String);
+        } else {
+          _execution.personalDispatcher?.paused.remove(senderId);
         }
         MessageCallbacks.changes.add(null);
         _conversationChanged();
@@ -143,6 +148,8 @@ extension PrivateChatRest on ChatController {
     Conversation conversation,
     String senderId,
   ) async {
+    if (_execution.personalDispatcher?.paused.contains(senderId) == true)
+      return;
     if (_groupSleeps.forGroup(conversation.id).containsKey(senderId)) {
       await _groupSleeps.remove(conversation.id, senderId);
     }

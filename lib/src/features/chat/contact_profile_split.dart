@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'detail_split_layout.dart';
+import 'home_tab_scope.dart';
 
 /// Keeps the address book mounted while browsing a profile and its subpages.
 class ContactProfileSplit extends StatefulWidget {
@@ -41,6 +42,8 @@ class ContactProfileSplitState extends State<ContactProfileSplit>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    HomeTabScope.isActive(context);
+    ModalRoute.isCurrentOf(context);
     _syncLayoutAfterFrame();
   }
 
@@ -53,6 +56,12 @@ class ContactProfileSplitState extends State<ContactProfileSplit>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _layoutQueued = false;
       if (!mounted || !_open) return;
+      // Kept-alive tabs must not promote an old detail onto the root navigator.
+      if (!HomeTabScope.isActive(context)) {
+        if (_fullscreenRoute != null) _returnToSplit();
+        return;
+      }
+      if (_fullscreenRoute == null && !ModalRoute.isCurrentOf(context)!) return;
       final view = View.of(context);
       final wide = view.physicalSize.width / view.devicePixelRatio >= 600;
       if (!wide && _fullscreenRoute == null) {
@@ -122,9 +131,11 @@ class ContactProfileSplitState extends State<ContactProfileSplit>
 
   @override
   Widget build(BuildContext context) => PopScope(
-    canPop: !_open,
+    canPop: !_open || !HomeTabScope.isActive(context),
     onPopInvokedWithResult: (didPop, _) {
-      if (!didPop && _open) _navigator!.currentState!.maybePop();
+      if (!didPop && _open && HomeTabScope.isActive(context)) {
+        _navigator!.currentState!.maybePop();
+      }
     },
     child: DetailSplitLayout(
       animation: _curve,

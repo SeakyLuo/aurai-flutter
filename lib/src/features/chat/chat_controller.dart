@@ -122,7 +122,7 @@ import '../../agent/group_sleep_tool.dart';
 import '../../agent/chat_rest_tool.dart';
 import '../../domain/local_time.dart';
 import '../../storage/group_participation.dart';
-import 'group_dispatcher.dart';
+import 'chat_dispatcher.dart';
 import '../../agent/group_chat_tools.dart';
 import '../../agent/project_tools.dart';
 import '../../agent/group_announcement_tool.dart';
@@ -209,7 +209,7 @@ part 'message_submission.dart';
 part 'message_quick_replies.dart';
 part 'global_tools.dart';
 part 'generated_file_actions.dart';
-part 'group_reply_context.dart';
+part 'reply_context.dart';
 part 'group_reply_draft.dart';
 part 'ai_identity_controller.dart';
 part 'project_controller_actions.dart';
@@ -262,6 +262,9 @@ part 'conversation_execution_state.dart';
 part 'live_project_changes.dart';
 part 'group_sleep_recovery.dart';
 part 'private_chat_rest.dart';
+part 'personal_chat_dispatch.dart';
+part 'personal_chat_recovery.dart';
+part 'personal_queue_migration.dart';
 part 'group_run_tools.dart';
 part 'group_member_mute.dart';
 part 'user_data_read_access.dart';
@@ -575,30 +578,6 @@ class ChatController extends ChangeNotifier {
     addListener(_drainMessageCallbacks);
     _drainMessageCallbacks();
     notifyListeners();
-  }
-
-  Future<void> continuePending() =>
-      _inConversation(activeConversation, _continuePending);
-
-  Future<void> _continuePending() async {
-    if (canStartPrivateDuringGroup) {
-      await _runPrivateDuringGroup();
-      return;
-    }
-    if (hasRunningTask) return;
-    if (pendingGoal == null) return;
-    final conversation = activeConversation;
-    _runningConversation = conversation;
-    notifyListeners();
-    try {
-      await _executeConversation(conversation);
-    } finally {
-      _runningConversation = null;
-      _resumeForwardedReply();
-      _drainGroupSystemNotices();
-      _updateConversationList(conversation);
-      notifyListeners();
-    }
   }
 
   Future<void> refreshCapabilities() async {

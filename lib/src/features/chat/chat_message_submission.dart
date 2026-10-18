@@ -14,7 +14,7 @@ extension ChatMessageSubmission on _ChatPageState {
       return;
     }
     _draftTimer?.cancel();
-    if (widget.controller.shouldQueuePrivateMessage) {
+    if (widget.controller.shouldQueueTaskMessage) {
       try {
         await widget.controller.submitGoal(goal);
       } on Object catch (error) {
@@ -22,7 +22,7 @@ extension ChatMessageSubmission on _ChatPageState {
       }
       return;
     }
-    if (widget.controller.activeConversation.kind != ConversationKind.group)
+    if (widget.controller.activeConversation.isTask)
       _focusNode.unfocus();
     if (!quoting && widget.controller.hasSearchWindow) _scrollToBottom();
     _beforeSentMessageId = widget.controller.messages.lastOrNull?.id;

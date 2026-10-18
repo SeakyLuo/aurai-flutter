@@ -1,10 +1,27 @@
 part of 'chat_controller.dart';
 
 extension GroupMessageAudience on ChatController {
+  Future<void> _captureObservedMessages(
+    MemoryController memory,
+    String runId,
+    List<AgentMessage> observed,
+    String senderId,
+  ) => memory.captureObserved(
+    runId,
+    observed.reversed
+        .where((m) => m.canView(senderId))
+        .take(24)
+        .map((m) => m.id),
+  );
+
   Future<List<AgentMessage>> _loadPrivateRunHistory(
     Conversation conversation,
     ExecutionReplyContext reply,
   ) async {
+    final dispatcher = _execution.personalDispatcher;
+    final arrivals = dispatcher == null
+        ? const <AgentMessage>[]
+        : List<AgentMessage>.of(dispatcher.history);
     final history = await _store.reader.messages(
       conversation.id,
       forModel: true,
@@ -12,6 +29,18 @@ extension GroupMessageAudience on ChatController {
       modelConfig: reply.config,
       memoryOwnerId: reply.senderId,
     );
+    if (dispatcher != null) {
+      final loaded = history.map((message) => message.id).toSet();
+      final delivered = _execution.personalDeliveredMessages;
+      for (final message in arrivals) {
+        if (loaded.contains(message.id)) delivered[message.id] = message;
+      }
+      if (dispatcher.history.every(
+        (message) => identical(delivered[message.id], message),
+      )) {
+        dispatcher.acknowledge(reply.senderId);
+      }
+    }
     return [
       for (final message in history)
         if (!_execution.liveUserMessageIds.contains(message.id)) message,

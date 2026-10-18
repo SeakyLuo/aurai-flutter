@@ -5,7 +5,7 @@ part of 'chat_controller.dart';
 class _PeerSession {
   _PeerSession(this.conversation);
   final Conversation conversation;
-  late GroupDispatcher dispatcher;
+  late ChatDispatcher dispatcher;
   final runtimes = <String, AgentRuntime>{};
   final runIds = <String, String>{};
 }
@@ -17,7 +17,7 @@ extension PeerConversations on ChatController {
     conversation.beginSharedContext();
     final history = await _store.reader.messages(id, forModel: true);
     final session = _PeerSession(conversation);
-    session.dispatcher = GroupDispatcher(
+    session.dispatcher = ChatDispatcher(
       history: history,
       members: members.map((m) => m.sender.id),
       paused: {},

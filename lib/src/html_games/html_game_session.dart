@@ -109,6 +109,14 @@ class HtmlGameSession extends ChangeNotifier {
   bool _closing = false;
   bool ready = false;
   bool _visible = true;
+  bool _interactive = true, _simultaneous = false;
+  Map<String, Object?> get presentation => {
+    'display': fullscreen ? 'fullscreen' : 'inline',
+    'displays': _simultaneous
+        ? ['inline', 'fullscreen']
+        : [fullscreen ? 'fullscreen' : 'inline'],
+    'interactive': _interactive,
+  };
   bool _pageLoaded = false;
   String? error;
   Uint8List? preview;
@@ -128,6 +136,7 @@ class HtmlGameSession extends ChangeNotifier {
       hostSafeTopInset: hostSafeTopInset,
       hostSafeBottomInset: hostSafeBottomInset,
       hostRightInset: hostRightInset,
+      presentation: presentation,
     );
   }
 
@@ -208,6 +217,10 @@ class HtmlGameSession extends ChangeNotifier {
         _pageLoaded = true;
         // Android's state acknowledgement waits for a visual frame; only then
         // may the view remove the previous preview covering the platform surface.
+        await channel.invokeMethod<void>(
+          'presentation',
+          jsonEncode(presentation),
+        );
         await channel.invokeMethod<void>('theme', htmlMessageTheme(theme));
         await channel.invokeMethod<void>('state', jsonEncode(game.snapshot()));
         await _sendCallbacks();
@@ -222,7 +235,7 @@ class HtmlGameSession extends ChangeNotifier {
         error = 'HTML 消息运行中断：${call.arguments}';
         notifyListeners();
       } else if (call.method == 'ai') {
-        if (!_visible)
+        if (!_visible || !_interactive)
           return jsonEncode({'error': '请打开小程序后使用模型服务', 'code': 'inactive'});
         final args = (call.arguments as Map).cast<String, Object?>();
         final id = args['id'] as int;
@@ -252,6 +265,12 @@ class HtmlGameSession extends ChangeNotifier {
               .cast<String, Object?>();
           if (args['operation'] == 'board') {
             final request = (args['request'] as Map).cast<String, Object?>();
+            if (!_interactive && request['operation'] == 'begin') {
+              return jsonEncode({'skipped': true});
+            }
+            if (!_interactive && request['operation'] != 'status') {
+              throw StateError('请在右侧详情中操作');
+            }
             if (request['operation'] != 'status' && !_visible)
               throw StateError('请在可见的棋盘中操作');
             if (!fullscreen &&
@@ -266,6 +285,14 @@ class HtmlGameSession extends ChangeNotifier {
             } on DecisionCancelled {
               return jsonEncode({'cancelled': true});
             }
+          }
+          if (!_interactive &&
+              !const [
+                'read',
+                'programResource',
+                'events',
+              ].contains(args['operation'])) {
+            throw StateError('请在右侧详情中操作');
           }
           if (args['operation'] == 'programResource') {
             if (independent) throw StateError('请从原会话查看旅程记录');
@@ -350,6 +377,7 @@ class HtmlGameSession extends ChangeNotifier {
         }
       } else if (call.method == 'interaction') {
         try {
+          if (!_interactive) throw StateError('请在右侧详情中操作');
           if (independent) {
             error = '此操作需要从原会话打开小程序';
             notifyListeners();
@@ -368,6 +396,7 @@ class HtmlGameSession extends ChangeNotifier {
         }
       } else if (call.method == 'event') {
         try {
+          if (!_interactive) throw StateError('请在右侧详情中操作');
           if (independent) throw StateError('此操作需要从原会话打开小程序');
           final args = (jsonDecode(call.arguments as String) as Map)
               .cast<String, Object?>();
@@ -455,6 +484,29 @@ class HtmlGameSession extends ChangeNotifier {
         error = '无法更新 HTML 消息：${errorMessage(caughtError)}';
         notifyListeners();
       }
+    }
+  }
+
+  Future<void> updatePresentation({
+    required bool interactive,
+    required bool simultaneous,
+  }) async {
+    if (_closed ||
+        _closing ||
+        (_interactive == interactive && _simultaneous == simultaneous))
+      return;
+    _interactive = interactive;
+    _simultaneous = simultaneous;
+    _document = null;
+    if (!interactive) {
+      _board.pause();
+      await _ai.cancelAll();
+    }
+    if (_pageLoaded && !_closed && !_closing) {
+      await _channel?.invokeMethod<void>(
+        'presentation',
+        jsonEncode(presentation),
+      );
     }
   }
 

@@ -35,6 +35,9 @@ extension HtmlActions on ChatController {
           if (belongs(last)) state.groupDispatcher!.interrupt(entry.key);
         }
       } else {
+        if (state.personalDispatcher?.history.lastOrNull case final last?) {
+          if (belongs(last)) state.personalDispatcher!.interrupt(entry.key);
+        }
         target.runState = ChatRunState.stopping;
       }
       cancellations.add(run.runtime.cancel());
@@ -49,7 +52,7 @@ extension HtmlActions on ChatController {
       await refreshGroupDisplayNames(change.conversationId);
     }
     final state = _executions.sessions[change.conversationId];
-    final dispatcher = state?.groupDispatcher;
+    final dispatcher = state?.chatDispatcher;
     for (final entry in change.replyStates.entries) {
       if (entry.value) {
         dispatcher?.paused.remove(entry.key);
@@ -58,6 +61,10 @@ extension HtmlActions on ChatController {
       }
     }
     await Future.wait([
+      if (state?.conversation?.isPersonalChat == true &&
+          change.replyStates[state!.conversation!.defaultSenderId] == false &&
+          state.runtime != null)
+        state.runtime!.cancel(),
       for (final entry in change.replyStates.entries)
         if (!entry.value && state?.groupRuns[entry.key]?.activeRunId != null)
           stopGroupMember(

@@ -8,6 +8,9 @@ function requestPageResize(){const page=$('officeGame').getBoundingClientRect(),
 let soundEnabled=AuraiHTML.state?.soundEnabled===true;F.setEnabled(soundEnabled);
 const art={paper:'{{PAPER}}',folder:'{{FOLDER}}',box:'{{BOX}}',coffee:'{{ART_COFFEE}}',sleeve:'{{ART_SLEEVE}}',cage:'{{ART_CAGE}}',lock:'{{ART_LOCK}}'};
 let game=AuraiHTML.state?.version===7?AuraiHTML.state.game:null,busy=false,path=[],drop=null,drag=false,item=null,panel='demands',screen='desk',toastTimer=0,pointer=null,groupDrag=false,keyboardSelection=false,inspectOpen=false;
+// Retire the experimental exchange orders while preserving the rest of the saved run.
+function retireExchangeOrders(){if(game)game.demands=game.demands.filter(d=>d.category!=='exchange');}
+retireExchangeOrders();
 let selectionGame=null,selectionOptions=null;
 function connectable(){
   if(!path.length||groupDrag||item!==null||busy)return [];
@@ -446,7 +449,7 @@ guide('fileGuide',[
   ['废弃','只能与同值废弃文件合并，送进废弃区才计入整理。'],['复印','可与任意普通文件合并，按另一份文件的份数复制，可多张叠加。'],
   ['撤销','可与普通文件合并，本次不得分并添加撤销；与普通文件合并后解除撤销；再次撤销可抵消，两个撤销文件合成普通 1 份。'],
   ['金属','导电、受磁吸；手动移动带电物品需要绝缘手套。']]);
-document.addEventListener('aurai:restore',()=>{if(!busy){game=AuraiHTML.state?.version===7?AuraiHTML.state.game:null;soundEnabled=AuraiHTML.state?.soundEnabled===true;F.setEnabled(soundEnabled);clearSelection();render();}});
+document.addEventListener('aurai:restore',()=>{if(!busy){game=AuraiHTML.state?.version===7?AuraiHTML.state.game:null;retireExchangeOrders();soundEnabled=AuraiHTML.state?.soundEnabled===true;F.setEnabled(soundEnabled);clearSelection();render();}});
 document.addEventListener('aurai:pause',()=>{OfficeItemUI.hide();F.pause();clearSelection();if(game)render();});
 document.addEventListener('aurai:resume',()=>{F.resume();render();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)F.pause();else F.resume();});

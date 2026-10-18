@@ -30,7 +30,7 @@ extension ConversationRunContinuation on ChatController {
         reply.config,
       );
     }
-    if (direct && !hasCallbacks) {
+    if (direct && conversation.isTask && !hasCallbacks) {
       return loadTaskContinuationProtocol(
         _store.database,
         conversation.id,

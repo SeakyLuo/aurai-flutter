@@ -19,6 +19,8 @@ import 'html_game_surface.dart';
 import 'html_visibility_observer.dart';
 import 'html_route_observer.dart';
 
+part 'html_view_presentation.dart';
+
 class HtmlView extends StatefulWidget {
   const HtmlView({
     super.key,
@@ -128,6 +130,8 @@ class _HtmlViewState extends State<HtmlView>
   bool _failed = false, _foreground = true, _leaving = false;
   bool _tabVisible = true;
   bool _profileOpen = false;
+  bool _detailShowing = false;
+  bool _presentationVisible = false;
   Future<void>? _closing;
 
   @override
@@ -200,14 +204,6 @@ class _HtmlViewState extends State<HtmlView>
         !htmlRouteObserver.isVisible(ModalRoute.of(context)!))
       return false;
     if (widget.fullscreen) return true;
-    if (_views.any(
-      (view) =>
-          view.widget.fullscreen &&
-          view.widget.messageId == widget.messageId &&
-          view.widget.surfaceId == widget.surfaceId &&
-          !view._leaving,
-    ))
-      return false;
     final box = _anchor.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.attached || !box.hasSize) return false;
     // Keyboard occlusion must not destroy a live form and dismiss its input.
@@ -224,6 +220,12 @@ class _HtmlViewState extends State<HtmlView>
   }
 
   void _checkVisibility() {
+    _notifyPresentationVisibility();
+    final detailShowing = !widget.fullscreen && _hasOtherDisplay;
+    if (_detailShowing != detailShowing) {
+      setState(() => _detailShowing = detailShowing);
+    }
+    _syncPresentation();
     if (!_visible) {
       if (_profileOpen) {
         _idleTimer?.cancel();
@@ -335,6 +337,7 @@ class _HtmlViewState extends State<HtmlView>
               !identical(view, this) &&
               view.widget.messageId == widget.messageId &&
               view.widget.surfaceId == widget.surfaceId &&
+              view.widget.fullscreen == widget.fullscreen &&
               (view._session != null || view._opening),
         )
         .firstOrNull;
@@ -390,6 +393,12 @@ class _HtmlViewState extends State<HtmlView>
             ? MediaQuery.paddingOf(context).bottom
             : 0,
         theme: Theme.of(context),
+      );
+      unawaited(
+        session.updatePresentation(
+          interactive: !_detailShowing,
+          simultaneous: _hasOtherDisplay,
+        ),
       );
       setState(() {
         _surfaceReady = false;
@@ -600,7 +609,9 @@ class _HtmlViewState extends State<HtmlView>
             borderRadius: BorderRadius.circular(22),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: _card.displayMode == 'hybrid' && !_inlineBoard
+              onTap: _detailShowing
+                  ? _focusDetails
+                  : _card.displayMode == 'hybrid' && !_inlineBoard
                   ? () => widget.openAdaptive(context)
                   : null,
               child: _buildView(context),
@@ -718,7 +729,8 @@ class _HtmlViewState extends State<HtmlView>
                       height: height,
                       child: IgnorePointer(
                         ignoring:
-                            _card.displayMode == 'hybrid' && !_inlineBoard,
+                            _detailShowing ||
+                            (_card.displayMode == 'hybrid' && !_inlineBoard),
                         child: HtmlGameSurface(
                           session: _session!,
                           preview: _themedPreview,
@@ -733,7 +745,9 @@ class _HtmlViewState extends State<HtmlView>
                     )
                   else if (_themedPreview != null && !_failed)
                     GestureDetector(
-                      onTap: _card.displayMode == 'hybrid'
+                      onTap: _detailShowing
+                          ? _focusDetails
+                          : _card.displayMode == 'hybrid'
                           ? () => widget.openAdaptive(context)
                           : _open,
                       child: ClipRRect(

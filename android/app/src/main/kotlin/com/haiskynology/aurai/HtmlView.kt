@@ -265,6 +265,9 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                     web.evaluateJavascript("(()=>{$layout document.dispatchEvent(new Event('aurai:displaychange')); window.dispatchEvent(new Event('resize')); window.__auraiMeasure?.(); window.__auraiLifecycle?.(false); AuraiGameBridge.editing(window.__auraiEditing?.()===true);})()", null)
                     result.success(null)
                 }
+                "presentation" -> {
+                    web.evaluateJavascript("window.__auraiPresentation(${call.arguments as String})") { result.success(null) }
+                }
                 "callbacks" -> {
                     web.evaluateJavascript("window.__auraiCallbacks?.(${call.arguments as String})", null)
                     result.success(null)

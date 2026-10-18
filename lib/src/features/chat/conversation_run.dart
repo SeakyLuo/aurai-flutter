@@ -1,7 +1,7 @@
 part of 'chat_controller.dart';
 
 extension ConversationRun on ChatController {
-  Future<void> _executeMember(
+  Future<void> _executeMemberTurn(
     Conversation runConversation, {
     bool scheduled = false,
     bool callbacksOnly = false,
@@ -53,13 +53,12 @@ extension ConversationRun on ChatController {
     );
     if (groupParent == null &&
         callbackEvents.isEmpty &&
-        lastUser >= 0 &&
-        history[lastUser].id == _execution.queuedUserMessageId) {
+        history.any((message) => message.id == _execution.queuedUserMessageId)) {
       _execution.queuedUserMessageId = null;
     }
     final userMessage = callbackEvents.isNotEmpty
         ? _callbackContext(callbackEvents)
-        : groupUser ?? history[lastUser];
+        : groupUser ?? (runConversation.isPersonalChat ? history.last : history[lastUser]);
     final continuationProtocol = await _runContinuation(
       conversation: runConversation,
       reply: reply,
@@ -276,7 +275,7 @@ extension ConversationRun on ChatController {
         conversation: [
           ...(groupHistory == null
               ? _privateHistory(
-                  sleepWakeReason != null
+                  sleepWakeReason != null || runConversation.isPersonalChat
                       ? history
                       : history.take(lastUser + 1),
                   reply.senderId,
@@ -365,6 +364,8 @@ extension ConversationRun on ChatController {
           _setMemberStreaming(reply.senderId, null, groupParent);
           _notifyMember(runConversation, groupParent, activityOnly: true);
         },
+        takeMessageInput: runConversation.isPersonalChat
+            ? () => _takePersonalRunUpdates(reply, observed) : null,
         takeUserUpdates: groupParent == null
             ? null
             : () => _takeGroupRunUpdates(reply.senderId, observed),
@@ -373,14 +374,8 @@ extension ConversationRun on ChatController {
           _notifyMember(runConversation, groupParent, activityOnly: true);
           await _persistMember(runConversation, groupParent);
           await _store.runs.finishTurn(modelTurnId, turn);
-          if (groupParent != null && !runConversation.isTemporary)
-            await memory.captureObserved(
-              runId,
-              observed.reversed
-                  .where((m) => m.canView(reply.senderId))
-                  .take(24)
-                  .map((m) => m.id),
-            );
+          if ((groupParent != null || runConversation.isPersonalChat) && !runConversation.isTemporary)
+            await _captureObservedMessages(memory, runId, observed, reply.senderId);
         },
         onToolStarted: (call) async {
           diagnosticCalls[call.id] = ExecutionLog.argumentShape(call.arguments);

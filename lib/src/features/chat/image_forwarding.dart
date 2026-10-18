@@ -310,9 +310,27 @@ extension ImageForwarding on ChatController {
     AgentMessage message,
   ) => _inConversation(target, () async {
     try {
+      if (target.isPersonalChat && await _receivePersonalMessage(message))
+        return;
+      if (target.isPersonalChat &&
+          (message.senderId != MessageSender.localUser.id ||
+              message.isSystem)) {
+        final paused = await GroupParticipation(
+          _store.database,
+        ).paused(target.id);
+        if (paused.contains(target.defaultSenderId)) {
+          if (_execution.queuedUserMessageId == message.id) {
+            _execution.queuedUserMessageId = null;
+          }
+          return;
+        }
+      }
       if (target.kind == ConversationKind.group && _groupDispatcher != null) {
         await _receiveGroupSystemNotice(target.id, message);
         return;
+      }
+      if (target.isPersonalChat) {
+        _execution.queuedUserMessageId = message.id;
       }
       // Only successive messages in the same conversation share a reply turn.
       if (_runningConversation != null ||

@@ -4,8 +4,8 @@ import '../../domain/agent_models.dart';
 import '../../domain/group_mute.dart';
 
 /// One mailbox per member. A new arrival never restarts an existing delay.
-class GroupDispatcher {
-  GroupDispatcher({
+class ChatDispatcher {
+  ChatDispatcher({
     required List<AgentMessage> history,
     required Iterable<String> members,
     required this.respond,
@@ -150,7 +150,7 @@ class GroupDispatcher {
 
   DateTime? sleepUntil(String id, DateTime? until) {
     if (stopped || closed || !_members.containsKey(id)) {
-      throw StateError('群聊已停止');
+      throw StateError('会话已停止');
     }
     if (paused.contains(id) && until != null)
       throw StateError('已暂停自动接话，不能安排唤醒');

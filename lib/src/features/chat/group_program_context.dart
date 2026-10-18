@@ -17,9 +17,8 @@ extension ProgramContext on ChatController {
       ).readProgram(conversation.id, args['messageId'] as String, senderId),
     );
     return () async {
-      final history = conversation.kind == ConversationKind.group
-          ? _groupDispatcher!.history
-          : conversation.messages;
+      final history =
+          _execution.chatDispatcher?.history ?? conversation.messages;
       final incoming = [
         // A previous reply can finish after the move that wakes this run.
         // Read the triggering move's instance, not the last history item.

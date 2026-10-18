@@ -221,14 +221,8 @@ extension _MessageItemActions on _MessageItemState {
         return GroupMessageSelection(
           key: _selectionKey,
           onChanged: (text) => _selectedText = text,
-          onOpenMenu: () async {
-            var acted = false;
-            await _openActions(
-              preserveSelection: true,
-              onActionSelected: () => acted = true,
-            );
-            return acted;
-          },
+          createdAt: message.createdAt,
+          loadOptions: _loadSelectionActions,
           onQuote: widget.onQuote == null
               ? null
               : (text) => _quote(selectedText: text),
@@ -236,6 +230,24 @@ extension _MessageItemActions on _MessageItemState {
               ? () => _openActions(directAction: MessageAction.star)
               : null,
           onForward: () => _openActions(directAction: MessageAction.forward),
+          onReaction:
+              widget.onQuickReply == null ||
+                  (message.role != AgentMessageRole.assistant &&
+                      message.senderId != MessageSender.localUser.id)
+              ? null
+              : (key) => runUiAction(
+                  context,
+                  () => widget.onQuickReply!(message, key),
+                ),
+          sentQuickReplyKeys:
+              !widget.groupBubble && message.role == AgentMessageRole.assistant
+              ? const {}
+              : message.quickReplies
+                    .where(
+                      (reply) => reply.senderId == MessageSender.localUser.id,
+                    )
+                    .map((reply) => reply.key)
+                    .toSet(),
           onReadAloud: _canReadAloud
               ? (text) => _readAloud(message, text: text)
               : null,
@@ -453,7 +465,7 @@ extension _MessageItemActions on _MessageItemState {
             message: snapshot,
             groupMenu: true,
             preserveSelection: preserveSelection,
-            allowReadAloud: _canReadAloud,
+            allowReadAloud: !preserveSelection && _canReadAloud,
             onVisibility: allowVisibility
                 ? (sheetContext) async {
                     await runUiAction(
@@ -466,30 +478,32 @@ extension _MessageItemActions on _MessageItemState {
                     );
                   }
                 : null,
-            allowStar: allowStar,
+            allowStar: !preserveSelection && allowStar,
             allowGroupMarks: groupMark?.isGroup ?? false,
             allowMarks: groupMark != null,
             allowPin: groupMark?.canPin ?? false,
             pinned: groupMark?.pinned ?? false,
             groupFavorite: groupMark?.favorite ?? false,
-            allowCopy: true,
+            allowCopy: !preserveSelection,
             allowSelect: !compactMenu && !_hasBubble,
             starred: starred,
             allowEditing:
                 widget.onEdit != null && snapshot.miniappShare == null,
             allowHistory: hasHistory,
             allowTimeline: hasProcess,
-            allowQuote: widget.onQuote != null,
+            allowQuote: !preserveSelection && widget.onQuote != null,
             allowRecall: widget.onRecall != null,
             allowRetry: allowRetry,
             retryLabel: retryLabel,
             allowForward:
+                !preserveSelection &&
                 !widget.streaming &&
                 (message.htmlGame != null ||
                     message.text.isNotEmpty ||
                     message.images.isNotEmpty ||
                     message.files.isNotEmpty),
             allowQuickReply:
+                !preserveSelection &&
                 widget.onQuickReply != null &&
                 (!widget.streaming ||
                     snapshot.senderId == MessageSender.localUser.id) &&
@@ -509,8 +523,8 @@ extension _MessageItemActions on _MessageItemState {
                       .toSet(),
           );
     if (!mounted || result == null) return;
-    onActionSelected?.call();
     if (result is MessageMenuDismissResult) return;
+    onActionSelected?.call();
     if (result case MessageQuickReplyResult(:final option)) {
       await widget.onQuickReply?.call(snapshot, option.key);
       return;

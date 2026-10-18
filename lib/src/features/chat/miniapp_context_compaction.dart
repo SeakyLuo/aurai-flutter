@@ -41,7 +41,7 @@ extension MiniappContextCompactionActions on ChatController {
       );
       final snapshot = MiniappProgram.decode(eventRows.single['snapshot_json']);
       if (!snapshot.containsKey('pendingContextChange')) return false;
-      final dispatcher = _executions.sessions[id]?.groupDispatcher;
+      final dispatcher = _executions.sessions[id]?.chatDispatcher;
       dispatcher?.hold();
       for (final conversation in conversations) {
         conversation.isCompacting = true;

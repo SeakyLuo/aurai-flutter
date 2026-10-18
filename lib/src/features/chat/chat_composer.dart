@@ -71,7 +71,7 @@ extension _ChatComposer on _ChatPageState {
         quote: _editing != null ? _editing!.message.quote : null,
         onCancelQuote: _editing == null ? () => _quoteMessage(null) : null,
         focusNode: _focusNode,
-        queueing: !isGroup && controller.shouldQueuePrivateMessage,
+        queueing: controller.shouldQueueTaskMessage,
         savingEdit: _editing?.saving == true,
         submitting: controller.isSubmitting,
         draftEnabled: muted
@@ -126,7 +126,9 @@ extension _ChatComposer on _ChatPageState {
             controller.pendingMessageQueue.messages.isEmpty &&
             (controller.activeConversation.isPersonalChat
                 ? controller.runState == ChatRunState.failed ||
-                      controller.runState == ChatRunState.interrupted
+                      controller.runState == ChatRunState.interrupted ||
+                      (controller.runState == ChatRunState.cancelled &&
+                          controller.pendingGoal != null)
                 : (controller.runState == ChatRunState.cancelled ||
                           controller.runState == ChatRunState.idle) &&
                       controller.pendingGoal != null),

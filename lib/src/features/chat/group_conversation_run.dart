@@ -1,6 +1,30 @@
 part of 'chat_controller.dart';
 
 extension GroupConversationRun on ChatController {
+  Future<void> continuePending() =>
+      _inConversation(activeConversation, _continuePending);
+
+  Future<void> _continuePending() async {
+    if (canStartPrivateDuringGroup) {
+      await _runPrivateDuringGroup();
+      return;
+    }
+    if (hasRunningTask) return;
+    if (pendingGoal == null) return;
+    final conversation = activeConversation;
+    _runningConversation = conversation;
+    notifyListeners();
+    try {
+      await _executeConversation(conversation);
+    } finally {
+      _runningConversation = null;
+      _resumeForwardedReply();
+      _drainGroupSystemNotices();
+      _updateConversationList(conversation);
+      notifyListeners();
+    }
+  }
+
   Future<void> updateGroupMembers(
     String conversationId,
     List<String> aiIds, {

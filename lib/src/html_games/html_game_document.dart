@@ -15,6 +15,7 @@ String htmlGameDocument(
   double hostSafeBottomInset = 0,
   double hostRightInset = 0,
   List<Object?> localState = const [],
+  Map<String, Object?>? presentation,
 }) {
   final local = base64Encode(utf8.encode(jsonEncode(localState)));
   final snapshot = base64Encode(utf8.encode(jsonEncode(game.snapshot())));
@@ -41,6 +42,11 @@ $htmlMessageComponentStyles
  window.addEventListener('unhandledrejection',e=>report(String(e.reason?.message||e.reason)));
 })();
 $htmlAiScript
+window.__auraiInitialPresentation=${jsonEncode(presentation ?? {
+        'display': fullscreen ? 'fullscreen' : 'inline',
+        'displays': [fullscreen ? 'fullscreen' : 'inline'],
+        'interactive': true,
+      })};
 $htmlGameLifecycleScript
 (()=>{
  let snapshot=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('$snapshot'),c=>c.charCodeAt(0))));

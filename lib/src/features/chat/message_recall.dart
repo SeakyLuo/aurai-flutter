@@ -171,9 +171,7 @@ extension MessageRecall on ChatController {
   }) async {
     if (!_recallingMessages.add(message.id)) return;
     final notice = _recallNotice(message, userInitiated: userInitiated);
-    final dispatcher = _runningConversation?.id == conversation.id
-        ? _groupDispatcher
-        : null;
+    final dispatcher = _execution.chatDispatcher;
     final live =
         dispatcher != null && !dispatcher.closed && !dispatcher.stopped;
     if (live) dispatcher.hold();
@@ -201,9 +199,9 @@ extension MessageRecall on ChatController {
               'miniapp_share_json': null,
               'run_id': null,
               'model_turn_id': null,
-              'interactive_json': notice.interactive == null
+              'interactive_json': notice.messageMetadata == null
                   ? null
-                  : jsonEncode(notice.interactive!.toJson()),
+                  : jsonEncode(notice.messageMetadata!.toJson()),
             },
             where: 'id = ? AND conversation_id = ?',
             whereArgs: [message.id, conversation.id],
@@ -283,7 +281,13 @@ extension MessageRecall on ChatController {
         if (summaryRevisions.isNotEmpty && live) {
           conversation.beginSharedContext();
         }
-        if (live) _replaceRecalled(dispatcher.history, message.id, notice);
+        if (live) {
+          _replaceRecalled(dispatcher.history, message.id, notice);
+          if (conversation.isPersonalChat &&
+              !dispatcher.history.any((item) => item.id == message.id)) {
+            dispatcher.history.add(notice);
+          }
+        }
         _store.writer.remember([notice]);
       });
       await programChange?.publish();
@@ -300,12 +304,17 @@ extension MessageRecall on ChatController {
       _conversationChanged();
       if (userInitiated && live) {
         dispatcher.start(
-          _groupReplies.keys.where(
-            (id) => !dispatcher.paused.contains(id) && (notice.canView(id)),
-          ),
+          (conversation.isPersonalChat
+                  ? [conversation.defaultSenderId]
+                  : _groupReplies.keys)
+              .where(
+                (id) => !dispatcher.paused.contains(id) && (notice.canView(id)),
+              ),
         );
       } else if (userInitiated && conversation.kind == ConversationKind.group) {
         await _receiveGroupSystemNotice(conversation.id, notice);
+      } else if (userInitiated && conversation.isPersonalChat) {
+        await _deliverForwardedMessage(conversation, notice);
       }
     } finally {
       _recallingMessages.remove(message.id);
@@ -413,6 +422,8 @@ extension MessageRecall on ChatController {
               : memory.nickname)
         : message.sender!.name;
     final text = '${actorName}撤回了一条消息';
+    final linkedText =
+        '${systemNoticeMember(message.senderId, actorName)}撤回了一条消息';
     final audience = message.audience;
     return AgentMessage(
       id: message.id,
@@ -423,19 +434,19 @@ extension MessageRecall on ChatController {
       createdAt: message.createdAt,
       isSystem: true,
       // Preserve visibility without retaining the recalled card's content or controls.
-      interactive: !message.hasRestrictedAudience
-          ? null
-          : InteractiveMessage.card(
-              revision: message.messageMetadata!.revision,
-              title: text,
-              body: '',
-              buttons: const [],
-              participation: {
-                if (audience != null) 'audience': audience,
-                if (message.excludedAudience != null)
-                  'excludedAudience': message.excludedAudience,
-              },
-            ),
+      interactive: InteractiveMessage.card(
+        revision: 1,
+        title: text,
+        body: '',
+        buttons: const [],
+        participation: {
+          'presentation': 'message',
+          '_systemNoticeText': linkedText,
+          if (audience != null) 'audience': audience,
+          if (message.excludedAudience != null)
+            'excludedAudience': message.excludedAudience,
+        },
+      ),
     );
   }
 

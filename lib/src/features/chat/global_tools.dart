@@ -207,7 +207,7 @@ extension GlobalTools on ChatController {
                 )).single;
                 final peer = _peerSessions[target.id];
                 final dispatchers = [
-                  if (_executions.sessions[target.id]?.groupDispatcher
+                  if (_executions.sessions[target.id]?.chatDispatcher
                       case final dispatcher?)
                     dispatcher,
                   if (peer != null) (await peer).dispatcher,
@@ -216,7 +216,11 @@ extension GlobalTools on ChatController {
                   final index = dispatcher.history.indexWhere(
                     (m) => m.id == id,
                   );
-                  if (index >= 0) dispatcher.history[index] = saved;
+                  if (index >= 0) {
+                    dispatcher.history[index] = saved;
+                  } else if (target.isPersonalChat) {
+                    dispatcher.history.add(saved);
+                  }
                 }
                 for (final value in _interactiveConversations(
                   target.id,
