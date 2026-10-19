@@ -410,7 +410,8 @@ class ChatComposer extends StatelessWidget {
       return MessageComposer(
         controller: controller,
         focusNode: focusNode,
-        enabled: draftEnabled,
+        enabled: draftEnabled || submitting,
+        inputLocked: !draftEnabled,
         hintText: hintText,
         maxLength: maxLength,
         attachments:

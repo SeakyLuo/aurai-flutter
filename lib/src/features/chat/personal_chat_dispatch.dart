@@ -13,13 +13,18 @@ extension PersonalChatDispatch on ChatController {
     String? sleepWakeReason,
     bool preserveAutoReplyPause = false,
   }) {
-    Future<void> turn(bool first, String? wakeReason) => _executeMemberTurn(
+    Future<void> turn(
+      bool first,
+      String? wakeReason,
+      AgentMessage? pendingMessage,
+    ) => _executeMemberTurn(
       conversation,
       reply: reply,
       scheduled: first && scheduled,
       callbacksOnly: first && callbacksOnly,
       groupHistory: groupHistory,
       groupUser: groupUser,
+      pendingMessage: pendingMessage,
       groupParent: groupParent,
       continuationRunId: first ? continuationRunId : null,
       sleepWakeReason: first ? sleepWakeReason : wakeReason,
@@ -31,13 +36,18 @@ extension PersonalChatDispatch on ChatController {
             turn,
             preserveAutoReplyPause: preserveAutoReplyPause,
           )
-        : turn(true, null);
+        : turn(true, null, null);
   }
 
   Future<void> _dispatchPersonalChat(
     Conversation conversation,
     ExecutionReplyContext reply,
-    Future<void> Function(bool first, String? wakeReason) respond, {
+    Future<void> Function(
+      bool first,
+      String? wakeReason,
+      AgentMessage? pendingMessage,
+    )
+    respond, {
     required bool preserveAutoReplyPause,
   }) async {
     Object? failure;
@@ -62,6 +72,15 @@ extension PersonalChatDispatch on ChatController {
             throw const AgentCancelled();
           }
           final woke = dispatcher.wokeFromSleep(reply.senderId);
+          final pending = snapshot.where(
+            (message) => !identical(
+              _execution.personalDeliveredMessages[message.id],
+              message,
+            ),
+          );
+          // Live arrivals already consumed by the previous run need no new reply.
+          if (!initial && !woke && pending.isEmpty) return;
+          final pendingMessage = pending.lastOrNull;
           final reason = woke
               ? await _groupSleepDraft(
                   'group_sleep_reason:${conversation.id}:${reply.senderId}',
@@ -71,7 +90,7 @@ extension PersonalChatDispatch on ChatController {
           await _guardPrivateReply(
             conversation,
             reply,
-            () => respond(initial, reason),
+            () => respond(initial, reason, pendingMessage),
           );
         } on Object catch (error, stack) {
           failureStack = stack;

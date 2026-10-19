@@ -6,10 +6,12 @@ import 'glass_surface.dart';
 import 'quick_reply_groups.dart';
 import 'sidebar_action_icon.dart';
 import 'message_time.dart';
+import 'settings_icon.dart';
 
 typedef SelectionMenuAction = ({String label, Widget icon, VoidCallback onTap});
 typedef SelectionMenuOptions = ({
   bool starred,
+  ({String label, VoidCallback onTap})? visibility,
   List<SelectionMenuAction> actions,
 });
 
@@ -24,6 +26,7 @@ class MessageSelectionMenu extends StatelessWidget {
     required this.recent,
     required this.sentQuickReplyKeys,
     required this.createdAt,
+    this.visibility,
     this.onReaction,
     this.onMoreReactions,
   });
@@ -34,6 +37,7 @@ class MessageSelectionMenu extends StatelessWidget {
   final List<String> recent;
   final Set<String> sentQuickReplyKeys;
   final DateTime createdAt;
+  final ({String label, VoidCallback onTap})? visibility;
   final ValueChanged<String>? onReaction;
   final VoidCallback? onMoreReactions;
 
@@ -104,20 +108,44 @@ class MessageSelectionMenu extends StatelessWidget {
                     },
                   ),
                 ],
+                const Divider(height: 12, thickness: .5),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      messageTime(createdAt),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                  child: DefaultTextStyle(
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(messageTime(createdAt))),
+                        if (visibility case final entry?)
+                          InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: entry.onTap,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(4, 8, 0, 8),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(entry.label),
+                                  const SizedBox(width: 4),
+                                  const SizedBox.square(
+                                    dimension: 16,
+                                    child: FittedBox(
+                                      child: SettingsIcon(
+                                        type: SettingsIconType.chevron,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
-                const Divider(height: 12, thickness: .5),
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final columns = constraints.maxWidth < 280 ? 4 : 5;

@@ -8,6 +8,7 @@ extension ConversationRun on ChatController {
     required ExecutionReplyContext reply,
     List<AgentMessage>? groupHistory,
     AgentMessage? groupUser,
+    AgentMessage? pendingMessage,
     Conversation? groupParent,
     String? continuationRunId,
     String? sleepWakeReason,
@@ -46,8 +47,11 @@ extension ConversationRun on ChatController {
     ).pending(runConversation.id, reply.senderId);
     if (callbacksOnly && callbackEvents.isEmpty) return;
     await _persistMember(runConversation, groupParent);
-    final history =
-        groupHistory ?? await _loadPrivateRunHistory(runConversation, reply);
+    final history = groupHistory ?? await _loadPrivateRunHistory(
+      runConversation, reply,
+      preparePersonalReply: runConversation.isPersonalChat &&
+          callbackEvents.isEmpty && sleepWakeReason == null && continuationRunId == null,
+    );
     final lastUser = history.lastIndexWhere(
       (message) => message.role == AgentMessageRole.user,
     );
@@ -58,7 +62,7 @@ extension ConversationRun on ChatController {
     }
     final userMessage = callbackEvents.isNotEmpty
         ? _callbackContext(callbackEvents)
-        : groupUser ?? (runConversation.isPersonalChat ? history.last : history[lastUser]);
+        : groupUser ?? pendingMessage ?? history[lastUser];
     final continuationProtocol = await _runContinuation(
       conversation: runConversation,
       reply: reply,

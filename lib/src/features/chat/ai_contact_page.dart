@@ -235,6 +235,14 @@ class _AiContactPageState extends State<AiContactPage> {
                                   ).colorScheme.onSurface,
                                 ),
                               ),
+                            (
+                              value: 'toolApprovals',
+                              label: '工具授权',
+                              icon: SettingsIcon(
+                                type: SettingsIconType.permission,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
                             if (!ai.sender.archived &&
                                 _isFriend &&
                                 ai.sender.id != MessageSender.aurai.id)
@@ -258,6 +266,13 @@ class _AiContactPageState extends State<AiContactPage> {
                           );
                         } else if (action == 'remark') {
                           await _remark();
+                        } else if (action == 'toolApprovals') {
+                          await _page(
+                            ToolApprovalsPage(
+                              controller: widget.controller,
+                              senderId: ai.sender.id,
+                            ),
+                          );
                         } else if (action == 'archive') {
                           await _archive();
                         }
@@ -412,16 +427,6 @@ class _AiContactPageState extends State<AiContactPage> {
                         );
                     }
                   }),
-                  _row(
-                    '工具授权',
-                    SettingsIconType.permission,
-                    () => _page(
-                      ToolApprovalsPage(
-                        controller: widget.controller,
-                        senderId: ai.sender.id,
-                      ),
-                    ),
-                  ),
                   if (!ai.sender.archived && _isFriend)
                     _row(
                       '任务',

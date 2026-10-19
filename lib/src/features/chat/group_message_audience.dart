@@ -16,12 +16,21 @@ extension GroupMessageAudience on ChatController {
 
   Future<List<AgentMessage>> _loadPrivateRunHistory(
     Conversation conversation,
-    ExecutionReplyContext reply,
-  ) async {
+    ExecutionReplyContext reply, {
+    bool preparePersonalReply = false,
+  }) async {
     final dispatcher = _execution.personalDispatcher;
     final arrivals = dispatcher == null
         ? const <AgentMessage>[]
         : List<AgentMessage>.of(dispatcher.history);
+    final pending = arrivals
+        .where(
+          (message) => !identical(
+            _execution.personalDeliveredMessages[message.id],
+            message,
+          ),
+        )
+        .toList();
     final history = await _store.reader.messages(
       conversation.id,
       forModel: true,
@@ -29,6 +38,16 @@ extension GroupMessageAudience on ChatController {
       modelConfig: reply.config,
       memoryOwnerId: reply.senderId,
     );
+    // An arrival can precede the previous run's final reply in storage.
+    // Keep that reply as history and deliver this turn's pending batch last.
+    if (preparePersonalReply && pending.isNotEmpty) {
+      final replyIds = pending.map((message) => message.id).toSet();
+      final replyMessages = history
+          .where((message) => replyIds.contains(message.id))
+          .toList();
+      history.removeWhere((message) => replyIds.contains(message.id));
+      history.addAll(replyMessages);
+    }
     if (dispatcher != null) {
       final loaded = history.map((message) => message.id).toSet();
       final delivered = _execution.personalDeliveredMessages;

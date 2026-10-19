@@ -50,7 +50,11 @@ class GroupMessageSelectionState extends State<GroupMessageSelection> {
   String? _text;
   List<String> _recent = const [];
   bool _prepared = false;
-  SelectionMenuOptions _options = (starred: false, actions: const []);
+  SelectionMenuOptions _options = (
+    starred: false,
+    visibility: null,
+    actions: const [],
+  );
   ScrollPosition? _scrollPosition;
 
   @override
@@ -228,6 +232,12 @@ class GroupMessageSelectionState extends State<GroupMessageSelection> {
       actions: actions,
       recent: _recent,
       createdAt: widget.createdAt,
+      visibility: _options.visibility == null
+          ? null
+          : (
+              label: _options.visibility!.label,
+              onTap: () => act((_) => _options.visibility!.onTap()),
+            ),
       sentQuickReplyKeys: widget.sentQuickReplyKeys,
       onReaction: widget.onReaction == null
           ? null

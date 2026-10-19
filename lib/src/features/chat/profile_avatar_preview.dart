@@ -9,6 +9,41 @@ import 'glass_surface.dart';
 import 'profile_avatar.dart';
 import 'question_icon.dart';
 
+ImageProvider? _originalAvatarImage(AvatarStyle style) => style.path != null
+    ? FileImage(File(style.path!))
+    : style.icon == 'app_logo'
+    ? const AssetImage('assets/branding/app_logo.png')
+    : null;
+
+Widget _avatarFlight(
+  AvatarStyle style,
+  String name,
+  Animation<double> animation,
+) {
+  final original = _originalAvatarImage(style);
+  return AnimatedBuilder(
+    animation: animation,
+    builder: (_, child) => LayoutBuilder(
+      builder: (_, constraints) => ClipRRect(
+        borderRadius: BorderRadius.circular(
+          constraints.biggest.shortestSide * .5 * (1 - animation.value),
+        ),
+        child: child,
+      ),
+    ),
+    child: original != null
+        ? Image(image: original, fit: BoxFit.cover)
+        : FittedBox(
+            child: ProfileAvatar(
+              style: style,
+              name: name,
+              size: 512,
+              borderRadius: BorderRadius.zero,
+            ),
+          ),
+  );
+}
+
 class ViewableProfileAvatar extends StatefulWidget {
   const ViewableProfileAvatar({
     super.key,
@@ -34,16 +69,26 @@ class _ViewableProfileAvatarState extends State<ViewableProfileAvatar> {
     label: '查看${widget.name}的头像大图',
     child: GestureDetector(
       onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
-        MaterialPageRoute(
-          builder: (_) => _ProfileAvatarPreview(
+        PageRouteBuilder<void>(
+          opaque: false,
+          transitionDuration: const Duration(milliseconds: 340),
+          reverseTransitionDuration: const Duration(milliseconds: 280),
+          pageBuilder: (_, _, _) => _ProfileAvatarPreview(
             style: widget.style,
             name: widget.name,
             heroTag: _heroTag,
+          ),
+          transitionsBuilder: (_, animation, _, child) => FadeTransition(
+            opacity: animation.drive(CurveTween(curve: Curves.easeInOutCubic)),
+            child: child,
           ),
         ),
       ),
       child: Hero(
         tag: _heroTag,
+        createRectTween: (begin, end) => RectTween(begin: begin, end: end),
+        flightShuttleBuilder: (_, animation, _, _, _) =>
+            _avatarFlight(widget.style, widget.name, animation),
         child: ProfileAvatar(
           style: widget.style,
           name: widget.name,
@@ -65,11 +110,12 @@ class _ProfileAvatarPreview extends StatelessWidget {
   final String name;
   final Object heroTag;
 
-  ImageProvider? get _originalImage => style.path != null
-      ? FileImage(File(style.path!))
-      : style.icon == 'app_logo'
-      ? const AssetImage('assets/branding/app_logo.png')
-      : null;
+  PhotoViewHeroAttributes get _heroAttributes => PhotoViewHeroAttributes(
+    tag: heroTag,
+    createRectTween: (begin, end) => RectTween(begin: begin, end: end),
+    flightShuttleBuilder: (_, animation, _, _, _) =>
+        _avatarFlight(style, name, animation),
+  );
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -77,14 +123,14 @@ class _ProfileAvatarPreview extends StatelessWidget {
     body: LayoutBuilder(
       builder: (context, constraints) {
         final size = math.min(constraints.maxWidth, constraints.maxHeight) - 48;
-        final original = _originalImage;
+        final original = _originalAvatarImage(style);
         return Stack(
           fit: StackFit.expand,
           children: [
             if (original != null)
               PhotoView(
                 imageProvider: original,
-                heroAttributes: PhotoViewHeroAttributes(tag: heroTag),
+                heroAttributes: _heroAttributes,
                 minScale: PhotoViewComputedScale.contained,
                 initialScale: PhotoViewComputedScale.contained,
                 maxScale: PhotoViewComputedScale.contained * 4,
@@ -92,13 +138,18 @@ class _ProfileAvatarPreview extends StatelessWidget {
               )
             else
               PhotoView.customChild(
-                heroAttributes: PhotoViewHeroAttributes(tag: heroTag),
+                heroAttributes: _heroAttributes,
                 childSize: Size.square(size),
                 minScale: PhotoViewComputedScale.contained,
                 initialScale: PhotoViewComputedScale.contained,
                 maxScale: PhotoViewComputedScale.contained * 4,
                 onTapUp: (_, _, _) => Navigator.pop(context),
-                child: ProfileAvatar(style: style, name: name, size: size),
+                child: ProfileAvatar(
+                  style: style,
+                  name: name,
+                  size: size,
+                  borderRadius: BorderRadius.zero,
+                ),
               ),
             Positioned(
               top: 0,

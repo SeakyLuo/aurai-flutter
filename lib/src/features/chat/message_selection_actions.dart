@@ -28,7 +28,11 @@ extension _MessageSelectionActions on _MessageItemState {
           : Future.value(<Map<String, Object?>>[]),
     ).wait;
     if (!mounted)
-      return (starred: starred, actions: const <SelectionMenuAction>[]);
+      return (
+        starred: starred,
+        visibility: null,
+        actions: const <SelectionMenuAction>[],
+      );
     final color = Theme.of(context).colorScheme.onSurface;
     SelectionMenuAction action(
       String label,
@@ -41,6 +45,19 @@ extension _MessageSelectionActions on _MessageItemState {
     );
     return (
       starred: starred,
+      visibility: mark?.isGroup == true && message.hasRestrictedAudience
+          ? (
+              label: message.visibilityLabel,
+              onTap: () => runUiAction(
+                context,
+                () => showMessageVisibilitySheet(
+                  context,
+                  message: message,
+                  database: database,
+                ),
+              ),
+            )
+          : null,
       actions: [
         if (mark?.canPin == true)
           action(
@@ -101,22 +118,6 @@ extension _MessageSelectionActions on _MessageItemState {
               color: color,
             ),
             MessageAction.retry,
-          ),
-        if (mark?.isGroup == true && message.hasRestrictedAudience)
-          (
-            label: '可见范围',
-            icon: ConversationMenuIcon(
-              type: ConversationMenuIconType.members,
-              color: color,
-            ),
-            onTap: () => runUiAction(
-              context,
-              () => showMessageVisibilitySheet(
-                context,
-                message: message,
-                database: database,
-              ),
-            ),
           ),
       ],
     );

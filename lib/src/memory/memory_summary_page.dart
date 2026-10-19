@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../features/chat/contacts_search_bar.dart';
+import '../features/chat/pagination_listener.dart';
 import '../features/chat/sidebar_action_icon.dart';
 import 'memory_source_list.dart';
 import '../app/glass_notice.dart';
@@ -46,7 +47,6 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
   bool _searching = false;
   String _searchValue = '';
   Timer? _searchTimer;
-  bool _loadingMore = false;
   final _text = TextEditingController();
   final _focus = FocusNode();
   bool _saving = false;
@@ -95,18 +95,6 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
     } on Object catch (error) {
       if (mounted)
         memoryToast(context, error.toString(), kind: ToastKind.error);
-    }
-  }
-
-  Future<void> _more() async {
-    setState(() => _loadingMore = true);
-    try {
-      await memory.loadMore();
-    } on Object catch (error) {
-      if (mounted)
-        memoryToast(context, error.toString(), kind: ToastKind.error);
-    } finally {
-      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -346,47 +334,49 @@ class _MemorySummaryPageState extends State<MemorySummaryPage> {
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 640),
-                child: ListView(
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: settingsPagePadding(
-                    context,
-                    EdgeInsets.fromLTRB(
-                      16,
-                      12,
-                      16,
+                child: PaginationListener(
+                  key: ValueKey(memory.searchQuery),
+                  hasMore: memory.hasMore && _plan == null,
+                  loadMore: memory.loadMore,
+                  retryBottomInset:
                       130 + MediaQuery.viewInsetsOf(context).bottom,
+                  child: ListView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: settingsPagePadding(
+                      context,
+                      EdgeInsets.fromLTRB(
+                        16,
+                        12,
+                        16,
+                        130 + MediaQuery.viewInsetsOf(context).bottom,
+                      ),
                     ),
-                  ),
-                  children: [
-                    if (_plan != null)
-                      MemoryPlanPreview(plan: _plan!)
-                    else if (memory.entries.isEmpty)
-                      EmptyDataView(
-                        title: _search.text.isEmpty ? '还没有记忆' : '没有找到相关记忆',
-                        description: _search.text.isEmpty
-                            ? '聊天和任务中的有用信息会留在这里，也可以在下方补充。'
-                            : '换一个名字或关键词试试。',
-                      )
-                    else ...[
-                      for (final entry in memory.entries)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: MemoryEntryTile(
-                            key: ValueKey(entry['id']),
-                            text: entry['text'] as String,
-                            enabled: !_saving && !_planning,
-                            onEdit: () => _edit(entry),
-                            onMenu: (position) => _menu(entry, position),
+                    children: [
+                      if (_plan != null)
+                        MemoryPlanPreview(plan: _plan!)
+                      else if (memory.entries.isEmpty)
+                        EmptyDataView(
+                          title: _search.text.isEmpty ? '还没有记忆' : '没有找到相关记忆',
+                          description: _search.text.isEmpty
+                              ? '聊天和任务中的有用信息会留在这里，也可以在下方补充。'
+                              : '换一个名字或关键词试试。',
+                        )
+                      else ...[
+                        for (final entry in memory.entries)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: MemoryEntryTile(
+                              key: ValueKey(entry['id']),
+                              text: entry['text'] as String,
+                              enabled: !_saving && !_planning,
+                              onEdit: () => _edit(entry),
+                              onMenu: (position) => _menu(entry, position),
+                            ),
                           ),
-                        ),
-                      if (memory.hasMore)
-                        TextButton(
-                          onPressed: _loadingMore ? null : _more,
-                          child: Text(_loadingMore ? '正在加载' : '更多记忆'),
-                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),

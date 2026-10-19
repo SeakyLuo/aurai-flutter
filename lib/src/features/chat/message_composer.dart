@@ -1,6 +1,7 @@
 import 'mention_tap_region.dart';
 import 'mention_text_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'glass_surface.dart';
 
@@ -10,6 +11,7 @@ class MessageComposer extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.enabled,
+    this.inputLocked = false,
     required this.hintText,
     required this.action,
     this.leading,
@@ -23,6 +25,7 @@ class MessageComposer extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool enabled;
+  final bool inputLocked;
   final String hintText;
   final Widget action;
   final Widget? leading;
@@ -127,6 +130,15 @@ class MessageComposer extends StatelessWidget {
                                             controller: controller,
                                             focusNode: focusNode,
                                             enabled: enabled,
+                                            // Keep the IME attached while a send is being saved.
+                                            inputFormatters: inputLocked
+                                                ? [
+                                                    TextInputFormatter.withFunction(
+                                                      (oldValue, newValue) =>
+                                                          oldValue,
+                                                    ),
+                                                  ]
+                                                : null,
                                             style: style,
                                             textAlignVertical: multiline
                                                 ? TextAlignVertical.top

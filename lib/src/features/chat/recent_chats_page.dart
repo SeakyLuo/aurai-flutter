@@ -513,6 +513,8 @@ class RecentChatsPageState extends State<RecentChatsPage> {
               ),
               empty: widget.groupsOnly
                   ? Center(child: EmptyDataView(title: '暂无群聊'))
+                  : !_tasks
+                  ? const Center(child: EmptyDataView(title: '暂无聊天'))
                   : Padding(
                       padding: EdgeInsets.fromLTRB(
                         12,
@@ -539,10 +541,8 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                               name: 'Aurai',
                               size: 48,
                             ),
-                            title: Text(_tasks ? '开始新任务' : '发起聊天'),
-                            subtitle: Text(
-                              _tasks ? '选择一位 AI 开始任务' : '选择一位 AI 开始聊天',
-                            ),
+                            title: const Text('开始新任务'),
+                            subtitle: const Text('选择一位 AI 开始任务'),
                             onTap: _newConversation,
                           ),
                         ),

@@ -1,3 +1,4 @@
+import 'initial_personal_chat.dart';
 import 'group_unread_messages.dart';
 import 'contact_store.dart';
 import 'dart:convert';
@@ -75,6 +76,7 @@ class ConversationStore {
         );
       }
       await clearLegacy();
+      await initializePersonalChat(database);
       await GroupUnreadMessages(database).initialize();
       await database.update('conversations', {
         'archived': 1,

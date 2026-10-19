@@ -24,7 +24,19 @@ Future<Map<String, Object?>> runMemoryConsolidation(
     job['owner_id'] as String,
     scope: job['scope'] as String,
   );
-  final recent = await search.find('', limit: 20);
+  final projectShared = (job['owner_id'] as String).startsWith('project:');
+  final initial = await Future.wait([
+    search.find('', limit: 20),
+    if (!projectShared)
+      database.query(
+        'message_senders',
+        columns: ['name'],
+        where: 'id = ?',
+        whereArgs: [job['owner_id']],
+        limit: 1,
+      ),
+  ]);
+  final recent = initial.first;
   var recentBudget = 12000;
   Map<String, Object?> describe(Map<String, Object?> row) => {
     for (final key in ['id', 'version', 'text', 'kind', 'assertion'])
@@ -43,6 +55,7 @@ Future<Map<String, Object?>> runMemoryConsolidation(
       'role': 'user',
       'content': jsonEncode({
         'owner': job['owner_id'],
+        if (!projectShared) 'owner_name': initial[1].single['name'],
         'scene': job['scope'],
         'evidence': evidence.records,
         'context_only': evidence.context,
