@@ -40,6 +40,10 @@ ModelFailure classifyModelFailure(String detail, {int? statusCode}) {
   for (final failure in ModelFailure.values) {
     if (heading == failure.title) return failure;
   }
+  if (heading == '模型连接已中断' || heading == '模型连接已中断，回复未完成') {
+    return ModelFailure.connection;
+  }
+  if (heading == '模型响应超时') return ModelFailure.timeout;
   final codes = <String>{};
   final messages = <String>{};
   void read(Map value) {

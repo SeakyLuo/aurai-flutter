@@ -164,18 +164,21 @@ extension ConversationRunFailure on ChatController {
     String? runId,
   ) {
     if (!conversation.isPersonalChat) return;
-    conversation.messages.add(
-      AgentMessage(
-        id: newMessageId(),
-        role: AgentMessageRole.assistant,
-        senderId: sender.id,
-        sender: sender,
-        text: conversation.errorDetail!,
-        createdAt: DateTime.now(),
-        isFailure: true,
-        runId: runId,
-      ),
+    final message = AgentMessage(
+      id: newMessageId(),
+      role: AgentMessageRole.assistant,
+      senderId: sender.id,
+      sender: sender,
+      text: conversation.errorDetail!,
+      createdAt: DateTime.now(),
+      isFailure: true,
+      runId: runId,
     );
+    if (_execution.personalDispatcher != null) {
+      _execution.personalFailure = message;
+      return;
+    }
+    conversation.messages.add(message);
     conversation.messageCount++;
   }
 

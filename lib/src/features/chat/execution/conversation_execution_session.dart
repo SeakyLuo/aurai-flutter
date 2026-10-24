@@ -50,6 +50,7 @@ class ConversationExecutionSession {
   Future<void>? get privateRunFinished => _privateRunFinished?.future;
   AgentRuntime? runtime;
   ChatDispatcher? personalDispatcher;
+  AgentMessage? personalFailure;
   final personalDeliveredMessages = <String, AgentMessage>{};
   ChatDispatcher? get chatDispatcher => personalDispatcher ?? groupDispatcher;
   final programRuns = <String, ({String messageId, AgentRuntime runtime})>{};

@@ -65,8 +65,6 @@ extension PersonalChatDispatch on ChatController {
       respond: (_, snapshot) async {
         final initial = first;
         first = false;
-        failure = null;
-        failureStack = null;
         try {
           if (conversation.runState == ChatRunState.stopping) {
             throw const AgentCancelled();
@@ -80,6 +78,9 @@ extension PersonalChatDispatch on ChatController {
           );
           // Live arrivals already consumed by the previous run need no new reply.
           if (!initial && !woke && pending.isEmpty) return;
+          failure = null;
+          failureStack = null;
+          _execution.personalFailure = null;
           final pendingMessage = pending.lastOrNull;
           final reason = woke
               ? await _groupSleepDraft(
@@ -98,6 +99,7 @@ extension PersonalChatDispatch on ChatController {
         }
       },
       // The existing private-run boundary persists and presents reply failures.
+      // Defer the card until dispatch settles, keeping per-run diagnostics.
       failed: (_, error) async {
         failure = error;
       },
@@ -108,11 +110,21 @@ extension PersonalChatDispatch on ChatController {
       dispatcher.runOnce(reply.senderId);
       await dispatcher.done;
       if (failure != null) {
+        if (failure is! AgentCancelled) {
+          // Failures before the reply boundary are presented by the outer guard.
+          if (_execution.personalFailure case final message?) {
+            conversation.messages.add(message);
+            conversation.messageCount++;
+            await _persistMember(conversation, null);
+            _notifyRun(conversation);
+          }
+        }
         Error.throwWithStackTrace(failure!, failureStack!);
       }
     } finally {
       dispatcher.stop();
       _execution.personalDispatcher = null;
+      _execution.personalFailure = null;
       _execution.personalDeliveredMessages.clear();
     }
   }

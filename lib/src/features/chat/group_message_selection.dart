@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../app/glass_notice.dart';
 import '../../app/ui_action.dart';
 import '../../storage/quick_reply_recents.dart';
 import 'attachment_action_icon.dart';
@@ -176,8 +178,20 @@ class GroupMessageSelectionState extends State<GroupMessageSelection> {
           (
             label: '复制',
             icon: CopyIcon(color: color),
-            onTap: () {
-              item.onPressed!();
+            onTap: () async {
+              final origin = this.context;
+              final text = _text!;
+              final copied = await runUiAction(
+                origin,
+                () => Clipboard.setData(ClipboardData(text: text)),
+              );
+              if (!mounted || !copied) return;
+              selection.hideToolbar();
+              selection.clearSelection();
+              ScaffoldMessenger.of(origin).showToast(
+                const SnackBar(content: Text('已复制')),
+                kind: ToastKind.success,
+              );
             },
           ),
       if (widget.onQuote case final quote?)
