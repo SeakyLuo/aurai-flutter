@@ -36,6 +36,28 @@ const htmlGameLifecycleScript = r'''
   window.AuraiHTML=Object.freeze({
     get presentation(){return structuredClone(presentation)},
     ai:window.__auraiAi,
+    location:Object.freeze({
+      reverseGeocode({latitude,longitude}){
+        if(!presentation.interactive)return Promise.reject(new Error('请在右侧详情中操作'));
+        return appData({operation:'reverseGeocode',latitude,longitude});
+      }
+    }),
+    files:Object.freeze({
+      info(){return appData({operation:'files',action:'info'})},
+      importStatus(){return appData({operation:'files',action:'status'})},
+      importArchive(){
+        if(!navigator.userActivation.isActive)return Promise.reject(new Error('Import from a user action'));
+        return appData({operation:'files',action:'import'});
+      },
+      listRecords(collection,{query='',offset=0,limit=24,favorite=false}={}){
+        return appData({operation:'files',action:'query',collection,query,offset,limit,favorite});
+      },
+      readRecord(collection,key){return appData({operation:'files',action:'record',collection,key})},
+      readDocument(name){return appData({operation:'files',action:'document',name})},
+      imageUrl(generation,path){
+        return 'https://aurai-game.invalid/app-files/'+encodeURIComponent(generation)+'/'+path.split('/').map(encodeURIComponent).join('/');
+      }
+    }),
     get events(){return structuredClone(events)},
     async readEvent(eventId){const result=await appData({operation:'events',eventId});return result.events[0]??null},
     async retryEvent(eventId){
@@ -56,6 +78,7 @@ const htmlGameLifecycleScript = r'''
       if(!navigator.userActivation.isActive)return Promise.reject(new Error('Open profiles from a user action'));
       return appData({operation:'openProfile',senderId});
     },
+    patchData(name,fields,expectedRevision){return appData({operation:'patch',name,fields,expectedRevision})},
     writeData(name,value,expectedRevision){return appData({operation:'write',name,value,expectedRevision})},
     get messageState(){return window.__auraiMessageState()},
     get interaction(){return window.__auraiInteractionState()},

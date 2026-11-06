@@ -47,10 +47,7 @@ class _TaskProgressListState extends State<TaskProgressList> {
   Widget build(BuildContext context) {
     final steps = widget.steps;
     final completed = steps
-        .where(
-          (step) =>
-              step['status'] == 'completed' || step['status'] == 'skipped',
-        )
+        .where((step) => step['status'] == 'completed')
         .length;
     if (steps.isEmpty) return const SizedBox.shrink();
     var currentIndex = steps.indexWhere(

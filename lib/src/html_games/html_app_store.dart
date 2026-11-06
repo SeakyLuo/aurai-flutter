@@ -125,6 +125,17 @@ class HtmlAppStore {
         .cast<String, Object?>();
   }
 
+  static Map<String, Object?> _patchValue(
+    Map previous,
+    Map<String, Object?> fields,
+  ) {
+    if (previous['revision'] == 0 ||
+        previous['value'] is! Map<String, dynamic>) {
+      throw StateError('只能更新已存在的 JSON 对象文档');
+    }
+    return {...(previous['value'] as Map).cast<String, Object?>(), ...fields};
+  }
+
   /// Both the page and AI use this transaction to serialize versioned writes.
   Future<Map<String, Object?>> data(
     String? id,
@@ -134,13 +145,19 @@ class HtmlAppStore {
     bool write = false,
     int? expectedRevision,
     Object? value,
+    Map<String, Object?>? patch,
   }) async {
     HtmlDataCommit? commit;
     try {
       return await database.transaction((txn) async {
         final apps = id == null
             ? <Map<String, Object?>>[]
-            : await txn.query('html_apps', where: 'id = ?', whereArgs: [id]);
+            : await txn.query(
+                'html_apps',
+                columns: ['creator_id', 'version'],
+                where: 'id = ?',
+                whereArgs: [id],
+              );
         if (id != null && apps.isEmpty) throw StateError('小程序不存在');
         Map<String, Object?>? session;
         if (messageId == null) {
@@ -169,7 +186,7 @@ class HtmlAppStore {
             throw StateError('数据已更新，请重新读取后再保存');
           final next = {
             'revision': (previous['revision'] as int) + 1,
-            'value': value,
+            'value': patch == null ? value : _patchValue(previous, patch),
           };
           documents[name] = next;
           final encoded = jsonEncode(documents);
@@ -177,7 +194,7 @@ class HtmlAppStore {
             'html_games',
             {
               'session_data_json': encoded,
-              'version': (session['version'] as int) + 1,
+              'version': (session['version'] as int) + (patch == null ? 1 : 0),
               'preview': null,
               'updated_at': DateTime.now().microsecondsSinceEpoch,
             },
@@ -196,11 +213,13 @@ class HtmlAppStore {
         }
         final next = {
           'revision': (previous['revision'] as int) + 1,
-          'value': value,
+          'value': patch == null ? value : _patchValue(previous, patch),
         };
         final bytes = utf8.encode(jsonEncode(next));
         await commit!.replace(txn, bytes);
-        final version = (apps.single['version'] as int) + 1;
+        // Patches change document revisions, not the message interaction/code version.
+        final version =
+            (apps.single['version'] as int) + (patch == null ? 1 : 0);
         await txn.update(
           'html_apps',
           {
@@ -212,7 +231,7 @@ class HtmlAppStore {
         );
         await txn.update(
           'html_games',
-          {'version': version, 'preview': null},
+          {if (patch == null) 'version': version, 'preview': null},
           where: 'app_id = ? AND session_data_json IS NULL',
           whereArgs: [id],
         );

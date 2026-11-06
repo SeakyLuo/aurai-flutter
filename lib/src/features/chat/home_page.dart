@@ -18,8 +18,9 @@ class HomePage extends StatefulWidget {
   static void showConversations() {
     final state = navigationKey.currentState!;
     state._miniapps.currentState?.close();
-    state._pages.jumpToPage(0);
+    state._conversationTabRequested = true;
     state._pageChanged(0);
+    state._applyConversationTab();
   }
 
   final ChatController controller;
@@ -32,11 +33,19 @@ class _HomePageState extends State<HomePage> with RouteAware {
   final _miniapps = GlobalKey<HomeMiniappDrawerState>();
   bool _miniappsOpen = false;
   int _tab = 0;
-  final _pages = PageController();
+  bool _conversationTabRequested = false;
+  late final _pages = PageController(onAttach: (_) => _applyConversationTab());
   final _contactSearch = TextEditingController();
   final _contactSearchFocus = FocusNode();
   bool _searchingContacts = false;
   bool _contactDetailOpen = false;
+
+  void _applyConversationTab() {
+    // Source navigation can request the home tab before its PageView mounts.
+    if (!_conversationTabRequested || !_pages.hasClients) return;
+    _pages.jumpToPage(0);
+    _conversationTabRequested = false;
+  }
 
   void _contactDetailChanged(bool open) {
     setState(() => _contactDetailOpen = open);

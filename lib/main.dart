@@ -12,8 +12,8 @@ Future<void> main() async {
   runApp(const AuraiStartup());
 }
 
-/// Reserved Android entry point. Existing miniapp launchers intentionally keep
-/// using in-app routes and split panes; no user-facing entry opens a task yet.
+/// Android full-screen miniapps own a task; inline cards and split panes
+/// continue using the application engine.
 @pragma('vm:entry-point')
 void miniappMain() {
   WidgetsFlutterBinding.ensureInitialized();

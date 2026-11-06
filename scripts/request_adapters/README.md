@@ -9,6 +9,7 @@
 | gpt-6-luna | Responses | dmx-gpt-6-luna.js |
 | gpt-6-sol | Responses | dmx-gpt-6-sol.js |
 | gpt-6-astra | Responses | dmx-gpt-6-astra.js |
+| gpt-6.1-terra | Responses | dmx-gpt-6.1-terra.js |
 
 Luna 已实测同样不支持 Chat Completions 下同时使用思考和工具，因此改用完整 Responses 协议；token 参数由协议层生成 `max_output_tokens`。
 
@@ -17,3 +18,5 @@ Luna 已实测同样不支持 Chat Completions 下同时使用思考和工具，
 配套 JSON 是 `providerDetails.requestAdapters` 的内容，供配置工具使用，不是脚本编辑器内容。
 
 Luna 已使用实际脚本通过两轮真实 Responses 流式请求验证：第一轮携带 reasoning 和 function tools，第二轮重放完整输出与工具结果，两轮均返回 completed。Sol 的同一脚本尚未做独立网络验证。两个模型配置已写入手机数据库；运行中的 App 需重新加载配置。没有安装、停止或重启 App。
+
+Terra 同样因 Chat Completions 下思考与工具调用组合返回 HTTP 400，已单独配置 Responses。已通过携带思考和工具的两轮真实流式请求验证：第一轮返回函数调用，第二轮接收工具结果并回复 OK，均为 completed；手机运行中的 App 已通过设置页保存并生效。

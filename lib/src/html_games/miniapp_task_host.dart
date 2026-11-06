@@ -32,8 +32,8 @@ abstract final class MiniappTaskHost {
     if (!_controller.isCompleted) _controller.complete(controller);
   }
 
-  // 已实现但暂不接入：openMiniapp / HtmlView.openFullscreen 继续走现有路由。
-  // 未来只替换 Android 全屏入口；内嵌消息和分屏不要调用此入口。
+  // Android 全屏入口使用独立任务；内嵌消息和分屏不要调用此入口。
+  // 安装/更新仍由现有 launcher 负责。
   // appId 必须是现有 launcher 完成安装/更新后得到的 runtimeId。
   static Future<void> openApp({required String title, required String appId}) =>
       channel.invokeMethod<void>('open', {'title': title, 'appId': appId});
@@ -61,8 +61,13 @@ abstract final class MiniappTaskHost {
         input as Map,
       );
       _sessions[instance] = pending;
-      final task = await pending;
-      return task.description;
+      try {
+        final task = await pending;
+        return task.description;
+      } on Object {
+        if (identical(_sessions[instance], pending)) _sessions.remove(instance);
+        rethrow;
+      }
     }
     if (method == 'close') {
       final pending = _sessions.remove(instance);
@@ -78,6 +83,14 @@ abstract final class MiniappTaskHost {
     switch (method) {
       case 'bind':
         await session.bind(task.channelId);
+      case 'layout':
+        final layout = input as Map;
+        await session.updateHostLayout(
+          topInset: (layout['topInset'] as num).toDouble(),
+          safeTopInset: (layout['safeTopInset'] as num).toDouble(),
+          safeBottomInset: (layout['safeBottomInset'] as num).toDouble(),
+          rightInset: 124,
+        );
       case 'visibility':
         await session.setVisible(input as bool);
       case 'theme':

@@ -257,11 +257,12 @@ class AgentRunStore {
       );
       if (finalMessageId != null) {
         // Failure cards keep their type even when they are the run's last message.
+        // Explicitly delivered messages have no model turn and remain chat messages.
         batch.update(
           'messages',
           {'kind': 'commentary'},
           where:
-              "run_id = ? AND id != ? AND kind NOT IN ('group_message', 'html_game', 'reasoning', 'system', 'message_failure') AND interactive_json IS NULL",
+              "run_id = ? AND id != ? AND model_turn_id IS NOT NULL AND kind NOT IN ('group_message', 'html_game', 'reasoning', 'system', 'message_failure') AND interactive_json IS NULL",
           whereArgs: [runId, finalMessageId],
         );
         batch.update(

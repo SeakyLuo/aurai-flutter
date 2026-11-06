@@ -71,6 +71,10 @@ object HtmlGamePool : ComponentCallbacks2 {
         }
     }
 
+    fun filesChanged(appId: String) {
+        pages.values.forEach { it.filesChanged(appId) }
+    }
+
     private fun releaseIdle() {
         underPressure = true
         val iterator = pages.entries.iterator()

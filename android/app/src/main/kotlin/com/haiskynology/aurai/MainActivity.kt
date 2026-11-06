@@ -11,16 +11,26 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
 
 class MainActivity : FlutterActivity() {
+    private var restoreMiniapp = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        restoreMiniapp = shouldRestoreMiniapp(intent)
         handleNotificationIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        restoreMiniapp = shouldRestoreMiniapp(intent)
         handleNotificationIntent(intent)
     }
+
+    private fun shouldRestoreMiniapp(intent: Intent) =
+        intent.action == Intent.ACTION_MAIN &&
+            intent.hasCategory(Intent.CATEGORY_LAUNCHER) &&
+            intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0 &&
+            !intent.hasExtra("projectId") && !intent.hasExtra("conversationId")
 
     private fun handleNotificationIntent(intent: Intent) {
         val projectId = intent.getStringExtra("projectId")
@@ -55,6 +65,9 @@ class MainActivity : FlutterActivity() {
         super.onResume()
         current = this
         isResumed = true
+        val restore = restoreMiniapp
+        restoreMiniapp = false
+        if (!restore || !MiniappTaskHistory.restore(this)) MiniappTaskHistory.clear(this)
         AgentSessionService.clearFinishedNotification(this)
         val backupStatus = java.io.File(applicationInfo.dataDir, "backup-status.txt")
         if (backupStatus.exists()) {
@@ -81,6 +94,7 @@ class MainActivity : FlutterActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == PreviewImageAccess.REQUEST) PreviewImageAccess.picker?.selected(if (resultCode == RESULT_OK) data?.data else null)
         if (requestCode == ChatFileAccess.REQUEST) ChatFileAccess.picker?.selected(if (resultCode == RESULT_OK) data else null)
+        if (requestCode == MiniappFilesAccess.REQUEST) MiniappFilesAccess.picker?.selected(if (resultCode == RESULT_OK) data else null)
         if (requestCode == DocumentAccess.REQUEST) DocumentAccess.picker?.selected(if (resultCode == RESULT_OK) data else null)
         if (requestCode == DocumentAccess.PROJECT_FILES_REQUEST) DocumentAccess.projectFilesPicker?.selectedProjectFiles(if (resultCode == RESULT_OK) data else null)
         if (requestCode == DataManagementAccess.REQUEST) DataManagementAccess.picker?.selected(if (resultCode == RESULT_OK) data?.data else null)

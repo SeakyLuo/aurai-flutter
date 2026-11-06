@@ -13,6 +13,20 @@ import java.util.UUID
 
 /** Each document owns its UI engine; the application engine owns data and AI. */
 class MiniappTaskActivity : FlutterActivity() {
+    override fun onResume() {
+        super.onResume()
+        current = this
+        MiniappTaskHistory.remember(this)
+    }
+    override fun onPause() { if (current === this) current = null; super.onPause() }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == MiniappFilesAccess.REQUEST) MiniappFilesAccess.picker?.selected(if (resultCode == RESULT_OK) data else null)
+    }
+    companion object {
+        var current: MiniappTaskActivity? = null
+            private set
+    }
     private val instance = UUID.randomUUID().toString()
     private lateinit var channel: MethodChannel
 
@@ -47,7 +61,14 @@ class MiniappTaskActivity : FlutterActivity() {
                     setTaskDescription(ActivityManager.TaskDescription(args["title"] as String, icon))
                     result.success(null)
                 }
-                "finish" -> { result.success(null); finishAndRemoveTask() }
+                "finish" -> {
+                    MiniappTaskHistory.closed(this)
+                    MiniappTasks.showMain(applicationContext)
+                    val error = call.arguments as String?
+                    if (error != null) Toast.makeText(applicationContext, error, Toast.LENGTH_LONG).show()
+                    result.success(null)
+                    finishAndRemoveTask()
+                }
                 else -> result.notImplemented()
             }
         }
@@ -59,6 +80,7 @@ class MiniappTaskActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        if (isFinishing) MiniappTaskHistory.closed(this)
         MiniappTasks.windows.remove(instance)
         // Dart UI disposal is not guaranteed when an engine is destroyed.
         // Release the host session even when the user swipes the task away.
@@ -81,6 +103,12 @@ object MiniappTasks {
     lateinit var host: MethodChannel
     lateinit var hostMessenger: io.flutter.plugin.common.BinaryMessenger
     val windows = mutableMapOf<String, MethodChannel>()
+
+    fun showMain(context: android.content.Context) {
+        context.startActivity(Intent(context, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        })
+    }
 
     fun register(application: AuraiApplication, engine: FlutterEngine) {
         hostMessenger = engine.dartExecutor.binaryMessenger
@@ -109,9 +137,7 @@ object MiniappTasks {
                         result.success(null)
                     }
                     "showMain" -> {
-                        application.startActivity(Intent(application, MainActivity::class.java).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                        })
+                        showMain(application)
                         result.success(null)
                     }
                     else -> result.notImplemented()

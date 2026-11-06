@@ -511,43 +511,15 @@ class RecentChatsPageState extends State<RecentChatsPage> {
                 12,
                 MediaQuery.paddingOf(context).bottom + 24,
               ),
-              empty: widget.groupsOnly
-                  ? Center(child: EmptyDataView(title: '暂无群聊'))
-                  : !_tasks
-                  ? const Center(child: EmptyDataView(title: '暂无聊天'))
-                  : Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        12,
-                        MediaQuery.paddingOf(context).top +
-                            SettingsAppBar.toolbarHeight +
-                            8,
-                        12,
-                        0,
-                      ),
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: _roundedTile(
-                          ListTile(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 0,
-                            ),
-                            horizontalTitleGap: 12,
-                            leading: const ProfileAvatar(
-                              style: AvatarStyle(icon: 'app_logo'),
-                              name: 'Aurai',
-                              size: 48,
-                            ),
-                            title: const Text('开始新任务'),
-                            subtitle: const Text('选择一位 AI 开始任务'),
-                            onTap: _newConversation,
-                          ),
-                        ),
-                      ),
-                    ),
+              empty: Center(
+                child: EmptyDataView(
+                  title: widget.groupsOnly
+                      ? '暂无群聊'
+                      : _tasks
+                      ? '暂无任务'
+                      : '暂无聊天',
+                ),
+              ),
               children: [
                 for (final item in _visibleItems)
                   ConversationMore(
@@ -619,13 +591,4 @@ class RecentChatsPageState extends State<RecentChatsPage> {
       },
     );
   }
-
-  Widget _roundedTile(Widget child, {bool pinned = false}) => Material(
-    color: pinned
-        ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.035)
-        : Colors.transparent,
-    borderRadius: BorderRadius.circular(16),
-    clipBehavior: Clip.antiAlias,
-    child: child,
-  );
 }

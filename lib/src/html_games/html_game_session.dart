@@ -5,6 +5,7 @@ import 'html_ai_service.dart';
 import '../storage/html_callback_state.dart';
 import '../storage/message_callbacks.dart';
 import 'html_app_store.dart';
+import 'miniapp_files.dart';
 import '../storage/interactive_message_store.dart';
 import 'package:flutter/material.dart';
 import 'html_message_theme.dart';
@@ -26,6 +27,8 @@ abstract final class HtmlGameSignals {
   startNextSession;
   static final callbackChanges = HtmlCallbackState.changes;
   static final changes = StreamController<String>.broadcast();
+  static final dataChanges =
+      StreamController<({String scope, Object source})>.broadcast();
   static final appChanges = StreamController<String>.broadcast();
 }
 
@@ -58,6 +61,18 @@ class HtmlGameSession extends ChangeNotifier {
     _appUpdates = HtmlGameSignals.appChanges.stream
         .where((id) => id == game.appId)
         .listen((_) => unawaited(_reload()));
+    _dataUpdates = HtmlGameSignals.dataChanges.stream
+        .where((event) => event.scope == _dataScope)
+        .listen((event) {
+          ++_captureGeneration;
+          preview = null;
+          previewVersion = null;
+          HtmlGameDisplayCache.invalidate(game.messageId);
+          if (!identical(event.source, this)) {
+            _pendingDataChange = true;
+            unawaited(_sendDataChange());
+          }
+        });
     _callbackUpdates = HtmlCallbackState.changes.stream
         .where((id) => id == game.messageId)
         .listen((_) => unawaited(_sendCallbacks()));
@@ -80,14 +95,15 @@ class HtmlGameSession extends ChangeNotifier {
   final Future<void> Function()? onNextSession;
   final bool fullscreen;
   final bool independent;
-  final double hostTopInset;
-  final double hostSafeTopInset;
-  final double hostSafeBottomInset;
-  final double hostRightInset;
+  double hostTopInset;
+  double hostSafeTopInset;
+  double hostSafeBottomInset;
+  double hostRightInset;
   late final Timer _readyTimeout;
   Future<void> _localWrite = Future.value();
   Timer? _captureTimer;
   bool _capturing = false;
+  int _captureGeneration = 0;
   String? _lastLocalState;
   double? contentHeight;
   List<Rect> gestureRegions = const [];
@@ -98,6 +114,17 @@ class HtmlGameSession extends ChangeNotifier {
   late final StreamSubscription<String> _callbackUpdates;
   late final StreamSubscription<String> _appUpdates;
   late final StreamSubscription<String> _interactiveUpdates;
+  late final StreamSubscription<({String scope, Object source})> _dataUpdates;
+  bool _pendingDataChange = false;
+  String get _dataScope =>
+      game.sessionScoped ? 'message:${game.messageId}' : 'app:${game.appId}';
+  Future<void> _sendDataChange() async {
+    if (!_pendingDataChange || !_pageLoaded || !_visible || _closed || _closing)
+      return;
+    _pendingDataChange = false;
+    await _channel?.invokeMethod<void>('dataChanged');
+  }
+
   final _ai = HtmlAiService();
   late final _board = BoardGameService(
     store.database,
@@ -215,6 +242,7 @@ class HtmlGameSession extends ChangeNotifier {
         await _localWrite;
       } else if (call.method == 'ready') {
         _pageLoaded = true;
+        await channel.invokeMethod<void>('layout', hostLayout);
         // Android's state acknowledgement waits for a visual frame; only then
         // may the view remove the previous preview covering the platform surface.
         await channel.invokeMethod<void>(
@@ -224,6 +252,7 @@ class HtmlGameSession extends ChangeNotifier {
         await channel.invokeMethod<void>('theme', htmlMessageTheme(theme));
         await channel.invokeMethod<void>('state', jsonEncode(game.snapshot()));
         await _sendCallbacks();
+        await _sendDataChange();
         if (_closed || _closing) return null;
         _readyTimeout.cancel();
         ready = true;
@@ -263,6 +292,46 @@ class HtmlGameSession extends ChangeNotifier {
         try {
           final args = (jsonDecode(call.arguments as String) as Map)
               .cast<String, Object?>();
+          if (args['operation'] == 'reverseGeocode') {
+            if (!_interactive || !_visible) {
+              throw StateError('请在可见的小程序页面中识别照片地址');
+            }
+            final latitude = (args['latitude'] as num).toDouble();
+            final longitude = (args['longitude'] as num).toDouble();
+            if (!latitude.isFinite ||
+                !longitude.isFinite ||
+                latitude < -90 ||
+                latitude > 90 ||
+                longitude < -180 ||
+                longitude > 180) {
+              throw ArgumentError('照片定位坐标无效');
+            }
+            try {
+              return jsonEncode(
+                await channel.invokeMethod<Object?>('reverseGeocode', {
+                  'latitude': latitude,
+                  'longitude': longitude,
+                }),
+              );
+            } on PlatformException catch (failure) {
+              return jsonEncode({
+                'error': failure.message,
+                'code': failure.code,
+                'details': failure.details,
+              });
+            }
+          }
+          if (args['operation'] == 'files') {
+            if (!independent || game.appId == null || game.sessionScoped) {
+              throw StateError('请从小程序库打开后访问本地资料');
+            }
+            if (args['action'] == 'import' && (!_interactive || !_visible)) {
+              throw StateError('请在可见的小程序页面中导入资料');
+            }
+            return jsonEncode(
+              await MiniappFiles.invoke(store.database, game.appId!, args),
+            );
+          }
           if (args['operation'] == 'board') {
             final request = (args['request'] as Map).cast<String, Object?>();
             if (!_interactive && request['operation'] == 'begin') {
@@ -351,8 +420,11 @@ class HtmlGameSession extends ChangeNotifier {
               ),
             });
           }
-          final write = args['operation'] == 'write';
-          if (!['read', 'write'].contains(args['operation'])) {
+          final patch = args['operation'] == 'patch';
+          final write = args['operation'] == 'write' || patch;
+          if (patch && (!_interactive || !_visible))
+            throw StateError('请在可见的小程序页面中保存');
+          if (!['read', 'write', 'patch'].contains(args['operation'])) {
             throw ArgumentError('不支持的数据操作');
           }
           final result = await HtmlAppStore(store.database).data(
@@ -363,7 +435,14 @@ class HtmlGameSession extends ChangeNotifier {
             write: write,
             expectedRevision: args['expectedRevision'] as int?,
             value: args['value'],
+            patch: patch
+                ? (args['fields'] as Map).cast<String, Object?>()
+                : null,
           );
+          if (patch) {
+            HtmlGameSignals.dataChanges.add((scope: _dataScope, source: this));
+            return jsonEncode({'revision': result['revision']});
+          }
           if (write) {
             if (game.sessionScoped) {
               HtmlGameSignals.changes.add(game.messageId);
@@ -421,12 +500,7 @@ class HtmlGameSession extends ChangeNotifier {
       }
       return null;
     });
-    await channel.invokeMethod<void>('connect', {
-      'topInset': hostTopInset,
-      'safeTopInset': hostSafeTopInset,
-      'safeBottomInset': hostSafeBottomInset,
-      'rightInset': hostRightInset,
-    });
+    await channel.invokeMethod<void>('connect', hostLayout);
   }
 
   Future<void> _sendCallbacks() async {
@@ -519,6 +593,35 @@ class HtmlGameSession extends ChangeNotifier {
       await _ai.cancelAll();
     }
     if (ready) await _channel?.invokeMethod<void>('visibility', value);
+    if (value) await _sendDataChange();
+  }
+
+  Map<String, double> get hostLayout => {
+    'topInset': hostTopInset,
+    'safeTopInset': hostSafeTopInset,
+    'safeBottomInset': hostSafeBottomInset,
+    'rightInset': hostRightInset,
+  };
+
+  Future<void> updateHostLayout({
+    required double topInset,
+    required double safeTopInset,
+    required double safeBottomInset,
+    required double rightInset,
+  }) async {
+    if (hostTopInset == topInset &&
+        hostSafeTopInset == safeTopInset &&
+        hostSafeBottomInset == safeBottomInset &&
+        hostRightInset == rightInset)
+      return;
+    hostTopInset = topInset;
+    hostSafeTopInset = safeTopInset;
+    hostSafeBottomInset = safeBottomInset;
+    hostRightInset = rightInset;
+    _document = null;
+    if (_pageLoaded && !_closed && !_closing) {
+      await _channel!.invokeMethod<void>('layout', hostLayout);
+    }
   }
 
   Future<void> updateTheme(ThemeData next, {bool force = false}) async {
@@ -567,12 +670,16 @@ class HtmlGameSession extends ChangeNotifier {
       return;
     _capturing = true;
     final version = game.version;
+    final generation = _captureGeneration;
     final captureTheme = theme;
     try {
       final bytes = await _channel
           ?.invokeMethod<Uint8List>('snapshot')
           .timeout(const Duration(seconds: 1));
-      if (bytes != null && version == game.version && captureTheme == theme) {
+      if (bytes != null &&
+          generation == _captureGeneration &&
+          version == game.version &&
+          captureTheme == theme) {
         preview = bytes;
         previewVersion = version;
         previewTheme = captureTheme.brightness.name;
@@ -605,6 +712,7 @@ class HtmlGameSession extends ChangeNotifier {
       _closed = true;
       await _updates.cancel();
       await _appUpdates.cancel();
+      await _dataUpdates.cancel();
       await _callbackUpdates.cancel();
       await _interactiveUpdates.cancel();
       try {

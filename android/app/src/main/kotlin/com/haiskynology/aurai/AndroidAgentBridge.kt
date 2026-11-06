@@ -21,6 +21,7 @@ import java.time.Instant
 class AndroidAgentBridge(private val context: Context) {
     private val visionImages = VisionImageAccess()
     private val chatFiles = ChatFileAccess(context)
+    private val miniappFiles = MiniappFilesAccess(context)
     private val previewImages = PreviewImageAccess(context)
     private val documents = DocumentAccess(context)
     private val projectShortcuts = ProjectShortcutAccess(context)
@@ -35,6 +36,7 @@ class AndroidAgentBridge(private val context: Context) {
         if (visionImages.handle(call, result)) return true
         if (previewImages.handle(call, result)) return true
         if (chatFiles.handle(call, result)) return true
+        if (miniappFiles.handle(call, result)) return true
         if (documents.handle(call, result)) return true
         if (projectShortcuts.handle(call, result)) return true
         when (call.method) {

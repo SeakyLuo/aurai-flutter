@@ -1,5 +1,14 @@
 [
   {
+    "id": "builtin.random-menu",
+    "title": "随机菜单",
+    "description": "绿色主题的饮食小助手。支持菜谱录入、标签筛选、随机挑选、收藏和本次菜单管理；餐厅与 AI 配菜单尚未开放。",
+    "publisherId": "user:local",
+    "asset": "assets/miniapps/random-menu.html",
+    "iconAsset": "assets/miniapps/icons/random-menu.png",
+    "version": "00bca6beeab3062da015372f241b5e399fb8d099c3d6efd78f40723db2a714c7"
+  },
+  {
     "id": "builtin.tipoff",
     "title": "TipOff",
     "description": "选择一位球员，重新打完整个职业生涯。创建球员、参加比赛，体验成长与交易。",

@@ -61,15 +61,36 @@ class _MiniappRunPageState extends State<MiniappRunPage>
         fullscreen: true,
         independent: true,
         hostTopInset:
-            MediaQuery.paddingOf(context).top + SettingsAppBar.toolbarHeight,
-        hostSafeTopInset: MediaQuery.paddingOf(context).top,
-        hostSafeBottomInset: MediaQuery.paddingOf(context).bottom,
+            MediaQuery.viewPaddingOf(context).top +
+            SettingsAppBar.toolbarHeight,
+        hostSafeTopInset: MediaQuery.viewPaddingOf(context).top,
+        hostSafeBottomInset: MediaQuery.viewPaddingOf(context).bottom,
         hostRightInset: 124,
       )..addListener(_changed);
     } else {
       unawaited(_session!.updateTheme(Theme.of(context)));
     }
+    final padding = MediaQuery.viewPaddingOf(context);
+    unawaited(_syncHostLayout(padding));
     _visibility();
+  }
+
+  Future<void> _syncHostLayout(EdgeInsets padding) async {
+    try {
+      await _session!.updateHostLayout(
+        topInset: padding.top + SettingsAppBar.toolbarHeight,
+        safeTopInset: padding.top,
+        safeBottomInset: padding.bottom,
+        rightInset: 124,
+      );
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showToast(
+          SnackBar(content: Text(errorMessage(error))),
+          kind: ToastKind.error,
+        );
+      }
+    }
   }
 
   void _changed() {
@@ -154,7 +175,7 @@ class _MiniappRunPageState extends State<MiniappRunPage>
             ),
           ),
           Positioned(
-            top: MediaQuery.paddingOf(context).top,
+            top: MediaQuery.viewPaddingOf(context).top,
             right: 16,
             height: SettingsAppBar.toolbarHeight,
             child: Center(

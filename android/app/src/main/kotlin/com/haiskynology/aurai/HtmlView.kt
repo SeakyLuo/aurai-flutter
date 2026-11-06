@@ -94,7 +94,8 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
         }
         web.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
-                MiniappAssetResources.response(webContext.assets, request)
+                MiniappFilesStore.response(webContext, appId, request)
+                    ?: MiniappAssetResources.response(webContext.assets, request)
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = true
             override fun onPageFinished(view: WebView, url: String) {
                 if (!disposed) { loaded = true; channel?.invokeMethod("ready", null); if (!attached) pause() }
@@ -194,7 +195,7 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                     }
                     channel?.invokeMethod("appData", json, object : MethodChannel.Result {
                         override fun success(result: Any?) = reply(result as String)
-                        override fun error(code: String, message: String?, details: Any?) = reply("{\"error\":${JSONObject.quote(message ?: "数据读写失败")}}")
+                        override fun error(code: String, message: String?, details: Any?) = reply("{\"error\":${JSONObject.quote(listOfNotNull(message, "错误码：$code", details?.toString()).joinToString("\n"))}}")
                         override fun notImplemented() = error("unavailable", "数据接口不可用", null)
                     })
                 }
@@ -235,6 +236,18 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
     }
 
 
+    private fun applyHostLayout(insets: Map<*, *>) {
+        val display = JSONObject.quote(if (fullscreen) "fullscreen" else "inline")
+        val layout = "const root=document.documentElement;root.dataset.auraiDisplay=$display;" +
+            "root.style.setProperty('--aurai-host-top-inset','${insets["topInset"]}px');" +
+            "root.style.setProperty('--aurai-host-safe-top-inset','${insets["safeTopInset"]}px');" +
+            "root.style.setProperty('--aurai-host-safe-bottom-inset','${insets["safeBottomInset"]}px');" +
+            "root.style.setProperty('--aurai-host-right-inset','${insets["rightInset"]}px');" +
+            "root.style.setProperty('--aurai-host-menu-width','${if (fullscreen) 0 else 38}px');" +
+            "root.style.setProperty('--aurai-host-menu-height','${if (fullscreen) 0 else 36}px');"
+        web.evaluateJavascript("(()=>{$layout document.dispatchEvent(new Event('aurai:displaychange')); window.dispatchEvent(new Event('resize')); window.__auraiMeasure?.();})()", null)
+    }
+
     fun attach(context: Context, messenger: BinaryMessenger, id: Int, fullscreen: Boolean): Int {
         channel?.setMethodCallHandler(null)
         channel = MethodChannel(messenger, "aurai/html_game/$id")
@@ -251,18 +264,15 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                 "connect" -> {
                     visibilityRevision++
                     val insets = call.arguments as Map<*, *>
-                    val display = JSONObject.quote(if (fullscreen) "fullscreen" else "inline")
-                    val layout = "const root=document.documentElement;root.dataset.auraiDisplay=$display;" +
-                        "root.style.setProperty('--aurai-host-top-inset','${insets["topInset"]}px');" +
-                        "root.style.setProperty('--aurai-host-safe-top-inset','${insets["safeTopInset"]}px');" +
-                        "root.style.setProperty('--aurai-host-safe-bottom-inset','${insets["safeBottomInset"]}px');" +
-                        "root.style.setProperty('--aurai-host-right-inset','${insets["rightInset"]}px');" +
-                        "root.style.setProperty('--aurai-host-menu-width','${if (fullscreen) 0 else 38}px');" +
-                        "root.style.setProperty('--aurai-host-menu-height','${if (fullscreen) 0 else 36}px');"
+                    applyHostLayout(insets)
                     if (loaded) channel?.invokeMethod("ready", null)
                     else channel?.invokeMethod("requestDocument", null)
                     web.onResume()
-                    web.evaluateJavascript("(()=>{$layout document.dispatchEvent(new Event('aurai:displaychange')); window.dispatchEvent(new Event('resize')); window.__auraiMeasure?.(); window.__auraiLifecycle?.(false); AuraiGameBridge.editing(window.__auraiEditing?.()===true);})()", null)
+                    web.evaluateJavascript("(()=>{window.__auraiLifecycle?.(false); AuraiGameBridge.editing(window.__auraiEditing?.()===true);})()", null)
+                    result.success(null)
+                }
+                "layout" -> {
+                    applyHostLayout(call.arguments as Map<*, *>)
                     result.success(null)
                 }
                 "presentation" -> {
@@ -274,6 +284,10 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                 }
                 "theme" -> {
                     web.evaluateJavascript("document.getElementById('aurai-theme').textContent=" + JSONObject.quote(call.arguments as String) + "; window.dispatchEvent(new Event('resize'));", null)
+                    result.success(null)
+                }
+                "dataChanged" -> {
+                    web.evaluateJavascript("document.dispatchEvent(new Event('aurai:messageupdate'))", null)
                     result.success(null)
                 }
                 "state" -> {
@@ -312,6 +326,10 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
                         }
                     }
                 }
+                "reverseGeocode" -> {
+                    val args = call.arguments as Map<*, *>
+                    PhotoAddressResolver.resolve(web.context, (args["latitude"] as Number).toDouble(), (args["longitude"] as Number).toDouble(), result)
+                }
                 "dispose" -> pause { result.success(null) }
                 "visibility" -> {
                     if (call.arguments == true) {
@@ -334,6 +352,12 @@ class HtmlGameRuntime(context: Context, val identity: String, private val messag
         web.evaluateJavascript("window.__auraiLifecycle?.(true)") {
             if (!disposed && owner == lease && visibility == visibilityRevision) web.onPause()
             stateWriter.execute { web.post { done() } }
+        }
+    }
+
+    fun filesChanged(id: String) {
+        if (!disposed && appId == id) {
+            web.evaluateJavascript("document.dispatchEvent(new Event('aurai:messageupdate'))", null)
         }
     }
 

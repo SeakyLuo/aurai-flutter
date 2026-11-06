@@ -77,7 +77,12 @@ class MessageImageStore {
           await validateSvg(bytes);
         } else {
           final codec = await ui.instantiateImageCodec(bytes, targetWidth: 1);
-          codec.dispose();
+          try {
+            final frame = await codec.getNextFrame();
+            frame.image.dispose();
+          } finally {
+            codec.dispose();
+          }
         }
         final path =
             '$directory/${DateTime.now().microsecondsSinceEpoch}.$extension';

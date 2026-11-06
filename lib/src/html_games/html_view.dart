@@ -18,8 +18,10 @@ import 'html_store.dart';
 import 'html_game_surface.dart';
 import 'html_visibility_observer.dart';
 import 'html_route_observer.dart';
+import 'miniapp_task_host.dart';
 
 part 'html_view_presentation.dart';
+part 'html_view_previews.dart';
 
 class HtmlView extends StatefulWidget {
   const HtmlView({
@@ -79,21 +81,27 @@ class HtmlView extends StatefulWidget {
         : openFullscreen(context);
   }
 
-  Future<void> openFullscreen(BuildContext context) =>
-      Navigator.of(context).push<void>(
-        MaterialPageRoute(
-          builder: (_) => HtmlView(
-            card: card,
-            messageId: messageId,
-            conversationId: conversationId,
-            store: store,
-            surfaceId: surfaceId,
-            fullscreen: true,
-            backLabel: backLabel,
-            onOpenProfile: onOpenProfile,
+  Future<void> openFullscreen(BuildContext context) => Platform.isAndroid
+      ? MiniappTaskHost.openMessage(
+          title: card.title,
+          messageId: messageId,
+          conversationId: conversationId,
+        )
+      : Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) => HtmlView(
+              card: card,
+              messageId: messageId,
+              conversationId: conversationId,
+              store: store,
+              surfaceId: surfaceId,
+              fullscreen: true,
+              backLabel: backLabel,
+              onOpenProfile: onOpenProfile,
+            ),
           ),
-        ),
-      );
+        );
+
   @override
   State<HtmlView> createState() => _HtmlViewState();
 }
@@ -303,24 +311,6 @@ class _HtmlViewState extends State<HtmlView>
       }
     } on Object {
       await _close();
-    }
-  }
-
-  Future<void> _openProfile(String senderId) async {
-    if (_profileOpen) return;
-    _profileOpen = true;
-    _idleTimer?.cancel();
-    _idleTimer = null;
-    // Acknowledge the HTML click immediately; navigation completes on return.
-    unawaited(_showProfile(senderId));
-  }
-
-  Future<void> _showProfile(String senderId) async {
-    try {
-      await widget.onOpenProfile!(senderId);
-    } finally {
-      _profileOpen = false;
-      if (mounted) _scheduleVisibility();
     }
   }
 

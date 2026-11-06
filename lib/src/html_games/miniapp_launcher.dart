@@ -1,9 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'html_store.dart';
-import 'html_view.dart';
 import 'miniapp_library_store.dart';
-import 'miniapp_run_page.dart';
+import 'miniapp_task_host.dart';
 
 Future<void> openMiniapp(
   BuildContext context,
@@ -25,29 +24,19 @@ Future<void> openMiniapp(
     }
   }
   final launcher = current.draft ? await library.launcher(id) : null;
-  late final Widget page;
+  if (!context.mounted) return;
+  onReady?.call();
   if (launcher == null) {
-    final game = await library.loadIndependent(id);
-    page = MiniappRunPage(game: game, store: store);
+    await MiniappTaskHost.openApp(title: current.title, appId: id);
   } else {
     final messageId = launcher['message_id'] as String;
     final conversationId = launcher['conversation_id'] as String;
-    final card = await store.card(messageId);
     // Validate the original entry before navigating to its existing runtime.
     await store.load(conversationId, messageId);
-    page = HtmlView(
-      card: card,
+    await MiniappTaskHost.openMessage(
+      title: current.title,
       messageId: messageId,
       conversationId: conversationId,
-      store: store,
-      fullscreen: true,
-      backLabel: '返回小程序',
     );
   }
-  if (!context.mounted) return;
-  onReady?.call();
-  await Navigator.of(
-    context,
-    rootNavigator: true,
-  ).push<void>(MaterialPageRoute(builder: (_) => page));
 }

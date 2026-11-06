@@ -61,7 +61,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
+            android:taskAffinity="com.haiskynology.aurai"
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
@@ -77,6 +77,12 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Vivo otherwise shows only one recent task for the entire package.
+                 Keep the main task in the package affinity; miniapps use their own. -->
+            <meta-data android:name="enable_multi_task" android:value="true" />
+            <intent-filter>
+                <action android:name="vivo.action.recents.ENABLE_MULTI_TASK" />
             </intent-filter>
         </activity>
         <service

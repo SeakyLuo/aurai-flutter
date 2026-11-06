@@ -15,7 +15,7 @@ import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
 import 'miniapp_favorite_action.dart';
 
-/// Dormant UI entry: enabled only by MiniappTaskHost.openApp/openMessage.
+/// Task UI entry: opened by MiniappTaskHost.openApp/openMessage.
 class MiniappTaskApp extends StatelessWidget {
   const MiniappTaskApp({super.key});
   @override
@@ -47,6 +47,7 @@ class _TaskPageState extends State<_TaskPage> with WidgetsBindingObserver {
   bool _starting = false, _ready = false, _busy = false, _closing = false;
   bool _visible = true, _hasApp = false;
   String? _lastError;
+  EdgeInsets? _lastHostPadding;
 
   Future<T?> _request<T>(String method, [Object? arguments]) => _channel
       .invokeMethod<T>('request', {'method': method, 'arguments': arguments});
@@ -65,11 +66,14 @@ class _TaskPageState extends State<_TaskPage> with WidgetsBindingObserver {
       }
       setState(() => _ready = state['ready'] == true);
       final error = state['error'] as String?;
+      if (state['failed'] == true) {
+        await _close(error: error);
+        return;
+      }
       if (error != null && error != _lastError) {
         _lastError = error;
         _notice(error);
       }
-      if (state['failed'] == true) await _close();
     });
   }
 
@@ -89,6 +93,18 @@ class _TaskPageState extends State<_TaskPage> with WidgetsBindingObserver {
         ),
       );
     }
+    unawaited(_run(_syncHostLayout));
+  }
+
+  Future<void> _syncHostLayout() async {
+    final padding = MediaQuery.viewPaddingOf(context);
+    if (_surface == null || padding == _lastHostPadding) return;
+    _lastHostPadding = padding;
+    await _request<void>('layout', {
+      'topInset': padding.top + SettingsAppBar.toolbarHeight,
+      'safeTopInset': padding.top,
+      'safeBottomInset': padding.bottom,
+    });
   }
 
   void _notice(String text, {ToastKind kind = ToastKind.error}) {
@@ -101,7 +117,7 @@ class _TaskPageState extends State<_TaskPage> with WidgetsBindingObserver {
     try {
       await action();
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) await _close(error: errorMessage(error));
     }
   }
 
@@ -113,7 +129,7 @@ class _TaskPageState extends State<_TaskPage> with WidgetsBindingObserver {
           AppearanceSettings.instance.mode == ThemeMode.dark ||
           (AppearanceSettings.instance.mode == ThemeMode.system &&
               MediaQuery.platformBrightnessOf(context) == Brightness.dark);
-      final padding = MediaQuery.paddingOf(context);
+      final padding = MediaQuery.viewPaddingOf(context);
       final description = (await _request<Map>('prepare', {
         'dark': dark,
         'visible': _visible,
@@ -127,9 +143,10 @@ class _TaskPageState extends State<_TaskPage> with WidgetsBindingObserver {
         _surface = (description['surface'] as Map).cast<String, Object?>();
         _hasApp = description['hasApp'] as bool;
       });
+      await _syncHostLayout();
       await _request<void>('visibility', _visible);
     } on Object catch (error) {
-      if (mounted) _notice(errorMessage(error));
+      if (mounted) await _close(error: errorMessage(error));
     }
   }
 
@@ -142,17 +159,21 @@ class _TaskPageState extends State<_TaskPage> with WidgetsBindingObserver {
       unawaited(_run(() => _request('visibility', _visible)));
   }
 
-  Future<void> _close() async {
+  Future<void> _close({String? error}) async {
     if (_closing) return;
     _closing = true;
+    // Flush an attached form before native destruction releases its channel.
+    // A cold-start prepare still waiting for the controller must not block exit;
+    // native destruction releases that pending host session asynchronously.
+    var notice = error;
     try {
-      await _request<void>('close');
-    } on Object catch (error) {
-      _closing = false;
-      if (mounted) _notice(errorMessage(error));
-      return;
+      if (_surface != null) await _request<void>('close');
+    } on Object catch (closeError) {
+      final message = errorMessage(closeError);
+      notice = error == null ? message : '$error\n$message';
+    } finally {
+      await _channel.invokeMethod<void>('finish', notice);
     }
-    await _channel.invokeMethod<void>('finish');
   }
 
   Future<void> _more(BuildContext anchor) async {
@@ -225,8 +246,9 @@ class _TaskPageState extends State<_TaskPage> with WidgetsBindingObserver {
                   () => EagerGestureRecognizer(),
                 ),
               },
-              onPlatformViewCreated: (_) =>
-                  unawaited(_run(() => _request('bind'))),
+              onPlatformViewCreated: (_) {
+                if (!_closing) unawaited(_run(() => _request('bind')));
+              },
             ),
           if (!_ready)
             ColoredBox(
@@ -239,7 +261,7 @@ class _TaskPageState extends State<_TaskPage> with WidgetsBindingObserver {
               ),
             ),
           Positioned(
-            top: MediaQuery.paddingOf(context).top,
+            top: MediaQuery.viewPaddingOf(context).top,
             right: 16,
             height: SettingsAppBar.toolbarHeight,
             child: Center(
