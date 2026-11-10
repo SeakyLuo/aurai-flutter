@@ -10,7 +10,7 @@ class ToolSearch implements AgentTool, RuntimeCapabilityAgentTool {
   ToolDefinition get definition => const ToolDefinition(
     name: 'searchTools',
     description:
-        'Find tools by task, keyword or exact name. Searches both summaries and full descriptions; returns only names and brief summaries, never loads them. Start with offset 0; use nextOffset for more matches. Select needed tools with loadTools to receive their complete schemas on the next turn. Already supplied tools can be called directly. Available domains include web, images, music, miniapps, interactive cards, contacts, groups, memory, history, projects, Git, skills, scheduling, models and Android device operations. Search and loading grant no permission.',
+        'Find tools by task, keyword or exact name. Searches both summaries and full descriptions; returns only names and brief summaries, never loads them. Start with offset 0; use nextOffset for more matches. Select needed tools with loadTools to receive their complete schemas on the next turn. Already supplied tools can be called directly. Available domains include web, images, music, miniapps, MCP external apps (RandomMenu recipes, restaurants and visit records), interactive cards, contacts, groups, memory, history, projects, Git, skills, scheduling, models and Android device operations. Search and loading grant no permission.',
     inputSchema: {
       'type': 'object',
       'properties': {

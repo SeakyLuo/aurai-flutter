@@ -1,3 +1,4 @@
+import '../../mcp/mcp_settings_page.dart';
 import '../../app/glass_notice.dart';
 import '../../app/language_settings.dart';
 import 'default_models_page.dart';
@@ -145,6 +146,26 @@ class SettingsPage extends StatelessWidget {
                   MediaQuery.paddingOf(context).bottom + 16,
                 ),
                 children: [
+                  Material(
+                    color: settingsFieldColor(context),
+                    borderRadius: BorderRadius.circular(26),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      leading: const SettingsIcon(type: SettingsIconType.tools),
+                      title: const Text('MCP'),
+                      subtitle: const Text('连接外部应用和工具服务'),
+                      trailing: const SettingsIcon(
+                        type: SettingsIconType.chevron,
+                      ),
+                      onTap: () => Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const McpSettingsPage(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   Material(
                     color: settingsFieldColor(context),
                     borderRadius: BorderRadius.circular(26),

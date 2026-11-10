@@ -29,8 +29,8 @@ import 'member_avatar.dart';
 import 'settings_appearance.dart';
 import 'settings_icon.dart';
 
-class DirectConversationInfoPage extends StatefulWidget {
-  const DirectConversationInfoPage({
+class ConversationDetailsPage extends StatefulWidget {
+  const ConversationDetailsPage({
     super.key,
     required this.controller,
     required this.conversation,
@@ -50,12 +50,11 @@ class DirectConversationInfoPage extends StatefulWidget {
   final String? originTaskId;
 
   @override
-  State<DirectConversationInfoPage> createState() =>
-      _DirectConversationInfoPageState();
+  State<ConversationDetailsPage> createState() =>
+      _ConversationDetailsPageState();
 }
 
-class _DirectConversationInfoPageState
-    extends State<DirectConversationInfoPage> {
+class _ConversationDetailsPageState extends State<ConversationDetailsPage> {
   late Conversation _conversation = widget.conversation;
   AiProfile? _profile;
   bool _loading = true;

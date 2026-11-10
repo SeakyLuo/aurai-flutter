@@ -27,7 +27,7 @@ class MessageComposer extends StatelessWidget {
   final bool enabled;
   final bool inputLocked;
   final String hintText;
-  final Widget action;
+  final Widget? action;
   final Widget? leading;
   final Widget? attachments;
   final int? maxLength;
@@ -84,7 +84,7 @@ class MessageComposer extends StatelessWidget {
                               final singleLinePadding = EdgeInsets.fromLTRB(
                                 leading == null ? 16 : 48,
                                 0,
-                                48,
+                                action == null ? 16 : 48,
                                 0,
                               );
                               final painter =
@@ -203,11 +203,12 @@ class MessageComposer extends StatelessWidget {
                                         ),
                                       ),
                                     ),
-                                  Positioned(
-                                    right: 0,
-                                    bottom: 0,
-                                    child: action,
-                                  ),
+                                  if (action != null)
+                                    Positioned(
+                                      right: 0,
+                                      bottom: 0,
+                                      child: action!,
+                                    ),
                                 ],
                               );
                             },

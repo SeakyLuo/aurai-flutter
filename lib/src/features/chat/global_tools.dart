@@ -618,6 +618,7 @@ extension GlobalTools on ChatController {
             DocumentTool(_platform, name, access: documents),
           for (final update in [false, true])
             GitConfigurationTool(_platform, update),
+          for (final name in McpAgentTool.names) McpAgentTool(name),
           if (documents.project case final project?
               when project.directories.any((directory) => directory.managed))
             for (final name in ProjectDevelopmentTool.names)

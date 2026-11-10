@@ -1,4 +1,5 @@
 import '../../agent/run_task_tool.dart';
+import '../../mcp/mcp_agent_tool.dart';
 import '../../agent/run_subagent_tool.dart';
 import '../../agent/deferred_tool.dart';
 import '../../domain/web_sources.dart';

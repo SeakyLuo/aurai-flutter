@@ -11,7 +11,7 @@ import 'chat_controller.dart';
 import 'ai_contact_page.dart';
 import 'group_activity_sheet.dart';
 import 'group_info_page.dart';
-import 'direct_conversation_info_page.dart';
+import 'conversation_details_page.dart';
 import 'conversation_task_navigation.dart';
 import 'file_tool_icon.dart';
 import 'header_action_menu.dart';
@@ -512,7 +512,7 @@ class _ConversationMoreState extends State<ConversationMore> {
             originTaskId: widget.originTaskId,
             onPin: _pin,
           )
-        : DirectConversationInfoPage(
+        : ConversationDetailsPage(
             controller: widget.controller,
             conversation: _conversation,
             originTaskId: widget.originTaskId,

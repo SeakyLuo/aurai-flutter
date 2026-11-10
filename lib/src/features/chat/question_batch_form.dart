@@ -285,6 +285,7 @@ class QuestionBatchForm extends StatelessWidget {
               key: ValueKey(question['id']),
               text: text,
               enabled: !busy,
+              showSend: _immediateAnswer,
               hint: question['mode'] == 'text' ? '填写回答' : '或自行撰写回复',
               onSend: busy || text.trim().isEmpty ? null : advance,
               onChanged: (value) => controller.answer({
@@ -337,13 +338,14 @@ class _QuestionTextInput extends StatefulWidget {
     super.key,
     required this.text,
     required this.enabled,
+    required this.showSend,
     required this.hint,
     required this.onChanged,
     required this.onSend,
     this.autofocus = false,
   });
   final String text, hint;
-  final bool enabled;
+  final bool enabled, showSend;
   final bool autofocus;
   final ValueChanged<String> onChanged;
   final VoidCallback? onSend;
@@ -388,14 +390,16 @@ class _QuestionTextInputState extends State<_QuestionTextInput> {
       maxLength: 2000,
       hintText: widget.hint,
       onChanged: widget.onChanged,
-      action: RoundAction(
-        label: '发送回答',
-        inkResponse: false,
-        primary: true,
-        compact: true,
-        icon: Icons.arrow_upward_rounded,
-        onPressed: widget.onSend,
-      ),
+      action: widget.showSend
+          ? RoundAction(
+              label: '发送回答',
+              inkResponse: false,
+              primary: true,
+              compact: true,
+              icon: Icons.arrow_upward_rounded,
+              onPressed: widget.onSend,
+            )
+          : null,
     ),
   );
 }
