@@ -4,6 +4,9 @@ import '../app/glass_notice.dart';
 import '../features/chat/delete_confirmation_dialog.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
+import '../features/chat/glass_surface.dart';
+import '../features/chat/settings_text_field.dart';
+import '../features/chat/provider_api_key_field.dart';
 import '../scheduling/task_unsaved_dialog.dart';
 import 'mcp_client.dart';
 import 'mcp_settings.dart';
@@ -21,7 +24,7 @@ class _McpConnectionPageState extends State<McpConnectionPage> {
   late final _url = TextEditingController(text: _original.url);
   late final _token = TextEditingController(text: _original.token);
   late bool _enabled = _original.enabled;
-  bool _busy = false, _leaving = false, _showToken = false;
+  bool _busy = false, _leaving = false;
   McpClient? _testing;
   McpConnection get _value => McpConnection(
     id: _original.id,
@@ -128,32 +131,34 @@ class _McpConnectionPageState extends State<McpConnectionPage> {
   Widget _field(
     String label,
     TextEditingController controller, {
-    String? hint,
+    required String hint,
     bool secret = false,
   }) => Padding(
-    padding: const EdgeInsets.only(bottom: 24),
-    child: TextField(
-      controller: controller,
-      enabled: !_busy,
-      autocorrect: !secret && label == '连接名称',
-      enableSuggestions: !secret,
-      obscureText: secret && !_showToken,
-      keyboardType: label == '服务地址' ? TextInputType.url : TextInputType.text,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        suffixIcon: secret
-            ? IconButton(
-                tooltip: _showToken ? '隐藏令牌' : '显示令牌',
-                onPressed: () => setState(() => _showToken = !_showToken),
-                icon: SettingsIcon(
-                  type: _showToken
-                      ? SettingsIconType.eyeOff
-                      : SettingsIconType.eye,
-                ),
-              )
-            : null,
-      ),
+    padding: const EdgeInsets.only(bottom: 28),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SettingsFieldLabel(label),
+        if (secret)
+          ProviderApiKeyField(
+            controller: controller,
+            enabled: !_busy,
+            credentialLabel: '令牌',
+            decoration: settingsTextFieldDecoration(context, hint: hint),
+          )
+        else
+          TextField(
+            controller: controller,
+            enabled: !_busy,
+            autocorrect: label == '连接名称',
+            enableSuggestions: label == '连接名称',
+            keyboardType: label == '服务地址'
+                ? TextInputType.url
+                : TextInputType.text,
+            style: const TextStyle(fontSize: 16),
+            decoration: settingsTextFieldDecoration(context, hint: hint),
+          ),
+      ],
     ),
   );
   @override
@@ -168,16 +173,41 @@ class _McpConnectionPageState extends State<McpConnectionPage> {
         title: widget.connection == null ? '添加 MCP 连接' : 'MCP 连接',
         onBack: _busy ? null : _leave,
         actions: [
-          SettingsGlassAction(
-            label: '保存',
-            icon: Icons.check_rounded,
-            iconWidget: _busy
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const SettingsIcon(type: SettingsIconType.check),
-            onPressed: _busy ? null : _save,
+          SettingsGlassActionSurface(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RoundAction(
+                  label: '测试连接',
+                  icon: Icons.link,
+                  iconWidget: _testing != null
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const SettingsIcon(type: SettingsIconType.link),
+                  onPressed: _busy ? null : _test,
+                ),
+                SizedBox(
+                  height: 18,
+                  child: VerticalDivider(
+                    width: 1,
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+                RoundAction(
+                  label: '保存',
+                  icon: Icons.check_rounded,
+                  iconWidget: _busy && _testing == null
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const SettingsIcon(type: SettingsIconType.check),
+                  onPressed: _busy ? null : _save,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -188,27 +218,25 @@ class _McpConnectionPageState extends State<McpConnectionPage> {
             child: ListView(
               padding: settingsPagePadding(
                 context,
-                const EdgeInsets.fromLTRB(16, 16, 16, 40),
+                const EdgeInsets.fromLTRB(16, 20, 16, 40),
               ),
               children: [
-                _field('连接名称', _name, hint: '随机菜单'),
+                _field('连接名称', _name, hint: '例如：随机菜单'),
                 _field('服务地址', _url, hint: 'http://127.0.0.1:52147/mcp'),
-                _field('访问令牌', _token, secret: true),
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('允许 AI 使用'),
-                  subtitle: const Text('保存后生效；开启不代表服务当前在线'),
-                  value: _enabled,
-                  onChanged: _busy ? null : (v) => setState(() => _enabled = v),
-                ),
-                const SizedBox(height: 24),
-                OutlinedButton(
-                  onPressed: _busy ? null : _test,
-                  child: const Text('测试连接'),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  '使用 Streamable HTTP。随机菜单的地址和令牌可在其「我的 → MCP 连接」中复制。测试只检查当前填写的配置，不会保存。',
+                _field('访问令牌', _token, hint: '粘贴访问令牌', secret: true),
+                Material(
+                  color: settingsFieldColor(context),
+                  borderRadius: BorderRadius.circular(26),
+                  clipBehavior: Clip.antiAlias,
+                  child: SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    minTileHeight: 60,
+                    title: const Text('启用连接', style: TextStyle(fontSize: 15)),
+                    value: _enabled,
+                    onChanged: _busy
+                        ? null
+                        : (value) => setState(() => _enabled = value),
+                  ),
                 ),
                 if (widget.connection != null) ...[
                   const SizedBox(height: 32),

@@ -8,10 +8,12 @@ class ProviderApiKeyField extends StatefulWidget {
     required this.controller,
     required this.enabled,
     required this.decoration,
+    this.credentialLabel = '密钥',
   });
   final TextEditingController controller;
   final bool enabled;
   final InputDecoration decoration;
+  final String credentialLabel;
   @override
   State<ProviderApiKeyField> createState() => _ProviderApiKeyFieldState();
 }
@@ -42,7 +44,9 @@ class _ProviderApiKeyFieldState extends State<ProviderApiKeyField> {
               onPressed: widget.enabled
                   ? () => setState(() => _obscure = !_obscure)
                   : null,
-              tooltip: _obscure ? '显示密钥' : '隐藏密钥',
+              tooltip: _obscure
+                  ? '显示${widget.credentialLabel}'
+                  : '隐藏${widget.credentialLabel}',
               icon: SettingsIcon(
                 type: _obscure ? SettingsIconType.eye : SettingsIconType.eyeOff,
               ),

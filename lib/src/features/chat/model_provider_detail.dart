@@ -1,5 +1,6 @@
 import 'provider_settings_draft.dart';
 import 'provider_api_key_field.dart';
+import 'settings_text_field.dart';
 import 'speech_api_settings_page.dart';
 import '../../providers/request_adapter_runner.dart';
 import 'package:flutter/foundation.dart';
@@ -509,31 +510,12 @@ class _ModelProviderDetailState extends State<ModelProviderDetail> {
     required String hint,
     Widget? prefixIcon,
     Widget? suffixIcon,
-  }) {
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(26),
-      borderSide: BorderSide.none,
-    );
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: TextStyle(
-        fontSize: 15,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-      filled: true,
-      fillColor: settingsFieldColor(context),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
-      prefixIcon: prefixIcon,
-      prefixIconConstraints: prefixIcon == null
-          ? null
-          : const BoxConstraints(minWidth: 60, minHeight: 48),
-      border: border,
-      enabledBorder: border,
-      focusedBorder: border,
-      disabledBorder: border,
-      suffixIcon: suffixIcon,
-    );
-  }
+  }) => settingsTextFieldDecoration(
+    context,
+    hint: hint,
+    prefixIcon: prefixIcon,
+    suffixIcon: suffixIcon,
+  );
 
   Widget _apiKeyField({TextEditingController? controller, String? hint}) =>
       ProviderApiKeyField(
@@ -701,16 +683,7 @@ class _Label extends StatelessWidget {
   const _Label(this.text);
   final String text;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-    child: Text(
-      text,
-      style: TextStyle(
-        fontSize: 15,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-    ),
-  );
+  Widget build(BuildContext context) => SettingsFieldLabel(text);
 }
 
 class _ModelChoice extends StatelessWidget {

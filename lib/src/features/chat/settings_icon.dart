@@ -36,6 +36,7 @@ enum SettingsIconType {
   chevronDown,
   back,
   check,
+  link,
   reset,
   tasks,
   execution,
@@ -500,6 +501,21 @@ class _SettingsIconPainter extends CustomPainter {
             ..lineTo(18, 12)
             ..moveTo(10, 18)
             ..lineTo(14, 18),
+          pen,
+        );
+      case SettingsIconType.link:
+        canvas.drawPath(
+          Path()
+            ..moveTo(10, 8)
+            ..lineTo(13, 5)
+            ..cubicTo(17, 1, 23, 7, 19, 11)
+            ..lineTo(16, 14)
+            ..moveTo(8, 10)
+            ..lineTo(5, 13)
+            ..cubicTo(1, 17, 7, 23, 11, 19)
+            ..lineTo(14, 16)
+            ..moveTo(8, 16)
+            ..lineTo(16, 8),
           pen,
         );
       case SettingsIconType.check:

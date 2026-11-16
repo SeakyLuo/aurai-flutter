@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app/glass_notice.dart';
+import '../widgets/empty_data_view.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
 import 'mcp_connection_page.dart';
@@ -59,11 +60,17 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     extendBodyBehindAppBar: true,
-    appBar: SettingsAppBar(title: 'MCP', onBack: () => Navigator.pop(context)),
-    floatingActionButton: FloatingActionButton(
-      tooltip: '添加连接',
-      onPressed: _loaded && !_busy ? () => _edit() : null,
-      child: const SettingsIcon(type: SettingsIconType.add),
+    appBar: SettingsAppBar(
+      title: 'MCP',
+      onBack: () => Navigator.pop(context),
+      actions: [
+        SettingsGlassAction(
+          label: '添加连接',
+          icon: Icons.add,
+          iconWidget: const SettingsIcon(type: SettingsIconType.add),
+          onPressed: _loaded && !_busy ? () => _edit() : null,
+        ),
+      ],
     ),
     body: SettingsPageBody(
       child: Center(
@@ -73,54 +80,64 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
               ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
               : ListenableBuilder(
                   listenable: _settings,
-                  builder: (context, _) => ListView(
-                    padding: settingsPagePadding(
-                      context,
-                      const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                    ),
-                    children: [
-                      Text(
-                        '连接外部应用，让 AI 调用它们提供的工具。',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 20),
-                      if (_settings.connections.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 48),
-                          child: Text(
-                            '还没有 MCP 连接，点击右下角添加。',
-                            textAlign: TextAlign.center,
+                  builder: (context, _) => _settings.connections.isEmpty
+                      ? Padding(
+                          padding: settingsPagePadding(
+                            context,
+                            const EdgeInsets.only(bottom: 24),
                           ),
-                        ),
-                      for (final connection in _settings.connections)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Material(
-                            color: settingsFieldColor(context),
-                            borderRadius: BorderRadius.circular(26),
-                            clipBehavior: Clip.antiAlias,
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.fromLTRB(
-                                18,
-                                10,
-                                12,
-                                10,
-                              ),
-                              title: Text(connection.name),
-                              subtitle: Text('${connection.url}\n允许 AI 使用'),
-                              isThreeLine: true,
-                              onTap: _busy ? null : () => _edit(connection),
-                              trailing: Switch.adaptive(
-                                value: connection.enabled,
-                                onChanged: _busy
-                                    ? null
-                                    : (value) => _enable(connection, value),
-                              ),
+                          child: EmptyDataView(
+                            title: '还没有 MCP 连接',
+                            description: '添加连接，让 AI 使用外部应用的工具',
+                            actionText: '添加连接',
+                            onAction: _busy ? null : () => _edit(),
+                          ),
+                        )
+                      : ListView(
+                          padding: settingsPagePadding(
+                            context,
+                            const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                          ),
+                          children: [
+                            Text(
+                              '连接外部应用，让 AI 调用它们提供的工具。',
+                              style: Theme.of(context).textTheme.bodyMedium,
                             ),
-                          ),
+                            const SizedBox(height: 20),
+                            for (final connection in _settings.connections)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Material(
+                                  color: settingsFieldColor(context),
+                                  borderRadius: BorderRadius.circular(26),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: ListTile(
+                                    contentPadding: const EdgeInsets.fromLTRB(
+                                      18,
+                                      10,
+                                      12,
+                                      10,
+                                    ),
+                                    title: Text(connection.name),
+                                    subtitle: Text(connection.url),
+                                    onTap: _busy
+                                        ? null
+                                        : () => _edit(connection),
+                                    trailing: Semantics(
+                                      label: '启用连接：${connection.name}',
+                                      child: Switch.adaptive(
+                                        value: connection.enabled,
+                                        onChanged: _busy
+                                            ? null
+                                            : (value) =>
+                                                  _enable(connection, value),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                    ],
-                  ),
                 ),
         ),
       ),
