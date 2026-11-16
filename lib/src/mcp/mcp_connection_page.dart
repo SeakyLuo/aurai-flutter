@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../app/glass_notice.dart';
 import '../features/chat/delete_confirmation_dialog.dart';
+import '../features/chat/dialog_action_button.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/settings_icon.dart';
 import '../features/chat/glass_surface.dart';
@@ -43,10 +44,20 @@ class _McpConnectionPageState extends State<McpConnectionPage> {
     }
   }
 
-  void _changed() => setState(() {});
+  void _changed() {
+    _cancelTest();
+    setState(() {});
+  }
+
+  void _cancelTest() {
+    final client = _testing;
+    _testing = null;
+    client?.close();
+  }
+
   @override
   void dispose() {
-    _testing?.close();
+    _cancelTest();
     for (final c in [_name, _url, _token]) {
       c.dispose();
     }
@@ -56,11 +67,13 @@ class _McpConnectionPageState extends State<McpConnectionPage> {
   void _notice(String text, {ToastKind kind = ToastKind.error}) =>
       AppToasts.show(SnackBar(content: Text(text)), kind: kind);
   void _pop() {
+    _cancelTest();
     setState(() => _leaving = true);
     Navigator.pop(context);
   }
 
   Future<void> _save() async {
+    _cancelTest();
     setState(() => _busy = true);
     try {
       await McpSettings.instance.save(_value);
@@ -74,6 +87,7 @@ class _McpConnectionPageState extends State<McpConnectionPage> {
 
   Future<void> _leave() async {
     if (_busy) return;
+    setState(_cancelTest);
     if (!_dirty) {
       _pop();
       return;
@@ -90,25 +104,27 @@ class _McpConnectionPageState extends State<McpConnectionPage> {
   }
 
   Future<void> _test() async {
-    setState(() => _busy = true);
-    final client = _testing = McpClient(_value);
+    final client = McpClient(_value);
+    setState(() => _testing = client);
     try {
       final result = await client.listTools();
-      if (mounted)
+      if (mounted && identical(_testing, client))
         _notice(
           '连接成功，已发现 ${(result['tools'] as List).length} 个工具${result['nextCursor'] == null ? '' : '，还有更多'}',
           kind: ToastKind.success,
         );
     } on Object catch (error) {
-      if (mounted) _notice(error.toString());
+      if (mounted && identical(_testing, client)) _notice(error.toString());
     } finally {
       client.close();
-      _testing = null;
-      if (mounted) setState(() => _busy = false);
+      if (mounted && identical(_testing, client)) {
+        setState(() => _testing = null);
+      }
     }
   }
 
   Future<void> _delete() async {
+    setState(_cancelTest);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => DeleteConfirmationDialog(
@@ -186,7 +202,7 @@ class _McpConnectionPageState extends State<McpConnectionPage> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const SettingsIcon(type: SettingsIconType.link),
-                  onPressed: _busy ? null : _test,
+                  onPressed: _busy || _testing != null ? null : _test,
                 ),
                 SizedBox(
                   height: 18,
@@ -198,7 +214,7 @@ class _McpConnectionPageState extends State<McpConnectionPage> {
                 RoundAction(
                   label: '保存',
                   icon: Icons.check_rounded,
-                  iconWidget: _busy && _testing == null
+                  iconWidget: _busy
                       ? const SizedBox.square(
                           dimension: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
@@ -240,14 +256,10 @@ class _McpConnectionPageState extends State<McpConnectionPage> {
                 ),
                 if (widget.connection != null) ...[
                   const SizedBox(height: 32),
-                  TextButton(
+                  DialogActionButton(
+                    text: '删除连接',
+                    role: DialogActionRole.destructive,
                     onPressed: _busy ? null : _delete,
-                    child: Text(
-                      '删除连接',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
                   ),
                 ],
               ],
