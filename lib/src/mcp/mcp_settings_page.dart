@@ -99,11 +99,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
                             const EdgeInsets.fromLTRB(16, 16, 16, 100),
                           ),
                           children: [
-                            Text(
-                              '连接外部应用，让 AI 调用它们提供的工具。',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 20),
+
                             for (final connection in _settings.connections)
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
