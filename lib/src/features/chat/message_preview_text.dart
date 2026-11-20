@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'markdown_preview_text.dart';
+import 'group_mention_text.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'cjk_strong_syntax.dart';
 
@@ -82,7 +83,9 @@ class MessagePreviewText extends StatelessWidget {
             ],
           ),
           maxLines: maxLines,
-          overflow: TextOverflow.ellipsis,
+          overflow: maxLines == null
+              ? TextOverflow.clip
+              : TextOverflow.ellipsis,
           textWidthBasis: textWidthBasis,
           style: style,
         );
@@ -115,18 +118,18 @@ class _FormattedMessagePreview extends StatelessWidget {
         children: [
           for (var i = 0; i < nodes.length; i++) ...[
             if (i > 0) const TextSpan(text: '\n'),
-            _span(nodes[i]),
+            _span(context, nodes[i]),
           ],
         ],
       ),
       maxLines: maxLines,
       textWidthBasis: textWidthBasis,
-      overflow: TextOverflow.ellipsis,
+      overflow: maxLines == null ? TextOverflow.clip : TextOverflow.ellipsis,
       style: style,
     );
   }
 
-  InlineSpan _span(md.Node node) {
+  InlineSpan _span(BuildContext context, md.Node node) {
     if (node is md.Text) return TextSpan(text: node.text);
     final element = node as md.Element;
     if (element.tag == 'br') return const TextSpan(text: '\n');
@@ -148,6 +151,10 @@ class _FormattedMessagePreview extends StatelessWidget {
         'em' => const TextStyle(fontStyle: FontStyle.italic),
         'del' => const TextStyle(decoration: TextDecoration.lineThrough),
         'code' => const TextStyle(fontFamily: 'monospace'),
+        'a'
+            when element.attributes['href']?.startsWith('aurai://member/') ==
+                true =>
+          groupMentionStyle(context),
         'a' => const TextStyle(fontWeight: FontWeight.w500),
         _ => null,
       },
@@ -156,7 +163,7 @@ class _FormattedMessagePreview extends StatelessWidget {
         for (var i = 0; i < children.length; i++) ...[
           if (i > 0 && block.contains(element.tag))
             TextSpan(text: element.tag == 'tr' ? ' · ' : '\n'),
-          _span(children[i]),
+          _span(context, children[i]),
         ],
       ],
     );

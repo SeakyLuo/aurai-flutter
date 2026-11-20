@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../features/chat/message_preview_text.dart';
 
 import '../features/chat/menu_press_highlight.dart';
 
@@ -62,8 +63,10 @@ class _MemoryEntryTileState extends State<MemoryEntryTile> {
               constraints: const BoxConstraints(minHeight: 48),
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Text(
-                  widget.text,
+                child: MessagePreviewText(
+                  text: widget.text,
+                  maxLines: null,
+                  formatted: true,
                   style: const TextStyle(fontSize: 16, height: 1.8),
                 ),
               ),

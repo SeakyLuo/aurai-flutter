@@ -2,6 +2,7 @@ import 'memory_source_list.dart';
 import '../app/glass_notice.dart';
 import '../features/chat/delete_confirmation_dialog.dart';
 import '../domain/error_message.dart';
+import '../domain/markdown_plain_text.dart';
 import 'package:flutter/material.dart';
 
 import 'memory_controller.dart';
@@ -25,7 +26,9 @@ class MemoryEditor extends StatefulWidget {
 }
 
 class MemoryEditorState extends State<MemoryEditor> {
-  late final original = widget.entry?['text'] as String? ?? '';
+  late final original = memberMentionsPlainText(
+    widget.entry?['text'] as String? ?? '',
+  );
   late final text = TextEditingController(text: original);
   bool busy = false;
   bool allowPop = false;

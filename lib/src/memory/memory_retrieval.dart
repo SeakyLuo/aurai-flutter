@@ -157,7 +157,7 @@ extension MemoryRetrieval on MemoryController {
       ),
       database.query(
         'messages',
-        columns: ['id', 'sender_id', 'created_at', 'text'],
+        columns: ['id', 'sender_id', 'created_at', 'text', 'markdown'],
         where: 'id IN (SELECT value FROM json_each(?))',
         whereArgs: [
           jsonEncode(rows.map((r) => r['message_id']).toSet().toList()),
@@ -208,6 +208,7 @@ extension MemoryRetrieval on MemoryController {
               ? (tools[row['tool_call_id']]?['started_at'])
               : (runs[row['run_id']]?['started_at']),
           'message_text': messages[row['message_id']]?['text'],
+          'message_markdown': messages[row['message_id']]?['markdown'] == 1,
           'tool_title': tools[row['tool_call_id']]?['title'],
           'parent_run_id': runs[row['run_id']]?['parent_run_id'],
           'focus_message_id':

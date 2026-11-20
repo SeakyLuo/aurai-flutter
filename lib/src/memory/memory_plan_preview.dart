@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../features/chat/message_preview_text.dart';
 import '../features/chat/settings_appearance.dart';
 import 'memory_plan.dart';
 
@@ -88,8 +89,10 @@ class _ChangeCard extends StatelessWidget {
             for (final text in change.before)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  text,
+                child: MessagePreviewText(
+                  text: text,
+                  maxLines: null,
+                  formatted: true,
                   style: TextStyle(
                     fontSize: deleting ? 16 : 14,
                     height: 1.5,
@@ -110,8 +113,10 @@ class _ChangeCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
             ],
-            Text(
-              change.text,
+            MessagePreviewText(
+              text: change.text,
+              maxLines: null,
+              formatted: true,
               style: const TextStyle(
                 fontSize: 16,
                 height: 1.5,
@@ -134,8 +139,10 @@ class _ChangeCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            change.reason,
+          MessagePreviewText(
+            text: change.reason,
+            maxLines: null,
+            formatted: true,
             style: TextStyle(
               fontSize: 13,
               height: 1.5,

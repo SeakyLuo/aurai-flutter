@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../app/glass_notice.dart';
+import '../features/chat/group_mention_text.dart';
+import '../features/chat/message_preview_text.dart';
 import '../features/chat/settings_icon.dart';
 import '../features/chat/settings_appearance.dart';
 import '../features/chat/member_avatar.dart';
-import '../features/chat/conversation_menu_icon.dart';
 import '../domain/message_sender.dart';
 import 'memory_controller.dart';
 import 'memory_toast.dart';
@@ -95,6 +96,18 @@ class _MemorySourceListState extends State<MemorySourceList> {
         : source['message_id'] != null
         ? '原始消息'
         : '任务执行记录';
+    final hasMessage = available && text != null && text.trim().isNotEmpty;
+    final markdown = hasMessage && source['message_markdown'] == true;
+    final preview = hasMessage
+        ? text
+        : available && source['tool_call_id'] != null
+        ? '工具执行：${source['tool_title']}'
+        : label;
+    final previewStyle = TextStyle(
+      fontSize: 14,
+      height: 1.5,
+      color: colors.onSurfaceVariant,
+    );
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Material(
@@ -138,60 +151,59 @@ class _MemorySourceListState extends State<MemorySourceList> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        !available
-                            ? '原始记录已删除'
-                            : text != null && text.trim().isNotEmpty
-                            ? text.replaceAll(RegExp(r'\s+'), ' ').trim()
-                            : source['tool_call_id'] != null
-                            ? '工具执行：${source['tool_title']}'
-                            : label,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          height: 1.5,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                if (markdown)
+                  MessagePreviewText(
+                    text: preview,
+                    formatted: true,
+                    maxLines: 3,
+                    style: previewStyle,
+                  )
+                else
+                  GroupMentionText(
+                    text: preview.replaceAll(RegExp(r'\s+'), ' ').trim(),
+                    members: const {},
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: previewStyle,
+                  ),
                 if (source['title'] != null) ...[
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      SizedBox.square(
-                        dimension: 16,
-                        child: FittedBox(
-                          child:
-                              source['conversation_kind'] != 'group' &&
-                                  source['personal_chat'] != 1
-                              ? SettingsIcon(
-                                  type: SettingsIconType.job,
-                                  color: colors.onSurfaceVariant,
-                                )
-                              : ConversationMenuIcon(
-                                  type: source['conversation_kind'] == 'group'
-                                      ? ConversationMenuIconType.members
-                                      : ConversationMenuIconType.profile,
-                                  color: colors.onSurfaceVariant,
-                                ),
-                        ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: canOpen ? settingsFieldColor(context) : null,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Padding(
+                      padding: canOpen
+                          ? const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            )
+                          : EdgeInsets.zero,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '来自 ${source['title']}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: secondaryStyle,
+                            ),
+                          ),
+                          if (canOpen) ...[
+                            const SizedBox(width: 2),
+                            SizedBox.square(
+                              dimension: 16,
+                              child: SettingsIcon(
+                                type: SettingsIconType.chevron,
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          source['title'] as String,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: secondaryStyle,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ],
