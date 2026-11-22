@@ -1,6 +1,13 @@
 import 'package:flutter/widgets.dart';
 import 'chat_controller.dart';
 
+typedef MessageAttachmentSelection = ({
+  BuildContext context,
+  String quoteText,
+  Widget Function(double maxHeight) preview,
+  Future<void> Function() copy,
+});
+
 class ImageActionScope extends InheritedWidget {
   const ImageActionScope({
     super.key,
@@ -20,13 +27,21 @@ class ImageMessageScope extends InheritedWidget {
   const ImageMessageScope({
     super.key,
     required this.messageId,
+    required this.onOpenMessageMenu,
     required super.child,
   });
   final String messageId;
-  static String? of(BuildContext context) => context
-      .dependOnInheritedWidgetOfExactType<ImageMessageScope>()
-      ?.messageId;
+  final Future<void> Function({MessageAttachmentSelection? attachment})?
+  onOpenMessageMenu;
+  static String? of(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<ImageMessageScope>()?.messageId;
+  static Future<void> Function({MessageAttachmentSelection? attachment})?
+  messageMenuOf(BuildContext context) => context
+      .getInheritedWidgetOfExactType<ImageMessageScope>()
+      ?.onOpenMessageMenu;
+
   @override
   bool updateShouldNotify(ImageMessageScope oldWidget) =>
-      messageId != oldWidget.messageId;
+      messageId != oldWidget.messageId ||
+      onOpenMessageMenu != oldWidget.onOpenMessageMenu;
 }

@@ -6,6 +6,8 @@ import android.os.Bundle
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
@@ -84,6 +86,12 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         if (current === this) current = null
         super.onDestroy()
+    }
+
+    fun setStatusBarVisible(visible: Boolean) {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        val statusBars = WindowInsetsCompat.Type.statusBars()
+        if (visible) controller.show(statusBars) else controller.hide(statusBars)
     }
 
     fun requestVpnPermission(intent: Intent) {

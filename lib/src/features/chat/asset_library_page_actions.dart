@@ -94,63 +94,12 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
     Offset? position,
     VoidCallback? closePreview,
   }) async {
-    final action = await showHeaderActionMenu(
+    final action = await showAssetActionsMenu(
       buttonContext,
       position: position,
-      destructiveValues: {'delete'},
-      separatorBeforeValues: {if (!widget.trash) 'rename', 'delete'},
-      items: [
-        if (widget.trash)
-          (
-            value: 'restore',
-            label: '恢复',
-            icon: const QuestionIcon(type: QuestionIconType.undo),
-          )
-        else ...[
-          (
-            value: 'forward',
-            label: '转发',
-            icon: const AttachmentActionIcon(
-              type: AttachmentActionIconType.forward,
-            ),
-          ),
-          (
-            value: 'save',
-            label: '下载',
-            icon: const AttachmentActionIcon(
-              type: AttachmentActionIconType.download,
-            ),
-          ),
-        ],
-        if (asset.conversationId != null && asset.messageId != null)
-          (
-            value: 'locate',
-            label: '定位消息',
-            icon: const AttachmentActionIcon(
-              type: AttachmentActionIconType.locate,
-            ),
-          ),
-        if (!widget.trash)
-          (
-            value: 'rename',
-            label: '重命名',
-            icon: const ConversationMenuIcon(
-              type: ConversationMenuIconType.rename,
-            ),
-          ),
-        (
-          value: 'info',
-          label: '查看信息',
-          icon: const SettingsIcon(type: SettingsIconType.info),
-        ),
-        (
-          value: 'delete',
-          label: widget.trash ? '彻底删除' : '移入回收站',
-          icon: const ConversationMenuIcon(
-            type: ConversationMenuIconType.delete,
-          ),
-        ),
-      ],
+      canLocate: asset.conversationId != null && asset.messageId != null,
+      canManageAsset: true,
+      trash: widget.trash,
     );
     if (!mounted) return null;
     switch (action) {
@@ -185,7 +134,12 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
       return;
     }
     final provider = localImageProvider(asset.path);
-    final size = await loadPreviewImageSize(provider, context);
+    final Size size;
+    try {
+      size = await loadPreviewImageSize(provider, context);
+    } on PathNotFoundException {
+      return;
+    }
     if (!mounted) return;
     var currentAsset = asset;
     await Navigator.push<void>(
@@ -245,30 +199,21 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
   }
 
   Future<void> _save(LibraryAsset asset, {bool notify = true}) async {
-    final support = await getApplicationSupportDirectory();
-    final directory = await Directory(
-      '${support.path}/downloads/${asset.id}',
-    ).create(recursive: true);
-    final name = asset.isImage && !asset.name.contains('.')
-        ? '${asset.name}.${extensionFromMime(asset.mimeType)}'
-        : asset.name;
-    await File(asset.path).copy('${directory.path}/$name');
+    await _library.download(asset);
     if (mounted && notify) _notice('已保存到应用下载目录', kind: ToastKind.success);
   }
 
   Future<void> _delete(List<String> ids, {VoidCallback? onDeleted}) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => DeleteConfirmationDialog(
-        title: widget.trash
-            ? '彻底删除 ${ids.length} 项资料？'
-            : '将 ${ids.length} 项资料移入回收站？',
-        description: widget.trash
-            ? '彻底删除后无法恢复。已发送的聊天附件会保留。'
-            : '可在回收站中恢复。已发送的聊天附件会保留。',
-        confirmLabel: widget.trash ? '彻底删除' : '移入回收站',
-      ),
-    );
+    final confirmed = widget.trash
+        ? await showDialog<bool>(
+            context: context,
+            builder: (_) => DeleteConfirmationDialog(
+              title: '彻底删除 ${ids.length} 项资料？',
+              description: '彻底删除后无法恢复。已发送的聊天附件会保留。',
+              confirmLabel: '彻底删除',
+            ),
+          )
+        : await confirmAssetTrash(context, ids.length);
     if (confirmed != true || !mounted) return;
     await _mutate(
       () => widget.trash ? _library.purge(ids) : _library.moveToTrash(ids),
@@ -279,15 +224,11 @@ extension _AssetLibraryPageActions on _AssetLibraryPageState {
       _notice('已彻底删除', kind: ToastKind.success);
       return;
     }
-    ScaffoldMessenger.of(context).showToast(
-      SnackBar(
-        content: const Text('已移入回收站'),
-        action: SnackBarAction(
-          label: '撤销',
-          onPressed: () => _perform(() => _restore(ids)),
-        ),
-      ),
-      kind: ToastKind.success,
+    showAssetTrashed(
+      ScaffoldMessenger.of(context),
+      () => mounted
+          ? _mutate(() => _library.restore(ids))
+          : _library.restore(ids),
     );
   }
 

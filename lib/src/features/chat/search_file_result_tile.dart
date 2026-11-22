@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../storage/attachment_search.dart';
 import 'attachment_action_icon.dart';
+import 'attachment_actions.dart';
+import 'menu_press_highlight.dart';
 import 'image_attachments.dart';
 
 class SearchFileResultTile extends StatelessWidget {
@@ -20,7 +22,7 @@ class SearchFileResultTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Material(
+    final tile = Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
@@ -36,6 +38,7 @@ class SearchFileResultTile extends StatelessWidget {
                   child: result.image != null
                       ? ImageAttachment(
                           image: result.image!,
+                          sourceMessageId: result.messageId,
                           gallery: [result.image!],
                           size: 56,
                           borderRadius: 11,
@@ -83,5 +86,18 @@ class SearchFileResultTile extends StatelessWidget {
         ),
       ),
     );
+    final file = result.file;
+    return file == null
+        ? tile
+        : MenuPressHighlight(
+            borderRadius: BorderRadius.circular(12),
+            onLongPressStart: (details) => openAttachmentActions(
+              context,
+              details.globalPosition,
+              file: file,
+              sourceMessageId: result.messageId,
+            ),
+            child: tile,
+          );
   }
 }

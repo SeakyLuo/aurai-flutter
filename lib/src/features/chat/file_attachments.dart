@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 import '../../domain/message_file.dart';
 import '../../platform/message_file_store.dart';
 import 'file_type_icon.dart';
+import 'attachment_actions.dart';
+import 'menu_press_highlight.dart';
 import 'question_icon.dart';
 import 'settings_appearance.dart';
 
@@ -45,6 +47,7 @@ class FileAttachmentCard extends StatelessWidget {
     required this.file,
     this.onRemove,
     this.onOpen,
+    this.sourceMessageId,
     this.title,
     this.vertical = false,
   });
@@ -53,11 +56,7 @@ class FileAttachmentCard extends StatelessWidget {
   final VoidCallback? onOpen;
   final MessageFile file;
   final VoidCallback? onRemove;
-  String get _size => file.size < 1024
-      ? '${file.size} B'
-      : file.size < 1024 * 1024
-      ? '${(file.size / 1024).toStringAsFixed(1)} KB'
-      : '${(file.size / (1024 * 1024)).toStringAsFixed(1)} MB';
+  final String? sourceMessageId;
   Widget _labels(BuildContext context) => Column(
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: vertical
@@ -82,7 +81,7 @@ class FileAttachmentCard extends StatelessWidget {
             ? '小程序'
             : file.name.contains('.')
             ? file.name.split('.').last.toUpperCase()
-            : '文件'} · $_size',
+            : '文件'} · ${file.sizeLabel}',
         textAlign: vertical ? TextAlign.center : TextAlign.start,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -96,61 +95,75 @@ class FileAttachmentCard extends StatelessWidget {
   );
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: settingsFieldColor(context),
+  Widget build(BuildContext context) => MenuPressHighlight(
     borderRadius: BorderRadius.circular(18),
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: () async {
-        onOpen?.call();
-        try {
-          await MessageFileStore.open(file);
-        } on PlatformException catch (error) {
-          if (context.mounted)
-            ScaffoldMessenger.of(context).showToast(
-              SnackBar(
-                content: Text(error.message ?? '附件无法打开：${errorMessage(error)}'),
-              ),
-              kind: ToastKind.error,
-            );
-        }
-      },
-      child: Padding(
-        padding: vertical
-            ? const EdgeInsets.fromLTRB(12, 12, 12, 12)
-            : const EdgeInsets.only(left: 12, top: 10, bottom: 10, right: 6),
-        child: vertical
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: Center(
-                      child: SizedBox.square(
-                        dimension: 32,
-                        child: FittedBox(child: FileTypeIcon(file: file)),
-                      ),
-                    ),
+    onLongPressStart: (details) => openAttachmentActions(
+      context,
+      details.globalPosition,
+      file: file,
+      sourceMessageId: sourceMessageId,
+      onRemove: onRemove,
+    ),
+    child: Material(
+      color: settingsFieldColor(context),
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () async {
+          onOpen?.call();
+          try {
+            await MessageFileStore.open(file);
+          } on PlatformException catch (error) {
+            if (context.mounted)
+              ScaffoldMessenger.of(context).showToast(
+                SnackBar(
+                  content: Text(
+                    error.message ?? '附件无法打开：${errorMessage(error)}',
                   ),
-                  const SizedBox(height: 8),
-                  _labels(context),
-                ],
-              )
-            : Row(
-                children: [
-                  FileTypeIcon(file: file),
-                  const SizedBox(width: 10),
-                  Expanded(child: _labels(context)),
-                  if (onRemove != null)
-                    SizedBox.square(
-                      dimension: 44,
-                      child: IconButton(
-                        tooltip: '移除附件',
-                        onPressed: onRemove,
-                        icon: const QuestionIcon(type: QuestionIconType.close),
+                ),
+                kind: ToastKind.error,
+              );
+          }
+        },
+        child: Padding(
+          padding: vertical
+              ? const EdgeInsets.fromLTRB(12, 12, 12, 12)
+              : const EdgeInsets.only(left: 12, top: 10, bottom: 10, right: 6),
+          child: vertical
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: SizedBox.square(
+                          dimension: 32,
+                          child: FittedBox(child: FileTypeIcon(file: file)),
+                        ),
                       ),
                     ),
-                ],
-              ),
+                    const SizedBox(height: 8),
+                    _labels(context),
+                  ],
+                )
+              : Row(
+                  children: [
+                    FileTypeIcon(file: file),
+                    const SizedBox(width: 10),
+                    Expanded(child: _labels(context)),
+                    if (onRemove != null)
+                      SizedBox.square(
+                        dimension: 44,
+                        child: IconButton(
+                          tooltip: '移除附件',
+                          onPressed: onRemove,
+                          icon: const QuestionIcon(
+                            type: QuestionIconType.close,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+        ),
       ),
     ),
   );

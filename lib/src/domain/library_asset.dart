@@ -68,13 +68,7 @@ class LibraryAsset {
       MessageImage(path: path, mimeType: mimeType, name: name);
   MessageFile get file =>
       MessageFile(path: path, name: name, mimeType: mimeType, size: size!);
-  String get sizeLabel => size == null
-      ? '图片'
-      : size! < 1024
-      ? '$size B'
-      : size! < 1024 * 1024
-      ? '${(size! / 1024).toStringAsFixed(1)} KB'
-      : '${(size! / (1024 * 1024)).toStringAsFixed(1)} MB';
+  String get sizeLabel => size == null ? '图片' : attachmentSizeLabel(size!);
 
   factory LibraryAsset.fromRow(Map<String, Object?> row, String directory) =>
       LibraryAsset(

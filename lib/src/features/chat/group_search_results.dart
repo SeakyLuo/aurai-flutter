@@ -156,6 +156,7 @@ class GroupSearchResults extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 6),
                           child: FileAttachmentCard(
                             file: file,
+                            sourceMessageId: r.id,
                             title: _highlight(
                               context,
                               file.name,

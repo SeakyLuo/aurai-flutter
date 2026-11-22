@@ -45,6 +45,7 @@ class SearchAttachmentTile extends StatelessWidget {
                   height: compact ? math.min(constraints.maxWidth, 144) : 84,
                   child: FileAttachmentCard(
                     file: result.file!,
+                    sourceMessageId: result.messageId,
                     onOpen: onOpen,
                     vertical: compact,
                   ),

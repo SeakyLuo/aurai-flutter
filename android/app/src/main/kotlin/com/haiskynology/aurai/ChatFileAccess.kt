@@ -1,11 +1,14 @@
 package com.haiskynology.aurai
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -19,6 +22,7 @@ class ChatFileAccess(private val context: Context) {
     private var reply: MethodChannel.Result? = null
     private var remaining = 0
     private var directory = ""
+    private var clipboardCache: File? = null
 
     fun handle(call: MethodCall, result: MethodChannel.Result): Boolean {
         when (call.method) {
@@ -50,6 +54,7 @@ class ChatFileAccess(private val context: Context) {
                     result.success(null)
                 } catch (error: Exception) { result.error("open_file", "无法打开附件，请检查是否安装了支持此文件的应用", null) }
             }
+            "copyChatAttachment" -> copyAttachment(call, result)
             "readChatFile" -> worker.execute {
                 try {
                     val output = ChatFileReader.read(context, attachment(call.argument<String>("path")!!),
@@ -61,6 +66,47 @@ class ChatFileAccess(private val context: Context) {
             else -> return false
         }
         return true
+    }
+
+    private fun copyAttachment(call: MethodCall, result: MethodChannel.Result) {
+        val name = call.argument<String>("name")!!
+        val mimeType = call.argument<String>("mimeType")!!
+        val path = call.argument<String>("path")
+        worker.execute {
+            var cached: File? = null
+            try {
+                val file = if (path != null) {
+                    attachment(path)
+                } else {
+                    val folder = File(context.cacheDir, "attachment_clipboard").apply { mkdirs() }
+                    val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
+                    File.createTempFile("attachment-", extension?.let { ".$it" }, folder).also {
+                        cached = it
+                        it.writeBytes(call.argument<ByteArray>("bytes")!!)
+                    }
+                }
+                require(file.isFile) { "附件文件已丢失" }
+                val uri = FileProvider.getUriForFile(
+                    context, "${context.packageName}.source_files", file, name
+                )
+                main.post {
+                    try {
+                        val clipboard = context.getSystemService(ClipboardManager::class.java)
+                        clipboard.setPrimaryClip(ClipData(name, arrayOf(mimeType), ClipData.Item(uri)))
+                        val previous = clipboardCache
+                        clipboardCache = cached
+                        if (previous != null) worker.execute { previous.delete() }
+                        result.success(null)
+                    } catch (error: Exception) {
+                        cached?.let { worker.execute { it.delete() } }
+                        result.error("copy_attachment", error.toString(), null)
+                    }
+                }
+            } catch (error: Exception) {
+                cached?.delete()
+                main.post { result.error("copy_attachment", error.toString(), null) }
+            }
+        }
     }
 
     private fun attachment(path: String): File {

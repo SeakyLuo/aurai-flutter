@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:mime/mime.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import '../domain/library_asset.dart';
 
@@ -53,6 +55,36 @@ class AssetLibrary {
       offset: offset,
     );
     return rows.map((row) => LibraryAsset.fromRow(row, directory)).toList();
+  }
+
+  Future<LibraryAsset?> activeAssetForPath(String path) async {
+    final rows = await database.query(
+      'assets',
+      where: 'file_name = ? AND deleted_at IS NULL AND purged = 0',
+      whereArgs: [File(path).uri.pathSegments.last],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    final asset = LibraryAsset.fromRow(rows.single, directory);
+    return asset.path == path ? asset : null;
+  }
+
+  Future<void> download(LibraryAsset asset) => downloadFile(
+    asset.path,
+    asset.isImage && !asset.name.contains('.')
+        ? '${asset.name}.${extensionFromMime(asset.mimeType)}'
+        : asset.name,
+  );
+
+  Future<void> downloadFile(String path, String name) async {
+    final support = await getApplicationSupportDirectory();
+    final id = File(path).uri.pathSegments.last;
+    final downloads = await Directory(
+      '${support.path}/downloads/$id',
+    ).create(recursive: true);
+    await File(
+      path,
+    ).copy('${downloads.path}/${File(name).uri.pathSegments.last}');
   }
 
   Future<void> rename(LibraryAsset asset, String name) async {

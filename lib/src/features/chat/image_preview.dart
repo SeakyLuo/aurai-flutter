@@ -1,20 +1,15 @@
-import '../../app/glass_notice.dart';
-import '../../domain/error_message.dart';
+import 'attachment_actions.dart';
 import 'unavailable_image.dart';
-import 'chat_controller.dart';
-import 'image_action_scope.dart';
-import 'image_forward_page.dart';
-import 'home_navigation.dart';
 import 'question_icon.dart';
 import 'settings_icon.dart';
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:photo_view/photo_view.dart';
 
 import 'glass_surface.dart';
-import 'image_actions_menu.dart';
-import '../../platform/preview_image_actions.dart';
 
 Future<Size> loadPreviewImageSize(
   ImageProvider image,
@@ -81,7 +76,6 @@ class _ImagePreviewState extends State<ImagePreview> {
   late final _pages = PageController(initialPage: widget.initialIndex);
   late int _index = widget.initialIndex;
 
-  bool _exporting = false;
   bool _controlsVisible = true;
   bool _menuOpen = false;
   int _pointers = 0;
@@ -97,13 +91,34 @@ class _ImagePreviewState extends State<ImagePreview> {
     _hideControls?.cancel();
     if (_menuOpen || _pointers > 0) return;
     _hideControls = Timer(const Duration(seconds: 5), () {
-      if (mounted) setState(() => _controlsVisible = false);
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      setState(() => _controlsVisible = false);
+      unawaited(_setStatusBarVisible(false));
     });
   }
 
   void _showControls() {
-    if (!_controlsVisible) setState(() => _controlsVisible = true);
+    if (!_controlsVisible) {
+      setState(() => _controlsVisible = true);
+      unawaited(_setStatusBarVisible(true));
+    }
     _scheduleHide();
+  }
+
+  Future<void> _setStatusBarVisible(bool visible) async {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android when !kIsWeb:
+        await const MethodChannel(
+          'com.haiskynology.aurai/platform',
+        ).invokeMethod<void>('setStatusBarVisible', visible);
+      case TargetPlatform.iOS when !kIsWeb:
+        await SystemChrome.setEnabledSystemUIMode(
+          SystemUiMode.manual,
+          overlays: [if (visible) SystemUiOverlay.top, SystemUiOverlay.bottom],
+        );
+      default:
+        break;
+    }
   }
 
   void _pointerDown(PointerDownEvent event) {
@@ -117,7 +132,7 @@ class _ImagePreviewState extends State<ImagePreview> {
   }
 
   Future<void> _openActions(Offset position) async {
-    if (_menuOpen || _exporting) return;
+    if (_menuOpen) return;
     _menuOpen = true;
     _showControls();
     try {
@@ -132,106 +147,23 @@ class _ImagePreviewState extends State<ImagePreview> {
     }
   }
 
-  Future<void> _showActions(Offset position) async {
-    if (_exporting) return;
-    final image = widget.images[_index];
-    final originMessageId = _index == widget.initialIndex
+  Future<void> _showActions(Offset position) => openAttachmentActions(
+    context,
+    position,
+    image: widget.images[_index],
+    sourceMessageId: _index == widget.initialIndex
         ? widget.initialOriginMessageId ?? widget.originMessageId
-        : widget.originMessageId;
-    if (image is FileImage && !await image.file.exists()) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showToast(
-          const SnackBar(content: Text('图片文件已丢失，无法保存或转发')),
-          kind: ToastKind.error,
-        );
-      return;
-    }
-    if (!mounted) return;
-    final controller = ImageActionScope.of(context);
-    ({String conversationId, String messageId})? origin;
-    try {
-      if (originMessageId != null || image is FileImage) {
-        origin = await controller.imageOrigin(
-          messageId: originMessageId,
-          path: image is FileImage ? image.file.path : null,
-        );
-      }
-    } on Object catch (error) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showToast(
-          SnackBar(content: Text('无法读取图片来源：${errorMessage(error)}')),
-          kind: ToastKind.error,
-        );
-    }
-    if (!mounted) return;
-    final action = await showImageActionsMenu(
-      context,
-      position,
-      canLocate: origin != null,
-    );
-    if (action == null || !mounted || _exporting) return;
-    if (action == 'share') {
-      final sent = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (_) =>
-              ImageForwardPage(controller: controller, image: image),
-        ),
-      );
-      if (sent == true && mounted)
-        ScaffoldMessenger.of(context).showToast(
-          const SnackBar(content: Text('已转发')),
-          kind: ToastKind.success,
-        );
-      return;
-    }
-    if (action == 'locate') {
-      final source = origin!;
-      try {
-        await openHomeConversation(
-          context,
-          controller,
-          source.conversationId,
-          messageId: source.messageId,
-        );
-      } on Object catch (error) {
-        if (mounted)
-          ScaffoldMessenger.of(context).showToast(
-            SnackBar(content: Text('无法定位原消息，可能已被删除：${errorMessage(error)}')),
-            kind: ToastKind.error,
-          );
-      }
-      return;
-    }
-    _exporting = true;
-    try {
-      final saved = await PreviewImageActions.perform(image, action);
-      if (mounted && action == 'save' && saved) {
-        ScaffoldMessenger.of(context).showToast(
-          const SnackBar(content: Text('图片已保存到应用目录')),
-          kind: ToastKind.success,
-        );
-      }
-    } on Object catch (error) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showToast(
-          SnackBar(
-            content: Text(
-              action == 'save'
-                  ? '图片保存失败，请重试：${errorMessage(error)}'
-                  : '无法转发图片，请重试：${errorMessage(error)}',
-            ),
-          ),
-          kind: ToastKind.error,
-        );
-    } finally {
-      _exporting = false;
-    }
-  }
+        : widget.originMessageId,
+    allowAssetManagement: true,
+    onTrashed: () {
+      if (ModalRoute.of(context)!.isCurrent) Navigator.pop(context);
+    },
+  );
 
   @override
   void dispose() {
     _hideControls?.cancel();
+    if (!_controlsVisible) unawaited(_setStatusBarVisible(true));
     _pages.dispose();
     super.dispose();
   }
@@ -266,6 +198,9 @@ class _ImagePreviewState extends State<ImagePreview> {
                     key: ValueKey(index),
                     image: widget.images[index],
                     heroTag: widget.heroTag,
+                    imageSize: index == widget.initialIndex
+                        ? widget.imageSize
+                        : null,
                     heroEnabled:
                         index == widget.initialIndex && index == _index,
                     onTap: () => Navigator.pop(context),
@@ -310,7 +245,7 @@ class _ImagePreviewState extends State<ImagePreview> {
                                       as RenderBox;
                               _openActions(
                                 box.localToGlobal(
-                                  Offset(box.size.width, box.size.height + 8),
+                                  Offset(box.size.width, box.size.height),
                                 ),
                               );
                             },
@@ -352,29 +287,49 @@ class _PreviewPage extends StatelessWidget {
     required this.image,
     required this.heroTag,
     required this.heroEnabled,
+    required this.imageSize,
     required this.onTap,
   });
   final ImageProvider image;
   final Object heroTag;
   final bool heroEnabled;
+  final Size? imageSize;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => PhotoView(
-    imageProvider: image,
-    wantKeepAlive: true,
-    heroAttributes: heroEnabled
-        ? PhotoViewHeroAttributes(
-            tag: heroTag,
-            createRectTween: (begin, end) => RectTween(begin: begin, end: end),
-            flightShuttleBuilder:
-                (flightContext, animation, direction, from, to) =>
-                    imagePreviewFlight(image, animation),
-          )
-        : null,
-    onTapUp: (_, _, _) => onTap(),
-    loadingBuilder: (_, _) =>
-        const Center(child: CircularProgressIndicator(color: Colors.white70)),
-    errorBuilder: (_, _, _) => const UnavailableImage(dark: true),
-  );
+  Widget build(BuildContext context) {
+    final size = imageSize;
+    if (size == null) {
+      return PhotoView(
+        imageProvider: image,
+        wantKeepAlive: true,
+        onTapUp: (_, _, _) => onTap(),
+        loadingBuilder: (_, _) => const Center(
+          child: CircularProgressIndicator(color: Colors.white70),
+        ),
+        errorBuilder: (_, _, _) => const UnavailableImage(dark: true),
+      );
+    }
+
+    // The first route frame needs the Hero even if the image stream is pending.
+    return PhotoView.customChild(
+      childSize: size,
+      wantKeepAlive: true,
+      heroAttributes: heroEnabled
+          ? PhotoViewHeroAttributes(
+              tag: heroTag,
+              createRectTween: (begin, end) =>
+                  RectTween(begin: begin, end: end),
+              flightShuttleBuilder: (_, animation, _, _, _) =>
+                  imagePreviewFlight(image, animation),
+            )
+          : null,
+      onTapUp: (_, _, _) => onTap(),
+      child: Image(
+        image: image,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => const UnavailableImage(dark: true),
+      ),
+    );
+  }
 }

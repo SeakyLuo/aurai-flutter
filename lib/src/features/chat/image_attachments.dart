@@ -3,6 +3,8 @@ import '../../platform/svg_image.dart';
 import '../../domain/error_message.dart';
 import 'unavailable_image.dart';
 import 'image_action_scope.dart';
+import 'attachment_actions.dart';
+import 'menu_press_highlight.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -13,9 +15,14 @@ export 'attachment_source_menu.dart';
 
 /// Keep message thumbnails compact while retaining every image in the viewer.
 class MessageImageGrid extends StatelessWidget {
-  const MessageImageGrid({super.key, required this.images});
+  const MessageImageGrid({
+    super.key,
+    required this.images,
+    this.sourceMessageId,
+  });
 
   final List<MessageImage> images;
+  final String? sourceMessageId;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -45,6 +52,7 @@ class MessageImageGrid extends StatelessWidget {
                         ImageAttachment(
                           image: images[i],
                           gallery: images,
+                          sourceMessageId: sourceMessageId,
                           size: size,
                         ),
                         if (i == 3 && images.length > 4)
@@ -110,6 +118,9 @@ class DraftImageAttachments extends StatelessWidget {
                 gallery: images,
                 size: 80,
                 borderRadius: 20,
+                onRemove: onRemove == null
+                    ? null
+                    : () => onRemove!(images[index]),
               ),
             ),
             Positioned(
@@ -159,13 +170,14 @@ class ImageAttachment extends StatefulWidget {
     this.borderRadius = 16,
     this.onOpen,
     this.sourceMessageId,
+    this.onRemove,
   });
   final MessageImage image;
   final List<MessageImage> gallery;
   final double size;
   final double? height;
   final double borderRadius;
-  final VoidCallback? onOpen;
+  final VoidCallback? onOpen, onRemove;
   final String? sourceMessageId;
 
   @override
@@ -207,7 +219,7 @@ class _ImageAttachmentState extends State<ImageAttachment> {
       if (!mounted) return;
       widget.onOpen?.call();
       final originMessageId = ImageMessageScope.of(context);
-      await Navigator.of(context).push<void>(
+      await Navigator.of(context, rootNavigator: true).push<void>(
         PageRouteBuilder<void>(
           opaque: false,
           transitionDuration: const Duration(milliseconds: 340),
@@ -238,33 +250,52 @@ class _ImageAttachmentState extends State<ImageAttachment> {
   }
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    button: true,
-    label: '查看图片',
-    child: Hero(
-      tag: _heroTag,
-      createRectTween: (begin, end) => RectTween(begin: begin, end: end),
-      flightShuttleBuilder: (flightContext, animation, direction, from, to) =>
-          imagePreviewFlight(localImageProvider(widget.image.path), animation),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(widget.borderRadius),
-        child: Material(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          child: InkWell(
-            onTap: _open,
-            child: Image(
-              image: ResizeImage.resizeIfNeeded(
-                (widget.size * MediaQuery.devicePixelRatioOf(context)).round(),
-                null,
-                localImageProvider(widget.image.path),
-              ),
-              width: widget.size,
-              height: widget.height ?? widget.size,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => SizedBox(
+  Widget build(BuildContext context) => MenuPressHighlight(
+    borderRadius: BorderRadius.circular(widget.borderRadius),
+    onLongPressStart: (details) => openAttachmentActions(
+      context,
+      details.globalPosition,
+      image: localImageProvider(widget.image.path),
+      imageName: widget.image.name,
+      imageMimeType: widget.image.mimeType,
+      imageNumber: widget.gallery.length > 1
+          ? widget.gallery.indexOf(widget.image) + 1
+          : null,
+      sourceMessageId: widget.sourceMessageId,
+      onRemove: widget.onRemove,
+    ),
+    child: Semantics(
+      button: true,
+      label: '查看图片',
+      child: Hero(
+        tag: _heroTag,
+        createRectTween: (begin, end) => RectTween(begin: begin, end: end),
+        flightShuttleBuilder: (flightContext, animation, direction, from, to) =>
+            imagePreviewFlight(
+              localImageProvider(widget.image.path),
+              animation,
+            ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(widget.borderRadius),
+          child: Material(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: InkWell(
+              onTap: _open,
+              child: Image(
+                image: ResizeImage.resizeIfNeeded(
+                  (widget.size * MediaQuery.devicePixelRatioOf(context))
+                      .round(),
+                  null,
+                  localImageProvider(widget.image.path),
+                ),
                 width: widget.size,
                 height: widget.height ?? widget.size,
-                child: const UnavailableImage(),
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => SizedBox(
+                  width: widget.size,
+                  height: widget.height ?? widget.size,
+                  child: const UnavailableImage(),
+                ),
               ),
             ),
           ),

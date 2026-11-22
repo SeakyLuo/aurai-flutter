@@ -206,6 +206,9 @@ class _MessageItemState extends State<MessageItem> {
       ? _taskSummary(context)
       : ImageMessageScope(
           messageId: message.id,
+          onOpenMessageMenu: widget.previewMaxHeight == null
+              ? _openActions
+              : null,
           child:
               widget.groupBubble &&
                   widget.onQuote != null &&
@@ -523,6 +526,11 @@ class _MessageItemState extends State<MessageItem> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        for (final file in message.files)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: FileAttachmentCard(file: file),
+          ),
         if (message.images.isNotEmpty)
           Padding(
             padding: EdgeInsets.only(bottom: message.text.isEmpty ? 0 : 8),

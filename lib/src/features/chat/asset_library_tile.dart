@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../../domain/library_asset.dart';
 import '../../platform/svg_image.dart';
@@ -6,6 +8,7 @@ import 'settings_appearance.dart';
 import 'settings_icon.dart';
 import 'unavailable_image.dart';
 import 'image_preview.dart';
+import 'menu_press_highlight.dart';
 
 class AssetLibraryTile extends StatelessWidget {
   const AssetLibraryTile({
@@ -20,7 +23,7 @@ class AssetLibraryTile extends StatelessWidget {
   });
   final LibraryAsset asset;
   final VoidCallback onTap, onSelect;
-  final ValueChanged<BuildContext> onMore;
+  final Future<void> Function(BuildContext, Offset?) onMore;
   final bool selectionMode, selected, grid;
 
   Widget _thumbnail() => asset.isImage
@@ -35,25 +38,28 @@ class AssetLibraryTile extends StatelessWidget {
               width: grid ? 480 : 144,
             ),
             fit: BoxFit.cover,
-            errorBuilder: (_, error, stack) => const UnavailableImage(),
+            errorBuilder: (_, error, _) => UnavailableImage(
+              label: error is PathNotFoundException ? '图片不存在' : '图片不可用',
+            ),
           ),
         )
       : Center(child: FileTypeIcon(file: asset.file));
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: settingsFieldColor(context),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(24),
-      side: selected && selectionMode
-          ? BorderSide(color: Theme.of(context).colorScheme.primary, width: 2)
-          : BorderSide.none,
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: Builder(
-      builder: (tileContext) => InkWell(
+  Widget build(BuildContext context) => MenuPressHighlight(
+    borderRadius: BorderRadius.circular(24),
+    onLongPressStart: (details) => onMore(context, details.globalPosition),
+    child: Material(
+      color: settingsFieldColor(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: selected && selectionMode
+            ? BorderSide(color: Theme.of(context).colorScheme.primary, width: 2)
+            : BorderSide.none,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
         onTap: selectionMode ? onSelect : onTap,
-        onLongPress: () => onMore(tileContext),
         child: grid && asset.isImage
             ? Semantics(
                 label: asset.name,
@@ -176,7 +182,7 @@ class AssetLibraryTile extends StatelessWidget {
           builder: (context) => IconButton(
             tooltip: '更多',
             icon: const SettingsIcon(type: SettingsIconType.more),
-            onPressed: () => onMore(context),
+            onPressed: () => onMore(context, null),
           ),
         ),
     ],

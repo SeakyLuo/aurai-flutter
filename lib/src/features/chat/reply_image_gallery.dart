@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'image_preview.dart';
+import 'attachment_actions.dart';
+import 'menu_press_highlight.dart';
 import 'attachment_action_icon.dart';
 
 class ReplyImageGalleryBuilder extends MarkdownElementBuilder {
@@ -117,8 +119,7 @@ class _ReplyImageCardState extends State<_ReplyImageCard> {
       final size = await loadPreviewImageSize(_provider, context);
       if (!mounted) return;
       final originMessageId = ImageMessageScope.of(context);
-      await Navigator.push<void>(
-        context,
+      await Navigator.of(context, rootNavigator: true).push<void>(
         PageRouteBuilder(
           opaque: false,
           transitionDuration: const Duration(milliseconds: 340),
@@ -158,53 +159,63 @@ class _ReplyImageCardState extends State<_ReplyImageCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Semantics(
-          button: true,
-          label: _image.title.isEmpty ? '查看参考图片' : _image.title,
-          child: GestureDetector(
-            onTap: _open,
-            child: Hero(
-              tag: _hero,
-              createRectTween: (begin, end) =>
-                  RectTween(begin: begin, end: end),
-              flightShuttleBuilder: (_, animation, direction, from, to) =>
-                  imagePreviewFlight(_provider, animation),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: SizedBox(
-                  height: widget.height,
-                  child: ColoredBox(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                    child: Image(
-                      image: _provider,
-                      key: ValueKey(_retry),
-                      fit: BoxFit.cover,
-                      frameBuilder: (context, child, frame, sync) =>
-                          frame == null
-                          ? const Center(
-                              child: SizedBox.square(
-                                dimension: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+        MenuPressHighlight(
+          borderRadius: BorderRadius.circular(16),
+          onLongPressStart: (details) => openAttachmentActions(
+            context,
+            details.globalPosition,
+            image: _provider,
+            imageName: _image.title.isEmpty ? null : _image.title,
+            imageNumber: widget.images.length > 1 ? widget.index + 1 : null,
+          ),
+          child: Semantics(
+            button: true,
+            label: _image.title.isEmpty ? '查看参考图片' : _image.title,
+            child: GestureDetector(
+              onTap: _open,
+              child: Hero(
+                tag: _hero,
+                createRectTween: (begin, end) =>
+                    RectTween(begin: begin, end: end),
+                flightShuttleBuilder: (_, animation, direction, from, to) =>
+                    imagePreviewFlight(_provider, animation),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: SizedBox(
+                    height: widget.height,
+                    child: ColoredBox(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                      child: Image(
+                        image: _provider,
+                        key: ValueKey(_retry),
+                        fit: BoxFit.cover,
+                        frameBuilder: (context, child, frame, sync) =>
+                            frame == null
+                            ? const Center(
+                                child: SizedBox.square(
+                                  dimension: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
-                              ),
-                            )
-                          : child,
-                      errorBuilder: (context, error, stack) {
-                        if (!_errorReported) {
-                          _errorReported = true;
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (mounted) _notice();
-                          });
-                        }
-                        return const Center(
-                          child: AttachmentActionIcon(
-                            type: AttachmentActionIconType.gallery,
-                          ),
-                        );
-                      },
+                              )
+                            : child,
+                        errorBuilder: (context, error, stack) {
+                          if (!_errorReported) {
+                            _errorReported = true;
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) _notice();
+                            });
+                          }
+                          return const Center(
+                            child: AttachmentActionIcon(
+                              type: AttachmentActionIconType.gallery,
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),

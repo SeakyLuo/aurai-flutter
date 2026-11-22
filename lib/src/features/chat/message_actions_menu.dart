@@ -38,6 +38,7 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   bool pinned = false,
   bool groupFavorite = false,
   bool allowCopy = true,
+  bool copyingAttachment = false,
   bool allowSelect = true,
   bool starred = false,
   bool allowEditing = true,
@@ -61,10 +62,11 @@ Future<MessageMenuResult?> showMessageActionsMenu(
   final allowSplit = split != null && split.supportsSplit;
   final canCopy =
       allowCopy &&
-      message.interactive == null &&
-      message.htmlGame == null &&
-      message.miniappShare == null &&
-      message.text.isNotEmpty;
+      (copyingAttachment ||
+          (message.interactive == null &&
+              message.htmlGame == null &&
+              message.miniappShare == null &&
+              message.text.isNotEmpty));
   final visibleKeys = recentQuickReplyKeys(recent, 5);
   return showMessageMenuSheet(
     context,

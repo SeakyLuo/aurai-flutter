@@ -104,6 +104,10 @@ class AuraiApplication : Application() {
 
     private fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "setStatusBarVisible" -> {
+                MainActivity.current?.setStatusBarVisible(call.arguments<Boolean>()!!)
+                result.success(null)
+            }
             "runMiniappProgram" -> Thread {
                 try {
                     val output = MiniappProgram.run(call.argument<String>("script")!!, call.argument<String>("input")!!)

@@ -14,6 +14,7 @@ class MessageFile {
   final String name;
   final String mimeType;
   final int size;
+  String get sizeLabel => attachmentSizeLabel(size);
   String get id => File(path).uri.pathSegments.last;
   Map<String, Object?> toJson() => {
     'fileName': id,
@@ -29,3 +30,9 @@ class MessageFile {
         size: json['size'] as int,
       );
 }
+
+String attachmentSizeLabel(int size) => size < 1024
+    ? '$size B'
+    : size < 1024 * 1024
+    ? '${(size / 1024).toStringAsFixed(1)} KB'
+    : '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';

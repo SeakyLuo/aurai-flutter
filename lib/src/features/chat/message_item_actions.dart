@@ -46,10 +46,13 @@ extension _FailureRetry on _MessageItemState {
 }
 
 extension _MessageItemActions on _MessageItemState {
-  void _quote({String? selectedText}) {
+  void _quote({String? selectedText, MessageAttachmentSelection? attachment}) {
     final heading = context
         .findAncestorWidgetOfExactType<GroupMessageHeading>();
     RenderBox sourceBox() {
+      if (attachment != null && attachment.context.mounted) {
+        return attachment.context.findRenderObject()! as RenderBox;
+      }
       RenderBox? row;
       if (heading != null) {
         context.visitAncestorElements((element) {
@@ -67,7 +70,7 @@ extension _MessageItemActions on _MessageItemState {
     final source = sourceBox();
     widget.onQuote!(
       message,
-      selectedText: selectedText,
+      selectedText: attachment?.quoteText ?? selectedText,
       visual: QuoteFocusVisual(
         createdAt: message.createdAt,
         rect: source.localToGlobal(Offset.zero) & source.size,
@@ -76,6 +79,9 @@ extension _MessageItemActions on _MessageItemState {
           return current.localToGlobal(Offset.zero) & current.size;
         },
         builder: (maxHeight) {
+          if (attachment != null) {
+            return IgnorePointer(child: attachment.preview(maxHeight));
+          }
           final preview = MessageItem(
             message: message,
             onEdit: null,
@@ -334,6 +340,7 @@ extension _MessageItemActions on _MessageItemState {
 
   Future<void> _openActions({
     MessageAction? directAction,
+    MessageAttachmentSelection? attachment,
     bool compactMenu = false,
     bool preserveSelection = false,
     VoidCallback? onActionSelected,
@@ -485,6 +492,7 @@ extension _MessageItemActions on _MessageItemState {
             pinned: groupMark?.pinned ?? false,
             groupFavorite: groupMark?.favorite ?? false,
             allowCopy: !preserveSelection,
+            copyingAttachment: attachment != null,
             allowSelect: !compactMenu && !_hasBubble,
             starred: starred,
             allowEditing:
@@ -675,8 +683,17 @@ extension _MessageItemActions on _MessageItemState {
       case MessageAction.recall:
         await widget.onRecall?.call(snapshot);
       case MessageAction.quote:
-        _quote(selectedText: preserveSelection ? _selectedText : null);
+        _quote(
+          selectedText: preserveSelection ? _selectedText : null,
+          attachment: attachment,
+        );
       case MessageAction.copy:
+        if (attachment != null) {
+          final copied = await runUiAction(context, attachment.copy);
+          if (copied && mounted)
+            _notice(context, '已复制附件', kind: ToastKind.success);
+          return;
+        }
         await _copy(
           context,
           _copyableText(

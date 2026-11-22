@@ -4,8 +4,6 @@ import '../../utils/widget_utils.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:mime/mime.dart';
 import '../../app/glass_notice.dart';
 import '../../domain/error_message.dart';
 import '../../domain/library_asset.dart';
@@ -26,6 +24,7 @@ import 'chat_controller.dart';
 import 'conversation_menu_icon.dart';
 import 'delete_confirmation_dialog.dart';
 import 'attachment_action_icon.dart';
+import 'image_actions_menu.dart';
 import 'conversation_icon.dart';
 import 'glass_surface.dart';
 import 'header_action_menu.dart';
@@ -134,7 +133,9 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
             assetImageRatio(asset).then(
               (ratio) => MapEntry(asset.path, ratio),
               onError: (Object error, StackTrace stack) async {
-                if (mounted && generation == _generation) {
+                if (error is! PathNotFoundException &&
+                    mounted &&
+                    generation == _generation) {
                   await _perform(() async {
                     Error.throwWithStackTrace(error, stack);
                   });
@@ -464,7 +465,8 @@ class _AssetLibraryPageState extends State<AssetLibraryPage> {
     selected: _selected.contains(asset.id),
     onSelect: () => _toggle(asset),
     onTap: () => _perform(() => _open(asset)),
-    onMore: (context) => _perform(() => _assetMenu(context, asset)),
+    onMore: (context, position) =>
+        _perform(() => _assetMenu(context, asset, position: position)),
   );
 
   void _closeSelection() {
